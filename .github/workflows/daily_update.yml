@@ -14,8 +14,26 @@ jobs:
       run: |
         cd "$GITHUB_WORKSPACE"
 
-        mkdir -p svn_browser
-        mkdir -p svn_trunk
-        mkdir -p MyJDownloaderClient
-        mkdir -p utils
+        mkdir -p ./svn_browser
+        mkdir -p ./svn_trunk
+        mkdir -p ./MyJDownloaderClient
+        mkdir -p ./utils
         
+        cd ./svn_browser/
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/browser"
+
+        cd ../svn_trunk
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/trunk"
+        
+        cd ../MyJDownloaderClient
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/MyJDownloaderClient"
+        
+        cd ../utils
+        svn checkout --force "svn://svn.appwork.org/utils"
+
+
+    - name: Check size
+      run: |
+        cd "$GITHUB_WORKSPACE"
+
+        du -sh *
