@@ -1,0 +1,21 @@
+name: Daily update of this mirror
+on: workflow_dispatch
+  #schedule:
+    #- cron:  '20 05 * * *'
+
+jobs:
+  update_mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Mirror
+      run: |
+        cd "$GITHUB_WORKSPACE"
+
+        mkdir -p svn_browser
+        mkdir -p svn_trunk
+        mkdir -p MyJDownloaderClient
+        mkdir -p utils
+        
