@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="themes"/>
+	<classpathentry kind="lib" path="libs/miglayout.jar"/>
+	<classpathentry kind="lib" path="libs/svgSalamander.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="libs/jsvg.jar" sourcepath="/tmp/.org.sf.feeling.decompiler1691745409643/source/jsvg-1.0.0-sources.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

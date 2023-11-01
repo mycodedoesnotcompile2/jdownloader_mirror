@@ -1,0 +1,31 @@
+action_tooltip=Abilita spegnimento del sistema a download completati
+addons_jdshutdown_statusmessage_disabled=JDownloader NON arresterà il sistema alla termine dei download
+addons_jdshutdown_statusmessage_enabled=JDownloader arresterà il sistema alla termine dei download
+config_active_by_default=Mantieni spegnimento abilitato
+config_toolbarbutton=Barra strumenti visibile
+gui_config_jdshutdown_close=Chiudi JD
+gui_config_jdshutdown_forceshutdown=Forza l'arresto (non per tutti i S.O.)
+gui_config_jdshutdown_hibernate=Iberna (non per tutti i S.O.)
+gui_config_jdshutdown_logoff=Disconnetti
+gui_config_jdshutdown_mode=Modo:
+gui_config_jdshutdown_shutdown=Spegni
+gui_config_jdshutdown_standby=Standby (non per tutti i S.O.)
+install_force=Installa spegnimento forzato
+install_msg=Preparare il sistema per la funzione spegnimento forzato?
+install_title=Installa spegnimento forzato
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">JDownloader verrà chiuso!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">Il sistema verra posto in ibernazione!</font></h2>
+interaction_shutdown_dialog_msg_logoff=<h2><font color="red">L'utente verrà disconnesso!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">Il sistema verrà spento!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">Il sistema verrà posto in standby!</font></h2>
+interaction_shutdown_dialog_title_closejd=Vuoi chiudere JD?
+interaction_shutdown_dialog_title_hibernate=Vuoi ibernare il PC?
+interaction_shutdown_dialog_title_logoff=Disconnettersi?
+interaction_shutdown_dialog_title_shutdown=Spegnere?
+interaction_shutdown_dialog_title_standby=Standby?
+jd_plugins_optional_jdshutdown=Chiusura JD
+jd_plugins_optional_jdshutdown_description=Spegni automaticamente, sospendi, iberna il tuo PC o chiudi JDownloader a download completati.
+lit_shutdownn=Spegni
+show_admin=Per configurare JDownload per ibernazione o standby sono richiesti i diritti di amministratore
+shutdown_toggle_action_disable=Disabilita estensione spegnimento dopo il download
+shutdown_toggle_action_enable=Abilita estensione spegnimento dopo i download

@@ -1,0 +1,59 @@
+package org.jdownloader.gui.packagehistorycontroller;
+
+import org.appwork.storage.Storable;
+import org.appwork.storage.StorableAllowPrivateAccessModifier;
+import org.appwork.utils.StringUtils;
+
+public class DownloadPath implements Storable, HistoryEntry {
+    @SuppressWarnings("unused")
+    @StorableAllowPrivateAccessModifier
+    private DownloadPath(/* Storable */) {
+    }
+
+    public DownloadPath(String myPath) {
+        name = myPath;
+        time = System.currentTimeMillis();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj != null && obj instanceof DownloadPath) {
+            return StringUtils.equals(getName(), ((DownloadPath) obj).getName());
+        }
+        return false;
+    }
+
+    public int hashCode() {
+        return name == null ? "".hashCode() : name.hashCode();
+    }
+
+    public void setName(String path) {
+        this.name = path;
+    }
+
+    public long getTime() {
+        return time;
+    }
+
+    public void setTime(long time) {
+        this.time = time;
+    }
+
+    private String name;
+    private long   time;
+
+    private static int compare(long x, long y) {
+        return (x < y) ? 1 : ((x == y) ? 0 : -1);
+    }
+
+    @Override
+    public int compareTo(HistoryEntry o) {
+        return compare(getTime(), o.getTime());
+    }
+}

@@ -1,0 +1,30 @@
+{
+  "artefact":"net.java.dev.jna/jna",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[],
+    "hashes":{"jna.jar":"66d4f819a062a51a1d5627bffc23fac55d1677f0e0a1feba144aabdd670a64bb"},
+    "licenses":[
+      {
+        "name":"LGPL-2.1-or-later",
+        "url":"https://www.gnu.org/licenses/old-licenses/lgpl-2.1",
+        "distribution":"repo",
+        "comments":"\n        Java Native Access (JNA) is licensed under the LGPL, version 2.1 or\n        later, or the Apache License, version 2.0. You can freely decide which\n        license you want to apply to the project.\n      "
+      },
+      {
+        "name":"Apache-2.0",
+        "url":"https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "distribution":"repo",
+        "comments":"\n        Java Native Access (JNA) is licensed under the LGPL, version 2.1 or\n        later, or the Apache License, version 2.0. You can freely decide which\n        license you want to apply to the project.\n      "
+      }
+    ],
+    "minJRE":"JVM_1_6",
+    "version":"5.13.0"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":null,
+  "confirm":true
+}

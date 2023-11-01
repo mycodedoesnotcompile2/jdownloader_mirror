@@ -1,0 +1,17 @@
+{
+  "artefact":"com.miglayout/miglayout-swing",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:31 CEST",
+    "dependencies":[],
+    "hashes":{"miglayout.jar":"e418fb4b2abcfcae7d897975b66f08a1c07bf6b58100473318099335753ef5b0"},
+    "licenses":["BSD "],
+    "minJRE":"JVM_1_5",
+    "version":"4.0"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":"/4\\.0.*/",
+  "confirm":true
+}

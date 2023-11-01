@@ -1,0 +1,13 @@
+EnableInfoBarGuiAction=Infofenster anzeigen
+InfoBarGuiToggleAction_deselected=Infofenster öffnen
+InfoBarGuiToggleAction_deselected_tt=Das Infofenster öffnen
+InfoBarGuiToggleAction_selected=Infofenster schließen
+InfoBarGuiToggleAction_selected_tt=Das Infofenster schließen
+jd_plugins_optional_infobar_InfoDialog_help=Drag'N'Drop Bereich
+jd_plugins_optional_infobar_InfoDialog_help_tooltip2=Ziehe URLs, Hyperlinks oder DLCs hier rein!
+jd_plugins_optional_infobar_InfoDialog_hideWindow=Infofenster verstecken
+jd_plugins_optional_infobar_docking=Andocken an den Rändern aktivieren
+jd_plugins_optional_infobar_dropLocation2=Drag'N'Drop Bereich aktivieren
+jd_plugins_optional_infobar_jdinfobar=Infofenster
+jd_plugins_optional_infobar_jdinfobar_description=Im Infofenster werden Downloadinformationen angezeigt und ein Drag'N'Drop Bereich für Links, Urls oder Linkcontainer bereitgestellt.
+jd_plugins_optional_infobar_opacity=Transparenz [%]

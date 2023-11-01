@@ -1,0 +1,21 @@
+{
+  "artefact":"com.github.weisj/jsvg",
+  "filter":null,
+  "installed":{
+    "date":"2023-10-06T14:16:36 CEST",
+    "dependencies":[],
+    "hashes":{"jsvg.jar":"912f37d85deaaf5b747700f5bd3761a93b14a5161900e7436cff386b6176118a"},
+    "licenses":[{
+      "name":"MIT",
+      "url":"https://github.com/jsvg/jsvg/blob/master/LICENSE",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_8",
+    "version":"1.2.0"
+  },
+  "minJRE":"1.8",
+  "provider":"maven",
+  "renames":null,
+  "version":null,
+  "confirm":true
+}

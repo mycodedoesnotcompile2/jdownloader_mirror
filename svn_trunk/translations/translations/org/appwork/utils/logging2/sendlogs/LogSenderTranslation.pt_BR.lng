@@ -1,0 +1,13 @@
+LogAction_actionPerformed_upload_=Fazer upload agora
+LogAction_actionPerformed_wait_=Aguarde...
+LogAction_actionPerformed_zip_title_=Criando Pacote de Log
+LogAction_getString_uploading_=Preparando seus logs...
+LogModel_current=Sessão atual de %s1
+LogModel_getStringValue_between_=Entre %s1 e %s2
+LogModel_initColumns_check_upload_=Fazer upload?
+LogModel_initColumns_time_=Data
+LogTable_onContextMenu_disable_=Desmarcar
+LogTable_onContextMenu_enable_=Marcar
+SendLogDialog_SendLogDialog_title_=Enviar Relatório de Erro
+SendLogDialog_layoutDialogContent_desc_=Quando ocorreu o Problema? Por favor, marque todas as entradas que possam ser consideradas!
+SendLogDialog_layoutDialogContent_nologs_=Nenhum log disponível encontrado!

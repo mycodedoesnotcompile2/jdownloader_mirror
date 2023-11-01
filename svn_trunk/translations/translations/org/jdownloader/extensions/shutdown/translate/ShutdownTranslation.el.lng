@@ -1,0 +1,28 @@
+action_tooltip=Ενεργοποιήστε για Τερματισμό του Συστήματος μετά την ολοκλήρωση των Λήψεων
+addons_jdshutdown_statusmessage_disabled=Το σύστημα ΔΕΝ θα τερματιστεί από τον JDownloader
+addons_jdshutdown_statusmessage_enabled=Το σύστημα θα τερματιστεί από τον JDownloader όταν ολοκληρωθούν οι λήψεις!
+config_active_by_default=Διατήρηση του Τερματισμού Ενεργοποιημένου
+config_toolbarbutton=Εμφάνιση στη Γραμμή Εργαλείων
+gui_config_jdshutdown_close=Κλείσιμο του JD
+gui_config_jdshutdown_forceshutdown=Τερματισμός (όχι σε όλα τα λειτουργικά)
+gui_config_jdshutdown_hibernate=Αδρανοποίηση (όχι σε όλα τα λειτουργικά)
+gui_config_jdshutdown_mode=Λειτουργία:
+gui_config_jdshutdown_shutdown=Τερματισμός
+gui_config_jdshutdown_standby=Αναμονή (όχι σε όλα τα λειτουργικά)
+install_force=Εγκατάσταση Επιβολής Τερματισμού
+install_msg=Θέλετε να προετοιμάσετε το σύστημά σας για τη δυνατότητα Επιβολής Τερματισμού;
+install_title=Εγκατάσταση Επιβολής Τερματισμού
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">Ο JDownloader θα τερματιστεί!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">Το σύστημα θα μεταβεί σε κατάσταση Αδρανοποίησης!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">Το σύστημα θα τερματιστεί!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">Το σύστημα θα μεταβεί σε κατάσταση Αναμονής!</font></h2>
+interaction_shutdown_dialog_title_closejd=Τερματισμός του JDownloader;
+interaction_shutdown_dialog_title_hibernate=Αδρανοποίηση;
+interaction_shutdown_dialog_title_shutdown=Τερματισμός λειτουργίας;
+interaction_shutdown_dialog_title_standby=Αναμονή;
+jd_plugins_optional_jdshutdown=Τερματισμός Λειτουργίας
+jd_plugins_optional_jdshutdown_description=Αυτόματος τερματισμός, αναμονή, αδρανοποίηση του υπολογιστή, ή κλείσιμο του JDownloader όταν ολοκληρωθούν οι Λήψεις.
+lit_shutdownn=Τερματισμός
+show_admin=Απαιτούνται δικαιώματα διαχειριστή για τη ρύθμιση του JDownloader για Αδρανοποίηση ή Αναμονή
+shutdown_toggle_action_disable=Απενεργοποίηση προσθέτου Τερματισμού μετά τις Λήψεις
+shutdown_toggle_action_enable=Ενεργοποίηση προσθέτου Τερματισμού μετά τις Λήψεις

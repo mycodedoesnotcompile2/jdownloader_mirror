@@ -1,0 +1,17 @@
+{
+	"args": {
+		"jvm": [
+			{
+				"commandline": [
+					"--add-exports",
+					"jdk.jartool/sun.security.tools.jarsigner=ALL-UNNAMED"
+				],
+				"condition": {
+					"jvm": {
+						"$gte": 9000000000000
+					}
+				}
+			}
+		]
+	}
+}

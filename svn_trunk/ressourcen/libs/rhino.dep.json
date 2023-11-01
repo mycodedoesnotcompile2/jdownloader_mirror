@@ -1,0 +1,20 @@
+{
+  "artefact":"org.mozilla/rhino",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[],
+    "hashes":{"js.jar":"5c6dae050ceb71774a5fc82ce6e3f0392daf0ffa9ec3596f70d4d07ee50b8970"},
+    "licenses":[{
+      "name":"Mozilla Public License, Version 2.0",
+      "url":"http://www.mozilla.org/MPL/2.0/index.txt"
+    }],
+    "minJRE":"JVM_1_6",
+    "version":"1.7.7.2"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":{"rhino":"js"},
+  "version":null,
+  "confirm":true
+}

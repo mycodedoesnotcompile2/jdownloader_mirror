@@ -1,0 +1,205 @@
+//jDownloader - Downloadmanager
+//Copyright (C) 2017  JD-Team support@jdownloader.org
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <http://www.gnu.org/licenses/>.
+package jd.plugins.hoster;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+import jd.PluginWrapper;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.PluginJSonUtils;
+
+@HostPlugin(revision = "$Revision: 48054 $", interfaceVersion = 3, names = { "vivud.com" }, urls = { "https?://(?:www\\.)?vivud\\.com/video/\\d+/" })
+public class VivudCom extends PluginForHost {
+    public VivudCom(PluginWrapper wrapper) {
+        super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    }
+
+    /* DEV NOTES */
+    // Tags: Porn plugin
+    // protocol: no https
+    // other:
+    /* Extension which will be used if no correct extension is found */
+    private static final String  default_extension = ".mp4";
+    /* Connection stuff */
+    private static final boolean free_resume       = true;
+    private static final int     free_maxchunks    = 0;
+    private static final int     free_maxdownloads = -1;
+    private String               dllink            = null;
+    private boolean              server_issues     = false;
+
+    @Override
+    public String getAGBLink() {
+        return "http://vivud.com/pages/terms-of-use/";
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        dllink = null;
+        server_issues = false;
+        this.setBrowserExclusive();
+        br.setFollowRedirects(true);
+        br.getPage(link.getDownloadURL());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String videoid = new Regex(link.getDownloadURL(), "(\\d+)/$").getMatch(0);
+        String filename = PluginJSonUtils.getJson(this.br, "videoTitle");
+        if (StringUtils.isEmpty(filename)) {
+            filename = videoid;
+        }
+        /* RegExes sometimes used for streaming */
+        final String jssource = br.getRegex("\"urls_CDN\"\\s*?:\\s*?(\\{.*?\\})").getMatch(0);
+        if (jssource != null) {
+            try {
+                Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+                long quality_temp = 0;
+                long quality_best = 0;
+                String dllink_temp = null;
+                final Iterator<Entry<String, Object>> it = entries.entrySet().iterator();
+                while (it.hasNext()) {
+                    final Entry<String, Object> entry = it.next();
+                    dllink_temp = (String) entry.getValue();
+                    quality_temp = Long.parseLong(new Regex(entry.getKey(), "(\\d+)").getMatch(0));
+                    if (StringUtils.isEmpty(dllink_temp) || quality_temp == 0) {
+                        continue;
+                    } else if (dllink_temp.contains(".m3u8")) {
+                        /* Skip hls */
+                        continue;
+                    }
+                    if (quality_temp > quality_best) {
+                        quality_best = quality_temp;
+                        dllink = dllink_temp;
+                    }
+                }
+                if (!StringUtils.isEmpty(dllink)) {
+                    logger.info("BEST handling for multiple video source succeeded");
+                    logger.info("quality_best: " + quality_best + "p, dllink: " + dllink);
+                }
+            } catch (final Throwable e) {
+                logger.info("BEST handling for multiple video source failed");
+            }
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            dllink = br.getRegex("\\'(?:file|video)\\'[\t\n\r ]*?:[\t\n\r ]*?\\'(http[^<>\"]*?)\\'").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            dllink = br.getRegex("(?:file|url):[\t\n\r ]*?(?:\"|\\')(http[^<>\"]*?)(?:\"|\\')").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            dllink = br.getRegex("<source src=\"(https?://[^<>\"]*?)\" type=(?:\"|\\')video/(?:mp4|flv)(?:\"|\\')").getMatch(0);
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            dllink = br.getRegex("property=\"og:video\" content=\"(http[^<>\"]*?)\"").getMatch(0);
+        }
+        if (filename == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        filename = Encoding.htmlDecode(filename);
+        filename = filename.trim();
+        final String ext;
+        if (!StringUtils.isEmpty(dllink)) {
+            ext = getFileNameExtensionFromString(dllink, default_extension);
+        } else {
+            ext = default_extension;
+        }
+        if (!filename.endsWith(ext)) {
+            filename += ext;
+        }
+        if (!StringUtils.isEmpty(dllink)) {
+            // dllink = Encoding.htmlDecode(dllink); // + is encoded as %20 gives error
+            link.setFinalFileName(filename);
+            URLConnectionAdapter con = null;
+            try {
+                con = br.openHeadConnection(dllink);
+                if (!con.getContentType().contains("html")) {
+                    link.setDownloadSize(con.getLongContentLength());
+                    link.setProperty("directlink", dllink);
+                } else {
+                    server_issues = true;
+                }
+            } finally {
+                try {
+                    con.disconnect();
+                } catch (final Throwable e) {
+                }
+            }
+        } else {
+            /* We cannot be sure whether we have the correct extension or not! */
+            link.setName(filename);
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    @Override
+    public void handleFree(final DownloadLink downloadLink) throws Exception {
+        requestFileInformation(downloadLink);
+        if (server_issues) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
+        } else if (StringUtils.isEmpty(dllink)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, downloadLink, dllink, free_resume, free_maxchunks);
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
+            if (dl.getConnection().getResponseCode() == 403) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
+        dl.startDownload();
+    }
+
+    @Override
+    public int getMaxSimultanFreeDownloadNum() {
+        return free_maxdownloads;
+    }
+
+    @Override
+    public void reset() {
+    }
+
+    @Override
+    public void resetPluginGlobals() {
+    }
+
+    @Override
+    public void resetDownloadlink(DownloadLink link) {
+    }
+}

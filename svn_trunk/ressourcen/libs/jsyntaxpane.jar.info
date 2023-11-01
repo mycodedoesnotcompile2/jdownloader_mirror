@@ -1,0 +1,15 @@
+jsyntaxpane-1.1.5.jar
+https://github.com/nordfalk/jsyntaxpane
+
+
+Statement
+
+SyntaxPane is an extension to Java Swing's JEditorKit component which adds syntax highlighting support for various languages, including Scala and Java. The original project JSyntaxPane can be found on google-code. This is a fork from the 0.9.6 branch.
+
+The original project is (C)opyright by Ayman Al-Sairafi and released under the Apache License, Version 2.0.
+
+All changes, reworkings and extensions in SyntaxPane (C)opyright 2011–2015 by Hanns Holger Rutz. Released under that same license.
+
+The original project JSyntaxPane can be found on google-code(https://code.google.com/archive/p/jsyntaxpane/).
+This is a fork from the 0.9.6 branch with Hanns Holger Rutz's work applied.
+The original project is (C)opyright by Ayman Al-Sairafi and released under the Apache License, Version 2.0.

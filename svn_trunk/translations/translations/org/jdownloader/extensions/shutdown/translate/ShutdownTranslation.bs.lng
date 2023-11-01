@@ -1,0 +1,31 @@
+action_tooltip=Omogući Shutdown sistema nakon završenih Download-a
+addons_jdshutdown_statusmessage_disabled=JDownloader-a NEĆE isključiti računar.
+addons_jdshutdown_statusmessage_enabled=JDownloader će isključiti računar nakon završetka svih download-a!
+config_active_by_default=Zadrži omogućen Shutdown
+config_toolbarbutton=Dugme Alatne trake je vidljivo
+gui_config_jdshutdown_close=Zatvori JDownloader
+gui_config_jdshutdown_forceshutdown=Isključi računar (Nije za sve OS-ove)
+gui_config_jdshutdown_hibernate=Hibernate (Nije za sve OS)
+gui_config_jdshutdown_logoff=Odlogovati se
+gui_config_jdshutdown_mode=Modus:
+gui_config_jdshutdown_shutdown=Ugasi računar
+gui_config_jdshutdown_standby=Standby (Nije za sve OS)
+install_force=Instaliraj Prisilni Shutdown
+install_msg=Želite li da pripremite svoj Sistem za opciju prisilnog shutdown-a?
+install_title=Instaliraj Prisilni Shutdown
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">JDownloader će biti zatvoren!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">Sistem će biti postavljen u hibernaciju!</font></h2>
+interaction_shutdown_dialog_msg_logoff=<h2><font color="red">Korisnik će biti odlogovan!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">Sistem će biti isključen!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">Sistem će biti postavljen u pripravnost!</font></h2>
+interaction_shutdown_dialog_title_closejd=Zatvoriti JDownloader?
+interaction_shutdown_dialog_title_hibernate=Hibernirati?
+interaction_shutdown_dialog_title_logoff=Odlogovati se?
+interaction_shutdown_dialog_title_shutdown=Ugasiti računar
+interaction_shutdown_dialog_title_standby=Pripravnost?
+jd_plugins_optional_jdshutdown=JD Gašenje
+jd_plugins_optional_jdshutdown_description=Automatski isključi, suspenduj, hiberniraj računar ili zatvori JDownloader kada se završe svi download-i.
+lit_shutdownn=Shutdown
+show_admin=Potrebna su administratorska prava za podešavanje JDownloader-a da pošalje sistem u Hibernaciju ili Standby
+shutdown_toggle_action_disable=Onemogući ShutdownDodatke nakon Download-a
+shutdown_toggle_action_enable=Onemogući ShutdownDodatke nakon Download-a

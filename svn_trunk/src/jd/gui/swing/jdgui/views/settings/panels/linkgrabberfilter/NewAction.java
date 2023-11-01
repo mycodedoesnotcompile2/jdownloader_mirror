@@ -1,0 +1,84 @@
+package jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter;
+
+import java.awt.event.ActionEvent;
+
+import javax.swing.AbstractAction;
+
+import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogCanceledException;
+import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.jdownloader.controlling.filter.LinkFilterController;
+import org.jdownloader.controlling.filter.LinkgrabberFilterRule;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.components.AbstractAddAction;
+import org.jdownloader.images.AbstractIcon;
+
+import jd.controlling.TaskQueue;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ConditionDialog;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.ExceptionsRuleDialog;
+import jd.gui.swing.jdgui.views.settings.panels.linkgrabberfilter.editdialog.FilterRuleDialog;
+
+public class NewAction extends AbstractAddAction {
+    /**
+     *
+     */
+    private static final long   serialVersionUID = 1L;
+
+    private AbstractFilterTable table;
+
+    private LinkgrabberFilter   linkgrabberFilter;
+
+    public NewAction(LinkgrabberFilter linkgrabberFilter) {
+        this.linkgrabberFilter = linkgrabberFilter;
+        this.putValue(NAME, _GUI.T.settings_linkgrabber_filter_action_add());
+        this.putValue(AbstractAction.SMALL_ICON, new AbstractIcon(IconKey.ICON_ADD, 20));
+
+    }
+
+    public NewAction(AbstractFilterTable table) {
+        this.table = table;
+        this.putValue(NAME, _GUI.T.settings_linkgrabber_filter_action_add());
+        this.putValue(AbstractAction.SMALL_ICON, new AbstractIcon(IconKey.ICON_ADD, 16));
+    }
+
+    public void actionPerformed(ActionEvent e) {
+        final LinkgrabberFilterRule rule = new LinkgrabberFilterRule();
+        rule.setEnabled(true);
+        add(rule, getTable());
+    }
+
+    private AbstractFilterTable getTable() {
+        if (table != null) {
+            return table;
+        }
+        return linkgrabberFilter.getTable();
+    }
+
+    public static void add(final LinkgrabberFilterRule rule, final AbstractFilterTable table) {
+        ConditionDialog<LinkgrabberFilterRule> d;
+        if (table instanceof SettingsFilterTable) {
+            d = new FilterRuleDialog(rule);
+        } else {
+            d = new ExceptionsRuleDialog(rule);
+        }
+
+        try {
+            Dialog.getInstance().showDialog(d);
+            rule.setEnabled(true);
+            TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+
+                @Override
+                protected Void run() throws RuntimeException {
+                    LinkFilterController.getInstance().add(rule);
+                    return null;
+                }
+            });
+        } catch (DialogClosedException e1) {
+            e1.printStackTrace();
+        } catch (DialogCanceledException e1) {
+            e1.printStackTrace();
+        }
+    }
+}

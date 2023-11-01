@@ -1,0 +1,24 @@
+{
+  "artefact":"com.kitfox.svg/svg-salamander",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:31 CEST",
+    "dependencies":[],
+    "hashes":{
+      "svgSalamander.jar.info":"37a3e6543de81642ca5e5f2a4ac52b01e504bd6ceda1a52a47ec594350b505eb",
+      "svgSalamander.jar":"dc14687ea181125aef73737fd2d8fa5ab3bc09c43254a2ae57128391b44e94f9"
+    },
+    "licenses":[{
+      "name":"GNU Lesser General Public License (LGPL)",
+      "url":"http://www.gnu.org/copyleft/lesser.html",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_6",
+    "version":"1.1.4.1-appwork.jre16"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":null,
+  "confirm":true
+}

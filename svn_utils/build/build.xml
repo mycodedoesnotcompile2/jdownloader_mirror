@@ -1,0 +1,54 @@
+<project default="standardBuild" basedir="../">
+
+	<property name="src" value="src" />
+	<property name="cls" value="bin" />
+	<property name="dist" value="dist" />
+    <path id="classpath">
+           <fileset dir="${cls}" />
+        <!-- Dependencies -->
+        <fileset dir="libs" includes="*.jar" />
+    	<!--  <fileset dir="${java.home}/lib" includes="**/*.jar" /> -->
+    	
+    	
+   
+    </path>
+	
+	
+	<target name="compile">
+		<mkdir dir="${cls}" />
+		  <delete dir="${cls}" />
+		  <mkdir dir="${cls}" />
+		<javac srcdir="${src}" nowarn="on" excludes="**/test/**" destdir="${cls}" encoding="UTF-8" source="1.6" target="1.6" >
+			 <classpath refid="classpath" />
+			
+			</javac>
+	</target>
+	<!-- Signs the jars -->
+	<target name="sign">
+		<signjar keystore="${appwork_java_cert}" alias="${appwork_java_cert_alias}" storepass="${appwork_java_cert_pass}">
+			<path>
+				<fileset dir="${dist}" includes="**/*.jar" />
+			</path>
+		</signjar>
+	</target>
+	<target name="jar">
+		<manifest file="Manifest.MF">
+			<attribute name="Created-By" value="AppWork GmbH" />
+		</manifest>
+
+		<mkdir dir="${dist}" />
+		<jar duplicate="fail" jarfile="${dist}/appworkutils.jar" manifest="Manifest.MF">
+			<fileset dir="${cls}">
+				<include name="**/**" />
+			</fileset>
+			<fileset dir="${src}">
+			                <exclude name="**/*.java" />
+			            </fileset>
+		</jar>
+		<delete file="Manifest.MF" failonerror="false" />
+	</target>
+
+	<target name="standardBuild" depends="compile,jar,sign">
+	</target>
+
+</project>

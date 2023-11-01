@@ -1,0 +1,30 @@
+{
+  "artefact":"org.antlr/antlr-runtime",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[
+      {
+        "groupId":"org.antlr",
+        "artifactId":"stringtemplate",
+        "version":"3.2.1",
+        "scope":"compile"
+      },
+      {
+        "groupId":"antlr",
+        "artifactId":"antlr",
+        "version":"2.7.7",
+        "scope":"compile"
+      }
+    ],
+    "hashes":{"antlr-runtime.jar":"5b7cf53b7b30b034023f58030c8147c433f2bee0fe7dec8fae6bebf3708c5a63"},
+    "licenses":[],
+    "minJRE":"JVM_1_4",
+    "version":"3.4"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":"3.4",
+  "confirm":true
+}

@@ -1,0 +1,11 @@
+LogAction_actionPerformed_wait_=Lütfen bekleyin...
+LogAction_actionPerformed_zip_title_=Günlük Paketi oluşturuluyor
+LogAction_getString_uploading_=Günlükleriniz hazırlanıyor
+LogModel_getStringValue_between_=%s1 ve %s2 arasında
+LogModel_initColumns_time_=Süre
+LogModel_initColumns_x_=İşaretle
+LogTable_onContextMenu_disable_=Seçimi kaldır
+LogTable_onContextMenu_enable_=Seç
+SendLogDialog_SendLogDialog_title_=Bir Hata raporu gönder
+SendLogDialog_layoutDialogContent_desc_=Sorun ne zaman meydana geldi? Lütfen dikkate değer olabilir tüm girişleri kontrol edin!
+SendLogDialog_layoutDialogContent_nologs_=Bulunan mevcut günlükler yok!

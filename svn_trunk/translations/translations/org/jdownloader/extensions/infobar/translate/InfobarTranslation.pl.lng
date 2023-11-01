@@ -1,0 +1,13 @@
+EnableInfoBarGuiAction=Pokaż InfoBar
+InfoBarGuiToggleAction_deselected=Otwórz InfoBar
+InfoBarGuiToggleAction_deselected_tt=Otwórz InfoBar
+InfoBarGuiToggleAction_selected=Zamknij InfoBar
+InfoBarGuiToggleAction_selected_tt=Zamknij InfoBar
+jd_plugins_optional_infobar_InfoDialog_help=Strefa Zrzutu
+jd_plugins_optional_infobar_InfoDialog_help_tooltip2=Wrzuć tu linki, adresy www lub pliki DLC!
+jd_plugins_optional_infobar_InfoDialog_hideWindow=Ukryj Pasek Informacyjny
+jd_plugins_optional_infobar_docking=Włącz dokowanie do krawędzi
+jd_plugins_optional_infobar_dropLocation2=Uaktywnij Strefę Zrzutu
+jd_plugins_optional_infobar_jdinfobar=Pasek Informacyjny
+jd_plugins_optional_infobar_jdinfobar_description=Mały pływający panel informacyjny ze statystykami pobierania w czasie rzeczywistym oraz strefa Przeciągnij & Upuść (Strefa Zrzutu) do przeciągania linków, adresów URL i plików DLC.
+jd_plugins_optional_infobar_opacity=Przeźroczystość [%]

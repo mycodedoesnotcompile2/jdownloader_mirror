@@ -1,0 +1,27 @@
+action_tooltip=Включи, чтобы выключить компьютер по завершении закачек
+addons_jdshutdown_statusmessage_disabled=Система не будет выключена после завершения закачек
+addons_jdshutdown_statusmessage_enabled=JDownloader выключит систему после завершения закачек
+config_toolbarbutton=Кнопка панели инструментов видна
+gui_config_jdshutdown_close=Закрыть JD
+gui_config_jdshutdown_forceshutdown=Выключить компьютер (Не все ОС)
+gui_config_jdshutdown_hibernate=Спящий режим
+gui_config_jdshutdown_mode=Режим:
+gui_config_jdshutdown_shutdown=Выключение
+gui_config_jdshutdown_standby=Ждущий режим
+install_force=Установить принудит. выключение
+install_msg=Хотите подготовить систему для возможности насильного выключения?
+install_title=Установить принудит. выключение
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">Программа сейчас будет закрыта!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">Система перейдёт в режим гибернации!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">Система будет выключена!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">Система перейдёт в спящий режим!</font></h2>
+interaction_shutdown_dialog_title_closejd=Завершить работу программы?
+interaction_shutdown_dialog_title_hibernate=Гибернация?
+interaction_shutdown_dialog_title_shutdown=Выключить?
+interaction_shutdown_dialog_title_standby=Спящий режим?
+jd_plugins_optional_jdshutdown=Выключение
+jd_plugins_optional_jdshutdown_description=Автоматическое выключение, ожидание, гибернация вашего PC или закрытие JDownloader по завершении закачек.
+lit_shutdownn=Выключить
+show_admin=Для настройки режимов гибернации\сна в JDownloader требуются права администратора
+shutdown_toggle_action_disabled2=Выключить по завершению загрузок
+shutdown_toggle_action_enabled2=Выключить по завершению загрузок

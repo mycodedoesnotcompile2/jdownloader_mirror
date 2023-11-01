@@ -1,0 +1,125 @@
+package jd.gui.swing.jdgui.views.settings.components;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+
+import org.appwork.storage.config.ValidationException;
+import org.appwork.storage.config.events.GenericConfigEventListener;
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.storage.config.handler.StringKeyHandler;
+import org.appwork.swing.components.ExtTextField;
+
+public class TextInput extends ExtTextField implements SettingsComponent, GenericConfigEventListener<String> {
+    /**
+     *
+     */
+    private static final long                         serialVersionUID = 1L;
+    protected final StateUpdateEventSender<TextInput> eventSender;
+    protected final AtomicBoolean                     settings         = new AtomicBoolean(false);
+    protected final StringKeyHandler                  keyHandler;
+    {
+        eventSender = new StateUpdateEventSender<TextInput>();
+        this.getDocument().addDocumentListener(new DocumentListener() {
+            public void removeUpdate(DocumentEvent e) {
+                if (!settings.get()) {
+                    eventSender.fireEvent(new StateUpdateEvent<TextInput>(TextInput.this));
+                }
+            }
+
+            public void insertUpdate(DocumentEvent e) {
+                if (!settings.get()) {
+                    eventSender.fireEvent(new StateUpdateEvent<TextInput>(TextInput.this));
+                }
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                if (!settings.get()) {
+                    eventSender.fireEvent(new StateUpdateEvent<TextInput>(TextInput.this));
+                }
+            }
+        });
+    }
+
+    @Override
+    public void setText(String t) {
+        if (!settings.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            super.setText(t);
+        } finally {
+            settings.set(false);
+        }
+    }
+
+    public TextInput() {
+        this(null);
+    }
+
+    @Override
+    public void onChanged() {
+        super.onChanged();
+        if (!settings.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            setKeyHandlerValue(getText());
+        } finally {
+            settings.set(false);
+        }
+    }
+
+    public TextInput(StringKeyHandler keyhandler) {
+        super();
+        this.keyHandler = keyhandler;
+        if (keyhandler != null) {
+            setText(keyhandler.getValue());
+            keyhandler.getEventSender().addListener(this, true);
+        }
+    }
+
+    protected void setKeyHandlerValue(String text) {
+        final StringKeyHandler keyHandler = getKeyhandler();
+        if (keyHandler != null) {
+            keyHandler.setValue(getText());
+        }
+    }
+
+    protected String getKeyHandlerValue() {
+        final StringKeyHandler keyHandler = getKeyhandler();
+        if (keyHandler == null) {
+            return null;
+        } else {
+            return keyHandler.getValue();
+        }
+    }
+
+    public StringKeyHandler getKeyhandler() {
+        return keyHandler;
+    }
+
+    public String getConstraints() {
+        return "sgy LINE";
+    }
+
+    public boolean isMultiline() {
+        return false;
+    }
+
+    public void addStateUpdateListener(StateUpdateListener listener) {
+        eventSender.addListener(listener);
+    }
+
+    @Override
+    public void onConfigValidatorError(KeyHandler<String> keyHandler, String invalidValue, ValidationException validateException) {
+    }
+
+    @Override
+    public void onConfigValueModified(KeyHandler<String> keyHandler, String newValue) {
+        if (!settings.get()) {
+            setText(getKeyHandlerValue());
+        }
+    }
+}

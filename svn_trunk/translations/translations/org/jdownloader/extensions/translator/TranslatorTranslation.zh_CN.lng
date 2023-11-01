@@ -1,0 +1,6 @@
+Translator=翻译工具
+TranslatorExtensionGuiToggleAction_deselected=打开翻译工具
+TranslatorExtensionGuiToggleAction_deselected_tt=打开「翻译工具」选卡
+TranslatorExtensionGuiToggleAction_selected=关闭翻译工具
+TranslatorExtensionGuiToggleAction_selected_tt=关闭「翻译工具」选卡
+description=这个扩展可用于编辑 JDownloader 的翻译，您需要一个开发者账号来使用这个扩展

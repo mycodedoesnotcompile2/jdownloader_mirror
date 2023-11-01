@@ -1,0 +1,6 @@
+Translator=Übersetzer
+TranslatorExtensionGuiToggleAction_deselected=Übersetzungsassistent öffnen
+TranslatorExtensionGuiToggleAction_deselected_tt=Öffnet den Übersetzungsassistent
+TranslatorExtensionGuiToggleAction_selected=Übersetzungsassistent schließen
+TranslatorExtensionGuiToggleAction_selected_tt=Übersetzungsassistenten schließen
+description=Diese Erweiterung kann dazu verwendet werden, um JDownloader-Übersetzungen zu bearbeiten. Du benötigst einen Entwickler-Account, um diese Erweiterung verwenden zu können.

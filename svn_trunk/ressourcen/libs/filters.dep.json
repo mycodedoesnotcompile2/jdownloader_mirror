@@ -1,0 +1,26 @@
+{
+  "artefact":"com.jhlabs/filters",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[{
+      "groupId":"junit",
+      "artifactId":"junit",
+      "version":"3.8.1",
+      "scope":"test"
+    }],
+    "hashes":{"Filters.jar":"a37202f03eae99ab1faf2a89eeaee3665c8489f45b1aeb0d5926d78a54c613bf"},
+    "licenses":[{
+      "name":"Apache License, Version 2.0",
+      "url":"http://www.apache.org/licenses/LICENSE-2.0",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_6",
+    "version":"2.0.235-1"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":{"filters":"Filters"},
+  "version":null,
+  "confirm":true
+}

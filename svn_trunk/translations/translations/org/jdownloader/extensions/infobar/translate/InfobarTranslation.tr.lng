@@ -1,0 +1,13 @@
+EnableInfoBarGuiAction=Bilgi Çubuğunu Göster
+InfoBarGuiToggleAction_deselected=Bilgi Çubuğunu Aç
+InfoBarGuiToggleAction_deselected_tt=Bilgi Çubuğunu açar
+InfoBarGuiToggleAction_selected=Bilgi Çubuğunu Kapat
+InfoBarGuiToggleAction_selected_tt=Bilgi Çubuğunu kapatır
+jd_plugins_optional_infobar_InfoDialog_help=Sürükle'V'Bırak Bölgesi
+jd_plugins_optional_infobar_InfoDialog_help_tooltip2=URL'leri, Hiper Bağlantıları veya DLC dosyalarını buraya bırakın!
+jd_plugins_optional_infobar_InfoDialog_hideWindow=Bilgi Çubuğunu Gizle
+jd_plugins_optional_infobar_docking=Kenarlara Kenetlemeyi etkinleştir
+jd_plugins_optional_infobar_dropLocation2=Bırakma Yerini etkinleştir
+jd_plugins_optional_infobar_jdinfobar=Bilgi Çubuğu
+jd_plugins_optional_infobar_jdinfobar_description=İndirmeler üzerine gerçek zamanlı bilgiler bulunan küçük gezinen panel, ve bağlantıları, URL'leri veya DLC dosyalarını ekleyebildiğiniz Sürükle'V'Bırak Bölgesi.
+jd_plugins_optional_infobar_opacity=İleti Kutusu opaklığı [% olarak]

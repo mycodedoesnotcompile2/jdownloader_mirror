@@ -1,0 +1,31 @@
+action_tooltip=Habilita o Desligamento do Sistema após finalizar os Downloads
+addons_jdshutdown_statusmessage_disabled=O Sistema não será desligado após o término dos downloads
+addons_jdshutdown_statusmessage_enabled=O Sistema será desligado após o término dos downloads
+config_active_by_default=Manter Desligamento habilitado
+config_toolbarbutton=Botão da Barra de Ferramentas visível
+gui_config_jdshutdown_close=Fechar o JDownloader
+gui_config_jdshutdown_forceshutdown=Forçar saída (Não disponível em todos os Sistemas Operacionais)
+gui_config_jdshutdown_hibernate=Hibernar (Não disponível em todos os Sistemas Operacionais)
+gui_config_jdshutdown_logoff=Fazer logoff
+gui_config_jdshutdown_mode=Modo:
+gui_config_jdshutdown_shutdown=Desligar
+gui_config_jdshutdown_standby=Suspender  (Não disponível em todos os Sistemas Operacionais)
+install_force=Instalar Desligamento Forçado
+install_msg=Deseja preparar seu Sistema para o recurso desligamento forçado?
+install_title=Instalar Desligamento Forçado
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">O JDownloader será fechado!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red"> O sistema entrará em modo de hibernação!</font></h2>
+interaction_shutdown_dialog_msg_logoff=<h2><font color="red">O usuário será desconectado!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">O sistema será desligado!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><fotn color="red">O sistema entrará em modo de espera!</font></h2>
+interaction_shutdown_dialog_title_closejd=Fechar o JDownloader?
+interaction_shutdown_dialog_title_hibernate=Hibernar?
+interaction_shutdown_dialog_title_logoff=Fazer logoff?
+interaction_shutdown_dialog_title_shutdown=Desligar?
+interaction_shutdown_dialog_title_standby=Modo de espera?
+jd_plugins_optional_jdshutdown=Desligamento
+jd_plugins_optional_jdshutdown_description=Automaticamente desliga, suspende, hiberna seu computador ou fecha o JDownloader assim que os downloads terminarem.
+lit_shutdownn=Desligar
+show_admin=Direitos de Administrador são necessários para configurar o JDownloader para o Modo de Hibernar/Suspender
+shutdown_toggle_action_disable=Desativar extensão de Desligamento após os Downloads
+shutdown_toggle_action_enable=Ativar extensão de Desligamento após os Downloads

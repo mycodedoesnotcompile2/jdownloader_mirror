@@ -1,0 +1,34 @@
+{
+  "artefact":"org.bouncycastle/bcpkix-jdk15to18",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[
+      {
+        "groupId":"org.bouncycastle",
+        "artifactId":"bcprov-jdk15to18",
+        "version":1.76,
+        "type":"jar"
+      },
+      {
+        "groupId":"org.bouncycastle",
+        "artifactId":"bcutil-jdk15to18",
+        "version":1.76,
+        "type":"jar"
+      }
+    ],
+    "hashes":{"bcpkix-jdk15on.jar":"1b437ec94be3f5db003029884ad9426a98cfabc2e61811aed262703826d86b2b"},
+    "licenses":[{
+      "name":"Bouncy Castle Licence",
+      "url":"http://www.bouncycastle.org/licence.html",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_5",
+    "version":"1.76"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":{"jdk15to18":"jdk15on"},
+  "version":null,
+  "confirm":true
+}

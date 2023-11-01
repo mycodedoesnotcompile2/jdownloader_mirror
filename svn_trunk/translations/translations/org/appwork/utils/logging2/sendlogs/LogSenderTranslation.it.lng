@@ -1,0 +1,10 @@
+LogAction_actionPerformed_wait_=Attendi...
+LogAction_actionPerformed_zip_title_=Crea registro pacchetto
+LogAction_getString_uploading_=Preparazione registro eventi
+LogModel_getStringValue_between_=Tra %s1 e %s2
+LogModel_initColumns_time_=Ora
+LogModel_initColumns_x_=Verifica
+LogTable_onContextMenu_disable_=Deseleziona
+LogTable_onContextMenu_enable_=Seleziona
+SendLogDialog_SendLogDialog_title_=Invia una segnalazione bug
+SendLogDialog_layoutDialogContent_desc_=Quando si è verificato il problema? Verifica tutti gli elementi importanti!!

@@ -1,0 +1,30 @@
+action_tooltip=Omogućeno je gašenje računala nakon završenih preuzimanja
+addons_jdshutdown_statusmessage_disabled=Računalo neće biti ugašeno nakon preuzimanja
+addons_jdshutdown_statusmessage_enabled=Računalo će biti ugašeno po završetku preuzimanja!
+config_active_by_default=Zadrži omogućeno gašenje
+config_toolbarbutton=Vidljiv dugme alatne trake
+gui_config_jdshutdown_close=Izlaz iz JD-a
+gui_config_jdshutdown_forceshutdown=Prisili na gašenje računala (nije za sve sustave)
+gui_config_jdshutdown_hibernate=Hibernacija (nije za sve sustave)
+gui_config_jdshutdown_logoff=Odjava
+gui_config_jdshutdown_mode=Odabir načina:
+gui_config_jdshutdown_shutdown=Gašenje računala
+gui_config_jdshutdown_standby=Stanje pripravnosti (nije za sve sustave)
+install_force=Instaliraj prisilno gašenje
+install_msg=Želite li pripremiti svoj sustav za značajke prisilnog gašenja
+install_title=Instaliraj prisilno gašenje
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">JDownloader će biti zatvoren!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">Sustav će ići u hibernaciju!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">Sustav će se isključiti!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">Sustav će ići u stanje pripravnosti!</font></h2>
+interaction_shutdown_dialog_title_closejd=Zatvoriti JD?
+interaction_shutdown_dialog_title_hibernate=Hibernacija?
+interaction_shutdown_dialog_title_logoff=Odjava?
+interaction_shutdown_dialog_title_shutdown=Isključivanje?
+interaction_shutdown_dialog_title_standby=Stanje pripravnosti?
+jd_plugins_optional_jdshutdown=JD isključivanje
+jd_plugins_optional_jdshutdown_description=Automatsko isključivanje, pripravnost, hibernacija računala ili\r\nzatvaranje JDownloader-a kada budu sva preuzimanja završena.
+lit_shutdownn=Gašenje
+show_admin=Za postavke načina pripravnosti ili hibernacije JDownloader-a morate imati administratorske ovlasti
+shutdown_toggle_action_disable=Onemogući dodatak za gašenje nakon preuzimanja
+shutdown_toggle_action_enable=Omogući dodatak za gašenje nakon preuzimanja

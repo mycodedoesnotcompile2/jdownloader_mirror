@@ -1,0 +1,21 @@
+{
+  "artefact":"net.sourceforge.htmlunit/htmlunit-core-js",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[],
+    "hashes":{"htmlunit-core-js.jar":"32fd749af1599ab0daf22b60cbe97b6792cb9fe8b4220496a3adb667e58a5c3c"},
+    "licenses":[{
+      "name":"Mozilla Public License version 2.0",
+      "url":"http://www.mozilla.org/MPL/2.0/",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_5",
+    "version":"2.17"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":"/2\\.17(\\..+)?/",
+  "confirm":true
+}

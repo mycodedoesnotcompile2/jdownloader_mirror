@@ -1,0 +1,26 @@
+action_tooltip=Habilita l'apagat automàtic del sistema cuan les descàrregues hagin finalitzat
+addons_jdshutdown_statusmessage_disabled=El JDownloader NO apagarà el sistema
+addons_jdshutdown_statusmessage_enabled=JDownloader apagarà l’equip en finalitzar las descàrregues
+config_active_by_default=Mantenir l'apagat habilitat
+config_toolbarbutton=Barra de botons visible
+gui_config_jdshutdown_close=Tanca JD
+gui_config_jdshutdown_forceshutdown=Força l'apagada (No per tots els S.O)
+gui_config_jdshutdown_hibernate=Hivernar (No per tots els S.O)
+gui_config_jdshutdown_mode=Mode:
+gui_config_jdshutdown_shutdown=Apagat
+gui_config_jdshutdown_standby=Pausa en espera (No per tots els S.O)
+install_force=Instal·lar Força a apagar
+install_msg=Voleu preparar el sistema per la funció de tancament forçat?
+install_title=Instal·lar Força a apagar
+interaction_shutdown_dialog_msg_closejd=<h2><font color="red">Es tancarà JDownloader!</font></h2>
+interaction_shutdown_dialog_msg_hibernate=<h2><font color="red">El sistema es posara en mode d'hivernació!</font></h2>
+interaction_shutdown_dialog_msg_shutdown=<h2><font color="red">El sistema s'apaga!</font></h2>
+interaction_shutdown_dialog_msg_standby=<h2><font color="red">El sistema es posara en moda d'espera!</font></h2>
+interaction_shutdown_dialog_title_closejd=Voleu tancar el JD?
+interaction_shutdown_dialog_title_hibernate=Hivernar?
+interaction_shutdown_dialog_title_shutdown=Apagar?
+interaction_shutdown_dialog_title_standby=Espera?
+jd_plugins_optional_jdshutdown=JDShutdown
+jd_plugins_optional_jdshutdown_description=Configureu si voleu tancar, hivernar o posar en mode pausa en espera l'ordinador, o bé tancar el JDownloader, de manera automàtica en finalitzar les descàrregues.
+lit_shutdownn=Desconnecta
+show_admin=Calen permisos d'administrador per configurar el JDownloader per la Hivernació o la Pausa en espera

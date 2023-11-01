@@ -1,0 +1,49 @@
+{
+  "artefact":"org.tmatesoft.sqljet/sqljet",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[
+      {
+        "groupId":"junit",
+        "artifactId":"junit",
+        "version":"4.8.2",
+        "scope":"test"
+      },
+      {
+        "groupId":"org.xerial",
+        "artifactId":"sqlite-jdbc",
+        "version":"3.7.2",
+        "scope":"test"
+      },
+      {
+        "groupId":"org.easymock",
+        "artifactId":"easymock",
+        "version":2.4,
+        "scope":"test"
+      },
+      {
+        "groupId":"org.antlr",
+        "artifactId":"antlr-runtime",
+        "version":3.4,
+        "scope":"compile",
+        "exclusions":{
+          "artifactId":"ST4",
+          "groupId":"org.antlr"
+        }
+      }
+    ],
+    "hashes":{"sqljet.jar":"df7463424e3560f5e8c8003e1816c0a6ea6e84673921ca5af05b90b0892b3c97"},
+    "licenses":[{
+      "name":"GPL (with dual licensing option)",
+      "url":"http://www.gnu.org/licenses/gpl.html"
+    }],
+    "minJRE":"JVM_1_5",
+    "version":"1.1.10"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":"1.1.10",
+  "confirm":true
+}

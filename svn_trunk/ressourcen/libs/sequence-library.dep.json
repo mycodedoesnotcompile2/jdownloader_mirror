@@ -1,0 +1,25 @@
+{
+  "artefact":"de.regnis.q.sequence/sequence-library",
+  "filter":null,
+  "installed":{
+    "date":"2023-09-04T11:08:34 CEST",
+    "dependencies":[{
+      "groupId":"junit",
+      "artifactId":"junit",
+      "version":"3.8.2",
+      "scope":"test"
+    }],
+    "hashes":{"sequence-library.jar":"2f36485bec6bb5f7ba97a40241462f3ce8b4dde2ad1acfe08ea3712450d9e7ea"},
+    "licenses":[{
+      "name":"Sequence Library License",
+      "url":"http://www.svnkit.com/SEQUENCE-LICENSE.txt"
+    }],
+    "minJRE":"JVM_1_4",
+    "version":"1.0.2"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":null,
+  "version":"1.0.2",
+  "confirm":true
+}
