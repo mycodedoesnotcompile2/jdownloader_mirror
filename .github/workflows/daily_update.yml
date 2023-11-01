@@ -16,24 +16,33 @@ jobs:
 
         mkdir -p ./svn_browser
         mkdir -p ./svn_trunk
-        mkdir -p ./MyJDownloaderClient
-        mkdir -p ./utils
+        mkdir -p ./svn_MyJDownloaderClient
+        mkdir -p ./svn_ utils
         
         cd ./svn_browser/
-        svn checkout --force "svn://svn.jdownloader.org/jdownloader/browser"
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/browser" &
 
         cd ../svn_trunk
-        svn checkout --force "svn://svn.jdownloader.org/jdownloader/trunk"
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/trunk" &
         
-        cd ../MyJDownloaderClient
-        svn checkout --force "svn://svn.jdownloader.org/jdownloader/MyJDownloaderClient"
+        cd ../svn_MyJDownloaderClient
+        svn checkout --force "svn://svn.jdownloader.org/jdownloader/MyJDownloaderClient" &
         
-        cd ../utils
-        svn checkout --force "svn://svn.appwork.org/utils"
+        cd ../svn_utils
+        svn checkout --force "svn://svn.appwork.org/utils" &
 
+        wait
 
     - name: Check size
       run: |
         cd "$GITHUB_WORKSPACE"
-
         du -sh *
+
+    - name: Git commit 
+      run: |
+        cd "$GITHUB_WORKSPACE"
+        git config user.name updating-bot
+        git config user.email github-actions@github.com
+        
+        git add -A
+        git push origin --force
