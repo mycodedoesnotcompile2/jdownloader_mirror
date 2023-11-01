@@ -1,7 +1,7 @@
 name: Daily update of this mirror
-on: workflow_dispatch
-  #schedule:
-    #- cron:  '20 05 * * *'
+on:
+  schedule:
+    - cron:  '10 05 * * *'
 
 permissions:
   contents: write
@@ -22,16 +22,9 @@ jobs:
         mkdir -p ./svn_MyJDownloaderClient
         mkdir -p ./svn_utils
         
-        #cd "$GITHUB_WORKSPACE/svn_browser"
         svn checkout --force "svn://svn.jdownloader.org/jdownloader/browser" "$GITHUB_WORKSPACE/svn_browser" &
-
-        #cd "$GITHUB_WORKSPACE/svn_trunk"
         svn checkout --force "svn://svn.jdownloader.org/jdownloader/trunk" "$GITHUB_WORKSPACE/svn_trunk" &
-        
-        #cd "$GITHUB_WORKSPACE/svn_MyJDownloaderClient"
         svn checkout --force "svn://svn.jdownloader.org/jdownloader/MyJDownloaderClient" "$GITHUB_WORKSPACE/svn_MyJDownloaderClient" &
-        
-        #cd "$GITHUB_WORKSPACE/svn_utils"
         svn checkout --force "svn://svn.appwork.org/utils" "$GITHUB_WORKSPACE/svn_utils" &
 
         wait
