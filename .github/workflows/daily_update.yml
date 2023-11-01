@@ -3,6 +3,9 @@ on: workflow_dispatch
   #schedule:
     #- cron:  '20 05 * * *'
 
+permissions:
+  contents: write
+
 jobs:
   update_mirror:
     runs-on: ubuntu-latest
@@ -45,4 +48,5 @@ jobs:
         git config user.email github-actions@github.com
         
         git add -A
+        git commit -m "mirroring bot - $(date '+%Y/%m/%d')"
         git push origin --force
