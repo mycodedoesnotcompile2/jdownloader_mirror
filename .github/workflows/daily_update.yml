@@ -29,6 +29,11 @@ jobs:
 
         wait
 
+        cd "$GITHUB_WORKSPACE/svn_browser" &&  svn revert -R . && svn update
+        cd "$GITHUB_WORKSPACE/svn_trunk" &&  svn revert -R . && svn update
+        cd "$GITHUB_WORKSPACE/svn_MyJDownloaderClient" &&  svn revert -R . && svn update
+        cd "$GITHUB_WORKSPACE/svn_utils" &&  svn revert -R . && svn update
+
     - name: Check size
       run: |
         cd "$GITHUB_WORKSPACE"
