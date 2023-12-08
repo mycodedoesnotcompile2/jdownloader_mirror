@@ -52,9 +52,9 @@ import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 48407 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48440 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
-    private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "restfile.ca", "restfilee.com", "storagely.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "uppit.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "easybytez.com", "userupload.net", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com" };
+    private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "restfile.ca", "restfilee.com", "storagely.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "uppit.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "userupload.net", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
     private static final String[] specialDomains = { "hotlink.cc", "ex-load.com", "imgbaron.com", "filespace.com", "spaceforfiles.com", "prefiles.com", "imagetwist.com", "file.al", "send.cm", "takefile.link" };
 
@@ -277,6 +277,9 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         String fpName;
         if ("hotlink.cc".equals(br.getHost())) {
             fpName = br.getRegex("<i class=\"glyphicon glyphicon-folder-open\"></i>\\s*(.*?)\\s*</span>").getMatch(0);
+        } else if ("imagetwist.com".equals(br.getHost())) {
+            /* 2023-11-09 */
+            fpName = br.getRegex("page_main_title\"[^>]*>([^<]+)<").getMatch(0);
         } else {
             // ex-load.com
             fpName = br.getRegex("Files in\\s*(.*?)\\s*folder\\s*</title>").getMatch(0);

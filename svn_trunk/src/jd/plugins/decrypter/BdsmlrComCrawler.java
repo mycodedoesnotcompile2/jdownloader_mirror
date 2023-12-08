@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.BdsmlrCom;
 
-@DecrypterPlugin(revision = "$Revision: 48387 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48413 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BdsmlrCom.class })
 public class BdsmlrComCrawler extends PluginForDecrypt {
     public BdsmlrComCrawler(PluginWrapper wrapper) {
@@ -296,6 +296,15 @@ public class BdsmlrComCrawler extends PluginForDecrypt {
                         distribute(dl);
                     }
                 }
+            }
+        }
+        /* Special handling for possible empty pages with ID for next page */
+        final String[] countinfs = br.getRegex("<div class=\"countinf\" data-id=\"(\\d+)\" style=\"display:none\"[^>]*></div>").getColumn(0);
+        if (countinfs != null && countinfs.length > 0) {
+            final String lastPostID2 = countinfs[countinfs.length - 1];
+            if (!lastPostID2.equals(this.lastPostID)) {
+                logger.info("Override lastPostID via countinf handling | Old: " + this.lastPostID + " | New: " + lastPostID2);
+                this.lastPostID = lastPostID2;
             }
         }
         lastNumberofPosts = posts.length;

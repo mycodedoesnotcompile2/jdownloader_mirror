@@ -26,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 48306 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48555 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -51,6 +51,15 @@ public class XvideosCom extends XvideosCore {
     public String[] getDeadDomains() {
         return new String[] { "xvideos2.com", "xvideos3.com" };
     }
+
+    @Override
+    public String[] getAvoidDomains() {
+        /*
+         * 2023-12-04: Added haysex.biz because that website looks quite diffent than main xvideos layout so using the main domain fixes
+         * linkcheck and download handling in this case.
+         */
+        return new String[] { "haysex.biz" };
+    };
 
     @Override
     protected String getFallbackPremiumDomain() {

@@ -17,6 +17,9 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import org.appwork.storage.TypeRef;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -32,9 +35,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
+import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 48262 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48482 $", interfaceVersion = 3, names = {}, urls = {})
 public class SlidesliveCom extends PluginForDecrypt {
     public SlidesliveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,23 +93,77 @@ public class SlidesliveCom extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getPage("https://ben.slideslive.com/player/" + contentID + "?player_token=" + Encoding.urlEncode(playerToken));
-        final String youtubeVideoID = br.getRegex("EXT-SL-VOD-VIDEO-ID:(.+)").getMatch(0);
-        if (youtubeVideoID == null) {
+        final String externalVideoServiceID = br.getRegex("#EXT-SL-VOD-VIDEO-SERVICE-NAME:(.*?)\\s").getMatch(0);
+        final String videoID = br.getRegex("EXT-SL-VOD-VIDEO-ID:(.*?)\\s").getMatch(0);
+        if (videoID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        ret.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(youtubeVideoID)));
+        if (externalVideoServiceID.equalsIgnoreCase("youtube")) {
+            /* E.g. https://slideslive.com/38893320/lhani-detekce-lzi-a-emoce-z-pohledu-forenzni-psychologie */
+            ret.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
+        } else if (externalVideoServiceID.equalsIgnoreCase("yoda")) {
+            /* E.g. https://slideslive.com/38955218/diffusion-models-and-lossy-generative-modeling */
+            final String serversArray = br.getRegex("#EXT-SL-VOD-VIDEO-SERVERS:(\\[.*?)\\s").getMatch(0);
+            final List<String> servers = restoreFromString(serversArray, TypeRef.STRING_LIST);
+            final String hlsMaster = "https://" + servers.get(0) + "/" + videoID + "/master.m3u8";
+            final DownloadLink video = this.createDownloadlink(hlsMaster);
+            video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
+            ret.add(video);
+        }
         final Browser brc = br.cloneBrowser();
-        brc.getPage("https://slides.slideslive.com/" + contentID + "/" + contentID + ".xml");
-        final String[] items = brc.getRegex("<slideName>([^<]+)</slideName>").getColumn(0);
-        if (items == null || items.length == 0) {
+        brc.getHeaders().put("Origin", "https://" + br.getHost());
+        brc.getHeaders().put("Accept", "application/json");
+        final boolean preferJsonAPI = false;
+        final String slidesjsonurl = br.getRegex("EXT-SL-VOD-SLIDES-JSON-URL:(https?://.*?)\\s").getMatch(0);
+        final String slidesxmlurl = br.getRegex("EXT-SL-VOD-SLIDES-XML-URL:(https?://.*?)\\s").getMatch(0);
+        if (slidesjsonurl == null && slidesxmlurl == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final String imagesExt = ".png";
-        for (final String slideName : items) {
-            final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/" + slideName + imagesExt + "?h=432&f=webp&s=lambda&accelerate_s3=1";
-            final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
-            image.setAvailable(true);
-            ret.add(image);
+        boolean useJsonAPI = false;
+        if ((preferJsonAPI && slidesjsonurl != null) || slidesxmlurl == null) {
+            /* 2023-11-16 */
+            useJsonAPI = true;
+        } else {
+            // brc.getPage("https://slides.slideslive.com/" + contentID + "/" + contentID + ".xml");
+            brc.getPage(slidesxmlurl);
+            final String[] items = brc.getRegex("<slideName>([^<]+)</slideName>").getColumn(0);
+            if (items != null && items.length > 0) {
+                for (final String slideName : items) {
+                    final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/" + slideName + imagesExt + "?h=432&f=webp&s=lambda&accelerate_s3=1";
+                    final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+                    image.setAvailable(true);
+                    ret.add(image);
+                }
+            } else {
+                logger.info("XML handling failed -> Use json as fallback");
+                useJsonAPI = true;
+            }
+        }
+        if (useJsonAPI) {
+            if (slidesjsonurl == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            // brc.getPage("https://s.slideslive.com/" + contentID + "/v5/slides.json?" + System.currentTimeMillis() / 1000);
+            brc.getPage(slidesjsonurl);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<Map<String, Object>> slides = (List<Map<String, Object>>) entries.get("slides");
+            int index = 0;
+            for (final Map<String, Object> slide : slides) {
+                final Map<String, Object> imagemap = (Map<String, Object>) slide.get("image");
+                final Map<String, Object> videomap = (Map<String, Object>) slide.get("video");
+                if (imagemap == null && videomap != null) {
+                    /* Not supported */
+                    logger.info("Skipping slide in index: " + index);
+                    continue;
+                }
+                final String slideName = imagemap.get("name").toString();
+                final String directurl = "https://" + slidesHost + "/" + contentID + "/slides/" + slideName + imagesExt + "?h=432&f=webp&s=lambda&accelerate_s3=1";
+                final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+                image.setAvailable(true);
+                ret.add(image);
+                index++;
+            }
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);

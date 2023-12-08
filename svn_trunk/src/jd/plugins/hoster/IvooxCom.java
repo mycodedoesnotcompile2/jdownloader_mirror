@@ -30,7 +30,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48071 $", interfaceVersion = 3, names = { "ivoox.com" }, urls = { "https?://(?:[a-z]+\\.)?ivoox\\.com/(?:[a-z]{2}/)?[a-z0-9\\-]+audios\\-mp3_rf_(\\d+)_\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 48501 $", interfaceVersion = 3, names = { "ivoox.com" }, urls = { "https?://(?:[a-z]+\\.)?ivoox\\.com/(?:[a-z]{2}/)?[a-z0-9\\-]+audios\\-mp3_rf_(\\d+)_\\d+\\.html" })
 public class IvooxCom extends PluginForHost {
     public IvooxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,10 +40,6 @@ public class IvooxCom extends PluginForHost {
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.AUDIO_STREAMING };
     }
-    /* DEV NOTES */
-    // Tags:
-    // protocol: no https
-    // other:
 
     /* Extension which will be used if no correct extension is found */
     private static final String  default_extension = ".mp3";
@@ -109,18 +105,20 @@ public class IvooxCom extends PluginForHost {
             /* 2019-02-05: Old way! */
             dllink = "http://files.ivoox.com/listen/" + fid;
         }
+        if (title != null) {
+            title = Encoding.htmlDecode(title);
+            title = title.trim();
+            link.setName(title + default_extension);
+        }
         /* Important: Direct-URL can only be used one time!! */
         if (dllink != null && !isDownload) {
-            if (title != null) {
-                title = Encoding.htmlDecode(title);
-                title = title.trim();
-                link.setName(title + default_extension);
-            }
             URLConnectionAdapter con = null;
             try {
                 con = br.openHeadConnection(dllink);
                 handleConnectionErrors(br, con);
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.getCompleteContentLength() > 0) {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
                 final String extByMimeType = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
                 if (extByMimeType != null) {
                     link.setFinalFileName(title + "." + extByMimeType);

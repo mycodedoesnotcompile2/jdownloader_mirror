@@ -179,6 +179,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Livestreams are not supported." })
     String decrypter_unavailable_unsupported_livestream();
 
+    @Default(lngs = { "en" }, values = { "Captcha 'Cloudflare Turnstile' is not supported." })
+    String decrypter_unavailable_unsupported_captcha_cloudflare_turnstile();
+
     @Default(lngs = { "en" }, values = { "Blocked by" })
     String decrypter_unavailable_blocked_by();
 
@@ -440,6 +443,24 @@ public interface JdownloaderTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Invalid download directory" })
     String DownloadLink_setSkipped_statusmessage_invalid_path();
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Permission issue" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_permission_issue();
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Permission issue: Failed to write file %s" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_permission_issue_file(final String str);
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Permission issue: Failed to write folder %s" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_permission_issue_folder(final String str);
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Permission issue: Can't write into folder %s" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_permission_issue_failed_to_write_into_folder(final String str);
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Filename too long" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_too_long_filename();
+
+    @Default(lngs = { "en" }, values = { "Invalid download directory: Path too long" })
+    String DownloadLink_setSkipped_statusmessage_invalid_path_too_long_path();
 
     @Default(lngs = { "en" }, values = { "Skipped - Account is missing" })
     String DownloadLink_setSkipped_statusmessage_account();
@@ -1088,6 +1109,18 @@ public interface JdownloaderTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "This plugin also supports login via cookies" })
     String LazyHostPlugin_FEATURE_COOKIE_LOGIN_OPTIONAL_TOOLTIP();
+
+    @Default(lngs = { "en" }, values = { "API key login" })
+    String LazyHostPlugin_FEATURE_API_KEY_LOGIN();
+
+    @Default(lngs = { "en" }, values = { "This plugin also supports login via API key" })
+    String LazyHostPlugin_FEATURE_API_KEY_LOGIN_TOOLTIP();
+
+    @Default(lngs = { "en" }, values = { "Username is e-mail" })
+    String LazyHostPlugin_FEATURE_USERNAME_IS_EMAIL();
+
+    @Default(lngs = { "en" }, values = { "This plugin requires login via e-mail" })
+    String LazyHostPlugin_FEATURE_USERNAME_IS_EMAIL_TOOLTIP();
 
     @Default(lngs = { "en" }, values = { "Cookie login only" })
     String LazyHostPlugin_FEATURE_COOKIE_LOGIN_ONLY();

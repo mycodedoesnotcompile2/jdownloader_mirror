@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48050 $", interfaceVersion = 3, names = { "gaskrank.tv" }, urls = { "https?://(?:www\\.)?gaskrank\\.tv/tv/[A-Za-z0-9\\-_]+/([A-Za-z0-9\\-_]+)\\.htm" })
+@HostPlugin(revision = "$Revision: 48526 $", interfaceVersion = 3, names = { "gaskrank.tv" }, urls = { "https?://(?:www\\.)?gaskrank\\.tv/tv/[A-Za-z0-9\\-_]+/([A-Za-z0-9\\-_]+)\\.htm" })
 public class GaskrankTv extends PluginForHost {
     public GaskrankTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,7 +98,6 @@ public class GaskrankTv extends PluginForHost {
         dllink = Encoding.htmlDecode(dllink);
         filename = Encoding.htmlDecode(filename);
         filename = filename.trim();
-        filename = filename;
         final String ext = getFileNameExtensionFromString(dllink, ".mp4");
         if (!filename.endsWith(ext)) {
             filename += ext;

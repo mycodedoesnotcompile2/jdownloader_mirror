@@ -68,9 +68,10 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 48130 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48523 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -240,7 +241,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> data = (Map<String, Object>) root.get("data");
             final int numberofItemsOnCurrentPage = ((Number) data.get("dist")).intValue();
             numberofItemsWalkedThrough += numberofItemsOnCurrentPage;
@@ -298,7 +299,7 @@ public class RedditComCrawler extends PluginForDecrypt {
             page++;
             logger.info("Crawling page: " + page);
             getPage(br, getApiBaseOauth() + "/user/" + Encoding.urlEncode(acc.getUser()) + "/saved?" + query.toString());
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             crawledLinks.addAll(this.crawlListing(entries, fp));
             final Map<String, Object> data = (Map<String, Object>) entries.get("data");
             final String fullnameAfter = (String) data.get("after");
@@ -313,9 +314,11 @@ public class RedditComCrawler extends PluginForDecrypt {
             } else if (lastItemDupes.contains(fullnameAfter)) {
                 logger.info("Stopping because we already know this fullnameAfter");
                 break;
+            } else {
+                /* Continue to next page */
+                lastItemDupes.add(fullnameAfter);
+                query.addAndReplace("after", fullnameAfter);
             }
-            lastItemDupes.add(fullnameAfter);
-            query.addAndReplace("after", fullnameAfter);
         } while (!this.isAbort());
         return crawledLinks;
     }
@@ -341,10 +344,10 @@ public class RedditComCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         /* [0] = post/"first comment" */
         /* [1] = Comments */
-        final Map<String, Object> entries = (Map<String, Object>) ressourcelist.get(0);
+        final Map<String, Object> entries = ressourcelist.get(0);
         crawledLinks.addAll(this.crawlListing(entries, null));
         return crawledLinks;
     }
@@ -457,6 +460,33 @@ public class RedditComCrawler extends PluginForDecrypt {
                          * http requests see down below.
                          */
                         logger.info("Ignoring URL found in 'url' field: " + maybeExternalURL);
+                    }
+                }
+                final Map<String, Object> preview = (Map<String, Object>) data.get("preview");
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && preview != null) {
+                    // TODO: Add setting to grab previews
+                    final List<Map<String, Object>> images = (List<Map<String, Object>>) preview.get("images");
+                    for (final Map<String, Object> image : images) {
+                        final Map<String, Object> variants = (Map<String, Object>) image.get("variants");
+                        final String gif = (String) JavaScriptEngineFactory.walkJson(variants, "gif/source/url");
+                        final String mp4 = (String) JavaScriptEngineFactory.walkJson(variants, "mp4/source/url");
+                        if (!StringUtils.isEmpty(gif)) {
+                            final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(Encoding.htmlOnlyDecode(gif)));
+                            direct.setAvailable(true);
+                            thisCrawledLinks.add(direct);
+                        }
+                        if (!StringUtils.isEmpty(mp4)) {
+                            final String url = Encoding.htmlOnlyDecode(mp4);
+                            final String filenameFromURL = Plugin.getFileNameFromURL(url);
+                            final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                            if (filenameFromURL != null) {
+                                /* Filename from URL contains .gif extension but this is a .mp4 file -> Correct that */
+                                direct.setFinalFileName(this.correctOrApplyFileNameExtension(filenameFromURL, ".mp4"));
+                            }
+                            direct.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);
+                            direct.setAvailable(true);
+                            thisCrawledLinks.add(direct);
+                        }
                     }
                 }
                 /* 2022-03-10: When a gallery is removed, 'is_gallery' can be true while 'gallery_data' does not exist. */

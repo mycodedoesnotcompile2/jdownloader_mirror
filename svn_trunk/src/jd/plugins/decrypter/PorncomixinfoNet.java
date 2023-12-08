@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.controlling.ProgressController;
@@ -13,6 +14,8 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -21,7 +24,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48410 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48415 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorncomixinfoNet extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
@@ -58,7 +61,7 @@ public class PorncomixinfoNet extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:chapter|porncomic)/([a-z0-9\\-]+)/?(([a-z0-9\\-]+)/?)?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:chapter|porncomic)/([a-z0-9\\-_]+)/?(([a-z0-9\\-_/]+)/?)?");
         }
         return ret.toArray(new String[0]);
     }
@@ -95,24 +98,47 @@ public class PorncomixinfoNet extends PluginForDecrypt {
                     /* 2020-11-13: Not needed anymore */
                     // imageurl = Encoding.htmlDecode(imageurl).replaceFirst("(-\\d+x\\d+)\\.(jpe?g|gif|png)$", ".$2");
                     final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
-                    link.setAvailable(true);
                     ret.add(link);
                 }
             } else {
                 /* New 2023-10-30 */
                 final String[] imageurls = br.getRegex("=\"image-\\d+\"\\s*src=\"\\s*(https?://[^\"]+)\"").getColumn(0);
-                if (imageurls == null || imageurls.length == 0) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (imageurls != null && imageurls.length > 0) {
+                    for (final String imageurl : imageurls) {
+                        final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
+                        ret.add(link);
+                    }
                 }
-                for (final String imageurl : imageurls) {
-                    final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
-                    link.setAvailable(true);
+            }
+            /* Add cover URLs */
+            final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+            final HashSet<String> webpurls = new HashSet<String>();
+            for (final String url : urls) {
+                if (StringUtils.endsWithCaseInsensitive(url, "cover.jpg") || StringUtils.endsWithCaseInsensitive(url, "cover.webp")) {
+                    final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                    ret.add(link);
+                } else if (url.endsWith(".webp")) {
+                    webpurls.add(url);
+                }
+            }
+            if (ret.isEmpty() && webpurls.size() > 0) {
+                /* Final fallback for cover URLs */
+                for (final String webpurl : webpurls) {
+                    final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(webpurl));
                     ret.add(link);
                 }
             }
+            if (ret.isEmpty()) {
+                throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+            }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);
-            fp.addLinks(ret);
+            /* Some chapters have the same names but they should go into separate packages. */
+            fp.setPackageKey("porncomix://chapter_by_url_path/" + br._getURL().getPath());
+            for (final DownloadLink result : ret) {
+                result.setAvailable(true);
+                result._setFilePackage(fp);
+            }
         } else if (seriesSlug != null) {
             /* Find all chapters of series */
             final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());

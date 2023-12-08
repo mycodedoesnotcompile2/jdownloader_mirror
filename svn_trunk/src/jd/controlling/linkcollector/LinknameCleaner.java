@@ -7,13 +7,10 @@ import java.util.Map.Entry;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import jd.controlling.packagecontroller.AbstractNode;
-
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.storage.config.handler.ObjectKeyHandler;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -48,12 +45,11 @@ public class LinknameCleaner {
             /* not loaded yet */
         }
     }
-    public static final Pattern   pat12    = Pattern.compile("(CD\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat13    = Pattern.compile("(part\\d+)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat17    = Pattern.compile("(.+)\\.\\d+\\.xtm($|\\.html?)");
-    public static final Pattern   pat18    = Pattern.compile("(.*)\\.isz($|\\.html?)", Pattern.CASE_INSENSITIVE);
-    public static final Pattern   pat19    = Pattern.compile("(.*)\\.i\\d{2}$", Pattern.CASE_INSENSITIVE);
-    public static final Pattern[] iszPats  = new Pattern[] { pat18, pat19 };
+    public static final Pattern   pat13   = Pattern.compile("(part\\d+)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat17   = Pattern.compile("(.+)\\.\\d+\\.xtm($|\\.html?)");
+    public static final Pattern   pat18   = Pattern.compile("(.*)\\.isz($|\\.html?)", Pattern.CASE_INSENSITIVE);
+    public static final Pattern   pat19   = Pattern.compile("(.*)\\.i\\d{2}$", Pattern.CASE_INSENSITIVE);
+    public static final Pattern[] iszPats = new Pattern[] { pat18, pat19 };
 
     public static enum EXTENSION_SETTINGS {
         KEEP,
@@ -61,18 +57,111 @@ public class LinknameCleaner {
         REMOVE_ALL
     }
 
-    public static String cleanFileName(String name, boolean splitUpperLowerCase, boolean ignoreArchiveFilters, final EXTENSION_SETTINGS extensionSettings, boolean cleanup) {
-        return cleanFileName(null, name, splitUpperLowerCase, ignoreArchiveFilters, extensionSettings, cleanup);
+    private static volatile Map<Pattern, String> FILENAME_REPLACEMAP         = new HashMap<Pattern, String>();
+    private static volatile Map<Pattern, String> FILENAME_REPLACEMAP_DEFAULT = new HashMap<Pattern, String>();
+    static {
+        final ObjectKeyHandler replaceMapKeyHandler = CFG_GENERAL.FILENAME_CHARACTER_REGEX_REPLACEMAP;
+        replaceMapKeyHandler.getEventSender().addListener(new GenericConfigEventListener<Object>() {
+            @Override
+            public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
+                FILENAME_REPLACEMAP = convertReplaceMap((Map<String, String>) newValue);
+            }
+
+            @Override
+            public void onConfigValidatorError(KeyHandler<Object> keyHandler, Object invalidValue, ValidationException validateException) {
+            }
+        });
+        FILENAME_REPLACEMAP = convertReplaceMap((Map<String, String>) replaceMapKeyHandler.getValue());
+        FILENAME_REPLACEMAP_DEFAULT = convertReplaceMap((Map<String, String>) replaceMapKeyHandler.getDefaultValue());
+    }
+    private static volatile Map<Pattern, String> PACKAGENAME_REPLACEMAP         = new HashMap<Pattern, String>();
+    private static volatile Map<Pattern, String> PACKAGENAME_REPLACEMAP_DEFAULT = new HashMap<Pattern, String>();
+    static {
+        final ObjectKeyHandler replaceMapKeyHandler = CFG_GENERAL.PACKAGE_NAME_CHARACTER_REGEX_REPLACEMAP;
+        replaceMapKeyHandler.getEventSender().addListener(new GenericConfigEventListener<Object>() {
+            @Override
+            public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
+                PACKAGENAME_REPLACEMAP = convertReplaceMap((Map<String, String>) newValue);
+            }
+
+            @Override
+            public void onConfigValidatorError(KeyHandler<Object> keyHandler, Object invalidValue, ValidationException validateException) {
+            }
+        });
+        PACKAGENAME_REPLACEMAP = convertReplaceMap((Map<String, String>) replaceMapKeyHandler.getValue());
+        PACKAGENAME_REPLACEMAP_DEFAULT = convertReplaceMap((Map<String, String>) replaceMapKeyHandler.getDefaultValue());
     }
 
-    /* TODO: Refactor this */
-    public static String cleanFileName(AbstractNode node, String name, boolean splitUpperLowerCase, boolean ignoreArchiveFilters, final EXTENSION_SETTINGS extensionSettings, boolean cleanup) {
+    /** Converts given <String, String> Map to <Pattern, String> Map. */
+    private static Map<Pattern, String> convertReplaceMap(final Map<String, String> replaceMap) {
+        if (replaceMap == null) {
+            return null;
+        }
+        final Map<Pattern, String> ret = new HashMap<Pattern, String>();
+        for (final Entry<String, String> entry : replaceMap.entrySet()) {
+            if (StringUtils.isNotEmpty(entry.getKey()) && entry.getValue() != null) {
+                try {
+                    ret.put(Pattern.compile(entry.getKey()), entry.getValue());
+                } catch (final PatternSyntaxException e) {
+                }
+            }
+        }
+        return ret;
+    }
+
+    private static String replaceCharactersByMap(final String str, final Map<Pattern, String> forbiddenCharacterRegexReplaceMap) {
+        if (forbiddenCharacterRegexReplaceMap == null) {
+            return str;
+        }
+        String newstr = str;
+        final Iterator<Entry<Pattern, String>> iterator = forbiddenCharacterRegexReplaceMap.entrySet().iterator();
+        while (iterator.hasNext()) {
+            final Entry<Pattern, String> entry = iterator.next();
+            final Pattern pattern = entry.getKey();
+            final String replacement = entry.getValue();
+            if (replacement != null) {
+                try {
+                    newstr = pattern.matcher(newstr).replaceAll(replacement);
+                } catch (final PatternSyntaxException e) {
+                }
+            }
+        }
+        /**
+         * Users can put anything into that replace map. </br>
+         * Try to avoid the results of adding something like ".+" resulting in empty filenames.
+         */
+        if (!StringUtils.isEmpty(newstr)) {
+            return newstr;
+        } else {
+            /* Fallback */
+            return str;
+        }
+    }
+
+    public static String cleanFilename(final String filename, final boolean removeLeadingHidingDot) {
+        String newfinalFileName = filename;
+        newfinalFileName = replaceCharactersByMap(filename, FILENAME_REPLACEMAP);
+        /* We can never know how users alter the setting so let's do one more round with our default replace map. */
+        newfinalFileName = replaceCharactersByMap(filename, FILENAME_REPLACEMAP_DEFAULT);
+        newfinalFileName = CrossSystem.alleviatePathParts(newfinalFileName, removeLeadingHidingDot);
+        return newfinalFileName;
+    }
+
+    public static String cleanPackagename(String name, boolean splitUpperLowerCase, boolean removeArchiveExtensions, final EXTENSION_SETTINGS extensionSettings, boolean allowCleanup) {
         if (name == null) {
             return null;
         }
+        /*
+         * Basic cleanup: Remove typical invalid characters because in many cases the package name will be used as part of our download
+         * path.
+         */
+        // TODO: Remove this into the optional "CLEAN_UP_PACKAGENAMES" handling down below
+        name = replaceCharactersByMap(name, PACKAGENAME_REPLACEMAP);
+        name = replaceCharactersByMap(name, PACKAGENAME_REPLACEMAP_DEFAULT);
         boolean extensionStilExists = true;
         String before = name;
-        if (!ignoreArchiveFilters) {
+        // final boolean removeArchiveExtensions = false;
+        if (removeArchiveExtensions) {
             /** remove rar extensions */
             for (Pattern Pat : rarPats) {
                 name = getNameMatch(name, Pat);
@@ -130,14 +219,7 @@ public class LinknameCleaner {
                 }
             }
         }
-        /**
-         * remove CDx,Partx
-         */
-        String tmpname = cutNameMatch(name, pat12);
-        if (tmpname.length() > 3) {
-            name = tmpname;
-        }
-        tmpname = cutNameMatch(name, pat13);
+        String tmpname = cutNameMatch(name, pat13);
         if (tmpname.length() > 3) {
             name = tmpname;
         }
@@ -145,20 +227,19 @@ public class LinknameCleaner {
         if (EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) || EXTENSION_SETTINGS.REMOVE_KNOWN.equals(extensionSettings)) {
             while (true) {
                 final int lastPoint = name.lastIndexOf(".");
-                if (lastPoint > 0) {
-                    final int extLength = (name.length() - (lastPoint + 1));
-                    final String ext = name.substring(lastPoint + 1);
-                    final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
-                    if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
-                        /* make sure to cut off only known extensions */
+                if (lastPoint <= 0) {
+                    break;
+                }
+                final int extLength = (name.length() - (lastPoint + 1));
+                final String ext = name.substring(lastPoint + 1);
+                final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
+                if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
+                    /* make sure to cut off only known extensions */
+                    name = name.substring(0, lastPoint);
+                } else if (extLength <= 4 && EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) && ext.matches("^[0-9a-zA-z]+$")) {
+                    /* make sure to cut off only known extensions */
+                    if (extensionStilExists) {
                         name = name.substring(0, lastPoint);
-                    } else if (extLength <= 4 && EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) && ext.matches("^[0-9a-zA-z]+$")) {
-                        /* make sure to cut off only known extensions */
-                        if (extensionStilExists) {
-                            name = name.substring(0, lastPoint);
-                        } else {
-                            break;
-                        }
                     } else {
                         break;
                     }
@@ -181,7 +262,7 @@ public class LinknameCleaner {
             name = name.substring(0, removeIndex);
         }
         /* if enabled, replace dots and _ with spaces and do further clean ups */
-        if (cleanup && org.jdownloader.settings.staticreferences.CFG_GENERAL.CLEAN_UP_FILENAMES.isEnabled()) {
+        if (allowCleanup && org.jdownloader.settings.staticreferences.CFG_GENERAL.CLEAN_UP_PACKAGENAMES.isEnabled()) {
             StringBuilder sb = new StringBuilder();
             char[] cs = name.toCharArray();
             char lastChar = 'a';
@@ -211,81 +292,122 @@ public class LinknameCleaner {
         return name.trim();
     }
 
-    public static String cleanPackagename(final String packagename) {
-        return LinknameCleaner.cleanFileName(null, packagename, false, true, LinknameCleaner.EXTENSION_SETTINGS.REMOVE_KNOWN, true);
-    }
-
-    private static volatile Map<Pattern, String> REPLACEMAP = new HashMap<Pattern, String>();
-    static {
-        final ObjectKeyHandler replaceMapKeyHandler = CFG_GENERAL.FILENAME_AND_PATH_CHARACTER_REGEX_REPLACEMAP;
-        replaceMapKeyHandler.getEventSender().addListener(new GenericConfigEventListener<Object>() {
-            @Override
-            public void onConfigValueModified(KeyHandler<Object> keyHandler, Object newValue) {
-                REPLACEMAP = convertReplaceMap((Map<String, String>) newValue);
-            }
-
-            @Override
-            public void onConfigValidatorError(KeyHandler<Object> keyHandler, Object invalidValue, ValidationException validateException) {
-            }
-        });
-        REPLACEMAP = convertReplaceMap((Map<String, String>) replaceMapKeyHandler.getValue());
-    }
-
-    private static Map<Pattern, String> convertReplaceMap(Map<String, String> replaceMap) {
-        final Map<Pattern, String> ret = new HashMap<Pattern, String>();
-        if (replaceMap != null) {
-            for (Entry<String, String> entry : replaceMap.entrySet()) {
-                if (StringUtils.isNotEmpty(entry.getKey()) && entry.getValue() != null) {
-                    try {
-                        ret.put(Pattern.compile(entry.getKey()), entry.getValue());
-                    } catch (final PatternSyntaxException e) {
-                    }
+    /** Derives package name out of given filename. */
+    public static String derivePackagenameFromFilename(String name) {
+        // TODO: Add functionality
+        /*
+         * Basic cleanup: Remove typical invalid characters because in many cases the package name will be used as part of our download
+         * path.
+         */
+        name = replaceCharactersByMap(name, PACKAGENAME_REPLACEMAP);
+        name = replaceCharactersByMap(name, PACKAGENAME_REPLACEMAP_DEFAULT);
+        boolean extensionStilExists = true;
+        String before = name;
+        {
+            /* Remove known archive file-extensions */
+            /** remove rar extensions */
+            for (Pattern Pat : rarPats) {
+                name = getNameMatch(name, Pat);
+                if (!before.equals(name)) {
+                    extensionStilExists = false;
+                    break;
                 }
             }
-        }
-        if (ret.size() > 0) {
-            return ret;
-        } else {
-            return null;
-        }
-    }
-
-    public static String cleanFilename(final String filename, final boolean removeLeadingHidingDot) {
-        String newfinalFileName = filename;
-        final String toRemove = new Regex(newfinalFileName, Pattern.compile("r(?:ar|\\d{2,3})(\\.html?)$", Pattern.CASE_INSENSITIVE)).getMatch(0);
-        if (toRemove != null) {
-            System.out.println("Use Workaround for stupid >>rar.html<< uploaders!");
-            newfinalFileName = newfinalFileName.substring(0, newfinalFileName.length() - toRemove.length());
-        }
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            // 2023-08-04: TODO, see https://svn.jdownloader.org/issues/83699
-            // TODO: This should never be null ?!
-            final Map<Pattern, String> forbiddenCharacterRegexReplaceMap = REPLACEMAP;
-            if (forbiddenCharacterRegexReplaceMap != null) {
-                String newfilenameTemp = newfinalFileName;
-                final Iterator<Entry<Pattern, String>> iterator = forbiddenCharacterRegexReplaceMap.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    final Entry<Pattern, String> entry = iterator.next();
-                    final Pattern pattern = entry.getKey();
-                    final String replacement = entry.getValue();
-                    if (replacement != null) {
-                        try {
-                            newfilenameTemp = pattern.matcher(newfilenameTemp).replaceAll(replacement);
-                        } catch (final PatternSyntaxException e) {
-                        }
-                    }
-                }
+            if (extensionStilExists) {
                 /**
-                 * Users can put anything into that replace map. </br> Try to avoid the results of adding something like ".+" resulting in
-                 * empty filenames.
+                 * remove 7zip/zip and merge extensions
                  */
-                if (!StringUtils.isEmpty(newfilenameTemp)) {
-                    newfinalFileName = newfilenameTemp;
+                before = name;
+                for (Pattern Pat : zipPats) {
+                    name = getNameMatch(name, Pat);
+                    if (!before.equals(name)) {
+                        extensionStilExists = false;
+                        break;
+                    }
+                }
+            }
+            if (extensionStilExists) {
+                /**
+                 * remove isz extensions
+                 */
+                before = name;
+                for (Pattern Pat : iszPats) {
+                    name = getNameMatch(name, Pat);
+                    if (!before.equals(name)) {
+                        extensionStilExists = false;
+                        break;
+                    }
+                }
+            }
+            if (extensionStilExists) {
+                before = name;
+                /* xtremsplit */
+                name = getNameMatch(name, pat17);
+                if (!before.equals(name)) {
+                    extensionStilExists = false;
+                }
+            }
+            if (extensionStilExists && ffsjPats != null) {
+                /**
+                 * FFSJ splitted files
+                 *
+                 */
+                before = name;
+                for (Pattern Pat : ffsjPats) {
+                    name = getNameMatch(name, Pat);
+                    if (!before.equalsIgnoreCase(name)) {
+                        extensionStilExists = false;
+                        break;
+                    }
                 }
             }
         }
-        newfinalFileName = CrossSystem.alleviatePathParts(newfinalFileName, removeLeadingHidingDot);
-        return newfinalFileName;
+        String tmpname = cutNameMatch(name, pat13);
+        if (tmpname.length() > 3) {
+            name = tmpname;
+        }
+        /* Remove other file extensions */
+        {
+            final EXTENSION_SETTINGS extensionSettings = EXTENSION_SETTINGS.REMOVE_ALL;
+            if (EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) || EXTENSION_SETTINGS.REMOVE_KNOWN.equals(extensionSettings)) {
+                while (true) {
+                    final int lastPoint = name.lastIndexOf(".");
+                    if (lastPoint <= 0) {
+                        break;
+                    }
+                    final int extLength = (name.length() - (lastPoint + 1));
+                    final String ext = name.substring(lastPoint + 1);
+                    final ExtensionsFilterInterface knownExt = CompiledFiletypeFilter.getExtensionsFilterInterface(ext);
+                    if (knownExt != null && !ArchiveExtensions.NUM.equals(knownExt)) {
+                        /* make sure to cut off only known extensions */
+                        name = name.substring(0, lastPoint);
+                    } else if (extLength <= 4 && EXTENSION_SETTINGS.REMOVE_ALL.equals(extensionSettings) && ext.matches("^[0-9a-zA-z]+$")) {
+                        /* make sure to cut off only known extensions */
+                        if (extensionStilExists) {
+                            name = name.substring(0, lastPoint);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        /* Remove ending ., - , _ */
+        int removeIndex = -1;
+        for (int i = name.length() - 1; i >= 0; i--) {
+            final char c = name.charAt(i);
+            if (c == ',' || c == '_' || c == '-') {
+                removeIndex = i;
+            } else {
+                break;
+            }
+        }
+        if (removeIndex > 0) {
+            name = name.substring(0, removeIndex);
+        }
+        return cleanPackagename(name, true, true, EXTENSION_SETTINGS.REMOVE_ALL, true);
     }
 
     private static String getNameMatch(String name, Pattern pattern) {

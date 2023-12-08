@@ -24,7 +24,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 46959 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48430 $", interfaceVersion = 3, names = {}, urls = {})
 public class RashaPornoCom extends PornEmbedParser {
     public RashaPornoCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +38,7 @@ public class RashaPornoCom extends PornEmbedParser {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "rasha-porno.com" });
+        ret.add(new String[] { "rasha-porno.cc", "rasha-porno.com" });
         return ret;
     }
 

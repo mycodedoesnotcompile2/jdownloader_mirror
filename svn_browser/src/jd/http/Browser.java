@@ -640,7 +640,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     * 
+     *
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -2967,6 +2967,39 @@ public class Browser {
             @Override
             public BlockSourceType getBlockSourceType() {
                 return BlockSourceType.SOFTWARE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
+        NETWORK_SECURITY_SUCURI {
+            @Override
+            public String getLabel() {
+                return "Sucuri.net Website Firewall";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isRequested() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 403 && request.getResponseHeader("X-Sucuri-Block") != null && request.getHtmlCode() != null && request.getHtmlCode().contains("sucuri.net")) {
+                    return this;
+                } else {
+                    return null;
+                }
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
             }
 
             @Override

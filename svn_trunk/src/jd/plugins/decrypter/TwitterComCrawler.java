@@ -82,7 +82,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48370 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48494 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -96,11 +96,18 @@ public class TwitterComCrawler extends PluginForDecrypt {
         super(wrapper);
     }
 
-    private static final String            TYPE_CARD                                                        = "https?://[^/]+/i/cards/tfw/v1/(\\d+)";
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static final Pattern           PATTERN_CARD                                                     = Pattern.compile("(?i)https?://[^/]+/i/cards/tfw/v1/(\\d+)");
     private static final String            TYPE_USER_ALL                                                    = "https?://[^/]+/([\\w\\-]+)(?:/(?:media|likes))?(\\?.*)?";
     private static final String            TYPE_USER_LIKES                                                  = "https?://[^/]+/([\\w\\-]+)/likes.*";
     private static final String            TYPE_USER_MEDIA                                                  = "https?://[^/]+/([\\w\\-]+)/media.*";
-    private static final String            TYPE_USER_POST                                                   = "https?://[^/]+/([^/]+)/status/(\\d+).*?";
+    private static final Pattern           PATTERN_SINGLE_TWEET                                             = Pattern.compile("(?i)https?://[^/]+/([^/]+)/status/(\\d+).*?");
     // private ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
     private static AtomicReference<String> GUEST_TOKEN                                                      = new AtomicReference<String>();
     private static AtomicLong              GUEST_TOKEN_TS                                                   = new AtomicLong(-1);
@@ -207,12 +214,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         } catch (final Throwable ignore) {
         }
         br.setAllowedResponseCodes(new int[] { 429 });
-        final String newURL = getContentURL(param);
-        if (!newURL.equals(param.getCryptedUrl())) {
-            logger.info("Currected URL: Old: " + param.getCryptedUrl() + " | New: " + newURL);
-            param.setCryptedUrl(newURL);
-        }
-        br.setFollowRedirects(true);
+        final String contenturl = getContentURL(param);
         /* Some profiles can only be accessed if they accepted others as followers --> Login if the user has added his twitter account */
         final Account account = getUserLogin(false);
         if (account != null) {
@@ -223,14 +225,24 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 throw new AccountRequiredException();
             }
         }
-        if (param.getCryptedUrl().matches(TYPE_CARD)) {
-            return this.crawlCard(param, account);
-        } else if (param.getCryptedUrl().matches(TwitterCom.TYPE_VIDEO_EMBED)) {
-            return this.crawlSingleTweet(account, null, new Regex(param.getCryptedUrl(), TwitterCom.TYPE_VIDEO_EMBED).getMatch(0));
-        } else if (param.getCryptedUrl().matches(TYPE_USER_POST)) {
-            return this.crawlSingleTweet(param, account);
+        final Regex singletweetVideoEmbed = new Regex(contenturl, TwitterCom.TYPE_VIDEO_EMBED);
+        final Regex singletweet = new Regex(contenturl, PATTERN_SINGLE_TWEET);
+        if (new Regex(contenturl, PATTERN_CARD).patternFind()) {
+            return this.crawlCard(contenturl);
+        } else if (singletweetVideoEmbed.patternFind()) {
+            final String tweetID = singletweetVideoEmbed.getMatch(0);
+            return this.crawlSingleTweet(account, null, tweetID);
+        } else if (singletweet.patternFind()) {
+            final String username = singletweet.getMatch(0);
+            final String tweetID = singletweet.getMatch(1);
+            return this.crawlSingleTweet(account, username, tweetID);
         } else {
-            return this.crawlUser(param, account);
+            final String username = new Regex(contenturl, TYPE_USER_ALL).getMatch(0);
+            if (StringUtils.endsWithCaseInsensitive(contenturl, "/likes")) {
+                return this.crawlUser(param, account, username, true);
+            } else {
+                return this.crawlUser(param, account, username, false);
+            }
         }
     }
 
@@ -249,7 +261,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private String getGraphqlQueryID(final String operationName) throws IOException, PluginException {
         synchronized (graphqlQueryids) {
             if (graphqlQueryids.isEmpty() || !graphqlQueryids.containsKey(operationName) || true) {
-                final Browser br = new Browser();
+                final Browser br = this.createNewBrowserInstance();
                 br.getPage("https://abs.twimg.com/responsive-web/client-web/api.b9f7c7ea.js");
                 final HashSet<String> operationNamesToCache = new HashSet<String>();
                 operationNamesToCache.add("UserByScreenName");
@@ -314,13 +326,14 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     @Deprecated
-    private ArrayList<DownloadLink> crawlCard(final CryptedLink param, final Account account) throws Exception {
+    private ArrayList<DownloadLink> crawlCard(final String contenturl) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String tweetID = new Regex(param.getCryptedUrl(), TYPE_CARD).getMatch(0);
+        final String tweetID = new Regex(contenturl, PATTERN_CARD).getMatch(0);
         if (tweetID == null) {
+            /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(param.getCryptedUrl());
+        getPage(contenturl);
         if (br.getRequest().getHttpConnection().getResponseCode() == 403 || br.getRequest().getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("class=\"ProtectedTimeline\"")) {
@@ -348,17 +361,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
             ret.add(dl);
         }
         return ret;
-    }
-
-    private ArrayList<DownloadLink> crawlSingleTweet(final CryptedLink param, final Account account) throws Exception {
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_USER_POST);
-        if (!urlinfo.patternFind()) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String username = urlinfo.getMatch(0);
-        final String tweetID = urlinfo.getMatch(1);
-        return crawlSingleTweet(account, username, tweetID);
     }
 
     private ArrayList<DownloadLink> crawlSingleTweet(final Account account, final String username, final String tweetID) throws Exception {
@@ -1047,32 +1049,26 @@ public class TwitterComCrawler extends PluginForDecrypt {
         return formatTwitterDateFromDate(new Date(timestamp));
     }
 
-    /** Returns true if an account is required to process the given URL. */
-    private boolean requiresAccount(final String url) {
-        if (url.matches(TYPE_USER_LIKES)) {
-            return true;
-        } else {
-            return false;
+    private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account, final String username, final boolean crawlUserLikes) throws Exception {
+        if (StringUtils.isEmpty(username)) {
+            throw new IllegalArgumentException();
         }
-    }
-
-    private ArrayList<DownloadLink> crawlUser(final CryptedLink param, final Account account) throws Exception {
-        final String username = new Regex(param.getCryptedUrl(), TYPE_USER_ALL).getMatch(0);
-        if (requiresAccount(param.getCryptedUrl()) && account == null) {
+        if (crawlUserLikes && account == null) {
             logger.info("Account required to crawl all liked items of a user");
             throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "ACCOUNT_REQUIRED_TO_CRAWL_LIKED_ITEMS_OF_PROFILE_" + username, "Account is required to crawl liked items of profiles.");
         }
+        final String warningtextNoAccount = "You did not add a Twitter account to JDownloader or you've disabled it.\r\nAdd your twitter.com account under: Settings -> Account Manager -> Add";
         if (account == null) {
-            displayBubblenotifyMessage("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nTwitter is hiding some posts (e.g. NSFW content) or profiles when a user is not logged in\r\nYou did not add a Twitter account to JDownloader or you've disabled it.");
+            displayBubblenotifyMessage("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nTwitter is hiding some posts (e.g. NSFW content) or profiles when a user is not logged in\r\n" + warningtextNoAccount);
         }
         final boolean crawlRetweets = PluginJsonConfig.get(TwitterConfigInterface.class).isCrawlRetweetsV2();
         if (account == null && crawlRetweets) {
-            displayBubblenotifyMessage("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nYou've enabled re-tweet crawling in twitter plugin settings.\r\nTwitter is sometimes hiding Re-Tweets when users are not logged in.\r\nYou did not add a Twitter account to JDownloader or you've disabled it.");
+            displayBubblenotifyMessage("Profile crawler " + username + " | Warning", "Results may be incomplete!\r\nYou've enabled re-tweet crawling in twitter plugin settings.\r\nTwitter is sometimes hiding Re-Tweets when users are not logged in.\r\n" + warningtextNoAccount);
         }
         if (crawlRetweets) {
-            return this.crawlUserViaGraphqlAPI(username, param, account);
+            return this.crawlUserViaGraphqlAPI(username, account);
         } else {
-            return crawlUserViaAPI(username, param, account);
+            return crawlUserViaAPI(username, crawlUserLikes, param, account);
         }
     }
 
@@ -1080,7 +1076,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private final String TWITTER_PROFILE_LIKES_PACKAGE_KEY_PREFIX = "twitterprofile_likes://";
 
     /** Crawls only tweets that were posted by the profile in given URL, no re-tweets!!! */
-    private ArrayList<DownloadLink> crawlUserViaAPI(final String username, final CryptedLink param, final Account account) throws Exception {
+    private ArrayList<DownloadLink> crawlUserViaAPI(final String username, final boolean crawlUserLikes, final CryptedLink param, final Account account) throws Exception {
         logger.info("Crawling user profile via API");
         if (username == null) {
             /* Developer mistake */
@@ -1096,6 +1092,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         /* = number of tweets containing media (can be lower [ar also higher?] than "statuses_count") */
         final int media_count = ((Number) user.get("media_count")).intValue();
         final boolean force_grab_media = true;
+        final boolean grabMedia = force_grab_media;
         /* Grab only content posted by user or grab everything from his timeline e.g. also re-tweets. */
         final String content_type;
         Integer maxCount = null;
@@ -1126,7 +1123,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         query.add("send_error_codes", "true");
         query.add("simple_quoted_tweet", "true");
         final FilePackage fp = FilePackage.getInstance();
-        if (param.getCryptedUrl().matches(TYPE_USER_LIKES)) {
+        if (crawlUserLikes) {
             /* Crawl all liked items of a user */
             logger.info("Crawling all liked items of user " + username);
             content_type = "favorites";
@@ -1140,7 +1137,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
             query.append("sorted_by_time", "true", false);
             fp.setName(username + " - likes");
             fp.setPackageKey(TWITTER_PROFILE_LIKES_PACKAGE_KEY_PREFIX + userID);
-        } else if (param.getCryptedUrl().matches(TYPE_USER_MEDIA) || force_grab_media) {
+        } else {
             logger.info("Crawling self posted media only from user: " + username);
             if (media_count == 0) {
                 ret.add(getDummyErrorProfileContainsNoMediaItems(username));
@@ -1150,22 +1147,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
             maxCount = media_count;
             fp.setName(username);
             fp.setPackageKey(TWITTER_PROFILE_PACKAGE_KEY_PREFIX + userID);
-        } else {
-            /*
-             * 2022-03-18: Legacy - not used anymore! This endpoint has either been removed by twitter or we're using it wrong. It would
-             * always return error 429 rate limit reached!
-             */
-            /* TODO: Remove this after 08-2022 */
-            logger.info("Crawling ALL media of a user e.g. also retweets | user: " + username);
-            if (tweet_count == 0) {
-                /* Profile contains zero tweets! */
-                ret.add(getDummyErrorProfileContainsNoTweets(username));
-                return ret;
-            }
-            content_type = "profile";
-            maxCount = tweet_count;
-            query.add("include_tweet_replies", "false");
-            fp.setName(username);
         }
         query.append("userId", userID, false);
         query.append("count", expected_items_per_page + "", false);
@@ -1299,7 +1280,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
     }
 
     /** Crawls tweets AND re-tweets of profile in given URL. */
-    private ArrayList<DownloadLink> crawlUserViaGraphqlAPI(final String username, final CryptedLink param, final Account account) throws Exception {
+    private ArrayList<DownloadLink> crawlUserViaGraphqlAPI(final String username, final Account account) throws Exception {
         if (username == null) {
             /* Developer mistake */
             throw new IllegalArgumentException();

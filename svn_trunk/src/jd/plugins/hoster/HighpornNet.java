@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48076 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
+@HostPlugin(revision = "$Revision: 48515 $", interfaceVersion = 3, names = { "highporn.net" }, urls = { "highporndecrypted://(.+)" })
 public class HighpornNet extends antiDDoSForHost {
     @Override
     public String[] siteSupportedNames() {
@@ -96,7 +96,7 @@ public class HighpornNet extends antiDDoSForHost {
         }
         getPage(url_source);
         dllink = br.getRegex("data-src\\s*=\\s*\"(https?[^<>\"]+)\"").getMatch(0); // If single link, no videoID
-        if (jd.plugins.decrypter.HighpornNet.isOffline(br)) {
+        if (jd.plugins.decrypter.HighpornNetCrawler.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String fid = getFID(link);

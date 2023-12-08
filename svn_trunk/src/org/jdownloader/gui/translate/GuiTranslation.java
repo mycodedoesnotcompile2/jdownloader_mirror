@@ -162,7 +162,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Restart Download when SFV/CRC check fails" })
     String gui_config_restart_crc();
 
-    @Default(lngs = { "en" }, values = { "Auto open Link Containers (dlc,ccf,...)" })
+    @Default(lngs = { "en" }, values = { "Auto open Link Containers (dlc,ccf,nzb,...)" })
     String gui_config_simple_container();
 
     @Default(lngs = { "en" }, values = { "Miscellaneous" })
@@ -294,8 +294,17 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Name:" })
     String jd_gui_swing_components_AccountDialog_name();
 
+    @Default(lngs = { "en" }, values = { "E-Mail:" })
+    String jd_gui_swing_components_AccountDialog_email();
+
+    @Default(lngs = { "en" }, values = { "Cookies:" })
+    String jd_gui_swing_components_AccountDialog_cookies();
+
     @Default(lngs = { "en" }, values = { "Pass:" })
     String jd_gui_swing_components_AccountDialog_pass();
+
+    @Default(lngs = { "en" }, values = { "Pass or cookies:" })
+    String jd_gui_swing_components_AccountDialog_pass_or_cookies();
 
     @Default(lngs = { "en" }, values = { "Add new Account" })
     String jd_gui_swing_components_AccountDialog_title();
@@ -555,8 +564,23 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Login cookies invalid" })
     String accountdialog_check_cookies_invalid();
 
+    @Default(lngs = { "en" }, values = { "Please enter a valid e-mail address into the username field." })
+    String accountdialog_LoginValidationErrorInputIsNotEmailAddress();
+
+    @Default(lngs = { "en" }, values = { "Cookie login is not supported for this provider." })
+    String accountdialog_LoginValidationErrorCookieLoginUnsupportedButGiven();
+
+    @Default(lngs = { "en" }, values = { "Cookie login is required for this provider but you did not provide login cookies." })
+    String accountdialog_LoginValidationErrorCookieLoginMandatoryButNoCookiesGiven();
+
+    @Default(lngs = { "en" }, values = { "Invalid API key" })
+    String accountdialog_LoginValidationErrorInvalidAPIKey();
+
     @Default(lngs = { "en" }, values = { "Enter Username..." })
     String jd_gui_swing_components_AccountDialog_help_username();
+
+    @Default(lngs = { "en" }, values = { "Enter E-Mail..." })
+    String jd_gui_swing_components_AccountDialog_help_email();
 
     @Default(lngs = { "en" }, values = { "Really remove %s1 account(s)?" })
     String account_remove_action_title(int num);
@@ -1257,6 +1281,12 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Enter password..." })
     String BuyAndAddPremiumAccount_layoutDialogContent_pass();
+
+    @Default(lngs = { "en" }, values = { "Enter password or exported cookies..." })
+    String BuyAndAddPremiumAccount_layoutDialogContent_pass_or_cookies();
+
+    @Default(lngs = { "en" }, values = { "Enter cookies..." })
+    String BuyAndAddPremiumAccount_layoutDialogContent_cookies();
 
     @Default(lngs = { "en" }, values = { "Max. sim. Downloads per Hoster" })
     String ParalellDownloadsEditor_ParallelDownloadsPerHostEditor_();
@@ -4534,6 +4564,12 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Publishing Date(Year,month,day). *date* or e.g. *date[yyyy/MM/dd]*" })
     String YoutubeHelper_getDescription_date();
 
+    @Default(lngs = { "en" }, values = { "Livestream start date" })
+    String YoutubeHelper_getDescription_date_livestream_start();
+
+    @Default(lngs = { "en" }, values = { "Livestream end date" })
+    String YoutubeHelper_getDescription_date_livestream_end();
+
     @Default(lngs = { "en" }, values = { "Uploaded Date(Year,month,day). *date_upload* or e.g. *date_upload[yyyy/MM/dd]*" })
     String YoutubeHelper_getDescription_date_upload();
 
@@ -6686,6 +6722,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Filename for Description files" })
     String YoutubeDashConfigPanel_YoutubeDashConfigPanel_filename_pattern_description();
+
+    @Default(lngs = { "en" }, values = { "Playlist items: Include position at beginning of filenames?" })
+    String YoutubeDashConfigPanel_YoutubeDashConfigPanel_PlaylistItemsIncludePlaylistPositionAtBeginningOfFilenames();
 
     @Default(lngs = { "en" }, values = { "Add an account to get the best our of this plugin. By using a premium account, JDownloader is able to bypass all limitations  for this plugin (like speed limits, banned IPs,...)" })
     String description_accountmanager_button();

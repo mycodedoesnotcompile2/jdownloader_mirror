@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TiktokComCrawler;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 48429 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
 public class TiktokCom extends PluginForHost {
     public TiktokCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -1032,8 +1032,8 @@ public class TiktokCom extends PluginForHost {
                 }
                 logger.info("Attempting user cookie login");
                 prepBRWebAPI(br);
-                br.getPage("https://us." + this.getHost() + "/passport/web/account/info/?" + getWebsiteQuery().toString());
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                br.getPage("https://www." + getHost() + "/passport/web/account/info/?" + getWebsiteQuery().toString());
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final String msg = entries.get("message").toString();
                 if (msg.equals("success")) {
                     /* Save new cookie timestamp */

@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
-import java.awt.Color;
 import java.awt.Graphics;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -42,7 +41,6 @@ import javax.swing.JComponent;
 import javax.swing.JTextArea;
 import javax.swing.event.AncestorEvent;
 
-import org.appwork.swing.components.tooltips.config.ExtTooltipSettings;
 import org.appwork.utils.swing.SwingUtils;
 
 /**
@@ -50,7 +48,6 @@ import org.appwork.utils.swing.SwingUtils;
  *
  */
 public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListener {
-
     /**
      *
      */
@@ -64,16 +61,13 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
     public BasicExtTooltip(final JComponent circledProgressBar) {
         super();
         this.component = circledProgressBar;
-
         // this.tf.setText(this.component.getToolTipText());
-
         this.component.addPropertyChangeListener(JComponent.TOOL_TIP_TEXT_KEY, this);
         this.tf.setText(this.component.getToolTipText());
     }
 
     @Override
     public void ancestorRemoved(final AncestorEvent event) {
-
         this.component.removePropertyChangeListener(JComponent.TOOL_TIP_TEXT_KEY, this);
     }
 
@@ -94,15 +88,11 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
         final TooltipPanel p = new TooltipPanel("ins 2,wrap 1", "[]", "[]");
         this.tf = new JTextArea();
         // this.tf.setEnabled(false);
-        ExtTooltipSettings cfg = this.getConfig();
-        Color c = new Color(cfg.getForegroundColor());
-        this.tf.setForeground(c);
+        this.tf.setForeground(FOREGROUND_COLOR);
         this.tf.setBackground(null);
         this.tf.setEditable(false);
         SwingUtils.setOpaque(this.tf, false);
-
         p.add(this.tf);
-
         return p;
     }
 
@@ -113,9 +103,7 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
 
     @Override
     public void paint(final Graphics g) {
-
         super.paint(g);
-
     }
 
     /*
@@ -125,18 +113,13 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
      */
     @Override
     public void propertyChange(final PropertyChangeEvent evt) {
-
         if (this.component.getToolTipText() == null || this.component.getToolTipText().length() == 0) {
             ToolTipController.getInstance().hideTooltip();
         } else {
-
             this.tf.setText(this.component.getToolTipText());
-
             System.out.println(this.component.getToolTipText());
-
             this.repaint();
         }
-
     }
 
     /*
@@ -146,7 +129,6 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
      */
     @Override
     public String toText() {
-        // TODO Auto-generated method stub
         return tf.getText();
     }
 }

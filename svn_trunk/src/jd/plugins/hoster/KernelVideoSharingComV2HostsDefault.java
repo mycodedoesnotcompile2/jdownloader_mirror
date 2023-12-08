@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48387 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48544 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "camsexvideo.net", "videowebcam.tv" });
         ret.add(new String[] { "hdzog.com" });
         ret.add(new String[] { "submityourflicks.com" });
-        ret.add(new String[] { "hclips.com", "privatehomeclips.com" });
         ret.add(new String[] { "pornicom.com" });
         ret.add(new String[] { "tubepornclassic.com" });
         ret.add(new String[] { "nudogram.com" });

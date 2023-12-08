@@ -24,7 +24,7 @@ import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 48281 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48470 $", interfaceVersion = 3, names = {}, urls = {})
 public class ShrinkeMe extends MightyScriptAdLinkFly {
     public ShrinkeMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +35,7 @@ public class ShrinkeMe extends MightyScriptAdLinkFly {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "shrinkme.io", "shrinke.me" });
+        ret.add(new String[] { "shrinkme.io", "shrinke.me", "shrinkme.info" });
         return ret;
     }
 

@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48380 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 48557 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
 public class ChipDe extends PluginForHost {
     public ChipDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -187,8 +187,8 @@ public class ChipDe extends PluginForHost {
                 filename = title + "_" + contentID_URL;
             }
         } else {
-            /* 2021-07-23: This seems to be broken */
             /* type_chip_de_video and type_chip_de_video_others */
+            /* 2021-07-23: This seems to be broken */
             if (contentID_URL != null) {
                 link.setLinkID(this.getHost() + "://video/" + contentID_URL);
             }
@@ -319,6 +319,8 @@ public class ChipDe extends PluginForHost {
                 if (isExternalDownload(link)) {
                     errorExternalDownloadImpossible();
                 }
+                final boolean looksLikeDownloadIsPossible = br.containsHTML("js_manual_installation");
+                final String textNoDownloadAvailable = "No download button available";
                 final String step1 = br.getRegex("class=\"[^\"]*download_button[^\"]+\"[^>]*><a rel=\"nofollow\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
                 if (step1 == null) {
                     /*
@@ -327,7 +329,7 @@ public class ChipDe extends PluginForHost {
                      * https://www.chip.de/downloads/WordPress-Android-App_54778552.html
                      */
                     // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "No download button available");
+                    throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
                 }
                 final boolean useStep1Better = false;
                 final String step1decoded = URLEncode.decodeURIComponent(step1);
@@ -343,7 +345,12 @@ public class ChipDe extends PluginForHost {
                 }
                 dllink = applicationDownloadsGetDllink();
                 if (dllink == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    if (!looksLikeDownloadIsPossible) {
+                        /* 2023-12-04: Example: https://www.chip.de/downloads/Adobe-Flash-Player_13003561.html */
+                        throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
                 String etag = this.br.getRequest().getResponseHeader("ETag");
@@ -420,8 +427,9 @@ public class ChipDe extends PluginForHost {
 
     /** Externally hosted content is not directly downloadable via chip.de servers thus cannot be downloaded via this plugin! */
     private boolean isExternalDownload(final DownloadLink link) {
-        if (link.hasProperty(PROPERTY_DOWNLOAD_TARGET)) {
-            if (link.getStringProperty(PROPERTY_DOWNLOAD_TARGET).equalsIgnoreCase("intern")) {
+        final String dltarget = link.getStringProperty(PROPERTY_DOWNLOAD_TARGET);
+        if (dltarget != null) {
+            if (dltarget.equalsIgnoreCase("intern")) {
                 return false;
             } else {
                 return true;

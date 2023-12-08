@@ -25,25 +25,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.ProgressController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDistributer;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.DecrypterRetryException.RetryReason;
-
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TrackerJob;
@@ -88,6 +69,26 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.ProgressController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDistributer;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.DecrypterRetryException.RetryReason;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Links entschlüsseln können
@@ -142,16 +143,16 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure() {
         return getAdoptedCloudFolderStructure(null);
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
-     * build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
+     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure(final String fallback) {
         CrawledLink current = getCurrentLink();
@@ -392,16 +393,24 @@ public abstract class PluginForDecrypt extends Plugin {
         return null;
     }
 
+    protected List<LazyCrawlerPlugin> findNextLazyCrawlerPlugins(final String url) {
+        return findNextLazyCrawlerPlugins(url, (LazyCrawlerPlugin.FEATURE[]) null);
+    }
+
     protected List<LazyCrawlerPlugin> findNextLazyCrawlerPlugins(final String url, final LazyCrawlerPlugin.FEATURE... features) {
         final List<LazyCrawlerPlugin> ret = new ArrayList<LazyCrawlerPlugin>();
         final LinkCrawler crawler = getCrawler();
         final List<LazyCrawlerPlugin> sortedLazyCrawlerPlugins = crawler.getSortedLazyCrawlerPlugins();
         for (final LazyCrawlerPlugin lazyCrawlerPlugin : sortedLazyCrawlerPlugins) {
-            if ((features == null || features.length == 0 || lazyCrawlerPlugin.hasFeature(features)) && crawler.canHandle(lazyCrawlerPlugin, url, getCurrentLink()) && !getLazyC().equals(lazyCrawlerPlugin) && !crawler.breakPluginForDecryptLoop(lazyCrawlerPlugin, getCurrentLink())) {
+            if (!getLazyC().equals(lazyCrawlerPlugin) && (features == null || features.length == 0 || lazyCrawlerPlugin.hasFeature(features)) && crawler.canHandle(lazyCrawlerPlugin, url, getCurrentLink()) && !crawler.breakPluginForDecryptLoop(lazyCrawlerPlugin, getCurrentLink())) {
                 ret.add(lazyCrawlerPlugin);
             }
         }
         return ret;
+    }
+
+    protected List<LazyHostPlugin> findNextLazyHostPlugins(final String url) {
+        return findNextLazyHostPlugins(url, (LazyCrawlerPlugin.FEATURE[]) null);
     }
 
     protected List<LazyHostPlugin> findNextLazyHostPlugins(final String url, final LazyPlugin.FEATURE... features) {
@@ -594,6 +603,7 @@ public abstract class PluginForDecrypt extends Plugin {
         return getCaptchaCode(br, method, captchaAddress, param);
     }
 
+    /** This gets executed whenever the user does not answer a captcha which then runs into timeout. */
     public void onCaptchaTimeout(final CrawledLink link, Challenge<?> challenge) throws CaptchaException, PluginException {
         switch (JsonConfig.create(CaptchaSettings.class).getCrawlerCaptchaTimeoutAction()) {
         case RETRY:
@@ -607,7 +617,10 @@ public abstract class PluginForDecrypt extends Plugin {
                 throw new PluginException(LinkStatus.ERROR_RETRY);
             }
             break;
+        case SKIP_HOSTER:
+            throw new CaptchaException(SkipRequest.BLOCK_HOSTER);
         case SKIP:
+            // fallthrough
         default:
             break;
         }

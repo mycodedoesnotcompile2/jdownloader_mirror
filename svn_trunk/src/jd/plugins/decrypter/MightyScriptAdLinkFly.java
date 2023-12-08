@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
@@ -55,7 +56,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *            With solvemedia: clik.pw
  *
  */
-@DecrypterPlugin(revision = "$Revision: 48392 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48478 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     public enum CaptchaType {
         hCaptcha,
@@ -77,7 +78,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
     private String appVars = null;
 
     protected String getContentURL(final CryptedLink param) {
-        final ArrayList<String> deadDomains = this.getDeadDomains();
+        final List<String> deadDomains = this.getDeadDomains();
         if (deadDomains != null) {
             /* Change domain in added URL if we know that the domain inside added URL is dead. */
             final String domain = Browser.getHost(param.getCryptedUrl(), false);
@@ -92,7 +93,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
      * Override this and add dead domains so upper handling can auto update added URLs and change domain if it contains a dead domain. This
      * way a lot of "old" URLs will continue to work in JD while they may fail in browser.
      */
-    protected ArrayList<String> getDeadDomains() {
+    protected List<String> getDeadDomains() {
         return null;
     }
 
@@ -155,7 +156,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
              */
             final String reCaptchaSiteURL;
             if (this.getSpecialReferer() != null) {
-                /* Required e.g. for sh2rt.com. */
+                /* Required e.g. for ClicksflyCom. */
                 reCaptchaSiteURL = br.getBaseURL();
             } else if (this.autoDetectedSpecialReferer.get() != null) {
                 /* E.g. up4cash.com */
@@ -244,7 +245,7 @@ public abstract class MightyScriptAdLinkFly extends antiDDoSForDecrypt {
                         }
                         final String siteURL;
                         if (this.getSpecialReferer() != null) {
-                            /* Required e.g. for sh2rt.com. */
+                            /* Required e.g. for ClicksflyCom. */
                             siteURL = br.getBaseURL();
                         } else {
                             /* Fine for most of all websites. */

@@ -34,7 +34,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.HostPlugin;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 47853 $", interfaceVersion = 3, names = { "zevera.com" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?zevera\\.com/file\\?id=([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 48430 $", interfaceVersion = 3, names = { "zevera.com" }, urls = { "https?://(?:[a-z0-9\\.\\-]+)?zevera\\.com/file\\?id=([A-Za-z0-9\\-_]+)" })
 public class ZeveraCom extends ZeveraCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("zevera.com");
 
@@ -93,11 +93,6 @@ public class ZeveraCom extends ZeveraCore {
 
     @Override
     public boolean supportsUsenet(final Account account) {
-        return false;
-    }
-
-    @Override
-    public boolean supportsFreeAccountDownloadMode(final Account acc) {
         return false;
     }
 

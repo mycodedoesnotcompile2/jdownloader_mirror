@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
@@ -37,10 +38,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47573 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48459 $", interfaceVersion = 3, names = {}, urls = {})
 public class SextbNet extends PluginForDecrypt {
     public SextbNet(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -66,22 +74,24 @@ public class SextbNet extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-_]+-\\d+)$");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9\\-_]+)$");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
         final String slug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("/images/404\\.png\"")) {
+            /* 404 error page with http response 200 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("<title>([^>]+)</title>").getMatch(0);
         if (title == null) {
             /* Fallback */
-            title = slug.replace("-", " ");
+            title = slug.replace("-", " ").trim();
         }
         title = Encoding.htmlDecode(title).trim();
         final String filmID = br.getRegex("filmId\\s*=\\s*(\\d+);").getMatch(0);
@@ -111,6 +121,9 @@ public class SextbNet extends PluginForDecrypt {
             brc.postPage("/ajax/player", query);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final String html = entries.get("player").toString();
+            if (StringUtils.containsIgnoreCase(html, "This is a server for VIP Members")) {
+                logger.info("Potential premium only mirror: " + mirrorID);
+            }
             final String[] urls = HTMLParser.getHttpLinks(html, br.getURL());
             for (final String url : urls) {
                 if (this.canHandle(url)) {
@@ -123,6 +136,7 @@ public class SextbNet extends PluginForDecrypt {
                 distribute(link);
             }
             if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
                 break;
             }
         }

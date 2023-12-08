@@ -1,5 +1,5 @@
 /**
- * 
+ *
  * ====================================================================================================================================================
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
@@ -7,16 +7,16 @@
  *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
  *         Schwabacher Straße 117
  *         90763 Fürth
- *         Germany   
+ *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
  *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
- * 	
+ *
  * === 3rd Party Licences ===
  *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
- *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header. 	
- * 	
+ *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
+ *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
  *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
@@ -25,9 +25,9 @@
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
  *     Contact AppWork for further details: <e-mail@appwork.org>
  * === Non-Commercial Usage ===
- *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the 
+ *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
- * 	
+ *
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
@@ -47,10 +47,7 @@ import javax.swing.JToolTip;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 
-import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.tooltips.config.ExtTooltipSettings;
-import org.appwork.utils.Application;
 
 import net.miginfocom.swing.MigLayout;
 
@@ -59,47 +56,24 @@ import net.miginfocom.swing.MigLayout;
  *
  */
 public abstract class ExtTooltip extends JToolTip implements AncestorListener {
-
     /**
      *
      */
-    private static final long  serialVersionUID = -2212735987320956801L;
-
-    /**
-     *
-     */
-    public static final String DEFAULT          = "default";
-
-    /**
-     * @param id
-     * @return
-     */
-    public static ExtTooltipSettings createConfig(final String id) {
-
-        return JsonConfig.create(Application.getResource("cfg/ExtTooltipSettings_" + id), ExtTooltipSettings.class);
-    }
+    private static final long serialVersionUID = -2212735987320956801L;
+    protected static Color    FOREGROUND_COLOR = Color.GRAY;
 
     /**
      * @param black
      */
     public static void setForgroundColor(final Color black) {
-        ExtTooltip.createConfig(ExtTooltip.DEFAULT).setForegroundColor(black.getRGB());
-
+        FOREGROUND_COLOR = black;
     }
 
-    private final ExtTooltipSettings config;
-
-    protected MigPanel               panel;
-
-    private int                      w    = 0;
-
-    private int                      h    = 0;
-
-    private long                     lastResize;
-
-    private long                     lastResizeH;
-
-    private final int                test = 0;
+    protected MigPanel panel;
+    private int        w = 0;
+    private int        h = 0;
+    private long       lastResize;
+    private long       lastResizeH;
 
     /**
      * @param title
@@ -107,18 +81,12 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
     public ExtTooltip() {
         super();
         setLayout(new MigLayout("ins 0", "[grow,fill]", "[grow,fill]"));
-        config = ExtTooltip.createConfig(getID());
-
         panel = createContent();
-
         // this.add(con);
         setTipText("");
-
         // this.setUI(null);
-
         // panel.setOpaque(true);
         // panel.setBackground(Color.BLUE);
-
         if (panel != null) {
             this.add(panel);
         }
@@ -136,7 +104,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
 
     @Override
     public void ancestorAdded(final AncestorEvent event) {
-
         h = 0;
         w = 0;
         lastResize = 0;
@@ -145,13 +112,10 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
 
     @Override
     public void ancestorMoved(final AncestorEvent event) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
     public void ancestorRemoved(final AncestorEvent event) {
-
     }
 
     /**
@@ -161,18 +125,12 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
 
     @Override
     public Rectangle getBounds() {
-
         return super.getBounds();
-
     }
 
     @Override
     public Rectangle getBounds(final Rectangle rv) {
         return super.getBounds(rv);
-    }
-
-    public ExtTooltipSettings getConfig() {
-        return config;
     }
 
     @Override
@@ -189,7 +147,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
                 final Rectangle b = parent.getBounds();
                 parent.setBounds(b.x, b.y, w, h);
             }
-
         } else if (th < h) {
             if (System.currentTimeMillis() - lastResizeH > 1000) {
                 h -= (h - th) * (System.currentTimeMillis() - lastResizeH - 1000) / 10000;
@@ -200,16 +157,7 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
                 }
             }
         }
-
         return h;
-    }
-
-    /**
-     * @return
-     */
-    protected String getID() {
-
-        return ExtTooltip.DEFAULT;
     }
 
     @Override
@@ -221,7 +169,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
         final Insets insets = this.getInsets();
         dim.width += insets.left + insets.right;
         dim.height += insets.top + insets.bottom;
-
         return dim;
     }
 
@@ -240,7 +187,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
                 parent.setBounds(b.x, b.y, w, h);
             }
             lastResize = System.currentTimeMillis();
-
         } else if (tw < w) {
             if (System.currentTimeMillis() - lastResize > 1000) {
                 w -= (w - tw) * (System.currentTimeMillis() - lastResize - 1000) / 10000;
@@ -251,9 +197,7 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
                 }
             }
         }
-
         return w;
-
     }
 
     /**
@@ -263,7 +207,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
      * @return
      */
     public boolean isLastHiddenEnabled() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -271,8 +214,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
      *
      */
     public void onHide() {
-        // TODO Auto-generated method stub
-
     }
 
     /**
@@ -280,7 +221,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
      *
      */
     public void onShow() {
-
     }
 
     /*
@@ -302,35 +242,28 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
             panel.setLocation(insets.left, insets.top);
         }
         super.paint(g);
-
     }
 
     @Override
     protected void paintChildren(final Graphics g) {
         super.paintChildren(g);
-
     }
 
     @Override
     protected void paintComponent(final Graphics g) {
-
         super.paintComponent(g);
-
         // final Insets insets = this.getInsets();
         // g.translate(insets.left, insets.top);
         // this.panel.setSize(this.panel.getPreferredSize());
         // this.panel.repaint();
         // if (this.test++ < 5) {
         // this.panel.paintComponents(g);
-
         // }
-
     }
 
     @Override
     public void paintComponents(final Graphics g) {
         super.paintComponents(g);
-
     }
 
     /**
@@ -344,7 +277,6 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
      * @return
      */
     public Point getDesiredLocation(final JComponent activeComponent, final Point ttPosition) {
-        // TODO Auto-generated method stub
         return ttPosition;
     }
 }

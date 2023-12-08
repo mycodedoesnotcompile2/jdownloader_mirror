@@ -372,10 +372,10 @@ public class ReflectionUtils {
             // java.lang.reflect.InaccessibleObjectException
             field.setAccessible(true);
         } catch (SecurityException e) {
-            throw Exceptions.addSuppressed(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
+            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
         } catch (RuntimeException e) {
             // java.lang.reflect.InaccessibleObjectException
-            throw Exceptions.addSuppressed(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
+            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
         }
         try {
             final Object returnValue = field.get(instance);
@@ -413,9 +413,9 @@ public class ReflectionUtils {
                 return null;
             }
         } catch (SecurityException e) {
-            throw Exceptions.addSuppressed(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
+            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
         } catch (RuntimeException e) {
-            throw Exceptions.addSuppressed(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
+            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
         }
     }
 

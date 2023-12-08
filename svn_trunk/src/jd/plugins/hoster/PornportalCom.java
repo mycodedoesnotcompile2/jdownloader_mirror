@@ -15,11 +15,14 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -30,11 +33,13 @@ import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPlugin
 import org.jdownloader.plugins.components.config.PornportalComConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
+import jd.http.Request;
 import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
@@ -43,6 +48,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -54,12 +60,20 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48488 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www.pornportal.com/");
         // setConfigElements();
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(new int[] { 400 });
+        return br;
     }
 
     @Override
@@ -186,11 +200,11 @@ public class PornportalCom extends PluginForHost {
     public static void checkUsedVersions(final Plugin plg) {
         final String target_version = "4.35.2";
         plg.getLogger().info("Target version: " + target_version);
-        final Browser br = new Browser();
+        final Browser br = plg.createNewBrowserInstance();
         final String[] supportedSites = getAnnotationNames();
         for (final String host : supportedSites) {
             try {
-                br.getPage(getPornportalMainURL(host));
+                getPage(br, getPornportalMainURL(host));
                 final String usedVersion = PluginJSonUtils.getJson(br, "appVersion");
                 plg.getLogger().info("***********************************");
                 plg.getLogger().info("Site: " + host);
@@ -219,8 +233,8 @@ public class PornportalCom extends PluginForHost {
                 plg.getLogger().warning("Failed to find sid");
                 return;
             }
-            br.getPage("https://ppp.contentdef.com/thirdparty?sid=" + sid + "&_=" + System.currentTimeMillis());
-            Map<String, Object> entries = JSonStorage.restoreFromString(br.toString(), TypeRef.MAP);
+            getPage(br, "https://ppp.contentdef.com/thirdparty?sid=" + sid + "&_=" + System.currentTimeMillis());
+            Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final List<Object> domaininfos = (List<Object>) entries.get("notificationNetworks");
             final PluginFinder finder = new PluginFinder();
             for (final Object domaininfo : domaininfos) {
@@ -273,10 +287,52 @@ public class PornportalCom extends PluginForHost {
     public static final String   PROPERTY_GALLERY_IMAGE_POSITION = "gallery_image_position";
     public static final String   PROPERTY_GALLERY_DIRECTORY      = "gallery_directory";
     public static final String   PROPERTY_GALLERY_SIZE           = "gallery_size";
+    public static Object         KEYLOCK                         = new Object();
 
-    public static Browser prepBR(final Browser br) {
-        br.setAllowedResponseCodes(new int[] { 400 });
-        return br;
+    public static Request getPage(final Browser br, final Request request) throws Exception {
+        br.getPage(request);
+        String RNKEY = evalKEY(br);
+        if (RNKEY != null) {
+            int maxLoops = 8;// up to 3 loops in tests
+            synchronized (KEYLOCK) {
+                while (true) {
+                    if (RNKEY == null) {
+                        return br.getRequest();
+                    } else if (--maxLoops > 0) {
+                        br.setCookie(br.getHost(), "KEY", RNKEY);
+                        Thread.sleep(1000 + ((8 - maxLoops) * 500));
+                        br.getPage(request.cloneRequest());
+                        RNKEY = evalKEY(br);
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
+                }
+            }
+        } else {
+            return br.getRequest();
+        }
+    }
+
+    public static Request getPage(final Browser br, final String url) throws Exception {
+        return getPage(br, br.createGetRequest(url));
+    }
+
+    /* Similar in: PornHubCom, PornportalCom */
+    public final static String evalKEY(Browser br) throws ScriptException {
+        if (br.containsHTML("document\\.cookie=\"KEY") && br.containsHTML("leastFactor")) {
+            ScriptEngineManager mgr = JavaScriptEngineFactory.getScriptEngineManager(null);
+            ScriptEngine engine = mgr.getEngineByName("JavaScript");
+            String js = br.toString();
+            js = new Regex(js, "<script[^>]*>(?:<!--)?(.*?)(?://-->)?</script>").getMatch(0);
+            js = js.replace("document.cookie=", "return ");
+            js = js.replaceAll("(/\\*.*?\\*/)", "");
+            engine.eval(js + " var ret=go();");
+            final String answer = engine.get("ret").toString();
+            final String keyStr = new Regex(answer, "KEY=(.+)").getMatch(0);
+            return keyStr.split(";")[0];
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -316,7 +372,6 @@ public class PornportalCom extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         final String dllink = link.getStringProperty(PROPERTY_directurl);
         if (dllink == null) {
             /* This should never happen */
@@ -372,7 +427,6 @@ public class PornportalCom extends PluginForHost {
                 con = br.openHeadConnection(newDirecturl);
             }
             if (con.getResponseCode() == 404) {
-                br.followConnection(true);
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (!this.looksLikeDownloadableContent(con)) {
                 br.followConnection(true);
@@ -449,7 +503,6 @@ public class PornportalCom extends PluginForHost {
                 }
                 brlogin.setCookiesExclusive(true);
                 // checkUsedVersions(this);
-                prepBR(brlogin);
                 Cookies cookies = account.loadCookies(target_domain);
                 String jwt = null;
                 if (cookies != null && setStoredAPIAuthHeaderAccount(brlogin, account, target_domain)) {
@@ -462,7 +515,7 @@ public class PornportalCom extends PluginForHost {
                         logger.info("Trust cookies without check");
                         return;
                     }
-                    brlogin.getPage(getAPIBase() + "/self");
+                    getPage(brlogin, getAPIBase() + "/self");
                     if (brlogin.getHttpConnection().getResponseCode() == 200) {
                         logger.info("Cookie login successful");
                         final long timestamp_headers_updated = this.getLongPropertyAccount(account, target_domain, PROPERTY_timestamp_website_cookies_updated, 0);
@@ -470,9 +523,9 @@ public class PornportalCom extends PluginForHost {
                         if (System.currentTimeMillis() - timestamp_headers_updated >= 5 * 60 * 1000l) {
                             logger.info("Updating website cookies and JWT value");
                             /* Access mainpage without authorization headers but with cookies */
-                            final Browser brc = prepBR(new Browser());
+                            final Browser brc = this.createNewBrowserInstance();
                             brc.setCookies(target_domain, cookies);
-                            brc.getPage(getPornportalMainURL(account.getHoster()));
+                            getPage(brc, getPornportalMainURL(account.getHoster()));
                             /* Attention: This is very unsafe without using json parser! */
                             jwt = PluginJSonUtils.getJson(brc, "jwt");
                             if (jwt == null) {
@@ -493,10 +546,7 @@ public class PornportalCom extends PluginForHost {
                 }
                 logger.info("Performing full login");
                 brlogin.setCookiesExclusive(true);
-                prepBR(brlogin);
-                brlogin.setFollowRedirects(true);
                 Map<String, Object> entries;
-                String api_base;
                 String cookie_name_login = null;
                 if (isExternalPortalLogin) {
                     handleExternalLoginStep(brlogin, account, target_domain);
@@ -506,44 +556,43 @@ public class PornportalCom extends PluginForHost {
                     }
                     /* Further checks will decide whether we're loggedIN or not */
                     entries = getJsonJuanEawInstance(brlogin);
-                    api_base = PluginJSonUtils.getJson(brlogin, "dataApiUrl");
                     cookie_name_login = PluginJSonUtils.getJson(brlogin, "authCookie");
                 } else {
-                    brlogin.getPage(getPornportalMainURL(target_domain) + "/login");
+                    getPage(brlogin, getPornportalMainURL(target_domain) + "/login");
                     entries = getJsonJuanEawInstance(brlogin);
-                    api_base = PluginJSonUtils.getJson(brlogin, "dataApiUrl");
+                    final String authApiUrl = PluginJSonUtils.getJson(brlogin, "authApiUrl");
                     cookie_name_login = PluginJSonUtils.getJson(brlogin, "authCookie");
                     if (cookie_name_login == null) {
                         cookie_name_login = getDefaultCookieNameLogin();
                     }
-                    if (StringUtils.isEmpty(api_base)) {
+                    if (StringUtils.isEmpty(authApiUrl)) {
                         logger.warning("Failed to find api_base");
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    if (!prepareBrAPI(this, brlogin, account, entries)) {
+                    } else if (!prepareBrAPI(this, brlogin, account, entries)) {
                         logger.warning("Failed to prepare API headers");
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    entries = (Map<String, Object>) entries.get("domain");
-                    /* E.g. site-ma.fakehub.com */
-                    final String hostname = (String) entries.get("hostname");
-                    final String recaptchaSiteKey = (String) entries.get("siteKey");
-                    final String recaptchaInvisibleSiteKey = (String) entries.get("siteKeyV3");
+                    final Map<String, Object> domainmap = (Map<String, Object>) entries.get("domain");
+                    final String hostname = domainmap.get("hostname").toString(); // E.g. site-ma.fakehub.com
+                    final String recaptchaSiteKey = (String) domainmap.get("siteKey");
+                    final String recaptchaInvisibleSiteKey = (String) domainmap.get("siteKeyV3");
+                    final boolean allowNormalReCaptchaV2 = false;
+                    final boolean allowInvisibleReCaptchaV2 = true; // 2023-11-02
                     /* Prepare POST-data */
-                    Map<String, Object> logindata = new HashMap<String, Object>();
-                    final String successUrl = "https://" + hostname + "/access/success";
-                    final String failureUrl = "https://" + hostname + "/access/failure";
+                    final Map<String, Object> logindata = new HashMap<String, Object>();
+                    logindata.put("hostname", hostname);
                     logindata.put("username", account.getUser());
                     logindata.put("password", account.getPass());
-                    logindata.put("failureUrl", failureUrl);
-                    logindata.put("successUrl", successUrl);
+                    /* 2023-11-02: Not needed anymore TODO: Remove commented-out-code down below */
+                    // logindata.put("failureUrl", "https://" + hostname + "/access/failure");
+                    // logindata.put("successUrl", "https://" + hostname + "/access/success");
                     /* 2020-04-03: So far, all pornportal websites required a captcha on login. */
                     String recaptchaV2Response = null;
-                    if (!StringUtils.isEmpty(recaptchaSiteKey)) {
+                    if (!StringUtils.isEmpty(recaptchaSiteKey) && allowNormalReCaptchaV2) {
                         final CaptchaHelperHostPluginRecaptchaV2 captcha = new CaptchaHelperHostPluginRecaptchaV2(this, brlogin, recaptchaSiteKey);
                         recaptchaV2Response = captcha.getToken();
                         logindata.put("googleReCaptchaResponse", recaptchaV2Response);
-                    } else if (!StringUtils.isEmpty(recaptchaInvisibleSiteKey)) {
+                    } else if (!StringUtils.isEmpty(recaptchaInvisibleSiteKey) && allowInvisibleReCaptchaV2) {
                         final CaptchaHelperHostPluginRecaptchaV2 captcha = new CaptchaHelperHostPluginRecaptchaV2(this, brlogin, recaptchaInvisibleSiteKey) {
                             @Override
                             public TYPE getType() {
@@ -554,15 +603,22 @@ public class PornportalCom extends PluginForHost {
                         logindata.put("googleReCaptchaResponse", recaptchaV2Response);
                         logindata.put("googleReCaptchaVersion", "v3");
                     }
-                    final PostRequest postRequest = brlogin.createPostRequest(api_base + "/v1/authenticate/redirect", JSonStorage.serializeToJson(logindata));
-                    brlogin.getPage(postRequest);
-                    final Map<String, Object> authInfo = restoreFromString(brlogin.getRequest().getHtmlCode(), TypeRef.MAP);
-                    final String authenticationUrl = (String) authInfo.get("authenticationUrl");
-                    if (StringUtils.isEmpty(authenticationUrl)) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    final PostRequest postRequest = brlogin.createPostRequest(authApiUrl + "/v1/authenticate", JSonStorage.serializeToJson(logindata));
+                    getPage(brlogin, postRequest);
+                    if (brlogin.getHttpConnection().getResponseCode() == 401) {
+                        throw new AccountInvalidException();
+                    } else if (brlogin.getHttpConnection().getResponseCode() == 403) {
+                        throw new AccountInvalidException();
                     }
+                    final Map<String, Object> authinfo = restoreFromString(brlogin.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final String accessToken = (String) authinfo.get("access_token");
+                    if (StringUtils.isEmpty(accessToken)) {
+                        throw new AccountInvalidException();
+                    }
+                    brlogin.setCookie(hostname, cookie_name_login, accessToken);
+                    final String authenticationUrl = "https://" + hostname + "/postlogin";
                     /* Now continue without API */
-                    brlogin.getPage(authenticationUrl);
+                    getPage(brlogin, authenticationUrl);
                     final Form continueform = brlogin.getFormbyKey("response");
                     if (continueform != null) {
                         /*
@@ -584,10 +640,14 @@ public class PornportalCom extends PluginForHost {
                  */
                 final String login_cookie = getLoginCookie(brlogin, cookie_name_login);
                 jwt = PluginJSonUtils.getJson(brlogin, "jwt");
-                if (login_cookie == null || StringUtils.isEmpty(jwt)) {
+                if (login_cookie == null) {
+                    logger.info("Login failure after API login");
+                    loginFailure(isExternalPortalLogin);
+                } else if (StringUtils.isEmpty(jwt)) {
                     logger.info("Login failure after API login");
                     loginFailure(isExternalPortalLogin);
                 }
+                logger.info("Looks like successful login");
                 setPropertyAccount(account, target_domain, PROPERTY_authorization, login_cookie);
                 setPropertyAccount(account, target_domain, PROPERTY_jwt, jwt);
                 setPropertyAccount(account, target_domain, PROPERTY_timestamp_website_cookies_updated, System.currentTimeMillis());
@@ -603,8 +663,7 @@ public class PornportalCom extends PluginForHost {
         }
     }
 
-    private void handleExternalLoginStep(final Browser brlogin, final Account account, final String target_domain) throws IOException {
-        brlogin.setFollowRedirects(true);
+    private void handleExternalLoginStep(final Browser brlogin, final Account account, final String target_domain) throws Exception {
         String autologinURL = this.getStringPropertyAccount(account, target_domain, PROPERTY_url_external_login, null);
         if (autologinURL == null) {
             logger.warning("Property autologinURL is null");
@@ -613,14 +672,14 @@ public class PornportalCom extends PluginForHost {
         if (autologinURL.startsWith("/")) {
             autologinURL = "https://ppp.contentdef.com/" + autologinURL;
         }
-        brlogin.getPage(autologinURL);
+        getPage(brlogin, autologinURL);
         final String redirectURL = brlogin.getRegex("window\\.top\\.location\\s*=\\s*\\'(https?://[^<>\"\\']+)").getMatch(0);
         if (redirectURL == null) {
             logger.warning("Failed to find external login redirectURL");
             return;
         }
         /* This is already the final step for non-pornportal sites */
-        brlogin.getPage(redirectURL);
+        getPage(brlogin, redirectURL);
         /* This is usually the final step for pornportal sites */
         final Form probillerForm = brlogin.getFormbyActionRegex(".+access/success.*?");
         if (probillerForm != null) {
@@ -637,7 +696,7 @@ public class PornportalCom extends PluginForHost {
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "External portal login failed");
         } else {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            throw new AccountInvalidException();
         }
     }
 
@@ -780,28 +839,32 @@ public class PornportalCom extends PluginForHost {
             try {
                 login(this.br, account, this.getHost(), true);
                 final AccountInfo ai = new AccountInfo();
+                account.setConcurrentUsePossible(true);
+                ai.setUnlimitedTraffic();
                 if (br.getURL() == null || !br.getURL().contains("/v1/self")) {
-                    br.getPage(getAPIBase() + "/self");
+                    getPage(br, getAPIBase() + "/self");
                 }
-                final Map<String, Object> map = restoreFromString(br.toString(), TypeRef.MAP);
-                final String joinDate = (String) map.get("joinDate");
+                final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String joinDate = (String) user.get("joinDate");
                 if (!StringUtils.isEmpty(joinDate)) {
                     ai.setCreateTime(TimeFormatter.getMilliSeconds(joinDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null));
                 }
-                if ((Boolean) map.get("isBanned")) {
+                if (Boolean.TRUE.equals(user.get("isBanned"))) {
                     /*
                      * 2021-11-08: This may randomly be "true" (also via website) although the account is definitely not banned! Tested with
                      * a brazzers.com account. --> Ignore this for now!
                      */
                     final boolean trustBannedFlag = false;
                     if (trustBannedFlag) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account banned", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                        throw new AccountInvalidException("Account banned");
                     } else {
                         logger.info("Account might be banned??");
                     }
                 }
-                final Boolean isExpired = (Boolean) map.get("isExpired");
-                final Boolean isTrial = (Boolean) map.get("isTrial");
+                final Boolean isExpired = (Boolean) user.get("isExpired");
+                final Boolean isTrial = (Boolean) user.get("isTrial");
+                final Boolean isCanceled = (Boolean) user.get("isCanceled");
+                final Number initialAmount = (Number) user.get("initialAmount");
                 boolean foundValidExpireDate = false;
                 if (Boolean.TRUE.equals(isExpired)) {
                     account.setType(AccountType.FREE);
@@ -811,13 +874,22 @@ public class PornportalCom extends PluginForHost {
                     /* Free trial -> Free Account with premium capability */
                     account.setType(AccountType.PREMIUM);
                     ai.setStatus("Free Account (Trial)");
+                } else if (initialAmount == null || initialAmount.longValue() <= 0) {
+                    /* Free user who never (?) had a premium subscription. */
+                    account.setType(AccountType.FREE);
                 } else {
+                    /* Premium account [well...most likely] */
                     /**
                      * Premium accounts must not have any expire-date! </br>
                      * 2021-06-05: Only set expire-date if it is still valid. Premium accounts are premium as long as "isExpired" != true.
                      */
                     account.setType(AccountType.PREMIUM);
-                    final String expiryDate = (String) map.get("expiryDate");
+                    if (Boolean.TRUE.equals(isCanceled)) {
+                        ai.setStatus("Premium Account (subscription cancelled)");
+                    } else {
+                        ai.setStatus("Premium Account (subscription running)");
+                    }
+                    final String expiryDate = (String) user.get("expiryDate");
                     if (!StringUtils.isEmpty(expiryDate)) {
                         final long expireTimestamp = TimeFormatter.getMilliSeconds(expiryDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
                         if (expireTimestamp > System.currentTimeMillis()) {
@@ -825,54 +897,45 @@ public class PornportalCom extends PluginForHost {
                             foundValidExpireDate = true;
                         }
                     }
-                    if ((Boolean) map.get("isCanceled")) {
-                        ai.setStatus("Premium Account (subscription cancelled)");
-                    } else {
-                        ai.setStatus("Premium Account (subscription running)");
-                    }
-                }
-                if (!foundValidExpireDate && map.containsKey("addons")) {
-                    /**
-                     * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
-                     * Each bundle can have different expire-dates and also separate pricing and so on.
-                     */
-                    logger.info("Looking for alternative expiredate");
-                    long highestExpireTimestamp = -1;
-                    String titleOfBundleWithHighestExpireDate = null;
-                    final List<Map<String, Object>> bundles = (List<Map<String, Object>>) map.get("addons");
-                    for (final Map<String, Object> bundle : bundles) {
-                        if (!(Boolean) bundle.get("isActive")) {
-                            continue;
+                    final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
+                    if (!foundValidExpireDate && bundles != null) {
+                        /**
+                         * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
+                         * Each bundle can have different expire-dates and also separate pricing and so on.
+                         */
+                        logger.info("Looking for alternative expiredate");
+                        long highestExpireTimestamp = -1;
+                        String titleOfBundleWithHighestExpireDate = null;
+                        for (final Map<String, Object> bundle : bundles) {
+                            if (!(Boolean) bundle.get("isActive")) {
+                                continue;
+                            }
+                            final String expireDateStrTmp = (String) bundle.get("expirationDate");
+                            final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
+                            if (expireTimestampTmp > highestExpireTimestamp) {
+                                highestExpireTimestamp = expireTimestampTmp;
+                                titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
+                            }
                         }
-                        final String expireDateStrTmp = (String) bundle.get("expirationDate");
-                        final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
-                        if (expireTimestampTmp > highestExpireTimestamp) {
-                            highestExpireTimestamp = expireTimestampTmp;
-                            titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
+                        if (highestExpireTimestamp > System.currentTimeMillis()) {
+                            logger.info("Successfully found alternative expiredate");
+                            ai.setValidUntil(highestExpireTimestamp, br);
+                            if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
+                                ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
+                            }
+                        } else {
+                            logger.info("Failed to find alternative expiredate");
                         }
                     }
-                    if (highestExpireTimestamp > System.currentTimeMillis()) {
-                        logger.info("Successfully found alternative expiredate");
-                        ai.setValidUntil(highestExpireTimestamp, br);
-                        if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
-                            ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
-                        }
-                    } else {
-                        logger.info("Failed to find alternative expiredate");
-                    }
-                }
-                account.setConcurrentUsePossible(true);
-                ai.setUnlimitedTraffic();
-                if (account.getType() == AccountType.PREMIUM) {
                     /* Now check which other websites we can now use as well and add them via multihoster handling. */
                     try {
-                        br.getPage("https://site-ma." + this.getHost() + "/");
-                        Map<String, Object> initialState = getJsonJuanInitialState(br);
-                        initialState = (Map<String, Object>) initialState.get("client");
-                        final String userAgent = (String) initialState.get("userAgent");
-                        final String domain = (String) initialState.get("domain");
-                        final String ip = (String) initialState.get("ip");
-                        final String baseUrl = (String) initialState.get("baseUrl");
+                        getPage(br, "https://site-ma." + this.getHost() + "/");
+                        final Map<String, Object> initialState = getJsonJuanInitialState(br);
+                        final Map<String, Object> client = (Map<String, Object>) initialState.get("client");
+                        final String userAgent = (String) client.get("userAgent");
+                        final String domain = (String) client.get("domain");
+                        final String ip = (String) client.get("ip");
+                        final String baseUrl = (String) client.get("baseUrl");
                         if (StringUtils.isEmpty(userAgent) || StringUtils.isEmpty(domain) || StringUtils.isEmpty(ip) || StringUtils.isEmpty(baseUrl)) {
                             /* Failure */
                         }
@@ -891,8 +954,9 @@ public class PornportalCom extends PluginForHost {
                         // JSonStorage.serializeToJson(portalmap));
                         // br.getPage(postRequest);
                         br.postPageRaw(getAPIBase() + "/pornportal", JSonStorage.serializeToJson(portalmap));
-                        final String data = PluginJSonUtils.getJson(br, "data");
-                        br.getPage("https://ppp.contentdef.com/postlogin?data=" + Encoding.urlEncode(data));
+                        final Map<String, Object> pornportalresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                        final String data = pornportalresponse.get("data").toString();
+                        getPage(br, "https://ppp.contentdef.com/postlogin?data=" + Encoding.urlEncode(data));
                         /*
                          * We can authorize ourselves to these other portals through these URLs. Sadly we do not get the full domains before
                          * accessing these URLs but this would take a lot of time which is why we will try to find the full domains here
@@ -901,8 +965,8 @@ public class PornportalCom extends PluginForHost {
                         final String[] autologinURLs = br.getRegex("(/autologin/[a-z0-9]+\\?sid=[^\"]+)\"").getColumn(0);
                         final String sid = UrlQuery.parse("https://" + this.getHost() + autologinURLs[0]).get("sid");
                         final Browser brContentdef = br.cloneBrowser();
-                        brContentdef.getPage(String.format("https://ppp.contentdef.com/notification/list?page=1&type=1&network=1&archived=0&ajaxCounter=1&sid=%s&data=%s&_=%d", sid, Encoding.urlEncode(data), System.currentTimeMillis()));
-                        Map<String, Object> entries = restoreFromString(brContentdef.toString(), TypeRef.MAP);
+                        getPage(brContentdef, String.format("https://ppp.contentdef.com/notification/list?page=1&type=1&network=1&archived=0&ajaxCounter=1&sid=%s&data=%s&_=%d", sid, Encoding.urlEncode(data), System.currentTimeMillis()));
+                        final Map<String, Object> entries = restoreFromString(brContentdef.getRequest().getHtmlCode(), TypeRef.MAP);
                         final List<Object> notificationNetworks = (List<Object>) entries.get("notificationNetworks");
                         final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
                         final ArrayList<String> allowedHosts = getAllSupportedPluginDomainsFlat();
@@ -979,7 +1043,7 @@ public class PornportalCom extends PluginForHost {
                             Account pornhubAccount = findSpecialPornhubAccount(account);
                             if (supportedHostsFinal.contains(domain_pornhub)) {
                                 /* Special pornhub handling --> Add dummy account if external login works */
-                                final Browser br2 = PornHubCom.prepBr(new Browser());
+                                final Browser br2 = PornHubCom.prepBr(this.createNewBrowserInstance());
                                 handleExternalLoginStep(br2, account, domain_pornhub);
                                 final boolean isLoggedIN = PornHubCom.isLoggedInHtmlPremium(br2);
                                 /* Look for special account created by this plugin --> Add account if non existant */

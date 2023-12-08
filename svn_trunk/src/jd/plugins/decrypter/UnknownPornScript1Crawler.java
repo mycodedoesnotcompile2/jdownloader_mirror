@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.UnknownPornScript1;
 
-@DecrypterPlugin(revision = "$Revision: 48108 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48530 $", interfaceVersion = 3, names = {}, urls = {})
 public class UnknownPornScript1Crawler extends PornEmbedParser {
     public UnknownPornScript1Crawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,6 @@ public class UnknownPornScript1Crawler extends PornEmbedParser {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "pornsteep.com" });
         ret.add(new String[] { "vidxporn.com" });
-        ret.add(new String[] { "porndull.com" });
         ret.add(new String[] { "dansmovies.com" });
         return ret;
     }

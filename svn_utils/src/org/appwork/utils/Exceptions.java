@@ -185,8 +185,9 @@ public class Exceptions {
                     throw new IndexOutOfBoundsException();
                 } else if (len == 0) {
                     return;
+                } else {
+                    sb.append(cbuf, off, len);
                 }
-                sb.append(cbuf, off, len);
             }
 
             @Override
@@ -205,11 +206,16 @@ public class Exceptions {
             }
         };
         try {
-            ClassCache cc = ClassCache.getClassCache(thrown.getClass());
-            for (String key : cc.getKeys()) {
+            final ClassCache cc = ClassCache.getClassCache(thrown.getClass());
+            for (final String key : cc.getKeys()) {
+                // TODO: slow, optimize
                 if (cc.getAnnotations(key, AppendToStacktrace.class).size() > 0) {
                     try {
-                        sb.append("Exception Property: " + key + ": " + Deser.get(Exceptions.class).toString(cc.getGetter(key).getValue(thrown), SC.LOG_SINGLELINE));
+                        final String toString = Deser.get(Exceptions.class).toString(cc.getGetter(key).getValue(thrown), SC.LOG_SINGLELINE);
+                        sb.append("Exception Property: ");
+                        sb.append(key);
+                        sb.append(": ");
+                        sb.append(toString);
                         sb.append("\r\n");
                     } catch (Exception e) {
                         LogV3.log(e);
@@ -266,6 +272,15 @@ public class Exceptions {
             return throwing;
         } catch (Throwable ex) {
             throw new RuntimeException(ex);
+        }
+    }
+
+    public static <E extends Throwable> E initCause(E throwing, Throwable cause) {
+        try {
+            throwing.initCause(cause);
+            return throwing;
+        } catch (Throwable ex) {
+            return addSuppressed(throwing, cause);
         }
     }
 

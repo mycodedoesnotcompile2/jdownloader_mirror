@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47629 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48474 $", interfaceVersion = 2, names = {}, urls = {})
 public class UltimboxOrg extends YetiShareCore {
     public UltimboxOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,6 +46,13 @@ public class UltimboxOrg extends YetiShareCore {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "ultimbox.org", "ultimbox.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("ultimbox.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

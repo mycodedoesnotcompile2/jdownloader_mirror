@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48569 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecurbateCom extends PluginForHost {
     public RecurbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,8 +84,22 @@ public class RecurbateCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "recurbate.com", "recurbate.xyz", "recurbate.cc" });
+        ret.add(new String[] { "recurbate.me", "recurbate.com", "recurbate.xyz", "recurbate.cc" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2023-11-20: Main domain has changed from recurbate.com to recurbate.me */
+        return this.rewriteHost(getPluginDomains(), host);
+    }
+
+    public List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("recurbate.com");
+        deadDomains.add("recurbate.xyz");
+        deadDomains.add("recurbate.cc");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -100,7 +114,7 @@ public class RecurbateCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/play\\.php\\?video=(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:play\\.php\\?video=|video/)(\\d+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -112,7 +126,7 @@ public class RecurbateCom extends PluginForHost {
 
     @Override
     public String getLinkID(final DownloadLink link) {
-        final String linkid = getFID(link);
+        final String linkid = getVideoID(link);
         if (linkid != null) {
             return this.getHost() + "://" + linkid;
         } else {
@@ -120,8 +134,28 @@ public class RecurbateCom extends PluginForHost {
         }
     }
 
-    private String getFID(final DownloadLink link) {
+    private String getVideoID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        return getContentURL(link);
+    }
+
+    private String getContentURL(final DownloadLink link) {
+        /* Get full host with subdomain and correct base domain. */
+        final List<String> deadDomains = this.getDeadDomains();
+        final String domainFromURL = Browser.getHost(link.getPluginPatternMatcher());
+        final String domainToUse;
+        if (deadDomains != null && deadDomains.contains(domainFromURL)) {
+            /* Fallback to plugin domain */
+            /* e.g. down.xx.com -> down.yy.com, keep subdomain(s) */
+            domainToUse = this.getHost();
+        } else {
+            domainToUse = domainFromURL;
+        }
+        return "https://" + domainToUse + "/video/" + this.getVideoID(link) + "/play";
     }
 
     @Override
@@ -130,15 +164,16 @@ public class RecurbateCom extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        final String fid = getFID(link);
+        final String fid = getVideoID(link);
         if (!link.isNameSet()) {
             /* Set fallback filename e.g. for offline items. */
             link.setName(fid + ".mp4");
         }
+        final String contenturl = getContentURL(link);
         if (account != null) {
-            login(account, link.getPluginPatternMatcher(), true);
+            login(account, contenturl, true);
         } else {
-            br.getPage(link.getPluginPatternMatcher());
+            br.getPage(contenturl);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -153,7 +188,7 @@ public class RecurbateCom extends PluginForHost {
             performer = Encoding.htmlDecode(performer).trim();
             link.setProperty(PROPERTY_USER, performer);
         }
-        setFilename(link, fid);
+        setFilename(link);
         return AvailableStatus.TRUE;
     }
 
@@ -171,16 +206,18 @@ public class RecurbateCom extends PluginForHost {
         }
     }
 
-    public static void setFilename(DownloadLink link, final String fid) {
+    public void setFilename(final DownloadLink link) {
+        final String extDefault = ".mp4";
+        final String videoid = this.getVideoID(link);
         final String performer = link.getStringProperty(PROPERTY_USER);
         final String dateStr = link.getStringProperty(PROPERTY_DATE);
         if (dateStr != null && performer != null) {
-            link.setFinalFileName(dateStr + "_" + performer + "_" + fid + ".mp4");
+            link.setFinalFileName(dateStr + "_" + performer + "_" + videoid + extDefault);
         } else if (performer != null) {
-            link.setFinalFileName(performer + "_" + fid + ".mp4");
+            link.setFinalFileName(performer + "_" + videoid + extDefault);
         } else {
             /* Fallback */
-            link.setFinalFileName(fid + ".mp4");
+            link.setFinalFileName(videoid + extDefault);
         }
     }
 
@@ -216,7 +253,8 @@ public class RecurbateCom extends PluginForHost {
                 logger.info("Found highspeed downloadurl: " + officialHighspeedDownloadlink);
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, officialHighspeedDownloadlink, RESUMABLE, MAXCHUNKS);
             } else {
-                final String token = br.getRegex("data-token\\s*=\\s*\"([a-f0-9]{32,})\"\\s*data-video-id").getMatch(0);
+                logger.info("Failed to find highspeed downloadurl -> Trying to download stream");
+                final String token = br.getRegex("data-token\\s*=\\s*\"([^\"]+)\"\\s*data-video-id").getMatch(0);
                 if (token == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -227,22 +265,25 @@ public class RecurbateCom extends PluginForHost {
                 brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
                 brc.getHeaders().put("Accept", "*/*");
                 final UrlQuery query = new UrlQuery();
-                query.add("video", this.getFID(link));
-                query.add("token", token);
-                brc.getPage("/api/get.php?" + query.toString());
-                final String streamLink = brc.getRegex("<source\\s*src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=\"video/mp4\"\\s*/>").getMatch(0);
+                query.add("token", Encoding.urlEncode(token));
+                brc.getPage("/api/video/" + this.getVideoID(link) + "?" + query.toString());
+                String streamLink = brc.getRegex("<source\\s*src\\s*=\\s*\"(https?://[^\"]+)\"[^>]*type=\"video/mp4\"\\s*/>").getMatch(0);
                 if (streamLink == null) {
-                    if (StringUtils.containsIgnoreCase(brc.toString(), "shall_signin")) {
+                    final String html = brc.getRequest().getHtmlCode();
+                    if (StringUtils.containsIgnoreCase(html, "shall_signin")) {
                         /**
                          * Free users can watch one video per IP per X time. </br>
                          * This error should only happen in logged-out state.
                          */
                         errorDailyDownloadlimitReached(account);
-                    } else if (StringUtils.containsIgnoreCase(brc.toString(), "shall_subscribe")) {
+                    } else if (StringUtils.containsIgnoreCase(html, "shall_subscribe")) {
                         errorDailyDownloadlimitReached(account);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
+                }
+                if (Encoding.isHtmlEntityCoded(streamLink)) {
+                    streamLink = Encoding.htmlOnlyDecode(streamLink);
                 }
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, streamLink, RESUMABLE, MAXCHUNKS);
             }

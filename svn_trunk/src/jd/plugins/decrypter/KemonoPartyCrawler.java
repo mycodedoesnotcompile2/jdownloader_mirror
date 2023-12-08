@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 48402 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48515 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -383,7 +383,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final Map<String, Object> filemap, final int index) {
+    private DownloadLink buildFileDownloadLinkAPI(final HashSet<String> dupes, final Map<String, Object> filemap, final int index) throws PluginException {
+        this.ensureInitHosterplugin();
         final String filename = filemap.get("name").toString();
         final String filepath = filemap.get("path").toString();
         final String url = "https://" + this.getHost() + "/data" + filepath + "?f=" + Encoding.urlEncode(filename);

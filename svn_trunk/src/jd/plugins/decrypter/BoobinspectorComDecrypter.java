@@ -25,7 +25,7 @@ import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 45846 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48544 $", interfaceVersion = 3, names = {}, urls = {})
 public class BoobinspectorComDecrypter extends PornEmbedParser {
     public BoobinspectorComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,6 +80,7 @@ public class BoobinspectorComDecrypter extends PornEmbedParser {
         }
     }
 
+    @Override
     protected boolean isSelfhosted(final Browser br) {
         if (br.containsHTML("/videos/embed/\\d+")) {
             return true;

@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-@HostPlugin(revision = "$Revision: 48402 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48515 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class KemonoParty extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://kemono.party/";
+        return "https://kemono.su";
     }
 
     private static List<String[]> getPluginDomains() {

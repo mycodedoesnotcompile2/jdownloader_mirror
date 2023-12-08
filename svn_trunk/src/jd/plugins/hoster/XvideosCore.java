@@ -60,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48555 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XvideosCore extends PluginForHost {
     public XvideosCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +88,11 @@ public abstract class XvideosCore extends PluginForHost {
      * online.
      */
     public String[] getDeadDomains() {
+        return new String[] {};
+    };
+
+    /** Returns domains which might be available but should be avoided */
+    public String[] getAvoidDomains() {
         return new String[] {};
     };
 
@@ -211,8 +216,20 @@ public abstract class XvideosCore extends PluginForHost {
          * 2020-10-12: In general, we use the user-added domain but some are dead but the content might still be alive --> Use main plugin
          * domain for such cases
          */
-        if (getDeadDomains() != null) {
-            for (final String deadDomain : this.getDeadDomains()) {
+        final String[] deadDomains = getDeadDomains();
+        boolean replacedDeadDomain = false;
+        if (deadDomains != null) {
+            for (final String deadDomain : deadDomains) {
+                if (url.contains(deadDomain)) {
+                    url = url.replaceFirst("(?i)" + Pattern.quote(deadDomain) + "/", this.getHost() + "/");
+                    replacedDeadDomain = true;
+                    break;
+                }
+            }
+        }
+        final String[] avoidDomains = this.getAvoidDomains();
+        if (avoidDomains != null && !replacedDeadDomain) {
+            for (final String deadDomain : avoidDomains) {
                 if (url.contains(deadDomain)) {
                     url = url.replaceFirst("(?i)" + Pattern.quote(deadDomain) + "/", this.getHost() + "/");
                     break;

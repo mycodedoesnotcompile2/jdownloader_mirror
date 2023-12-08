@@ -25,7 +25,6 @@ import java.util.Map;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
@@ -58,7 +57,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
+@HostPlugin(revision = "$Revision: 48517 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
 public class NexusmodsCom extends antiDDoSForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -667,7 +666,6 @@ public class NexusmodsCom extends antiDDoSForHost {
          *
          */
         private static final long serialVersionUID = 1L;
-        private final String      PINHELP          = "Enter your API Key";
         private final JLabel      apikeyLabel;
 
         private String getPassword() {
@@ -694,8 +692,8 @@ public class NexusmodsCom extends antiDDoSForHost {
 
         public NexusmodsAccountFactory(final InputChangedCallbackInterface callback) {
             super("ins 0, wrap 2", "[][grow,fill]", "");
-            add(new JLabel("Click here to find your API Key:"));
-            add(new JLink("https://www.nexusmods.com/users/myaccount?tab=api%20access"));
+            add(new JLabel("Where can I find my API key?"));
+            add(new JLink("Click here", "https://www.nexusmods.com/users/myaccount?tab=api%20access"));
             add(apikeyLabel = new JLabel("<html><u><b>Personal</b></u> API Key [premium accounts only]:</html>"));
             add(this.pass = new ExtPasswordField() {
                 @Override
@@ -703,7 +701,7 @@ public class NexusmodsCom extends antiDDoSForHost {
                     callback.onChangedInput(this);
                 }
             }, "");
-            pass.setHelpText(PINHELP);
+            pass.setHelpText("Enter your API Key");
         }
 
         @Override

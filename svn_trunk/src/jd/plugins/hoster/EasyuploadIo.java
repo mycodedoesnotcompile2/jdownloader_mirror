@@ -38,8 +38,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.EasyuploadIoFolder;
 
-@HostPlugin(revision = "$Revision: 47985 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48430 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadIo extends PluginForHost {
     public EasyuploadIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,11 +101,7 @@ public class EasyuploadIo extends PluginForHost {
         }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*FILE NOT FOUND")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
+        EasyuploadIoFolder.checkErrors(br);
         parseFileInfo(br, link);
         return AvailableStatus.TRUE;
     }

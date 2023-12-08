@@ -28,6 +28,8 @@ import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -35,22 +37,32 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48393 $", interfaceVersion = 3, names = { "webtoons.com" }, urls = { "https?://(?:www\\.)?webtoons\\.com/[a-z\\-]+/[^/]+/[^/]+/(?:[^/]+/viewer\\?title_no=\\d+\\&episode_no=\\d+|list\\?title_no=\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 48432 $", interfaceVersion = 3, names = { "webtoons.com" }, urls = { "https?://(?:www\\.)?webtoons\\.com/[a-z\\-]+/[^/]+/[^/]+/(?:[^/]+/viewer\\?title_no=\\d+\\&episode_no=\\d+|list\\?title_no=\\d+)" })
 public class WebtoonsCom extends PluginForDecrypt {
     public WebtoonsCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        this.br.setAllowedResponseCodes(400);
-        /* This cookie will allow us to access 18+ content */
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         setImportantCookies(br, this.getHost());
         br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(400, 429);
+        return br;
+    }
+
+    private void setImportantCookies(final Browser br, final String host) {
+        /* These cookies will allow us to access 18+ content. */
+        br.setCookie(host, "pagGDPR", "true");
+        br.setCookie(host, "atGDPR", "AD_CONSENT");
+        br.setCookie(host, "needGDPR", "false");
+    }
+
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 400 || br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
+        checkErrors(br);
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         final String titlenumber = query.get("title_no");
         final String episodenumber = query.get("episode_no");
@@ -58,16 +70,13 @@ public class WebtoonsCom extends PluginForDecrypt {
         if (fpName == null) {
             fpName = br.getRegex("<title>([^<>]+)</title>").getMatch(0);
         }
-        final FilePackage fp;
+        final FilePackage fp = FilePackage.getInstance();
         if (fpName != null) {
-            fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(fpName).trim());
-        } else {
-            fp = null;
         }
         String[] links;
         if (episodenumber != null) {
-            /* Decrypt single episode */
+            /* Crawl single episode */
             links = br.getRegex("class=\"_images\" data\\-url=\"(https?://[^<>\"]*?)\"").getColumn(0);
             if (links == null || links.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -90,30 +99,28 @@ public class WebtoonsCom extends PluginForDecrypt {
                 ret.add(dl);
             }
         } else {
-            int pageNumber = 1;
-            final HashSet<String> singleLinks = new HashSet<String>();
-            while (true) {
-                logger.info("Crawling page: " + pageNumber);
-                if (pageNumber > 1) {
-                    final String nextPage = param.getCryptedUrl() + "&page=" + pageNumber;
-                    this.br.getPage(nextPage);
-                    /* 2021-08-02: This sometimes randomly happens... */
-                    if (br.getURL().contains("/gdpr/ageGate")) {
-                        setImportantCookies(br, this.br.getHost());
-                        this.br.getPage(nextPage);
-                    }
-                }
+            /* Crawl all episodes of a series */
+            int page = 1;
+            final HashSet<String> dupes = new HashSet<String>();
+            do {
+                logger.info("Crawling page: " + page);
                 /* Find urls of all episode of a title --> Re-Add these single episodes to the crawler. */
                 links = br.getRegex("<li[^>]*id=\"episode_\\d+\"[^>]+>[^<>]*?<a href=\"(https?://[^<>\"]+title_no=" + titlenumber + "\\&episode_no=\\d+)\"").getColumn(0);
                 if (links.length == 0) {
                     /* Maybe we already found everything or there simply isn't anything. */
-                    logger.info("Stopping because: Failed to find any item on current page");
-                    break;
+                    if (ret.isEmpty()) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else {
+                        /* This should be an extremely rare case */
+                        logger.info("Stopping because: Failed to find any item on current page");
+                        break;
+                    }
                 }
-                boolean foundNewItem = false;
+                logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
+                int numberofNewItems = 0;
                 for (final String singleLink : links) {
-                    if (singleLinks.add(singleLink)) {
-                        foundNewItem = true;
+                    if (dupes.add(singleLink)) {
+                        numberofNewItems++;
                         final DownloadLink link = this.createDownloadlink(singleLink);
                         if (fp != null) {
                             fp.add(link);
@@ -122,29 +129,47 @@ public class WebtoonsCom extends PluginForDecrypt {
                         ret.add(link);
                     }
                 }
-                if (!foundNewItem) {
-                    logger.info("Stopping because: Failed to find any new item on current page");
+                if (numberofNewItems == 0) {
+                    logger.info("Stopping because: Failed to find any new item on current page: " + page);
                     break;
-                }
-                pageNumber++;
-                if (!br.containsHTML("page=" + pageNumber)) {
-                    logger.info("Stopping because: No next page available");
+                } else if (!br.containsHTML("page=" + (page + 1))) {
+                    logger.info("Stopping because: No next page available -> Reached end? Last page = " + page);
                     break;
+                } else if (this.isAbort()) {
+                    logger.info("Stopping because: Aborted by user");
+                    break;
+                } else {
+                    /* Continue to next page */
+                    page++;
+                    final String nextPage = param.getCryptedUrl() + "&page=" + page;
+                    this.br.getPage(nextPage);
+                    /* 2021-08-02: This sometimes randomly happens... */
+                    if (br.getURL().contains("/gdpr/ageGate")) {
+                        setImportantCookies(br, this.br.getHost());
+                        this.br.getPage(nextPage);
+                    }
+                    checkErrors(br);
+                    // continue;
                 }
-                if (this.isAbort()) {
-                    return ret;
-                }
-            }
-            if (ret.size() == 0) {
+            } while (!this.isAbort());
+            if (ret.isEmpty()) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         return ret;
     }
 
-    private void setImportantCookies(final Browser br, final String host) {
-        br.setCookie(host, "pagGDPR", "true");
-        br.setCookie(host, "atGDPR", "AD_CONSENT");
-        br.setCookie(host, "needGDPR", "false");
+    private void checkErrors(final Browser br) throws PluginException, DecrypterRetryException {
+        if (br.getHttpConnection().getResponseCode() == 400 || br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 429) {
+            throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
+        }
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        /* 2023-11-07: Try to avoid running into rate limits. */
+        return 1;
     }
 }

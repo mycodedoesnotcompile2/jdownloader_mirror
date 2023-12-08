@@ -33,16 +33,23 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48009 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48538 $", interfaceVersion = 2, names = {}, urls = {})
 public class Viet69Net extends antiDDoSForDecrypt {
     public Viet69Net(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc" });
+        ret.add(new String[] { "viet69.gg", "viet69.in", "viet69.net", "viet69.co", "viet69.love", "viet69.page", "viet69.vc", "viet69.tube" });
         return ret;
     }
 
@@ -69,7 +76,6 @@ public class Viet69Net extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -110,11 +116,11 @@ public class Viet69Net extends antiDDoSForDecrypt {
                 }
             }
         }
+        final FilePackage fp = FilePackage.getInstance();
         if (title != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(title.trim()));
-            fp.addLinks(ret);
+            fp.setName(Encoding.htmlDecode(title).trim());
         }
+        fp.addLinks(ret);
         return ret;
     }
 }

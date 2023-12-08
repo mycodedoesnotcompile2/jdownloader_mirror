@@ -26,7 +26,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46050 $", interfaceVersion = 2, names = { "proxer.me" }, urls = { "https?://(?:www\\.)?proxer\\.me/watch/\\d+/\\d+/(ger|eng)sub" })
+@DecrypterPlugin(revision = "$Revision: 48424 $", interfaceVersion = 2, names = { "proxer.me" }, urls = { "https?://(?:www\\.)?proxer\\.me/watch/\\d+/\\d+/(ger|eng)sub" })
 public class ProxrMe extends PluginForDecrypt {
     public ProxrMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -34,7 +34,8 @@ public class ProxrMe extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        br.getPage(contenturl);
         if (br.getRequest().getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("/images/misc/404\\.png\"")) {
@@ -48,8 +49,8 @@ public class ProxrMe extends PluginForDecrypt {
         replace = replace.replace("\\", "").replace("#", "");
         code = code.replace("\\", "").replace("#", "");
         final String finallink = replace + code;
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        decryptedLinks.add(createDownloadlink(finallink));
-        return decryptedLinks;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        ret.add(createDownloadlink(finallink));
+        return ret;
     }
 }

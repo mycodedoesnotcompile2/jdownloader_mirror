@@ -24,16 +24,55 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.hoster.HighWayCore;
+import jd.plugins.hoster.HighWayMe2;
 
-@DecrypterPlugin(revision = "$Revision: 48224 $", interfaceVersion = 3, names = { "high-way.me" }, urls = { "https?://((?:torrent|usenet)(archiv)?)\\.(?:high-way\\.me|dwld\\.link)/dl(?:u|t)/[a-z0-9]+(?:/$|/.+)" })
+@DecrypterPlugin(revision = "$Revision: 48420 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
     public HighWayMeFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        HighWayCore.prepBRHighway(br);
+        return br;
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "high-way.me", "dwld.link" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://\\w+\\." + buildHostsPatternPart(domains) + "/(dl(?:u|t|[0-9]+)/[a-z0-9]+(?:/$|/.+)|dav/.+)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     public static final String PROPERTY_ALTERNATIVE_ROOT_FOLDER_TITLE = "alternative_root_folder_title";
@@ -41,6 +80,22 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         betterRootFolderName = param.getDownloadLink() != null ? param.getDownloadLink().getStringProperty(PROPERTY_ALTERNATIVE_ROOT_FOLDER_TITLE) : null;
+        final String domainHW = "high-way.me";
+        final Account account = AccountController.getInstance().getValidAccount(domainHW);
+        final HighWayMe2 hosterplugin = (HighWayMe2) this.getNewPluginForHostInstance(domainHW);
+        if (account != null) {
+            /* Required for WebDAV URLs. */
+            hosterplugin.login(account, false);
+        }
+        final boolean accountRequired;
+        if (param.getCryptedUrl().matches("(?i)https?://[^/]+/dav/.+")) {
+            accountRequired = true;
+        } else {
+            accountRequired = false;
+        }
+        if (accountRequired && account == null) {
+            logger.info("Looks like account required and no account available -> This one will most likely fail");
+        }
         final ArrayList<DownloadLink> crawledItems = super.decryptIt(param, progress);
         if (param.getCryptedUrl().matches("(?i)^https?://(?:torrentarchiv|torrent)\\.[^/]+/dlt/[a-z0-9]+/$")) {
             /*
@@ -62,7 +117,7 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
         }
         final List<DownloadLink> remove2 = new ArrayList<DownloadLink>();
         for (final DownloadLink link : crawledItems) {
-            if (link.getPluginPatternMatcher().endsWith("/__ADMIN__/") && !link.isAvailabilityStatusChecked()) {
+            if (StringUtils.endsWithCaseInsensitive(link.getPluginPatternMatcher(), "/__ADMIN__/") && !link.isAvailabilityStatusChecked()) {
                 remove2.add(link);
             }
         }
@@ -79,12 +134,12 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
          */
         for (final DownloadLink link : crawledItems) {
             if (StringUtils.startsWithCaseInsensitive(link.getPluginPatternMatcher(), "directhttp://")) {
-                link.setPluginPatternMatcher(link.getPluginPatternMatcher().replaceFirst("(?i)directhttp://", ""));
-                link.setHost(this.getHost());
+                /* Workaround to make single file links to into our high-way.me hosterplugin */
+                final String directurlCorrected = link.getPluginPatternMatcher().replaceFirst("(?i)directhttp://", "");
+                link.setPluginPatternMatcher(directurlCorrected);
+                link.setHost(domainHW);
+                link.setDefaultPlugin(hosterplugin);
             }
-        }
-        /* Set additional properties */
-        for (final DownloadLink link : crawledItems) {
             link.setProperty(PROPERTY_ALTERNATIVE_ROOT_FOLDER_TITLE, this.betterRootFolderName);
         }
         return crawledItems;
@@ -109,7 +164,7 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
             if (betterRootFolderName != null) {
                 rootFolderName = betterRootFolderName;
             } else {
-                rootFolderName = new Regex(br.getURL(), "/dl(?:u|t)/([a-z0-9]+)").getMatch(0);
+                rootFolderName = new Regex(br.getURL(), "/dl(?:u|t|[0-9]+)/([a-z0-9]+)").getMatch(0);
             }
             if (path.equals("/")) {
                 return rootFolderName;
@@ -127,7 +182,7 @@ public class HighWayMeFolder extends GenericHTTPDirectoryIndexCrawler {
 
     @Override
     protected String getCurrentDirectoryPath(final String url) throws UnsupportedEncodingException {
-        final Regex pathregex = new Regex(url, "(?i)^https?://[^/]+/dl(?:u|t)/([a-z0-9]+)/(.+)");
+        final Regex pathregex = new Regex(url, "(?i)^https?://[^/]+/dl(?:u|t|[0-9]+)/([a-z0-9]+)/(.+)");
         if (pathregex.patternFind()) {
             final String internalRootFolder = pathregex.getMatch(0);
             final String path = pathregex.getMatch(1);

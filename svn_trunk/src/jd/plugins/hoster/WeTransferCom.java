@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 46968 $", interfaceVersion = 2, names = { "wetransfer.com", "boards.wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}", "https?://boards\\.wetransfer\\.com/board/[a-z0-9]+" })
+@HostPlugin(revision = "$Revision: 48488 $", interfaceVersion = 2, names = { "wetransfer.com", "boards.wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}", "https?://boards\\.wetransfer\\.com/board/[a-z0-9]+" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -54,6 +54,7 @@ public class WeTransferCom extends PluginForHost {
     public static Browser prepBRWebsite(final Browser br) {
         br.addAllowedResponseCodes(new int[] { 410, 503 });
         br.setCookie("wetransfer.com", "wt_tandc", "20170208");
+        br.setFollowRedirects(true);
         return br;
     }
 
@@ -87,7 +88,7 @@ public class WeTransferCom extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         setBrowserExclusive();
         if (isTypeDownload(link)) {
-            br = prepBRWebsite(new Browser());
+            br = prepBRWebsite(this.createNewBrowserInstance());
             final String[] dlinfo = link.getPluginPatternMatcher().replace("http://wetransferdecrypted/", "").split("/");
             final String id_main = dlinfo[0];
             final String security_hash = dlinfo[1];
@@ -145,7 +146,7 @@ public class WeTransferCom extends PluginForHost {
             boolean authed = false;
             do {
                 /* Clear old headers and cookies each loop */
-                br = prepBRAPI(new Browser());
+                br = prepBRAPI(this.createNewBrowserInstance());
                 try {
                     if (token == null) {
                         /* Only generate new token if needed */
@@ -184,7 +185,7 @@ public class WeTransferCom extends PluginForHost {
                 /* 2019-09-30 e.g. {"success":false,"message":"This collection does not exist","error_key":"board_deleted"} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
             String filename = (String) entries.get("name");
             final String filesize = PluginJSonUtils.getJson(br, "size");
             if (StringUtils.isEmpty(filename)) {
@@ -212,8 +213,8 @@ public class WeTransferCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Use website from now on */
-            br = prepBRWebsite(new Browser());
-            br.getHeaders().put("x-requested-with", "XMLHttpRequest");
+            br = prepBRWebsite(this.createNewBrowserInstance());
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             final String fid = this.getFID(link);
             final String action = String.format("https://boards.wetransfer.com/api/boards/%s/%s/download", fid, operation_version);
             br.postPageRaw(action, "{}");
@@ -228,12 +229,13 @@ public class WeTransferCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, downloadurl, resume, maxChunks);
-        if (dl.getConnection().getContentType().contains("html")) {
-            br.followConnection();
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
             if (br.containsHTML("<title>Error while downloading your file")) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
             }
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
         }
         dl.startDownload();
     }

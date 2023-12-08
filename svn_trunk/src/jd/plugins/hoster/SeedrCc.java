@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
+@HostPlugin(revision = "$Revision: 48530 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
 public class SeedrCc extends PluginForHost {
     public SeedrCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,13 +66,13 @@ public class SeedrCc extends PluginForHost {
     }
 
     /* Connection stuff */
-    private final int            FREE_MAXDOWNLOADS    = -1;
-    private final int            ACCOUNT_MAXDOWNLOADS = -1;
-    private final boolean        ACCOUNT_RESUME       = true;
-    private final int            ACCOUNT_MAXCHUNKS    = -2;
-    private String               dllink               = null;
-    private static final String  PROPERTY_DIRECTURL   = "directurl";
-    private static final boolean cookieLoginOnly      = false;
+    private final int           FREE_MAXDOWNLOADS    = -1;
+    private final int           ACCOUNT_MAXDOWNLOADS = -1;
+    private final boolean       ACCOUNT_RESUME       = true;
+    private final int           ACCOUNT_MAXCHUNKS    = -2;
+    private String              dllink               = null;
+    private static final String PROPERTY_DIRECTURL   = "directurl";
+    private final boolean       cookieLoginOnly      = false;
 
     private boolean isDirectDownloadURL(final DownloadLink link) {
         return link != null && new Regex(link.getPluginPatternMatcher(), ".*/download/archive/.*").matches();

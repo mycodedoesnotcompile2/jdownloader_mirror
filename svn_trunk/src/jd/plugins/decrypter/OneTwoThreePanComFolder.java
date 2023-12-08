@@ -41,13 +41,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.OneTwoThreePanCom;
 
-@DecrypterPlugin(revision = "$Revision: 47906 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48490 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneTwoThreePanComFolder extends PluginForDecrypt {
     public OneTwoThreePanComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    public static final String API_BASE = "https://www.123pan.com/a/api";
+    public static final String API_BASE   = "https://www.123pan.com/a/api";
+    public static final String API_BASE_2 = "https://www.123pan.com/b/api";
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();

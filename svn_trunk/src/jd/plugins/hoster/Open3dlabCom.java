@@ -38,7 +38,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47794 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48444 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,17 +133,13 @@ public class Open3dlabCom extends PluginForHost {
                 brc.setFollowRedirects(true);
                 /* 2023-03-20: HEAD-request impossible */
                 con = brc.openGetConnection(dllink);
-                if (!looksLikeDownloadableContent(con, link.getName())) {
-                    brc.followConnection(true);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                    final String serverFilename = Plugin.getFileNameFromHeader(con);
-                    if (serverFilename != null) {
-                        link.setFinalFileName(serverFilename);
-                    }
+                handleConnectionErrors(brc, con, link.getName());
+                if (con.getCompleteContentLength() > 0) {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+                final String serverFilename = Plugin.getFileNameFromHeader(con);
+                if (serverFilename != null) {
+                    link.setFinalFileName(serverFilename);
                 }
             } finally {
                 try {
@@ -153,6 +149,21 @@ public class Open3dlabCom extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con, final String filename) throws PluginException, IOException {
+        if (!this.looksLikeDownloadableContent(con, filename)) {
+            br.followConnection(true);
+            if (dl.getConnection().getResponseCode() == 403) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 503) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 503", 5 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+        }
     }
 
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection, final String filename) {
@@ -179,16 +190,7 @@ public class Open3dlabCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
-            if (!this.looksLikeDownloadableContent(dl.getConnection(), link.getName())) {
-                br.followConnection(true);
-                if (dl.getConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
+            handleConnectionErrors(br, dl.getConnection(), link.getName());
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
         }
         dl.startDownload();

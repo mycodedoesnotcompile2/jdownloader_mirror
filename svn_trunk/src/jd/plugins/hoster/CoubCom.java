@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48102 $", interfaceVersion = 3, names = { "coub.com" }, urls = { "https?://(?:www\\.)?coub\\.com/(?:view|embed)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 48481 $", interfaceVersion = 3, names = { "coub.com" }, urls = { "https?://(?:www\\.)?coub\\.com/(?:view|embed)/([A-Za-z0-9]+)" })
 public class CoubCom extends PluginForHost {
     public CoubCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,14 +89,14 @@ public class CoubCom extends PluginForHost {
             } else if (this.br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } else {
             this.br.getPage("https://" + this.getHost() + "/view/" + fid);
             if (this.br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String json = br.getRegex("<script [^>]*coubPageCoubJson[^>]*>(.*?)</script>").getMatch(0);
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+            entries = restoreFromString(json, TypeRef.MAP);
         }
         final String created_at = (String) entries.get("created_at");
         String filename = getFilename(this, entries, fid);

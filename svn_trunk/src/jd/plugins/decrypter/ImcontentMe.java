@@ -23,7 +23,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -40,11 +39,31 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 48298 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48455 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImcontentMe extends PluginForDecrypt {
     public ImcontentMe(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static String decodeData(final String t) {
+        final String e = "2";
+        final String b64decoded = Encoding.Base64Decode(t);
+        final StringBuilder res = new StringBuilder();
+        for (int i = 0; i < b64decoded.length(); i++) {
+            char c = b64decoded.charAt(i);
+            char eChar = e.charAt(i % e.length());
+            char xor = (char) (c ^ eChar);
+            res.append(xor);
+        }
+        return res.toString();
+    }
+
+    public static void main(String[] args) {
+        String t = "testStringHere";
+        String result = decodeData(t);
+        System.out.println(result);
     }
 
     public static List<String[]> getPluginDomains() {
@@ -84,16 +103,12 @@ public class ImcontentMe extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2023-09-14: Plugin does not yet work. */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         br.setFollowRedirects(true);
         String referer = null;
         if (param.getDownloadLink() != null) {
             referer = param.getDownloadLink().getReferrerUrl();
         }
-        if (referer == null) {
+        if (StringUtils.isEmpty(referer)) {
             /* Fallback */
             referer = "https://fbjav.com/";
         }
@@ -115,35 +130,41 @@ public class ImcontentMe extends PluginForDecrypt {
         final String titleSlug = (String) entries.get("jid");
         final String cryptedData = (String) entries.get("data");
         if (StringUtils.isEmpty(cryptedData)) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (entries.containsKey("error")) {
+                /* .g. {"status":true,"current_request":"CENSORED","error":{"code":500,"message":"Source is empty try restart"}} */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
-        // TODO: Decrypt 'cryptedData'
-        String title = null;
-        if (param.getDownloadLink() != null) {
-            title = param.getDownloadLink().getStringProperty(PROPERTY_TITLE);
-        }
-        if (title == null && titleSlug != null) {
+        final String title;
+        final String betterTitle = param.getDownloadLink() != null ? param.getDownloadLink().getStringProperty(PROPERTY_TITLE) : null;
+        if (betterTitle != null) {
+            title = betterTitle;
+        } else {
             title = titleSlug.replace("-", " ").trim();
         }
-        final String[] links = br.getRegex("").getColumn(0);
-        if (links == null || links.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        for (final String singleLink : links) {
-            ret.add(createDownloadlink(singleLink));
-        }
-        if (title != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(title).trim());
-            fp.addLinks(ret);
-        }
+        final String decodedDataJson = decodeData(cryptedData);
+        final Map<String, Object> entries2 = restoreFromString(decodedDataJson, TypeRef.MAP);
+        final String hlsMaster = entries2.get("url").toString();
+        final DownloadLink video = this.createDownloadlink(hlsMaster);
+        video.setProperty(GenericM3u8.PRESET_NAME_PROPERTY, title);
+        ret.add(video);
+        /* 2023-11-11: This is not a subtitle but a list of thumbnails / preview-seek-frames. */
+        // final String subtitleURL = entries2.get("vtt").toString();
+        // final DownloadLink subtitle = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(subtitleURL));
+        // subtitle.setFinalFileName(title + ".vtt");
+        // subtitle.setAvailable(true);
+        // ret.add(subtitle);
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(title);
+        fp.addLinks(ret);
         return ret;
     }
 
     public static final String findKey(final Plugin plg, final String src) {
         /* Old function used in hoster-plugins "StreamonTo" and "UpvideoTo" until including revision 44721. */
-        String dllink = null;
         String[][] hunters = new Regex(src, "<script[^>]*>\\s*(var _[^<]*?\\})eval(\\(function\\(h,u,n,t,e,r\\).*?)</script>").getMatches();
         int counter = 0;
         for (final String[] hunter : hunters) {
@@ -189,6 +210,6 @@ public class ImcontentMe extends PluginForDecrypt {
             }
             counter += 1;
         }
-        return dllink;
+        return null;
     }
 }

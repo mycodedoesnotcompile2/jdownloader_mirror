@@ -29,6 +29,7 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
         if (this.pass == null) {
             return null;
         }
+        // TODO: Evaluate if this check is still required
         if (EMPTYPW.equals(new String(this.pass.getPassword()))) {
             return null;
         }
@@ -49,7 +50,10 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
     private final ExtTextField                  name;
     private final ExtPasswordField              pass;
     private final InputChangedCallbackInterface callback;
-    private static String                       EMPTYPW = "                 ";
+    private static String                       EMPTYPW                     = "                 ";
+    private JLabel                              usernameLabel               = null;
+    private JLabel                              passwordLabel               = null;
+    private boolean                             allowCookiesInPasswordField = false;
 
     public boolean updateAccount(Account input, Account output) {
         boolean changed = false;
@@ -68,29 +72,25 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
         this(callback, true);
     }
 
-    public DefaultEditAccountPanel(final InputChangedCallbackInterface callback, boolean requiresUserName) {
+    public DefaultEditAccountPanel(final InputChangedCallbackInterface callback, final boolean allowCookieLogin) {
         super("ins 0, wrap 2", "[][grow,fill]", "");
         this.callback = callback;
-        if (requiresUserName) {
-            add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
-            add(this.name = new ExtTextField() {
-                @Override
-                public void onChanged() {
-                    callback.onChangedInput(name);
-                }
+        add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
+        add(this.name = new ExtTextField() {
+            @Override
+            public void onChanged() {
+                callback.onChangedInput(name);
+            }
 
-                {
-                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
-                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
-                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
-                    refreshTextHighlighter();
-                }
-            });
-            name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
-        } else {
-            name = null;
-        }
-        add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
+            {
+                final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
+                addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
+                refreshTextHighlighter();
+            }
+        });
+        name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
+        add(passwordLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
         add(this.pass = new ExtPasswordField() {
             @Override
             public void onChanged() {
@@ -104,25 +104,35 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
                 applyTextHighlighter(null);
             }
         }, "");
-        pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
+        if (allowCookieLogin) {
+            pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass_or_cookies());
+        } else {
+            pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
+        }
         final ExtTextField dummy = new ExtTextField();
         dummy.paste();
         final String clipboard = dummy.getText();
         if (StringUtils.isNotEmpty(clipboard)) {
             /* Automatically put exported cookies json string into password field in case that's the current clipboard content. */
-            if (Cookies.parseCookiesFromJsonString(clipboard, null) != null && pass != null) {
+            if (allowCookieLogin && Cookies.parseCookiesFromJsonString(clipboard, null) != null) {
+                /*
+                 * Cookie login is supported and users' clipboard contains exported cookies at this moment -> Auto-fill password field with
+                 * them.
+                 */
                 pass.setPassword(clipboard.toCharArray());
             } else if (name != null) {
+                /* Auto fill username field with clipboard content if username is needed. */
                 name.setText(clipboard);
             }
         }
+        allowCookiesInPasswordField = allowCookieLogin;
     }
 
     public InputChangedCallbackInterface getCallback() {
         return callback;
     }
 
-    public void setAccount(Account defaultAccount) {
+    public void setAccount(final Account defaultAccount) {
         if (defaultAccount != null) {
             if (name != null) {
                 name.setText(defaultAccount.getUser());
@@ -133,10 +143,39 @@ public class DefaultEditAccountPanel extends MigPanel implements AccountBuilderI
 
     @Override
     public boolean validateInputs() {
-        if (name == null) {
-            return StringUtils.isAllNotEmpty(getPassword());
+        final boolean userok;
+        final boolean passok;
+        if (this.name != null) {
+            if (StringUtils.isEmpty(this.getUsername())) {
+                usernameLabel.setForeground(Color.RED);
+                userok = false;
+            } else {
+                usernameLabel.setForeground(Color.BLACK);
+                userok = true;
+            }
         } else {
-            return StringUtils.isAllNotEmpty(getPassword(), getUsername());
+            /* No username needed */
+            userok = true;
+        }
+        final String pw = getPassword();
+        final Cookies cookies = Cookies.parseCookiesFromJsonString(pw);
+        if (StringUtils.isEmpty(pw)) {
+            passok = false;
+        } else if (cookies != null && !allowCookiesInPasswordField) {
+            /* Cookie login is not allowed but user has entered exported cookies into password field. */
+            passok = false;
+        } else {
+            passok = true;
+        }
+        if (!passok) {
+            passwordLabel.setForeground(Color.RED);
+        } else {
+            passwordLabel.setForeground(Color.BLACK);
+        }
+        if (userok && passok) {
+            return true;
+        } else {
+            return false;
         }
     }
 

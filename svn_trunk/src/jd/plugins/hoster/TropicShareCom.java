@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@HostPlugin(revision = "$Revision: 48348 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
+@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 2, names = { "tropicshare.com" }, urls = { "https?://(?:www\\.)?tropicshare\\.com/files/(\\d+)" })
 public class TropicShareCom extends PluginForHost {
     public TropicShareCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -208,16 +208,16 @@ public class TropicShareCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error: Got html code instead of file");
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
-            dl.startDownload();
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired");
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
             } else {
                 throw e;
             }
         }
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        dl.startDownload();
     }
 
     private void login(final Account account, final boolean force) throws Exception {

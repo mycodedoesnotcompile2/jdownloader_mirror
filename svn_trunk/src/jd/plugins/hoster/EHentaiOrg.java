@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48410 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -389,7 +389,7 @@ public class EHentaiOrg extends PluginForHost {
             }
         }
         final boolean userPrefersOriginalDownloadurl = cfg.isAccountDownloadsPreferOriginalQuality();
-        final Regex originalDownloadRegex = br.getRegex("href=\"(https?://(?:(?:g\\.)?e\\-hentai|exhentai)\\.org/fullimg\\.php[^<>\"]*?)\">\\s*Download original \\d+ x \\d+ ([^<]*?)<");
+        final Regex originalDownloadRegex = br.getRegex("href=\"(https?://(?:(?:g\\.)?e\\-hentai|exhentai)\\.org/(?:fullimg\\.php|fullimg/)[^<>\"]*?)\">\\s*Download original \\d+ x \\d+ ([^<]*?)<");
         final String filesizeStrOriginalImage = originalDownloadRegex.getMatch(1);
         String originalImageDownloadurl = originalDownloadRegex.getMatch(0);
         if (originalImageDownloadurl != null) {
@@ -568,7 +568,7 @@ public class EHentaiOrg extends PluginForHost {
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directurlproperty);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired");
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
             } else {
                 throw e;
             }

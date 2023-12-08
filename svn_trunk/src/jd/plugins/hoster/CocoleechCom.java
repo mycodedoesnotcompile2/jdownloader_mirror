@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48250 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48517 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     private static final String          API_ENDPOINT        = "https://members.cocoleech.com/auth/api";
     /* Last updated: 2017-02-08 according to admin request. */
@@ -68,6 +68,12 @@ public class CocoleechCom extends PluginForHost {
         super(wrapper);
         this.enablePremium("https://members.cocoleech.com/");
         this.setStartIntervall(3000l);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+        /// return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
 
     @Override
@@ -133,11 +139,6 @@ public class CocoleechCom extends PluginForHost {
             }
             return false;
         }
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
     @Override
@@ -321,6 +322,7 @@ public class CocoleechCom extends PluginForHost {
     @Override
     public AccountBuilderInterface getAccountFactory(InputChangedCallbackInterface callback) {
         return new CocoleechAccountFactory(callback);
+        // return super.getAccountFactory(callback);
     }
 
     public static class CocoleechAccountFactory extends MigPanel implements AccountBuilderInterface {
@@ -397,6 +399,21 @@ public class CocoleechCom extends PluginForHost {
             return new Account(null, getPassword());
         }
     }
+    // @Override
+    // protected String getAPILoginHelpURL() {
+    // return "https://members.cocoleech.com/settings";
+    // }
+    //
+    // @Override
+    // protected boolean looksLikeValidAPIKey(final String str) {
+    // if (str == null) {
+    // return false;
+    // } else if (str.matches("[a-f0-9]{24}")) {
+    // return true;
+    // } else {
+    // return false;
+    // }
+    // }
 
     @Override
     public void reset() {

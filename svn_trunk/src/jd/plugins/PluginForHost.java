@@ -136,6 +136,7 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.AccountJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
@@ -153,6 +154,7 @@ import jd.config.SubConfiguration;
 import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
 import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadSession;
@@ -746,8 +748,9 @@ public abstract class PluginForHost extends Plugin {
         }
     }
 
+    /** This gets executed whenever the user does not answer a captcha which then runs into timeout. */
     public void onCaptchaTimeout(final DownloadLink link, Challenge<?> challenge) throws CaptchaException, PluginException, InterruptedException {
-        switch (JsonConfig.create(CaptchaSettings.class).getCaptchaTimeoutAction()) {
+        switch (JsonConfig.create(CaptchaSettings.class).getHosterCaptchaTimeoutAction()) {
         case RETRY:
             throw new PluginException(LinkStatus.ERROR_RETRY);
         case ASK:
@@ -755,7 +758,10 @@ public abstract class PluginForHost extends Plugin {
                 throw new PluginException(LinkStatus.ERROR_RETRY);
             }
             break;
+        case SKIP_HOSTER:
+            throw new CaptchaException(SkipRequest.BLOCK_HOSTER);
         case SKIP:
+            // fallthrough
         default:
             if (CFG_GUI.HELP_DIALOGS_ENABLED.isEnabled()) {
                 HelpDialog.show(false, true, HelpDialog.getMouseLocation(), "SKIPPEDHOSTER", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.ChallengeDialogHandler_viaGUI_skipped_help_title(), _GUI.T.ChallengeDialogHandler_viaGUI_skipped_help_msg(), new AbstractIcon(IconKey.ICON_SKIPPED, 32));
@@ -920,14 +926,6 @@ public abstract class PluginForHost extends Plugin {
         AccountInfo ai = new AccountInfo();
         account.setValid(true);
         return ai;
-    }
-
-    public boolean getAccountwithoutUsername() {
-        return accountWithoutUsername;
-    }
-
-    public void setAccountwithoutUsername(boolean b) {
-        accountWithoutUsername = b;
     }
 
     public abstract String getAGBLink();
@@ -1520,11 +1518,6 @@ public abstract class PluginForHost extends Plugin {
     public void resetPluginGlobals() {
     }
 
-    /**
-     * JD2 only
-     *
-     * @return
-     */
     protected boolean isAbort() {
         final DownloadLink link = getDownloadLink();
         if (link != null) {
@@ -1567,9 +1560,6 @@ public abstract class PluginForHost extends Plugin {
      * @return
      */
     public String getBuyPremiumUrl() {
-        if (premiumurl != null) {
-            return premiumurl;
-        }
         return premiumurl;
     }
 
@@ -2183,8 +2173,17 @@ public abstract class PluginForHost extends Plugin {
      *
      * @return
      */
-    public AccountBuilderInterface getAccountFactory(InputChangedCallbackInterface callback) {
-        return new DefaultEditAccountPanel(callback, !getAccountwithoutUsername());
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        // TODO: Add check for API key only login
+        if (this.hasFeature(FEATURE.COOKIE_LOGIN_ONLY) || this.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL)) {
+            return new DefaultEditAccountPanelCookieLogin(callback, this);
+        } else if (this.hasFeature(FEATURE.USERNAME_IS_EMAIL)) {
+            return new DefaultEditAccountPanelCookieLogin(callback, this);
+        } else if (this.hasFeature(FEATURE.API_KEY_LOGIN)) {
+            return new DefaultEditAccountPanelAPIKeyLogin(callback, this);
+        } else {
+            return new DefaultEditAccountPanel(callback, false);
+        }
     }
 
     public void resumeDownloadlink(DownloadLink downloadLink) {
@@ -2477,8 +2476,6 @@ public abstract class PluginForHost extends Plugin {
     }
 
     /**
-     * JD2 ONLY
-     *
      * sort accounts for best order to download downloadLink
      *
      * @param accounts
@@ -2490,8 +2487,6 @@ public abstract class PluginForHost extends Plugin {
     }
 
     /**
-     * JD2 ONLY
-     *
      * sort downloadLinks for best order to download via account
      *
      * @param accounts
@@ -2996,6 +2991,60 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public void extendAccountSettingsPanel(Account acc, PluginConfigPanelNG panel) {
+    }
+
+    /**
+     * Override this if API login is needed for this plugin. </br>
+     * Return an URL which will lead the user to his API key and/or instructions on how to login via API in JDownloader. </br>
+     * Example(s): </br>
+     * pixeldrain.com: https://pixeldrain.com/user/connect_app?app=jdownloader </br>
+     * cocoleech.com: https://members.cocoleech.com/settings
+     */
+    protected String getAPILoginHelpURL() {
+        return null;
+    }
+
+    /** Override if API key login is used for this plugins' account functionality. */
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return false;
+    }
+
+    /**
+     * Use this to pre-validate login credentials. </br>
+     * This method works locally/offline and shall not perform any http requests!
+     *
+     * @throws AccountInvalidException
+     */
+    public void validateLogins(final Account account) throws AccountInvalidException {
+        if (this.hasFeature(FEATURE.USERNAME_IS_EMAIL)) {
+            if (!looksLikeValidEmailAddress(account.getUser())) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorInputIsNotEmailAddress());
+            }
+        }
+        if (this.hasFeature(FEATURE.COOKIE_LOGIN_ONLY)) {
+            if (account.loadUserCookies() == null) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorCookieLoginMandatoryButNoCookiesGiven());
+            }
+        } else if (!this.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL)) {
+            if (account.loadUserCookies() != null) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorCookieLoginUnsupportedButGiven());
+            }
+        } else if (this.hasFeature(FEATURE.API_KEY_LOGIN)) {
+            if (!this.looksLikeValidAPIKey(account.getPass())) {
+                throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorInvalidAPIKey());
+            }
+        }
+    }
+
+    public static boolean looksLikeValidEmailAddress(final String str) {
+        // TODO: Move this function to a better place
+        if (str == null) {
+            return false;
+        } else if (str.matches(".+@.+")) {// TODO: Add more sophisticated validation
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public boolean isSameAccount(Account downloadAccount, AbstractProxySelectorImpl downloadProxySelector, Account candidateAccount, AbstractProxySelectorImpl candidateProxySelector) {

@@ -74,7 +74,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48381 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48544 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -389,7 +389,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     }
 
     /**
-     * Enable this for websites which have embed URLs but they're broken e.g. motherporno.com. </br>
+     * Enable this for websites which have embed URLs but they're broken e.g. motherporno.com, hclips.com. </br>
      * EWmbed URLs will be changed to "fake" normal content URLs which should then redirect to the correct contentURL. </br>
      * <b>Warning:</b> Enabling this without testing can break embed support of host plugins!!
      */

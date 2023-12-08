@@ -319,9 +319,7 @@ public class AccountController implements AccountControllerListener, AccountProp
                 }
                 long tempDisabledCounterBefore = account.getTmpDisabledTimeout();
                 try {
-                    /*
-                     * make sure the current Thread uses the PluginClassLoaderChild of the Plugin in use
-                     */
+                    plugin.validateLogins(account);
                     ai = plugin.fetchAccountInfo(account);
                     plugin.validateLastChallengeResponse();
                     account.setAccountInfo(ai);
@@ -344,7 +342,7 @@ public class AccountController implements AccountControllerListener, AccountProp
                     return ai;
                 }
                 if (tempDisabledCounterBefore > 0 && account.getTmpDisabledTimeout() == tempDisabledCounterBefore) {
-                    /* reset temp disabled information */
+                    /* Reset temp disabled information */
                     logger.info("no longer temp disabled!");
                     account.setTempDisabled(false);
                 }

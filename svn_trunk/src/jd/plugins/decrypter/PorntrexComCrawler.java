@@ -25,6 +25,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -36,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PorntrexCom;
 
-@DecrypterPlugin(revision = "$Revision: 47165 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48413 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PorntrexCom.class })
 public class PorntrexComCrawler extends PluginForDecrypt {
     public PorntrexComCrawler(PluginWrapper wrapper) {
@@ -73,8 +74,8 @@ public class PorntrexComCrawler extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final ArrayList<String> dupes = new ArrayList<String>();
         final String addedlink = param.getCryptedUrl();
-        final Regex photoalbum = new Regex(addedlink, "^https?://[^/]+/albums/(\\d+)/([a-z0-9\\-]+)/?$");
-        if (photoalbum.matches()) {
+        final Regex photoalbum = new Regex(addedlink, "(?i)^https?://[^/]+/albums/(\\d+)/([a-z0-9\\-]+)/?$");
+        if (photoalbum.patternFind()) {
             /* Photo album */
             final String slug = photoalbum.getMatch(1);
             final String title = slug.replace("-", " ").trim();
@@ -82,6 +83,9 @@ public class PorntrexComCrawler extends PluginForDecrypt {
             br.getPage(addedlink);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(">\\s*This album is a private album uploaded by")) {
+                logger.info("Private album -> Account required to access it");
+                throw new AccountRequiredException();
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);

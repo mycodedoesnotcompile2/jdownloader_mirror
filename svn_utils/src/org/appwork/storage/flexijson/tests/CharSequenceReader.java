@@ -41,9 +41,7 @@ import java.io.Reader;
  * @date Dec 3, 2021
  *
  */
-
 public class CharSequenceReader extends Reader {
-
     private CharSequence str;
     private int          length;
     private int          next = 0;
@@ -61,9 +59,12 @@ public class CharSequenceReader extends Reader {
     }
 
     /** Check to make sure that the stream has not been closed */
-    private void ensureOpen() throws IOException {
-        if (str == null) {
+    private CharSequence ensureOpen() throws IOException {
+        final CharSequence ret = this.str;
+        if (ret == null) {
             throw new IOException("Stream closed");
+        } else {
+            return ret;
         }
     }
 
@@ -77,11 +78,12 @@ public class CharSequenceReader extends Reader {
      */
     public int read() throws IOException {
         synchronized (lock) {
-            ensureOpen();
+            final CharSequence str = ensureOpen();
             if (next >= length) {
                 return -1;
+            } else {
+                return str.charAt(next++);
             }
-            return str.charAt(next++);
         }
     }
 
@@ -102,21 +104,21 @@ public class CharSequenceReader extends Reader {
      */
     public int read(char cbuf[], int off, int len) throws IOException {
         synchronized (lock) {
-            ensureOpen();
+            final CharSequence str = ensureOpen();
             if ((off < 0) || (off > cbuf.length) || (len < 0) || ((off + len) > cbuf.length) || ((off + len) < 0)) {
                 throw new IndexOutOfBoundsException();
             } else if (len == 0) {
                 return 0;
-            }
-            if (next >= length) {
+            } else if (next >= length) {
                 return -1;
+            } else {
+                int n = Math.min(length - next, len);
+                for (int copy = 0; copy < n; copy++) {
+                    cbuf[off + copy] = str.charAt(next + copy);
+                }
+                next += n;
+                return n;
             }
-            int n = Math.min(length - next, len);
-            for (int copy = 0; copy < n; copy++) {
-                cbuf[off + copy] = str.charAt(next + copy);
-            }
-            next += n;
-            return n;
         }
     }
 
@@ -136,7 +138,7 @@ public class CharSequenceReader extends Reader {
      */
     public long skip(long ns) throws IOException {
         synchronized (lock) {
-            ensureOpen();
+            final CharSequence str = ensureOpen();
             if (next >= length) {
                 return 0;
             }

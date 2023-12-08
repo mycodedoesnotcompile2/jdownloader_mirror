@@ -48,7 +48,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GoogleDrive;
 import jd.plugins.hoster.GoogleDrive.JsonSchemeType;
 
-@DecrypterPlugin(revision = "$Revision: 48319 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48446 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -609,7 +609,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         }
     }
 
-    private String generateFileURL(final String fileID, final String resourceKey) {
+    public static String generateFileURL(final String fileID, final String resourceKey) {
         String url = "https://drive.google.com/file/d/" + fileID;
         if (resourceKey != null) {
             url += "?resourcekey=" + resourceKey;
@@ -617,7 +617,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         return url;
     }
 
-    private String generateFolderURL(final String folderID, final String folderResourceKey) {
+    public static String generateFolderURL(final String folderID, final String folderResourceKey) {
         String url = "https://drive.google.com/drive/folders/" + folderID;
         if (folderResourceKey != null) {
             url += "?resourcekey=" + folderResourceKey;

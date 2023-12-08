@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48101 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48440 $", interfaceVersion = 3, names = {}, urls = {})
 public class EzvnNet extends XFileSharingProBasic {
     public EzvnNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,14 @@ public class EzvnNet extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public boolean isPremiumOnly(final Browser br) {
+        if (br.getURL().matches("(?i).*/login\\?redirect=.*")) {
+            return true;
+        } else {
+            return super.isPremiumOnly(br);
+        }
     }
 }

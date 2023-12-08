@@ -560,7 +560,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void windowGainedFocus(final WindowEvent e) {
-        // TODO Auto-generated method stub
+        
     }
 
     /*
@@ -580,7 +580,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void mousePressed(final MouseEvent e) {
-        // TODO Auto-generated method stub
+        
     }
 
     /*
@@ -590,6 +590,6 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void mouseReleased(final MouseEvent e) {
-        // TODO Auto-generated method stub
+        
     }
 }

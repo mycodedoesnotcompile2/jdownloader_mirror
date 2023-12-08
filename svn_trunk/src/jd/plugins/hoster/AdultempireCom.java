@@ -44,11 +44,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.AdultempireComCrawler;
 
-@HostPlugin(revision = "$Revision: 48455 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48457 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AdultempireComCrawler.class })
 public class AdultempireCom extends PluginForHost {
     public AdultempireCom(PluginWrapper wrapper) {
         super(wrapper);
+        /** 2023-11-14: Added account support and then realized that this website is using a light DRM for their HLS streams. */
         this.enablePremium("https://www.adultempire.com/unlimited/account/join");
     }
 
@@ -220,7 +221,7 @@ public class AdultempireCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return 1;
+        return -1;
     }
 
     @Override

@@ -26,7 +26,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48392 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48444 $", interfaceVersion = 3, names = {}, urls = {})
 public class OiiIo extends MightyScriptAdLinkFly {
     public OiiIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,14 @@ public class OiiIo extends MightyScriptAdLinkFly {
 
     @Override
     protected Form getContinueForm(CryptedLink param, Form form, final Browser br) {
-        /* 2023-10-24: Ugly hack */
-        return null;
+        /* 2023-11-10 */
+        final Form continueform = super.getContinueForm(param, form, br);
+        final String specialContinueURL = br.getRegex("var domain = \"(https?://[^/]+/links/go[^\"]*)\";").getMatch(0);
+        if (continueform != null && specialContinueURL != null) {
+            continueform.setAction(specialContinueURL);
+            return continueform;
+        } else {
+            return null;
+        }
     }
 }

@@ -148,7 +148,7 @@ public class CrossSystem {
         ROCKYLINUX(OSFamily.LINUX),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -165,7 +165,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -177,9 +177,9 @@ public class CrossSystem {
         RASPBIAN_BOOKWORM(OSFamily.LINUX),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -207,7 +207,7 @@ public class CrossSystem {
         UBUNTU_KINETIC(OSFamily.LINUX), // 22.10
         UBUNTU_LUNAR(OSFamily.LINUX), // 23.04
         UBUNTU_MANTIC(OSFamily.LINUX), // 23.10
-        UBUNTU_NAUGHTY(OSFamily.LINUX), // 24.04
+        UBUNTU_NOBLE(OSFamily.LINUX), // 24.04
         /*
          * MAC: List must be sorted by release Date!!
          */
@@ -524,7 +524,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -974,7 +974,7 @@ public class CrossSystem {
                                     } else if (line.contains("ubuntu") || OperatingSystem.UBUNTU.equals(ret)) {
                                         ret = OperatingSystem.UBUNTU;
                                         if (line.contains("24.04")) {
-                                            return OperatingSystem.UBUNTU_NAUGHTY;
+                                            return OperatingSystem.UBUNTU_NOBLE;
                                         } else if (line.contains("23.10")) {
                                             return OperatingSystem.UBUNTU_MANTIC;
                                         } else if (line.contains("23.04")) {

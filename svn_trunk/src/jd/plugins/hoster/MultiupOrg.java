@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48328 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
 public class MultiupOrg extends PluginForHost {
     private static final String          API_BASE                   = "https://multiup.io/api";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("multiup.io");
@@ -165,12 +165,12 @@ public class MultiupOrg extends PluginForHost {
         } catch (final Exception e) {
             if (storedDirecturl != null) {
                 link.removeProperty(directlinkproperty);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired");
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
             } else {
                 throw e;
             }
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     @Override

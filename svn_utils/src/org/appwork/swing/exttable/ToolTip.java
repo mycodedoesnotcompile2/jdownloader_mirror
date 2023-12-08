@@ -33,8 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable;
 
-import java.awt.Color;
-
 import javax.swing.JLabel;
 
 import org.appwork.swing.components.tooltips.ExtTooltip;
@@ -46,7 +44,6 @@ import org.appwork.utils.swing.SwingUtils;
  *
  */
 public class ToolTip extends ExtTooltip {
-
     /**
      *
      */
@@ -59,42 +56,31 @@ public class ToolTip extends ExtTooltip {
 
     @Override
     public void onShow() {
-        // TODO Auto-generated method stub
         super.onShow();
-
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.swing.components.tooltips.ExtTooltip#createContent()
-     */
     @Override
     public TooltipPanel createContent() {
         final TooltipPanel p = new TooltipPanel("ins 2,wrap 1", "[]", "[]");
         tf = new JLabel();
-        Color col;
         // this.tf.setEnabled(false);
-        tf.setForeground(col = new Color(getConfig().getForegroundColor()));
+        tf.setForeground(FOREGROUND_COLOR);
         tf.setBackground(null);
-
         SwingUtils.setOpaque(tf, false);
-
         p.add(tf);
-
         return p;
     }
 
     /**
      * @param txt
      */
-
     public void setTipText(String txt) {
         if (txt != null) {
             if ((txt.contains("\r") || txt.contains("\n")) && !txt.startsWith("<html>")) {
                 txt = "<html>" + txt.replaceAll("[\r\n]{1,2}", "<br>").replace(" ", "&nbsp;") + "</html>";
             }
         }
+        tf.setForeground(FOREGROUND_COLOR);
         tf.setText(txt);
         panel.invalidate();
     }
@@ -107,15 +93,8 @@ public class ToolTip extends ExtTooltip {
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.swing.components.tooltips.ExtTooltip#toText()
-     */
     @Override
     public String toText() {
-
         return tf.getText();
     }
-
 }

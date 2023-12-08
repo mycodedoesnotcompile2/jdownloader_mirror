@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SpankBangComCrawler;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48480 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { SpankBangComCrawler.class })
 public class SpankBangCom extends PluginForHost {
     public SpankBangCom(PluginWrapper wrapper) {
@@ -78,7 +78,8 @@ public class SpankBangCom extends PluginForHost {
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
-        return new String[] { "http://spankbangdecrypted\\.com/\\d+" };
+        /* No regular expression -> Crawler plugin is adding links. */
+        return new String[] { "" };
     }
 
     @Override

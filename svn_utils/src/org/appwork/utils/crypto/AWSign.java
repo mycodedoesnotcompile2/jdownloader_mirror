@@ -313,8 +313,16 @@ public class AWSign {
      * @throws NoSuchAlgorithmException
      * @throws InvalidKeySpecException
      */
-    public static PrivateKey getPrivateKey(final String privateKey) throws InvalidKeySpecException, NoSuchAlgorithmException {
-        return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(Base64.decode(privateKey)));
+    public static PrivateKey getPrivateKey(final String privateKeyBase64) throws InvalidKeySpecException, NoSuchAlgorithmException {
+        if (privateKeyBase64.contains("BEGIN")) {
+            String privateKeyPem = privateKeyBase64;
+            privateKeyPem = privateKeyPem.replaceAll("(?i)^\\s*[\\-]*BEGIN\\s*(RSA\\s*)?PRIVATE\\s*KEY[\\-]*\\s*", "");
+            privateKeyPem = privateKeyPem.replaceAll("(?i)\\s*[\\-]*END\\s*(RSA\\s*)?PRIVATE\\s*KEY[\\-]*\\s*$", "");
+            privateKeyPem = privateKeyPem.replaceAll("\\s+", "");
+            return getPrivateKey(Base64.decode(privateKeyPem));
+        } else {
+            return getPrivateKey(Base64.decode(privateKeyBase64));
+        }
     }
 
     public static PrivateKey getPrivateKey(final byte[] bytes) throws InvalidKeySpecException, NoSuchAlgorithmException {
@@ -331,13 +339,15 @@ public class AWSign {
         }
     }
 
-    public static PublicKey getPublicKey(final String base64Encoded) throws SignatureViolationException {
-        try {
-            return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(Base64.decode(base64Encoded)));
-        } catch (final InvalidKeySpecException e) {
-            throw new SignatureViolationException(e);
-        } catch (final NoSuchAlgorithmException e) {
-            throw new SignatureViolationException(e);
+    public static PublicKey getPublicKey(String publicKeyBase64) throws SignatureViolationException {
+        if (publicKeyBase64.contains("BEGIN")) {
+            String publiceKeyPem = publicKeyBase64;
+            publiceKeyPem = publiceKeyPem.replaceAll("(?i)^\\s*[\\-]*BEGIN\\s*(RSA\\s*)?PUBLIC\\s*KEY[\\-]*\\s*", "");
+            publiceKeyPem = publiceKeyPem.replaceAll("(?i)\\s*[\\-]*END\\s*(RSA\\s*)?PUBLIC\\s*KEY[\\-]*\\s*$", "");
+            publiceKeyPem = publiceKeyPem.replaceAll("\\s+", "");
+            return getPublicKey(Base64.decode(publiceKeyPem));
+        } else {
+            return getPublicKey(Base64.decode(publicKeyBase64));
         }
     }
 

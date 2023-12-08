@@ -56,7 +56,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48293 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 48453 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -268,7 +268,7 @@ public class MediafireCom extends PluginForHost {
                 try {
                     con = br.openGetConnection(link.getPluginPatternMatcher());
                     if (this.looksLikeDownloadableContent(con)) {
-                        finalDownloadurl = con.getURL().toString();
+                        finalDownloadurl = con.getURL().toExternalForm();
                     } else {
                         br.followConnection(true);
                     }
@@ -339,6 +339,7 @@ public class MediafireCom extends PluginForHost {
                 }
             }
             if (StringUtils.isEmpty(finalDownloadurl)) {
+                this.handleNonAPIErrors(link, br);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             link.setProperty(directurlproperty, finalDownloadurl);
@@ -779,7 +780,7 @@ public class MediafireCom extends PluginForHost {
         }
         // error checking below!
         final String errorcodeStr = UrlQuery.parse(brc.getURL()).get("errno");
-        if (errorcodeStr != null) {
+        if (errorcodeStr != null && errorcodeStr.matches("\\d+")) {
             switch (Integer.parseInt(errorcodeStr)) {
             case 320:
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "File is removed by the originating user or MediaFire");

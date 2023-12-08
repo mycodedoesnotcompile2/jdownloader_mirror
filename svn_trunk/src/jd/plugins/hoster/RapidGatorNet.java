@@ -71,7 +71,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48387 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -628,36 +628,36 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorMsg);
             }
-            if (!StringUtils.containsIgnoreCase(dl.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCEPT_RANGES), "bytes")) {
-                /* First download attempt and resume is not possible according to header: Disable it for future download-attempts. */
-                logger.info("Resume disabled: missing Accept-Ranges response!");
-                link.setResumeable(false);
-            }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
-            /* Serverside wait time until next download can be started counts from beginning of first/last download. */
-            if (currentIP != null) {
-                synchronized (blockedIPsMap) {
-                    blockedIPsMap.put(currentIP, System.currentTimeMillis());
-                    this.getPluginConfig().setProperty(PROPERTY_LAST_BLOCKED_IPS_MAP, new HashMap<String, Long>(blockedIPsMap));
-                }
-            }
-            this.getPluginConfig().setProperty(PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP, System.currentTimeMillis());
-            /* Add a download slot */
-            controlMaxFreeDownloads(account, link, +1);
-            try {
-                /* Start download */
-                dl.startDownload();
-            } finally {
-                /* Remove download slot */
-                controlMaxFreeDownloads(account, link, -1);
-            }
         } catch (final Exception e) {
             if (storedDirecturl != null && finalDownloadURL.equals(storedDirecturl)) {
                 link.removeProperty(directlinkproperty);
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired");
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired?", e);
             } else {
                 throw e;
             }
+        }
+        if (!StringUtils.containsIgnoreCase(dl.getConnection().getHeaderField(HTTPConstants.HEADER_RESPONSE_ACCEPT_RANGES), "bytes")) {
+            /* First download attempt and resume is not possible according to header: Disable it for future download-attempts. */
+            logger.info("Resume disabled: missing Accept-Ranges response!");
+            link.setResumeable(false);
+        }
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        /* Serverside wait time until next download can be started counts from beginning of first/last download. */
+        if (currentIP != null) {
+            synchronized (blockedIPsMap) {
+                blockedIPsMap.put(currentIP, System.currentTimeMillis());
+                this.getPluginConfig().setProperty(PROPERTY_LAST_BLOCKED_IPS_MAP, new HashMap<String, Long>(blockedIPsMap));
+            }
+        }
+        this.getPluginConfig().setProperty(PROPERTY_LAST_DOWNLOAD_STARTED_TIMESTAMP, System.currentTimeMillis());
+        /* Add a download slot */
+        controlMaxFreeDownloads(account, link, +1);
+        try {
+            /* Start download */
+            dl.startDownload();
+        } finally {
+            /* Remove download slot */
+            controlMaxFreeDownloads(account, link, -1);
         }
     }
 
@@ -1156,13 +1156,24 @@ public class RapidGatorNet extends PluginForHost {
         }
         final Map<String, Object> response = (Map<String, Object>) entries.get("response");
         synchronized (account) {
+            final Boolean success = (Boolean) entries.get("success");
+            if (response == null && Boolean.TRUE.equals(success)) {
+                /* No error */
+                return entries;
+            }
             String errorMessage = (String) entries.get("response_details");
             if (errorMessage == null) {
                 errorMessage = (String) entries.get("details");
+                if (errorMessage == null) {
+                    /* There can be two types of response-maps */
+                    /* E.g. {"error":"Denied by IP","success":false} */
+                    errorMessage = (String) entries.get("error");
+                }
             }
             final String details = (String) entries.get("details");
-            final int status = ((Number) entries.get("status")).intValue();
-            if (status == 200) {
+            final Object statusO = entries.get("status");
+            final int status = (statusO != null && statusO instanceof Number) ? ((Number) statusO).intValue() : 200;
+            if (statusO != null && status == 200) {
                 /* No error */
                 return response;
             }

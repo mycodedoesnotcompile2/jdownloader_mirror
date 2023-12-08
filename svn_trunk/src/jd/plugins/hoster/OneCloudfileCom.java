@@ -18,15 +18,20 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+
 import org.jdownloader.plugins.components.YetiShareCore;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47259 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48567 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneCloudfileCom extends YetiShareCore {
     public OneCloudfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,6 +91,31 @@ public class OneCloudfileCom extends YetiShareCore {
             /* Free(anonymous) and unknown account type */
             return 0;
         }
+    }
+
+    @Override
+    protected String getContinueLink(final Browser br) throws Exception {
+        /* 2023-12-06: Similar for: 1cloudfile.com, bowfile.com */
+        final String jsFunc = br.getRegex("(function getNextDownloadPageLink\\(crl, btnText\\).*?\\s+\\})\\s+").getMatch(0);
+        final String jsCall = br.getRegex("(getNextDownloadPageLink\\(\".*?\\))\n").getMatch(0);
+        if (jsFunc != null && jsCall != null) {
+            /* 2023-12-06: This doesn't work yet */
+            String result = null;
+            final StringBuilder sb = new StringBuilder();
+            sb.append(jsFunc);
+            sb.append("\nvar result = " + jsCall + ";");
+            // System.out.print(sb.toString());
+            final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
+            final ScriptEngine engine = manager.getEngineByName("javascript");
+            try {
+                engine.eval(sb.toString());
+                result = engine.get("result").toString();
+                return result;
+            } catch (final Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return super.getContinueLink(br);
     }
 
     @Override

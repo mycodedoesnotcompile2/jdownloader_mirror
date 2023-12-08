@@ -54,7 +54,7 @@ public class PanelToolTip extends ExtTooltip {
 
     @Override
     public TooltipPanel createContent() {
-        // TODO Auto-generated method stub
+        
         return null;
     }
 
@@ -63,7 +63,7 @@ public class PanelToolTip extends ExtTooltip {
      */
     @Override
     public String toText() {
-        // TODO Auto-generated method stub
+        
         return null;
     }
 

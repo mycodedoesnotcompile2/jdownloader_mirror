@@ -28,7 +28,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47038 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48555 $", interfaceVersion = 3, names = {}, urls = {})
 public class XiaoshenkeNetCrawler extends PluginForDecrypt {
     public XiaoshenkeNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,15 +62,26 @@ public class XiaoshenkeNetCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/videox/([a-f0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video(h|x)/([a-f0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        ret.add(createDownloadlink(SxyprnComCrawler.getContentURL("sxyprn.com", contentID)));
+        final String contenturl = param.getCryptedUrl();
+        final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
+        final String urltype = urlinfo.getMatch(0);
+        final String contentID = urlinfo.getMatch(1);
+        if (urltype.equalsIgnoreCase("h")) {
+            ret.add(createDownloadlink("https://mydaddy.cc/video/" + contentID + "/"));
+        } else if (urltype.equalsIgnoreCase("x")) {
+            /* 2023-12-04 */
+            ret.add(createDownloadlink(SxyprnComCrawler.getContentURL("sxyprn.com", contentID)));
+        } else {
+            /* Pass result to hosterplugin */
+            ret.add(this.createDownloadlink(contenturl));
+        }
         return ret;
     }
 }

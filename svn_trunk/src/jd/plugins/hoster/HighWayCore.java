@@ -16,6 +16,7 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.notify.BasicNotify;
 import org.jdownloader.gui.notify.BubbleNotify;
@@ -51,7 +54,6 @@ import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -62,14 +64,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48410 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48419 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
-    private static final String                            PATTERN_DIRECT                         = "(?i)https?://[^/]+/dl(?:u|t)/(([a-z0-9]+)(?:/$|/.+))";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
     /* Contains <host><Boolean resume possible|impossible> */
     private static Map<String, Map<String, Boolean>>       hostResumeMap                          = new HashMap<String, Map<String, Boolean>>();
@@ -101,7 +103,12 @@ public abstract class HighWayCore extends UseNet {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
+        HighWayCore.prepBRHighway(br);
+        return br;
+    }
+
+    public static Browser prepBRHighway(final Browser br) {
         br.setCookiesExclusive(true);
         br.getHeaders().put("User-Agent", "JDownloader");
         br.setCustomCharset("utf-8");
@@ -118,10 +125,10 @@ public abstract class HighWayCore extends UseNet {
 
     /** Returns true if an account is required to download the given item. */
     private boolean requiresAccount(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(PATTERN_DIRECT)) {
-            return false;
-        } else {
+        if (link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches(PATTERN_TV)) {
             return true;
+        } else {
+            return false;
         }
     }
 
@@ -182,12 +189,24 @@ public abstract class HighWayCore extends UseNet {
     }
 
     private String getFID(final DownloadLink link) {
-        if (link.getPluginPatternMatcher() == null) {
+        if (link == null || link.getPluginPatternMatcher() == null) {
             return null;
         } else if (link.getPluginPatternMatcher().matches(PATTERN_TV)) {
-            return new Regex(link.getPluginPatternMatcher(), "(?i)id=(\\d+)").getMatch(0);
+            try {
+                return UrlQuery.parse(link.getPluginPatternMatcher()).get("id");
+            } catch (MalformedURLException e) {
+                /* This should never happen! */
+                e.printStackTrace();
+                return null;
+            }
         } else {
-            return new Regex(link.getPluginPatternMatcher(), PATTERN_DIRECT).getMatch(0);
+            /* Assume that we have a direct downloadable URL. */
+            try {
+                return new URL(link.getPluginPatternMatcher()).getPath();
+            } catch (final MalformedURLException e) {
+                e.printStackTrace();
+                return null;
+            }
         }
     }
 
@@ -205,7 +224,7 @@ public abstract class HighWayCore extends UseNet {
                 link.setName(this.getFID(link) + ".mp4");
             }
             if (account == null) {
-                link.getLinkStatus().setStatusText("Only downloadable via account!");
+                link.getLinkStatus().setStatusText("Only downloadable/checkable via account!");
                 return AvailableStatus.UNCHECKABLE;
             }
             br.setFollowRedirects(true);
@@ -249,14 +268,23 @@ public abstract class HighWayCore extends UseNet {
             }
         } else {
             /* Direct-URL download. */
-            if (!link.isNameSet()) {
+            final String filenameFromURL = Plugin.getFileNameFromURL(link.getPluginPatternMatcher());
+            final String fallbackFilename;
+            if (filenameFromURL != null) {
+                fallbackFilename = filenameFromURL;
+            } else {
+                fallbackFilename = this.getFID(link);
+            }
+            if (!link.isNameSet() && fallbackFilename != null) {
                 /* Set fallback name */
-                link.setName(this.getFID(link));
+                link.setName(fallbackFilename);
             }
             if (account == null) {
-                link.getLinkStatus().setStatusText("Only downloadable via account!");
+                /* Some items might be checkable without account but we require an account for all items just in case. */
+                link.getLinkStatus().setStatusText("Only downloadable/checkable via account!");
                 return AvailableStatus.UNCHECKABLE;
             }
+            this.login(account, false);
             URLConnectionAdapter con = null;
             try {
                 final Browser brc = br.cloneBrowser();
@@ -264,18 +292,20 @@ public abstract class HighWayCore extends UseNet {
                 con = brc.openHeadConnection(link.getPluginPatternMatcher());
                 if (!this.looksLikeDownloadableContent(con)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final String serverFilename = getFileNameFromHeader(con);
+                if (!StringUtils.isEmpty(serverFilename)) {
+                    link.setFinalFileName(serverFilename);
                 } else {
-                    final String serverFilename = getFileNameFromHeader(con);
-                    if (!StringUtils.isEmpty(serverFilename)) {
-                        link.setFinalFileName(serverFilename);
+                    /* Fallback: This should not be needed. */
+                    final String realExtension = this.getExtensionFromMimeType(con.getContentType());
+                    if (realExtension != null) {
+                        link.setFinalFileName(applyFilenameExtension(fallbackFilename, "." + realExtension));
                     } else {
-                        String fallbackFilename = this.getFID(link);
-                        final String realExtension = this.getExtensionFromMimeType(con.getContentType());
-                        if (realExtension != null) {
-                            fallbackFilename = applyFilenameExtension(fallbackFilename, "." + realExtension);
-                        }
                         link.setFinalFileName(fallbackFilename);
                     }
+                }
+                if (con.getCompleteContentLength() != -1) {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
             } finally {
@@ -776,15 +806,16 @@ public abstract class HighWayCore extends UseNet {
                     throw new AccountInvalidException("Invalid API key format");
                 }
             }
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
-                this.br.setCookies(this.getHost(), cookies);
+                br.setCookies(this.getHost(), cookies);
                 if (!validateCookies) {
                     /* Do not validate cookies */
                     return;
                 } else {
                     logger.info("Checking cookies");
-                    this.br.getPage(this.getAPIBase() + "?logincheck");
+                    br.getPage(this.getAPIBase() + "?logincheck");
                     /* Don't check for errors here as a failed login can trigger error dialogs which we don't want here! */
                     // this.checkErrors(this.br, account);
                     try {
@@ -796,6 +827,7 @@ public abstract class HighWayCore extends UseNet {
                     } catch (final PluginException ignore) {
                         logger.log(ignore);
                         logger.info("Cookie login failed");
+                        br.clearCookies(null);
                     }
                 }
             }
@@ -975,11 +1007,13 @@ public abstract class HighWayCore extends UseNet {
 
     @Override
     protected int getMaxSimultanDownload(final DownloadLink link, final Account account) {
+        final int defaultMaxdlsUsenet = 10;
+        final int defaultMaxdlsSelfhosted = 5;
         if (account != null && link != null) {
             if (isUsenetLink(link)) {
-                return account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, 10);
-            } else if (link.getPluginPatternMatcher().matches(PATTERN_DIRECT)) {
-                return 5;
+                return account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, defaultMaxdlsUsenet);
+            } else if (link != null && link.getHost().equals(this.getHost())) {
+                return defaultMaxdlsSelfhosted;
             } else {
                 /* Look for host specific limit */
                 synchronized (getMapLock()) {
@@ -989,13 +1023,12 @@ public abstract class HighWayCore extends UseNet {
                     }
                 }
             }
-        } else if (link != null && link.getPluginPatternMatcher().matches(PATTERN_DIRECT)) {
-            /* Last checked: 2021-05-17 */
-            return 5;
+        } else if (link != null && link.getHost().equals(this.getHost())) {
+            return defaultMaxdlsSelfhosted;
         } else if (account != null) {
             /* Return max simultan downloads per account. */
             // return account.getMaxSimultanDownloads();
-            return account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_ACCOUNT, 10);
+            return account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_ACCOUNT, defaultMaxdlsUsenet);
         }
         return 1;
     }

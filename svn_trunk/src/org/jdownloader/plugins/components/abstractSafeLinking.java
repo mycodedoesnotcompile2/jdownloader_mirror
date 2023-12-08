@@ -43,7 +43,7 @@ import jd.utils.JDUtilities;
  * @author bismarck - parts of the original
  * @author psp - parts of the original
  */
-@DecrypterPlugin(revision = "$Revision: 47660 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48457 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
     public abstractSafeLinking(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         // set parameter. required to be set here!
         parameter = param.toString();
         // link correction
@@ -85,17 +85,20 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
             }
             /* redirect goes to outside link or back own shortlink */
             if (!newparameter.matches(".+/(?:p|d)/[a-f0-9]{10}")) {
-                decryptedLinks.add(createDownloadlink(newparameter));
-                return decryptedLinks;
+                ret.add(createDownloadlink(newparameter));
+                return ret;
             }
             parameter = newparameter;
         }
         getPage(parameter);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         // /d/ should redirect, but now apparently it stays on the short url link..
         if (parameter.matches(".*?/d/([a-f0-9]{10}|" + regexBase58() + ")")) {
             final String link = br.getRedirectLocation();
             if (link != null) {
-                decryptedLinks.add(createDownloadlink(link));
+                ret.add(createDownloadlink(link));
             }
         } else {
             // now comes the json
@@ -105,8 +108,7 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                 message = PluginJSonUtils.getJsonValue(ajax, "messsage");
             }
             if (StringUtils.containsIgnoreCase(message, "not found") || StringUtils.containsIgnoreCase(message, "not found")) {
-                decryptedLinks.add(createOfflinelink(parameter));
-                return decryptedLinks;
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             // we could also here check status?? maybe trust them that files are offline?? this way no captchas needed to find the links and
             // confirm ourselves.
@@ -278,16 +280,16 @@ public abstract class abstractSafeLinking extends antiDDoSForDecrypt {
                     // we want the url json
                     final String url = PluginJSonUtils.getJsonValue(link, "url");
                     if (url != null) {
-                        decryptedLinks.add(createDownloadlink(url));
+                        ret.add(createDownloadlink(url));
                     }
                 }
             }
         }
-        if (decryptedLinks.isEmpty()) {
+        if (ret.isEmpty()) {
             logger.warning("Decrypter out of date for link: " + parameter);
             return null;
         }
-        return decryptedLinks;
+        return ret;
     }
 
     private Browser ajax = null;

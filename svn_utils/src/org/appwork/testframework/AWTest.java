@@ -37,7 +37,6 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -73,6 +72,7 @@ import org.appwork.utils.CompareUtils;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.net.LineParsingOutputStream;
+import org.appwork.utils.net.NoClosingInputStream;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -141,7 +141,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
@@ -204,7 +204,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          */
         public void equals(String other) {
             try {
-                assertEquals(object, other);
+                is(other);
             } catch (Exception e) {
                 throw new WTFException(e);
             }
@@ -295,12 +295,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     public static void validateZipOrJar(String path, InputStream is) throws IOException {
-        is = new FilterInputStream(is) {
-            @Override
-            public void close() throws IOException {
-                // do not close the source stream
-            }
-        };
+        is = new NoClosingInputStream(is);
         final ZipInputStream zipStream = path.toLowerCase(Locale.ROOT).endsWith(".jar") ? new JarInputStream(is, true) : new ZipInputStream(is);
         try {
             is = null;
@@ -360,7 +355,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         LogV3.setFactory(new SimpleLoggerFactory() {
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#removeSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -373,7 +368,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToConsole(org.appwork.loggingv3.simple.sink.LogToStdOutSink)
              */
             @Override
@@ -386,7 +381,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToFile(org.appwork.loggingv3.simple.sink.LogToFileSink)
              */
             @Override
@@ -399,7 +394,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#addSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -415,7 +410,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                 return new LoggerToSink(this) {
                     /*
                      * (non-Javadoc)
-                     *
+                     * 
                      * @see org.appwork.loggingv3.AbstractLogger#getThrownAt()
                      */
                     @Override

@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48446 $", interfaceVersion = 3, names = {}, urls = {})
 public class BatoTo extends PluginForHost {
     public BatoTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,8 +70,15 @@ public class BatoTo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "bato.to", "battwo.com", "batotoo.com", "dto.to", "hto.to", "mangatoto.to", "mto.to", "wto.to", "comiko.net" });
+        ret.add(new String[] { "bato.to", "battwo.com", "batotoo.com", "dto.to", "hto.to", "mangatoto.to", "mto.to", "wto.to", "comiko.net", "batocomic.com", "batocomic.net", "batocomic.org", "comiko.org", "mangatoto.com", "mangatoto.net", "mangatoto.org", "readtoto.com", "readtoto.net", "readtoto.org", "xbato.com", "xbato.net", "xbato.org", "zbato.com", "zbato.net", "zbato.org" });
         return ret;
+    }
+
+    /** 2023-11-10: Collect list of dead domains as that may come in handy in the future. */
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("mangatoto.to");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

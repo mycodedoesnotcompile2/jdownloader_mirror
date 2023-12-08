@@ -41,10 +41,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.CamvaultXyz;
 
-@DecrypterPlugin(revision = "$Revision: 48210 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48530 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamvaultXyzCrawler extends PluginForDecrypt {
     public CamvaultXyzCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -102,11 +109,12 @@ public class CamvaultXyzCrawler extends PluginForDecrypt {
         /* Login if account is available */
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         final CamvaultXyz hosterPlugin = (CamvaultXyz) this.getNewPluginForHostInstance(this.getHost());
+        final String contenturl = param.getCryptedUrl();
         if (account != null) {
-            hosterPlugin.login(account, false);
+            hosterPlugin.login(account, contenturl, true);
+        } else {
+            br.getPage(contenturl);
         }
-        br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
         if (isRateLimitReached(br)) {
             throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         } else if (isOffline(br)) {
@@ -123,7 +131,7 @@ public class CamvaultXyzCrawler extends PluginForDecrypt {
         if (videoTokens.length == 1) {
             /* Selfhosted content? Pass to hosterplugin. */
             logger.info("Looks like selfhosted content");
-            final DownloadLink selfhostedVideo = new DownloadLink(hosterPlugin, this.getHost(), this.getHost(), param.getCryptedUrl(), true);
+            final DownloadLink selfhostedVideo = new DownloadLink(hosterPlugin, this.getHost(), this.getHost(), contenturl, true);
             CamvaultXyz.parseFileInfo(br, selfhostedVideo);
             if (selfhostedVideo.getName() != null) {
                 fp = FilePackage.getInstance();

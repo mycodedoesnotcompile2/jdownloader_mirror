@@ -54,7 +54,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48362 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48453 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
         return ret;
     }
 
-    public static void setSSLSocketStreamOptions(Browser br) {
+    public static void setSSLSocketStreamOptions(final Browser br) {
         br.setSSLSocketStreamOptions(new SSLSocketStreamOptionsModifier() {
             @Override
             public SSLSocketStreamOptions modify(SSLSocketStreamOptions sslSocketStreamOptions, HTTPConnection httpConnection) {

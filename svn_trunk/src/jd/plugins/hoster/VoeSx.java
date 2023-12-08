@@ -22,6 +22,7 @@ import java.util.List;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
 
 import jd.PluginWrapper;
@@ -40,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 48398 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48543 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -156,11 +157,15 @@ public class VoeSx extends XFileSharingProBasic {
 
     @Override
     protected String getDllinkVideohost(DownloadLink link, Account account, Browser br, final String src) {
-        final String mp4Master = new Regex(src, "(\"|')mp4\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
+        final String mp4Master = new Regex(src, "(?i)(\"|')mp4\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
         if (mp4Master != null) {
             return mp4Master;
         }
-        final String hlsMaster = new Regex(src, "(\"|')hls\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
+        String hlsMaster = new Regex(src, "(?i)(\"|')hls\\1\\s*:\\s*(\"|')(https?://[^\"']+)").getMatch(2);
+        if (hlsMaster == null) {
+            /* 2023-11-21 */
+            hlsMaster = new Regex(src, "(?i)\"(https?://[^/]+/engine/hls[^\"]+)").getMatch(0);
+        }
         if (hlsMaster != null) {
             return hlsMaster;
         } else {
@@ -177,6 +182,9 @@ public class VoeSx extends XFileSharingProBasic {
         if (br.containsHTML(">\\s*Server overloaded, download temporary disabled|The server of this file is currently over")) {
             /* 2023-10-26 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server overloaded");
+        } else if (br.containsHTML(">\\s*Access to this file has been temporarily restricted")) {
+            /* 2023-11-29 */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Access to this file has been temporarily restricted");
         }
     }
 
@@ -200,7 +208,7 @@ public class VoeSx extends XFileSharingProBasic {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String[] fileInfo = internal_getFileInfoArray();
-        scanInfo(fileInfo);
+        scanInfo(br.getRequest().getHtmlCode(), fileInfo);
         processFileInfo(fileInfo, br, link);
         if (!StringUtils.isEmpty(fileInfo[0])) {
             /* Correct- and set filename */
@@ -209,11 +217,25 @@ public class VoeSx extends XFileSharingProBasic {
             /* Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or not. */
             this.setWeakFilename(link, br);
         }
-        final String dllink = getDllinkVideohost(link, account, null, br.toString());
+        final String dllink = getDllinkVideohost(link, account, null, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink) && embedOnly) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
         }
         return dllink;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        String betterTitle = new Regex(html, "class=\"player-title\"[^>]*>([^<]+)").getMatch(0);
+        if (betterTitle == null) {
+            /* 2023-11-29 */
+            betterTitle = new Regex(html, "name=\"og:title\" content=\"([^\"]+\\.mp4)").getMatch(0);
+        }
+        if (betterTitle != null) {
+            fileInfo[0] = betterTitle;
+        }
+        return fileInfo;
     }
 
     @Override
@@ -240,12 +262,20 @@ public class VoeSx extends XFileSharingProBasic {
                 logger.info("Failed to find any official video downloads");
                 return null;
             }
+            final String streamDownloadlink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
+            final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
+            if (streamDownloadlink != null && (mode == DownloadMode.STREAM || mode == DownloadMode.AUTO) && Boolean.TRUE.equals(requiresCaptchaForOfficialVideoDownload())) {
+                /*
+                 * User wants to download stream. Obtaining an official downloadlink would require the user to enter a captcha -> Skip that.
+                 */
+                return null;
+            }
             if (br.containsHTML("&embed=&adb=")) {
                 /* 2022-08-24: This might give us more download-speed, not sure though. */
                 continueLink += "&embed=&adb=0";
             }
             this.getPage(br, continueLink);
-            final Form dlform = br.getFormbyActionRegex(".+/download$");
+            final Form dlform = br.getFormbyActionRegex("(?i).+/download$");
             if (dlform != null) {
                 try {
                     reCaptchaSiteurlWorkaround = br.getURL();
@@ -265,6 +295,10 @@ public class VoeSx extends XFileSharingProBasic {
                 if (dllink == null) {
                     /* 2023-10-07 */
                     dllink = br.getRegex("<a href=\"(http[^\"]+)\"[^>]*class=\"btn btn-primary\" target=\"_blank\"").getMatch(0);
+                    if (dllink == null) {
+                        /* 2023-11-21 */
+                        dllink = br.getRegex("\"(https?://[^/]+/engine/download/[^\"]+)\"").getMatch(0);
+                    }
                 }
                 if (dllink != null) {
                     dllink = Encoding.htmlOnlyDecode(dllink);
@@ -300,17 +334,12 @@ public class VoeSx extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String html, final String[] fileInfo) {
-        super.scanInfo(html, fileInfo);
-        final String betterTitle = br.getRegex("class=\"player-title\"[^>]*>([^<]+)").getMatch(0);
-        if (betterTitle != null) {
-            fileInfo[0] = betterTitle;
-        }
-        return fileInfo;
-    }
-
-    @Override
     public Class<? extends XFSConfigVideoVoeSx> getConfigInterface() {
         return XFSConfigVideoVoeSx.class;
+    }
+
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        // TODO: Add override annotation once this gets added to XFS core
+        return Boolean.TRUE;
     }
 }
