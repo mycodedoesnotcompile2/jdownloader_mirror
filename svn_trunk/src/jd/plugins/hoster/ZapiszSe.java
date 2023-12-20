@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48571 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz.se/files/\\d+/([^/]+)?" })
+@HostPlugin(revision = "$Revision: 48573 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz.se/files/\\d+/([^/]+)?" })
 public class ZapiszSe extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://zapisz.se";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("zapisz.se");
@@ -175,7 +175,7 @@ public class ZapiszSe extends PluginForHost {
                         final UrlQuery query = new UrlQuery();
                         query.add("response", Encoding.urlEncode(nitroflareRecaptchaV2Response));
                         br.postPage(nitroflareCaptchaURL, query);
-                        if (!br.toString().equalsIgnoreCase("passed")) {
+                        if (!br.getRequest().getHtmlCode().equalsIgnoreCase("passed")) {
                             throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                         } else {
                             // Looks like captcha was solved successfully

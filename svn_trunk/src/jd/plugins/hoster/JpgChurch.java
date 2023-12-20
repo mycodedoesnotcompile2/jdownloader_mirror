@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 48343 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48575 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +69,7 @@ public class JpgChurch extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
+        ret.add(new String[] { "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
         return ret;
     }
 
@@ -96,6 +96,7 @@ public class JpgChurch extends PluginForHost {
         /* 2023-06-20: Main domain changed from jpg.fishing to jpg.pet. */
         /* 2023-07-12: Main domain changed from jpg.pet to jpeg.pet */
         /* 2023-08-14: Main domain changed from jpeg.pet to jpg1.su */
+        /* 2023-12-19: Main domain changed from jpg2.su to jpg3.su */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

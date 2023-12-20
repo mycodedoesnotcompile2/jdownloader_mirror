@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.LibGenCrawler;
 
-@HostPlugin(revision = "$Revision: 48488 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48573 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class LibGenInfo extends PluginForHost {
     public LibGenInfo(PluginWrapper wrapper) {
@@ -275,7 +275,9 @@ public class LibGenInfo extends PluginForHost {
             if (br.getURL() == null || !br.getURL().matches(TYPE_ADS)) {
                 br.getPage("/ads.php?md5=" + this.getFID(link));
             }
-            dllink = br.getRegex("<a\\s*href\\s*=\\s*(\"|')((?:https?:)?(?://[\\w\\-\\./]+)?/?get\\.php\\?md5=[a-f0-9]{32}.*?)\\1").getMatch(1);
+            /** 2023-12-19: They've crippled the direct-URLs on purpose so we'll first fix the html source and then regex that link. */
+            final String correctedHTML = br.getRequest().getHtmlCode().replace("\\", "/");
+            dllink = new Regex(correctedHTML, "<a\\s*href\\s*=\\s*(\"|')((?:https?:)?(?://[\\w\\-\\./]+)?/?get\\.php\\?md5=[a-f0-9]{32}.*?)\\1").getMatch(1);
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

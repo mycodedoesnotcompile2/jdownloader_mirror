@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48368 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48576 $", interfaceVersion = 3, names = {}, urls = {})
 public class HexuploadNet extends XFileSharingProBasic {
     public HexuploadNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class HexuploadNet extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "hexupload.net", "hexupload.com" });
+        ret.add(new String[] { "hexload.com", "hexupload.net", "hexupload.com" });
         return ret;
     }
 
@@ -81,7 +81,8 @@ public class HexuploadNet extends XFileSharingProBasic {
     }
 
     @Override
-    public String rewriteHost(String host) {
+    public String rewriteHost(final String host) {
+        /* 2023-12-19: Main domain changed from hexupload.net to hexload.com */
         return this.rewriteHost(getPluginDomains(), host, new String[0]);
     }
 
