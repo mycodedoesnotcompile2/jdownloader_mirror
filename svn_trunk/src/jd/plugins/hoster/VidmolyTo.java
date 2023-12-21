@@ -30,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46003 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48578 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -39,7 +39,7 @@ public class VidmolyTo extends XFileSharingProBasic {
 
     @Override
     protected String buildNormalURLPath(DownloadLink link, final String fuid) {
-        return "/dl/" + fuid;
+        return "/" + fuid;
     }
 
     /**

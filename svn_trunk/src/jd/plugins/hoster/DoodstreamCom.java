@@ -54,7 +54,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48453 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48577 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -543,14 +543,18 @@ public class DoodstreamCom extends XFileSharingProBasic {
             }
             String captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
             if (captchaContainer != null) {
-                final Browser brc = br.cloneBrowser();
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc).getToken();
-                this.getPage(brc, captchaContainer + Encoding.urlEncode(recaptchaV2Response), true);
-                sleep(1000, link);
-                getPage(br.getURL());// location.reload();
-                captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
-                if (captchaContainer != null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.containsHTML("turnstile\\.render")) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
+                } else {
+                    final Browser brc = br.cloneBrowser();
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, brc).getToken();
+                    this.getPage(brc, captchaContainer + Encoding.urlEncode(recaptchaV2Response), true);
+                    sleep(1000, link);
+                    getPage(br.getURL());// location.reload();
+                    captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
+                    if (captchaContainer != null) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
             }
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
