@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47877 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48580 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdsexOrg extends PluginForHost {
     public HdsexOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,8 +49,14 @@ public class HdsexOrg extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "hdsex.org", "hdsex2.com" });
+        ret.add(new String[] { "hdsex2.com", "hdsex.org" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2023-12-21: Changed main domain from hdsex.org to hdsex2.com since they had major server issue when streaming via hdsex.org */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
