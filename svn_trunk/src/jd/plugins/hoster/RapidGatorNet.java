@@ -71,7 +71,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48580 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48582 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -444,6 +444,7 @@ public class RapidGatorNet extends PluginForHost {
                 if (waitSecondsStr == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
+                logger.info("Pre download wait in seconds according to website: " + waitSecondsStr);
                 long waitMillis = Long.parseLong(waitSecondsStr) * 1000;
                 final Browser br2 = br.cloneBrowser();
                 br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");

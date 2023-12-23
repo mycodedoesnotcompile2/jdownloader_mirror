@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48584 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiveSixSevenFileCom extends PluginForHost {
     public FiveSixSevenFileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class FiveSixSevenFileCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "567yun.cn", "567file.com" });
+        ret.add(new String[] { "567yun.cn", "567file.com", "567pan.cn" });
         return ret;
     }
 
@@ -181,7 +181,9 @@ public class FiveSixSevenFileCom extends PluginForHost {
             }
             if (dllink == null) {
                 if (br.containsHTML("vip\\.php")) {
-                    throw new AccountRequiredException();
+                    // throw new AccountRequiredException();
+                    /* 2023-12-22: New */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Free download is not possible at this moment", 30 * 60 * 1000l);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }

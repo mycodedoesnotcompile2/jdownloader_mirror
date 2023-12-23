@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.LibGenCrawler;
 
-@HostPlugin(revision = "$Revision: 48580 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48582 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class LibGenInfo extends PluginForHost {
     public LibGenInfo(PluginWrapper wrapper) {
@@ -190,6 +190,7 @@ public class LibGenInfo extends PluginForHost {
         if (filesizeBytesStr != null && filesizeBytesStr.matches("\\d+")) {
             link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
         }
+        link.setMD5Hash(md5);
     }
 
     @Deprecated
