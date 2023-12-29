@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47722 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:www\\.)?eroprofile\\.com/m/(?:videos|photos)/view/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 48587 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:www\\.)?eroprofile\\.com/m/(?:videos|photos)/view/([A-Za-z0-9\\-_]+)" })
 public class EroProfileCom extends PluginForHost {
     public EroProfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -99,11 +99,15 @@ public class EroProfileCom extends PluginForHost {
             return AvailableStatus.TRUE;
         }
         final String fid = this.getFID(link);
+        final String regexAlbumNotFound = ">\\s*Album not found";
         if (link.getDownloadURL().matches(VIDEOLINK)) {
             if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(>\\s*Video not found|>\\s*The video could not be found|<title>\\s*EroProfile</title>)")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">\\s*Video processing failed")) {
                 /* <h1 class="capMultiLine">Video processing failed</h1> */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(regexAlbumNotFound)) {
+                /* 2023-12-28: E.g. https://www.eroprofile.com/m/videos/view/3-sisters */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             String filename = getFilename(br);
@@ -128,6 +132,8 @@ public class EroProfileCom extends PluginForHost {
             link.setFinalFileName(filename + ext);
         } else {
             if (br.containsHTML("(>\\s*Photo not found|>\\s*The photo could not be found|<title>\\s*EroProfile\\s*</title>)")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(regexAlbumNotFound)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             String filename = getFilename(br);
