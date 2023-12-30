@@ -34,10 +34,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48103 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=view\\&id=(\\d+)" })
+@HostPlugin(revision = "$Revision: 48589 $", interfaceVersion = 3, names = { "gelbooru.com" }, urls = { "https?://(?:www\\.)?gelbooru\\.com/index\\.php\\?page=post\\&s=view\\&id=(\\d+)" })
 public class GelbooruCom extends PluginForHost {
     public GelbooruCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -82,7 +89,6 @@ public class GelbooruCom extends PluginForHost {
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         dllink = null;
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.setCookie(getHost(), "fringeBenefits", "yup");
         final String extDefault = ".jpg";
         final String fid = this.getFID(link);
@@ -134,8 +140,6 @@ public class GelbooruCom extends PluginForHost {
         link.setFinalFileName(this.correctOrApplyFileNameExtension(title, extFromURL));
         if (!StringUtils.isEmpty(dllink)) {
             final Browser br2 = br.cloneBrowser();
-            // In case the link redirects to the finallink
-            br2.setFollowRedirects(true);
             URLConnectionAdapter con = null;
             try {
                 con = br2.openHeadConnection(this.dllink);

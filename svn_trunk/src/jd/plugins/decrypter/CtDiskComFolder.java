@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -43,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48593 $", interfaceVersion = 2, names = {}, urls = {})
 public class CtDiskComFolder extends PluginForDecrypt {
     @Deprecated
     private String             uuid                = null;
@@ -161,7 +160,7 @@ public class CtDiskComFolder extends PluginForDecrypt {
             query.addAndReplace("passcode", passCode != null ? Encoding.urlEncode(passCode) : "");
             query.addAndReplace("r", "0." + System.currentTimeMillis());
             br.getPage(WEBAPI_BASE + "/getdir.php?" + query.toString());
-            folderinfo = restoreFromString(br.toString(), TypeRef.MAP);
+            folderinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             if (((Number) folderinfo.get("code")).intValue() == 401) {
                 if (passwordCounter > 3) {
                     throw new DecrypterException(DecrypterException.PASSWORD);
