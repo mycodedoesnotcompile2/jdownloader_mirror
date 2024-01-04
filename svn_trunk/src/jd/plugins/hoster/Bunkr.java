@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 48440 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48596 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -77,6 +77,7 @@ public class Bunkr extends PluginForHost {
     @Override
     public String rewriteHost(final String host) {
         /* This host is frequently changing its' main domain. */
+        /* 2023-01-03: Main domain changed from bunkr.la to bunkrr.su */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

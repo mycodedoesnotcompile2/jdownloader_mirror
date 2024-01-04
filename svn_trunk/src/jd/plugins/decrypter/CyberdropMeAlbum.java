@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48594 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48596 $", interfaceVersion = 3, names = {}, urls = {})
 public class CyberdropMeAlbum extends PluginForDecrypt {
     public CyberdropMeAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,6 +153,10 @@ public class CyberdropMeAlbum extends PluginForDecrypt {
             if (albumjs != null) {
                 albumTitle = new Regex(albumjs, "name\\s*:\\s*'([^\\']+)'").getMatch(0);
                 albumDescription = new Regex(albumjs, "description\\s*:\\s*(?:'|`)([^\\'`]+)").getMatch(0);
+            }
+            if (albumTitle == null) {
+                /* 2023-01-03 */
+                albumTitle = br.getRegex("<h1 id=\"title\"[^>]*>([^<]+)</h1>").getMatch(0);
             }
             if (albumDescription == null) {
                 albumDescription = br.getRegex("<span id=\"description-box\"[^>]*>([^<]+)</span>").getMatch(0);

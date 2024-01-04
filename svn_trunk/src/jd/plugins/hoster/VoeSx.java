@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 48543 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48596 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -229,8 +229,8 @@ public class VoeSx extends XFileSharingProBasic {
         super.scanInfo(html, fileInfo);
         String betterTitle = new Regex(html, "class=\"player-title\"[^>]*>([^<]+)").getMatch(0);
         if (betterTitle == null) {
-            /* 2023-11-29 */
-            betterTitle = new Regex(html, "name=\"og:title\" content=\"([^\"]+\\.mp4)").getMatch(0);
+            /* 2024-01-03 */
+            betterTitle = new Regex(html, "name=\"og:title\" content=\"([^\"]+)").getMatch(0);
         }
         if (betterTitle != null) {
             fileInfo[0] = betterTitle;
