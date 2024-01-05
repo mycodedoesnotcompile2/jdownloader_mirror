@@ -36,6 +36,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
 /**
  * Please do not mess with the following Regex! <br />
@@ -46,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
  *
  *         "old style" , "new style", "redirect url shorting service", "some json crap".
  */
-@DecrypterPlugin(revision = "$Revision: 46365 $", interfaceVersion = 3, names = { "promodj.com" }, urls = { "https?://((www\\.)?(((([\\w\\-\\.]+\\.(djkolya\\.net|pdj\\.ru|promodeejay\\.(net|ru)|promodj\\.(ru|com)))|(djkolya\\.net|pdj\\.ru|promodeejay\\.(net|ru)|promodj\\.(ru|com))(/[\\w\\-\\.]+)?)/(?!top100|podsafe)(foto/(all|\\d+)/?(#(foto|full|list|biglist|middlelist)\\d+)?(\\d+(\\.html)?(#(foto|full|list|biglist|middlelist)\\d+)?)?|(acapellas|groups|mixes|podcasts|promos|radioshows|realtones|remixes|samples|tracks|videos)/\\d+|prelisten/\\d+/.+|prelisten_m3u/\\d+/[\\w]+\\.m3u|(download|source)/\\d+/[^\r\n\"'<>]*))|pdj\\.cc/\\w+))|https?://xml\\.(?:maases|promodj)\\.com/audio/\\d+\\.json" })
+@DecrypterPlugin(revision = "$Revision: 48599 $", interfaceVersion = 3, names = { "promodj.com" }, urls = { "https?://((www\\.)?(((([\\w\\-\\.]+\\.(djkolya\\.net|pdj\\.ru|promodeejay\\.(net|ru)|promodj\\.(ru|com)))|(djkolya\\.net|pdj\\.ru|promodeejay\\.(net|ru)|promodj\\.(ru|com))(/[\\w\\-\\.]+)?)/(?!top100|podsafe)(foto/(all|\\d+)/?(#(foto|full|list|biglist|middlelist)\\d+)?(\\d+(\\.html)?(#(foto|full|list|biglist|middlelist)\\d+)?)?|(acapellas|groups|mixes|podcasts|promos|radioshows|realtones|remixes|samples|tracks|videos)/\\d+|prelisten/\\d+/.+|prelisten_m3u/\\d+/[\\w]+\\.m3u|(download|source)/\\d+/[^\r\n\"'<>]*))|pdj\\.cc/\\w+))|https?://xml\\.(?:maases|promodj)\\.com/audio/\\d+\\.json" })
 public class ProDjCm extends PluginForDecrypt {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -311,7 +312,7 @@ public class ProDjCm extends PluginForDecrypt {
             if (filter.add(link) == true) {
                 final DownloadLink dl = createDownloadlink(link);
                 if (customHeaders.size() != 0) {
-                    dl.setProperty("customHeader", customHeaders);
+                    dl.setProperty(DirectHTTP.PROPERTY_HEADERS, customHeaders);
                 }
                 dl.setContentUrl(grabThis);
                 ret.add(dl);
