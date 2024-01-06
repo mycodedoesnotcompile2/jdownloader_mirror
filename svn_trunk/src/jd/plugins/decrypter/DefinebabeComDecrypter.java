@@ -25,7 +25,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.DefineBabeCom;
 
-@DecrypterPlugin(revision = "$Revision: 46558 $", interfaceVersion = 3, names = { "definebabe.com" }, urls = { "https?://(?:www\\.)?definebabes?\\.com/video/([a-z0-9]+)/([a-z0-9\\-]+)/" })
+@DecrypterPlugin(revision = "$Revision: 48603 $", interfaceVersion = 3, names = { "definebabe.com" }, urls = { "https?://(?:www\\.)?definebabes?\\.com/video/([a-z0-9]+)/([a-z0-9\\-]+)/" })
 public class DefinebabeComDecrypter extends PornEmbedParser {
     public DefinebabeComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,6 +71,10 @@ public class DefinebabeComDecrypter extends PornEmbedParser {
         if (title == null) {
             /* 2022-08-23 */
             title = br.getRegex("property=\"og:title\" content=\"([^\"]+)").getMatch(0);
+            if (title == null) {
+                /* 2023-01-05 */
+                title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+            }
         }
         if (title == null) {
             /* Fallback */

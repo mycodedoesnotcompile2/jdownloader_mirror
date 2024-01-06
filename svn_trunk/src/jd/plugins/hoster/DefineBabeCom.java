@@ -51,7 +51,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.DefinebabeComDecrypter;
 
-@HostPlugin(revision = "$Revision: 48599 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48603 $", interfaceVersion = 2, names = {}, urls = {})
 public class DefineBabeCom extends PluginForHost {
     public DefineBabeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,6 +157,10 @@ public class DefineBabeCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server is busy", 5 * 60 * 1000l);
         }
         String title = DefinebabeComDecrypter.getFileTitle(br);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            link.setFinalFileName(title + extDefault);
+        }
         final String videoID = getVideoID(br);
         if (videoID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -187,10 +191,6 @@ public class DefineBabeCom extends PluginForHost {
                     break;
                 }
             }
-        }
-        if (title != null) {
-            title = Encoding.htmlDecode(title).trim();
-            link.setFinalFileName(title + extDefault);
         }
         if (!StringUtils.isEmpty(dllink)) {
             URLConnectionAdapter con = null;

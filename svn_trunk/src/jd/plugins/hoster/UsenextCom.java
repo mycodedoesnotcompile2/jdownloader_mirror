@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48601 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48603 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,13 +46,19 @@ public class UsenextCom extends UseNet {
         return "https://www.usenext.com/terms";
     }
 
+    private final String FLATRATE_DOMAIN = "flat.usenext.de";
+
     public static interface UsenextConfigInterface extends UsenetAccountConfigInterface {
     };
 
     @Override
     public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) throws PluginException {
         final UsenetServer server = getLastUsedUsenetServer();
-        if (server == null || !StringUtils.equalsIgnoreCase("flat.usenext.de", server.getHost())) {
+        /**
+         * If the "flatrate domain" is in use, do not substract traffic from users' account. </br>
+         * Only substract traffic if no domain is given or a non-flatrate domain is given.
+         */
+        if (server == null || !StringUtils.equalsIgnoreCase(FLATRATE_DOMAIN, server.getHost())) {
             super.update(downloadLink, account, bytesTransfered);
         }
     }
@@ -61,7 +67,8 @@ public class UsenextCom extends UseNet {
     public int getMaxSimultanDownload(DownloadLink link, Account account, AbstractProxySelectorImpl proxy) {
         if (account != null) {
             final UsenetAccountConfigInterface config = getAccountJsonConfig(account);
-            if (config != null && StringUtils.equalsIgnoreCase("flat.usenext.de", config.getHost())) {
+            if (config != null && StringUtils.equalsIgnoreCase(FLATRATE_DOMAIN, config.getHost())) {
+                /* Flatrate domain does not use up users' traffic but therefore has a connection limit in place. */
                 return 4;
             }
         }
