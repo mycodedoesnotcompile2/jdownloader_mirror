@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 48605 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 48607 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     public NaughtyamericaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,6 +133,8 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find any directurls");
             }
+            // final String[] captchaDownloadurls =
+            // br.getRegex("\"(https?://members\\.naughtyamerica\\.com/scene/\\d+/captcha\\?file_name=[^\"]+)").getColumn(0);
             final List<DownloadLink> unknownQualities = new ArrayList<DownloadLink>();
             final Map<Integer, DownloadLink> foundQualities = new HashMap<Integer, DownloadLink>();
             int qualityHeightMax = -1;

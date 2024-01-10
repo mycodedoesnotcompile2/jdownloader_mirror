@@ -50,7 +50,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48453 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48607 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -172,7 +172,7 @@ public class EPornerCom extends PluginForHost {
         if (isVideo) {
             final String betterTitleByURL = new Regex(br.getURL(), PATTERN_VIDEO).getMatch(2);
             if (betterTitleByURL != null) {
-                fallbackFilename = titleByURL.replace("-", " ").trim() + extDefault;
+                fallbackFilename = betterTitleByURL.replace("-", " ").trim() + extDefault;
             }
             dllink = getDllinkVideo(this.br, link);
             if (dllink == null) {
