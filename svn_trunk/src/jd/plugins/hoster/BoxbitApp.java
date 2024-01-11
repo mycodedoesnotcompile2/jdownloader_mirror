@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48009 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48610 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -166,7 +166,7 @@ public class BoxbitApp extends PluginForHost {
         } else {
             logger.info("Re-using stored directurl");
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {

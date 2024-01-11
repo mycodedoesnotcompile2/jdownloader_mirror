@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 48488 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48612 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,7 +93,7 @@ public class PornportalCom extends PluginForHost {
         ret.add(new String[] { "babes.com", "blackisbetter.com" });
         ret.add(new String[] { "bellesafilms.com" });
         ret.add(new String[] { "biempire.com" });
-        ret.add(new String[] { "brazzers.com" });
+        ret.add(new String[] { "brazzers.com", "brazzer.com" });
         ret.add(new String[] { "digitalplayground.com" });
         ret.add(new String[] { "erito.com", "eritos.com" });
         ret.add(new String[] { "fakehub.com", "femalefaketaxi.com", "fakedrivingschool.com", "fakehostel.com" });
@@ -390,12 +390,12 @@ public class PornportalCom extends PluginForHost {
                 br.followConnection(true);
                 /* Directurl needs to be refreshed */
                 logger.info("Directurl needs to be refreshed");
-                if (account == null) {
-                    /* We need an account! */
-                    return AvailableStatus.UNCHECKABLE;
-                } else if (!isDownload) {
+                if (!isDownload) {
                     /* Only refresh directurls in download mode - account will only be available in download mode anyways! */
                     return AvailableStatus.UNCHECKABLE;
+                } else if (account == null) {
+                    /* We need an account! */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Account required to refresh expired directurl", 5 * 60 * 1000l);
                 }
                 logger.info("Trying to refresh directurl");
                 final String contentID = getContentID(link);
@@ -416,7 +416,7 @@ public class PornportalCom extends PluginForHost {
                     }
                 }
                 if (result == null) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh expired directurl --> Content offline?");
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to refresh expired directurl --> Content offline or session expired?");
                 }
                 newDirecturl = result.getStringProperty(PROPERTY_directurl);
                 if (newDirecturl == null) {
@@ -456,8 +456,7 @@ public class PornportalCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        logger.info("Downloading in free mode (e.g. trailer download or active premium direct-downloadurls)");
-        this.handlePremium(link, null);
+        this.handleDownload(link, null);
     }
 
     @Override
@@ -610,7 +609,14 @@ public class PornportalCom extends PluginForHost {
                     } else if (brlogin.getHttpConnection().getResponseCode() == 403) {
                         throw new AccountInvalidException();
                     }
-                    final Map<String, Object> authinfo = restoreFromString(brlogin.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final Object resp = restoreFromString(brlogin.getRequest().getHtmlCode(), TypeRef.OBJECT);
+                    if (resp instanceof List) {
+                        /* Assume we got an error e.g. [{"code":3004,"message":"Invalid Captcha."}] */
+                        final List<Map<String, Object>> errorlist = (List<Map<String, Object>>) resp;
+                        final Map<String, Object> error0 = errorlist.get(0);
+                        throw new AccountInvalidException("Code " + error0.get("code") + " | " + error0.get("message"));
+                    }
+                    final Map<String, Object> authinfo = (Map<String, Object>) resp;
                     final String accessToken = (String) authinfo.get("access_token");
                     if (StringUtils.isEmpty(accessToken)) {
                         throw new AccountInvalidException();
@@ -856,7 +862,7 @@ public class PornportalCom extends PluginForHost {
                      */
                     final boolean trustBannedFlag = false;
                     if (trustBannedFlag) {
-                        throw new AccountInvalidException("Account banned");
+                        throw new AccountInvalidException("Account banned for reason: " + user.get("banReason"));
                     } else {
                         logger.info("Account might be banned??");
                     }
@@ -864,41 +870,54 @@ public class PornportalCom extends PluginForHost {
                 final Boolean isExpired = (Boolean) user.get("isExpired");
                 final Boolean isTrial = (Boolean) user.get("isTrial");
                 final Boolean isCanceled = (Boolean) user.get("isCanceled");
+                final Boolean hasAccess = (Boolean) user.get("hasAccess");
                 final Number initialAmount = (Number) user.get("initialAmount");
-                boolean foundValidExpireDate = false;
+                long expireTimestamp = -1;
+                final String expiryDate = (String) user.get("expiryDate");
+                if (!StringUtils.isEmpty(expiryDate)) {
+                    expireTimestamp = TimeFormatter.getMilliSeconds(expiryDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
+                }
+                final ArrayList<String> packageFeatures = new ArrayList<String>();
                 if (Boolean.TRUE.equals(isExpired)) {
                     account.setType(AccountType.FREE);
                     /* Free accounts can be used to download trailers */
-                    ai.setStatus("Free Account (expired premium)");
-                } else if (isTrial) {
+                    packageFeatures.add("expired premium");
+                } else if (Boolean.TRUE.equals(isTrial)) {
                     /* Free trial -> Free Account with premium capability */
                     account.setType(AccountType.PREMIUM);
-                    ai.setStatus("Free Account (Trial)");
+                    packageFeatures.add("Trial");
+                } else if (expireTimestamp > System.currentTimeMillis()) {
+                    /* Premium user with running contract */
+                    ai.setValidUntil(expireTimestamp, br);
+                    account.setType(AccountType.PREMIUM);
+                } else if (Boolean.TRUE.equals(hasAccess)) {
+                    /* Premium account without expire-date */
+                    account.setType(AccountType.PREMIUM);
                 } else if (initialAmount == null || initialAmount.longValue() <= 0) {
                     /* Free user who never (?) had a premium subscription. */
                     account.setType(AccountType.FREE);
                 } else {
-                    /* Premium account [well...most likely] */
-                    /**
-                     * Premium accounts must not have any expire-date! </br>
-                     * 2021-06-05: Only set expire-date if it is still valid. Premium accounts are premium as long as "isExpired" != true.
-                     */
+                    /* Assume that we got a premium account */
                     account.setType(AccountType.PREMIUM);
+                }
+                if (isCanceled != null) {
                     if (Boolean.TRUE.equals(isCanceled)) {
-                        ai.setStatus("Premium Account (subscription cancelled)");
+                        packageFeatures.add("subscription cancelled");
                     } else {
-                        ai.setStatus("Premium Account (subscription running)");
+                        packageFeatures.add("subscription running");
                     }
-                    final String expiryDate = (String) user.get("expiryDate");
-                    if (!StringUtils.isEmpty(expiryDate)) {
-                        final long expireTimestamp = TimeFormatter.getMilliSeconds(expiryDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
-                        if (expireTimestamp > System.currentTimeMillis()) {
-                            ai.setValidUntil(expireTimestamp, br);
-                            foundValidExpireDate = true;
-                        }
+                }
+                String packageFeaturesCommaSeparated = "";
+                for (final String packageFeature : packageFeatures) {
+                    if (packageFeaturesCommaSeparated.length() > 0) {
+                        packageFeaturesCommaSeparated += ", ";
                     }
+                    packageFeaturesCommaSeparated += packageFeature;
+                }
+                ai.setStatus(account.getType().getLabel() + " (" + packageFeaturesCommaSeparated + ")");
+                if (account.getType() == AccountType.PREMIUM) {
                     final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
-                    if (!foundValidExpireDate && bundles != null) {
+                    if (bundles != null) {
                         /**
                          * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
                          * Each bundle can have different expire-dates and also separate pricing and so on.
@@ -929,6 +948,7 @@ public class PornportalCom extends PluginForHost {
                     }
                     /* Now check which other websites we can now use as well and add them via multihoster handling. */
                     try {
+                        /* TODO: 2024-01-10: Review this. Looks like this is either broken and/or was disabled by Pornportal. */
                         getPage(br, "https://site-ma." + this.getHost() + "/");
                         final Map<String, Object> initialState = getJsonJuanInitialState(br);
                         final Map<String, Object> client = (Map<String, Object>) initialState.get("client");
@@ -1165,9 +1185,14 @@ public class PornportalCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        handleDownload(link, account);
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link, account, true);
         final String dllink = link.getStringProperty(PROPERTY_directurl);
         if (StringUtils.isEmpty(dllink)) {
+            /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
