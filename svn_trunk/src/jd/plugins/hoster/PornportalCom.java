@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 48612 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48616 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -596,6 +596,12 @@ public class PornportalCom extends PluginForHost {
                             @Override
                             public TYPE getType() {
                                 return TYPE.INVISIBLE;
+                            }
+
+                            @Override
+                            protected boolean isEnterprise() {
+                                /* 2023-01-11: This is mandatory! Without this, this reCaptcha may fail for some users. */
+                                return true;
                             }
                         };
                         recaptchaV2Response = captcha.getToken();

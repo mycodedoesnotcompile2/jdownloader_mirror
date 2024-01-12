@@ -26,6 +26,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -43,11 +44,18 @@ import jd.plugins.hoster.NitroFlareCom;
  * @author raztoki, pspzockerscene
  *
  */
-@DecrypterPlugin(revision = "$Revision: 46234 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48615 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { NitroFlareCom.class })
 public class NitroFlareComFolder extends PluginForDecrypt {
     public NitroFlareComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -143,6 +151,7 @@ public class NitroFlareComFolder extends PluginForDecrypt {
         return ret;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

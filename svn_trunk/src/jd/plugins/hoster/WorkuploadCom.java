@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48614 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 48615 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
 public class WorkuploadCom extends PluginForHost {
     public WorkuploadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -275,6 +275,7 @@ public class WorkuploadCom extends PluginForHost {
                 final String captchaCookie = brc.getCookie(brc.getHost(), "captcha");
                 if (captchaCookie != null) {
                     logger.info("Captcha success: captchaCookie = " + captchaCookie);
+                    /* Reset request so we can send it again as a new request. */
                     req.resetConnection();
                     br.getPage(req);
                     if (isAntiBotCaptchaBlocked(br)) {

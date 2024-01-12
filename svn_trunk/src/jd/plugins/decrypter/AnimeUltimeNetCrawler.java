@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AnimeUltimeNet;
 
-@DecrypterPlugin(revision = "$Revision: 48607 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48617 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AnimeUltimeNet.class })
 public class AnimeUltimeNetCrawler extends PluginForDecrypt {
     public AnimeUltimeNetCrawler(PluginWrapper wrapper) {
@@ -83,7 +83,7 @@ public class AnimeUltimeNetCrawler extends PluginForDecrypt {
         final String[] urls = br.getRegex("(info\\-0\\-1/((\\d+)(/([^/]+))?))").getColumn(0);
         for (String url : urls) {
             url = "/" + url;
-            ret.add(createDownloadlink(br.getURL(url).toString()));
+            ret.add(createDownloadlink(br.getURL(url).toExternalForm()));
         }
         final FilePackage fp = FilePackage.getInstance();
         if (title != null) {
