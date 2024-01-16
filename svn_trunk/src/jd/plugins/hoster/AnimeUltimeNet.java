@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48617 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48620 $", interfaceVersion = 2, names = {}, urls = {})
 public class AnimeUltimeNet extends PluginForHost {
     public AnimeUltimeNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -235,7 +235,7 @@ public class AnimeUltimeNet extends PluginForHost {
                         if (!skipPreDownloadWaittime) {
                             final int waittimeSeconds = ((Number) entries.get("wait")).intValue();
                             logger.info("Pre download wait in seconds: " + waittimeSeconds);
-                            this.sleep(waittimeSeconds * 1000l, link);
+                            this.sleep(waittimeSeconds * 1001l, link);
                         }
                         brc.postPage(brc.getURL(), dlquery);
                         final Map<String, Object> entries2 = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);

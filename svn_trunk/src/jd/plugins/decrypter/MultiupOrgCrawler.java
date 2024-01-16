@@ -39,7 +39,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48585 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48621 $", interfaceVersion = 2, names = {}, urls = {})
 public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
@@ -52,6 +52,13 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // uid and filename are required to be a valid links for all link structures!
     public MultiupOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     private static List<String[]> getPluginDomains() {
@@ -80,7 +87,6 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         String contenturl = param.getCryptedUrl();
         contenturl = contenturl.replaceFirst("/(en|fr)/", "/");
         contenturl = contenturl.replaceFirst("(?i)http://", "https://");

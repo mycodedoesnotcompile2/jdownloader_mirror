@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48307 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48620 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilozNet extends XFileSharingProBasic {
     public FilozNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +104,16 @@ public class FilozNet extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String regexFilenameAbuse(final Browser br) {
+        final String betterFilename = br.getRegex("Filename:?\\s*</label>\\s*<input[^>]*readonly value=\"([^\"]+)").getMatch(0);
+        if (betterFilename != null) {
+            /* 2023-01-15 */
+            return betterFilename;
+        } else {
+            return super.regexFilenameAbuse(br);
+        }
     }
 }

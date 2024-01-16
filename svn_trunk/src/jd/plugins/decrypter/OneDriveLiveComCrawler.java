@@ -49,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.OneDriveLiveCom;
 
-@DecrypterPlugin(revision = "$Revision: 48560 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "https?://([a-zA-Z0-9\\-]+\\.)?(onedrive\\.live\\.com/.+|skydrive\\.live\\.com/.+|(sdrv|1drv)\\.ms/[A-Za-z0-9&!=#\\.,-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 48619 $", interfaceVersion = 3, names = { "onedrive.live.com" }, urls = { "https?://([a-zA-Z0-9\\-]+\\.)?(onedrive\\.live\\.com/.+|skydrive\\.live\\.com/.+|(sdrv|1drv)\\.ms/[A-Za-z0-9&!=#\\.,-_]+)" })
 public class OneDriveLiveComCrawler extends PluginForDecrypt {
     public OneDriveLiveComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,6 +120,10 @@ public class OneDriveLiveComCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> resourceinfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> errormap = (Map<String, Object>) resourceinfo.get("error");
+            if (errormap != null) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormap.get("localizedMessage").toString());
+            }
             final Map<String, Object> foldermap = (Map<String, Object>) resourceinfo.get("folder");
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             if (foldermap != null) {
