@@ -30,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48352 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48626 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +79,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
     @Override
     public void correctDownloadLink(final DownloadLink link) {
         final Regex special = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL);
-        if (special.matches()) {
+        if (special.patternFind()) {
             link.setPluginPatternMatcher("https://" + this.getHost() + super.buildNormalURLPath(link, special.getMatch(0)));
         }
     }
@@ -105,7 +105,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
             return 1;
         } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
-            return 0;
+            return 1;
         } else {
             /* Free(anonymous) and unknown account type */
             return 1;
@@ -141,7 +141,8 @@ public class WorldBytezCom extends XFileSharingProBasic {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        /* 2024-01-23: Max limit according to admin */
+        return 5;
     }
 
     @Override

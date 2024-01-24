@@ -30,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 44532 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48623 $", interfaceVersion = 3, names = {}, urls = {})
 public class WolfstreamTv extends XFileSharingProBasic {
     public WolfstreamTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,7 @@ public class WolfstreamTv extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "wolfstream.tv", "aparat.cam" });
+        ret.add(new String[] { "wolfstream.tv", "aparat.cam", "wolfstream.top" });
         return ret;
     }
 

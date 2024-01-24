@@ -82,7 +82,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48577 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -1595,6 +1595,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
             } else if (br.getHttpConnection().getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Invalid API response");
             }
         }
         final Object errorsO = entries.get("errors");

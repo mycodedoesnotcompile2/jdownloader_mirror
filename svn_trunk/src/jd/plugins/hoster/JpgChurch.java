@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 48606 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,7 @@ public class JpgChurch extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/img/([^/\\?#]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/img/([A-Za-z0-9\\-\\.]+)");
         }
         return ret.toArray(new String[0]);
     }

@@ -18,7 +18,9 @@ package jd.plugins.hoster;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
@@ -41,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 48596 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48623 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -165,6 +167,13 @@ public class VoeSx extends XFileSharingProBasic {
         if (hlsMaster == null) {
             /* 2023-11-21 */
             hlsMaster = new Regex(src, "(?i)\"(https?://[^/]+/engine/hls[^\"]+)").getMatch(0);
+        }
+        final String altSourceB64 = br.getRegex("let wc0 = '([^\\']+)").getMatch(0);
+        if (altSourceB64 != null && hlsMaster == null) {
+            /* 2024-01-23 */
+            final String json = Encoding.Base64Decode(altSourceB64);
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+            hlsMaster = (String) entries.get("file");
         }
         if (hlsMaster != null) {
             return hlsMaster;
