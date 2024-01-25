@@ -28,7 +28,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48625 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
+@HostPlugin(revision = "$Revision: 48627 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
 public class SxyprnCom extends antiDDoSForHost {
     public SxyprnCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,6 +84,7 @@ public class SxyprnCom extends antiDDoSForHost {
         ret = ret.replaceAll("(https?://.*?)(\\s+|$)", "");// remove URLs
         ret = ret.replaceAll("(?s)(.+#\\w+)\\s*(.+)", "$1");// remove everything after tags
         ret = ret.replaceAll("(?s)(WATCH FULL VIDEO.+)", "");// remove WATCH FULL VIDEO section
+        ret = ret.replaceFirst("(?i)\\s*on SexyPorn$", "");// remove " on SexyPorn"
         ret = ret.trim();
         return ret;
     }

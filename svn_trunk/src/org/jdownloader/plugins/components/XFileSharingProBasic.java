@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48578 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48627 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3639,7 +3639,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 logger.info("Only downloadable via premium");
                 throw new AccountRequiredException();
             }
-        } else if (new Regex(html, "(?i)>\\s*Expired download session").matches()) {
+        } else if (new Regex(html, "(?i)>\\s*Expired download session").patternFind()) {
             /* Rare error */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Expired download session'", 10 * 60 * 1000l);
         } else if (isServerUnderMaintenance(br)) {
@@ -3647,7 +3647,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         /* Host-type specific errors */
         /* Videohoster */
-        if (new Regex(html, "(?i)>\\s*Video is processing now").matches()) {
+        if (new Regex(html, "(?i)>\\s*Video is processing now").patternFind()) {
             /* E.g. '<div id="over_player_msg">Video is processing now. <br>Conversion stage: <span id='enc_pp'>...</span></div>' */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not (yet) downloadable: Video is still being encoded or broken", 10 * 60 * 1000l);
         }
