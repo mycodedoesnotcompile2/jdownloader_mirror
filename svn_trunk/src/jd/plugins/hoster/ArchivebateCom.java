@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48627 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48628 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArchivebateCom extends PluginForHost {
     public ArchivebateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,8 @@ public class ArchivebateCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return Integer.MAX_VALUE;
+        /* 2025-01-25: Their CDN servers are very very slow. */
+        return 2;
     }
 
     @Override

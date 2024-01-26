@@ -16,7 +16,6 @@ import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.parser.html.Form.MethodType;
-import jd.parser.html.HTMLSearch;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -28,7 +27,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48627 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
+@HostPlugin(revision = "$Revision: 48628 $", interfaceVersion = 2, names = { "yourporn.sexy", "sxyprn.com" }, urls = { "https?://(?:www\\.)?yourporn\\.sexy/post/([a-fA-F0-9]{13})(?:\\.html)?", "https?://(?:www\\.)?sxyprn\\.(?:com|net)/post/([a-fA-F0-9]{13})(?:\\.html)?" })
 public class SxyprnCom extends antiDDoSForHost {
     public SxyprnCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +134,7 @@ public class SxyprnCom extends antiDDoSForHost {
     }
 
     public static final String regexTitle(final Browser br) {
-        return HTMLSearch.searchMetaTag(br, "og:title");
+        return br.getRegex("<meta property='og:title' content='(.*?)'/>").getMatch(0);
     }
 
     public static final boolean isOffline(final Browser br) {

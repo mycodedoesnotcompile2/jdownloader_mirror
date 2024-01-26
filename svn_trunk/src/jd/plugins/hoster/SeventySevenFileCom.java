@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48152 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48628 $", interfaceVersion = 2, names = {}, urls = {})
 public class SeventySevenFileCom extends PluginForHost {
     public SeventySevenFileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -144,14 +144,18 @@ public class SeventySevenFileCom extends PluginForHost {
         if (extFileID != null) {
             link.setLinkID(this.getHost() + "://" + extFileID);
         }
-        String filename = br.getRegex("align='absbottom' border='0'[^/>]*/>([^<>\"]+)<").getMatch(0);
+        String filename = br.getRegex("align=.absbottom. border=.0.[^>]*/>([^<>\"]+)<").getMatch(0);
         String filesize = br.getRegex("<span id=\"file_size\">([^<>\"]+)</span>").getMatch(0);
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             filesize += "b";
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }

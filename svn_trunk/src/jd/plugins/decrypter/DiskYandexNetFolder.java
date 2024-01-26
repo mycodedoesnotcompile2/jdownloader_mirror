@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DiskYandexNet;
 
-@DecrypterPlugin(revision = "$Revision: 48316 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48628 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNetFolder extends PluginForDecrypt {
     public DiskYandexNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -499,7 +499,7 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
     }
 
     public static String getHashWithoutPath(final String hash) {
-        if (hash.matches(".+:/.+")) {
+        if (hash.matches(".+:/.?$")) {
             return hash.substring(0, hash.indexOf(":/"));
         } else {
             return hash;
@@ -546,7 +546,7 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
     }
 
     private void parseFilePropertiesAPI(final DownloadLink dl, final Map<String, Object> entries) throws Exception {
-        final AvailableStatus status = DiskYandexNet.parseInformationAPIAvailablecheckFiles(this, dl, entries);
+        final AvailableStatus status = DiskYandexNet.parseInformationAPIAvailablecheckFiles(this, dl, null, entries);
         dl.setAvailableStatus(status);
     }
 
