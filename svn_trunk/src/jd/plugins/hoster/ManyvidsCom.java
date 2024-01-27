@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -43,13 +42,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48629 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48631 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsCom extends PluginForHost {
     public ManyvidsCom(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://www.manyvids.com/Create-Free-Account/");
-        }
+        this.enablePremium("https://www.manyvids.com/Create-Free-Account/");
     }
 
     @Override
@@ -104,6 +101,7 @@ public class ManyvidsCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        // 2024-01-26: Not used
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
@@ -131,6 +129,7 @@ public class ManyvidsCom extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        // 2024-01-26: Not used
         String dllink = br.getRegex("").getMatch(0);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -154,7 +153,7 @@ public class ManyvidsCom extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
@@ -209,14 +208,29 @@ public class ManyvidsCom extends PluginForHost {
             loginform.put("user_action", "login");
             br.submitForm(loginform);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String errorMsg = (String) entries.get("error");
-            if (errorMsg != null) {
+            final String serversideErrorMsg = (String) entries.get("error");
+            if (serversideErrorMsg != null) {
                 /*
                  * E.g. {"internalStatus":7,
                  * "error":"We do not recognize the location in which you are logging in from. An email has been sent to you with further instructions to login."
                  * }
                  */
-                throw new AccountInvalidException(errorMsg);
+                throw new AccountInvalidException(serversideErrorMsg);
+            }
+            final int internalStatus = ((Number) entries.get("internalStatus")).intValue();
+            if (internalStatus != 3 && internalStatus != 6) {
+                /* Messages according to: https://www.manyvids.com/js/compiled.js */
+                final String customErrormessage;
+                if (internalStatus == 0) {
+                    customErrormessage = "Check Username & Password are correct and re-try.";
+                } else if (internalStatus == 2) {
+                    customErrormessage = "Invalid credentials";
+                } else if (internalStatus == 4) {
+                    customErrormessage = "You need to verify your account before you are able to log in to manyvids. Please check your email inbox.";
+                } else {
+                    customErrormessage = "Unknown error status " + internalStatus;
+                }
+                throw new AccountInvalidException(customErrormessage);
             }
             br.getPage("/");
             if (!checkLogin(br)) {
@@ -242,11 +256,8 @@ public class ManyvidsCom extends PluginForHost {
     }
 
     private String getLoginCookie(final Browser br) {
+        /* Returns login-cookie which is supposed to be the internal user-ID of the profile we are currently logged in. */
         return br.getCookie(br.getHost(), "KGID", Cookies.NOTDELETEDPATTERN);
-    }
-
-    private boolean isLoggedin(final Browser br) {
-        return br.containsHTML("/logout");
     }
 
     @Override
@@ -260,6 +271,7 @@ public class ManyvidsCom extends PluginForHost {
         if (Boolean.TRUE.equals(entries.get("premiumMember"))) {
             account.setType(AccountType.PREMIUM);
         } else {
+            /* Free accounts can still contain single bought video elements which the user will be allowed to watch- and download. */
             account.setType(AccountType.FREE);
         }
         ai.setUnlimitedTraffic();

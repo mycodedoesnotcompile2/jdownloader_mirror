@@ -50,7 +50,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48631 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,6 +76,8 @@ public class GofileIo extends PluginForHost {
     private static final String        PROPERTY_DANGEROUS_FILE                                      = "dangerous_file";
     private static final String        PROPERTY_DIRECTURL                                           = "directurl";
     private static final String        PROPERTY_INTERNAL_FILEID                                     = "internal_fileid";
+    private static final String        PROPERTY_PARENT_FOLDER_ID                                    = "parent_folder_id";
+    public static final String         PROPERTY_PARENT_FOLDER_SHORT_ID                              = "parent_folder_short_id";
     private static final String        SETTING_ALLOW_DOWNLOAD_OF_FILES_FLAGGED_AS_MALICIOUS         = "allow_download_of_files_flagged_as_malicious";
     private static final boolean       default_SETTING_ALLOW_DOWNLOAD_OF_FILES_FLAGGED_AS_MALICIOUS = false;
     /* Don't touch the following! */
@@ -102,6 +104,10 @@ public class GofileIo extends PluginForHost {
                 final Browser brc = br.cloneBrowser();
                 brc.getPage("https://" + plugin.getHost() + "/dist/js/alljs.js");
                 token = brc.getRegex("websiteToken\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
+                if (token == null) {
+                    /* 2024-01-26 */
+                    token = brc.getRegex("fetchData\\.wt\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
+                }
                 if (StringUtils.isEmpty(token)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } else {
@@ -130,7 +136,7 @@ public class GofileIo extends PluginForHost {
                 if (!"ok".equalsIgnoreCase(response.get("status").toString())) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                token = (String) JavaScriptEngineFactory.walkJson(response, "data/token");
+                token = JavaScriptEngineFactory.walkJson(response, "data/token").toString();
                 if (StringUtils.isEmpty(token)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } else {
@@ -140,6 +146,20 @@ public class GofileIo extends PluginForHost {
             }
             br.setCookie(plugin.getHost(), "accountToken", token);
             return token;
+        }
+    }
+
+    @Override
+    public String getPluginContentURL(final DownloadLink link) {
+        final String parentFolderShortID = link.getStringProperty(PROPERTY_PARENT_FOLDER_SHORT_ID);
+        final String parentFolderID = link.getStringProperty(PROPERTY_PARENT_FOLDER_ID);
+        if (parentFolderShortID != null) {
+            return "https://" + getHost() + "/d/" + parentFolderShortID;
+        } else if (parentFolderID != null) {
+            /* Link to next folder which contains this file */
+            return "https://" + getHost() + "/d/" + parentFolderID;
+        } else {
+            return super.getPluginContentURL(link);
         }
     }
 
@@ -160,9 +180,8 @@ public class GofileIo extends PluginForHost {
         }
         final UrlQuery query = new UrlQuery();
         query.add("contentId", folderID);
-        query.add("websiteToken", getWebsiteToken(this, br));
         query.add("token", Encoding.urlEncode(token));
-        query.add("cache", "true");
+        query.add("wt", getWebsiteToken(this, br));
         String passCode = null;
         boolean passwordCorrect = true;
         boolean passwordRequired = false;
@@ -318,7 +337,8 @@ public class GofileIo extends PluginForHost {
         if (!StringUtils.isEmpty(downloadURL)) {
             link.setProperty(PROPERTY_DIRECTURL, downloadURL);
         }
-        link.setProperty(PROPERTY_INTERNAL_FILEID, entry.get("id").toString());
+        link.setProperty(PROPERTY_INTERNAL_FILEID, entry.get("id"));
+        link.setProperty(PROPERTY_PARENT_FOLDER_ID, entry.get("parentFolder"));
     }
 
     @Override
