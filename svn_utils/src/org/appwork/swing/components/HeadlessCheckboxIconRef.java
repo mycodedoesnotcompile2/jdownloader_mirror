@@ -86,7 +86,6 @@ public enum HeadlessCheckboxIconRef implements IconRef {
      */
     @Override
     public String path() {
-        // TODO Auto-generated method stub
         return path;
     }
 }

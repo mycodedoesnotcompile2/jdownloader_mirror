@@ -44,10 +44,9 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.FIELD, ElementType.TYPE, ElementType.PARAMETER })
-
+//@StorableLink(labels = { "MongoDB Docs" }, hrefs = { "https://www.mongodb.com/docs/drivers/java/sync/v4.8/fundamentals/connection/connect/" })
 public @interface StorableLink {
     String[] hrefs();
 
     String[] labels();
-
 }

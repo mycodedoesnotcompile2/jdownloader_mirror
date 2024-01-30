@@ -105,7 +105,6 @@ public class CircledProgressBarExample {
 
                                     @Override
                                     public String toText() {
-                                        // TODO Auto-generated method stub
                                         return null;
                                     }
                                 };

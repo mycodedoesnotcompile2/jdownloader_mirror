@@ -238,9 +238,7 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      * @see java.awt.event.WindowListener#windowActivated(java.awt.event.WindowEvent)
      */
     @Override
-    public void windowActivated(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
+    public void windowActivated(final WindowEvent windowevent) { 
     }
 
     /*
@@ -250,8 +248,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     @Override
     public void windowClosed(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
     }
 
     /*
@@ -261,8 +257,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     @Override
     public void windowClosing(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
     }
 
     /*
@@ -272,8 +266,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     @Override
     public void windowDeactivated(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
     }
 
     /*
@@ -283,8 +275,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     @Override
     public void windowDeiconified(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
     }
 
     /*
@@ -294,8 +284,6 @@ public class WindowResetListener implements PropertySetListener, HierarchyListen
      */
     @Override
     public void windowIconified(final WindowEvent windowevent) {
-        // TODO Auto-generated method stub
-
     }
 
 }

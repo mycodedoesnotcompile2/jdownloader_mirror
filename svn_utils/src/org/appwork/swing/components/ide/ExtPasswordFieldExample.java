@@ -94,7 +94,6 @@ public class ExtPasswordFieldExample {
 
             @Override
             protected void requestExit() {
-                // TODO Auto-generated method stub
             }
         };
     }

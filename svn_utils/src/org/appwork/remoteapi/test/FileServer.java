@@ -81,8 +81,7 @@ public class FileServer implements HttpRequestHandler {
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) {
-        // TODO Auto-generated method stub
+    public boolean onPostRequest(final PostRequest request, final HttpResponse response) {        
         return false;
     }
 

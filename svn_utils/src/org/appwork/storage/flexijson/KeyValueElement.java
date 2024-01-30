@@ -64,8 +64,7 @@ public class KeyValueElement {
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {
-        // TODO Auto-generated method stub
+    public String toString() {        
         StringBuilder sb = new StringBuilder();
         if (commentsBeforeKey != null) {
             for (FlexiCommentJsonNode c : commentsBeforeKey) {

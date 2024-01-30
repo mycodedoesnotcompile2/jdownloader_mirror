@@ -99,16 +99,14 @@ public class SliderDialog extends AbstractDialog<Integer> implements SliderDialo
     /**
      * @return
      */
-    public int getMaxValue() {
-        // TODO Auto-generated method stub
+    public int getMaxValue() {        
         return 100;
     }
 
     /**
      * @return
      */
-    public int getMinValue() {
-        // TODO Auto-generated method stub
+    public int getMinValue() {        
         return 0;
     }
 
@@ -148,8 +146,7 @@ public class SliderDialog extends AbstractDialog<Integer> implements SliderDialo
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getPreferredWidth()
      */
     @Override
-    protected int getPreferredWidth() {
-        // TODO Auto-generated method stub
+    protected int getPreferredWidth() {        
         return 600;
     }
 
@@ -176,8 +173,7 @@ public class SliderDialog extends AbstractDialog<Integer> implements SliderDialo
     /**
      *
      */
-    protected void onSliderValueChanged() {
-        // TODO Auto-generated method stub
+    protected void onSliderValueChanged() {        
     }
 
     /*
@@ -186,8 +182,7 @@ public class SliderDialog extends AbstractDialog<Integer> implements SliderDialo
      * @see org.appwork.utils.swing.dialog.AbstractDialog#createReturnValue()
      */
     @Override
-    protected Integer createReturnValue() {
-        // TODO Auto-generated method stub
+    protected Integer createReturnValue() {        
         return getValue();
     }
 }

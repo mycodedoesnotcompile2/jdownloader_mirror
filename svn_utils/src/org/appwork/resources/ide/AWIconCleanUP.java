@@ -102,8 +102,7 @@ public class AWIconCleanUP {
     private static void findUnused(final HashSet<String> icons, final File root) {
         org.appwork.utils.Files.walkThroughStructure(new FileHandler<RuntimeException>() {
             @Override
-            public void intro(File f) throws RuntimeException {
-                // TODO Auto-generated method stub
+            public void intro(File f) throws RuntimeException {                
             }
 
             @Override
@@ -120,8 +119,7 @@ public class AWIconCleanUP {
             }
 
             @Override
-            public void outro(File f) throws RuntimeException {
-                // TODO Auto-generated method stub
+            public void outro(File f) throws RuntimeException {                
             }
         }, root);
     }

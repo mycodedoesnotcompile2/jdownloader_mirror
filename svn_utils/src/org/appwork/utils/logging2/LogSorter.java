@@ -85,8 +85,7 @@ public class LogSorter {
          * @see java.lang.Object#toString()
          */
         @Override
-        public String toString() {
-            // TODO Auto-generated method stub
+        public String toString() {            
             return ts + " - " + new Date(ts) + " " + text + "  [" + clazz + "]";
         }
 
@@ -96,8 +95,7 @@ public class LogSorter {
          * @see java.lang.Comparable#compareTo(java.lang.Object)
          */
         @Override
-        public int compareTo(LogLine o) {
-            // TODO Auto-generated method stub
+        public int compareTo(LogLine o) {            
             return CompareUtils.compare(ts, o.ts);
         }
     }

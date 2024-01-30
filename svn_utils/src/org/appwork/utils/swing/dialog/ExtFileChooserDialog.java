@@ -1174,13 +1174,11 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     /**
      * @param namePanel
      */
-    protected void modifiyNamePanel(final JPanel namePanel) {
-        // TODO Auto-generated method stub
+    protected void modifiyNamePanel(final JPanel namePanel) {        
     }
 
     @Override
-    protected void packed() {
-        // TODO Auto-generated method stub
+    protected void packed() {        
         super.packed();
         if (parentGlassPane != null) {
             parentGlassPane.setCursor(null);

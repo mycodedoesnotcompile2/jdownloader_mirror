@@ -77,8 +77,7 @@ public abstract class ExtButtonColumn<T> extends ExtComponentColumn<T> implement
      * @see javax.swing.AbstractCellEditor#stopCellEditing()
      */
     @Override
-    public boolean stopCellEditing() {
-        // TODO Auto-generated method stub
+    public boolean stopCellEditing() {        
         return super.stopCellEditing();
     }
 

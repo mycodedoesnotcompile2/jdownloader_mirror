@@ -46,6 +46,7 @@ import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JWindow;
+import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import javax.swing.plaf.synth.ColorType;
 import javax.swing.plaf.synth.SynthContext;
@@ -146,7 +147,7 @@ public class SyntheticaHelper {
      * @return
      * @throws IOException
      */
-    public String readLicense() throws IOException {
+    public static String readLicense() throws IOException {
         final URL url = Application.getRessourceURL("cfg/synthetica-license.key");
         if (url == null) {
             org.appwork.loggingv3.LogV3.warning("Missing Look And Feel License. Reverted to your System Look And Feel!");
@@ -170,7 +171,6 @@ public class SyntheticaHelper {
         }
         if (CrossSystem.isMac()) {
             if (checkIfMacInitWillFail()) {
-                System.runFinalization();
                 System.gc();
                 if (checkIfMacInitWillFail()) {
                     throw new IOException("Cannot Init LookAndFeel. Windows Are Open");
@@ -248,7 +248,7 @@ public class SyntheticaHelper {
         }
     }
 
-    public void setLicense(String license) {
+    public static void setLicense(String license) {
         /* we save around x-400 ms here by not using AES */
         if (license == null) {
             org.appwork.loggingv3.LogV3.warning("Missing Look And Feel License. Reverted to your System Look And Feel!");
@@ -324,6 +324,22 @@ public class SyntheticaHelper {
             // do not throw exception in edt
             LogV3.log(e);
             return Color.BLACK;
+        }
+    }
+
+    /**
+     * @return
+     */
+    public static boolean isSynthetica() {
+        if (Application.isHeadless()) {
+            return false;
+        }
+        try {
+            Class<?> synthetica = Class.forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel");
+            LookAndFeel laf = UIManager.getLookAndFeel();
+            return synthetica.isAssignableFrom(laf.getClass());
+        } catch (ClassNotFoundException e) {
+            return false;
         }
     }
 }

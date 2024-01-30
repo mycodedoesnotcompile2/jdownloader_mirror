@@ -52,9 +52,7 @@ public class RendererComboBoxModel implements ComboBoxModel {
      * )
      */
     @Override
-    public void addListDataListener(final ListDataListener l) {
-        // TODO Auto-generated method stub
-
+    public void addListDataListener(final ListDataListener l) {    
     }
 
     /*
@@ -63,8 +61,7 @@ public class RendererComboBoxModel implements ComboBoxModel {
      * @see javax.swing.ListModel#getElementAt(int)
      */
     @Override
-    public Object getElementAt(final int index) {
-        // TODO Auto-generated method stub
+    public Object getElementAt(final int index) {        
         return this.selection;
     }
 
@@ -74,8 +71,7 @@ public class RendererComboBoxModel implements ComboBoxModel {
      * @see javax.swing.ComboBoxModel#getSelectedItem()
      */
     @Override
-    public Object getSelectedItem() {
-        // TODO Auto-generated method stub
+    public Object getSelectedItem() {        
         return this.selection;
     }
 
@@ -85,8 +81,7 @@ public class RendererComboBoxModel implements ComboBoxModel {
      * @see javax.swing.ListModel#getSize()
      */
     @Override
-    public int getSize() {
-        // TODO Auto-generated method stub
+    public int getSize() {        
         return 1;
     }
 
@@ -98,8 +93,6 @@ public class RendererComboBoxModel implements ComboBoxModel {
      */
     @Override
     public void removeListDataListener(final ListDataListener l) {
-        // TODO Auto-generated method stub
-
     }
 
     /*
@@ -110,7 +103,6 @@ public class RendererComboBoxModel implements ComboBoxModel {
     @Override
     public void setSelectedItem(final Object anItem) {
         this.selection = anItem;
-
     }
 
 }

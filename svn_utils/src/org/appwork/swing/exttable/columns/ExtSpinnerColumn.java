@@ -102,8 +102,7 @@ public abstract class ExtSpinnerColumn<E> extends ExtTextColumn<E> {
 
             @Override
             public void focusGained(FocusEvent e) {
-                // TODO Auto-generated method stub
-            }
+			}
         };
         this.setRowSorter(new ExtDefaultRowSorter<E>() {
             @Override
@@ -148,8 +147,7 @@ public abstract class ExtSpinnerColumn<E> extends ExtTextColumn<E> {
      */
     @Override
     public Object getCellEditorValue() {
-        // TODO Auto-generated method stub
-        return this.editor.getValue();
+		return this.editor.getValue();
     }
 
     public NumberEditor getDoubleEditor() {
@@ -285,8 +283,7 @@ public abstract class ExtSpinnerColumn<E> extends ExtTextColumn<E> {
      */
     @Override
     public boolean isEnabled(final E obj) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     /*
@@ -296,8 +293,7 @@ public abstract class ExtSpinnerColumn<E> extends ExtTextColumn<E> {
      */
     @Override
     public boolean isSortable(final E obj) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     @Override
@@ -319,7 +315,6 @@ public abstract class ExtSpinnerColumn<E> extends ExtTextColumn<E> {
 
     @Override
     final public void setValue(final Object value, final E object) {
-        // TODO Auto-generated method stub
-        this.setNumberValue((Number) value, object);
+		this.setNumberValue((Number) value, object);
     }
 }

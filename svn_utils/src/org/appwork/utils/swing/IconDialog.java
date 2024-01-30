@@ -62,8 +62,7 @@ public class IconDialog extends AbstractDialog<Integer> implements MessageDialog
     }
 
     @Override
-    protected Integer createReturnValue() {
-        // TODO Auto-generated method stub
+    protected Integer createReturnValue() {        
         return getReturnmask();
     }
 

@@ -89,8 +89,7 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
 
     @Override
     public void configureEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
-        // TODO Auto-generated method stub
-    }
+	}
 
     /*
      * (non-Javadoc)
@@ -174,8 +173,7 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
     // final - not implemented
     @Override
     public final void resetEditor() {
-        // TODO Auto-generated method stub
-    }
+	}
 
     @Override
     public void resetRenderer() {

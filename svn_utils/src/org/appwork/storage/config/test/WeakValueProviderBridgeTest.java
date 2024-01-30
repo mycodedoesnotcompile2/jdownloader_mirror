@@ -74,7 +74,6 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
         @Override
         public void onConfigValidatorError(KeyHandler<Boolean> keyHandler, Boolean invalidValue, ValidationException validateException) {
-            // TODO Auto-generated method stub
         }
     }
 
@@ -127,8 +126,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
-            }
+			}
         }, false);
         ValueProviderListener<Boolean> listener;
         bridge.register(listener = new ValueProviderListener<Boolean>() {
@@ -139,8 +137,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
-            }
+			}
         }, true);
         bridge.register(listener, false);
         bridge = null;
@@ -185,7 +182,6 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
             }
         };
         bridge.register(listenerProvider, true);
@@ -219,8 +215,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onConfigValidatorError(KeyHandler<Boolean> keyHandler, Boolean invalidValue, ValidationException validateException) {
-                // TODO Auto-generated method stub
-            }
+			}
         }, false);
         //
         KeyHandlerProviderBridge bridge = new KeyHandlerProviderBridge(keyHandler);
@@ -232,8 +227,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
-            }
+           	}
         }, false);
         ValueProviderListener<Boolean> listener;
         bridge.register(listener = new ValueProviderListener<Boolean>() {
@@ -244,7 +238,6 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
             }
         }, true);
         bridge.register(listener, false);
@@ -278,7 +271,6 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onConfigValidatorError(KeyHandler<Boolean> keyHandler, Boolean invalidValue, ValidationException validateException) {
-                // TODO Auto-generated method stub
             }
         }, true);
         //
@@ -291,7 +283,6 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-                // TODO Auto-generated method stub
             }
         };
         bridge.register(listenerProvider, true);

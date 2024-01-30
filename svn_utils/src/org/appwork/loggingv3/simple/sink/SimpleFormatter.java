@@ -107,29 +107,11 @@ public class SimpleFormatter implements Formatter {
      */
     @Override
     public String format(LogRecord2 record) {
-        // long t = System.currentTimeMillis();
         String message = record.message == null ? "" : record.message;
         final StackTraceElement source = record.getThrownAt();
         final String sourceString = Exceptions.stacktraceElementToThrownAtString(source);
         String pre = createPre(record, sourceString);
-        int line = 0;
-        int preLength = pre.length();
-        String[] lines = message.split("[\r\n]+");
-        StringBuilder sb = new StringBuilder(message.length() + lines.length * preLength);
-        sb.append(pre);
-        // TODO: This is pretty slow for MANY lines
-        for (String s : lines) {
-            if (s.trim().length() > 0) {
-                if (line == 0) {
-                    sb.append(s);
-                } else {
-                    sb.append("\r\n").append(fillPre("", " ", preLength)).append(s);
-                }
-                line++;
-            }
-        }
-        // System.out.println(System.currentTimeMillis() - t);
-        return sb.toString();
+        return StringUtils.multiLineIntend(message, pre, fillPre("", " ", pre.length()));
     }
 
     protected String createPre(LogRecord2 record, String sourceString) {

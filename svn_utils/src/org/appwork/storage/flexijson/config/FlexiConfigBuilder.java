@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Proxy;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -84,6 +85,8 @@ public class FlexiConfigBuilder<T> implements InterfaceStorageListener<Object> {
         return source;
     }
 
+    public static final AtomicBoolean WRITE_ON_SHUTDOWN = new AtomicBoolean(true);
+
     /**
      * @author thomas
      * @date 28.07.2022
@@ -113,6 +116,9 @@ public class FlexiConfigBuilder<T> implements InterfaceStorageListener<Object> {
 
         @Override
         public void onShutdown(final ShutdownRequest shutdownRequest) {
+            if (!WRITE_ON_SHUTDOWN.get()) {
+                return;
+            }
             FlexiConfigBuilder actualStorage = builder.get();
             if (actualStorage != null) {
                 actualStorage.onShutdown();
@@ -336,7 +342,6 @@ public class FlexiConfigBuilder<T> implements InterfaceStorageListener<Object> {
      * @param e
      */
     protected void onAutoWriteException(Exception e) {
-        // TODO Auto-generated method stub
     }
 
     /**

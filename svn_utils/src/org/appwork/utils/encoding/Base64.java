@@ -591,8 +591,7 @@ public class Base64 {
      * @param keyBytes
      * @return
      */
-    public static String encodeToString(byte[] keyBytes) {
-        // TODO Auto-generated method stub
+    public static String encodeToString(byte[] keyBytes) {        
         return encodeToString(keyBytes, false);
     }
 }

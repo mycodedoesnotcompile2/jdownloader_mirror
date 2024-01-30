@@ -350,7 +350,6 @@ public class PathChooser extends MigPanel {
      * @return
      */
     protected String getDefaultPreSelection() {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -362,7 +361,6 @@ public class PathChooser extends MigPanel {
      * @return
      */
     public String getDialogTitle() {
-        // TODO Auto-generated method stub
         return _AWU.T.pathchooser_dialog_title();
     }
 
@@ -430,7 +428,6 @@ public class PathChooser extends MigPanel {
      * @param txt2
      */
     protected void onChanged(final ExtTextField txt2) {
-        // TODO Auto-generated method stub
     }
 
     @Override

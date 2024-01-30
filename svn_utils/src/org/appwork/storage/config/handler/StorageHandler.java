@@ -87,14 +87,16 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class StorageHandler<T extends ConfigInterface> implements InvocationHandler {
-    private final static LinkedHashMap<String, Runnable>    DELAYEDWRITES = new LinkedHashMap<String, Runnable>();
-    protected static final DelayedRunnable                  SAVEDELAYER   = new DelayedRunnable(5000, 30000) {
-                                                                              @Override
-                                                                              public void delayedrun() {
-                                                                                  StorageHandler.saveAll();
-                                                                              }
-                                                                          };
+    private final static LinkedHashMap<String, Runnable>    DELAYEDWRITES     = new LinkedHashMap<String, Runnable>();
+    protected static final DelayedRunnable                  SAVEDELAYER       = new DelayedRunnable(5000, 30000) {
+                                                                                  @Override
+                                                                                  public void delayedrun() {
+                                                                                      StorageHandler.saveAll();
+                                                                                  }
+                                                                              };
     private static final HashMap<StorageHandler<?>, String> STORAGEMAP;
+    // can be used to disable writes on shutdown
+    public static final AtomicBoolean                       WRITE_ON_SHUTDOWN = new AtomicBoolean(true);
     static {
         // important, because getDefaultLogger might initialize StorageHandler and access to STORAGEMAP must be ensured in constructor of
         // StorageHandler
@@ -112,7 +114,9 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
 
             @Override
             public void onShutdown(final ShutdownRequest shutdownRequest) {
-                flushWrites();
+                if (WRITE_ON_SHUTDOWN.get()) {
+                    flushWrites();
+                }
             }
 
             @Override
@@ -135,7 +139,9 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
 
             @Override
             public void onShutdown(final ShutdownRequest shutdownRequest) {
-                StorageHandler.saveAll();
+                if (WRITE_ON_SHUTDOWN.get()) {
+                    StorageHandler.saveAll();
+                }
             }
 
             @Override
@@ -353,7 +359,6 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
      *
      */
     protected void preInit(File path, Class<T> configInterfac) {
-        // TODO Auto-generated method stub
     }
 
     public StorageHandler(final Storage storage, final Class<T> configInterface) {

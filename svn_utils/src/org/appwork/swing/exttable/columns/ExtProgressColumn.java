@@ -211,8 +211,7 @@ abstract public class ExtProgressColumn<E> extends ExtColumn<E> {
      *
      */
     protected void preInit() {
-        // TODO Auto-generated method stub
-    }
+	}
 
     protected IndeterminatedRenderer<E> initIndeterminatedRenderer() {
         return new IndeterminatedRenderer<E>(this);

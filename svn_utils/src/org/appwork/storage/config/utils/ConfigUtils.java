@@ -64,8 +64,7 @@ public class ConfigUtils {
     }
 
     public static void printStaticMappings(final Class<? extends ConfigInterface> configInterface, final String resource, String factory) {
-        // TODO Auto-generated method stub
-        final StringBuilder strBuild = new StringBuilder();
+		final StringBuilder strBuild = new StringBuilder();
         System.err.println(configInterface);
         System.err.flush();
         strBuild.append("\r\n");

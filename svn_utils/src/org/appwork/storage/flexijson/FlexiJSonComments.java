@@ -85,8 +85,7 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
      */
     @Override
     public void add(int index, FlexiCommentJsonNode element) {
-        element.setParent(this);
-        // TODO Auto-generated method stub
+        element.setParent(this);        
         super.add(index, element);
     }
 

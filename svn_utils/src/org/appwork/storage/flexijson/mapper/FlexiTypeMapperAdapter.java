@@ -33,8 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper;
 
-import java.util.List;
-
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -53,9 +51,8 @@ public abstract class FlexiTypeMapperAdapter implements FlexiTypeMapper {
      * java.lang.Object, org.appwork.storage.simplejson.mapper.Getter, java.util.List)
      */
     @Override
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHierarchy) throws FlexiMapperException {
-        // TODO Auto-generated method stub
-        return null;
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext context) throws FlexiMapperException {
+		return null;
     }
 
     /*
@@ -66,8 +63,7 @@ public abstract class FlexiTypeMapperAdapter implements FlexiTypeMapper {
      */
     @Override
     public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode node, CompiledType type, Setter reference) throws FlexiMapperException {
-        // TODO Auto-generated method stub
-        return null;
+		return null;
     }
 
     /*
@@ -78,8 +74,7 @@ public abstract class FlexiTypeMapperAdapter implements FlexiTypeMapper {
      */
     @Override
     public boolean canConvert2Json(Object obj, Getter getter) {
-        // TODO Auto-generated method stub
-        return false;
+		return false;
     }
 
     /*
@@ -90,7 +85,6 @@ public abstract class FlexiTypeMapperAdapter implements FlexiTypeMapper {
      */
     @Override
     public boolean canConvert2Object(FlexiJSonNode node, CompiledType type, Setter setter) {
-        // TODO Auto-generated method stub
-        return false;
+		return false;
     }
 }

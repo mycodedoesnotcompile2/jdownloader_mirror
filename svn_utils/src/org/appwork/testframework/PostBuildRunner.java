@@ -59,6 +59,7 @@ import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.utils.Application;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
@@ -259,7 +260,7 @@ public class PostBuildRunner {
             System.exit(0);
         } catch (java.lang.InstantiationException e) {
         } catch (Throwable e) {
-            if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null) {
+            if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null || Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
                 AWTest.setLoggerSilent(false, false);
                 LogV3.info(header("ERROR") + "Class file(s) not in JAR: " + e.getMessage());
                 LogV3.disableSysout();

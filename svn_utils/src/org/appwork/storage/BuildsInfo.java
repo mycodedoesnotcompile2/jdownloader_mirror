@@ -61,6 +61,6 @@ public class BuildsInfo implements Storable {
     @StorableValidateNotNull
     @StorableValidateTimestampRelative(min = -50 * 365 * 24 * 60 * 60 * 1000l, max = +24 * 60 * 60 * 1000l, level = FailLevel.ERROR, message = "It can be found in the Connect Client about dialog or the projects.appwork.org release pages")
     @StorableDoc("@See #minimumBuildDate")
-    @StorableExample("\"2022-10-07T00:00CET\"")
+    @StorableExample("\"$NOW\"")
     private Date maximumBuildDate;
 }

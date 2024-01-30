@@ -33,10 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
+import java.awt.Color;
 import java.util.ArrayList;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
+import javax.swing.UIManager;
 
 import org.appwork.utils.swing.SwingUtils;
 
@@ -95,11 +97,15 @@ public class MultiLineLabelTooltip extends ExtTooltip {
 
     public MultiLineLabelTooltip(final LabelInfo... labels) {
         panel = new TooltipPanel("ins 3,wrap 1", "[grow,fill]", "[grow,fill]");
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
         for (final LabelInfo link : labels) {
             JLabel lbl;
             panel.add(lbl = new JLabel(link.getText(), link.getIcon(), link.getConstrains()));
             SwingUtils.setOpaque(lbl, false);
-            lbl.setForeground(ExtTooltip.FOREGROUND_COLOR);
+            lbl.setForeground(color);
         }
         panel.setOpaque(false);
         add(panel);

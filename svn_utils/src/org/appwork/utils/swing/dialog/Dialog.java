@@ -885,8 +885,7 @@ public class Dialog {
              * @see org.appwork.utils.swing.dialog.AbstractDialog#getModalityType()
              */
             @Override
-            public ModalityType getModalityType() {
-                // TODO Auto-generated method stub
+            public ModalityType getModalityType() {                
                 return ModalityType.MODELESS;
             }
         };

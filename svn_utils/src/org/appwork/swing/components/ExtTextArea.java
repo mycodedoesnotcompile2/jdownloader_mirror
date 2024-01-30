@@ -268,7 +268,6 @@ public class ExtTextArea extends JTextArea implements FocusListener, DocumentLis
 
     @Override
     public boolean isTooltipWithoutFocusEnabled() {
-        // TODO Auto-generated method stub
         return true;
     }
 }

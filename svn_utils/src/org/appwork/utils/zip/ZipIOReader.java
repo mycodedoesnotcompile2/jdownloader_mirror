@@ -542,8 +542,7 @@ public class ZipIOReader {
     /**
      * @return
      */
-    protected boolean isAutoCreateSubDirs() {
-        // TODO Auto-generated method stub
+    protected boolean isAutoCreateSubDirs() {        
         return this.autoCreateSubDirs;
     }
 
@@ -554,8 +553,7 @@ public class ZipIOReader {
     /**
      * @return
      */
-    protected boolean isOverwrite() {
-        // TODO Auto-generated method stub
+    protected boolean isOverwrite() {        
         return this.overwrite;
     }
 

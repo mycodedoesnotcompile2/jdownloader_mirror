@@ -54,8 +54,7 @@ public class ResourceHandler implements HttpRequestHandler {
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onGetRequest(final GetRequest request, final HttpResponse response) {
-        // TODO Auto-generated method stub
+    public boolean onGetRequest(final GetRequest request, final HttpResponse response) {        
         // TODO: SECURITY
         if (!request.getRequestedPath().startsWith("/resources/")) {
             return false;
@@ -80,8 +79,7 @@ public class ResourceHandler implements HttpRequestHandler {
      * org.appwork.utils.net.httpserver.responses.HttpResponse)
      */
     @Override
-    public boolean onPostRequest(final PostRequest request, final HttpResponse response) {
-        // TODO Auto-generated method stub
+    public boolean onPostRequest(final PostRequest request, final HttpResponse response) {        
         return false;
     }
 }

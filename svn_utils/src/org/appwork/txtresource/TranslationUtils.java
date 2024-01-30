@@ -202,9 +202,7 @@ public class TranslationUtils {
      * @return
      */
     public static String serialize(TranslateData map) {
-        // TODO Auto-generated method stub
-        // return JSonStorage.serializeToJson(map);
-        StringBuilder ret = new StringBuilder();
+		StringBuilder ret = new StringBuilder();
         java.util.List<String> keys = new ArrayList<String>();
         for (Entry<String, TranslatedEntry> entry : map.entrySet()) {
             keys.add(entry.getKey());

@@ -88,14 +88,12 @@ public abstract class ExtTreeTableModel<T extends TreeNodeInterface> extends Ext
     }
 
     @Override
-    public List<T> getElements() {
-        // TODO Auto-generated method stub
+    public List<T> getElements() {        
         return super.getElements();
     }
 
     @Override
-    public void refreshSort() {
-        // TODO Auto-generated method stub
+    public void refreshSort() {        
         super.refreshSort();
     }
 
@@ -228,8 +226,7 @@ public abstract class ExtTreeTableModel<T extends TreeNodeInterface> extends Ext
     }
 
     @Override
-    public List<T> refreshSort(final List<T> data) {
-        // TODO Auto-generated method stub
+    public List<T> refreshSort(final List<T> data) {        
         return super.refreshSort(data);
     }
 

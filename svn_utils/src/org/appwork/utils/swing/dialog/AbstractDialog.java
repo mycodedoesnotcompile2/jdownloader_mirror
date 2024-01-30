@@ -80,6 +80,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
 import org.appwork.swing.MigPanel;
+import org.appwork.swing.RelayoutOnScreenScaleUpdate;
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.uio.UserIODefinition;
@@ -258,6 +259,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
         if (owner == null) {
             return null;
         } else if (owner instanceof java.awt.Frame || owner instanceof java.awt.Dialog) {
+            RelayoutOnScreenScaleUpdate.init(owner);
             return owner;
         } else {
             org.appwork.loggingv3.LogV3.log(new Exception("Warning! Bad Owner Frame Detected - fallback to null: " + printTypeHirarchy(owner.getClass())));
@@ -736,7 +738,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected DefaultButtonPanel createBottomButtonPanel() {
-        // TODO Auto-generated method stub
         if (AbstractDialog.BUTTON_HEIGHT <= 0) {
             return createButtonPanelImpl("ins 0", "[]", "0[grow,fill]0");
         } else {
@@ -751,7 +752,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected DefaultButtonPanel createButtonPanelImpl(String ins, String columns, String rows) {
-        // TODO Auto-generated method stub
         return new DefaultButtonPanel(ins, columns, rows);
     }
 
@@ -759,7 +759,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected MigPanel createBottomPanel() {
-        // TODO Auto-generated method stub
         return new MigPanel("ins 0", "[]20[grow,fill][]", "[]");
     }
 
@@ -931,7 +930,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected Color getBackground() {
-        // TODO Auto-generated method stub
         return this.getDialog().getBackground();
     }
 
@@ -1048,7 +1046,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected String getIconConstraints() {
-        // TODO Auto-generated method stub
         return "gapright 10,gaptop 2";
     }
 
@@ -1127,7 +1124,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * @return
      */
     protected int getPreferredHeight() {
-        // TODO Auto-generated method stub
         return preferredHeight;
     }
 
@@ -1837,7 +1833,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
 
     @Override
     public void windowLostFocus(final WindowEvent e) {
-        // TODO Auto-generated method stub
     }
 
     public void windowOpened(final WindowEvent arg0) {

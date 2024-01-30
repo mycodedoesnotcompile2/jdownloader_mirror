@@ -84,13 +84,10 @@ public class HelpNotifier implements FocusListener, CaretListener {
 
             @Override
             public void addPropertyChangeListener(final PropertyChangeListener listener) {
-                // TODO Auto-generated method stub
-
             }
 
             @Override
-            public Object getValue(final String key) {
-                // TODO Auto-generated method stub
+            public Object getValue(final String key) {                
                 return null;
             }
 
@@ -101,20 +98,14 @@ public class HelpNotifier implements FocusListener, CaretListener {
 
             @Override
             public void putValue(final String key, final Object value) {
-                // TODO Auto-generated method stub
-
             }
 
             @Override
-            public void removePropertyChangeListener(final PropertyChangeListener listener) {
-                // TODO Auto-generated method stub
-
+            public void removePropertyChangeListener(final PropertyChangeListener listener) { 
             }
 
             @Override
-            public void setEnabled(final boolean b) {
-                // TODO Auto-generated method stub
-
+            public void setEnabled(final boolean b) {  
             }
 
         });

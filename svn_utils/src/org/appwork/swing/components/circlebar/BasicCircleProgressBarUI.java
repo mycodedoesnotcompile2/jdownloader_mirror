@@ -161,7 +161,6 @@ public class BasicCircleProgressBarUI extends CircleProgressBarUI {
 
     @Override
     public BaselineResizeBehavior getBaselineResizeBehavior(final JComponent c) {
-        // TODO Auto-generated method stub
         return super.getBaselineResizeBehavior(c);
     }
 
@@ -176,13 +175,11 @@ public class BasicCircleProgressBarUI extends CircleProgressBarUI {
 
     @Override
     public Dimension getMaximumSize(final JComponent c) {
-        // TODO Auto-generated method stub
         return super.getMaximumSize(c);
     }
 
     @Override
     public Dimension getMinimumSize(final JComponent c) {
-        // TODO Auto-generated method stub
         return super.getMinimumSize(c);
     }
 
@@ -378,8 +375,7 @@ public class BasicCircleProgressBarUI extends CircleProgressBarUI {
     }
 
     @Override
-    public void update(final Graphics g, final JComponent c) {
-        // TODO Auto-generated method stub
+    public void update(final Graphics g, final JComponent c) {        
         super.update(g, c);
     }
 

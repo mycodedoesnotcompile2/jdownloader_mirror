@@ -55,7 +55,7 @@ import org.appwork.storage.flexijson.mapper.FlexiKeyLookup;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.ClassPathScanner;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Exceptions;
 
 /**
@@ -71,7 +71,6 @@ public class ValidateFlexiAnnotationsTest extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
-        // TODO Auto-generated method stub
         new ClassPathScanner<Exception>() {
             @Override
             public void handle(Class<?> cls) throws Exception {

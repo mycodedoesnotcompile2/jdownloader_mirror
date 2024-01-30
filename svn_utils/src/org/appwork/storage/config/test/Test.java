@@ -87,14 +87,11 @@ public class Test extends AWTest {
 
             @Override
             public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
-                // TODO Auto-generated method stub
-
-            }
+        	}
 
             @Override
             public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
                 LogV3.info("New value: " + keyHandler);
-
             }
 
         });
@@ -102,15 +99,11 @@ public class Test extends AWTest {
 
             @Override
             public void onConfigValidatorError(final KeyHandler<Integer> keyHandler, final Integer invalidValue, final ValidationException validateException) {
-                // TODO Auto-generated method stub
-
-            }
+           	}
 
             @Override
             public void onConfigValueModified(final KeyHandler<Integer> keyHandler, final Integer newValue) {
-                // TODO Auto-generated method stub
-
-            }
+			}
 
         });
 

@@ -327,8 +327,7 @@ public class SimpleHTTP {
     /**
      * @return
      */
-    protected String getCharset() {
-        // TODO Auto-generated method stub
+    protected String getCharset() {        
         return "UTF-8";
     }
 

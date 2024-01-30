@@ -43,15 +43,14 @@ import java.util.HashMap;
 import javax.swing.Icon;
 import javax.swing.JComponent;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
 import org.appwork.swing.components.CheckBoxIcon;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.IconIO;
-import org.appwork.utils.images.Interpolation;
 
 /**
  *
@@ -155,7 +154,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                 final String key = this.getCacheKey(_getIcon, "disabled");
                 ret = this.getCached(key);
                 if (ret == null) {
-                    final Icon ico = ImageProvider.getDisabledIcon(component, _getIcon);
+                    final Icon ico = FACTORY.getDisabled(component, _getIcon);
                     ret = ico;
                     ret = this.modify(ret, key);
                     this.cache(ret, key);
@@ -193,22 +192,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                     ret = CheckBoxIcon.FALSE;
                     if (ret != null) {
                         // may be null during calss loading static init of the CheckBoxIconClass
-                        ret = IconIO.getScaledInstance(ret, size, size);
+                        ret = FACTORY.scale(ret, size, size);
                     }
                 } else if (StringUtils.equalsIgnoreCase(relativePath, "enabled") || StringUtils.equalsIgnoreCase(relativePath, "checkbox_true")) {
                     ret = CheckBoxIcon.TRUE;
                     if (ret != null) {// may be null during calss loading static init of the CheckBoxIconClass
-                        ret = IconIO.getScaledInstance(ret, size, size);
+                        ret = FACTORY.scale(ret, size, size);
                     }
                 } else if (StringUtils.equalsIgnoreCase(relativePath, "checkbox_undefined")) {
                     ret = CheckBoxIcon.UNDEFINED;
                     if (ret != null) {// may be null during calss loading static init of the CheckBoxIconClass
-                        ret = IconIO.getScaledInstance(ret, size, size);
+                        ret = FACTORY.scale(ret, size, size);
                     }
                 }
                 if (ret == null) {
                     final URL url = lookupImageUrl(relativePath, size);
-                    ret = IconIO.getImageIcon(url, size);
+                    ret = FACTORY.urlToIcon(url, size, size);
                     ret = this.modify(ret, relativePath);
                     if (url == null && doNotLogMissingIcons) {
                         org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.getPath("images/", relativePath, ".png", false)));
@@ -220,6 +219,19 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
         }
         return ret;
+    }
+
+    private static IconFactory FACTORY = createIconFactory();
+
+    public static IconFactory getFACTORY() {
+        return FACTORY;
+    }
+
+    public static void setFACTORY(IconFactory fACTORY) {
+        if (fACTORY == null) {
+            throw new IllegalArgumentException();
+        }
+        FACTORY = fACTORY;
     }
 
     /**
@@ -251,6 +263,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
         }
         return url;
+    }
+
+    /**
+     * @return
+     */
+    private static IconFactory createIconFactory() {
+        String iconFactoryClass = System.getProperty("ICON_FACTORY");
+        if (StringUtils.isEmpty(iconFactoryClass)) {
+            iconFactoryClass = DefaultIconFactory.class.getName();
+        }
+        try {
+            return (IconFactory) Class.forName(iconFactoryClass).getConstructor().newInstance();
+        } catch (Exception e) {
+            LogV3.log(e);
+            return new DefaultIconFactory();
+        }
     }
 
     /**
@@ -301,7 +329,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             image = delegate.getImage(key, size, useCache);
         }
         if (image == null) {
-            image = IconIO.toBufferedImage(this.getIcon(key, size, useCache));
+            image = FACTORY.toImage(this.getIcon(key, size, useCache));
         }
         return image;
     }
@@ -336,7 +364,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             final String key = this.getCacheKey(imageIcon, size);
             ret = this.getCached(key);
             if (ret == null) {
-                ret = IconIO.getScaledInstance(imageIcon, size, size, Interpolation.BILINEAR);
+                ret = FACTORY.scale(imageIcon, size, size);
                 this.cache(ret, key);
             }
         }

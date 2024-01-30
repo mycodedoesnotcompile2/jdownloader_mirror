@@ -109,7 +109,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
 
                 @Override
                 public void focusLost(final FocusEvent e) {
-                    // TODO Auto-generated method stub
                     SearchComboBox.this.hidePopup();
                     // to replaint the focus hilight
                     SearchComboBox.this.repaint();
@@ -316,7 +315,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
          */
         @Override
         public Component getEditorComponent() {
-            // TODO Auto-generated method stub
             return this.panel;
         }
 
@@ -327,7 +325,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
          */
         @Override
         public Object getItem() {
-            // TODO Auto-generated method stub
             return this.value;
         }
 
@@ -440,7 +437,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
      * @return
      */
     protected boolean isSetTextFieldOnlyForSingleMatch() {
-        // TODO Auto-generated method stub
         return false;
     }
 
@@ -500,7 +496,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
 
             @Override
             public void focusLost(final FocusEvent e) {
-                // TODO Auto-generated method stub
                 SearchComboBox.this.hidePopup();
             }
         });
@@ -510,7 +505,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
         this.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuCanceled(final PopupMenuEvent e) {
-                // TODO Auto-generated method stub
             }
 
             @Override
@@ -891,7 +885,6 @@ public abstract class SearchComboBox<T> extends JComboBox {
      * @param found
      */
     protected void sortFound(String search, final List<T> found) {
-        // TODO Auto-generated method stub
     }
 
     protected void setListSearchResults(final List<T> found, final List<T> all) {

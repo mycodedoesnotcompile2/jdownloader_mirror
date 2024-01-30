@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable.columns;
 
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -59,7 +58,6 @@ import javax.swing.border.Border;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
-import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.renderer.RenderLabel;
@@ -75,8 +73,6 @@ public abstract class ExtTextColumn<E> extends ExtColumn<E> implements ActionLis
 
     protected JTextField          editorField;
     private final Border          defaultBorder = BorderFactory.createEmptyBorder(0, 5, 0, 5);
-    private Color                 rendererForeground;
-    private Color                 editorForeground;
     private Font                  rendererFont;
     private Font                  editorFont;
     protected JPanel              editor;
@@ -176,8 +172,6 @@ public abstract class ExtTextColumn<E> extends ExtColumn<E> implements ActionLis
             }
         };
         this.rendererField = createRendererField();
-        this.rendererForeground = this.rendererField.getForeground();
-        this.editorForeground = this.editorField.getForeground();
         this.rendererFont = this.rendererField.getFont();
         this.editorFont = this.editorField.getFont();
         this.editor = this.createEditorPanel();
@@ -339,20 +333,6 @@ public abstract class ExtTextColumn<E> extends ExtColumn<E> implements ActionLis
     @Override
     public Object getCellEditorValue() {
         return this.editorField.getText();
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.swing.exttable.ExtColumn#getDefaultForeground()
-     */
-    @Override
-    protected Color getDefaultForeground() {
-        ExtTable<E> table = getModel().getTable();
-        if (table != null) {
-            return table.getForeground();
-        }
-        return this.editorForeground;
     }
 
     /**

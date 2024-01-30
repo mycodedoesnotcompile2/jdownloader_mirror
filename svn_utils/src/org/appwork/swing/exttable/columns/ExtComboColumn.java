@@ -215,8 +215,7 @@ public abstract class ExtComboColumn<E, ModelType> extends ExtTextColumn<E> impl
 
     @Override
     public void configureRendererComponent(final E value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-        // TODO Auto-generated method stub
-        final ModelType selected = getSelectedItem(value);
+		final ModelType selected = getSelectedItem(value);
         rendererPanel.setEditable(isEditable(value));
         rendererPanel.setIcon(editing == value ? iconUp : iconDown);
         Icon icon = getIconForRenderer(value, selected);

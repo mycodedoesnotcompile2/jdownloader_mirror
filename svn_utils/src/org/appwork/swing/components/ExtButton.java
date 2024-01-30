@@ -138,7 +138,6 @@ public class ExtButton extends JButton implements ToolTipHandler {
      */
     @Override
     public void setEnabled(final boolean b) {
-        // TODO Auto-generated method stub
         super.setEnabled(b);
     }
 
@@ -237,7 +236,6 @@ public class ExtButton extends JButton implements ToolTipHandler {
 
     @Override
     public boolean isTooltipWithoutFocusEnabled() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -309,7 +307,6 @@ public class ExtButton extends JButton implements ToolTipHandler {
      *
      */
     protected void onReleased() {
-        // TODO Auto-generated method stub
     }
 
     public void setTooltipFactory(final TooltipFactory tooltipFactory) {

@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.crypto.Cipher;
@@ -68,9 +69,9 @@ import org.appwork.utils.reflection.Clazz;
 
 public class JSonStorage {
     /* hash map contains file location as string and the storage instance */
-    private static final HashMap<String, Storage>                   MAP       = new HashMap<String, Storage>();
-
-    private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP = new WeakHashMap<String, WeakReference<String>>();
+    private static final HashMap<String, Storage>                   MAP               = new HashMap<String, Storage>();
+    private final static WeakHashMap<String, WeakReference<String>> DEDUPEMAP         = new WeakHashMap<String, WeakReference<String>>();
+    public static final AtomicBoolean                               WRITE_ON_SHUTDOWN = new AtomicBoolean(true);
 
     public static String dedupeString(String string) {
         if (string != null) {
@@ -90,18 +91,15 @@ public class JSonStorage {
     }
 
     private static JSONMapper                         JSON_MAPPER = new SimpleMapper() {
-
                                                                       protected JSonFactory newJsonFactory(String jsonString) {
                                                                           return new JSonFactory(jsonString) {
-                                                                              @Override
-                                                                              protected String dedupeString(String string) {
-                                                                                  return JSonStorage.dedupeString(string);
-                                                                              };
-
-                                                                          };
+                                                                                                                                            @Override
+                                                                                                                                            protected String dedupeString(String string) {
+                                                                                                                                                return JSonStorage.dedupeString(string);
+                                                                                                                                            };
+                                                                                                                                        };
                                                                       };
                                                                   };
-
     /* default key for encrypted json */
     static public byte[]                              KEY         = new byte[] { 0x01, 0x02, 0x11, 0x01, 0x01, 0x54, 0x01, 0x01, 0x01, 0x01, 0x12, 0x01, 0x01, 0x01, 0x22, 0x01 };
     private static final HashMap<File, AtomicInteger> LOCKS       = new HashMap<File, AtomicInteger>();
@@ -120,7 +118,9 @@ public class JSonStorage {
 
             @Override
             public void onShutdown(final ShutdownRequest shutdownRequest) {
-                JSonStorage.close();
+                if (WRITE_ON_SHUTDOWN.get()) {
+                    JSonStorage.close();
+                }
             }
 
             @Override
@@ -229,7 +229,6 @@ public class JSonStorage {
                 }
                 JSonStorage.unLock(file);
             }
-
         }
     }
 
@@ -347,7 +346,6 @@ public class JSonStorage {
         } else {
             return JSonStorage.JSON_MAPPER.inputStreamToObject(is, type);
         }
-
     }
 
     public static <E> E restoreFromString(final String string, final TypeRef<E> type, final E def) {
@@ -397,7 +395,6 @@ public class JSonStorage {
                     return (E) JSonStorage.JSON_MAPPER.inputStreamToObject(is, def.getClass());
                 }
             } catch (final Exception e) {
-
                 org.appwork.loggingv3.LogV3.log(new Exception());
             }
         }

@@ -58,7 +58,6 @@ public class URLMapper extends TypeMapper<URL> {
      */
     @Override
     public URL json2Obj(JSonNode json) {
-        // TODO Auto-generated method stub
         try {
             return new URL((String)((JSonValue)json).getValue());
         } catch (MalformedURLException e) {

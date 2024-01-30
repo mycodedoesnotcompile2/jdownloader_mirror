@@ -700,7 +700,6 @@ public class JSonMapper {
      * @throws MapperException
      */
     protected void onClassFieldMissing(Object inst, String key, JSonNode value) throws MapperException {
-        // TODO Auto-generated method stub
     }
 
     /**

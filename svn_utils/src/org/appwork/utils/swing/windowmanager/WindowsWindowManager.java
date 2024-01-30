@@ -464,14 +464,12 @@ public class WindowsWindowManager extends WindowManager {
         }
         w.addWindowFocusListener(new WindowFocusListener() {
             @Override
-            public void windowLostFocus(final WindowEvent windowevent) {
-                // TODO Auto-generated method stub
+            public void windowLostFocus(final WindowEvent windowevent) {                
                 log(windowevent);
             }
 
             @Override
-            public void windowGainedFocus(final WindowEvent windowevent) {
-                // TODO Auto-generated method stub
+            public void windowGainedFocus(final WindowEvent windowevent) {                
                 log(windowevent);
             }
         });
@@ -520,39 +518,32 @@ public class WindowsWindowManager extends WindowManager {
         w.addComponentListener(new ComponentListener() {
             @Override
             public void componentShown(final ComponentEvent e) {
-                // System.out.println(e);
             }
 
             @Override
             public void componentResized(final ComponentEvent e) {
-                // System.out.println(e);
             }
 
             @Override
             public void componentMoved(final ComponentEvent e) {
-                // System.out.println(e);
             }
 
             @Override
             public void componentHidden(final ComponentEvent e) {
-                // System.out.println(e);
             }
         });
         w.addHierarchyBoundsListener(new HierarchyBoundsListener() {
             @Override
             public void ancestorResized(final HierarchyEvent e) {
-                // System.out.println(e);
             }
 
             @Override
             public void ancestorMoved(final HierarchyEvent e) {
-                // System.out.println(e);
             }
         });
         w.addHierarchyListener(new HierarchyListener() {
             @Override
             public void hierarchyChanged(final HierarchyEvent e) {
-                // System.out.println(e);
             }
         });
     }

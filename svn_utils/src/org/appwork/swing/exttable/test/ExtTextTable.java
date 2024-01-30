@@ -69,23 +69,11 @@ public class ExtTextTable extends ExtTable<TextObject> {
     public ExtTextTable() {
         super(new ExtTestModel());
         setSearchEnabled(true);
-
         setDragEnabled(true);
         setDropMode(DropMode.ON);
-
         final DragDropHelper ddh = new DragDropHelper();
         this.setTransferHandler(ddh);
         addRowHighlighter(new SelectionHighlighter(null, new Color(10, 10, 10, 40)));
-//        getModel().addExtComponentRowHighlighter(new ExtComponentRowHighlighter<TextObject>(Color.BLACK,Color.RED,null) {
-//            
-//            @Override
-//            public boolean accept(ExtColumn<TextObject> column, TextObject value, boolean selected, boolean focus, int row) {
-//                // TODO Auto-generated method stub
-//                return selected;
-//            }
-//        });
-        // this.setShowHorizontalLines(false);
-      
         setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
        
 

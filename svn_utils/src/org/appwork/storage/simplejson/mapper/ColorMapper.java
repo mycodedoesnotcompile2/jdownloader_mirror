@@ -82,7 +82,6 @@ public class ColorMapper extends TypeMapper<Color> {
      */
     @Override
     public Color json2Obj(JSonNode json) {
-        // TODO Auto-generated method stub
         String str = getString(json);
         if(str.length()>7){
             return new Color(Integer.parseInt(str.substring(1), 16),true);

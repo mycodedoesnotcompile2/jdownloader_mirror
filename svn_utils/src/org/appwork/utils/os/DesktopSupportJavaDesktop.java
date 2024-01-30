@@ -113,8 +113,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
      * @see org.appwork.utils.os.DesktopSupport#shutdown()
      */
     @Override
-    public boolean shutdown(boolean force) throws InterruptedException {
-        // TODO Auto-generated method stub
+    public boolean shutdown(boolean force) throws InterruptedException {        
         return false;
     }
 
@@ -124,8 +123,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
      * @see org.appwork.utils.os.DesktopSupport#standby()
      */
     @Override
-    public boolean standby() throws InterruptedException {
-        // TODO Auto-generated method stub
+    public boolean standby() throws InterruptedException {        
         return false;
     }
 
@@ -135,8 +133,7 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
      * @see org.appwork.utils.os.DesktopSupport#hibernate()
      */
     @Override
-    public boolean hibernate() throws InterruptedException {
-        // TODO Auto-generated method stub
+    public boolean hibernate() throws InterruptedException {        
         return false;
     }
 

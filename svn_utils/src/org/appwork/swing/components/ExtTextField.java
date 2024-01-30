@@ -194,7 +194,6 @@ public class ExtTextField extends JTextField implements CaretListener, FocusList
      * @return
      */
     public Color getDefaultColor() {
-        // TODO Auto-generated method stub
         return this.defaultColor;
     }
 

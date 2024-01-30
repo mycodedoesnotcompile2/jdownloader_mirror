@@ -139,7 +139,6 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
      */
     @Override
     public void focusGained(final FocusEvent e) {
-        // TODO Auto-generated method stub
     }
 
     /*

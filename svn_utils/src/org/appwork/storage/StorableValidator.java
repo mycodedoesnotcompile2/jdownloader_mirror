@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -83,14 +84,14 @@ import org.appwork.storage.validator.classvalidator.StorableAbstractValidator;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator1;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator2;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator3;
+import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.reflection.CompiledType;
-import org.appwork.utils.reflection.CompiledType.ToStringRule;
-import org.appwork.utils.reflection.CompiledType.ToStringSyntax;
+import org.appwork.utils.reflection.JsonSyntax;
 
 /**
  * @author thomas
@@ -221,7 +222,7 @@ public class StorableValidator<T> {
             if (cc.getClassCache().getAnnotations(key, StorableValidatorIgnoresMissingSetter.class).size() > 0) {
                 return;
             }
-            // add(new UnknownPropertyException(StorableValidator.this, JSPath.fromFlexiNode(value), value, null));
+            // add(new UnknownPropertyException(StorableValidator.this, fromFlexiNode(value), value, null));
         }
 
         /*
@@ -242,7 +243,7 @@ public class StorableValidator<T> {
                 } else {
                     structure = "Number/String/Enum/Boolean/null";
                 }
-                add(new ValidatorException(StorableValidator.this, ex, JSPath.fromFlexiNode(ex.node), ex.node, ex.type, "Unexpected data structure: '" + structure + "' for target type '" + ex.type.toString(new ToStringRule(ToStringSyntax.JSON)) + "" + "'", FailLevel.ERROR));
+                add(new ValidatorException(StorableValidator.this, ex, fromFlexiNode(ex.node), ex.node, ex.type, "Unexpected data structure: '" + structure + "' for target type '" + ex.type.toString(new JsonSyntax()) + "" + "'", FailLevel.ERROR));
             } else {
                 add(ex);
             }
@@ -289,7 +290,7 @@ public class StorableValidator<T> {
             // Property property = cc.getProperty(key);
             // if (json instanceof FlexiJSonObject) {
             // if (((FlexiJSonObject) json).getElement(key) == null) {
-            // toDos.add(new ValidatetoDoss(null, null, property.type, cc, key, JSPath.fromFlexiNode(json).add(key)));
+            // toDos.add(new ValidatetoDoss(null, null, property.type, cc, key, fromFlexiNode(json).add(key)));
             // }
             // }
             // }
@@ -316,7 +317,7 @@ public class StorableValidator<T> {
         if (ex instanceof ValidatorException) {
             exceptions.add((ValidatorException) ex);
         } else {
-            exceptions.add(new ValidatorException(this, ex, JSPath.fromFlexiNode(ex.node), ex.node, ex.type, null, FailLevel.ERROR));
+            exceptions.add(new ValidatorException(this, ex, fromFlexiNode(ex.node), ex.node, ex.type, null, FailLevel.ERROR));
         }
     }
 
@@ -351,13 +352,12 @@ public class StorableValidator<T> {
          */
         @Override
         public <T> T convert(Object obj, TypeRef<T> targetType) throws FlexiMapperException {
-            // TODO Auto-generated method stub
             return super.convert(obj, targetType);
         }
 
         @Override
         protected Object convertStringToNumber(FlexiJSonValue node, String value, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
             return super.convertStringToNumber(node, value, destType);
         }
 
@@ -369,25 +369,25 @@ public class StorableValidator<T> {
          */
         @Override
         protected Object convertStringToBoolean(FlexiJSonValue node, String value, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
             return super.convertStringToBoolean(node, value, destType);
         }
 
         @Override
         protected Object convertToString(FlexiJSonValue node) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(node), node, CompiledType.STRING, null, FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.STRING, null, FailLevel.ERROR));
             return super.convertToString(node);
         }
 
         @Override
         protected Object convertNullToBoolean(FlexiJSonValue node) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(node), node, CompiledType.BOOLEAN_PRIMITIVE, null, FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.BOOLEAN_PRIMITIVE, null, FailLevel.ERROR));
             return super.convertNullToBoolean(node);
         }
 
         @Override
         protected Object convertNullToNumber(FlexiJSonValue node, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
             return super.convertNullToNumber(node, destType);
         }
 
@@ -433,7 +433,7 @@ public class StorableValidator<T> {
         // adding defaults will removed missing fields
         @Override
         protected void onClassFieldMissing(Object inst, String key, FlexiJSonNode value, CompiledType cc) throws FlexiMapperException {
-            add(new UnknownPropertyException(StorableValidator.this, JSPath.fromFlexiNode(value), value, null));
+            add(new UnknownPropertyException(StorableValidator.this, fromFlexiNode(value), value, null));
         }
     }
 
@@ -441,7 +441,7 @@ public class StorableValidator<T> {
         public final Enum bestGuess;
 
         public UnknownEnumException(StorableValidator validator, FlexiJSonNode value, CompiledType targetType, Enum bestGuess) {
-            super(validator, JSPath.fromFlexiNode(value), value, targetType, (String) null, FailLevel.ERROR);
+            super(validator, fromFlexiNode(value), value, targetType, (String) null, FailLevel.ERROR);
             this.bestGuess = bestGuess;
         }
 
@@ -582,12 +582,12 @@ public class StorableValidator<T> {
                 // final ArrayList<String> allowed = new ArrayList<String>();
                 // allowed.add(FlexiUtils.getPathString(node));
                 // allowed.add(FlexiUtils.getPathString(node.getParent()) + ".//");
-                final JSPath nodePath = node == null ? null : JSPath.fromFlexiNode(node);
+                final JSPath nodePath = node == null ? null : fromFlexiNode(node);
                 final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(new NodeFilter() {
                     @Override
                     public boolean skipNode(FlexiJSonArray array, int i) {
                         FlexiJSonNode lNode = array.get(i);
-                        JSPath path = JSPath.fromFlexiNode(lNode);
+                        JSPath path = fromFlexiNode(lNode);
                         if (nodePath == null || nodePath.startsWith(path)) {
                             return false;
                         }
@@ -596,7 +596,7 @@ public class StorableValidator<T> {
 
                     @Override
                     public boolean skipNode(FlexiJSonObject object, KeyValueElement es) {
-                        JSPath path = JSPath.fromFlexiNode(es.getValue());
+                        JSPath path = fromFlexiNode(es.getValue());
                         if (nodePath == null || nodePath.startsWith(path)) {
                             return false;
                         }
@@ -605,7 +605,7 @@ public class StorableValidator<T> {
 
                     @Override
                     public boolean skipCommentNode(FlexiComment comment) {
-                        JSPath path = JSPath.fromFlexiNode(comment);
+                        JSPath path = fromFlexiNode(comment);
                         if (nodePath == null || nodePath.getParent().equals(path.getParent())) {
                             return false;
                         }
@@ -727,6 +727,38 @@ public class StorableValidator<T> {
         public ValidatorMandatoryPropertyMissingException(StorableValidator storableValidator, CompiledType type, JSPath path, StorableValidateMandatoryInJson a) {
             super(storableValidator, path, (FlexiJSonNode) null, type, StringUtils.isEmpty(a.message()) ? ("The property " + path.getLast() + " must be set!") : a.message(), a.level());
             this.annotation = a;
+        }
+    }
+
+    public static class ValidatorNonUniqueKeyException extends ValidatorException {
+        public final StorableUnique annotation;
+        public final Object         dupe;
+
+        /**
+         * @param storableValidator
+         * @param type
+         * @param path
+         * @param a
+         * @param value
+         */
+        public ValidatorNonUniqueKeyException(StorableValidator storableValidator, CompiledType type, JSPath path, FlexiJSonNode flexiJSonNode, StorableUnique a, Object value) {
+            this(storableValidator, path, flexiJSonNode, type, StringUtils.isEmpty(a.message()) ? ("There may be only a single entry with " + a.value() + "=" + FlexiUtils.serializeMinimizedWithWTF(value)) : a.message(), a, value, a.level());
+        }
+
+        /**
+         * @param storableValidator
+         * @param path
+         * @param flexiJSonNode
+         * @param type
+         * @param a
+         * @param value
+         * @param string
+         * @param level
+         */
+        public ValidatorNonUniqueKeyException(StorableValidator storableValidator, JSPath path, FlexiJSonNode flexiJSonNode, CompiledType type, String message, StorableUnique a, Object value, FailLevel level) {
+            super(storableValidator, path, flexiJSonNode, type, message, level);
+            this.annotation = a;
+            this.dupe = value;
         }
     }
 
@@ -960,7 +992,7 @@ public class StorableValidator<T> {
             }
         }
         // public ValidatetoDoss(FlexiJSonNode node, Object value, CompiledType type, ClassCache cc, String key) {
-        // this(node, value, type, cc, key, JSPath.fromFlexiNode(node));
+        // this(node, value, type, cc, key, fromFlexiNode(node));
         // }
 
         /**
@@ -991,6 +1023,7 @@ public class StorableValidator<T> {
                 add(cc.getAnnotations(null, StorableValidateRegex.class));
                 add(cc.getAnnotations(null, StorableDeprecatedSince.class));
                 add(cc.getAnnotations(null, StorableAvailableSince.class));
+                add(cc.getAnnotations(null, StorableUnique.class));
                 add(cc.getAnnotations(null, StorableValidateTimestamp.class));
                 add(cc.getAnnotations(null, StorableValidateTimestampRelative.class));
                 add(cc.getAnnotations(null, StorableValidateTimeSpan.class));
@@ -1008,6 +1041,7 @@ public class StorableValidator<T> {
                 add(cc.getAnnotations(context.key, StorableValidateCondition3.class));
                 add(cc.getAnnotations(context.key, StorableValidateRegex.class));
                 add(cc.getAnnotations(context.key, StorableDeprecatedSince.class));
+                add(cc.getAnnotations(context.key, StorableUnique.class));
                 add(cc.getAnnotations(context.key, StorableAvailableSince.class));
                 add(cc.getAnnotations(context.key, StorableValidateTimestamp.class));
                 add(cc.getAnnotations(context.key, StorableValidateTimestampRelative.class));
@@ -1116,11 +1150,23 @@ public class StorableValidator<T> {
                 Condition.PATH_HANDLERS.set(before);
             }
         } catch (ClassCastFlexiMapperException e) {
-            add(new InvalidTypeException(StorableValidator.this, JSPath.fromFlexiNode(e.node), e.node, e.type, e.getMessage(), FailLevel.ERROR));
+            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(e.node), e.node, e.type, e.getMessage(), FailLevel.ERROR));
         } catch (FlexiMapperException e) {
             add(e);
         }
         return exceptions;
+    }
+
+    /**
+     * @param node
+     * @return
+     */
+    private static JSPath fromFlexiNode(FlexiJSonNode node) {
+        try {
+            return JSPath.fromFlexiNode(node);
+        } catch (InvalidPathException e) {
+            throw new WTFException(e);
+        }
     }
 
     /**
@@ -1243,7 +1289,6 @@ public class StorableValidator<T> {
      * @param defMapper
      */
     protected void extendMapper(FlexiJSonMapper mapper) {
-        // TODO Auto-generated method stub
     }
 
     public T getResult() {
@@ -1395,6 +1440,9 @@ public class StorableValidator<T> {
                         }
                     }
                 }
+                if (c instanceof StorableUnique) {
+                    validateUnique(toDo, (StorableUnique) c);
+                }
                 if (c instanceof StorableValidateMandatoryInJson) {
                     validateMandatory(toDo, (StorableValidateMandatoryInJson) c);
                 }
@@ -1503,6 +1551,39 @@ public class StorableValidator<T> {
             return;
         }
         add(new ValidatorMandatoryPropertyMissingException(this, toDo.type, toDo.path, a));
+    }
+
+    private void validateUnique(StorableValidator<T>.ValidatetoDoss toDo, StorableUnique a) {
+        if (toDo.node == null) {
+            return;
+        }
+        HashSet<Object> dupeCheck = new HashSet<Object>();
+        if (toDo.node instanceof FlexiJSonArray) {
+            NEXT_ENTRY: for (FlexiJSonNode entry : (FlexiJSonArray) toDo.node) {
+                try {
+                    Object uniqueValue;
+                    uniqueValue = JSPath.fromPathString(a.value()).resolve(entry);
+                    try {
+                        if (dupeCheck.contains(uniqueValue)) {
+                            add(new ValidatorNonUniqueKeyException(this, toDo.type, toDo.path, toDo.node, a, uniqueValue));
+                            continue NEXT_ENTRY;
+                        }
+                        for (Object o : dupeCheck) {
+                            if (CompareUtils.equalsDeep(o, uniqueValue)) {
+                                add(new ValidatorNonUniqueKeyException(this, toDo.path, toDo.node, toDo.type, "Invalid Key", a, null, a.level()));
+                                continue NEXT_ENTRY;
+                            }
+                        }
+                    } finally {
+                        dupeCheck.add(uniqueValue);
+                    }
+                } catch (Exception e) {
+                    add(new ValidatorNonUniqueKeyException(this, toDo.path, toDo.node, toDo.type, "Invalid Key", a, null, a.level()));
+                    break;
+                }
+            }
+        }
+        // add(new ValidatorNonUniqueKeyException(this, toDo.type, toDo.path, a, ""));
     }
 
     /**

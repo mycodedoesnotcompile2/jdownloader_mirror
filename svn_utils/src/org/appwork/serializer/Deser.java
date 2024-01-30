@@ -9,8 +9,9 @@ import org.appwork.storage.commonInterface.SerializerInterface;
 import org.appwork.utils.reflection.Clazz;
 
 public class Deser {
-    private static final String        AWU_SERIALIZER_CLASS = "AWU_SERIALIZER_CLASS";
-    private static SerializerInterface SERIALIZER           = createDefaultSerializer();
+    private static final String                     AWU_SERIALIZER_CLASS = "AWU_SERIALIZER_CLASS";
+    private static SerializerInterface              SERIALIZER           = createDefaultSerializer();
+    private static ThreadLocal<SerializerInterface> THREAD_SERIALIZER    = new ThreadLocal<SerializerInterface>();
 
     public static SerializerInterface createDefaultSerializer() {
         String cls = System.getProperty(AWU_SERIALIZER_CLASS, "org.appwork.storage.SimpleSerializer");
@@ -25,11 +26,24 @@ public class Deser {
         }
     }
 
+    public static SerializerInterface setThreadDeser(SerializerInterface i) {
+        SerializerInterface ret = THREAD_SERIALIZER.get();
+        THREAD_SERIALIZER.set(i);
+        return ret;
+    }
+
     public static SerializerInterface get() {
+        SerializerInterface ret = THREAD_SERIALIZER.get();
+        if (ret != null) {
+            return ret;
+        }
         return SERIALIZER;
     }
 
     public static void set(final SerializerInterface s) {
+        if (s == null) {
+            throw new IllegalArgumentException();
+        }
         SERIALIZER = s;
     }
 
@@ -43,10 +57,11 @@ public class Deser {
 
     // can be used if we need a special Serializer - this throws an exception if the currently set serializer is different
     public static <T extends SerializerInterface> T get(final Class<T> expected) {
-        if (!Clazz.isInstanceof(get().getClass(), expected)) {
+        SerializerInterface ret = get();
+        if (!Clazz.isInstanceof(ret.getClass(), expected)) {
             throw new RuntimeException("We need a " + expected + " Serializer here!");
         }
-        return (T) get();
+        return (T) ret;
     }
 
     /**

@@ -73,8 +73,7 @@ public class ContainerDialog extends AbstractDialog<Integer> {
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getRetValue()
      */
     @Override
-    protected Integer createReturnValue() {
-        // TODO Auto-generated method stub
+    protected Integer createReturnValue() {        
         return getReturnmask();
     }
 

@@ -91,8 +91,7 @@ public class TranslationSource {
     /**
      * @return
      */
-    public String getID() {
-        // TODO Auto-generated method stub
+    public String getID() {        
         return id != null ? id : resource.getName();
     }
 

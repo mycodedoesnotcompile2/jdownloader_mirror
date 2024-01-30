@@ -48,7 +48,6 @@ import java.util.Set;
  */
 public abstract class TypeRef<T> {
     public static final TypeRef<String>                             STRING         = new SimpleTypeRef<String>(String.class);
-
     public static final TypeRef<byte[]>                             BYTE_ARRAY     = new SimpleTypeRef<byte[]>(byte[].class);
     public static final TypeRef<HashMap<String, Object>>            HASHMAP        = new TypeRef<HashMap<String, Object>>() {
                                                                                    };
@@ -59,37 +58,29 @@ public abstract class TypeRef<T> {
      */
     public static final TypeRef<Map<String, Object>>                MAP            = new TypeRef<Map<String, Object>>() {
                                                                                    };
-
     /**
      * TypeRef to List interface, do not enforce a specific List implementation
      */
     public static final TypeRef<List<Object>>                       LIST           = new TypeRef<List<Object>>() {
                                                                                    };
-
     public static final TypeRef<HashMap<String, String>>            HASHMAP_STRING = new TypeRef<HashMap<String, String>>() {
                                                                                    };
-
     public static final TypeRef<Boolean>                            BOOLEAN        = new SimpleTypeRef<Boolean>(Boolean.class) {
                                                                                    };
     public static final TypeRef<String[]>                           STRING_ARRAY   = new SimpleTypeRef<String[]>(String[].class);
-
     public static final TypeRef<Object>                             OBJECT         = new SimpleTypeRef<Object>(Object.class);
     public static final TypeRef<int[]>                              INT_ARRAY      = new SimpleTypeRef<int[]>(int[].class);
     public static final TypeRef<HashSet<String>>                    STRING_HASHSET = new TypeRef<HashSet<String>>() {
                                                                                    };
-
     public static final TypeRef<Set<String>>                        STRING_SET     = new TypeRef<Set<String>>() {
                                                                                    };
-
     public static final TypeRef<Object[]>                           OBJECT_ARRAY   = new SimpleTypeRef<Object[]>(Object[].class);
     public static final TypeRef<boolean[]>                          BOOLEAN_ARRAY  = new SimpleTypeRef<boolean[]>(boolean[].class);
     public static final TypeRef<Long>                               LONG           = new SimpleTypeRef<Long>(Long.class);
-
     public static final TypeRef<ArrayList<String>>                  STRING_LIST    = new TypeRef<ArrayList<String>>() {
                                                                                    };
-
+    public static final TypeRef<Integer>                            INT            = new SimpleTypeRef<Integer>(Integer.class);
     private final Type                                              type;
-
     private final Class<?>                                          rawClass;
 
     public TypeRef() {
@@ -99,9 +90,7 @@ public abstract class TypeRef<T> {
         } else {
             this.type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
         }
-
         rawClass = initRawClass(getType());
-
     }
 
     /**
@@ -134,7 +123,6 @@ public abstract class TypeRef<T> {
             return getType().equals(((TypeRef) obj).getType());
         }
         return false;
-
     }
 
     /*

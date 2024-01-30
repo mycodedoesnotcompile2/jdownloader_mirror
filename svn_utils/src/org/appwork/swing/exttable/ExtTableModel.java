@@ -693,16 +693,14 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     /**
      * @return a list of all ExtComponentRowHighlighters
      */
-    public java.util.List<ExtComponentRowHighlighter<E>> getExtComponentRowHighlighters() {
-        // TODO Auto-generated method stub
+    public java.util.List<ExtComponentRowHighlighter<E>> getExtComponentRowHighlighters() {        
         return this.extComponentRowHighlighters;
     }
 
     /**
      * @return
      */
-    public int getExtViewColumnCount() {
-        // TODO Auto-generated method stub
+    public int getExtViewColumnCount() {        
         return this.getTable().getColumnCount();
     }
 

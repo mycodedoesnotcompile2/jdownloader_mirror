@@ -65,8 +65,7 @@ public class ExtTransferable implements Transferable {
      * @see java.awt.datatransfer.Transferable#getTransferDataFlavors()
      */
     @Override
-    public DataFlavor[] getTransferDataFlavors() {
-        // TODO Auto-generated method stub
+    public DataFlavor[] getTransferDataFlavors() {        
         return flavorList;
     }
 
@@ -77,8 +76,7 @@ public class ExtTransferable implements Transferable {
      * datatransfer.DataFlavor)
      */
     @Override
-    public boolean isDataFlavorSupported(DataFlavor flavor) {
-        // TODO Auto-generated method stub
+    public boolean isDataFlavorSupported(DataFlavor flavor) {        
         return this.flavor.equals(flavor);
     }
 

@@ -215,8 +215,7 @@ public class ConfirmDialog extends AbstractDialog<Integer> implements ConfirmDia
     /**
      * @param textField
      */
-    protected void modifyTextPane(JTextPane textField) {
-        // TODO Auto-generated method stub
+    protected void modifyTextPane(JTextPane textField) {        
     }
 
     @Override

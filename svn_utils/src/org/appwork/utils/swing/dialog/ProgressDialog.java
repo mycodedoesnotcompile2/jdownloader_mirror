@@ -114,8 +114,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
      * @see org.appwork.utils.swing.dialog.AbstractDialog#getRetValue()
      */
     @Override
-    protected Integer createReturnValue() {
-        // TODO Auto-generated method stub
+    protected Integer createReturnValue() {        
         return this.getReturnmask();
     }
 
@@ -180,8 +179,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
     /**
      * @param textField2
      */
-    private void modifyTextPane(JTextPane textField2) {
-        // TODO Auto-generated method stub
+    private void modifyTextPane(JTextPane textField2) {        
     }
 
     /**
@@ -256,15 +254,13 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
     /**
      * @param p
      */
-    protected void extendLayout(JPanel p) {
-        // TODO Auto-generated method stub
+    protected void extendLayout(JPanel p) {        
     }
 
     /**
      * @return
      */
-    protected boolean isLabelEnabled() {
-        // TODO Auto-generated method stub
+    protected boolean isLabelEnabled() {        
         return false;
     }
 
@@ -305,8 +301,7 @@ public class ProgressDialog extends AbstractDialog<Integer> implements ProgressI
      * @see org.appwork.utils.swing.dialog.ProgressInterface#getMessage()
      */
     @Override
-    public String getMessage() {
-        // TODO Auto-generated method stub
+    public String getMessage() {        
         return this.message;
     }
 

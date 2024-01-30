@@ -54,6 +54,7 @@ import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.utils.Application;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;

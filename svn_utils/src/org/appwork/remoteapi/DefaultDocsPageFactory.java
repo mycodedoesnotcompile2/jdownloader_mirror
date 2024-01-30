@@ -274,8 +274,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
          * @see java.lang.Object#toString()
          */
         @Override
-        public String toString() {
-            // TODO Auto-generated method stub
+        public String toString() {            
             return sb.toString();
         }
 
@@ -760,8 +759,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
      * @param declaringClass
      * @return
      */
-    protected boolean isInterfaceVisible(Class<?> iClass) {
-        // TODO Auto-generated method stub
+    protected boolean isInterfaceVisible(Class<?> iClass) {        
         return true;
     }
 
@@ -778,8 +776,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
     /**
      * @param requiredTypes
      */
-    protected void collectRequiredTypes(HashSet<Type> requiredTypes) {
-        // TODO Auto-generated method stub
+    protected void collectRequiredTypes(HashSet<Type> requiredTypes) {        
     }
 
     protected void appendPossibleErrors(HashSet<Type> requiredTypes, final HTMLStringBuilder content, final Method m) {

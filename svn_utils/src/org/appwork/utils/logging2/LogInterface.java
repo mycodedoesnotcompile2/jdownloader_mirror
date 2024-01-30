@@ -38,9 +38,6 @@ package org.appwork.utils.logging2;
  *
  */
 public interface LogInterface {
-    /**
-     * @param string
-     */
     void info(String msg);
 
     /**

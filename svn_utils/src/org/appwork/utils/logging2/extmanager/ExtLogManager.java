@@ -113,8 +113,7 @@ public class ExtLogManager extends LogManager {
                     }
 
                     @Override
-                    public void flush() {
-                        // TODO Auto-generated method stub
+                    public void flush() {                        
                     }
 
                     @Override
@@ -124,9 +123,6 @@ public class ExtLogManager extends LogManager {
             }
         }
         boolean ret = super.addLogger(logger);
-        // if (ret) {
-        // System.out.println("Created System Logger " + name + " " + logger);
-        // }
         return ret;
     }
 

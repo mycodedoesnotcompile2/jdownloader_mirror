@@ -217,8 +217,7 @@ public class ExtFileSystemView extends FileSystemView {
     /**
      * @return
      */
-    public NetWorkFolder getNetworkFolder() {
-        // TODO Auto-generated method stub
+    public NetWorkFolder getNetworkFolder() {        
         return this.networkFolder;
     }
 

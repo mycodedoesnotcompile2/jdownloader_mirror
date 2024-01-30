@@ -180,9 +180,7 @@ abstract public class ExtCircleProgressColumn<E> extends ExtColumn<E> {
 
     @Override
     public void configureEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public void configureRendererComponent(final E value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
@@ -312,8 +310,7 @@ abstract public class ExtCircleProgressColumn<E> extends ExtColumn<E> {
      * @return
      */
     protected boolean isIndeterminated(final E value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-        // TODO Auto-generated method stub
-        return false;
+		return false;
     }
 
     /*
@@ -331,9 +328,7 @@ abstract public class ExtCircleProgressColumn<E> extends ExtColumn<E> {
 
     @Override
     public void resetEditor() {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public void resetRenderer() {
@@ -352,7 +347,6 @@ abstract public class ExtCircleProgressColumn<E> extends ExtColumn<E> {
      */
     @Override
     public void setValue(final Object value, final E object) {
-
-    }
+	}
 
 }

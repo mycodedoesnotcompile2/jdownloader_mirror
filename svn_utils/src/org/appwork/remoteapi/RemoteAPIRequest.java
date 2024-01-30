@@ -80,8 +80,7 @@ public class RemoteAPIRequest implements HttpRequestInterface {
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {
-        // TODO Auto-generated method stub
+    public String toString() {        
         return request + "\r\n" + "Method: " + method + "\r\nParameters:" + JSonStorage.serializeToJson(parameters);
     }
 
@@ -252,8 +251,7 @@ public class RemoteAPIRequest implements HttpRequestInterface {
      * @see org.appwork.utils.net.httpserver.requests.HttpRequestInterface#getID()
      */
     @Override
-    public long getId() {
-        // TODO Auto-generated method stub
+    public long getId() {        
         return request.getId();
     }
 }

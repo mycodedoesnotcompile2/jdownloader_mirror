@@ -112,8 +112,7 @@ public enum ExtFileChooserDialogIcon implements IconRef {
      * @see org.appwork.resources.IconRef#path()
      */
     @Override
-    public String path() {
-        // TODO Auto-generated method stub
+    public String path() {        
         return path;
     }
 }

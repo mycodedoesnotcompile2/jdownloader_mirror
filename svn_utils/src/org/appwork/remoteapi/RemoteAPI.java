@@ -105,19 +105,6 @@ public class RemoteAPI implements HttpRequestHandler {
             this.methodName = methodName;
         }
 
-        //
-        // protected void registerRootInterface() {
-        // try {
-        // this.register(this);
-        // } catch (ParseException e) {
-        // throw new WTFException(e);
-        // }
-        // }
-        //
-        // @Override
-        // public void help(RemoteAPIRequest request, RemoteAPIResponse response) {
-        // // TODO Auto-generated method stub
-        // }
         public final InterfaceHandler<?> getInterfaceHandler() {
             return this.interfaceHandler;
         }
@@ -499,8 +486,7 @@ public class RemoteAPI implements HttpRequestHandler {
      * @param request
      * @return
      */
-    protected Object prepareRawRequest(HttpRequest request) {
-        // TODO Auto-generated method stub
+    protected Object prepareRawRequest(HttpRequest request) {        
         return null;
     }
 
@@ -830,15 +816,13 @@ public class RemoteAPI implements HttpRequestHandler {
     /**
      * @param request
      */
-    protected void validateRequest(final HttpRequest request) throws BasicRemoteAPIException {
-        // TODO Auto-generated method stub
+    protected void validateRequest(final HttpRequest request) throws BasicRemoteAPIException {        
     }
 
     /**
      * @param ret
      */
-    protected void validateRequest(final RemoteAPIRequest ret) throws BasicRemoteAPIException {
-        // TODO Auto-generated method stub
+    protected void validateRequest(final RemoteAPIRequest ret) throws BasicRemoteAPIException {        
     }
 
     public void writeStringResponse(Object responseData, final Method method, final RemoteAPIRequest request, final RemoteAPIResponse response) throws BasicRemoteAPIException {

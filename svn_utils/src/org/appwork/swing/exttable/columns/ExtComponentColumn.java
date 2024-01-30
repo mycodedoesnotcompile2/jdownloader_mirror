@@ -132,8 +132,7 @@ public abstract class ExtComponentColumn<T> extends ExtColumn<T> {
      */
     @Override
     public Object getCellEditorValue() {
-        // TODO Auto-generated method stub
-        return null;
+		return null;
     }
 
     @Override
@@ -190,8 +189,7 @@ public abstract class ExtComponentColumn<T> extends ExtColumn<T> {
      */
     @Override
     public boolean isEditable(final T obj) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     /*
@@ -201,8 +199,7 @@ public abstract class ExtComponentColumn<T> extends ExtColumn<T> {
      */
     @Override
     public boolean isEnabled(final T obj) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     /*
@@ -212,8 +209,7 @@ public abstract class ExtComponentColumn<T> extends ExtColumn<T> {
      */
     @Override
     public boolean isSortable(final T obj) {
-        // TODO Auto-generated method stub
-        return false;
+		return false;
     }
 
     /**
@@ -233,8 +229,6 @@ public abstract class ExtComponentColumn<T> extends ExtColumn<T> {
      */
     @Override
     public void setValue(final Object value, final T object) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
 }

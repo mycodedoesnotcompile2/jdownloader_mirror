@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
-import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -59,21 +58,13 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
     /**
      *
      */
-    private static final long serialVersionUID = -2212735987320956801L;
-    protected static Color    FOREGROUND_COLOR = Color.GRAY;
-
-    /**
-     * @param black
-     */
-    public static void setForgroundColor(final Color black) {
-        FOREGROUND_COLOR = black;
-    }
-
-    protected MigPanel panel;
-    private int        w = 0;
-    private int        h = 0;
-    private long       lastResize;
-    private long       lastResizeH;
+    public static final String APPWORK_TOOLTIP_FOREGROUND = "Appwork.Tooltip.Foreground";
+    private static final long  serialVersionUID           = -2212735987320956801L;
+    protected MigPanel         panel;
+    private int                w                          = 0;
+    private int                h                          = 0;
+    private long               lastResize;
+    private long               lastResizeH;
 
     /**
      * @param title

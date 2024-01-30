@@ -1,0 +1,25 @@
+{
+  "artefact":"com.github.weisj/jsvg",
+  "filter":null,
+  "installed":{
+    "date":"2023-11-30T16:01:52 CET",
+    "dependencies":[],
+    "description":"A lightweight Java2D SVG renderer",
+    "hashes":{"jsvg.jar":"a215cf2a11dca182da9bc578ca6ab7c3e1728282df3a56f39ec8302f2c7895ef"},
+    "licenses":[{
+      "name":"MIT",
+      "url":"https://github.com/jsvg/jsvg/blob/master/LICENSE",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_8",
+    "name":"Jsvg",
+    "version":"1.3.0"
+  },
+  "minJRE":"1.8",
+  "provider":"maven",
+  "renames":null,
+  "requiredBy":[],
+  "version":null,
+  "autoRenameEnabled":true,
+  "confirm":true
+}

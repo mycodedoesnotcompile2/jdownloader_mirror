@@ -194,8 +194,7 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     /**
      * @return
      */
-    public String getSpeedString() {
-        // TODO Auto-generated method stub
+    public String getSpeedString() {        
         if (this.all <= 0) {
             return null;
         }
@@ -241,8 +240,7 @@ abstract public class Graph extends JPanel implements ToolTipHandler {
     }
 
     @Override
-    public boolean isTooltipWithoutFocusEnabled() {
-        // TODO Auto-generated method stub
+    public boolean isTooltipWithoutFocusEnabled() {        
         return true;
     }
 

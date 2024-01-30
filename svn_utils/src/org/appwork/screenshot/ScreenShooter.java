@@ -216,8 +216,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
         this.frame = new JFrame();
         this.frame.addKeyListener(new KeyListener() {
             @Override
-            public void keyPressed(final KeyEvent e) {
-                // TODO Auto-generated method stub
+            public void keyPressed(final KeyEvent e) {                
             }
 
             @Override
@@ -228,8 +227,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
             }
 
             @Override
-            public void keyTyped(final KeyEvent e) {
-                // TODO Auto-generated method stub
+            public void keyTyped(final KeyEvent e) {                
             }
         });
         this.frame.setUndecorated(false);
@@ -447,8 +445,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      * @see java.awt.event.MouseListener#mouseEntered(java.awt.event.MouseEvent)
      */
     @Override
-    public void mouseEntered(final MouseEvent e) {
-        // TODO Auto-generated method stub
+    public void mouseEntered(final MouseEvent e) {        
     }
 
     /*
@@ -457,8 +454,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      * @see java.awt.event.MouseListener#mouseExited(java.awt.event.MouseEvent)
      */
     @Override
-    public void mouseExited(final MouseEvent e) {
-        // TODO Auto-generated method stub
+    public void mouseExited(final MouseEvent e) {        
     }
 
     /*

@@ -33,9 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
+import java.awt.Color;
+
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JLabel;
+import javax.swing.UIManager;
 
 import org.appwork.utils.swing.SwingUtils;
 
@@ -55,11 +58,15 @@ public class BasicTooltipFactory implements TooltipFactory {
     public ExtTooltip createTooltip() {
         TooltipPanel p = new TooltipPanel("ins 3", "[][grow,fill]", "[][grow,fill]");
         JLabel headerLbl = SwingUtils.toBold(new JLabel(getHeader()));
-        headerLbl.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ExtTooltip.FOREGROUND_COLOR));
-        headerLbl.setForeground(ExtTooltip.FOREGROUND_COLOR);
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
+        headerLbl.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, color));
+        headerLbl.setForeground(color);
         JLabel iconLbl = new JLabel(getIcon());
         JLabel txt = new JLabel();
-        txt.setForeground(ExtTooltip.FOREGROUND_COLOR);
+        txt.setForeground(color);
         txt.setText("<html>" + getText().replaceAll("[\r\n]+", "<br>") + "</html>");
         p.add(headerLbl, "hidemode 2,spanx,pushx,growx");
         p.add(iconLbl, "hidemode 2");

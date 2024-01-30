@@ -50,9 +50,10 @@ import org.appwork.txtresource.LocaleMap;
 import org.appwork.utils.KeyValueEntry;
 import org.appwork.utils.KeyValueStringEntry;
 import org.appwork.utils.reflection.CompiledType;
+import org.appwork.utils.reflection.CompiledType.AbstractNameScheme;
 import org.appwork.utils.reflection.CompiledType.PrimitiveWrapperStrategy;
-import org.appwork.utils.reflection.CompiledType.ToStringRule;
-import org.appwork.utils.reflection.CompiledType.ToStringSyntax;
+import org.appwork.utils.reflection.JavaSyntax;
+import org.appwork.utils.reflection.JsonSyntax;
 
 /**
  * @author thomas
@@ -75,10 +76,10 @@ public class CompiledTypeTests<T extends Object> extends AWTest {
     public void runTest() throws Exception {
         ClassCache cc = ClassCache.getClassCache(A.class);
         assertTrue(cc.getAllGetter().size() == 1);
-        final ToStringRule javaRule = new ToStringRule(ToStringSyntax.JAVA);
-        final ToStringRule jsonRule = new ToStringRule(ToStringSyntax.JSON);
+        final AbstractNameScheme javaRule = new JavaSyntax();
+        final AbstractNameScheme jsonRule = new JsonSyntax();
         assertEquals("Array<Condition<Object>>", CompiledType.create(new TypeRef<ArrayList<Condition<Object>>>() {
-        }.getType()).toString(new ToStringRule(ToStringSyntax.JSON)));
+        }.getType()).toString(new JsonSyntax()));
         // Condition
         CompiledType ct = CompiledType.create(Condition.class);
         assertEquals("Condition<Object>", ct.toString(javaRule));
@@ -90,21 +91,21 @@ public class CompiledTypeTests<T extends Object> extends AWTest {
         ct = CompiledType.create(new CompiledTypeTests() {
         }.getClass());
         assertEquals("", ct.toString(null));
-        assertEquals("CompiledTypeTests<Object>", ct.toString(new ToStringRule().skipAnonymousClasses(true)));
+        assertEquals("CompiledTypeTests<Object>", ct.toString(new JavaSyntax().skipAnonymousClasses(true)));
         // int[]
         ct = CompiledType.create(int[].class);
         assertEquals("Array<int>", ct.toString(jsonRule));
         assertEquals("int[]", ct.toString(javaRule));
-        assertEquals("Array<Integer>", ct.toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.WRAPPER_NAMES_FOR_BOTH)));
-        assertEquals("Array<int>", ct.toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
+        assertEquals("Array<Integer>", ct.toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.WRAPPER_NAMES_FOR_BOTH)));
+        assertEquals("Array<int>", ct.toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
         // Integer[]
         ct = CompiledType.create(Integer[].class);
         assertEquals("Array<Integer>", ct.toString(jsonRule));
         assertEquals("Integer[]", ct.toString(javaRule));
-        assertEquals("Array<int>", ct.toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.PRIMITIVE_NAMES_FOR_BOTH)));
-        assertEquals("Array<Integer>", ct.toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.WRAPPER_NAMES_FOR_BOTH)));
-        assertEquals("Array<Integer>", ct.toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
-        assertEquals("Array<KeyValueStringEntry>", CompiledType.create(KeyValueStringEntry[].class).toString(new ToStringRule().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
+        assertEquals("Array<int>", ct.toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.PRIMITIVE_NAMES_FOR_BOTH)));
+        assertEquals("Array<Integer>", ct.toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.WRAPPER_NAMES_FOR_BOTH)));
+        assertEquals("Array<Integer>", ct.toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
+        assertEquals("Array<KeyValueStringEntry>", CompiledType.create(KeyValueStringEntry[].class).toString(new JsonSyntax().primitiveWrapperStrategy(PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH)));
         ct = CompiledType.create(new TypeRef<KeyValueEntry<String, String>[]>() {
         }.getType());
         assertEquals("Array<KeyValueEntry<String,String>>", ct.toString(null));

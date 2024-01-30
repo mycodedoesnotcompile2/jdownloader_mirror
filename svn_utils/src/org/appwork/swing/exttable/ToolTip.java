@@ -33,7 +33,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable;
 
+import java.awt.Color;
+
 import javax.swing.JLabel;
+import javax.swing.UIManager;
 
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.components.tooltips.TooltipPanel;
@@ -64,7 +67,11 @@ public class ToolTip extends ExtTooltip {
         final TooltipPanel p = new TooltipPanel("ins 2,wrap 1", "[]", "[]");
         tf = new JLabel();
         // this.tf.setEnabled(false);
-        tf.setForeground(FOREGROUND_COLOR);
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
+        tf.setForeground(color);
         tf.setBackground(null);
         SwingUtils.setOpaque(tf, false);
         p.add(tf);
@@ -80,7 +87,11 @@ public class ToolTip extends ExtTooltip {
                 txt = "<html>" + txt.replaceAll("[\r\n]{1,2}", "<br>").replace(" ", "&nbsp;") + "</html>";
             }
         }
-        tf.setForeground(FOREGROUND_COLOR);
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
+        tf.setForeground(color);
         tf.setText(txt);
         panel.invalidate();
     }

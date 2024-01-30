@@ -69,8 +69,7 @@ public class FlexiUtilsWalkTest extends AWTest {
              * @see org.appwork.storage.flexijson.mapper.FlexiJSonMapper#isAnnotationCommentsEnabled()
              */
             @Override
-            protected boolean isAnnotationCommentsEnabled() {
-                // TODO Auto-generated method stub
+            protected boolean isAnnotationCommentsEnabled() {                
                 return true;
             }
         };

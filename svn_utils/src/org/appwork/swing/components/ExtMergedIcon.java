@@ -170,13 +170,6 @@ public class ExtMergedIcon implements Icon, IDIcon {
         }
     }
 
-    // /**
-    // * @return
-    // */
-    // public Icon crop() {
-    // // TODO Auto-generated method stub
-    // return null;
-    // }
 
     public ExtMergedIcon crop(final int width, final int height) {
         this.cropedWidth = width;

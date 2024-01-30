@@ -149,8 +149,7 @@ public class TESTAPIImpl implements TESTAPI, TestApiInterface, bla, JSONP {
      * java.lang.String, int, boolean)
      */
     @Override
-    public String merge(final String a, final String b, final int a2, final boolean b2) {
-        // TODO Auto-generated method stub
+    public String merge(final String a, final String b, final int a2, final boolean b2) {        
         return a + b + a2 + b2;
     }
 
@@ -167,8 +166,7 @@ public class TESTAPIImpl implements TESTAPI, TestApiInterface, bla, JSONP {
      * @see org.appwork.remoteapi.test.TestApiInterface#sum(int, int)
      */
     @Override
-    public int sum(final long a, final Byte b) {
-        // TODO Auto-generated method stub
+    public int sum(final long a, final Byte b) {        
         return (int) (a + b);
     }
 

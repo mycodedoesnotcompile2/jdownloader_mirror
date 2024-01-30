@@ -33,12 +33,15 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
+import java.awt.Color;
 import java.awt.Graphics;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JTextArea;
+import javax.swing.UIManager;
 import javax.swing.event.AncestorEvent;
 
 import org.appwork.utils.swing.SwingUtils;
@@ -88,7 +91,11 @@ public class BasicExtTooltip extends ExtTooltip implements PropertyChangeListene
         final TooltipPanel p = new TooltipPanel("ins 2,wrap 1", "[]", "[]");
         this.tf = new JTextArea();
         // this.tf.setEnabled(false);
-        this.tf.setForeground(FOREGROUND_COLOR);
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
+        this.tf.setForeground(color);
         this.tf.setBackground(null);
         this.tf.setEditable(false);
         SwingUtils.setOpaque(this.tf, false);

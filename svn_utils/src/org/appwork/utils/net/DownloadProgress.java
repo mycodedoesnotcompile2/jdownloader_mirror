@@ -81,7 +81,6 @@ public class DownloadProgress {
      * @param b
      * @param len
      */
-    public void onBytesLoaded(byte[] b, int len) {
-        // TODO Auto-generated method stub
+    public void onBytesLoaded(byte[] b, int len) {        
     }
 }

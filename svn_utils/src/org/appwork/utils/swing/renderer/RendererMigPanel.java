@@ -116,8 +116,7 @@ public class RendererMigPanel extends MigPanel {
     }
 
     @Override
-    public void paint(final Graphics g) {
-        // TODO Auto-generated method stub
+    public void paint(final Graphics g) {        
         super.paint(g);
     }
 

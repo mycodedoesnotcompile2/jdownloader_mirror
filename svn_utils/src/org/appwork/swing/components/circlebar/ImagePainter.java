@@ -169,7 +169,6 @@ public class ImagePainter implements IconPainter {
      */
     @Override
     public Dimension getPreferredSize() {
-        // TODO Auto-generated method stub
         return preferredSize;
     }
 

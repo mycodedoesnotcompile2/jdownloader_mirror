@@ -182,17 +182,12 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
         }
         this.flavor = new ExtDataFlavor<E>(this.getClass());
         this.eventSender = new ExtTableEventSender();
-        ToolTipController.getInstance().register(this);
-        ToolTipManager.sharedInstance().unregisterComponent(this);
+        initTooltipHandler();
         this.rowHighlighters = new ArrayList<ExtOverlayRowHighlighter>();
         this.model = model;
         // workaround
         this.setColumnModel(new ExtColumnModel(this.getColumnModel()));
         model.setTable(this);
-        // final int suggestedRowHeight =
-        // UIManager.getInt(ExtTable.SUGGESTEDROWHEIGHTPROPERTY);
-        // if (suggestedRowHeight > 0) {
-        // this.setRowHeight(suggestedRowHeight);
         this.setRowHeight(22);
         this.renameClickDelayer = new DelayedRunnable(ExtTable.EXECUTER, this.setupRenameClickInterval()) {
             @Override
@@ -222,23 +217,6 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                 ret.height = 19;
                 return ret;
             }
-            // @Override
-            // public void setPreferredSize(final Dimension preferredSize) {
-            // int suggestedRowHeight =
-            // UIManager.getInt(ExtTable.SUGGESTEDROWHEIGHTPROPERTY);
-            // if (suggestedRowHeight > 0 && suggestedRowHeight >
-            // preferredSize.getHeight()) {
-            // if (suggestedRowHeight > 0) {
-            // suggestedRowHeight += 8;
-            // }
-            // org.appwork.loggingv3.LogV3.info("Using SuggestedRowHeight of " +
-            // suggestedRowHeight +
-            // " instead of setPreferredSize of " + ExtTable.this.rowHeight);
-            // preferredSize.height = suggestedRowHeight;
-            // }
-            // this.getPreferredSize()
-            // super.setPreferredSize(preferredSize);
-            // }
         });
         this.createColumns();
         getModel().autoColumnWidth();
@@ -365,6 +343,11 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
             public void columnSelectionChanged(final ListSelectionEvent e) {
             }
         });
+    }
+
+    protected void initTooltipHandler() {
+        ToolTipController.getInstance().register(this);
+        ToolTipManager.sharedInstance().unregisterComponent(this);
     }
 
     private boolean                       dontDoRightNow = false;
@@ -1173,7 +1156,8 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     }
 
     /**
-     * @param g TODO
+     * @param g
+     *            TODO
      *
      */
     protected boolean handleCellHeightProviders(Graphics g) {
@@ -1207,7 +1191,6 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                     anyThingNonDefault = true;
                 }
                 this.setRowHeight(i, height);
-                System.out.println(i + " - " + height);
             }
             if (!anyThingNonDefault) {
                 // Set Default height for all

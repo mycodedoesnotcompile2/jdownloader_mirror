@@ -60,8 +60,7 @@ public class Template {
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {
-        // TODO Auto-generated method stub
+    public String toString() {        
         return build();
     }
 

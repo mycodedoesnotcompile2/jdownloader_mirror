@@ -43,15 +43,13 @@ public abstract class ResponseAdapter implements ResponseListener {
      * @see org.appwork.utils.singleapp.ResponseListener#onConnected(java.lang.String[])
      */
     @Override
-    public void onConnected(String[] message) {
-        // TODO Auto-generated method stub
+    public void onConnected(String[] message) {        
     }
 
     /* (non-Javadoc)
      * @see org.appwork.utils.singleapp.ResponseListener#onReceivedResponse(org.appwork.utils.singleapp.Response)
      */
     @Override
-    public void onReceivedResponse(Response r) {
-        // TODO Auto-generated method stub
+    public void onReceivedResponse(Response r) {        
     }
 }

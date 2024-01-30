@@ -46,8 +46,8 @@ import java.util.zip.ZipInputStream;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.ClassPathScanner;
 import org.appwork.testframework.PostBuildTestInterface;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.Files;
 import org.appwork.utils.ZipContentHasher;
 import org.appwork.utils.ZipContentHasher.Customizer;
@@ -80,7 +80,7 @@ public class AssertNoTestsInJars implements PostBuildTestInterface {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
@@ -97,6 +97,9 @@ public class AssertNoTestsInJars implements PostBuildTestInterface {
                             return false;
                         }
                         if (entry.getName().matches("org/bouncycastle/util/test/.*")) {
+                            return false;
+                        }
+                        if (entry.getName().matches("net/sf/image4j/test/.*")) {
                             return false;
                         }
                         if (entry.getName().matches("(?i).*/tests?/.*")) {

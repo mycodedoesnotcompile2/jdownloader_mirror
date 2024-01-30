@@ -55,7 +55,6 @@ public class InternDialog<T> extends ExtJDialog {
      *
      */
     private static final long       serialVersionUID               = 1L;
-
     protected static boolean        REQUESTUSERATTENTION_SUPPORTED = true;
 
     public void setVisible(boolean b) {
@@ -144,5 +143,4 @@ public class InternDialog<T> extends ExtJDialog {
     protected void realDispose() {
         super.dispose();
     }
-
 }

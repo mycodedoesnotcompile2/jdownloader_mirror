@@ -96,9 +96,7 @@ public abstract class ExtIconColumn<E> extends ExtColumn<E> {
 
     @Override
     public void configureEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public void configureRendererComponent(final E value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
@@ -176,9 +174,7 @@ public abstract class ExtIconColumn<E> extends ExtColumn<E> {
 
     @Override
     public void resetEditor() {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public void resetRenderer() {

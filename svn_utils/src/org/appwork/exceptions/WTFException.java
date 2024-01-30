@@ -50,7 +50,6 @@ public class WTFException extends RuntimeException {
      */
     public WTFException() {
         super();
-        // TODO Auto-generated constructor stub
     }
 
     /**
@@ -58,7 +57,6 @@ public class WTFException extends RuntimeException {
      */
     public WTFException(final String message) {
         super(message);
-        // TODO Auto-generated constructor stub
     }
 
     /**
@@ -67,7 +65,6 @@ public class WTFException extends RuntimeException {
      */
     public WTFException(final String message, final Throwable cause) {
         super(message, cause);
-        // TODO Auto-generated constructor stub
     }
 
     /**
@@ -75,7 +72,6 @@ public class WTFException extends RuntimeException {
      */
     public WTFException(final Throwable cause) {
         super(cause);
-        // TODO Auto-generated constructor stub
     }
 
     /**

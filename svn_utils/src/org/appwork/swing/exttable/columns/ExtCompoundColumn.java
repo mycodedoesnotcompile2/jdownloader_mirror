@@ -172,8 +172,7 @@ public abstract class ExtCompoundColumn<T> extends ExtColumn<T> implements CellE
 
     @Override
     protected String getTooltipText(final T obj) {
-        // TODO Auto-generated method stub
-        return super.getTooltipText(obj);
+		return super.getTooltipText(obj);
     }
 
     @Override
@@ -230,10 +229,7 @@ public abstract class ExtCompoundColumn<T> extends ExtColumn<T> implements CellE
      */
     abstract public ExtColumn<T> selectColumn(T object);
 
-    // @Override
-    // public void setModel(final ExtTableModel<T> model) {
-    // super.setModel(model);
-    // }
+
     @Override
     public void setValue(final Object value, final T object) {
         this.editor.setValue(value, object);

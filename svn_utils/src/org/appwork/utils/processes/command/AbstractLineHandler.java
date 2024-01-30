@@ -91,8 +91,7 @@ public abstract class AbstractLineHandler implements LineHandler, OutputHandler 
                  * @see org.appwork.utils.net.LineParsingOutputStream#split(java.lang.StringBuilder)
                  */
                 @Override
-                protected int split(StringBuilder sb) {
-                    // TODO Auto-generated method stub
+                protected int split(StringBuilder sb) {                    
                     return AbstractLineHandler.this.splitLine(sb);
                 }
             };
@@ -128,8 +127,7 @@ public abstract class AbstractLineHandler implements LineHandler, OutputHandler 
      * @param sb
      * @return
      */
-    protected int splitLine(StringBuilder sb) {
-        // TODO Auto-generated method stub
+    protected int splitLine(StringBuilder sb) {        
         return 0;
     }
 

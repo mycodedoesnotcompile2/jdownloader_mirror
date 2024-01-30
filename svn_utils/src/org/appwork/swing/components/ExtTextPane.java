@@ -141,8 +141,6 @@ public class ExtTextPane extends JTextPane implements DocumentListener, FocusLis
      * 
      */
     public void onChanged() {
-        // TODO Auto-generated method stub
-
     }
 
     public void paintBadge(final Graphics g) {

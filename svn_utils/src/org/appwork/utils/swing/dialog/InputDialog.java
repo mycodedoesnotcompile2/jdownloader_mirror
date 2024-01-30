@@ -209,8 +209,7 @@ public class InputDialog extends AbstractDialog<String> implements KeyListener, 
     /**
      * @return
      */
-    protected JTextPane getLargeInputComponent() {
-        // TODO Auto-generated method stub
+    protected JTextPane getLargeInputComponent() {        
         return new JTextPane();
     }
 

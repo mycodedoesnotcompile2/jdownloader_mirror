@@ -132,7 +132,6 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
 
     @Override
     public boolean isTooltipWithoutFocusEnabled() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -187,19 +186,16 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
 
     @Override
     public Dimension getSize() {
-        // TODO Auto-generated method stub
         return super.getSize();
     }
 
     @Override
     public void setSize(final int width, final int height) {
-        // TODO Auto-generated method stub
         super.setSize(width, height);
     }
 
     @Override
     public void setSize(final Dimension d) {
-        // TODO Auto-generated method stub
         super.setSize(d);
     }
 
@@ -270,7 +266,6 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
      */
     @Override
     public boolean isTooltipDisabledUntilNextRefocus() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -320,16 +315,12 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
      * @param string
      */
     public void setString(final String string) {
-        // TODO Auto-generated method stub
-
     }
 
     /**
      * @param b
      */
     public void setStringPainted(final boolean b) {
-        // TODO Auto-generated method stub
-
     }
 
     public void setTooltipFactory(final TooltipFactory tooltipFactory) {
@@ -393,8 +384,6 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
      */
     @Override
     public void updateUI() {
-        // final CircleProgressBarUI newUI = (CircleProgressBarUI)
-        // UIManager.getUI(this);
         this.setUI(new BasicCircleProgressBarUI());
     }
 
@@ -421,7 +410,6 @@ public class CircledProgressBar extends JComponent implements ToolTipHandler, Ic
             }
 
         }
-
         return ret;
     }
 

@@ -67,6 +67,8 @@ import org.appwork.loggingv3.simple.sink.LogToFileSink;
 import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter;
 import org.appwork.loggingv3.simple.sink.Sink;
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
 import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.IO;
@@ -91,23 +93,23 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         private final CopyOnWriteArrayList<LogRecord2> buffer = new CopyOnWriteArrayList<LogRecord2>();
 
         public List<LogRecord2> getBuffer() {
-            return buffer;
+            return this.buffer;
         }
 
         @Override
-        public void publish(LogRecord2 record) {
+        public void publish(final LogRecord2 record) {
             if (record != null) {
-                buffer.add(record);
+                this.buffer.add(record);
             }
         }
 
         public void clear() {
-            buffer.clear();
+            this.buffer.clear();
         }
     }
 
     public static abstract class AssertAnException<ExceptionType extends Exception> {
-        private CompiledType expectedExceptionType;
+        private final CompiledType expectedExceptionType;
 
         /**
          *
@@ -120,10 +122,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
         public void start() throws Exception {
             try {
-                run();
-                throw new Exception("Expected an Exception : " + expectedExceptionType);
-            } catch (Exception e) {
-                if (expectedExceptionType.isInstanceOf(e.getClass())) {
+                this.run();
+                throw new Exception("Expected an Exception : " + this.expectedExceptionType);
+            } catch (final Exception e) {
+                if (this.expectedExceptionType.isInstanceOf(e.getClass())) {
                     // fine;
                 } else {
                     throw e;
@@ -141,22 +143,22 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
-    public void runPostBuildTest(String[] args, File workingDirectory) throws Exception {
-        runTest();
+    public void runPostBuildTest(final String[] args, final File workingDirectory) throws Exception {
+        this.runTest();
     }
 
     public static class AssertThat {
-        private Object object;
+        private final Object object;
 
         /**
          * @param o
          */
-        public AssertThat(Object o) {
-            object = o;
+        public AssertThat(final Object o) {
+            this.object = o;
         }
 
         /**
@@ -164,21 +166,21 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          * @return
          * @throws Exception
          */
-        public void is(Object d) throws Exception {
-            assertEquals(object, d);
+        public void is(final Object d) throws Exception {
+            assertEquals(this.object, d);
         }
 
         /**
          * @param i
          * @throws Exception
          */
-        public void isNumber(Number n) throws Exception {
-            if (object instanceof Number) {
-                if (!CompareUtils.equalsNumber((Number) object, n)) {
-                    throw new Exception("a does not equal b. " + object + "!=" + n);
+        public void isNumber(final Number n) throws Exception {
+            if (this.object instanceof Number) {
+                if (!CompareUtils.equalsNumber((Number) this.object, n)) {
+                    throw new Exception("a does not equal b. " + this.object + "!=" + n);
                 }
             } else {
-                throw new Exception("a is not a number " + object);
+                throw new Exception("a is not a number " + this.object);
             }
         }
 
@@ -186,15 +188,16 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          * @param strings
          * @throws Exception
          */
-        public void equalsDeep(Object other) throws Exception {
-            assertEqualsDeep(object, other);
+        public void equalsDeep(final Object other) throws Exception {
+            assertEqualsDeep(this.object, other);
         }
 
         /**
          * @param strings
          * @throws Exception
          */
-        public boolean equals(Object other) {
+        @Override
+        public boolean equals(final Object other) {
             throw new WTFException("Wrong Equals Method!");
         }
 
@@ -202,10 +205,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          * @param strings
          * @throws Exception
          */
-        public void equals(String other) {
+        public void equals(final String other) {
             try {
-                is(other);
-            } catch (Exception e) {
+                assertEquals(this.object, other);
+            } catch (final Exception e) {
                 throw new WTFException(e);
             }
         }
@@ -214,31 +217,31 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          * @param parse
          * @throws Exception
          */
-        public void isHigherThan(Comparable other) throws Exception {
-            if (object instanceof Number) {
-                assertTrue(CompareUtils.compareNumber((Number) object, (Number) other) > 0);
-            } else if (object instanceof Comparable) {
-                assertTrue(((Comparable) object).compareTo(other) > 0);
+        public void isHigherThan(final Comparable other) throws Exception {
+            if (this.object instanceof Number) {
+                assertTrue(CompareUtils.compareNumber((Number) this.object, (Number) other) > 0);
+            } else if (this.object instanceof Comparable) {
+                assertTrue(((Comparable) this.object).compareTo(other) > 0);
             } else {
                 throw new Exception("object is not a comparable");
             }
         }
 
-        public void isLowerThan(Comparable other) throws Exception {
-            if (object instanceof Number) {
-                assertTrue(CompareUtils.compareNumber((Number) object, (Number) other) < 0);
-            } else if (object instanceof Comparable) {
-                assertTrue(((Comparable) object).compareTo(other) < 0);
+        public void isLowerThan(final Comparable other) throws Exception {
+            if (this.object instanceof Number) {
+                assertTrue(CompareUtils.compareNumber((Number) this.object, (Number) other) < 0);
+            } else if (this.object instanceof Comparable) {
+                assertTrue(((Comparable) this.object).compareTo(other) < 0);
             } else {
                 throw new Exception("object is not a comparable");
             }
         }
 
-        public void isSameAs(Comparable other) throws Exception {
-            if (object instanceof Number) {
-                assertTrue(CompareUtils.compareNumber((Number) object, (Number) other) == 0);
-            } else if (object instanceof Comparable) {
-                assertTrue(((Comparable) object).compareTo(other) == 0);
+        public void isSameAs(final Comparable other) throws Exception {
+            if (this.object instanceof Number) {
+                assertTrue(CompareUtils.compareNumber((Number) this.object, (Number) other) == 0);
+            } else if (this.object instanceof Comparable) {
+                assertTrue(((Comparable) this.object).compareTo(other) == 0);
             } else {
                 throw new Exception("object is not a comparable");
             }
@@ -247,30 +250,37 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         /**
          * @param string
          */
-        public void equalsObject(Object other) {
+        public void equalsObject(final Object other) {
             try {
-                assertEquals(object, other);
-            } catch (Exception e) {
+                assertEquals(this.object, other);
+            } catch (final Exception e) {
                 throw new WTFException(e);
             }
         }
     }
 
-    public static AssertThat assertThat(Object o) {
+    public static AssertThat assertThat(final Object o) {
         return new AssertThat(o);
     }
 
-    public static void assertEqualsDeep(Object a, Object b) throws Exception {
+    public static void assertEqualsDeep(final Object a, final Object b) throws Exception {
         if (!CompareUtils.equalsDeep(a, b)) {
-            throw new Exception("a does not equal b. " + a + "!=" + b);
+            throw new Exception("a does not equal b. " + Deser.toString(a, SC.LOG_SINGLELINE) + "!=" + Deser.toString(b, SC.LOG_SINGLELINE));
         }
     }
 
-    public static void assertNull(Object b) throws Exception {
+    public static void assertNull(final Object b) throws Exception {
         assertEquals(null, b);
     }
 
-    public static void assertEquals(Object a, Object b) throws Exception {
+    public static void assertEquals(final Object a, final Object b) throws Exception {
+        if (a instanceof Number && b instanceof Number) {
+            if (!CompareUtils.equalsNumber((Number) a, (Number) b)) {
+                throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b);
+            } else {
+                return;
+            }
+        }
         if (!Objects.equals(a, b)) {
             throw new Exception("a does not equal b. \r\n" + a + " != \r\n" + b);
         } else {
@@ -282,13 +292,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertEqualsNot(Object a, Object b) throws Exception {
+    public static void assertEqualsNot(final Object a, final Object b) throws Exception {
         if (Objects.equals(a, b)) {
             throw new Exception("a equals b. " + a + "==" + b);
         }
     }
 
-    public void assertEqualsDeepNot(Object a, Object b) throws Exception {
+    public void assertEqualsDeepNot(final Object a, final Object b) throws Exception {
         if (CompareUtils.equalsDeep(a, b)) {
             throw new Exception("Test Failed. 'a' and 'b'  equal");
         }
@@ -303,7 +313,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             if (path.length() > 0) {
                 path += "!";
             }
-            HashSet<String> dupes = new HashSet<String>();
+            final HashSet<String> dupes = new HashSet<String>();
             while (true) {
                 try {
                     final ZipEntry e = zipStream.getNextEntry();
@@ -351,15 +361,15 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     /**
      *
      */
-    public static void initLogger(SimpleFormatter formater) {
+    public static void initLogger(final SimpleFormatter formater) {
         LogV3.setFactory(new SimpleLoggerFactory() {
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#removeSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
-            public synchronized boolean removeSink(Sink sink) {
+            public synchronized boolean removeSink(final Sink sink) {
                 if (!SINK_ACCESS_GRANTED) {
                     return false;
                 }
@@ -368,11 +378,11 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToConsole(org.appwork.loggingv3.simple.sink.LogToStdOutSink)
              */
             @Override
-            public void setSinkToConsole(LogToStdOutSink sinkToConsole) {
+            public void setSinkToConsole(final LogToStdOutSink sinkToConsole) {
                 if (!SINK_ACCESS_GRANTED) {
                     return;
                 }
@@ -381,11 +391,11 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToFile(org.appwork.loggingv3.simple.sink.LogToFileSink)
              */
             @Override
-            public void setSinkToFile(LogToFileSink sinkToFile) {
+            public void setSinkToFile(final LogToFileSink sinkToFile) {
                 if (!SINK_ACCESS_GRANTED) {
                     return;
                 }
@@ -394,11 +404,11 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#addSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
-            public boolean addSink(Sink sink) {
+            public boolean addSink(final Sink sink) {
                 if (!SINK_ACCESS_GRANTED) {
                     return false;
                 }
@@ -406,19 +416,19 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             }
 
             @Override
-            protected LoggerToSink createLogger(Object name) {
+            protected LoggerToSink createLogger(final Object name) {
                 return new LoggerToSink(this) {
                     /*
                      * (non-Javadoc)
-                     * 
+                     *
                      * @see org.appwork.loggingv3.AbstractLogger#getThrownAt()
                      */
                     @Override
                     public StackTraceElement getThrownAt() {
                         StackTraceElement last = null;
-                        Exception localEx = new Exception();
+                        final Exception localEx = new Exception();
                         StackTraceElement found = null;
-                        for (StackTraceElement es : localEx.getStackTrace()) {
+                        for (final StackTraceElement es : localEx.getStackTrace()) {
                             last = es;
                             if ("java.io.PrintStream".equals(es.getClassName())) {
                                 if ("println".equals(es.getMethodName())) {
@@ -434,7 +444,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                                     continue;
                                 }
                             }
-                            if (filterThrownAtEntries(es)) {
+                            if (this.filterThrownAtEntries(es)) {
                                 continue;
                             }
                             if (found == null) {
@@ -448,7 +458,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                     }
 
                     @Override
-                    protected boolean filterThrownAtEntries(StackTraceElement es) {
+                    protected boolean filterThrownAtEntries(final StackTraceElement es) {
                         if (super.filterThrownAtEntries(es)) {
                             return true;
                         } else if (es.getClassName().equals(AWTest.class.getName())) {
@@ -473,7 +483,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     /**
      * @param cONSOLE_LOGGER2
      */
-    private static void setSinkToConsole(LogToStdOutSink sink) {
+    private static void setSinkToConsole(final LogToStdOutSink sink) {
         try {
             SINK_ACCESS_GRANTED = true;
             LOGGER.setSinkToConsole(sink);
@@ -485,7 +495,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     /**
      * @param sinkToFile
      */
-    private synchronized static void removeSink(Sink sink) {
+    private synchronized static void removeSink(final Sink sink) {
         try {
             SINK_ACCESS_GRANTED = true;
             LOGGER.removeSink(sink);
@@ -515,7 +525,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @param c
      * @return
      */
-    public synchronized static boolean setLoggerSilent(boolean silent, boolean cache) {
+    public synchronized static boolean setLoggerSilent(final boolean silent, final boolean cache) {
         if (AWTest.SILENT == silent) {
             return false;
         } else if (AWTest.LOGGER == null) {
@@ -535,7 +545,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             if (AWTest.CACHE != null) {
                 removeSink(CACHE);
                 if (cache) {
-                    for (LogRecord2 record : AWTest.CACHE.getBuffer()) {
+                    for (final LogRecord2 record : AWTest.CACHE.getBuffer()) {
                         AWTest.CONSOLE_LOGGER.publish(record);
                     }
                 }
@@ -556,7 +566,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     /**
      * @param cACHE2
      */
-    private static void addSink(Sink sink) {
+    private static void addSink(final Sink sink) {
         try {
             SINK_ACCESS_GRANTED = true;
             LOGGER.addSink(sink);
@@ -565,23 +575,23 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertTrue(Boolean b, String message) throws Exception {
+    public static void assertTrue(final Boolean b, final String message) throws Exception {
         if (!Boolean.TRUE.equals(b)) {
             throw new Exception(message);
         }
     }
 
-    public static void assertFalse(Boolean b, String message) throws Exception {
+    public static void assertFalse(final Boolean b, final String message) throws Exception {
         if (!Boolean.FALSE.equals(b)) {
             throw new Exception(message);
         }
     }
 
-    public static void assertFalse(Boolean b) throws Exception {
+    public static void assertFalse(final Boolean b) throws Exception {
         assertFalse(b, "Value=" + b + " Expected=false");
     }
 
-    public static void assertTrue(Boolean b) throws Exception {
+    public static void assertTrue(final Boolean b) throws Exception {
         assertTrue(b, "Value=" + b + " Expected=true");
     }
 
@@ -593,13 +603,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertLt(long length, long i) throws Exception {
+    public static void assertLt(final long length, final long i) throws Exception {
         if (length >= i) {
             throw new Exception(length + " <= " + i);
         }
     }
 
-    public static void assertPathExistsInZip(final File zip, String path) throws Exception {
+    public static void assertPathExistsInZip(final File zip, final String path) throws Exception {
         final ZipFile zipFile = new ZipFile(zip);
         try {
             if (zipFile.getEntry(path) == null) {
@@ -626,7 +636,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertPathExistsNotInZip(final File zip, String path) throws Exception {
+    public static void assertPathExistsNotInZip(final File zip, final String path) throws Exception {
         final ZipFile zipFile = new ZipFile(zip);
         try {
             if (zipFile.getEntry(path) != null) {
@@ -637,10 +647,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static String readStringFromZip(final File zip, String path) throws Exception {
+    public static String readStringFromZip(final File zip, final String path) throws Exception {
         final ZipFile zipFile = new ZipFile(zip);
         try {
-            ZipEntry entry = zipFile.getEntry(path);
+            final ZipEntry entry = zipFile.getEntry(path);
             if (entry == null) {
                 throw new Exception("Path in Zip is missing: " + zip + "!" + path);
             }
@@ -650,7 +660,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
-    public static void assertGt(long length, long i) throws Exception {
+    public static void assertGt(final long length, final long i) throws Exception {
         if (length <= i) {
             throw new Exception(length + " <= " + i);
         }
@@ -662,15 +672,15 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     public static Class<? extends TestInterface> getTestClass() {
-        StackTraceElement[] st = new Exception().getStackTrace();
-        for (StackTraceElement e : st) {
+        final StackTraceElement[] st = new Exception().getStackTrace();
+        for (final StackTraceElement e : st) {
             if (!e.getClassName().startsWith(AWTest.class.getName())) {
                 try {
-                    Class<? extends TestInterface> cls = (Class<? extends TestInterface>) Class.forName(e.getClassName());
+                    final Class<? extends TestInterface> cls = (Class<? extends TestInterface>) Class.forName(e.getClassName());
                     if (TestInterface.class.isAssignableFrom(cls)) {
                         return cls;
                     }
-                } catch (ClassNotFoundException ex) {
+                } catch (final ClassNotFoundException ex) {
                     throw new WTFException(ex);
                 }
             }
@@ -682,14 +692,14 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @param deserializedObject
      * @throws Exception
      */
-    public static void assertNotNull(Object obj) throws Exception {
+    public static void assertNotNull(final Object obj) throws Exception {
         if (obj == null) {
             throw new Exception("Object is null");
         }
     }
 
-    public static void asswertCachedLogsRecordMatches(String pattern) throws Exception {
-        for (LogRecord2 lr : getCachedLogRecords()) {
+    public static void asswertCachedLogsRecordMatches(final String pattern) throws Exception {
+        for (final LogRecord2 lr : getCachedLogRecords()) {
             if (LOG_FORMATER.format(lr).matches(pattern)) {
                 return;
             }
@@ -698,7 +708,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         throw new Exception("Cached Logs do not contain the pattern " + pattern);
     }
 
-    public static void assertType(Object obj, Class<?> cls) throws Exception {
+    public static void assertType(final Object obj, final Class<?> cls) throws Exception {
         if (obj == null) {
             throw new Exception("Object " + obj + " is null");
         } else if (!(cls.isAssignableFrom(obj.getClass()))) {
@@ -709,10 +719,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     /**
      * @param string
      */
-    public synchronized static void logInfoAnyway(String string) {
-        boolean wasSilent = AWTest.SILENT;
+    public synchronized static void logInfoAnyway(final String string) {
+        final boolean wasSilent = AWTest.SILENT;
         if (wasSilent) {
-            LogCache keepCache = CACHE;
+            final LogCache keepCache = CACHE;
             if (keepCache != null) {
                 removeSink(keepCache);
             }
@@ -734,7 +744,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @return
      * @throws Exception
      */
-    public static String verifyJar(File f) throws Exception {
+    public static String verifyJar(final File f) throws Exception {
         ensureToolsJar();
         final PrintStream out = System.out;
         final PrintStream err = System.err;
@@ -780,7 +790,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             }
             final Class<?> cls = Class.forName("sun.security.tools.jarsigner.Main");
             cls.getDeclaredMethod("main", new Class[] { String[].class }).invoke(null, new Object[] { new String[] { "-verify", f.getAbsolutePath() } });
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new Exception(errBuffer + "\r\n" + outBuffer, e);
         } finally {
             if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7) && JVMVersion.get() < JVMVersion.JAVA_18) {
@@ -823,8 +833,8 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
      * @param zip
      * @throws IOException
      */
-    public static void validateZipOrJar(File zip) throws IOException {
-        InputStream is = new BufferedInputStream(new FileInputStream(zip));
+    public static void validateZipOrJar(final File zip) throws IOException {
+        final InputStream is = new BufferedInputStream(new FileInputStream(zip));
         try {
             validateZipOrJar(zip.getAbsolutePath(), is);
         } finally {

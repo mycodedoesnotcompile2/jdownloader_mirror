@@ -148,7 +148,6 @@ public abstract class ExtCheckColumn<E> extends ExtColumn<E> implements ActionLi
 
     @Override
     public void extendControlButtonMenu(final JPopupMenu popup) {
-        // TODO Auto-generated method stub
         super.extendControlButtonMenu(popup);
     }
 
@@ -166,7 +165,6 @@ public abstract class ExtCheckColumn<E> extends ExtColumn<E> implements ActionLi
 
     @Override
     public JComponent getEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
-        // TODO Auto-generated method stub
         return this.editor;
     }
 

@@ -73,8 +73,7 @@ public class DialogNoAnswerException extends Exception implements ExceptionDefau
         }
     }
 
-    public Level getDefaultLogLevel() {
-        // TODO Auto-generated method stub
+    public Level getDefaultLogLevel() {        
         return Level.WARNING;
     }
 

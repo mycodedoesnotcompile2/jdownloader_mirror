@@ -91,8 +91,7 @@ public class TEstProgressDialog {
                     /**
                      *
                      */
-                    protected boolean isLabelEnabled() {
-                        // TODO Auto-generated method stub
+                    protected boolean isLabelEnabled() {                        
                         return true;
                     }
                 };

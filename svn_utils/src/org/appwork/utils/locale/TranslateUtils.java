@@ -266,9 +266,7 @@ public class TranslateUtils {
      * @throws IllegalArgumentException
      */
     private static String getName(final Translate entry) throws IllegalArgumentException, SecurityException, IllegalAccessException, NoSuchFieldException {
-        // TODO Auto-generated method stub
-
-        for (final Field f : entry.getClass().getDeclaredFields()) {
+		for (final Field f : entry.getClass().getDeclaredFields()) {
             if (f.isEnumConstant()) {
                 final Object value = f.get(null);
                 if (value == entry) { return f.getName(); }

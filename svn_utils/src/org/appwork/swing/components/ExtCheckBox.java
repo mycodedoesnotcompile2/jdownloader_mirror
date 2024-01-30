@@ -122,26 +122,7 @@ public class ExtCheckBox extends JCheckBox implements ToolTipHandler {
     public void setTooltipFactory(final TooltipTextDelegateFactory tooltipFactory) {
         this.tooltipFactory = tooltipFactory;
     }
-    // public void setSelected(boolean b) {
-    //
-    // super.setSelected(b);
-    //
-    // updateDependencies();
-    // }
 
-    // /*
-    // * (non-Javadoc)
-    // *
-    // * @see
-    // * java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-    // */
-    // @Override
-    // public void actionPerformed(ActionEvent e) {
-    // updateDependencies();
-    // }
-    /**
-     *
-     */
     public void updateDependencies() {
         if (dependencies != null) {
             ArrayList<ExtCheckBox> boxes = new ArrayList<ExtCheckBox>();
@@ -163,13 +144,11 @@ public class ExtCheckBox extends JCheckBox implements ToolTipHandler {
      * @return
      */
     protected boolean getDependenciesLogic(final JComponent c, final boolean b) {
-        // TODO Auto-generated method stub
         return b;
     }
 
     @Override
     public boolean isTooltipWithoutFocusEnabled() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -190,7 +169,6 @@ public class ExtCheckBox extends JCheckBox implements ToolTipHandler {
      */
     @Override
     public boolean isTooltipDisabledUntilNextRefocus() {
-        // TODO Auto-generated method stub
         return true;
     }
 
@@ -207,7 +185,6 @@ public class ExtCheckBox extends JCheckBox implements ToolTipHandler {
 
     @Override
     public boolean updateTooltip(final ExtTooltip activeToolTip, final MouseEvent e) {
-        // TODO Auto-generated method stub
         return false;
     }
 

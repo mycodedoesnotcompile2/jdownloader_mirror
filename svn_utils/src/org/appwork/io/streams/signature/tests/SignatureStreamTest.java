@@ -73,27 +73,22 @@ public class SignatureStreamTest {
     private static ByteArrayOutputStream               baos;
     private static byte[]                              rawInput;
     private static byte[]                              bytes;
-
     private static byte[]                              nonce = null;
     private static int                                 chunkLength;
     private static DigestInterface                     digester;
     private static MacDigester                         macDigester;
 
     public static void main(String[] args) throws Exception {
-
         // Stream Version Byte
         // calculate how much bytes we need to store it
         digester = new MessageDigester(MessageDigest.getInstance(Hash.HASH_TYPE_SHA256));
-
         SecretKeySpec secretKeySpec = new SecretKeySpec("ABC".getBytes(), Hash.HASH_TYPE_SHA256);
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(secretKeySpec);
-
         macDigester = new MacDigester(mac);
         testReadExactContentLength();
         testIncrementRead();
         testSslMacEOFCutStreamMD5();
-
         /*     */
         for (Provider provider : Security.getProviders()) {
             for (Provider.Service service : provider.getServices()) {
@@ -103,30 +98,25 @@ public class SignatureStreamTest {
                     // System.out.println("Test on " + service.getAlgorithm() + " Cloneable:" + (mac instanceof Cloneable));
                     macDigester = new MacDigester(mac);
                     digester = macDigester;
-
                     try {
                         mac.clone();
                         testIncompleteStreamClonableMAC();
                     } catch (CloneNotSupportedException e) {
                         testIncompleteStreamNotCloneable();
                     }
-
                 } catch (NoSuchAlgorithmException e) {
                     // e.printStackTrace();
                 } catch (InvalidKeyException e) {
                     // e.printStackTrace();
                 }
-
                 try {
                     digester = new MessageDigester(MessageDigest.getInstance(service.getAlgorithm()));
-
                     try {
                         mac.clone();
                         testIncompleteStreamClonableMAC();
                     } catch (CloneNotSupportedException e) {
                         testIncompleteStreamNotCloneable();
                     }
-
                 } catch (NoSuchAlgorithmException e) {
                     // e.printStackTrace();
                 } catch (InvalidKeyException e) {
@@ -135,26 +125,17 @@ public class SignatureStreamTest {
             }
         }
         testReadUntilEOF();
-
         testReadToEndOfChunk();
         testCorruptStream();
-
         testReadPlus1Scenario();
         testEmptyStream();
-
     }
 
-    /**
-     *
-     */
     private static void testIncrementRead() {
-        // TODO Auto-generated method stub
-
     }
 
     protected static void testIncompleteStreamClonableMAC() throws Exception {
         write(null, 100, 1024, digester);
-
         HandleStreamSignatureInputStream in;
         byte[] bytesTmp = new byte[102 + digester.getLength()];
         // cut stream after the first signature. this looks like a valid end of stream
@@ -165,7 +146,6 @@ public class SignatureStreamTest {
             IO.readStream(-1, in);
             throw new Exception("Expected StreamEndedUnexpectedException here");
         } catch (StreamEndedUnexpectedException e) {
-
             if (in.getLastValidPayloadPosition() != chunkLength) {
                 throw new Exception("Validation not correct");
             }
@@ -176,7 +156,6 @@ public class SignatureStreamTest {
                 throw new Exception("STream should be closed");
             }
             System.out.println("TEST testIncompleteStream " + digester + ": SUCCESS");
-
         } catch (SignatureMismatchException e) {
             e.printStackTrace();
             System.out.println("The Digester " + digester + " does not support Cloning");
@@ -184,14 +163,10 @@ public class SignatureStreamTest {
     }
 
     protected static void testSslMacEOFCutStreamMD5() throws Exception {
-
         SecretKeySpec secretKeySpec = new SecretKeySpec("ABC".getBytes(), Hash.HASH_TYPE_SHA256);
-
         Mac mac = Mac.getInstance("SslMacMD5");
         mac.init(secretKeySpec);
-
         write(null, 100, 1024, new MacDigester(mac));
-
         HandleStreamSignatureInputStream in;
         byte[] bytesTmp = new byte[134];
         // cut stream after the first signature. this looks like a valid end of stream
@@ -212,13 +187,11 @@ public class SignatureStreamTest {
                 throw new Exception("STream should be closed");
             }
             System.out.println("TEST testSslMacMD5: SUCCESS");
-
         }
     }
 
     protected static void testIncompleteStreamNotCloneable() throws Exception {
         write(null, 100, 1024, digester);
-
         HandleStreamSignatureInputStream in;
         byte[] bytesTmp = new byte[102 + digester.getLength()];
         // cut stream after the first signature. this looks like a valid end of stream
@@ -231,7 +204,6 @@ public class SignatureStreamTest {
         } catch (StreamEndedUnexpectedException e) {
             System.out.println("The Digester " + digester + " does not support Cloning and should not throw this exception");
             e.printStackTrace();
-
         } catch (SignatureMismatchException e) {
             if (in.getLastValidPayloadPosition() != 0) {
                 throw new Exception("Validation not correct");
@@ -251,7 +223,6 @@ public class SignatureStreamTest {
         write(nonce, chunkLength, 0, digester);
         HandleStreamSignatureInputStream in;
         IO.readStream(-1, in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce));
-
         if (in.getLastValidPayloadPosition() != rawInput.length) {
             throw new Exception("Validation not correct");
         }
@@ -290,14 +261,11 @@ public class SignatureStreamTest {
         if (digester != null) {
             SignatureStreamTest.digester = digester;
         }
-
         ByteArrayOutputStream rawBaos = new ByteArrayOutputStream();
         out = new StreamSignatureCreatingOutputStream(baos = new ByteArrayOutputStream(), digester, nonce, chunkLength);
-
         while (byteCount > 0) {
             out.write(B, 0, Math.min(byteCount, B.length));
             rawBaos.write(B, 0, Math.min(byteCount, B.length));
-
             byteCount -= Math.min(byteCount, B.length);
         }
         rawInput = rawBaos.toByteArray();
@@ -307,7 +275,6 @@ public class SignatureStreamTest {
         int x = IO.writeLongOptimized(out.getStreamVersion(), null);
         expectedBytes += x;
         expectedBytes += Math.max(1, Math.ceil(rawInput.length / (double) chunkLength)) * (digester.getLength() + IO.writeLongOptimized(chunkLength, null));
-
         if (bytes.length != expectedBytes) {
             throw new WTFException("We expected a stream size of " + expectedBytes);
         }
@@ -317,7 +284,6 @@ public class SignatureStreamTest {
     }
 
     protected static void testCorruptStream() throws NoSuchAlgorithmException, IOException {
-
         write(null, 9, 1024, new MessageDigester(MessageDigest.getInstance(Hash.HASH_TYPE_SHA256)));
         try {
             bytes[0]++;
@@ -329,7 +295,6 @@ public class SignatureStreamTest {
             // e.printStackTrace();
             System.out.println("TEST detect bad first byte: SUCCESS");
         }
-
         try {
             bytes[bytes.length / 2]++;
             HandleStreamSignatureInputStream in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce);
@@ -340,7 +305,6 @@ public class SignatureStreamTest {
             // e.printStackTrace();
             System.out.println("TEST detect bad middle byte: SUCCESS");
         }
-
         try {
             bytes[bytes.length - 1]++;
             HandleStreamSignatureInputStream in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce);
@@ -351,16 +315,12 @@ public class SignatureStreamTest {
             // e.printStackTrace();
             System.out.println("TEST detect last byte: SUCCESS");
         }
-
     }
 
     protected static void testReadToEndOfChunk() throws Exception {
-
         write(null, 9, 1024, new MessageDigester(MessageDigest.getInstance(Hash.HASH_TYPE_SHA256)));
         HandleStreamSignatureInputStream in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce);
-
         byte[] readBytes = IO.readStream(chunkLength, in);
-
         if (in.getLastValidPayloadPosition() != in.getPayloadBytesLoaded()) {
             throw new WTFException("Not fully validated");
         }
@@ -378,9 +338,7 @@ public class SignatureStreamTest {
 
     protected static void testReadExactContentLength() throws Exception {
         write(null, 9, 1024, new MessageDigester(MessageDigest.getInstance(Hash.HASH_TYPE_SHA256)));
-
         HandleStreamSignatureInputStream in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce);
-
         byte[] readBytes = IO.readStream(rawInput.length, in);
         if (!Arrays.equals(readBytes, rawInput)) {
             throw new WTFException("COntent Mismatch");
@@ -401,9 +359,7 @@ public class SignatureStreamTest {
     }
 
     protected static void testReadUntilEOF() throws Exception {
-
         write(null, 9, 1024, new MessageDigester(MessageDigest.getInstance(Hash.HASH_TYPE_SHA256)));
-
         HandleStreamSignatureInputStream in = new HandleStreamSignatureInputStream(new ByteArrayInputStream(bytes), digester, nonce) {
             /*
              * (non-Javadoc)
@@ -418,7 +374,6 @@ public class SignatureStreamTest {
                 }
                 return ret;
             }
-
         };
         // read header
         in.read(new byte[] {});
@@ -442,7 +397,6 @@ public class SignatureStreamTest {
             if (in.getPayloadBytesLoaded() != rawInput.length) {
                 throw new Exception("Payload bytes read incorrect");
             }
-
         }
         if (in.getLastValidPayloadPosition() != in.getPayloadBytesLoaded()) {
             throw new WTFException("Not fully validated");
@@ -451,7 +405,5 @@ public class SignatureStreamTest {
             throw new Exception("STream should be closed");
         }
         System.out.println("TEST Reading until -1: SUCCESS");
-
     }
-
 }

@@ -49,6 +49,7 @@ import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogInterface;
 
 public class ShutdownController extends Thread {
@@ -403,7 +404,6 @@ public class ShutdownController extends Thread {
                 LogV3.log(e);
             }
         }
-
         this.log("Request Shutdown: " + request);
         this.requestedShutDowns.incrementAndGet();
         try {
@@ -514,8 +514,20 @@ public class ShutdownController extends Thread {
         } catch (final Throwable e) {
         }
     }
+    // private boolean enabled = true;
+    //
+    // public boolean isEnabled() {
+    // return enabled;
+    // }
+    //
+    // public void setEnabled(boolean enabled) {
+    // this.enabled = enabled;
+    // }
 
     private void runHooks() {
+        // if (!isEnabled()) {
+        // return;
+        // }
         if (shutDownHookRunning.compareAndSet(false, true)) {
             /*
              * Attention. This runs in shutdownhook. make sure, that we do not have to load previous unloaded classes here.
@@ -533,7 +545,7 @@ public class ShutdownController extends Thread {
                 for (final ShutdownEvent e : list) {
                     try {
                         i++;
-                        final long started = System.currentTimeMillis();
+                        final long started = Time.systemIndependentCurrentJVMTimeMillis();
                         log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: start item->" + e);
                         final Thread thread = new Thread(new Runnable() {
                             @Override
@@ -553,7 +565,7 @@ public class ShutdownController extends Thread {
                             log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: " + e + "->is still running after " + e.getMaxDuration() + " ms");
                             log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: " + e + "->StackTrace:\r\n" + this.getStackTrace(thread));
                         } else {
-                            log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: item ended after->" + (System.currentTimeMillis() - started));
+                            log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: item ended after->" + (Time.systemIndependentCurrentJVMTimeMillis() - started));
                         }
                         log("[Done:" + i + "/" + list.size() + "]");
                     } catch (final Throwable e1) {

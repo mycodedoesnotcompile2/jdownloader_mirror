@@ -256,8 +256,7 @@ public abstract class Queue {
     /**
      * Overwrite this to hook before a action execution
      */
-    protected void handlePreRun() {
-        // TODO Auto-generated method stub
+    protected void handlePreRun() {        
     }
 
     protected void internalAdd(final QueueAction<?, ?> action) {
@@ -369,8 +368,7 @@ public abstract class Queue {
     /**
      * @param item
      */
-    protected void onItemHandled(final QueueAction<?, ? extends Throwable> item) {
-        // TODO Auto-generated method stub
+    protected void onItemHandled(final QueueAction<?, ? extends Throwable> item) {        
     }
 
     public boolean remove(final QueueAction<?, ?> action) {

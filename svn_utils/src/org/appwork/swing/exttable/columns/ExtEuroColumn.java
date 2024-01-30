@@ -120,9 +120,7 @@ public abstract class ExtEuroColumn<E> extends ExtColumn<E> {
 
     @Override
     public void resetEditor() {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public void resetRenderer() {

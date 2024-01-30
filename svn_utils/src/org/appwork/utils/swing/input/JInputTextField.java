@@ -117,8 +117,7 @@ public class JInputTextField extends javax.swing.JTextField implements DocumentL
     /**
      * @return
      */
-    protected String getInfoText() {
-        // TODO Auto-generated method stub
+    protected String getInfoText() {        
         return infoText;
     }
 

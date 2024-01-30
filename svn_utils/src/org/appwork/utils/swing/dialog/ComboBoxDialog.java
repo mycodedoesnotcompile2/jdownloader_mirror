@@ -125,8 +125,7 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
      * @param renderer2
      * @return
      */
-    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
-        // TODO Auto-generated method stub
+    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {        
         return renderer;
     }
 
@@ -212,8 +211,7 @@ public class ComboBoxDialog extends AbstractDialog<Integer> implements ComboBoxD
      * @see org.appwork.uio.ComboBoxDialogInterface#getPreSelectedIndex()
      */
     @Override
-    public int getPreSelectedIndex() {
-        // TODO Auto-generated method stub
+    public int getPreSelectedIndex() {        
         return defaultAnswer;
     }
 }

@@ -172,8 +172,7 @@ public abstract class ExtFileBrowser<T> extends ExtComponentColumn<T> implements
 
     @Override
     protected JComponent getInternalEditorComponent(T value, boolean isSelected, int row, int column) {
-        // TODO Auto-generated method stub
-        return editor;
+		return editor;
     }
 
     @Override

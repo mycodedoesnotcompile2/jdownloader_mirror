@@ -187,26 +187,23 @@ public class Xml2Json {
         builder.setEntityResolver(new EntityResolver() {
             @Override
             public InputSource resolveEntity(final String publicId, final String systemId) throws SAXException, IOException {
-                // TODO Auto-generated method stub
+                
                 return new InputSource(new StringReader(""));
             }
         });
         builder.setErrorHandler(new ErrorHandler() {
             @Override
-            public void warning(final SAXParseException exception) throws SAXException {
-                // TODO Auto-generated method stub
+            public void warning(final SAXParseException exception) throws SAXException {                
                 exception.printStackTrace();
             }
 
             @Override
-            public void fatalError(final SAXParseException exception) throws SAXException {
-                // TODO Auto-generated method stub
+            public void fatalError(final SAXParseException exception) throws SAXException {                
                 exception.printStackTrace();
             }
 
             @Override
-            public void error(final SAXParseException exception) throws SAXException {
-                // TODO Auto-generated method stub
+            public void error(final SAXParseException exception) throws SAXException {                
                 exception.printStackTrace();
             }
         });

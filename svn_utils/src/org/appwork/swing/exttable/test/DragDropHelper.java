@@ -57,20 +57,17 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
 
     @Override
     public boolean canImport(final JComponent comp, final DataFlavor[] transferFlavors) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     @Override
     public boolean canImport(final TransferSupport support) {
-        // TODO Auto-generated method stub
-        return true;
+		return true;
     }
 
     @Override
     protected Transferable createTransferable(final JComponent c) {
-        // TODO Auto-generated method stub
-        return new StringSelection(this.getClass().getName());
+		return new StringSelection(this.getClass().getName());
     }
 
     /*
@@ -82,9 +79,7 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
      */
     @Override
     public void dragEnter(final DropTargetDragEvent dtde) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     /*
      * (non-Javadoc)
@@ -94,9 +89,7 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
      */
     @Override
     public void dragExit(final DropTargetEvent dte) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     /*
      * (non-Javadoc)
@@ -107,9 +100,7 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
      */
     @Override
     public void dragOver(final DropTargetDragEvent dtde) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     /*
      * (non-Javadoc)
@@ -119,9 +110,7 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
      */
     @Override
     public void drop(final DropTargetDropEvent dtde) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     /*
      * (non-Javadoc)
@@ -131,9 +120,7 @@ public class DragDropHelper extends TransferHandler implements DropTargetListene
      */
     @Override
     public void dropActionChanged(final DropTargetDragEvent dtde) {
-        // TODO Auto-generated method stub
-
-    }
+	}
 
     @Override
     public int getSourceActions(final JComponent c) {

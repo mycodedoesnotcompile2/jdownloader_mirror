@@ -356,8 +356,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
     /**
      * @return
      */
-    public String getHost() {
-        // TODO Auto-generated method stub
+    public String getHost() {        
         return txtHost.getText();
     }
 
@@ -407,8 +406,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
     /**
      * @return
      */
-    public String getUser() {
-        // TODO Auto-generated method stub
+    public String getUser() {        
         return txtUser.getText();
     }
 
@@ -542,8 +540,7 @@ public class ProxyDialog extends AbstractDialog<HTTPProxy> implements CaretListe
             }
 
             @Override
-            public void focusLost(final FocusEvent e) {
-                // TODO Auto-generated method stub
+            public void focusLost(final FocusEvent e) {                
             }
         });
     }

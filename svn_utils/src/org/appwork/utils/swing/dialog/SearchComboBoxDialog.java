@@ -154,7 +154,7 @@ public class SearchComboBoxDialog<Type> extends AbstractDialog<Type> implements 
      *
      */
     protected void onChanged() {
-        // TODO Auto-generated method stub
+        
     }
 
     /**
@@ -201,8 +201,7 @@ public class SearchComboBoxDialog<Type> extends AbstractDialog<Type> implements 
         contentpane.add(box, "pushy,growy,height 24!");
         getDialog().addWindowFocusListener(new WindowFocusListener() {
             @Override
-            public void windowLostFocus(final WindowEvent windowevent) {
-                // TODO Auto-generated method stub
+            public void windowLostFocus(final WindowEvent windowevent) {                
             }
 
             @Override

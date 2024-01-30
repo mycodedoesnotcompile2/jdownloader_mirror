@@ -63,8 +63,7 @@ public class RememberRelativeDialogLocator implements DialogLocator {
              * @see org.appwork.utils.swing.locator.RememberRelativeLocator#getID (java.awt.Window)
              */
             @Override
-            protected String getID(final Window frame) {
-                // TODO Auto-generated method stub
+            protected String getID(final Window frame) {                
                 return RememberRelativeDialogLocator.this.getID(frame);
             }
         };

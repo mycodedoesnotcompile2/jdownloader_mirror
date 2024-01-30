@@ -41,6 +41,7 @@ import java.util.Arrays;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.FlexiJSONParser;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiJSonValue;
@@ -109,6 +110,7 @@ public class FlexiMapperTest extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
+        FlexiJSonNode result = new FlexiJSONParser("[\"string\"  , true]").setDebug(new StringBuilder()).parse();
         // Same test for simpleJSOn: org.appwork.storage.simplejson.mapper.test.GenList2DTestForSImpleJson
         {
             // primitives work, because simplemapper can "guess" them

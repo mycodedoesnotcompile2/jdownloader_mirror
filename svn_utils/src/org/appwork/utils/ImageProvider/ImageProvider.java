@@ -402,8 +402,7 @@ public class ImageProvider {
         }
     }
 
-    public static ImageIcon getImageIconUnCached(final String name, final int x, final int y) {
-        // TODO Auto-generated method stub
+    public static ImageIcon getImageIconUnCached(final String name, final int x, final int y) {        
         try {
             return ImageProvider.getImageIcon(name, x, y, true, false);
         } catch (final IOException e) {

@@ -69,9 +69,7 @@ public abstract class ExtPasswordEditorColumn<E> extends ExtTextColumn<E> implem
 
             @Override
             public void focusLost(final FocusEvent e) {
-                // TODO Auto-generated method stub
-
-            }
+			}
         });
 
     }

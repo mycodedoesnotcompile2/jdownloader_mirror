@@ -110,7 +110,6 @@ public class Getter implements GetterOrSetter {
      */
     @Override
     public String toString() {
-        // TODO Auto-generated method stub
         return method.toString();
     }
 }

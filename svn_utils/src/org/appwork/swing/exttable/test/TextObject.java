@@ -71,8 +71,7 @@ public class TextObject {
     /**
      * @return
      */
-    public long getRand() {
-        // TODO Auto-generated method stub
+    public long getRand() {        
         return this.rand;
     }
 

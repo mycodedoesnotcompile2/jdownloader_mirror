@@ -121,7 +121,6 @@ public class ExtPasswordField extends MigPanel implements FocusListener, Documen
      */
     @Override
     public void setBackground(Color bg) {
-        // TODO Auto-generated method stub
         super.setBackground(bg);
         if (renderer != null) {
             renderer.setBackground(bg);

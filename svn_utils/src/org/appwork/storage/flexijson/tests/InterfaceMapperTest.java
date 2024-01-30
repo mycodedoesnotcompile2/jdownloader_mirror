@@ -106,8 +106,7 @@ public class InterfaceMapperTest extends AWTest {
          * @see org.appwork.storage.flexijson.tests.InterfaceMapperTest.TestInterface#getInt()
          */
         @Override
-        public int getInt() {
-            // TODO Auto-generated method stub
+        public int getInt() {            
             return i;
         }
 
@@ -117,8 +116,7 @@ public class InterfaceMapperTest extends AWTest {
          * @see org.appwork.storage.flexijson.tests.InterfaceMapperTest.TestInterface#getIntWithDef()
          */
         @Override
-        public int getIntWithDef() {
-            // TODO Auto-generated method stub
+        public int getIntWithDef() {            
             return 9;
         }
 
@@ -138,8 +136,7 @@ public class InterfaceMapperTest extends AWTest {
          * @see org.appwork.storage.flexijson.tests.InterfaceMapperTest.TestInterface#getSubList()
          */
         @Override
-        public TestInterface2[] getSubList() {
-            // TODO Auto-generated method stub
+        public TestInterface2[] getSubList() {            
             return null;
         }
 
@@ -149,8 +146,7 @@ public class InterfaceMapperTest extends AWTest {
          * @see org.appwork.storage.flexijson.tests.InterfaceMapperTest.TestInterface#getSubWithDefault()
          */
         @Override
-        public TestInterface2 getSubWithDefault() {
-            // TODO Auto-generated method stub
+        public TestInterface2 getSubWithDefault() {            
             return null;
         }
     }

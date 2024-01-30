@@ -217,8 +217,7 @@ public class InterfaceStorage<InterfaceType> implements InvocationHandler {
      * @param old
      * @param object
      */
-    protected void onSet(String key, Object old, Object object) {
-        // TODO Auto-generated method stub
+    protected void onSet(String key, Object old, Object object) {        
     }
 
     private Object getWithUsingTheCache(final Getter getter, final String key) throws FlexiParserException, FlexiMapperException {

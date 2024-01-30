@@ -33,9 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
+import java.awt.Color;
+
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
+import javax.swing.UIManager;
 
 import org.appwork.utils.swing.SwingUtils;
 
@@ -64,7 +67,11 @@ public class IconLabelToolTip extends ExtTooltip {
         final TooltipPanel ret = new TooltipPanel("ins 0", "[grow,fill]", "[]");
         label = new JLabel();
         SwingUtils.setOpaque(label, false);
-        label.setForeground(ExtTooltip.FOREGROUND_COLOR);
+        Color color = UIManager.getColor(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND);
+        if (color == null) {
+            color = new JLabel().getForeground();
+        }
+        label.setForeground(color);
         ret.add(label);
         return ret;
     }

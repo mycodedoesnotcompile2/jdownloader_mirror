@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.ShellParser;
@@ -110,7 +111,6 @@ public class ParameterParser {
      * parses the command row. and fires {@link CommandSwitch} for each switch command
      *
      * @param commandFilePath
-     *            TODO
      *
      * @return
      */
@@ -179,13 +179,41 @@ public class ParameterParser {
      * @return
      */
     public String getParameter(String key, int index, String def) {
+        try {
+            return getMandatoryParameter(key, index);
+        } catch (ParameterMissingException e) {
+            return def;
+        }
+    }
+
+    /**
+     * @param string
+     * @param i
+     * @return
+     * @throws ParameterMissingException
+     */
+    public String getMandatoryParameter(String key, int index) throws ParameterMissingException {
+        if (index < 0) {
+            throw new ParameterMissingException(key, index);
+        }
         final CommandSwitch s = getCommandSwitch(key);
         if (s == null) {
-            return def;
+            throw new ParameterMissingException(key, index);
         } else if (s.getParameters().length <= index) {
-            return def;
+            throw new ParameterMissingException(key, index);
         } else {
             return s.getParameters()[index];
+        }
+    }
+
+    public boolean hasParameter(String key, int index) {
+        final CommandSwitch s = getCommandSwitch(key);
+        if (s == null) {
+            return false;
+        } else if (s.getParameters().length <= index) {
+            return false;
+        } else {
+            return true;
         }
     }
 
@@ -208,5 +236,18 @@ public class ParameterParser {
             }
         }
         return ret;
+    }
+
+    /**
+     * @param commandSwitch
+     */
+    public void add(CommandSwitch commandSwitch) {
+        if (commandSwitch == null) {
+            return;
+        }
+        // Do we use this method? if yes, think about sync
+        DebugMode.debugger();
+        this.list.add(commandSwitch);
+        this.map.put(commandSwitch.getCaseInsensitiveSwitchCommand(), commandSwitch);
     }
 }

@@ -119,9 +119,7 @@ public class StringKeyHandler extends KeyHandler<String> {
      * @see org.appwork.storage.config.KeyHandler#validateValue(java.lang.Object)
      */
     @Override
-    protected void validateValue(final String object) throws Throwable {
-        // TODO Auto-generated method stub
-
-    }
+    protected void validateValue(final String object) throws Throwable {      
+	}
 
 }

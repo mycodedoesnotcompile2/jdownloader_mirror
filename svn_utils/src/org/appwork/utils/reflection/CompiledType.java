@@ -183,43 +183,15 @@ public class CompiledType {
         WRAPPER_NAMES_FOR_BOTH;
     }
 
-    public static enum ToStringSyntax {
-        JSON, // Pseudo Code for documentation etc.
-        JAVA// VALID Java COde
-    }
-
-    public static class ToStringRule {
+    public abstract static class AbstractNameScheme {
         private boolean                  skipAnonymousClasses      = false;
         private PrimitiveWrapperStrategy primitiveWrapperStrategy  = PrimitiveWrapperStrategy.DEDICATED_NAME_FOR_EACH;
-        private String                   nameForArrays             = "Array";
         private String                   nameForUnspecifiedGeneric = "?";
-        private ToStringSyntax           syntax                    = ToStringSyntax.JSON;
-
-        /**
-         * @param java
-         */
-        public ToStringRule(ToStringSyntax java) {
-            setSyntax(java);
-        }
 
         /**
          *
          */
-        public ToStringRule() {
-            // TODO Auto-generated constructor stub
-        }
-
-        public ToStringSyntax getSyntax() {
-            return syntax;
-        }
-
-        public ToStringRule syntax(ToStringSyntax syntax) {
-            this.syntax = syntax;
-            return this;
-        }
-
-        public void setSyntax(ToStringSyntax syntax) {
-            this.syntax = syntax;
+        public AbstractNameScheme() {
         }
 
         public String getNameForUnspecifiedGeneric() {
@@ -230,34 +202,6 @@ public class CompiledType {
             this.nameForUnspecifiedGeneric = nameForUnspecifiedGeneric;
         }
 
-        public String getNameForArrays() {
-            return nameForArrays;
-        }
-
-        public void setNameForArrays(String nameForArrays) {
-            this.nameForArrays = nameForArrays;
-        }
-
-        public String getNameForMaps() {
-            return nameForMaps;
-        }
-
-        public void setNameForMaps(String nameForMaps) {
-            this.nameForMaps = nameForMaps;
-        }
-
-        private String postFixForEnums = "-Enum";
-
-        public String getPostFixForEnums() {
-            return postFixForEnums;
-        }
-
-        public void setPostFixForEnums(String postFixForEnums) {
-            this.postFixForEnums = postFixForEnums;
-        }
-
-        private String nameForMaps = "Map";
-
         public boolean isSkipAnonymousClasses() {
             return skipAnonymousClasses;
         }
@@ -266,7 +210,7 @@ public class CompiledType {
             this.skipAnonymousClasses = skipAnonymousClasses;
         }
 
-        public ToStringRule skipAnonymousClasses(boolean skipAnonymousClasses) {
+        public AbstractNameScheme skipAnonymousClasses(boolean skipAnonymousClasses) {
             this.skipAnonymousClasses = skipAnonymousClasses;
             return this;
         }
@@ -279,19 +223,78 @@ public class CompiledType {
             this.primitiveWrapperStrategy = primitiveWrapperStrategy;
         }
 
-        public ToStringRule primitiveWrapperStrategy(PrimitiveWrapperStrategy primitiveWrapperStrategy) {
+        public AbstractNameScheme primitiveWrapperStrategy(PrimitiveWrapperStrategy primitiveWrapperStrategy) {
             this.primitiveWrapperStrategy = primitiveWrapperStrategy;
             return this;
         }
+
+        /**
+         * @param type
+         * @param raw
+         * @return
+         */
+        public abstract String getCollectionName(CompiledType type, Class<?> raw);
+
+        /**
+         * @param compiledType
+         * @param raw
+         * @return
+         */
+        public abstract String getMapName(CompiledType type, Class<?> raw);
+
+        /**
+         * @param type
+         * @param raw
+         * @return
+         */
+        public abstract String getClassName(CompiledType type, Class<?> raw);
+
+        /**
+         * @param compiledType
+         * @param raw
+         * @return
+         */
+        public abstract String getArrayName(CompiledType type, Class<?> raw);
+
+        /**
+         * @param compiledType
+         * @param raw
+         * @return
+         */
+        public abstract String getEnumName(CompiledType type, Class<?> raw);
+
+        /**
+         * @param compiledType
+         * @return
+         */
+        public abstract CompiledType[] getComponentTypes(CompiledType type, Class<?> raw);
+
+        /**
+         * @param compiledType
+         * @param raw
+         * @param sb
+         * @param actualComponents
+         */
+        public abstract void appendComponents(CompiledType type, Class<?> raw, StringBuilder sb, CompiledType[] components);
     }
 
-    public String toString(ToStringRule rule) {
-        if (rule == null) {
-            rule = new ToStringRule();
-        }
+    public String toString(AbstractNameScheme rule) {
         StringBuilder sb = new StringBuilder();
+        if (rule == null) {
+            rule = new JsonSyntax();
+        }
+        appendName(rule, sb);
+        return sb.toString();
+    }
+
+    /**
+     * @param rule
+     * @param sb
+     */
+    public void appendName(AbstractNameScheme rule, StringBuilder sb) {
         if (raw != null && raw.isAnonymousClass() && rule.isSkipAnonymousClasses()) {
-            return superType.toString(rule);
+            superType.appendName(rule, sb);
+            return;
         }
         if (raw == null) {
             if (type instanceof WildcardType) {
@@ -307,112 +310,45 @@ public class CompiledType {
                 sb.append(((TypeVariable) type).toString());
             } else {
                 LogV3.log(new Exception("Unknown type " + type));
-                return "Unknown Type";
+                sb.append("Unknown Type");
+                return;
             }
         } else {
             if (Collection.class.isAssignableFrom(raw)) {
-                switch (rule.getSyntax()) {
-                case JAVA:
-                    sb.append(raw.getSimpleName());
-                    break;
-                default:
-                    sb.append(rule.getNameForArrays());
-                    break;
-                }
+                sb.append(rule.getCollectionName(this, raw));
             } else if (Map.class.isAssignableFrom(raw)) {
-                switch (rule.getSyntax()) {
-                case JAVA:
-                    sb.append(raw.getSimpleName());
-                    break;
-                default:
-                    if (!isImplementing(Map.class)) {
-                        // Like LocalMap or Condition
-                        sb.append(raw.getSimpleName());
-                    } else {
-                        sb.append(rule.getNameForMaps());
-                    }
-                    break;
-                }
+                sb.append(rule.getMapName(this, raw));
             } else if (((Class) raw).isArray()) {
-                switch (rule.getSyntax()) {
-                case JAVA:
-                    break;
-                default:
-                    sb.append(rule.getNameForArrays());
-                    break;
-                }
+                sb.append(rule.getArrayName(this, raw));
             } else if (((Class) raw).isEnum()) {
-                switch (rule.getSyntax()) {
-                case JAVA:
-                    sb.append(((Class) raw).getSimpleName());
-                    break;
-                default:
-                    sb.append(((Class) raw).getSimpleName() + rule.getPostFixForEnums());
-                    break;
-                }
+                sb.append(rule.getEnumName(this, raw));
             } else if (Clazz.isPrimitive(raw)) {
                 switch (rule.getPrimitiveWrapperStrategy()) {
                 case DEDICATED_NAME_FOR_EACH:
-                    sb.append(raw.getSimpleName());
+                    sb.append(rule.getClassName(this, raw));
                     break;
                 case PRIMITIVE_NAMES_FOR_BOTH:
                     if (!Clazz.isPrimitiveWrapper(raw)) {
-                        sb.append(raw.getSimpleName());
+                        sb.append(rule.getClassName(this, raw));
                     } else {
-                        sb.append(((Class) Clazz.wrapperToPrimitive(raw)).getSimpleName());
+                        sb.append(rule.getClassName(this, (Clazz.wrapperToPrimitive(raw))));
                     }
                     break;
                 case WRAPPER_NAMES_FOR_BOTH:
                     if (Clazz.isPrimitiveWrapper(raw)) {
-                        sb.append(raw.getSimpleName());
+                        sb.append(rule.getClassName(this, raw));
                     } else {
-                        sb.append(((Class) Clazz.primitiveToWrapper(raw)).getSimpleName());
+                        sb.append(rule.getClassName(this, ((Class) Clazz.primitiveToWrapper(raw))));
                     }
                     break;
                 }
             } else {
-                sb.append(raw.getSimpleName());
+                sb.append(rule.getClassName(this, raw));
             }
         }
         CompiledType[] actualComponents = componentTypes;
-        if (rule.getSyntax() == ToStringSyntax.JSON && raw != null) {
-            // Maps and Collections are handled a bit different by json Mappers and thus need a bit different handling to return the JSON
-            // Name
-            if (isImplementing(Map.class)) {
-                // LocaleMap extends HashMap<String,String>
-                actualComponents = getComponentTypes(Map.class);
-            } else if (Collection.class.isAssignableFrom(raw)) {
-                // thisincludes set
-                actualComponents = getComponentTypes(Collection.class);
-            }
-        }
-        if (raw != null && ((Class) raw).isArray() && rule.getSyntax() == ToStringSyntax.JAVA) {
-            sb.append(actualComponents[0].toString(rule));
-            sb.append("[]");
-        } else {
-            if (actualComponents.length > 0) {
-                sb.append("<");
-                for (CompiledType t : actualComponents) {
-                    if (sb.charAt(sb.length() - 1) != '<') {
-                        sb.append(",");
-                    }
-                    if (rule.getSyntax() == ToStringSyntax.JAVA) {
-                        // java does not allow primitiv types as generic
-                        PrimitiveWrapperStrategy before = rule.getPrimitiveWrapperStrategy();
-                        try {
-                            rule.setPrimitiveWrapperStrategy(PrimitiveWrapperStrategy.WRAPPER_NAMES_FOR_BOTH);
-                            sb.append(t.toString(rule));
-                        } finally {
-                            rule.setPrimitiveWrapperStrategy(before);
-                        }
-                    } else {
-                        sb.append(t.toString(rule));
-                    }
-                }
-                sb.append(">");
-            }
-        }
-        return sb.toString();
+        actualComponents = rule.getComponentTypes(this, raw);
+        rule.appendComponents(this, raw, sb, actualComponents);
     }
 
     /**
@@ -421,7 +357,7 @@ public class CompiledType {
      * @param class1
      * @return
      */
-    private boolean isImplementing(Class<?>... interfaces) {
+    protected boolean isImplementing(Class<?>... interfaces) {
         NEXT_REQUESTED: for (Class<?> requested : interfaces) {
             for (Class<?> i : raw.getInterfaces()) {
                 if (i == requested) {

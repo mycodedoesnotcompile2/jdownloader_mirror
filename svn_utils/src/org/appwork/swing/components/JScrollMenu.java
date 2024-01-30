@@ -126,10 +126,6 @@ public class JScrollMenu extends JMenu {
      */
     @Override
     public String getText() {
-        // TODO Auto-generated method stub
-        // if (StringUtils.equals(super.getText(), "Video")) {
-        // new Exception().printStackTrace();
-        // }
         return super.getText();
     }
 
@@ -140,7 +136,6 @@ public class JScrollMenu extends JMenu {
      */
     @Override
     protected void paintComponent(Graphics g) {
-        // TODO Auto-generated method stub
         super.paintComponent(g);
     }
 

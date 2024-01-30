@@ -91,8 +91,7 @@ public class SecuritySoftwareInfo extends HashMap<String, String> {
      * @see java.util.AbstractMap#toString()
      */
     @Override
-    public String toString() {
-        // TODO Auto-generated method stub
+    public String toString() {        
         return getName() + " Enabled: " + isEnabled() + " Up2Date: " + isUp2Date();
     }
 

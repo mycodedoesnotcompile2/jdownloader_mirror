@@ -130,7 +130,6 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      */
     @Override
     public String toString() {
-        // TODO Auto-generated method stub
         return getClass().getSimpleName() + ":" + getModel().getModelID() + "." + getName();
     }
 
@@ -178,10 +177,14 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     protected void adaptHighlighters(final E value, final JComponent comp, final boolean isSelected, final boolean hasFocus, final int row) {
         try {
             final List<ExtComponentRowHighlighter<E>> hs = this.getModel().getExtComponentRowHighlighters();
+            if (hs.size() == 0) {
+                return;
+            }
+            ExtTable<E> table = getModel().getTable();
             // set background back
             SwingUtils.setOpaque(comp, false);
-            comp.setBackground(getDefaultBackground());
-            comp.setForeground(getDefaultForeground());
+            comp.setBackground(table.getBackground());
+            comp.setForeground(table.getForeground());
             for (final ExtComponentRowHighlighter<E> rh : hs) {
                 if (rh.highlight(this, comp, value, isSelected, hasFocus, row)) {
                     // no break. we may have mixing highlighters
@@ -193,29 +196,12 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     }
 
     /**
-     * @return
-     */
-    protected Color getDefaultForeground() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    /**
-     * @return
-     */
-    protected Color getDefaultBackground() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    /**
      * @param value
      * @param isSelected
      * @param row
      * @param column
      */
     protected void configureCurrentlyEditingComponent(final E value, final boolean isSelected, final int row, final int column) {
-        // TODO Auto-generated method stub
     }
 
     abstract public void configureEditorComponent(final E value, final boolean isSelected, final int row, final int column);
@@ -335,7 +321,6 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      * @param popup
      */
     public void extendControlButtonMenu(final JPopupMenu popup) {
-        // TODO Auto-generated method stub
     }
 
     protected String generateID() {
@@ -387,7 +372,6 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      * @return
      */
     public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -555,7 +539,6 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      * @return
      */
     protected String getTooltipText(final E value) {
-        // TODO Auto-generated method stub
         return null;
     }
 
@@ -934,7 +917,6 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
      * @return
      */
     public boolean isAutoWidthEnabled() {
-        // TODO Auto-generated method stub
         return false;
     }
 

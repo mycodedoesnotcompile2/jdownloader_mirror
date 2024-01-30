@@ -518,6 +518,31 @@ public class StringUtils {
         return join(params.toArray(new Object[] {}), separator);
     }
 
+    public static interface Stringifier<T> {
+        public String toString(T obj);
+    }
+
+    /**
+     * @param <T>
+     * @param requiredBy
+     * @param string
+     * @param stringifyer
+     */
+    public static <T> String join(Collection<T> params, String separator, Stringifier<T> stringifier) {
+        StringBuilder sb = new StringBuilder();
+        for (T o : params) {
+            String s = stringifier.toString(o);
+            if (s == null) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(separator);
+            }
+            sb.append(s);
+        }
+        return sb.toString();
+    }
+
     /**
      * @param fcgiPorts
      * @param separator
@@ -736,6 +761,25 @@ public class StringUtils {
         return staticKey.toString();
     }
 
+    public static ArrayList<CharSequence> camelCaseSplit(final CharSequence key) {
+        final ArrayList<CharSequence> ret = new ArrayList<CharSequence>();
+        char c, lastc;
+        lastc = ' ';
+        int offset = 0;
+        for (int i = 0; i < key.length(); i++) {
+            c = key.charAt(i);
+            if (Character.isUpperCase(c) && Character.isLowerCase(lastc)) {
+                ret.add(key.subSequence(offset, i));
+                offset = i;
+            }
+            lastc = c;
+        }
+        if (offset < key.length()) {
+            ret.add(key.subSequence(offset, key.length()));
+        }
+        return ret;
+    }
+
     /**
      * @param trim
      * @param maxCharactersByLine
@@ -751,9 +795,10 @@ public class StringUtils {
      * @param compile
      * @return
      */
-    public static final Pattern NEWLINE             = Pattern.compile("[\r\n]{1,2}");
-    public static final Pattern DEFAULT_WRAP_BEFORE = Pattern.compile("(\\s)");
-    public static final Pattern DEFAULT_WRAP_AFTER  = Pattern.compile("$^");
+    public static final Pattern  NEWLINE             = Pattern.compile("[\r\n]{1,2}");
+    public static final Pattern  DEFAULT_WRAP_BEFORE = Pattern.compile("(\\s)");
+    private static final Pattern MATCHES_NEVER       = Pattern.compile("$^");
+    public static final Pattern  DEFAULT_WRAP_AFTER  = MATCHES_NEVER;
 
     public static String wrapText(String trim, int size, String patternWrapBefore, String patternWrapAfter, boolean forceWrapLongWords) {
         if (size == 0) {
@@ -796,7 +841,7 @@ public class StringUtils {
             int last = 0;
             String replaceBefore = null;
             while (true) {
-                if (matcherBefore.find()) {
+                if (matcherBefore != null && matcherBefore.find()) {
                     int start = matcherBefore.start();
                     int end = matcherBefore.end();
                     if (start > maxCharsPerLine) {
@@ -832,7 +877,7 @@ public class StringUtils {
             }
             last = 0;
             while (true) {
-                if (matcherAfter.find()) {
+                if (patternAfter != null && patternAfter != DEFAULT_WRAP_AFTER && matcherAfter.find()) {
                     int end = matcherAfter.end();
                     if (end > maxCharsPerLine || end == stringToWrap.length()) {
                         if (last == 0 && !forceWrapLongWords) {
@@ -1095,5 +1140,21 @@ public class StringUtils {
             sb.append(s);
         }
         return sb.toString();
+    }
+
+    /**
+     * @param library
+     * @param version2
+     * @param description2
+     * @param filesHashes
+     * @param licenses2
+     * @return
+     */
+    public static int getMaxLength(String... strings) {
+        int ret = 0;
+        for (String s : strings) {
+            ret = Math.max(s.length(), ret);
+        }
+        return ret;
     }
 }

@@ -73,51 +73,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
      * @see org.appwork.utils.swing.table.ExtTableModel#initColumns()
      */
     @Override
-    protected void initColumns() {
-        // this.addColumn(new ExtProgressColumn<TextObject>("BAR") {
-        //
-        // @Override
-        // protected String getString(final TextObject value) {
-        // // TODO Auto-generated method stub
-        // return value.getRand() + " Tooltip";
-        // }
-        //
-        // @Override
-        // protected long getValue(final TextObject value) {
-        // // TODO Auto-generated method stub
-        // return value.getRand();
-        // }
-        //
-        // @Override
-        // protected boolean isIndeterminated(final TextObject value, final
-        // boolean isSelected, final boolean hasFocus, final int row, final int
-        // column) {
-        // // TODO Auto-generated method stub
-        // return isSelected;
-        // }
-        // });
-        // this.addColumn(new ExtCircleProgressColumn<TextObject>("PIE") {
-        //
-        // @Override
-        // protected String getString(final TextObject value) {
-        // // TODO Auto-generated method stub
-        // return null;
-        // }
-        //
-        // @Override
-        // protected long getValue(final TextObject value) {
-        // // TODO Auto-generated method stub
-        // return value.getRand();
-        // }
-        //
-        // @Override
-        // protected boolean isIndeterminated(final TextObject value, final
-        // boolean isSelected, final boolean hasFocus, final int row, final int
-        // column) {
-        // // TODO Auto-generated method stub
-        // return true;
-        // }
-        // });
+    protected void initColumns() {      
         addColumn(new ExtFileBrowser<TextObject>("Browse me") {
             /**
              *
@@ -125,8 +81,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
             private static final long serialVersionUID = -7233073890074043200L;
 
             @Override
-            public File getFile(TextObject o) {
-                // TODO Auto-generated method stub
+            public File getFile(TextObject o) {                
                 return o.getFile();
             }
 
@@ -184,8 +139,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
 
             @Override
             public int getDefaultWidth() {
-                // TODO Auto-generated method stub
-                return 80;
+				return 80;
             }
 
             @Override
@@ -198,8 +152,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
 
             @Override
             public int getDefaultWidth() {
-                // TODO Auto-generated method stub
-                return 120;
+				return 120;
             }
 
             @Override
@@ -209,8 +162,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
 
             @Override
             protected boolean isDefaultResizable() {
-                // TODO Auto-generated method stub
-                return false;
+				return false;
             }
         });
         this.addColumn(new ExtTextColumn<TextObject>("col 4") {
@@ -218,8 +170,7 @@ public class ExtTestModel extends ExtTableModel<TextObject> {
 
             @Override
             public int getDefaultWidth() {
-                // TODO Auto-generated method stub
-                return 200;
+				return 200;
             }
 
             @Override

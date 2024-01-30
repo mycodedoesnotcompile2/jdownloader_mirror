@@ -36,6 +36,7 @@ package org.appwork.loggingv3;
 import java.io.PrintStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Method;
+import java.util.IllegalFormatException;
 
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.LogVetoListener;
@@ -325,5 +326,42 @@ public class LogV3 {
         };
         System.setOut(nullStream);
         System.setErr(nullStream);
+    }
+
+    /**
+     * @param abstractMultiRepoUpdateClient
+     * @param string
+     * @param link
+     * @param target
+     * @param file
+     */
+    public static void info(Object context, String formatString, Object... formatParams) {
+        if (formatParams != null && formatParams.length > 0) {
+            try {
+                formatString = String.format(formatString, formatParams);
+            } catch (IllegalFormatException e) {
+                e.printStackTrace();
+            }
+        }
+        logger(context).info(formatString);
+    }
+
+    /**
+     * @param logToFileSink
+     * @param e
+     */
+    public static void exception(Object context, Throwable e, String formatString, Object... formatParams) {
+        if (formatParams != null && formatParams.length > 0) {
+            try {
+                formatString = String.format(formatString, formatParams);
+            } catch (IllegalFormatException e1) {
+                e1.printStackTrace();
+            }
+        }
+        logger(context).exception(formatString, e);
+    }
+
+    public static void exception(Object context, Throwable e) {
+        exception(context, e, null);
     }
 }

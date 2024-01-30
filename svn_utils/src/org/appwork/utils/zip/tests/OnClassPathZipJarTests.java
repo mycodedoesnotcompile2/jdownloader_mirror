@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.ClassPathScanner;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.Files;
 

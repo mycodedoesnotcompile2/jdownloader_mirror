@@ -160,8 +160,7 @@ public interface MyInterface extends ConfigInterface {
 
     class DefFac extends AbstractDefaultFactory<TestObject> {
         @Override
-        public TestObject getDefaultValue(KeyHandler<TestObject> keyHandler) {
-            // TODO Auto-generated method stub
+        public TestObject getDefaultValue(KeyHandler<TestObject> keyHandler) {            
             return null;
         }
     }
