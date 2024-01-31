@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 
+import org.appwork.utils.images.MultiResIcon;
+
 /**
  * @author thomas
  * @date 16.01.2023
@@ -71,5 +73,13 @@ public class KitFoxFactory implements SVGFactory {
         // https://github.com/blackears/svgSalamander/tree/ecd1092927971a9e02a9062fdd1a95dd610d7309
         // self compiled for Java 1.6 compatibility
         return true;// JVMVersion.isMinimum(JVMVersion.JAVA_1_8);
+    }
+
+    /**
+     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, int, int, java.awt.Color)
+     */
+    @Override
+    public MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+        return SVGIO.getIconFromSVG(stream, width, height, color);
     }
 }

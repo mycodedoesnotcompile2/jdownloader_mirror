@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper.mod;
 
+import org.appwork.moncompare.ConditionException;
+
 /**
  * @author thomas
  * @date 07.07.2023
@@ -44,5 +46,12 @@ public class IllegalPathException extends MergeException {
      */
     public IllegalPathException(String string) {
         super(string);
+    }
+
+    /**
+     * @param e
+     */
+    public IllegalPathException(ConditionException e) {
+        super(e);
     }
 }

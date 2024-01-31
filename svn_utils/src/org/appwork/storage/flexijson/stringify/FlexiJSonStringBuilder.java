@@ -392,65 +392,69 @@ public class FlexiJSonStringBuilder {
 
     protected void appendString(JSONBuilderOutputStream out, String s) throws IOException, CharacterCodingException {
         bytesToStream(out, escapedQuotationMarks);
-        for (int i = 0; i < s.length(); i++) {
-            final char ch = s.charAt(i);
-            switch (ch) {
-            case '"':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedQuotationMarks);
-                continue;
+        try {
+            for (int i = 0; i < s.length(); i++) {
+                final char ch = s.charAt(i);
+                switch (ch) {
+                case '"':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedQuotationMarks);
+                    continue;
                 // case '\'':
                 // We support only " in the stringifier
                 // bytesToStream(out, "\\'".getBytes(charset));
                 // continue;
-            case '\\':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscaped);
-                continue;
-            case '\b':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedBString);
-                continue;
-            case '\f':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedFString);
-                continue;
-            case '\n':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedNString);
-                continue;
-            case '\r':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedRString);
-                continue;
-            case '\t':
-                finalizeAppendString(out);
-                bytesToStream(out, escapedEscapedTString);
-                continue;
-            }
-            // '\u0000' && ch <= '\u001F' are controll characters )(
-            // http://www.ietf.org/rfc/rfc4627.txt 5.2 Strings)
-            // the text says U+0000 >>> to U+001F but the syntax diagram just
-            // says control character, which in >>> Unicode 6.3 also includes
-            // U+007F to U+009F
-            // http://www.unicode.org/charts/PDF/U2000.pdf
-            if (ch >= '\u0000' && ch <= '\u001F' || ch >= '\u007F' && ch <= '\u009F' || ch >= '\u2000' && ch <= '\u20FF') {
-                finalizeAppendString(out);
-                final String ss = Integer.toHexString(ch);
-                bytesToStream(out, escapedEscapedUString);
-                for (int k = 0; k < 4 - ss.length(); k++) {
-                    bytesToStream(out, zeroString);
-                }
-                stringToStream(out, ss.toUpperCase(Locale.ENGLISH));
-                continue;
-            } else {
-                charBuffer.append(ch);
-                if (!Character.isHighSurrogate(ch) && !Character.isLowSurrogate(ch)) {
+                case '\\':
                     finalizeAppendString(out);
+                    bytesToStream(out, escapedEscaped);
+                    continue;
+                case '\b':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedBString);
+                    continue;
+                case '\f':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedFString);
+                    continue;
+                case '\n':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedNString);
+                    continue;
+                case '\r':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedRString);
+                    continue;
+                case '\t':
+                    finalizeAppendString(out);
+                    bytesToStream(out, escapedEscapedTString);
+                    continue;
+                }
+                // '\u0000' && ch <= '\u001F' are controll characters )(
+                // http://www.ietf.org/rfc/rfc4627.txt 5.2 Strings)
+                // the text says U+0000 >>> to U+001F but the syntax diagram just
+                // says control character, which in >>> Unicode 6.3 also includes
+                // U+007F to U+009F
+                // http://www.unicode.org/charts/PDF/U2000.pdf
+                if (ch >= '\u0000' && ch <= '\u001F' || ch >= '\u007F' && ch <= '\u009F' || ch >= '\u2000' && ch <= '\u20FF') {
+                    finalizeAppendString(out);
+                    final String ss = Integer.toHexString(ch);
+                    bytesToStream(out, escapedEscapedUString);
+                    for (int k = 0; k < 4 - ss.length(); k++) {
+                        bytesToStream(out, zeroString);
+                    }
+                    stringToStream(out, ss.toUpperCase(Locale.ENGLISH));
+                    continue;
+                } else {
+                    charBuffer.append(ch);
+                    if (!Character.isHighSurrogate(ch) && !Character.isLowSurrogate(ch)) {
+                        finalizeAppendString(out);
+                    }
                 }
             }
+        } finally {
+            // ensure that the buffers are cleared
+            finalizeAppendString(out);
         }
-        finalizeAppendString(out);
         bytesToStream(out, escapedQuotationMarks);
     }
 

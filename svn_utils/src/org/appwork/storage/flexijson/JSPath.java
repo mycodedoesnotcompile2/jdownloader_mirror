@@ -41,11 +41,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.moncompare.CompareException;
 import org.appwork.moncompare.Condition;
+import org.appwork.moncompare.ConditionException;
 import org.appwork.moncompare.Scope;
 import org.appwork.moncompare.fromjson.FlexiConditionMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
+import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -73,7 +74,7 @@ public class JSPath implements Iterable<Object> {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#hashCode()
      */
     @Override
@@ -83,7 +84,7 @@ public class JSPath implements Iterable<Object> {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
@@ -198,8 +199,9 @@ public class JSPath implements Iterable<Object> {
     /**
      * @param json
      * @return
+     * @throws InvalidPathException
      */
-    public static JSPath fromFlexiNode(FlexiJSonNode org) {
+    public static JSPath fromFlexiNode(FlexiJSonNode org) throws InvalidPathException {
         if (org == null) {
             throw new IllegalArgumentException("Node is null");
         }
@@ -208,7 +210,7 @@ public class JSPath implements Iterable<Object> {
         next: while (json != null) {
             FlexiJSonNode parent = json.getParent();
             if (parent == json) {
-                throw new WTFException("Bad Path");
+                throw new InvalidPathException("Bad Path");
             }
             if (parent == null) {
                 break;
@@ -262,7 +264,7 @@ public class JSPath implements Iterable<Object> {
                         index++;
                     }
                 }
-                throw new WTFException("Bad Path");
+                throw new InvalidPathException("Bad Path");
             }
             if (parent instanceof FlexiJSonObject) {
                 for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
@@ -272,7 +274,7 @@ public class JSPath implements Iterable<Object> {
                         continue next;
                     }
                 }
-                throw new WTFException("Bad Path");
+                throw new InvalidPathException("Bad Path: Element is not a child of its own parent");
             } else if (parent instanceof FlexiJSonArray) {
                 for (int i = 0; i < ((FlexiJSonArray) parent).size(); i++) {
                     if (((FlexiJSonArray) parent).get(i) == json) {
@@ -281,11 +283,11 @@ public class JSPath implements Iterable<Object> {
                         continue next;
                     }
                 }
-                throw new WTFException("Bad Path");
+                throw new InvalidPathException("Bad Path");
             } else if (parent instanceof FlexiJSonValue) {
-                throw new WTFException("Bad Path");
+                throw new InvalidPathException("Bad Path");
             } else {
-                throw new WTFException("Unknown entry");
+                throw new InvalidPathException("Unknown entry");
             }
         }
         // if (org instanceof FlexiJSonComments || org instanceof FlexiCommentJsonNode) {
@@ -348,12 +350,15 @@ public class JSPath implements Iterable<Object> {
      * @return
      */
     public Object getLast() {
+        if (elements.size() == 0) {
+            return null;
+        }
         return elements.getLast();
     }
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.util.AbstractCollection#toString()
      */
     @Override
@@ -483,6 +488,10 @@ public class JSPath implements Iterable<Object> {
         return new JSPath(Arrays.asList(elements));
     }
 
+    public static JSPath fromPathElements(List<Object> elements) {
+        return new JSPath(elements);
+    }
+
     /**
      * @param nextPathElement
      * @return
@@ -511,9 +520,9 @@ public class JSPath implements Iterable<Object> {
     /**
      * @param o
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public Object resolve(Object o) throws CompareException {
+    public Object resolve(Object o) throws ConditionException {
         return new Condition().resolveKeyPath(new Scope(o), this).getLast();
     }
 
@@ -528,5 +537,24 @@ public class JSPath implements Iterable<Object> {
             index = size() + index;
         }
         return this.elements.get(index);
+    }
+
+    /**
+     * @param keyPath
+     * @return
+     */
+    public JSPath getRelative(JSPath keyPath) {
+        JSPath ret = new JSPath();
+        int sameUntil = 0;
+        for (sameUntil = 0; sameUntil < keyPath.size(); sameUntil++) {
+            if (!CompareUtils.equals(elements.get(sameUntil), keyPath.elements.get(sameUntil))) {
+                sameUntil--;
+                break;
+            }
+        }
+        if (sameUntil >= 0) {
+            ret.elements.addAll(this.elements.subList(sameUntil, elements.size()));
+        }
+        return ret;
     }
 }

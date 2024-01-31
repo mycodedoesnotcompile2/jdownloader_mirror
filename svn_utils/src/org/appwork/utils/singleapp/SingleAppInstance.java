@@ -62,7 +62,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.shutdown.ShutdownController;
-import org.appwork.shutdown.ShutdownRunableEvent;
+import org.appwork.shutdown.ShutdownEvent;
+import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
@@ -154,20 +155,6 @@ public class SingleAppInstance {
         }
     }
 
-    private static class ShutdownHook implements Runnable {
-        private final SingleAppInstance instance;
-
-        public ShutdownHook(final SingleAppInstance instance) {
-            this.instance = instance;
-        }
-
-        public void run() {
-            if (this.instance != null) {
-                this.instance.exit();
-            }
-        }
-    }
-
     private final String                      appID;
     private volatile IncommingMessageListener listener                                     = null;
     private final File                        lockFile;
@@ -181,6 +168,7 @@ public class SingleAppInstance {
     private boolean                           forwardMessageDirectIfNoOtherInstanceIsFound = true;
     private InetSocketAddress                 address;
     private int                               port                                         = -1;
+    private ShutdownEvent                     shutdownEvent;
     private final static Charset              UTF8                                         = Charset.forName("UTF-8");
 
     public boolean isForwardMessageDirectIfNoOtherInstanceIsFound() {
@@ -220,26 +208,30 @@ public class SingleAppInstance {
     }
 
     public synchronized Thread exit(final boolean closeClientConnections) {
-        if (this.fileLock == null) {
-            if (closeClientConnections) {
-                closeAllConnections();
+        try {
+            if (this.fileLock == null) {
+                if (closeClientConnections) {
+                    closeAllConnections();
+                }
+                return null;
+            } else {
+                final Thread daemon = this.daemon.getAndSet(null);
+                if (daemon != null) {
+                    daemon.interrupt();
+                }
+                try {
+                    closeServer();
+                    closeLock();
+                } finally {
+                    deleteLockFile(1000);
+                }
+                if (closeClientConnections) {
+                    closeAllConnections();
+                }
+                return daemon;
             }
-            return null;
-        } else {
-            final Thread daemon = this.daemon.getAndSet(null);
-            if (daemon != null) {
-                daemon.interrupt();
-            }
-            try {
-                closeServer();
-                closeLock();
-            } finally {
-                deleteLockFile(1000);
-            }
-            if (closeClientConnections) {
-                closeAllConnections();
-            }
-            return daemon;
+        } finally {
+            ShutdownController.getInstance().removeShutdownEvent(shutdownEvent);
         }
     }
 
@@ -343,6 +335,9 @@ public class SingleAppInstance {
 
     protected int readPortFromPortFile() throws IOException {
         try {
+            if (!lockFile.isFile()) {
+                throw new NoPortFileException("No Port File");
+            }
             int retry = 10;
             while (retry-- >= 0) {
                 final String port;
@@ -392,6 +387,9 @@ public class SingleAppInstance {
     }
 
     public void sendToRunningInstance(ResponseListener callback, final String... message) throws IOException, ErrorReadingResponseException, InvalidResponseID, NoPortFileException, InterruptedException, ExceptionInRunningInstance {
+        if (port < 0) {
+            port = readPortFromPortFile();
+        }
         final InetSocketAddress con = getAddress();
         if (con != null) {
             Socket socket = null;
@@ -408,6 +406,9 @@ public class SingleAppInstance {
                 this.writeLine(chunkedOut, getClientID());
                 if (message == null || message.length == 0) {
                     this.writeLine(chunkedOut, "0");
+                    if (callback != null) {
+                        callback.onConnected(message);
+                    }
                 } else {
                     this.writeLine(chunkedOut, message.length + "");
                     if (callback != null) {
@@ -616,7 +617,13 @@ public class SingleAppInstance {
                 lockChannel.write(ByteBuffer.wrap(portStringBytes));
                 lockChannel.force(true);
                 lockFile.deleteOnExit();
-                ShutdownController.getInstance().addShutdownEvent(new ShutdownRunableEvent(new ShutdownHook(this)));
+                shutdownEvent = new ShutdownEvent() {
+                    @Override
+                    public void onShutdown(ShutdownRequest shutdownRequest) {
+                        exit(true);
+                    }
+                };
+                ShutdownController.getInstance().addShutdownEvent(shutdownEvent);
                 this.startDaemon();
                 final IncommingMessageListener listener = this.getListener();
                 if (listener != null && responseListener != null && isForwardMessageDirectIfNoOtherInstanceIsFound()) {
@@ -650,7 +657,6 @@ public class SingleAppInstance {
      * @param serverSocket2
      */
     protected void onServerOpened(ServerSocket serverSocket2) {
-        // TODO Auto-generated method stub
     }
 
     private synchronized void startDaemon() {
@@ -817,68 +823,66 @@ public class SingleAppInstance {
                     if (line.matches("^\\d+$")) {
                         try {
                             final int lines = Integer.parseInt(line);
-                            if (lines != 0) {
-                                message = new String[lines];
-                                for (int index = 0; index < lines; index++) {
-                                    message[index] = client.readLine();
-                                }
-                                final IncommingMessageListener listener = SingleAppInstance.this.getListener();
-                                if (listener != null) {
-                                    try {
-                                        final Thread keepAliveThread = new Thread("SingleInstance KeepAlive: " + appID) {
-                                            {
-                                                setDaemon(true);
-                                            }
-
-                                            @Override
-                                            public void run() {
-                                                while (!client.isOutputShutdown()) {
-                                                    try {
-                                                        // System.out.println("Sleep " + (getReadtimeoutForReadingResponses() - 1000));
-                                                        Thread.sleep(getReadtimeoutForReadingResponses() - 1000);
-                                                    } catch (InterruptedException e) {
-                                                        return;
-                                                    }
-                                                    // System.out.println("PING");
-                                                    try {
-                                                        client.sendResponse(new Response(KEEP_ALIVE, String.valueOf(Time.now())));
-                                                    } catch (IOException e) {
-                                                        // LogV3.severe("Failed to send Keep-Alive");
-                                                        return;
-                                                    }
-                                                }
-                                            }
-                                        };
-                                        keepAliveThread.start();
-                                        try {
-                                            listener.onIncommingMessage(new ResponseSender() {
-                                                @Override
-                                                public void sendResponse(Response response) throws FailedToSendResponseException {
-                                                    if (GO_AWAY_BYE.equals(response.getType())) {
-                                                        throw new InvalidParameterException(GO_AWAY_BYE + " is reserved for internal usage");
-                                                    } else if (GO_AWAY_INVALID_ID.equals(response.getType())) {
-                                                        throw new InvalidParameterException(GO_AWAY_INVALID_ID + " is reserved for internal usage");
-                                                    } else if (KEEP_ALIVE.equals(response.getType())) {
-                                                        throw new InvalidParameterException(KEEP_ALIVE + " is reserved for internal usage");
-                                                    } else if (EXCEPTION.equals(response.getType())) {
-                                                        throw new InvalidParameterException(EXCEPTION + " is reserved for internal usage");
-                                                    } else if (DONE.equals(response.getType())) {
-                                                        throw new InvalidParameterException(DONE + " is reserved for internal usage");
-                                                    } else {
-                                                        try {
-                                                            client.sendResponse(response);
-                                                        } catch (IOException e) {
-                                                            throw new FailedToSendResponseException(response, e);
-                                                        }
-                                                    }
-                                                }
-                                            }, message);
-                                        } finally {
-                                            keepAliveThread.interrupt();
+                            message = new String[lines];
+                            for (int index = 0; index < lines; index++) {
+                                message[index] = client.readLine();
+                            }
+                            final IncommingMessageListener listener = SingleAppInstance.this.getListener();
+                            if (listener != null) {
+                                try {
+                                    final Thread keepAliveThread = new Thread("SingleInstance KeepAlive: " + appID) {
+                                        {
+                                            setDaemon(true);
                                         }
-                                    } catch (final Throwable e) {
-                                        client.sendResponse(new Response(EXCEPTION, Exceptions.getStackTrace(e)));
+
+                                        @Override
+                                        public void run() {
+                                            while (!client.isOutputShutdown()) {
+                                                try {
+                                                    // System.out.println("Sleep " + (getReadtimeoutForReadingResponses() - 1000));
+                                                    Thread.sleep(getReadtimeoutForReadingResponses() - 1000);
+                                                } catch (InterruptedException e) {
+                                                    return;
+                                                }
+                                                // System.out.println("PING");
+                                                try {
+                                                    client.sendResponse(new Response(KEEP_ALIVE, String.valueOf(Time.now())));
+                                                } catch (IOException e) {
+                                                    // LogV3.severe("Failed to send Keep-Alive");
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    };
+                                    keepAliveThread.start();
+                                    try {
+                                        listener.onIncommingMessage(new ResponseSender() {
+                                            @Override
+                                            public void sendResponse(Response response) throws FailedToSendResponseException {
+                                                if (GO_AWAY_BYE.equals(response.getType())) {
+                                                    throw new InvalidParameterException(GO_AWAY_BYE + " is reserved for internal usage");
+                                                } else if (GO_AWAY_INVALID_ID.equals(response.getType())) {
+                                                    throw new InvalidParameterException(GO_AWAY_INVALID_ID + " is reserved for internal usage");
+                                                } else if (KEEP_ALIVE.equals(response.getType())) {
+                                                    throw new InvalidParameterException(KEEP_ALIVE + " is reserved for internal usage");
+                                                } else if (EXCEPTION.equals(response.getType())) {
+                                                    throw new InvalidParameterException(EXCEPTION + " is reserved for internal usage");
+                                                } else if (DONE.equals(response.getType())) {
+                                                    throw new InvalidParameterException(DONE + " is reserved for internal usage");
+                                                } else {
+                                                    try {
+                                                        client.sendResponse(response);
+                                                    } catch (IOException e) {
+                                                        throw new FailedToSendResponseException(response, e);
+                                                    }
+                                                }
+                                            }
+                                        }, message);
+                                    } finally {
+                                        keepAliveThread.interrupt();
                                     }
+                                } catch (final Throwable e) {
+                                    client.sendResponse(new Response(EXCEPTION, Exceptions.getStackTrace(e)));
                                 }
                             }
                         } finally {

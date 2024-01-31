@@ -166,8 +166,9 @@ public class FlexiUtils {
     /**
      * @param json
      * @return
+     * @throws InvalidPathException
      */
-    public static String getPathString(final FlexiJSonNode json) {
+    public static String getPathString(final FlexiJSonNode json) throws InvalidPathException {
         return JSPath.fromFlexiNode(json).toPathString(true);
     }
 

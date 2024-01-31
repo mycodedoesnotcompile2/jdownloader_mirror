@@ -68,8 +68,7 @@ public class AggregationResult implements ConditionResult {
      * @see org.appwork.moncompare.ConditionResult#implicitEquals(org.appwork.moncompare.Condition, org.appwork.moncompare.Scope)
      */
     @Override
-    public Object implicitEquals(Condition<?> condition, Scope newScope) throws CompareException {
-       
+    public Object implicitEquals(Condition<?> condition, Scope newScope) throws ConditionException {       
         return Condition.EQOP.opEval(condition, getValue(), newScope);
     }
 

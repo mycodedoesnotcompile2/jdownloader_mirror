@@ -63,8 +63,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -79,14 +77,13 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.URLStream;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.images.svg.NoSVGSupportFactory;
 import org.appwork.utils.images.svg.SVGFactory;
-import org.appwork.utils.net.Base64InputStream;
 import org.appwork.utils.net.Base64OutputStream;
-import org.appwork.utils.net.CharSequenceInputStream;
 
 public class IconIO {
     /**
@@ -149,7 +146,6 @@ public class IconIO {
          */
         @Override
         public int getIconHeight() {
-            // TODO Auto-generated method stub
             return this.height;
         }
 
@@ -160,7 +156,6 @@ public class IconIO {
          */
         @Override
         public int getIconWidth() {
-            // TODO Auto-generated method stub
             return this.width;
         }
 
@@ -171,6 +166,10 @@ public class IconIO {
          */
         @Override
         public void paintIcon(final Component c, final Graphics g, final int x, final int y) {
+            if (source instanceof MultiResIcon) {
+                ((MultiResIcon) source).paintIcon(c, g, x, y, getIconWidth(), getIconHeight());
+                return;
+            }
             final Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, this.interpolation.getHint());
             final AffineTransform old = g2.getTransform();
@@ -480,10 +479,19 @@ public class IconIO {
      * @return
      */
     public static ImageIcon getImageIcon(final URL resource, final int size) {
+        return toImageIcon(getIcon(resource, size));
+    }
+
+    public static Icon getIcon(final URL resource, final int size) {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {
-                    return new ImageIcon(getSvgFactory().getImageFromSVG(resource, size, size));
+                    InputStream is = resource.openStream();
+                    try {
+                        return getSvgFactory().getIconFromSVG(is, size, size, null);
+                    } finally {
+                        is.close();
+                    }
                 } catch (IOException e) {
                     LogV3.log(e);
                     return new ImageIcon(ImageProvider.createIcon("DUMMY", size, size));
@@ -513,6 +521,9 @@ public class IconIO {
      * @return
      */
     public static Icon getScaledInstance(final Icon icon, final int width, final int height, final Interpolation bicubic) {
+        if (icon instanceof MultiResIcon) {
+            return new ProxyIcon((MultiResIcon) icon, width, height);
+        }
         if (icon instanceof ImageIcon) {
             final ImageIcon iIcon = (ImageIcon) icon;
             if (iIcon.getIconHeight() == height && iIcon.getIconWidth() == width) {
@@ -945,14 +956,6 @@ public class IconIO {
      * @throws IOException
      */
     public static Image getImageFromDataUrl(String dataURL) throws IOException {
-        final int base64Index = dataURL.indexOf(";base64,");
-        final CharBuffer cb;
-        if (base64Index > 0 && base64Index + 8 < dataURL.length()) {
-            cb = CharBuffer.wrap(dataURL, base64Index + 8, dataURL.length());
-        } else {
-            cb = CharBuffer.wrap(dataURL);
-        }
-        final Base64InputStream is = new Base64InputStream(new CharSequenceInputStream(cb, Charset.forName("UTF-8")));
-        return ImageIO.read(is);
+        return ImageIO.read(IO.dataUrlToInputStream(dataURL));
     }
 }

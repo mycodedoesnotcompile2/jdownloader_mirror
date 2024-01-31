@@ -113,7 +113,11 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + " - " + new FlexiJSonPrettyStringify().toJSONString(this);
+        try {
+            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonPrettyStringify().toJSONString(this);
+        } catch (InvalidPathException e) {
+            return "ERROR:" + e.getMessage() + ": " + new FlexiJSonPrettyStringify().toJSONString(this);
+        }
     }
 
     public String toPrettyString() {
@@ -139,7 +143,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      */
     @Override
     public FlexiJSonNode set(int index, FlexiJSonNode e) {
-        e.setParent(this);
+        e.setParent(this);     
         return super.set(index, e);
     }
 

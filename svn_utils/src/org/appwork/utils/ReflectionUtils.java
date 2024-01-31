@@ -851,7 +851,7 @@ public class ReflectionUtils {
             // See #FlexiMapperTestGenericArrays
             return ((GenericArrayType) cls).getGenericComponentType();
         }
-        throw new IllegalArgumentException("Class or ParameterizedType are supported");
+        throw new IllegalArgumentException("Class or ParameterizedType are supported. You tried: " + cls);
     }
 
     /**

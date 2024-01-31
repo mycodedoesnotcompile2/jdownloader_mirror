@@ -35,13 +35,13 @@ package org.appwork.storage.flexijson.mapper.typemapper;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.StringUtils;
@@ -57,7 +57,7 @@ public class URLMapper implements FlexiTypeMapper {
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         if (mapper != null) {
             return mapper.createFlexiJSonValue(((URL) obj).toExternalForm());
         } else {

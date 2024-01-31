@@ -199,7 +199,11 @@ public class FlexiJSonValue implements FlexiJSonNode {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + ": " + new FlexiJSonStringBuilder().toJSONString(this);
+        try {
+            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonStringBuilder().toJSONString(this);
+        } catch (InvalidPathException e) {
+            return "ERROR:" + e.getMessage() + ": " + new FlexiJSonStringBuilder().toJSONString(this);
+        }
     }
 
     public FlexiJSonValue(final Number number) {

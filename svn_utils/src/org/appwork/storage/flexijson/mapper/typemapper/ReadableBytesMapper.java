@@ -33,14 +33,13 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper.typemapper;
 
-import java.util.List;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.ReadableBytes;
@@ -63,7 +62,7 @@ public class ReadableBytesMapper implements FlexiTypeMapper {
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
 
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         if (mapper != null) {
             if (obj == null) {
                 return mapper.createFlexiJSonValue((String) null);
@@ -86,6 +85,8 @@ public class ReadableBytesMapper implements FlexiTypeMapper {
         if (node instanceof FlexiJSonValue) {
             switch (((FlexiJSonValue) node).getType()) {
             case LONG:
+                //fallthrough
+            case DOUBLE:
                 return ReadableBytes.fromBytes(((Number) ((FlexiJSonValue) node).getValue()).longValue());
             case STRING:
                 if (((FlexiJSonValue) node).getValue().equals("")) {

@@ -33,14 +33,19 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.images.svg;
 
-import java.awt.AlphaComposite;
-import java.awt.Color;
+import java.awt.Component;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+
+import javax.swing.JComponent;
+
+import org.appwork.utils.images.MultiResIcon;
 
 /**
  * @author daniel
@@ -48,7 +53,7 @@ import java.io.InputStream;
  *
  */
 public class WeisjJSVG {
-    public static Image getImageFromSVG(InputStream inputStream, int w, int h, final Color backgroundColor) throws IOException {
+    public static Image getImageFromSVG(InputStream inputStream, int w, int h) throws IOException {
         try {
             com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
             final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(inputStream);
@@ -62,13 +67,8 @@ public class WeisjJSVG {
                 }
                 final double scaleWidth;
                 final double scaleHeight;
-                if (false) {
-                    scaleWidth = 1d / Math.max(size.getWidth() / w, 1);
-                    scaleHeight = 1d / Math.max(size.getHeight() / h, 1);
-                } else {
-                    scaleWidth = 1d / Math.max(size.getWidth() / w, size.getHeight() / h);
-                    scaleHeight = scaleWidth;
-                }
+                scaleWidth = 1d / Math.max(size.getWidth() / w, size.getHeight() / h);
+                scaleHeight = scaleWidth;
                 final int width = Math.max((int) (size.getWidth() * scaleWidth), 1);
                 final int height = Math.max((int) (size.getHeight() * scaleHeight), 1);
                 final BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
@@ -77,12 +77,6 @@ public class WeisjJSVG {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
                     g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    if (backgroundColor != null) {
-                        g.setComposite(AlphaComposite.Src);
-                        g.setColor(backgroundColor);
-                        g.fillRect(0, 0, width, height);
-                        g.setComposite(AlphaComposite.SrcAtop);
-                    }
                     if (scaleWidth != 1.0d || scaleHeight != 1.0d) {
                         g.scale(scaleWidth, scaleHeight);
                     }
@@ -95,6 +89,61 @@ public class WeisjJSVG {
             return null;
         } catch (Throwable e) {
             throw new IOException(e);
+        }
+    }
+
+    /**
+     * @param stream
+     * @param width
+     * @param height
+     * @return
+     */
+    public static MultiResIcon getIconFromSVG(InputStream stream, int width, int height) {
+        try {
+            com.github.weisj.jsvg.parser.SVGLoader loader = new com.github.weisj.jsvg.parser.SVGLoader();
+            final com.github.weisj.jsvg.SVGDocument svgDocument = loader.load(stream);
+            if (svgDocument == null) {
+                return null;
+            }
+            return new SVGIcon(width, height) {
+                /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
+                 */
+                @Override
+                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
+                    final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
+                    if (width <= 0) {
+                        width = (int) size.getWidth();
+                    }
+                    if (height <= 0) {
+                        height = (int) size.getHeight();
+                    }
+                    final double scaleWidth;
+                    final double scaleHeight;
+                    scaleWidth = 1d / Math.max(size.getWidth() / width, size.getHeight() / height);
+                    scaleHeight = scaleWidth;
+                    width = Math.max((int) (size.getWidth() * scaleWidth), 1);
+                    height = Math.max((int) (size.getHeight() * scaleHeight), 1);
+                    final Graphics2D g = (Graphics2D) ((Graphics2D) g1D).create();
+                    RenderingHints restoreHints = g.getRenderingHints();
+                    AffineTransform restoreTransform = g.getTransform();
+                    try {
+                        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+                        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                        // AffineTransform transform = g.getTransform();
+                        g.translate(x, y);
+                        if (scaleWidth != 1.0d || scaleHeight != 1.0d) {
+                            g.scale(scaleWidth, scaleHeight);
+                        }
+                        svgDocument.render((JComponent) (c instanceof JComponent ? c : null), g);
+                    } finally {
+                        g.setRenderingHints(restoreHints);
+                        g.setTransform(restoreTransform);
+                    }
+                }
+            };
+        } finally {
         }
     }
 }

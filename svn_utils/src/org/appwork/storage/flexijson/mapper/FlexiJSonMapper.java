@@ -42,7 +42,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -71,6 +70,7 @@ import org.appwork.storage.StorableLink;
 import org.appwork.storage.StorableOrder;
 import org.appwork.storage.StorableSee;
 import org.appwork.storage.StorableTypeAlternatives;
+import org.appwork.storage.StorableUnique;
 import org.appwork.storage.StorableValidateMandatoryInJson;
 import org.appwork.storage.StorableValidateNotNull;
 import org.appwork.storage.TypeRef;
@@ -211,7 +211,7 @@ public class FlexiJSonMapper {
      * @throws FlexiMapperException
      */
     public FlexiJSonNode objectToJsonNode(final Object obj, CompiledType type) throws FlexiMapperException {
-        return objectToJsonNode(null, obj, new LinkedList<CompiledType>(Arrays.asList(type)));
+        return objectToJsonNode(null, obj, createObjectToJsonContext(type));
     }
 
     public FlexiJSonNode objectToJsonNode(final Object obj) throws FlexiMapperException {
@@ -222,25 +222,24 @@ public class FlexiJSonMapper {
      * @param reference
      *            TODO
      * @param obj
-     * @param typeHirarchy
+     * @param context
      *            TODO
      * @return
      * @throws FlexiMapperException
      */
     @SuppressWarnings("unchecked")
-    public FlexiJSonNode objectToJsonNode(Getter reference, Object obj, LinkedList<CompiledType> typeHirarchy) throws FlexiMapperException {
-        if (typeHirarchy == null) {
-            typeHirarchy = new LinkedList<CompiledType>();
-            typeHirarchy.add(obj == null ? CompiledType.OBJECT : CompiledType.create(obj.getClass()));
+    public FlexiJSonNode objectToJsonNode(Getter reference, Object obj, DefaultObjectToJsonContext context) throws FlexiMapperException {
+        if (context == null) {
+            context = createObjectToJsonContext(obj == null ? CompiledType.OBJECT : CompiledType.create(obj.getClass()));
         }
         if (obj instanceof FlexiJSonNode) {
             return (FlexiJSonNode) obj;
         }
-        final FlexiJSonNode mapped = handleMapperObjectToJsonNode(reference, obj, typeHirarchy);
+        final FlexiJSonNode mapped = handleMapperObjectToJsonNode(reference, obj, context);
         if (mapped != null) {
             return mapped;
         }
-        final CompiledType cType = getTargetClass(obj, typeHirarchy);
+        final CompiledType cType = getTargetClass(obj, context);
         if (cType.isPrimitiveWrapper()) {
             // if (obj == null) {
             // return createFlexiJSonValue((String) null);
@@ -301,10 +300,10 @@ public class FlexiJSonMapper {
                     type = CompiledType.create(next.getValue().getClass());
                 }
                 try {
-                    typeHirarchy.add(type);
-                    ret.add(createKeyValueElement(ret, next.getKey().toString(), objectToJsonNode(reference, next.getValue(), typeHirarchy)));
+                    context.add(type, next.getKey());
+                    ret.add(createKeyValueElement(ret, next.getKey().toString(), objectToJsonNode(reference, next.getValue(), context)));
                 } finally {
-                    typeHirarchy.removeLast();
+                    context.removeLast();
                 }
             }
             return ret;
@@ -319,6 +318,7 @@ public class FlexiJSonMapper {
                 return node;
             }
             final FlexiJSonArray ret = (FlexiJSonArray) node;
+            int i = 0;
             for (final Object o : (Collection<?>) obj) {
                 CompiledType type = CompiledType.OBJECT;
                 if (compTypes.length == 1 && compTypes[0].isGenericsResolved()) {
@@ -328,10 +328,11 @@ public class FlexiJSonMapper {
                     type = CompiledType.create(o.getClass());
                 }
                 try {
-                    typeHirarchy.add(type);
-                    ret.add(objectToJsonNode(reference, o, typeHirarchy));
+                    context.add(type, i);
+                    ret.add(objectToJsonNode(reference, o, context));
                 } finally {
-                    typeHirarchy.removeLast();
+                    context.removeLast();
+                    i++;
                 }
             }
             return ret;
@@ -357,10 +358,10 @@ public class FlexiJSonMapper {
                     type = CompiledType.create(o.getClass());
                 }
                 try {
-                    typeHirarchy.add(type);
-                    ret.add(objectToJsonNode(reference, o, typeHirarchy));
+                    context.add(type, i);
+                    ret.add(objectToJsonNode(reference, o, context));
                 } finally {
-                    typeHirarchy.removeLast();
+                    context.removeLast();
                 }
             }
             return ret;
@@ -395,15 +396,19 @@ public class FlexiJSonMapper {
                 Collection<Getter> getters = cc.getGetterMap().values();
                 HashMap<KeyValueElement, Integer> orderMap = null;
                 for (final Getter g : getters) {
-                    try {
-                        typeHirarchy.add(CompiledType.create(g.getMethod().getGenericReturnType(), cType.type));
+                    CompiledType t=CompiledType.create(g.getMethod().getGenericReturnType(), cType.type);
+                    try {                        
+                        context.add(t, g.getKey());
                         if (cType.getClassCache().getAnnotations(g.key, StorableHidden.class).size() > 0) {
+                            continue;
+                        }
+                        if (isIgnoreProperty(obj, cType, context, g)) {
                             continue;
                         }
                         Object value = g.getValue(obj);
                         if (isIgnoreDefaultValuesEnabled(obj, cType, g)) {
                             if (empty == null) {
-                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                             }
                             if (empty != null) {
                                 if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
@@ -411,10 +416,10 @@ public class FlexiJSonMapper {
                                 }
                             }
                         }
-                        FlexiJSonNode subNode = objectToJsonNode(g, value, typeHirarchy);
+                        FlexiJSonNode subNode = objectToJsonNode(g, value, context);
                         if (isTagDefaultValuesEnabled(obj, cType, g)) {
                             if (empty == null) {
-                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                             }
                             if (empty != null) {
                                 if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
@@ -425,15 +430,15 @@ public class FlexiJSonMapper {
                         KeyValueElement element;
                         if (isAddDefaultValueCommentEnabled(obj, cType, g)) {
                             if (empty == null) {
-                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                                empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                             }
                             if (empty == null) {
-                                element = (methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), null, false));
+                                element = (methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), null, false));
                             } else {
-                                element = (methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), g.getValue(empty), true));
+                                element = (methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), g.getValue(empty), true));
                             }
                         } else {
-                            element = (methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), null, false));
+                            element = (methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), null, false));
                         }
                         if (is != null) {
                             KeyValueElement backEndElement = is.backendNode.getElement(g.key);
@@ -459,7 +464,7 @@ public class FlexiJSonMapper {
                     } catch (InvocationTargetException e) {
                         returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
                     } finally {
-                        typeHirarchy.removeLast();
+                        context.removeLast();
                     }
                 }
                 if (is != null) {
@@ -516,6 +521,26 @@ public class FlexiJSonMapper {
     }
 
     /**
+     * @param compiledType
+     * @return
+     */
+    protected DefaultObjectToJsonContext createObjectToJsonContext(CompiledType compiledType) {
+        return new DefaultObjectToJsonContext(compiledType);
+    }
+
+    /**
+     * @param obj
+     * @param cType
+     * @param typeHirarchy
+     * @param g
+     * @return
+     */
+    protected boolean isIgnoreProperty(Object obj, CompiledType cType, DefaultObjectToJsonContext context, Getter g) {
+        // can be used to ignore properties during serialisation/obj -> Json mapping
+        return false;
+    }
+
+    /**
      * @param commentsBeforeKey
      */
     private void cleanUpComments(FlexiJSonComments comments) {
@@ -540,7 +565,7 @@ public class FlexiJSonMapper {
      * @return
      * @throws FlexiMapperException
      */
-    protected FlexiJSonObject interfaceStorageToNode(InterfaceStorage<Object> is, Object obj, CompiledType cType, LinkedList<CompiledType> typeHirarchy) throws FlexiMapperException {
+    protected FlexiJSonObject interfaceStorageToNode(InterfaceStorage<Object> is, Object obj, CompiledType cType, DefaultObjectToJsonContext context) throws FlexiMapperException {
         final FlexiJSonObject ret = createFlexiJSonObject();
         addClassHeaderCommentsByAnnotations(ret, cType);
         CompiledType[] compTypes = cType.componentTypes;
@@ -550,24 +575,20 @@ public class FlexiJSonMapper {
         ret.addCommentsAfter(is.backendNode.getCommentsAfter());
         ret.addCommentsBefore(is.backendNode.getCommentsBefore());
         ret.addCommentsInside(is.backendNode.getCommentsInside());
-        // for(KeyValueElement el: is.backendNode.getElements()) {
-        //
-        //
-        //
-        // }
         try {
             Object empty = null;
             Collection<Getter> getters = cType.getClassCache().getGetterMap().values();
             for (final Getter g : getters) {
+                CompiledType t = CompiledType.create(g.getMethod().getGenericReturnType(), cType.type);
                 try {
-                    typeHirarchy.add(CompiledType.create(g.getMethod().getGenericReturnType(), cType.type));
+                    context.add(t, g.getKey());
                     if (cType.getClassCache().getAnnotations(g.key, StorableHidden.class).size() > 0) {
                         continue;
                     }
                     Object value = g.getValue(obj);
                     if (isIgnoreDefaultValuesEnabled(obj, cType, g)) {
                         if (empty == null) {
-                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                         }
                         if (empty != null) {
                             if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
@@ -575,10 +596,10 @@ public class FlexiJSonMapper {
                             }
                         }
                     }
-                    FlexiJSonNode subNode = objectToJsonNode(g, value, typeHirarchy);
+                    FlexiJSonNode subNode = objectToJsonNode(g, value, context);
                     if (isTagDefaultValuesEnabled(obj, cType, g)) {
                         if (empty == null) {
-                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                         }
                         if (empty != null) {
                             if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
@@ -588,15 +609,15 @@ public class FlexiJSonMapper {
                     }
                     if (isAddDefaultValueCommentEnabled(obj, cType, g)) {
                         if (empty == null) {
-                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), typeHirarchy);
+                            empty = createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                         }
                         if (empty == null) {
-                            ret.add(methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), null, false));
+                            ret.add(methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), null, false));
                         } else {
-                            ret.add(methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), g.getValue(empty), true));
+                            ret.add(methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), g.getValue(empty), true));
                         }
                     } else {
-                        ret.add(methodOrFieldAnnotationsToComments(g, typeHirarchy, createKeyValueElement(ret, g.getKey(), subNode), null, false));
+                        ret.add(methodOrFieldAnnotationsToComments(g, context, createKeyValueElement(ret, g.getKey(), subNode), null, false));
                     }
                 } catch (IllegalArgumentException e) {
                     returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
@@ -605,7 +626,7 @@ public class FlexiJSonMapper {
                 } catch (InvocationTargetException e) {
                     returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
                 } finally {
-                    typeHirarchy.removeLast();
+                    context.removeLast();
                 }
             }
         } catch (SecurityException e) {
@@ -648,12 +669,12 @@ public class FlexiJSonMapper {
      * different.
      *
      * @param obj
-     * @param typeHirarchy
+     * @param context
      * @return
      */
-    protected CompiledType getTargetClass(Object obj, LinkedList<CompiledType> typeHirarchy) {
+    protected CompiledType getTargetClass(Object obj, DefaultObjectToJsonContext context) {
         if (obj == null) {
-            return typeHirarchy.getLast();
+            return context.getLast();
         }
         if (obj instanceof Proxy) {
             InvocationHandler handler = Proxy.getInvocationHandler(obj);
@@ -676,17 +697,17 @@ public class FlexiJSonMapper {
         return new KeyValueElement(parent, key, node);
     }
 
-    protected FlexiJSonNode handleMapperObjectToJsonNode(Getter getter, final Object obj, LinkedList<CompiledType> typeHirarchy) throws FlexiMapperException {
+    protected FlexiJSonNode handleMapperObjectToJsonNode(Getter getter, final Object obj, DefaultObjectToJsonContext context) throws FlexiMapperException {
         for (FlexiTypeMapper mapper : typeMapper) {
             if (mapper.canConvert2Json(obj, getter)) {
-                return mapper.obj2JSon(this, obj, getter, typeHirarchy);
+                return mapper.obj2JSon(this, obj, getter, context);
             }
         }
         ArrayList<FlexiTypeMapper> mappers = THREAD_MAPPERS.get();
         if (mappers != null) {
             for (FlexiTypeMapper mapper : mappers) {
                 if (mapper.canConvert2Json(obj, getter)) {
-                    return mapper.obj2JSon(this, obj, getter, typeHirarchy);
+                    return mapper.obj2JSon(this, obj, getter, context);
                 }
             }
         }
@@ -713,7 +734,7 @@ public class FlexiJSonMapper {
         this.tagDefaultValuesEnabled = tagDefaultValuesEnabled;
     }
 
-    protected Object createDefaultObject(final Object obj, CompiledType cType, final FlexiJSonObject ret, Getter getter, Setter setter, LinkedList<CompiledType> typeHirarchy) throws NoSuchMethodException, FlexiMapperException {
+    protected Object createDefaultObject(final Object obj, CompiledType cType, final FlexiJSonObject ret, Getter getter, Setter setter, DefaultObjectToJsonContext context) throws NoSuchMethodException, FlexiMapperException {
         if (obj instanceof Proxy) {
             InvocationHandler handler = Proxy.getInvocationHandler(obj);
             if (handler instanceof InterfaceStorage) {
@@ -799,7 +820,7 @@ public class FlexiJSonMapper {
 
     /**
      * @param g
-     * @param typeHirarchy
+     * @param context
      * @param create
      * @param defaultValue
      *            TODO
@@ -807,7 +828,7 @@ public class FlexiJSonMapper {
      * @return
      * @throws FlexiMapperException
      */
-    protected KeyValueElement methodOrFieldAnnotationsToComments(Getter g, LinkedList<CompiledType> typeHirarchy, KeyValueElement create, Object defaultValue, boolean addDefaultValueAnnotation) throws FlexiMapperException {
+    protected KeyValueElement methodOrFieldAnnotationsToComments(Getter g, DefaultObjectToJsonContext context, KeyValueElement create, Object defaultValue, boolean addDefaultValueAnnotation) throws FlexiMapperException {
         // / move comments to KeyValueElement
         FlexiJSonComments comments = create.getValue().getCommentsBefore();
         Class<?> cls = g.getMethod().getDeclaringClass();
@@ -816,7 +837,7 @@ public class FlexiJSonMapper {
             if (addDefaultValueAnnotation) {
                 comments = addComment(comments, "Default: " + new FlexiJSonStringBuilder().toJSONString(new FlexiJSonMapper().objectToJsonNode(defaultValue)), FlexiMapperTags.DEFAULT_VALUE);
             }
-            comments = addComment(comments, TYPE + typeToString(CompiledType.createFromCompiledHirarchy(typeHirarchy)), FlexiMapperTags.TYPE);
+            comments = addComment(comments, TYPE + typeToString(context.getCompiledType()), FlexiMapperTags.TYPE);
         } else if (addDefaultValueAnnotation) {
             comments = addComment(comments, "Default: " + defaultValue, FlexiMapperTags.DEFAULT_VALUE);
         }
@@ -827,7 +848,7 @@ public class FlexiJSonMapper {
             return create;
         }
         comments = addCommentByAnnotations(g, comments, cls);
-        comments = addEnumOptionsComments(comments, typeHirarchy.getLast());
+        comments = addEnumOptionsComments(comments, context.getLast());
         if (comments != null) {
             create.setCommentsBeforeKey(comments);
         }
@@ -1039,6 +1060,9 @@ public class FlexiJSonMapper {
                 comments = pushComment(comments, "Example: " + ((StorableExample) anno).value(), FlexiMapperTags.EXAMPLE);
             }
         }
+        if (anno instanceof StorableUnique) {
+            comments = pushComment(comments, "Unique: " + ((StorableUnique) anno).value() + " - There may be only one entry with the same '" + ((StorableUnique) anno).value() + "' property", FlexiMapperTags.DOCS);
+        }
         if (anno instanceof StorableTypeAlternatives) {
             if (((StorableTypeAlternatives) anno).value().length > 0) {
                 for (Class<?> cl : ((StorableTypeAlternatives) anno).value()) {
@@ -1132,7 +1156,6 @@ public class FlexiJSonMapper {
      * @return
      */
     protected boolean isAnnotationCommentsEnabled() {
-        // TODO Auto-generated method stub
         return false;
     }
 
@@ -1491,7 +1514,29 @@ public class FlexiJSonMapper {
         if (((FlexiJSonValue) json).getValue() == null) {
             return null;
         }
-        return Enum.valueOf((Class<Enum>) type.raw, StringUtils.valueOfOrNull(((FlexiJSonValue) json).getValue()));
+        String string = StringUtils.valueOfOrNull(((FlexiJSonValue) json).getValue());
+        try {
+            return Enum.valueOf((Class<Enum>) type.raw, string);
+        } catch (java.lang.IllegalArgumentException e) {
+            // invalid enum check annotations to see if we have fallback values
+            for (Field f : type.raw.getDeclaredFields()) {
+                FlexiKeyLookup fallback = f.getAnnotation(FlexiKeyLookup.class);
+                if (fallback != null) {
+                    for (String fb : fallback.value()) {
+                        if (fb.equals(string)) {
+                            try {
+                                return (Enum) f.get(null);
+                            } catch (IllegalArgumentException e1) {
+                                LogV3.log(e1);
+                            } catch (IllegalAccessException e1) {
+                                LogV3.log(e1);
+                            }
+                        }
+                    }
+                }
+            }
+            throw e;
+        }
     }
 
     protected Object handleMapperJsonNodeToObject(final FlexiJSonNode json, CompiledType type, Setter setter) throws FlexiMapperException {
@@ -1652,7 +1697,7 @@ public class FlexiJSonMapper {
      * @throws FlexiMapperException
      */
     protected void onClassFieldMissing(Object inst, String key, FlexiJSonNode value, CompiledType cType) throws FlexiMapperException {
-        // TODO Auto-generated method stub
+        // LogV3.warning("Unexpected field in json: " + key + " in " + cType.toString(new JavaSyntax(true)));
     }
 
     /**

@@ -46,6 +46,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
@@ -608,6 +609,20 @@ public class Application {
         final Properties properties = System.getProperties();
         final Enumeration propertiesKey = properties.keys();
         final StringBuilder sb = new StringBuilder();
+        try {
+            final List<String> lst = ManagementFactory.getRuntimeMXBean().getInputArguments();
+            for (String key : lst) {
+                if (blackList != null && blackList.contains("jvm_" + key)) {
+                    continue;
+                } else {
+                    sb.append("JVM: ").append(key);
+                    logger.info(sb.toString());
+                    sb.setLength(0);
+                }
+            }
+        } catch (Throwable e) {
+            logger.log(e);
+        }
         while (propertiesKey.hasMoreElements()) {
             final String key = String.valueOf(propertiesKey.nextElement());
             if (blackList != null && blackList.contains("prop_" + key)) {
@@ -1109,6 +1124,12 @@ public class Application {
                 }
             }
         }
+        final HashMap<String, String> manifestMap = readManifests(jars);
+        MANIFEST = manifestMap;
+        return manifestMap;
+    }
+
+    public static HashMap<String, String> readManifests(final List<File> jars) {
         final HashMap<String, String> manifestMap = new HashMap<String, String>();
         NEXT_FILE: for (File jar : jars) {
             try {
@@ -1143,7 +1164,6 @@ public class Application {
             } catch (Exception e) {
             }
         }
-        MANIFEST = manifestMap;
         return manifestMap;
     }
 }

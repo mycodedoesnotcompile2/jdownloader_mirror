@@ -37,7 +37,11 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
+import org.appwork.storage.Storable;
 import org.appwork.storage.flexijson.JSPath;
+import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiStorableInterface;
 
 /**
  * @author thomas
@@ -49,12 +53,26 @@ public class Scope {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
     public String toString() {
-        return "{ROOT}" + path.toPathString(true) + " = " + getLast();
+        String ret = "<ROOT>";
+        for (int i = 0; i < path.size(); i++) {
+            ret += "\r\n";
+            if (scope.get(i + 1) == Condition.KEY_DOES_NOT_EXIST) {
+                ret += path.get(i) + " = " + "KEY_DOES_NOT_EXIST";
+            } else {
+                Object seria = scope.get(i + 1);
+                if (seria == null || seria instanceof Storable || seria instanceof FlexiStorableInterface) {
+                    ret += path.get(i) + " = " + Deser.toString(scope.get(i + 1), SC.LOG_SINGLELINE);
+                } else {
+                    ret += path.get(i) + " = " + String.valueOf(scope.get(i + 1));
+                }
+            }
+        }
+        return ret;
     }
 
     public List<Object> getScope() {
@@ -72,7 +90,11 @@ public class Scope {
      * @param realPath
      */
     public Scope(List<Object> scope, JSPath path) {
-        this.scope = new LinkedList<Object>(scope);
+        this(new LinkedList<Object>(scope), path);
+    }
+
+    private Scope(LinkedList<Object> scope, JSPath path) {
+        this.scope = scope;
         this.path = path;
     }
 
@@ -109,6 +131,7 @@ public class Scope {
      * @param keyOrg
      */
     public void add(Object value, Object key) {
+        // DebugMode.breakIf(value == null);
         scope.add(value);
         path = path.derive(key);
     }
@@ -139,5 +162,42 @@ public class Scope {
     public void removeLast() {
         scope.removeLast();
         path = path.getParent();
+    }
+
+    /**
+     * @param keyDoesNotExist
+     */
+    public void replaceLast(Object newValue) {
+        // path stays unchanged
+        scope.removeLast();
+        scope.add(newValue);
+    }
+
+    /**
+     * @param test
+     */
+    public void replaceAll(Scope test) {
+        scope.clear();
+        scope.addAll(test.scope);
+        this.path = test.path;
+    }
+
+    /**
+     * @param indexMissing
+     * @param autoCreated
+     */
+    public void set(int index, Object object) {
+        scope.set(index, object);
+    }
+
+    /**
+     * @param i
+     * @param i2
+     */
+    public void trim(int from, int to) {
+        List<Object> sub = scope.subList(from, to);
+        scope.clear();
+        scope.addAll(sub);
+        path = JSPath.fromPathElements(path.getElements().subList(from, to).toArray(new Object[0]));
     }
 }

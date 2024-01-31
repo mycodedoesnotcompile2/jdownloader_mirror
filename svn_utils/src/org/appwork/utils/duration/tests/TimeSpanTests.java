@@ -53,6 +53,12 @@ public class TimeSpanTests extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
+        try {
+            TimeSpan.MAX.toInt(Unit.MILLISECONDS);
+            throw new Exception("ArithmeticException due to overflow expected");
+        } catch (ArithmeticException e) {
+            // expected
+        }
         System.out.println(TimeSpan.MAX.format());
         System.out.println(TimeSpan.MIN.format());
         try {

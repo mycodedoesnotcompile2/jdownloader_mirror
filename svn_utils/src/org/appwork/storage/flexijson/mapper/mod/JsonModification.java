@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
 import org.appwork.storage.BuildsInfo;
 import org.appwork.storage.FailLevel;
@@ -58,8 +59,7 @@ import org.appwork.storage.flexijson.JSPath;
 import org.appwork.storage.validator.classvalidator.StorableAbstractValidator;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator1;
 import org.appwork.utils.reflection.CompiledType;
-import org.appwork.utils.reflection.CompiledType.ToStringRule;
-import org.appwork.utils.reflection.CompiledType.ToStringSyntax;
+import org.appwork.utils.reflection.JavaSyntax;
 
 /**
  * @author thomas
@@ -93,26 +93,35 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
             if (!(node instanceof FlexiJSonArray)) {
                 ret.add(new org.appwork.storage.StorableValidator.InvalidTypeException(validator, path, node, type, "Array<String> expected!", FailLevel.ERROR));
             }
-            CompiledType toCheckType = validator.getRootType().getComponentType().getComponentType();
-            ;
-            for (int i = 0; i < ((FlexiJSonArray) node).size(); i++) {
-                FlexiJSonNode element = ((FlexiJSonArray) node).get(i);
-                String key = ((FlexiJSonValue) element).getStringValue();
-                if (key == null) {
-                    ret.add(new ValidatorValueIsNullException(validator, path.derive(i), element, CompiledType.STRING, "May not be null", FailLevel.ERROR));
-                } else {
-                    try {
+            JSPath mod = path.getParent();
+            CompiledType toCheckType;
+            try {
+                toCheckType = validator.getRootType().resolve(mod).getComponentType();
+                // CompiledType toCheckType = validator.getRootType().getComponentType().getComponentType();
+                ;
+                for (int i = 0; i < ((FlexiJSonArray) node).size(); i++) {
+                    FlexiJSonNode element = ((FlexiJSonArray) node).get(i);
+                    String key = ((FlexiJSonValue) element).getStringValue();
+                    if (key == null) {
+                        ret.add(new ValidatorValueIsNullException(validator, path.derive(i), element, CompiledType.STRING, "May not be null", FailLevel.ERROR));
+                    } else {
                         try {
-                            CompiledType exists = toCheckType.resolve(JSPath.fromPathString(key));
-                            ret.add(new ValidatorException(validator, path.derive(i), element, null, "Will delete '" + JSPath.fromPathString(key) + "' of type " + exists.toString(new ToStringRule(ToStringSyntax.JAVA)), FailLevel.INFO));
-                        } catch (CannotResolvePathException e) {
-                            ret.add(new ValidatorException(validator, path.derive(i), element, null, "Unknown element - the path " + JSPath.fromPathString(key) + " does not exist in " + toCheckType.toString(new ToStringRule(ToStringSyntax.JAVA)), FailLevel.WARNING));
+                            try {
+                                CompiledType exists = toCheckType.resolve(JSPath.fromPathString(key));
+                                ret.add(new ValidatorException(validator, path.derive(i), element, null, "Will delete '" + JSPath.fromPathString(key).toPathString(false) + "' of type " + exists.toString(new JavaSyntax()), FailLevel.INFO));
+                            } catch (CannotResolvePathException e) {
+                                LogV3.log(e);
+                                ret.add(new ValidatorException(validator, path.derive(i), element, null, "Unknown element - the path " + JSPath.fromPathString(key) + " does not exist in " + toCheckType.toString(new JavaSyntax())));
+                            }
+                        } catch (InvalidPathException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
                         }
-                    } catch (InvalidPathException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
                     }
                 }
+            } catch (CannotResolvePathException e) {
+                LogV3.log(e);
+                ret.add(new ValidatorException(validator, path, node, null, "Unknown Error in JsonModification.unset validator"));
             }
             return ret;
         }
@@ -125,7 +134,6 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
          */
         @Override
         public String getDocsDescription(String parameter, Object anno) {
-            // TODO Auto-generated method stub
             return null;
         }
     }
@@ -145,7 +153,7 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
 
     private Condition<MatcherType>[] conditions;
 
-    @StorableDoc("The Conditions property is used to specify under which circumstances a modification is applied.")
+    @StorableDoc("The Conditions property is used to specify under which circumstances a modification is applied. All conditions must match - if a single condition does not match, the mod will not get applied")
     public Condition<MatcherType>[] getConditions() {
         return conditions;
     }

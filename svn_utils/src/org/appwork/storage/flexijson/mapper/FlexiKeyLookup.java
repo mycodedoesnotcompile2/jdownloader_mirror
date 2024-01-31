@@ -42,7 +42,7 @@ import java.lang.annotation.Target;
  * @author thomas Usage: in Lower case. latest key is the first one. @LookUpKeys({"key","olderkey","evenolderkey"})
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.METHOD })
+@Target({ ElementType.METHOD, ElementType.FIELD })
 public @interface FlexiKeyLookup {
     /**
      * The first entry is the major key. it will get used as first lookup and for writing.

@@ -34,12 +34,12 @@
 package org.appwork.storage.flexijson.mapper.typemapper;
 
 import java.awt.Color;
-import java.util.List;
 
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.reflection.CompiledType;
@@ -54,7 +54,7 @@ public class ColorMapper implements FlexiTypeMapper {
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#obj2Json(java.lang.Object )
      */
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         Color c = (Color) obj;
         StringBuilder sb = new StringBuilder();
         sb.append("#");

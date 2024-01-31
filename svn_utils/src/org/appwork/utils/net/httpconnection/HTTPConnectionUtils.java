@@ -631,53 +631,51 @@ public class HTTPConnectionUtils {
         ByteBuffer bigbuffer = ByteBuffer.wrap(new byte[4096]);
         final byte[] minibuffer = new byte[1];
         int position;
-        
-            while (in.read(minibuffer) >= 0) {
-                if (Thread.currentThread().isInterrupted()) {
-                    throw new InterruptedIOException();
-                }
-                if (bigbuffer.remaining() < 1) {
-                    final ByteBuffer newbuffer = ByteBuffer.wrap(new byte[bigbuffer.capacity() * 2]);
-                    JDK8BufferHelper.flip(bigbuffer);
-                    newbuffer.put(bigbuffer);
-                    bigbuffer = newbuffer;
-                }
-                bigbuffer.put(minibuffer);
-                if (readSingleLine) {
-                    if (bigbuffer.position() >= 1) {
-                        /*
-                         * \n only line termination, for fucking buggy non rfc servers
-                         */
-                        position = bigbuffer.position();
-                        if (bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
+        while (in.read(minibuffer) >= 0) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedIOException();
+            }
+            if (bigbuffer.remaining() < 1) {
+                final ByteBuffer newbuffer = ByteBuffer.wrap(new byte[bigbuffer.capacity() * 2]);
+                JDK8BufferHelper.flip(bigbuffer);
+                newbuffer.put(bigbuffer);
+                bigbuffer = newbuffer;
+            }
+            bigbuffer.put(minibuffer);
+            if (readSingleLine) {
+                if (bigbuffer.position() >= 1) {
+                    /*
+                     * \n only line termination, for fucking buggy non rfc servers
+                     */
+                    position = bigbuffer.position();
+                    if (bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
+                        break;
+                    }
+                    if (bigbuffer.position() >= 2) {
+                        /* \r\n, correct line termination */
+                        if (bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
                             break;
-                        }
-                        if (bigbuffer.position() >= 2) {
-                            /* \r\n, correct line termination */
-                            if (bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
-                                break;
-                            }
                         }
                     }
-                } else {
-                    if (bigbuffer.position() >= 2) {
-                        position = bigbuffer.position();
-                        if (bigbuffer.get(position - 2) == HTTPConnectionUtils.N && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
-                            /*
-                             * \n\n for header<->content divider, or fucking buggy non rfc servers
-                             */
+                }
+            } else {
+                if (bigbuffer.position() >= 2) {
+                    position = bigbuffer.position();
+                    if (bigbuffer.get(position - 2) == HTTPConnectionUtils.N && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
+                        /*
+                         * \n\n for header<->content divider, or fucking buggy non rfc servers
+                         */
+                        break;
+                    }
+                    if (bigbuffer.position() >= 4) {
+                        /* \r\n\r\n for header<->content divider */
+                        if (bigbuffer.get(position - 4) == HTTPConnectionUtils.R && bigbuffer.get(position - 3) == HTTPConnectionUtils.N && bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
                             break;
-                        }
-                        if (bigbuffer.position() >= 4) {
-                            /* \r\n\r\n for header<->content divider */
-                            if (bigbuffer.get(position - 4) == HTTPConnectionUtils.R && bigbuffer.get(position - 3) == HTTPConnectionUtils.N && bigbuffer.get(position - 2) == HTTPConnectionUtils.R && bigbuffer.get(position - 1) == HTTPConnectionUtils.N) {
-                                break;
-                            }
                         }
                     }
                 }
             }
-        
+        }
         JDK8BufferHelper.flip(bigbuffer);
         return bigbuffer;
     }

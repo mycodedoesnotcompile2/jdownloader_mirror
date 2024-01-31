@@ -72,8 +72,8 @@ import org.appwork.storage.simplejson.mapper.ClassCache.Rules;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.ClassPathScanner;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.reflection.Clazz;
@@ -123,7 +123,7 @@ public class StorableValidatorTest extends AWTest {
                         } catch (Exception e) {
                             // expected
                             String message = e.getMessage();
-                            if (!"WARNING: package org.appwork.storage.tests(BadCollectionExtends.java:1) is a List and will not de/serialize setters or getters".equals(message)) {
+                            if (!message.startsWith("WARNING: package org.appwork.storage.tests(BadCollectionExtends.java:1) is a List and will not de/serialize setters or getters")) {
                                 throw new Exception("Expected a differend message", e);
                             }
                             return;
@@ -135,7 +135,7 @@ public class StorableValidatorTest extends AWTest {
                         } catch (Exception e) {
                             // expected
                             String message = e.getMessage();
-                            if (!"WARNING: package org.appwork.storage.tests(BadMapExtends.java:1) is a Map and will not de/serialize setters or getters".equals(message)) {
+                            if (!message.startsWith("WARNING: package org.appwork.storage.tests(BadMapExtends.java:1) is a Map and will not de/serialize setters or getters")) {
                                 throw new Exception("Expected a differend message", e);
                             }
                             return;
@@ -275,19 +275,19 @@ public class StorableValidatorTest extends AWTest {
         final ClassCache classCache = createClassCache(cls);
         if (Map.class.isAssignableFrom(cls)) {
             if (classCache.getKeys().size() > 0) {
-                throw new Exception("WARNING: " + link(cls) + " is a Map and will not de/serialize setters or getters");
+                throw new Exception("WARNING: " + link(cls) + " is a Map and will not de/serialize setters or getters: " + classCache.getKeys());
             } else {
                 return;
             }
         } else if (Set.class.isAssignableFrom(cls)) {
             if (classCache.getKeys().size() > 0) {
-                throw new Exception("WARNING: " + link(cls) + " is a Set and will not de/serialize setters or getters");
+                throw new Exception("WARNING: " + link(cls) + " is a Set and will not de/serialize setters or getters: " + classCache.getKeys());
             } else {
                 return;
             }
         } else if (Collection.class.isAssignableFrom(cls)) {
             if (classCache.getKeys().size() > 0) {
-                throw new Exception("WARNING: " + link(cls) + " is a List and will not de/serialize setters or getters");
+                throw new Exception("WARNING: " + link(cls) + " is a List and will not de/serialize setters or getters " + classCache.getKeys());
             } else {
                 return;
             }
@@ -395,7 +395,6 @@ public class StorableValidatorTest extends AWTest {
      * @return
      */
     private String link(Class<?> cls) {
-        // TODO Auto-generated method stub
         return cls.getPackage().toString() + "(" + cls.getSimpleName() + ".java:1)";
     }
 

@@ -33,8 +33,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiUtils;
+import org.appwork.storage.flexijson.InvalidPathException;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -43,7 +45,6 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public class ClassCastFlexiMapperException extends FlexiMapperException {
-
     public final Object value;
 
     /**
@@ -55,9 +56,16 @@ public class ClassCastFlexiMapperException extends FlexiMapperException {
      * @param v
      */
     public ClassCastFlexiMapperException(FlexiJSonNode json, CompiledType type, String message, Throwable e, Object v) {
-        super(json, type, message == null ? "Could not map " + FlexiUtils.getPathString(json) + " = " + json + (v == null ? "" : (" (" + v.getClass() + ")")) + " to " + type + (e != null ? ("(" + e.getMessage() + ")") : "") : message, e);
+        super(json, type, message == null ? "Could not map " + extracted(json) + " = " + json + (v == null ? "" : (" (" + v.getClass() + ")")) + " to " + type + (e != null ? ("(" + e.getMessage() + ")") : "") : message, e);
         this.value = v;
-
     }
 
+    private static String extracted(FlexiJSonNode json) {
+        try {
+            return FlexiUtils.getPathString(json);
+        } catch (InvalidPathException e) {
+            LogV3.log(e);
+            return "Invalid Path: " + e.getMessage();
+        }
+    }
 }

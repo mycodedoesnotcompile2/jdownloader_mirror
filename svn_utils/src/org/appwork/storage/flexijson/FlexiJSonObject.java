@@ -52,6 +52,7 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
 import org.appwork.storage.simplejson.JSonUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -59,7 +60,8 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public class FlexiJSonObject implements FlexiJSonNode {
-    private final LinkedList<KeyValueElement> elements;
+    public static final SimpleTypeRef<FlexiJSonObject> TYPE = new SimpleTypeRef<FlexiJSonObject>(FlexiJSonObject.class);
+    private final LinkedList<KeyValueElement>          elements;
 
     public LinkedList<KeyValueElement> getElements() {
         return this.elements;
@@ -235,7 +237,12 @@ public class FlexiJSonObject implements FlexiJSonNode {
 
     @Override
     public String toString() {
-        return this.getClass().getSimpleName() + ": " + FlexiUtils.getPathString(this) + "\r\n" + new FlexiJSonPrettyStringify().toJSONString(this);
+        String pretty = new FlexiJSonPrettyStringify().toJSONString(this);
+        try {
+            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + (pretty.contains("\r") ? "\r\n" : "") + pretty;
+        } catch (InvalidPathException e) {
+            return "ERROR:" + e.getMessage() + ": " + (pretty.contains("\r") ? "\r\n" : "") + pretty;
+        }
     }
 
     protected String toStringKey(final String key) {
@@ -395,7 +402,9 @@ public class FlexiJSonObject implements FlexiJSonNode {
                 }
             } else {
                 if (depths == path.size() - 1) {
-                    return obj;
+                    // hä?
+                    DebugMode.debugger();
+                    return null;
                 } else {
                     return null;
                 }

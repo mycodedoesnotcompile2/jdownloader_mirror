@@ -40,6 +40,7 @@ import java.io.InputStream;
 import java.net.URL;
 
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.images.MultiResIcon;
 
 /**
  * @author daniel
@@ -92,6 +93,14 @@ public class WeisjJSVGFactory implements SVGFactory {
 
     @Override
     public Image getImageFromSVG(InputStream inputStream, int w, int h, Color color) throws IOException {
-        return WeisjJSVG.getImageFromSVG(inputStream, w, h, color);
+        return WeisjJSVG.getImageFromSVG(inputStream, w, h);
+    }
+
+    /**
+     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, int, int, java.awt.Color)
+     */
+    @Override
+    public MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+        return WeisjJSVG.getIconFromSVG(stream, width, height);
     }
 }

@@ -33,13 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper.typemapper;
 
-import java.util.List;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.ValueType;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -56,7 +55,7 @@ public class LocaleMapMapper implements FlexiTypeMapper {
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         throw new WTFException("Nut supported");
     }
     /*

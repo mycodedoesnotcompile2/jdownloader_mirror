@@ -161,7 +161,7 @@ public class CompareUtils {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.lang.Object#hashCode()
          */
         @Override
@@ -182,7 +182,7 @@ public class CompareUtils {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.lang.Object#equals(java.lang.Object)
          */
         @Override
@@ -435,5 +435,19 @@ public class CompareUtils {
                 throw new WTFException(e);
             }
         }
+    }
+
+    /**
+     * @param unwrapType
+     * @param unwrapType2
+     * @return
+     */
+    public static Integer compare(Object a, Object b) {
+        if (a instanceof Number && b instanceof Number) {
+            return compareNumber((Number) a, (Number) b);
+        } else if (a instanceof Comparable && b instanceof Comparable) {
+            return compare((Comparable) a, (Comparable) b);
+        }
+        return null;
     }
 }

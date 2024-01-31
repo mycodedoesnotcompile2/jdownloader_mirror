@@ -35,6 +35,7 @@ package org.appwork.utils;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,7 +43,6 @@ import java.util.regex.Pattern;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.storage.SimpleTypeRef;
-import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReadableBytes.ReadableBytesParseException;
 
@@ -51,7 +51,7 @@ import org.appwork.utils.ReadableBytes.ReadableBytesParseException;
  * @date 20.09.2023
  *
  */
-public class ReadableBytes implements Storable {
+public class ReadableBytes {
     public static enum Unit {
         // TIP etc is International Electrotechnical Commission (IEC) standard
         TB("TiB", "TB", 1024l * 1024l * 1024l * 1024l, 1000l * 1000l * 1000l * 1000l),
@@ -97,21 +97,22 @@ public class ReadableBytes implements Storable {
     private static HashSet<String>             KIBIS;
 
     public ReadableBytes() {
+        this(0);
     }
 
     /**
      * @param bytes2
      */
     public ReadableBytes(long bytes) {
-        this.bytes = bytes;
+        this(bytes, true);
     }
 
     /**
      * @param i
      * @param b
      */
-    public ReadableBytes(int bytes, boolean kibi) {
-        this(bytes);
+    public ReadableBytes(long bytes, boolean kibi) {
+        this.bytes = bytes;
         this.kibi = kibi;
     }
 
@@ -125,34 +126,32 @@ public class ReadableBytes implements Storable {
         return Deser.get(ReadableBytes.class).toString(this, SC.WITH_DOCUMENTATION);
     }
 
-    private long bytes;
+    private final long bytes;
 
     public long getBytes() {
         return bytes;
     }
 
-    public void setBytes(long bytes) {
-        this.bytes = bytes;
-    }
-
-    private boolean                            kibi = true;
+    private final boolean                      kibi;
     private static final HashMap<String, Unit> UNIT_MAP;
+    public static final ReadableBytes          ZERO = new ReadableBytes(0);
 
     public boolean isKibi() {
         return kibi;
     }
 
-    public void setKibi(boolean kibi) {
-        this.kibi = kibi;
-    }
-
     /**
+     * @param hasKibi
      * @param longValue
      * @return
      */
-    public static ReadableBytes fromBytes(long bytes) {
-        ReadableBytes ret = new ReadableBytes(bytes);
+    public static ReadableBytes fromBytes(long bytes, boolean kibi) {
+        ReadableBytes ret = new ReadableBytes(bytes, kibi);
         return ret;
+    }
+
+    public static ReadableBytes fromBytes(long bytes) {
+        return fromBytes(bytes, false);
     }
 
     /**
@@ -174,7 +173,7 @@ public class ReadableBytes implements Storable {
                 break;
             }
             long factor = u.factor(k);
-            if (b > factor) {
+            if (b >= factor) {
                 long full = b / factor;
                 sb.append(full).append(u.unit(k));
                 b -= factor * full;
@@ -231,6 +230,7 @@ public class ReadableBytes implements Storable {
 
     public static ReadableBytes parse(String value) throws ReadableBytesParseException {
         value = value.replaceAll("\\s+", "");
+        boolean hasKibi = false;
         boolean negative = false;
         long result = 0;
         int index = 0;
@@ -249,6 +249,9 @@ public class ReadableBytes implements Storable {
             if (unit == null) {
                 throw new ReadableBytesParseException("Unknown unit: " + matcher.group("unit"));
             }
+            if (u.equalsIgnoreCase(unit.unit(true)) && unit != Unit.B) {
+                hasKibi = true;
+            }
             double doub = Double.parseDouble(num.replace(",", "."));
             doub *= unit.factor(KIBIS.contains(u));
             result += (long) doub;
@@ -257,6 +260,53 @@ public class ReadableBytes implements Storable {
         if (negative) {
             result += -1;
         }
-        return fromBytes(result);
+        return fromBytes(result, hasKibi);
+    }
+
+    /**
+     * @param i
+     * @param mb
+     * @return
+     */
+    public ReadableBytes ceil(long amount, Unit unit) {
+        long unitBytes = isKibi() ? unit.kibytes : unit.bytes;
+        double d = (getBytes() / (double) amount) / unitBytes;
+        long full = ((long) Math.ceil(d));
+        long newBytes = full * amount * unitBytes;
+        if (newBytes == bytes) {
+            return this;
+        } else {
+            return new ReadableBytes(newBytes, isKibi());
+        }
+    }
+
+    /**
+     * returns a map - splitted the bytes in all units.
+     *
+     * @return
+     */
+    public LinkedHashMap<Unit, Long> units() {
+        LinkedHashMap<Unit, Long> ret = new LinkedHashMap<Unit, Long>();
+        long b = bytes;
+        boolean k = isKibi();
+        for (Unit u : Unit.values()) {
+            if (b == 0) {
+                break;
+            }
+            if (u == Unit.B) {
+                ret.put(u, b);
+                break;
+            }
+            long factor = u.factor(k);
+            if (b > factor) {
+                long full = b / factor;
+                ret.put(u, full);
+                b -= factor * full;
+            }
+        }
+        if (ret.size() == 0) {
+            ret.put(Unit.B, 0l);
+        }
+        return ret;
     }
 }

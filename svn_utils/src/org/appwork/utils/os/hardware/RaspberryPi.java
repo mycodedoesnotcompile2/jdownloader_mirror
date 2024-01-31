@@ -124,36 +124,40 @@ public abstract class RaspberryPi implements HardwareTypeInterface {
         if (CrossSystem.isUnix() && ARCHFamily.ARM.equals(CrossSystem.getARCHFamily())) {
             final File cpuInfo = new File("/proc/cpuinfo");
             if (cpuInfo.isFile()) {
-                FileInputStream fis = null;
                 try {
-                    fis = new FileInputStream(cpuInfo);
-                    final BufferedReader is = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
-                    String bcmHardware = null;
-                    String revision = null;
-                    String line = null;
-                    while ((line = is.readLine()) != null) {
-                        if (StringUtils.startsWithCaseInsensitive(line, "Hardware")) {
-                            bcmHardware = new Regex(line, "(?i)^\\s*Hardware\\s*:\\s*(BCM[0-9a-zA-Z]+)").getMatch(0);
-                        } else if (StringUtils.startsWithCaseInsensitive(line, "Revision")) {
-                            revision = new Regex(line, "(?i)^\\s*Revision\\s*:\\s*([0-9a-fA-F]+)").getMatch(0);
+                    final FileInputStream fis = new FileInputStream(cpuInfo);
+                    try {
+                        String raspberryPIModel = null;
+                        String raspberryPIHardware = null;
+                        String revision = null;
+                        final BufferedReader is = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+                        try {
+                            while (true) {
+                                final String line = is.readLine();
+                                if (line == null) {
+                                    break;
+                                } else if (StringUtils.startsWithCaseInsensitive(line, "Model")) {
+                                    raspberryPIModel = new Regex(line, "(?i)^\\s*Model\\s*:\\s*(Raspberry.*?)(\r|\n|$)").getMatch(0);
+                                } else if (StringUtils.startsWithCaseInsensitive(line, "Hardware")) {
+                                    raspberryPIHardware = new Regex(line, "(?i)^\\s*Hardware\\s*:\\s*(BCM[0-9a-zA-Z]+)").getMatch(0);
+                                } else if (StringUtils.startsWithCaseInsensitive(line, "Revision")) {
+                                    revision = new Regex(line, "(?i)^\\s*Revision\\s*:\\s*([0-9a-fA-F]+)").getMatch(0);
+                                }
+                                if (raspberryPIModel != null && revision != null) {
+                                    break;
+                                }
+                            }
+                        } finally {
+                            is.close();
                         }
-                        if (bcmHardware != null && revision != null) {
-                            break;
+                        if ((raspberryPIModel != null || raspberryPIHardware != null) && revision != null) {
+                            return RaspberryPi.parse(revision);
                         }
-                    }
-                    is.close();
-                    if (bcmHardware != null && revision != null) {
-                        return RaspberryPi.parse(revision);
+                    } finally {
+                        fis.close();
                     }
                 } catch (final Throwable ignore) {
                     ignore.printStackTrace();
-                } finally {
-                    if (fis != null) {
-                        try {
-                            fis.close();
-                        } catch (final Throwable ignore) {
-                        }
-                    }
                 }
             }
         }
@@ -161,6 +165,10 @@ public abstract class RaspberryPi implements HardwareTypeInterface {
     }
 
     private RaspberryPi() {
+    }
+
+    public static void main(String[] args) {
+        System.out.println(getRaspberryPiDetails());
     }
 
     /**

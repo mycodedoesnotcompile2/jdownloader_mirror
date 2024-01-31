@@ -46,6 +46,7 @@ import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -115,7 +116,7 @@ public class DateMapper implements FlexiTypeMapper {
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
 
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         SimpleDateFormat formater = getSerializationFormater(reference);
         if (formater == null) {
             if (mapper != null) {
@@ -152,7 +153,9 @@ public class DateMapper implements FlexiTypeMapper {
         if (node instanceof FlexiJSonValue) {
             switch (((FlexiJSonValue) node).getType()) {
             case LONG:
-                return new Date((Long) ((FlexiJSonValue) node).getValue());
+                // fallthrough!
+            case DOUBLE:
+                return numberToDate(((Number) ((FlexiJSonValue) node).getValue()));
             case STRING:
                 if (((FlexiJSonValue) node).getValue().equals("")) {
                     return null;
@@ -170,6 +173,13 @@ public class DateMapper implements FlexiTypeMapper {
             }
         }
         throw new FlexiMapperException(node, type, "Cannot Map node to Date");
+    }
+
+    protected Date numberToDate(Number number) {
+        if (number == null || number.longValue() <= 0) {
+            return null;
+        }
+        return new Date(number.longValue());
     }
 
     public Date parseString(String s) {

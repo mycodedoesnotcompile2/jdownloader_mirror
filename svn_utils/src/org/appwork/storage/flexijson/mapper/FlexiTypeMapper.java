@@ -1,7 +1,5 @@
 package org.appwork.storage.flexijson.mapper;
 
-import java.util.List;
-
 /**
  *
  * ====================================================================================================================================================
@@ -46,7 +44,7 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public interface FlexiTypeMapper {
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHierarchy) throws FlexiMapperException;
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext context) throws FlexiMapperException;
 
     public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode node, CompiledType type, Setter reference) throws FlexiMapperException;
 

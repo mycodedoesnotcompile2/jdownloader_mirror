@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.moncompare;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -41,15 +40,12 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
@@ -58,6 +54,14 @@ import java.util.regex.PatternSyntaxException;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.moncompare.list.ArrayAccessor;
+import org.appwork.moncompare.list.CollectionAccessor;
+import org.appwork.moncompare.list.ListAccessor;
+import org.appwork.moncompare.list.ListAccessorInterface;
+import org.appwork.moncompare.object.MapAccessor;
+import org.appwork.moncompare.object.MapAccessorInterface;
+import org.appwork.moncompare.typehandler.DateHandler;
+import org.appwork.moncompare.typehandler.TimeSpanHandler;
 import org.appwork.remoteapi.annotations.ApiDoc;
 import org.appwork.remoteapi.annotations.ApiDocExample;
 import org.appwork.storage.Storable;
@@ -65,16 +69,13 @@ import org.appwork.storage.StorableDoc;
 import org.appwork.storage.StorableExample;
 import org.appwork.storage.flexijson.InvalidPathException;
 import org.appwork.storage.flexijson.JSPath;
-import org.appwork.storage.flexijson.mapper.FlexiMapperException;
-import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.duration.InvalidTimeSpanException;
-import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.reflection.Clazz;
 
@@ -109,6 +110,14 @@ import org.appwork.utils.reflection.Clazz;
 @ApiDoc("A Condition Object. See the WIKI for more details.")
 @StorableExample("{\"$eq\":\"MyValue\"}")
 public class Condition<MatcherType> extends LinkedHashMap<String, Object> implements Storable {
+    public static Condition<Object> C() {
+        return new Condition<Object>();
+    }
+
+    public static Condition<Object> C(final String key, final Object b) {
+        return new Condition<Object>(key, b);
+    }
+
     /**
      *
      */
@@ -125,217 +134,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /**
      * @author Thomas
-     * @date 10.05.2019
-     *
-     */
-    public static class AccessByField implements AccessMethod {
-        private final Field   field;
-        private final boolean isStatic;
-
-        /**
-         * @param field
-         */
-        public AccessByField(Field field) {
-            this.field = field;
-            isStatic = Modifier.isStatic(field.getModifiers());
-        }
-
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                if (isStatic) {
-                    return field.get(null);
-                } else {
-                    return field.get(value);
-                }
-            } catch (IllegalAccessException e) {
-                throw new CannotGetValueException(e);
-            }
-        }
-    }
-
-    /**
-     * @author Thomas
-     * @date 10.05.2019
-     *
-     */
-    public static class AccessByMethod implements AccessMethod {
-        private final boolean         isStatic;
-        private final Method          method;
-        private final static Object[] EMPTY_ARGS = new Object[] {};
-
-        /**
-         * @param method
-         */
-        public AccessByMethod(Method method) {
-            this.method = method;
-            isStatic = Modifier.isStatic(method.getModifiers());
-        }
-
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                if (isStatic) {
-                    return method.invoke(null, EMPTY_ARGS);
-                } else {
-                    return method.invoke(value, EMPTY_ARGS);
-                }
-            } catch (IllegalAccessException e) {
-                throw new CannotGetValueException(e);
-            } catch (IllegalArgumentException e) {
-                throw new CannotGetValueException(e);
-            } catch (InvocationTargetException e) {
-                if (e.getTargetException() instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
-                }
-                throw new CannotGetValueException(e);
-            } catch (RuntimeException e) {
-                throw new CannotGetValueException(e);
-            }
-        }
-    }
-
-    /**
-     * @author Thomas
-     * @date 10.05.2019
-     *
-     */
-    public static class AccessListElement implements AccessMethod {
-        /**
-         *
-         */
-        public AccessListElement() {
-        }
-
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                final int index = Integer.parseInt(key);
-                return ((List<?>) value).get(index);
-            } catch (Throwable e) {
-                throw new CannotGetValueException(e);
-            }
-        }
-    }
-
-    public static class AccessCollectionElement implements AccessMethod {
-        /**
-         *
-         */
-        public AccessCollectionElement() {
-        }
-
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                int index = Integer.parseInt(key);
-                for (Object r : ((Collection) value)) {
-                    if (index == 0) {
-                        return r;
-                    }
-                    index--;
-                }
-            } catch (Throwable e) {
-                throw new CannotGetValueException(e);
-            }
-            throw new CannotGetValueException("Index out of bounds");
-        }
-    }
-
-    public static class AccessArrayElement implements AccessMethod {
-        /**
-         *
-         */
-        public AccessArrayElement() {
-        }
-
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                final int index = Integer.parseInt(key);
-                return Array.get(value, index);
-            } catch (Throwable e) {
-                throw new CannotGetValueException(e);
-            }
-        }
-    }
-
-    public static class AccessMapElement implements AccessMethod {
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            try {
-                final Map<?, ?> map = (Map<?, ?>) value;
-                final Object ret = map.get(key);
-                if (ret == null) {
-                    if (map.containsKey(key)) {
-                        return null;
-                    } else {
-                        return KEY_DOES_NOT_EXIST;
-                    }
-                } else {
-                    return ret;
-                }
-            } catch (Throwable e) {
-                throw new CannotGetValueException(e);
-            }
-        }
-    }
-
-    public interface AccessMethod {
-        /**
-         * @param obj
-         * @return
-         * @throws CompareException
-         */
-        public abstract Object getValue(Object value, String key) throws CannotGetValueException;
-    }
-
-    /**
-     * @author Thomas
-     * @date 10.05.2019
-     *
-     */
-    public static class AccessNotFound implements AccessMethod {
-        @Override
-        public Object getValue(Object value, String key) throws CannotGetValueException {
-            return KEY_DOES_NOT_EXIST;
-        }
-    }
-
-    public static class AddOp implements Operator {
-        @Override
-        public Object opEval(Condition<?> container, Object expressions, Scope scope) throws CompareException {
-            if (ReflectionUtils.isListOrArray(expressions.getClass())) {
-                final List<Object> listExpressions = ReflectionUtils.wrapUnmodifiableList(expressions, Object.class);
-                Number result = null;
-                for (final Object expression : listExpressions) {
-                    final Number num = (Number) container.resolveValue(container, expression, scope, true);
-                    if (result == null) {
-                        result = num;
-                    } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
-                        result = result.doubleValue() + num.doubleValue();
-                    } else if (Clazz.isFloat(result.getClass()) || Clazz.isFloat(num.getClass())) {
-                        result = result.floatValue() + num.floatValue();
-                    } else {
-                        result = result.longValue() + num.longValue();
-                    }
-                }
-                return result;
-            }
-            throw new AggregationException("AddOp:" + (container) + "|" + (expressions));
-        }
-
-        /**
-         * returns false if this operator acts as filter root - See "Query Filter mode" vs. "Strict Compare mode"
-         */
-        @Override
-        public boolean isFilterRoot() {
-            return false;
-        }
-    }
-
-    /**
-     * @author Thomas
      * @date 07.05.2019
      *
      */
@@ -349,12 +147,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            // no reason to unwrap - KEY_DOES_NOT_EXIST is never wrapped
             if (scope.getLast() == KEY_DOES_NOT_EXIST) {
                 return false;
             } else {
-                final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                for (Object exp : listExpression) {
+                for (final Object exp : container.getListWrapper(expression)) {
                     final Object resolved = container.resolveValue(container, exp, scope, false);
                     if (container.isFalse(resolved)) {
                         return false;
@@ -375,30 +173,30 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             final Object last = scope.getLast();
             if (last == KEY_DOES_NOT_EXIST) {
                 return false;
-            } else if (last == null || Clazz.isPrimitive(last.getClass()) || last instanceof String) {
+            } else if (container.isValue(last)) {
                 return container.resolveValue(container, expression, scope, false);
             } else {
                 try {
-                    for (String g : container.listKeys(last)) {
-                        Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathElements(g));
+                    for (final String g : container.listKeys(last)) {
+                        final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathElements(g));
                         if (container.equalsDeep(container, expression, newScope.getLast(), newScope)) {
                             // {§any:1}
                             if (container._isDebug()) {
-                                container.log(newScope.getPath(), getClass().getSimpleName() + ": " + container.resolveValue(container, expression, newScope, false) + ".matches(" + expression + ")");
+                                container.log(newScope.getPath(), this.getClass().getSimpleName() + ": " + container.resolveValue(container, expression, newScope, false) + ".matches(" + expression + ")");
                             }
                             return true;
                         }
                     }
-                } catch (SecurityException e) {
-                    throw new CompareException(e);
+                } catch (final SecurityException e) {
+                    throw new ConditionException(e);
                 }
             }
             if (container._isDebug()) {
-                container.log(scope.getPath(), getClass().getSimpleName() + ": no element matches(" + expression + ")");
+                container.log(scope.getPath(), this.getClass().getSimpleName() + ": no element matches(" + expression + ")");
             }
             return false;
         }
@@ -414,17 +212,17 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             try {
-                if (ReflectionUtils.isListOrArray(expression)) {
+                ListAccessorInterface access = container.getListWrapper(expression);
+                if (access != null) {
                     final StringBuilder sb = new StringBuilder();
-                    final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                    for (Object exp : listExpression) {
+                    for (final Object exp : access) {
                         sb.append(container.resolveValue(container, exp, scope, true));
                     }
                     return sb.toString();
                 }
-            } catch (CompareException e) {
+            } catch (final ConditionException e) {
                 throw new AggregationException(e);
             }
             throw new AggregationException();
@@ -436,7 +234,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          * @param parameters
          * @return
          */
-        public Output resolve(Input options) throws CompareException;
+        public Output resolve(Input options) throws ConditionException;
     }
 
     public static class DivideOp implements Operator {
@@ -449,22 +247,20 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expressions, Scope scope) throws CompareException {
-            if (expressions != null && ReflectionUtils.isListOrArray(expressions.getClass())) {
-                final List<Object> division = ReflectionUtils.wrapUnmodifiableList(expressions, Object.class);
-                if (division.size() == 2) {
-                    final Number dividend = (Number) container.resolveValue(container, division.get(0), scope, true);
-                    final Number divisor = (Number) container.resolveValue(container, division.get(1), scope, true);
-                    final Number result;
-                    if (Clazz.isDouble(dividend.getClass()) || Clazz.isDouble(divisor.getClass())) {
-                        result = dividend.doubleValue() / divisor.doubleValue();
-                    } else if (Clazz.isFloat(dividend.getClass()) || Clazz.isFloat(divisor.getClass())) {
-                        result = dividend.floatValue() / divisor.floatValue();
-                    } else {
-                        result = dividend.longValue() / divisor.longValue();
-                    }
-                    return new AggregationResult(result);
+        public Object opEval(final Condition<?> container, final Object expressions, final Scope scope) throws ConditionException {
+            ListAccessorInterface list = container.getListWrapper(expressions);
+            if (list != null && list.size() == 2) {
+                final Number dividend = (Number) container.resolveValue(container, list.get(0), scope, true);
+                final Number divisor = (Number) container.resolveValue(container, list.get(1), scope, true);
+                final Number result;
+                if (Clazz.isDouble(dividend.getClass()) || Clazz.isDouble(divisor.getClass())) {
+                    result = dividend.doubleValue() / divisor.doubleValue();
+                } else if (Clazz.isFloat(dividend.getClass()) || Clazz.isFloat(divisor.getClass())) {
+                    result = dividend.floatValue() / divisor.floatValue();
+                } else {
+                    result = dividend.longValue() / divisor.longValue();
                 }
+                return new AggregationResult(result);
             }
             throw new AggregationException("DivideOp:" + (container) + "|" + (expressions));
         }
@@ -480,11 +276,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, final Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             final Object last = scope.getLast();
             if (last == KEY_DOES_NOT_EXIST) {
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + " -> KEY_DOES_NOT_EXIST ");
+                    container.log(scope.getPath(), this.getClass().getSimpleName() + " -> KEY_DOES_NOT_EXIST ");
                 }
                 return last;
             } else {
@@ -494,63 +290,81 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     } else {
                         return null;
                     }
-                } else if (last instanceof Map) {
+                }
+                MapAccessorInterface map = container.getMapWrapper(last);
+                if (map != null) {
                     final HashMap<Object, Object> result = new HashMap<Object, Object>();
                     final Scope newScope = scope.copy();
-                    for (final Map.Entry<?, ?> entry : ((Map<?, ?>) last).entrySet()) {
+                    for (final Map.Entry<?, ?> entry : map) {
                         final Object key = entry.getKey();
                         final Object o = entry.getValue();
                         newScope.add(o, key);
-                        if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
-                            result.put(key, o);
+                        try {
+                            if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
+                                result.put(key, o);
+                            }
+                        } catch (ConditionException e) {
+                            // failed to project - continue; the filter condition may not match to o -> Error. However, others may match.
+                        } finally {
+                            newScope.removeLast();
                         }
-                        newScope.removeLast();
                     }
                     if (container._isDebug()) {
-                        container.log(scope.getPath(), getClass().getSimpleName() + " -> Map with " + result.size() + " entries: " + result.keySet());
+                        container.log(scope.getPath(), this.getClass().getSimpleName() + " -> Map with " + result.size() + " entries: " + result.keySet());
                     }
-                    return result;
-                } else if (Clazz.isArray(last.getClass()) || last instanceof List || last instanceof Collection) {
-                    final Collection<Object> collection = ReflectionUtils.wrapCollection(last, false, Object.class);
+                    return container.createMap(result);
+                }
+                Iterable<Object> listIter = container.getListWrapper(last);
+                if (listIter != null) {
                     final LinkedList<Object> result = new LinkedList<Object>();
                     int i = 0;
                     final Scope newScope = scope.copy();
-                    for (final Object o : collection) {
+                    for (final Object o : listIter) {
                         newScope.add(o, i++);
-                        if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
-                            result.add(o);
+                        try {
+                            if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
+                                result.add(o);
+                            }
+                        } catch (ConditionException e) {
+                            // failed to project - continue; the filter condition may not match to the entry -> Error. However, others may
+                            // match.
+                        } finally {
+                            newScope.removeLast();
                         }
-                        newScope.removeLast();
                     }
-                    return result;
+                    return container.createList(result);
                 } else {
-                    final HashMap<String, Object> result = new HashMap<String, Object>();
+                    final HashMap<Object, Object> result = new HashMap<Object, Object>();
                     try {
                         final Scope newScope = scope.copy();
                         for (final Getter key : ClassCache.getClassCache(last.getClass()).getGetter()) {
                             final Object o = key.getValue(last);
                             newScope.add(o, key);
-                            if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
-                                result.put(key.getKey(), o);
+                            try {
+                                if (container.isTrue(container.resolveValue(container, expression, newScope, false))) {
+                                    result.put(key.getKey(), o);
+                                }
+                            } catch (ConditionException e) {
+                                // failed to project - continue; the filter condition may not match to the entry -> Error. However, others
+                                // may match.
+                            } finally {
+                                newScope.removeLast();
                             }
-                            newScope.removeLast();
                         }
-                    } catch (SecurityException e) {
-                        throw new CompareException(e);
-                    } catch (NoSuchMethodException e) {
-                        throw new CompareException(e);
-                    } catch (IllegalArgumentException e) {
-                        throw new CompareException(e);
-                    } catch (IllegalAccessException e) {
-                        throw new CompareException(e);
-                    } catch (InvocationTargetException e) {
+                    } catch (final SecurityException e) {
+                        throw new ConditionException(e);
+                    } catch (final NoSuchMethodException e) {
+                        throw new ConditionException(e);
+                    } catch (final IllegalArgumentException e) {
+                        throw new ConditionException(e);
+                    } catch (final IllegalAccessException e) {
+                        throw new ConditionException(e);
+                    } catch (final InvocationTargetException e) {
                         if (e.getTargetException() instanceof InterruptedException) {
                             Thread.currentThread().interrupt();
                         }
-                    } catch (CompareException e) {
-                        throw new CompareException(e);
                     }
-                    return result;
+                    return container.createMap(result);
                 }
             }
         }
@@ -566,20 +380,16 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            Object last = scope.getLast();
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            final Object last = container.unwrapType(scope.getLast());
             if (last == KEY_DOES_NOT_EXIST) {
                 return false;
             } else if (last == null || Clazz.isPrimitive(last.getClass()) || last instanceof String) {
                 return container.resolveValue(container, expression, scope, false);
             } else {
                 try {
-                    Condition filter = null;
-                    Object options = container.get($OPTIONS);
-                    if (options != null && options instanceof Condition) {
-                        filter = (Condition) ((Condition) options).get("filter");
-                    }
-                    for (String g : container.listKeys(last)) {
+                    Condition filter = container.getOptions(Condition.class, "filter");
+                    for (final String g : container.listKeys(scope.getLast())) {
                         final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathString(g));
                         if (filter != null) {
                             if (!filter.matchesWithoutExceptions(newScope.getLast())) {
@@ -591,10 +401,10 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                             return false;
                         }
                     }
-                } catch (SecurityException e) {
-                    throw new CompareException(e);
-                } catch (InvalidPathException e) {
-                    throw new CompareException(e);
+                } catch (final SecurityException e) {
+                    throw new ConditionException(e);
+                } catch (final InvalidPathException e) {
+                    throw new ConditionException(e);
                 }
             }
             return true;
@@ -632,9 +442,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          * https://docs.mongodb.com/manual/reference/operator/expression/eq/
          */
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            boolean isNEQ = false;
-            return opEvalInternal(container, expression, scope, isNEQ);
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            final boolean isNEQ = false;
+            return this.opEvalInternal(container, expression, scope, isNEQ);
         }
 
         /**
@@ -643,37 +453,30 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          * @param scope
          * @param isNEQ
          * @param path
-         *            TODO
          * @return
-         * @throws CompareException
+         * @throws ConditionException
          */
-        protected Object opEvalInternal(Condition container, Object expression, Scope scope, boolean isNEQ) throws CompareException {
+        protected Object opEvalInternal(final Condition container, Object expression, final Scope scope, final boolean isNEQ) throws ConditionException {
             boolean queryMode = true;
-            Object matcherValue = scope.getLast();
-            Object options = container.get($OPTIONS);
-            if (options != null && options instanceof Condition) {
-                if (Boolean.TRUE.equals(((Condition) options).get(OPTIONS_AGGREGATE))) {
-                    queryMode = false;
-                }
+            final Object matcherValue = scope.getLast();
+            if (Boolean.TRUE.equals(container.getOptions(Boolean.class, OPTIONS_AGGREGATE))) {
+                queryMode = false;
             }
-            // Object resolvedExpression = container.resolveValue(expression, matcher);
             if (queryMode) {
                 // { tags: { $eq: "B" } } equals
-                expression = container.convertSpecialTypes(expression, matcherValue);
                 if (container.equalsDeep(container, expression, matcherValue, scope)) {
                     if (container._isDebug()) {
-                        container.log(scope.getPath(), getClass().getSimpleName() + " " + expression + ".equals(" + scope.getLast() + ")" + " = true " + "|Options: " + options);
+                        container.log(scope.getPath(), this.getClass().getSimpleName() + " " + expression + ".equals(" + scope.getLast() + ")" + " = true " + "|Options: " + container.getOptions(Condition.class));
                     }
                     return true;
                 }
                 boolean disableMongoDBListSpecial = false;
-                if (options != null && options instanceof Condition) {
-                    if (Boolean.TRUE.equals(((Condition) options).get(DISABLE_LIST_SPECIAL_HANDLING))) {
-                        disableMongoDBListSpecial = true;
-                    }
+                if (Boolean.TRUE.equals(container.getOptions(Boolean.class, DISABLE_LIST_SPECIAL_HANDLING))) {
+                    disableMongoDBListSpecial = true;
                 }
                 // this is not available for $ne
-                if (ReflectionUtils.isListOrArray(matcherValue) && !disableMongoDBListSpecial && !isNEQ) {
+                Iterable listIter = container.getListWrapper(matcherValue);
+                if (listIter != null && !disableMongoDBListSpecial && !isNEQ) {
                     // Match an Array Value
                     // If the specified <value> is an array, MongoDB matches documents where the <field> matches the array exactly or
                     // the
@@ -682,15 +485,14 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     // Equals
                     // an Array Value.
                     // the expression matches ANY of the matcherValues list entries
-                    final List<Object> list = ReflectionUtils.wrapList(matcherValue, false, Object.class);
                     int i = 0;
-                    for (final Object obj : list) {
+                    for (final Object obj : listIter) {
                         // { tags: { $eq: "B" } } matches { tags: [ "A", "B" ] }
                         scope.add(obj, i++);
                         try {
                             if (container.equalsDeep(container, expression, obj, scope)) {
                                 if (container._isDebug()) {
-                                    container.log(scope.getPath(), getClass().getSimpleName() + " (Matcher List contains expression Mode)\"" + scope.getLast() + "\".equals(" + expression + ")" + " = true |Options: " + options);
+                                    container.log(scope.getPath(), this.getClass().getSimpleName() + " (Matcher List contains expression Mode)\"" + scope.getLast() + "\".equals(" + expression + ")" + " = true |Options: " + container.getOptions(Condition.class));
                                 }
                                 return true;
                             }
@@ -699,12 +501,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         }
                     }
                     if (container._isDebug()) {
-                        container.log(scope.getPath(), getClass().getSimpleName() + " (Matcher List contains expression Mode)\"" + scope.getLast() + "\".contains(" + expression + ")" + " = false |Options: " + options);
+                        container.log(scope.getPath(), this.getClass().getSimpleName() + " (Matcher List contains expression Mode)\"" + scope.getLast() + "\".contains(" + expression + ")" + " = false |Options: " + container.getOptions(Condition.class));
                     }
                     return false;
                 }
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + " " + expression + ".equals(" + scope.getLast() + ")" + " = false |Options: " + options);
+                    container.log(scope.getPath(), this.getClass().getSimpleName() + " " + expression + ".equals(" + scope.getLast() + ")" + " = false |Options: " + container.getOptions(Condition.class));
                 }
                 return false;
             } else {
@@ -713,13 +515,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                  *
                  * @throws CompareException
                  */
-                if (ReflectionUtils.isListOrArray(expression.getClass())) {
-                    final List<Object> aggregation = ReflectionUtils.wrapList(expression, false, Object.class);
-                    if (aggregation.size() == 2) {
-                        Object x = (container.resolveValue(container, aggregation.get(0), scope, true));
-                        Object y = (container.resolveValue(container, aggregation.get(1), scope, true));
-                        return new AggregationResult(CompareUtils.equals(y, x));
-                    }
+                ListAccessorInterface list = container.getListWrapper(expression);
+                if (list != null && list.size() == 2) {
+                    final Object x = (container.resolveValue(container, list.get(0), scope, true));
+                    final Object y = (container.resolveValue(container, list.get(1), scope, true));
+                    return new AggregationResult(CompareUtils.equals(y, x));
                 }
                 return new AggregationResult(false);
             }
@@ -743,12 +543,13 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, Object expression, final Scope scope) throws ConditionException {
             Object matcherValue;
-            if (ReflectionUtils.isListOrArray(expression)) {
+            ListAccessorInterface list = container.getListWrapper(expression);
+            if (list != null) {
                 // aggregation
-                matcherValue = (container.resolveValue(container, ReflectionUtils.getListElement(expression, 0), scope, true));
-                expression = (container.resolveValue(container, ReflectionUtils.getListElement(expression, 1), scope, true));
+                matcherValue = (container.resolveValue(container, list.get(0), scope, true));
+                expression = (container.resolveValue(container, list.get(1), scope, true));
                 boolean exists = container.isTrue(expression);
                 // {$exists:true} == {$exists:1}
                 exists |= expression instanceof Number && ((Number) expression).intValue() != 0;
@@ -781,11 +582,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            final Object last = scope.getLast();
-            if (ReflectionUtils.isListOrArray(last)) {
+        public Object opEval(final Condition<?> container, Object expression, final Scope scope) throws ConditionException {
+            if (container.getListWrapper(scope.getLast()) != null) {
                 return false;
             } else {
+                final Object last = container.unwrapType(scope.getLast());
                 expression = (container.resolveValue(container, expression, scope, true));
                 boolean isPattern = false;
                 if (last instanceof Pattern) {
@@ -794,11 +595,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     try {
                         Pattern.compile((String) last);
                         isPattern = true;
-                    } catch (Exception e) {
+                    } catch (final Exception e) {
                         // return false;
                     }
                 }
-                if (expression == Boolean.TRUE) {
+                if (container.isTrue(expression)) {
                     return isPattern;
                 } else {
                     return !isPattern;
@@ -819,90 +620,85 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         public static enum OP {
             LTE {
                 @Override
-                protected boolean opEval(int compareResult) {
+                protected boolean opEval(final int compareResult) {
                     return compareResult <= 0;
                 }
             },
             LT {
                 @Override
-                protected boolean opEval(int compareResult) {
+                protected boolean opEval(final int compareResult) {
                     return (compareResult < 0);
                 }
             },
             GTE {
                 @Override
-                protected boolean opEval(int compareResult) {
+                protected boolean opEval(final int compareResult) {
                     return (compareResult >= 0);
                 }
             },
             GT {
                 @Override
-                protected boolean opEval(int compareResult) {
+                protected boolean opEval(final int compareResult) {
                     return (compareResult > 0);
                 }
             };
+
             protected abstract boolean opEval(int compareResult);
         }
 
         private final NumberOp.OP op;
 
-        public NumberOp(NumberOp.OP op) {
+        public NumberOp(final NumberOp.OP op) {
             this.op = op;
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            Object before = expression;
-            final Object matcherValue = scope.getLast();
-            Condition root = ROOT_CONDITION.get();
-            if (ReflectionUtils.isListOrArray(expression)) {
+        public Object opEval(final Condition<?> container, Object expression, final Scope scope) throws ConditionException {
+            // final Object before = expression;
+            // final Condition root = ROOT_CONDITION.get();
+            ListAccessorInterface list = container.getListWrapper(expression);
+            if (list != null) {
                 // aggregation
-                final List<Number> aggregation = ReflectionUtils.wrapList(expression, false, Number.class);
-                final Number a = (Number) (container.resolveValue(container, aggregation.get(0), scope, true));
-                final Number b = (Number) (container.resolveValue(container, aggregation.get(1), scope, true));
-                boolean ret = op.opEval(CompareUtils.compareNumber(a, b));
+                final Number a = (Number) (container.resolveValue(container, list.get(0), scope, true));
+                final Number b = (Number) (container.resolveValue(container, list.get(1), scope, true));
+                final boolean ret = this.op.opEval(CompareUtils.compareNumber(a, b));
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + " \"" + aggregation.get(0) + "\"." + op.name() + "(" + aggregation.get(1) + ")" + " = " + ret);
-                    ;
+                    container.log(scope.getPath(), "%s: %s.%s(%s)" + " = %s", this.getClass().getSimpleName(), list.get(0), this.op.name(), list.get(1), ret);
                 }
                 return new AggregationResult(ret);
             } else {
-                expression = (container.resolveValue(container, expression, scope, true));
-                if (matcherValue == KEY_DOES_NOT_EXIST) {
+                expression = container.resolveValue(container, expression, scope, true);
+                if (KEY_DOES_NOT_EXIST == container.unwrapType(scope.getLast())) {
                     if (container._isDebug()) {
-                        container.log(scope.getPath(), getClass().getSimpleName() + " \"" + KEY_DOES_NOT_EXIST + "\"." + op.name() + "(" + expression + ")" + " = " + false);
+                        container.log(scope.getPath(), "%s \"%s\".%s(%s)" + " = false", this.getClass().getSimpleName(), KEY_DOES_NOT_EXIST, this.op.name(), expression);
                         ;
                     }
                     return false;
                 } else if (expression instanceof Condition) {
-                    final Number a = (Number) matcherValue;
-                    final Number b = (Number) (container.resolveValue(container, expression, scope, true));
-                    boolean ret = op.opEval(CompareUtils.compareNumber(a, b));
+                    DebugMode.debugger();
+                    final Object b = container.resolveValue(container, expression, scope, true);
+                    final boolean ret = this.op.opEval(container.compare(scope.getLast(), b));
                     if (container._isDebug()) {
-                        container.log(scope.getPath(), getClass().getSimpleName() + ": " + a + "." + op.name() + "(" + b + ")" + " = " + ret);
+                        container.log(scope.getPath(), "%s: %s.%s(%s)" + " = %s", this.getClass().getSimpleName(), scope.getLast(), this.op.name(), b, ret);
                         ;
                     }
                     return ret;
                 } else {
-                    expression = container.convertSpecialTypes(expression, matcherValue);
-                    if (matcherValue instanceof Number && expression instanceof Number) {
-                        final Number a = (Number) matcherValue;
-                        final Number b = (Number) expression;
-                        boolean ret = op.opEval(CompareUtils.compareNumber(a, b));
+                    try {
+                        Integer result = container.compare(scope.getLast(), expression);
+                        if (result == null) {
+                            throw new ConditionException("Unsupported expression: " + container.toLog(expression) + " on " + container.toLog(scope.getLast()));
+                        }
+                        final boolean ret = this.op.opEval(result.intValue());
                         if (container._isDebug()) {
-                            container.log(scope.getPath(), getClass().getSimpleName() + ": " + a + "." + op.name() + "(" + b + ")" + " = " + ret);
+                            container.log(scope.getPath(), "%s: %s.%s(%s)" + " = %s", this.getClass().getSimpleName(), scope.getLast(), this.op.name(), expression, ret);
                         }
                         return ret;
-                    } else if (matcherValue instanceof Comparable && expression instanceof Comparable) {
-                        boolean ret = op.opEval(CompareUtils.compare((Comparable) matcherValue, (Comparable) expression));
-                        if (container._isDebug()) {
-                            container.log(scope.getPath(), getClass().getSimpleName() + " \"" + matcherValue + "\"." + op.name() + "(" + expression + ")" + " = " + ret);
-                        }
-                        return ret;
+                    } catch (ClassCastException e) {
+                        throw new ConditionException("Unsupported expression: " + container.toLog(expression) + " on " + container.toLog(scope.getLast()));
                     }
                 }
             }
-            throw new CompareException("Unsupported expression: " + expression + " on " + matcherValue);
         }
     }
 
@@ -921,106 +717,51 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            Object matcherValue = scope.getLast();
+        public Object opEval(final Condition<?> container, Object expression, final Scope scope) throws ConditionException {
+            // final Object matcherValue = scope.getLast();
+            Object mappedMatcher = container.unwrapType(scope.getLast());
             expression = container.resolveValue(container, expression, scope, true);
-            if (matcherValue == KEY_DOES_NOT_EXIST) {
+            if (mappedMatcher == KEY_DOES_NOT_EXIST) {
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + ": KEY_DOES_NOT_EXIST -> false");
+                    container.log(scope.getPath(), "%s: KEY_DOES_NOT_EXIST -> false", this.getClass().getSimpleName());
                 }
                 return false;
-            } else if (!ReflectionUtils.isListOrArray(expression)) {
-                throw new CompareException("Operator expects an array as parameter");
-            } else if (!ReflectionUtils.isListOrArray(matcherValue)) {
+            }
+            Iterable<Object> itExpression = container.getListWrapper(expression);
+            if (itExpression == null) {
+                throw new ConditionException("Operator expects an array as parameter");
+            }
+            Iterable<Object> itScope = container.getListWrapper(scope.getLast());
+            if (itScope == null) {
                 // Use the $in Operator to Match Values
-                final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                for (final Object exp : listExpression) {
-                    if (container.equalsDeep(container, exp, matcherValue, scope)) {
+                for (final Object exp : itExpression) {
+                    if (container.equalsDeep(container, exp, scope.getLast(), scope)) {
                         if (container._isDebug()) {
-                            container.log(scope.getPath(), getClass().getSimpleName() + ": 'does matcher match any expression-list-element-mode':  " + matcherValue + ".matches(" + exp + ") = true");
+                            container.log(scope.getPath(), "%s: 'does matcher match any expression-list-element-mode':  %s.matches(%s) = true", this.getClass().getSimpleName(), scope.getLast(), exp);
                         }
                         return true;
                     }
                 }
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + ": 'does matcher match any expression-list-element-mode':  " + matcherValue + " does not match any of " + expression);
+                    container.log(scope.getPath(), "%s: 'does matcher match any expression-list-element-mode':  %s does not match any of %s", this.getClass().getSimpleName(), scope.getLast(), expression);
                 }
                 return false;
             } else {
-                final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                final List<Object> listMatcherValues = ReflectionUtils.wrapUnmodifiableList(matcherValue, Object.class);
-                for (final Object exp : listExpression) {
-                    for (Object matcher : listMatcherValues) {
+                for (final Object exp : itExpression) {
+                    for (final Object matcher : itScope) {
                         if (container.equalsDeep(container, exp, matcher, scope)) {
                             if (container._isDebug()) {
-                                container.log(scope.getPath(), getClass().getSimpleName() + ": 'does any matcher-list-element match any expression-list-element-mode':  " + matcher + ".matches(" + exp + ") = true");
+                                container.log(scope.getPath(), "%s: 'does any matcher-list-element match any expression-list-element-mode':  %s.matches(%s) = true", this.getClass().getSimpleName(), matcher, exp);
                             }
                             return true;
                         }
                     }
                 }
                 if (container._isDebug()) {
-                    container.log(scope.getPath(), getClass().getSimpleName() + ": 'oes any matcher-list-element match any expression-list-element-mode':  " + matcherValue + " has no element that matches any element of " + expression);
+                    container.log(scope.getPath(), "%s: 'oes any matcher-list-element match any expression-list-element-mode':  %s has no element that matches any element of %s", this.getClass().getSimpleName(), scope.getLast(), expression);
                 }
                 return false;
             }
-        }
-    }
-
-    /**
-     * @param value
-     * @param key
-     * @return
-     * @throws CompareException
-     * @throws InvocationTargetException
-     * @throws IllegalArgumentException
-     * @throws IllegalAccessException
-     */
-    public static class KeyOnClass {
-        private final Class<? extends Object> class1;
-        private final int                     hashCode;
-        private final String                  key;
-
-        /**
-         * @param class1
-         * @param key
-         */
-        public KeyOnClass(Class<? extends Object> class1, String key) {
-            this.class1 = class1;
-            this.key = key;
-            this.hashCode = class1.hashCode() + key.hashCode();
-        }
-
-        /*
-         * (non-Javadoc)
-         *
-         * @see java.lang.Object#equals(java.lang.Object)
-         */
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == this) {
-                return true;
-            } else if (obj == null) {
-                return false;
-            } else if (!(obj instanceof KeyOnClass)) {
-                return false;
-            } else if (!class1.equals(((KeyOnClass) obj).class1)) {
-                return false;
-            } else if (!key.equals(((KeyOnClass) obj).key)) {
-                return false;
-            } else {
-                return true;
-            }
-        }
-
-        /*
-         * (non-Javadoc)
-         *
-         * @see java.lang.Object#hashCode()
-         */
-        @Override
-        public int hashCode() {
-            return hashCode;
         }
     }
 
@@ -1034,52 +775,59 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             if (expression instanceof Number) {
                 return expression;
             }
             Number result = null;
-            if (ReflectionUtils.isListOrArray(expression.getClass())) {
-                final int length = ReflectionUtils.getListLength(expression);
-                for (int index = 0; index < length; index++) {
-                    Object value = ReflectionUtils.getListElement(expression, index);
-                    /**
-                     * If some, but not all, documents for the $max operation have either a null value for the field or are missing the
-                     * field, the $max operator only considers the non-null and the non-missing values for the field.
-                     */
-                    Number num = null;
-                    try {
+            {
+                Iterable<Object> it = container.getListWrapper(expression);
+                if (it != null) {
+                    int count = 0;
+                    boolean singleListMode = false;
+                    for (Object value : it) {
+                        /**
+                         * If some, but not all, documents for the $max operation have either a null value for the field or are missing the
+                         * field, the $max operator only considers the non-null and the non-missing values for the field.
+                         */
+                        Number num = null;
                         /**
                          * With a single expression as its operand, if the expression resolves to an array, $max traverses into the array to
                          * operate on the numerical elements of the array to return a single value. With a list of expressions as its
                          * operand, if any of the expressions resolves to an array, $max does not traverse into the array but instead treats
                          * the array as a non-numerical value
                          */
-                        if (ReflectionUtils.isListOrArray(value.getClass()) && length == 1) {
-                            num = (Number) opEval(container, value, scope);
-                            // num = aggregate(container, value, obj);
+                        if (singleListMode && count > 0) {
+                            // reset because we have more than 1 entry
+                            result = 0;
+                            singleListMode = false;
+                        }
+                        ListAccessorInterface list = container.getListWrapper(value);
+                        if (list != null && count == 0) {
+                            // num = aggregate(container, value, matcherValue);
+                            num = (Number) this.opEval(container, value, scope);
+                            singleListMode = true;
+                        } else if (list != null && count == 0) {
+                            num = (Number) this.opEval(container, value, scope);
+                            singleListMode = true;
                         } else {
                             value = (container.resolveValue(container, value, scope, true));
                             // value = getNumber(container, value, obj, false);
                             if (value instanceof Number) {
                                 num = (Number) value;
                             }
-                            if (ReflectionUtils.isListOrArray(value.getClass())) {
-                                num = (Number) opEval(container, value, scope);
-                            }
                         }
-                    } catch (AggregationException e) {
-                        continue;
+                        if (result == null) {
+                            result = num;
+                        } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
+                            result = Math.max(result.doubleValue(), num.doubleValue());
+                        } else if (Clazz.isFloat(result.getClass()) || Clazz.isFloat(num.getClass())) {
+                            result = Math.max(result.floatValue(), num.floatValue());
+                        } else {
+                            result = Math.max(result.longValue(), num.longValue());
+                        }
                     }
-                    if (result == null) {
-                        result = num;
-                    } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
-                        result = Math.max(result.doubleValue(), num.doubleValue());
-                    } else if (Clazz.isFloat(result.getClass()) || Clazz.isFloat(num.getClass())) {
-                        result = Math.max(result.floatValue(), num.floatValue());
-                    } else {
-                        result = Math.max(result.longValue(), num.longValue());
-                    }
+                    count++;
                 }
             }
             /**
@@ -1101,52 +849,58 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             if (expression instanceof Number) {
                 return expression;
             }
             Number result = null;
-            if (ReflectionUtils.isListOrArray(expression.getClass())) {
-                final int length = ReflectionUtils.getListLength(expression);
-                for (int index = 0; index < length; index++) {
-                    Object value = ReflectionUtils.getListElement(expression, index);
-                    /**
-                     * If some, but not all, documents for the $max operation have either a null value for the field or are missing the
-                     * field, the $max operator only considers the non-null and the non-missing values for the field.
-                     */
-                    Number num = null;
-                    try {
+            {
+                Iterable<Object> it = container.getListWrapper(expression);
+                if (it != null) {
+                    int count = 0;
+                    boolean singleListMode = false;
+                    for (Object value : it) {
                         /**
-                         * With a single expression as its operand, if the expression resolves to an array, $max traverses into the array to
-                         * operate on the numerical elements of the array to return a single value. With a list of expressions as its
-                         * operand, if any of the expressions resolves to an array, $max does not traverse into the array but instead treats
-                         * the array as a non-numerical value
+                         * If some, but not all, documents for the $max operation have either a null value for the field or are missing the
+                         * field, the $max operator only considers the non-null and the non-missing values for the field.
                          */
-                        if (ReflectionUtils.isListOrArray(value.getClass()) && length == 1) {
-                            num = (Number) opEval(container, value, scope);
-                            // num = aggregate(container, value, obj);
-                        } else {
-                            value = container.resolveValue(container, value, scope, true);
-                            // value = getNumber(container, value, obj, false);
-                            if (value instanceof Number) {
-                                num = (Number) value;
+                        Number num = null;
+                        try {
+                            /**
+                             * With a single expression as its operand, if the expression resolves to an array, $max traverses into the
+                             * array to operate on the numerical elements of the array to return a single value. With a list of expressions
+                             * as its operand, if any of the expressions resolves to an array, $max does not traverse into the array but
+                             * instead treats the array as a non-numerical value
+                             */
+                            if (singleListMode && count > 0) {
+                                // reset because we have more than 1 entry
+                                result = 0;
+                                singleListMode = false;
                             }
-                            if (ReflectionUtils.isListOrArray(value.getClass())) {
-                                num = (Number) opEval(container, value, scope);
+                            if (container.getListWrapper(value) != null && count == 0) {
+                                num = (Number) this.opEval(container, value, scope);
+                                singleListMode = true;
+                            } else {
+                                value = container.resolveValue(container, value, scope, true);
+                                // value = getNumber(container, value, obj, false);
+                                if (value instanceof Number) {
+                                    num = (Number) value;
+                                }
                             }
+                        } catch (final AggregationException e) {
+                            continue;
                         }
-                    } catch (AggregationException e) {
-                        continue;
+                        if (result == null) {
+                            result = num;
+                        } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
+                            result = Math.min(result.doubleValue(), num.doubleValue());
+                        } else if (Clazz.isFloat(result.getClass()) || Clazz.isFloat(num.getClass())) {
+                            result = Math.min(result.floatValue(), num.floatValue());
+                        } else {
+                            result = Math.min(result.longValue(), num.longValue());
+                        }
                     }
-                    if (result == null) {
-                        result = num;
-                    } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
-                        result = Math.min(result.doubleValue(), num.doubleValue());
-                    } else if (Clazz.isFloat(result.getClass()) || Clazz.isFloat(num.getClass())) {
-                        result = Math.min(result.floatValue(), num.floatValue());
-                    } else {
-                        result = Math.min(result.longValue(), num.longValue());
-                    }
+                    count++;
                 }
             }
             /**
@@ -1168,12 +922,16 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expressions, Scope scope) throws CompareException {
-            if (ReflectionUtils.isListOrArray(expressions.getClass())) {
-                final List<Object> listExpressions = ReflectionUtils.wrapUnmodifiableList(expressions, Object.class);
+        public Object opEval(final Condition<?> container, final Object expressions, final Scope scope) throws ConditionException {
+            Iterable<Object> it = container.getListWrapper(expressions);
+            if (it != null) {
                 Number result = null;
-                for (final Object expression : listExpressions) {
-                    final Number num = (Number) container.resolveValue(container, expression, scope, true);
+                for (final Object expression : it) {
+                    Object ret = container.unwrapType(container.resolveValue(container, expression, scope, true));
+                    if (!(ret instanceof Number)) {
+                        throw new AggregationException("MultiplyOp:" + (container) + "|" + (expression) + " does not resolve to a number but " + ret);
+                    }
+                    final Number num = (Number) ret;
                     if (result == null) {
                         result = num;
                     } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
@@ -1205,27 +963,28 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(Condition<?> container, Object expression, Scope scope) throws ConditionException {
             // the field does not exist.
             final Object matcherValue = scope.getLast();
-            if (matcherValue == KEY_DOES_NOT_EXIST) {
+            if (container.unwrapType(scope.getLast()) == KEY_DOES_NOT_EXIST) {
                 return true;
-            } else if (!ReflectionUtils.isListOrArray(expression)) {
-                throw new CompareException("Operator expects an array as parameter");
-            } else if (!ReflectionUtils.isListOrArray(matcherValue)) {
+            }
+            Iterable<Object> expressionIt = container.getListWrapper(expression);
+            if (expressionIt == null) {
+                throw new ConditionException("Operator expects an array as parameter");
+            }
+            Iterable<Object> matcherValueIt = container.getListWrapper(matcherValue);
+            if (matcherValueIt == null) {
                 // value is not a list
-                final List<Object> listExpressions = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                for (final Object exp : listExpressions) {
+                for (final Object exp : expressionIt) {
                     if (container.equalsDeep(container, exp, matcherValue, scope)) {
                         return false;
                     }
                 }
                 return true;
             } else {
-                final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-                final List<Object> listMatcherValues = ReflectionUtils.wrapUnmodifiableList(matcherValue, Object.class);
-                for (final Object exp : listExpression) {
-                    for (Object matcher : listMatcherValues) {
+                for (final Object exp : expressionIt) {
+                    for (Object matcher : matcherValueIt) {
                         if (container.equalsDeep(container, exp, matcher, scope)) {
                             return false;
                         }
@@ -1250,12 +1009,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             if (scope.getLast() == KEY_DOES_NOT_EXIST) {
                 // KEY_DOES_NOT_EXIST can never match anything. It does not match null neither!
                 return true;
             } else {
-                Object result = EQOP.opEvalInternal(container, expression, scope, true);
+                final Object result = EQOP.opEvalInternal(container, expression, scope, true);
                 // inverted
                 return result == Boolean.TRUE ? false : true;
             }
@@ -1277,7 +1036,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             return !container.equalsDeep(container, expression, scope.getLast(), scope);
         }
     }
@@ -1300,9 +1059,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expression, Object.class);
-            for (Object exp : listExpression) {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            for (final Object exp : container.getListWrapper(expression)) {
                 final Object resolved = container.resolveValue(container, exp, scope, false);
                 if (container.isTrue(resolved)) {
                     return true;
@@ -1319,8 +1077,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          * @param value
          * @param key
          * @return
+         * @throws CannotGetValueException
          */
-        Scope resolve(Scope oldScope, Scope newScope, Object key);
+        Scope resolve(Scope oldScope, Scope newScope, Object key) throws CannotGetValueException;
     }
 
     public static class RegexFindOp implements Operator {
@@ -1333,34 +1092,34 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
             try {
-                if (ReflectionUtils.isListOrArray(expression)) {
+                ListAccessorInterface list = container.getListWrapper(expression);
+                if (list != null) {
                     // container.resolveValue(expression, scope)
                     // }
-                    Object matcherObject = container.resolveValue(container, ReflectionUtils.getListElement(expression, 0), scope, true);
+                    final Object matcherObject = container.resolveValue(container, list.get(0), scope, true);
                     if (matcherObject == KEY_DOES_NOT_EXIST) {
                         return null;
                     }
-                    Pattern pattern = (Pattern) container.getCache(RegexFindOp.class);
+                    Pattern pattern = null;
                     if (pattern == null) {
-                        Object patternString = container.resolveValue(container, ReflectionUtils.getListElement(expression, 1), scope, true);
+                        final Object patternString = container.resolveValue(container, list.get(1), scope, true);
                         pattern = Pattern.compile(String.valueOf(patternString));
-                        container.putCache(RegexFindOp.class, pattern);
                     }
                     int groupIndex = 1;
-                    if (ReflectionUtils.getListLength(expression) > 2) {
-                        Object obj = container.resolveValue(container, ReflectionUtils.getListElement(expression, 2), scope, true);
+                    if (list.size() > 2) {
+                        final Object obj = container.resolveValue(container, list.get(2), scope, true);
                         groupIndex = Integer.parseInt(String.valueOf(obj));
                     }
-                    Matcher matcher = pattern.matcher(toCharSequence(matcherObject));
+                    final Matcher matcher = pattern.matcher(toCharSequence(matcherObject));
                     if (matcher.find()) {
                         return matcher.group(groupIndex);
                     } else {
                         return null;
                     }
                 }
-            } catch (CompareException e) {
+            } catch (final ConditionException e) {
                 throw new AggregationException(e);
             }
             throw new AggregationException();
@@ -1384,22 +1143,25 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         /**
          * @param container
          * @return
-         * @throws CompareException
+         * @throws ConditionException
          */
-        private int getFlags(Condition container) throws CompareException {
+        private int getFlags(final Condition<Object> container) throws ConditionException {
             int flags = 0;
-            Object options = container.get($OPTIONS);
+            Object options = container.getOptions(Object.class);
+            String stringFlags = null;
             if (options == null) {
                 return flags;
             }
-            if (options instanceof Condition) {
-                options = ((Condition) options).get("flags");
-                if (options == null) {
-                    return flags;
-                }
+            if (options instanceof String) {
+                stringFlags = (String) options;
+            } else {
+                stringFlags = (String) ((Map) options).get("flags");
             }
-            for (int i = 0; i < ((String) options).length(); i++) {
-                switch (((String) options).charAt(i)) {
+            if (stringFlags == null) {
+                return flags;
+            }
+            for (int i = 0; i < stringFlags.length(); i++) {
+                switch (stringFlags.charAt(i)) {
                 case 'i':
                     flags |= Pattern.CASE_INSENSITIVE;
                     break;
@@ -1410,28 +1172,28 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     flags |= Pattern.DOTALL;
                     break;
                 default:
-                    throw new CompareException("Unsupported Regex Option");
+                    throw new ConditionException("Unsupported Regex Option");
                 }
             }
             return flags;
         }
 
-        protected boolean matchPattern(final Object matcherValue, final Pattern pattern) {
+        protected boolean matchPattern(final Condition<?> container, final Object matcherValue, final Pattern pattern) {
             // no resolve, because matcherValue is from the matcherObject and does not get resolved/evaluated
             if (matcherValue == null) {
                 return false;
             } else {
                 final Matcher matcher = pattern.matcher("");
-                final List<Object> matcherValues = ReflectionUtils.wrapUnmodifiableList(matcherValue, Object.class);
+                final Iterable<Object> matcherValues = container.getListWrapper(matcherValue);
                 if (matcherValues != null) {
                     // the expression matches ANY of the matcherValues list entries
                     for (final Object matcherObject : matcherValues) {
-                        if (matcherObject != null && matcher.reset(toCharSequence(matcherObject)).matches()) {
+                        if (matcherObject != null && matcher.reset(toCharSequence(container.unwrapType(matcherObject))).matches()) {
                             return true;
                         }
                     }
                 }
-                if (matcher.reset(toCharSequence(matcherValue)).matches()) {
+                if (matcher.reset(toCharSequence(container.unwrapType(matcherValue))).matches()) {
                     return true;
                 }
                 return false;
@@ -1442,39 +1204,37 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          *
          */
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
+        public Object opEval(final Condition<?> container, Object expression, final Scope scope) throws ConditionException {
             final Object matcherValue = scope.getLast();
             if (matcherValue == KEY_DOES_NOT_EXIST) {
                 return false;
             } else {
                 try {
                     expression = container.resolveValue(container, expression, scope, true);
-                    Pattern pattern = (Pattern) container.getCache(RegexOp.class);
-                    if (ReflectionUtils.isListOrArray(expression)) {
+                    Pattern pattern = null;
+                    ListAccessorInterface list;
+                    if ((list = container.getListWrapper(expression)) != null) {
                         // aggregation mode
                         if (pattern == null) {
-                            pattern = Pattern.compile(String.valueOf(container.resolveValue(container, ReflectionUtils.getListElement(expression, 0), scope, true)), getFlags(container));
+                            pattern = Pattern.compile(String.valueOf(container.resolveValue(container, list.get(0), scope, true)), this.getFlags((Condition<Object>) container));
                         }
-                        container.putCache(RegexOp.class, pattern);
-                        return matchPattern(container.resolveValue(container, ReflectionUtils.getListElement(expression, 1), scope, true), pattern);
+                        return this.matchPattern(container, container.resolveValue(container, list.get(1), scope, true), pattern);
                     } else if (expression instanceof Pattern) {
                         pattern = (Pattern) expression;
-                        container.putCache(RegexOp.class, pattern);
-                        return matchPattern(matcherValue, pattern);
+                        return this.matchPattern(container, matcherValue, pattern);
                     } else if (expression instanceof String) {
                         if (pattern == null) {
                             expression = container.resolveValue(container, expression, scope, true);
-                            pattern = Pattern.compile((String) expression, getFlags(container));
+                            pattern = Pattern.compile((String) expression, this.getFlags((Condition<Object>) container));
                         }
-                        container.putCache(RegexOp.class, pattern);
-                        return matchPattern(matcherValue, pattern);
+                        return this.matchPattern(container, matcherValue, pattern);
                     }
-                } catch (PatternSyntaxException e) {
-                    throw new CompareException(e);
-                } catch (IllegalArgumentException e) {
-                    throw new CompareException(e);
+                } catch (final PatternSyntaxException e) {
+                    throw new ConditionException(e);
+                } catch (final IllegalArgumentException e) {
+                    throw new ConditionException(e);
                 }
-                throw new CompareException("Operator expects a String or a Pattern(is not serializable) type as parameter");
+                throw new ConditionException("Operator expects a String or a Pattern(is not serializable) type as parameter");
             }
         }
     }
@@ -1503,32 +1263,32 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
          * @param key
          * @param resolver
          */
-        public ResolverOPHandler(String key, ConditionResolver<Input, Output> resolver) {
+        public ResolverOPHandler(final String key, final ConditionResolver<Input, Output> resolver) {
             this.key = key;
             this.resolver = resolver;
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object query, Scope matcher) throws CompareException {
+        public Object opEval(final Condition<?> container, final Object query, final Scope matcher) throws ConditionException {
             if (query instanceof Condition) {
-                final Condition cQuery = (Condition) query;
+                final Condition<?> cQuery = (Condition) query;
                 @SuppressWarnings("unchecked")
-                final Map<String, Object> options = (Map<String, Object>) cQuery.get(Condition.$OPTIONS);
+                Condition options = cQuery.getOptions(Condition.class);
                 if (options == null) {
-                    throw new CompareException("§options property is missing. Add §options." + key.substring(1));
+                    throw new ConditionException("§options property is missing. Add §options." + this.key.substring(1));
                 }
-                final Input parameters = (Input) options.get(key.substring(1));
+                final Input parameters = (Input) options.get(this.key.substring(1));
                 if (parameters == null) {
-                    throw new CompareException("§options." + key.substring(1) + " property is missing");
+                    throw new ConditionException("§options." + this.key.substring(1) + " property is missing");
                 }
-                final Output resolved = resolver.resolve(parameters);
+                final Output resolved = this.resolver.resolve(parameters);
                 final ArrayList<Object> newScopeObjects = new ArrayList<Object>(matcher.getScope());
                 // Resolver convert types to a "Wrapper" Type, (FileContext?) the original instance must be removed from the scope hirarchy,
                 // because $parent would not work
                 newScopeObjects.set(newScopeObjects.size() - 1, resolved);
                 return container.resolveValue(container, cQuery, new Scope(newScopeObjects, matcher.getPath()), false);
             }
-            throw new CompareException();
+            throw new ConditionException();
         }
 
         /*
@@ -1552,12 +1312,16 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expressions, Scope scope) throws CompareException {
-            if (ReflectionUtils.isListOrArray(expressions.getClass())) {
-                final List<Object> listExpressions = ReflectionUtils.wrapUnmodifiableList(expressions, Object.class);
+        public Object opEval(final Condition<?> container, final Object expressions, final Scope scope) throws ConditionException {
+            ListAccessorInterface list;
+            if ((list = container.getListWrapper(expressions)) != null) {
                 Number result = null;
-                for (final Object expression : listExpressions) {
-                    final Number num = (Number) container.resolveValue(container, expression, scope, true);
+                for (final Object expression : list) {
+                    final Object ret = container.unwrapType(container.resolveValue(container, expression, scope, true));
+                    if (!(ret instanceof Number)) {
+                        throw new AggregationException("SubtractOp:" + (container) + "|" + (expression) + " does not resolve to a number but " + ret);
+                    }
+                    final Number num = (Number) ret;
                     if (result == null) {
                         result = num;
                     } else if (Clazz.isDouble(result.getClass()) || Clazz.isDouble(num.getClass())) {
@@ -1571,7 +1335,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 // no scope evaluation here
                 return new AggregationResult(result);
             }
-            throw new AggregationException("SubstracOp:" + (container) + "|" + (expressions));
+            throw new AggregationException("SubtractOp:" + (container) + "|" + (expressions));
         }
     }
 
@@ -1585,42 +1349,41 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
 
         @Override
-        public Object opEval(Condition<?> container, Object expression, Scope scope) throws CompareException {
-            if (expression instanceof Number) {
+        public Object opEval(final Condition<?> container, final Object expression, final Scope scope) throws ConditionException {
+            if (container.unwrapType(expression) instanceof Number) {
                 return expression;
             }
-            if (ReflectionUtils.isListOrArray(expression.getClass())) {
-                final int length = ReflectionUtils.getListLength(expression);
+            final Iterable<Object> it = container.getListWrapper(expression);
+            if (it != null) {
                 Number result = null;
-                for (int index = 0; index < length; index++) {
-                    Object value = ReflectionUtils.getListElement(expression, index);
+                int count = 0;
+                boolean singleListMode = false;
+                for (Object value : it) {
                     /**
                      * If used on a field that does not exist in any document in the collection, $sum returns 0 for that field.
                      */
                     Number num = 0;
-                    try {
-                        /**
-                         * With a single expression as its operand, if the expression resolves to an array, $sum traverses into the array to
-                         * operate on the numerical elements of the array to return a single value. With a list of expressions as its
-                         * operand, if any of the expressions resolves to an array, $sum does not traverse into the array but instead treats
-                         * the array as a non-numerical value
-                         */
-                        if (ReflectionUtils.isListOrArray(value.getClass()) && length == 1) {
-                            // num = aggregate(container, value, matcherValue);
-                            num = (Number) opEval(container, value, scope);
-                        } else {
-                            value = container.resolveValue(container, value, scope, true);
-                            // value = getNumber(container, value, matcherValue, false);
-                            if (value instanceof Number) {
-                                num = (Number) value;
-                            }
-                            if (ReflectionUtils.isListOrArray(value.getClass())) {
-                                // num = aggregate(container, value, obj);
-                                num = (Number) opEval(container, value, scope);
-                            }
+                    /**
+                     * With a single expression as its operand, if the expression resolves to an array, $sum traverses into the array to
+                     * operate on the numerical elements of the array to return a single value. With a list of expressions as its operand,
+                     * if any of the expressions resolves to an array, $sum does not traverse into the array but instead treats the array as
+                     * a non-numerical value
+                     */
+                    if (singleListMode && count > 0) {
+                        // reset because we have more than 1 entry
+                        result = 0;
+                        singleListMode = false;
+                    }
+                    if (container.getListWrapper(value) != null && count == 0) {
+                        // num = aggregate(container, value, matcherValue);
+                        num = (Number) this.opEval(container, value, scope);
+                        singleListMode = true;
+                    } else {
+                        value = container.unwrapType(container.resolveValue(container, value, scope, true));
+                        // value = getNumber(container, value, matcherValue, false);
+                        if (value instanceof Number) {
+                            num = (Number) value;
                         }
-                    } catch (AggregationException e) {
-                        continue;
                     }
                     if (result == null) {
                         result = num;
@@ -1631,6 +1394,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     } else {
                         result = result.longValue() + num.longValue();
                     }
+                    count++;
                 }
                 return result;
             }
@@ -1648,22 +1412,21 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * CURRENT is modifiable. However, since $<field> is equivalent to $$CURRENT.<field>, rebinding CURRENT changes the meaning of $
      * accesses.
      */
-    public static final String                                 $$CURRENT                 = "§§CURRENT";
+    public static final String                              $$CURRENT          = "§§CURRENT";
     @StorableDoc("Path Modifier: References the root document, i.e. the top-level document.")
-    public static final String                                 $$ROOT                    = "§§ROOT";
+    public static final String                              $$ROOT             = "§§ROOT";
     @ApiDoc("Path Modifier:  §§THIS references the current scope object or field. Note: All field identifiers that start with §§ are absolute identifiers and MUST be places as first key element")
     @ApiDocExample("{'c':{'§gt':[{'§sum':['§§this',1]},0}}  '§§this' references to the field c, adds 1 and checks if the result is greater than 0")
-    public static final String                                 $$THIS                    = "§§THIS";
-    public static final String                                 $ADD                      = "§add";
-    public static final String                                 $AND                      = "§and";
+    public static final String                              $$THIS             = "§§THIS";
+    public static final String                              $AND               = "§and";
     /**
      *
      */
-    public static final String                                 $ANY                      = "§any";
+    public static final String                              $ANY               = "§any";
     @ApiDoc("Aggregation OP: concat all values to a single string")
-    private static final String                                $CONCAT                   = "§concat";
-    public static final String                                 $DIVIDE                   = "§divide";
-    public static final String                                 $EACH                     = "§each";
+    private static final String                             $CONCAT            = "§concat";
+    public static final String                              $DIVIDE            = "§divide";
+    public static final String                              $EACH              = "§each";
     /**
      * Specifies equality condition. The $eq operator matches documents where the value of a field equals the specified value. WARNING:
      * There is a difference to MongoDb $EQ: If the specified <value> is a document, the order of the fields in the document DOES NOT
@@ -1672,21 +1435,20 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * the <field> contains an element that matches the array exactly. The order of the elements matters. For an example, see Equals an
      * Array Value.
      */
-    public static final String                                 $EQ                       = "§eq";
+    public static final String                              $EQ                = "§eq";
     /**
      *
      */
-    public static final String                                 $EXISTS                   = "§exists";
-    public static final String                                 $IS_REGEX                 = "§isRegex";
+    public static final String                              $EXISTS            = "§exists";
+    public static final String                              $IS_REGEX          = "§isRegex";
     /**
      * $gt selects those documents where the value of the field is greater than (i.e. >) the specified value.
      */
-    public static final String                                 $GT                       = "§gt";
+    public static final String                              $GT                = "§gt";
     /**
      * $gte selects the documents where the value of the field is greater than or equal to (i.e. >=) a specified value (e.g. value.)
      */
-    public static final String                                 $GTE                      = "§gte";
-    public static final String                                 $IGNORE_GETTER_EXCEPTIONS = "§ignoreGetterErrors";
+    public static final String                              $GTE               = "§gte";
     /**
      * The $in operator selects the documents where the value of a field equals any value in the specified array. To specify an $in
      * expression, use the following prototype:
@@ -1696,98 +1458,126 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      *
      *
      */
-    public static final String                                 $IN                       = "§in";
+    public static final String                              $IN                = "§in";
     /**
      *
      */
     @ApiDoc("Path modifier. a.§keys returns all keys of the map a or all indizes of the list a")
     @ApiDocExample("a.§keys")
-    public static final String                                 $KEYS                     = "§keys";
+    public static final String                              $KEYS              = "§keys";
     /**
      *
      */
-    public static final String                                 $LT                       = "§lt";
+    public static final String                              $LT                = "§lt";
     /**
      *
      */
-    public static final String                                 $LTE                      = "§lte";
-    public static final String                                 $MAX                      = "§max";
-    public static final String                                 $MIN                      = "§min";
-    public static final String                                 $MULTIPLY                 = "§multiply";
+    public static final String                              $LTE               = "§lte";
+    public static final String                              $MAX               = "§max";
+    public static final String                              $MIN               = "§min";
+    public static final String                              $MULTIPLY          = "§multiply";
     /**
      * $ne selects the documents where the value of the field is not equal to the specified value. This includes documents that do not
      * contain the field.
      */
-    public static final String                                 $NE                       = "§ne";
+    public static final String                              $NE                = "§ne";
     /**
      *
      */
-    public static final String                                 $NIN                      = "§nin";
+    public static final String                              $NIN               = "§nin";
     /**
      *
      */
-    public static final String                                 $NOT                      = "§not";
+    public static final String                              $NOT               = "§not";
     /**
      * Returns the current datetime value, which is same across all members of the deployment and remains constant throughout the
      * aggregation pipeline.
      */
-    public static final String                                 $NOW                      = "§§NOW";
+    public static final String                              $NOW               = "§§NOW";
     /**
      * Regex options https://docs.mongodb.com/manual/reference/operator/expression/regex/#op._S_options
      */
-    public static final String                                 $OPTIONS                  = "§options";
+    public static final String                              $OPTIONS           = "§options";
     /**
      *
      */
-    public static final String                                 $OR                       = "§or";
+    public static final String                              $OR                = "§or";
     /**
      *
      */
     @ApiDoc("Path traversal identifier. Used to access parent fields in the matcher object - relative to the current scope. Usage is like ../../ in directory pathes")
-    public static final String                                 $PARENT                   = "§PARENT";
-    public static final String                                 $REGEX                    = "§regex";
+    public static final String                              $PARENT            = "§PARENT";
+    public static final String                              $REGEX             = "§regex";
     @ApiDoc("Aggregation OP: find a match in a string via regex\r\nParam 1:string\r\nParam 2:regex\r\nParam 3: matching group index(optional)")
-    public static final String                                 $REGEX_FIND_ONE           = "§regexFindOne";
+    public static final String                              $REGEX_FIND_ONE    = "§regexFindOne";
     @ApiDoc("Virtual field identifier. a.§size references length of an array, string, map or other objects")
     @ApiDocExample("a.§size")
-    public static final String                                 $SIZE                     = "§size";
-    public static final String                                 $SUBTRACT                 = "§subtract";
-    public static final String                                 $SUM                      = "§sum";
+    public static final String                              $SIZE              = "§size";
+    public static final String                              $SUBTRACT          = "§subtract";
+    public static final String                              $SUM               = "§sum";
     /**
      *
      */
     @ApiDoc("Virtual field identifier. a.§type references the ClassName of 'a'")
     @ApiDocExample("a.§type")
-    public static final String                                 $TYPE                     = "§type";
-    private static final Class[]                               EMPTY                     = new Class[] {};
-    protected static final EqOp                                EQOP                      = new EqOp();
-    private static HashSet<String>                             IGNORE                    = new HashSet<String>();
-    private static final Object                                KEY_DOES_NOT_EXIST        = new Object() {
-                                                                                             @Override
-                                                                                             public String toString() {
-                                                                                                 return "KEY_DOES_NOT_EXIST";
-                                                                                             }
-                                                                                         };
-    private final static ThreadLocal<Long>                     now                       = new ThreadLocal<Long>();
-    private final static ThreadLocal<Condition>                ROOT_CONDITION            = new ThreadLocal<Condition>();
-    public static final ThreadLocal<Map<String, OpHandler>>    OPERATIONS                = new ThreadLocal<Map<String, OpHandler>>();
-    private static final HashMap<String, Operator>             OPS                       = new HashMap<String, Operator>();
+    public static final String                              $TYPE              = "§type";
+    private static final Class[]                            EMPTY              = new Class[] {};
+    protected static final EqOp                             EQOP               = new EqOp();
+    private static HashSet<String>                          IGNORE             = new HashSet<String>();
+    public static final Object                              KEY_DOES_NOT_EXIST = new Object() {
+                                                                                   @Override
+                                                                                   public String toString() {
+                                                                                       return "KEY_DOES_NOT_EXIST";
+                                                                                   }
+                                                                               };
+    private final static ThreadLocal<Long>                  now                = new ThreadLocal<Long>();
+    private final static ThreadLocal<Condition>             ROOT_CONDITION     = new ThreadLocal<Condition>();
+    public static final ThreadLocal<Map<String, OpHandler>> OPERATIONS         = new ThreadLocal<Map<String, OpHandler>>();
+    private static final HashMap<String, Operator>          OPS                = new HashMap<String, Operator>();
     /**
      * used as $options to force a Condition get handled as Aggregate COndition
      */
     @ApiDoc("Set this option to true to force all operators in the same layer to work in aggregation mode.")
     @ApiDocExample("{§eq:['§a',1],§options:{'aggregate':true}}")
-    public static final String                                 OPTIONS_AGGREGATE         = "aggregate";
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS             = new ThreadLocal<Map<String, PathHandler>>();
+    public static final String                              OPTIONS_AGGREGATE  = "aggregate";
+    protected ArrayList<TypeHandler>                        typeHandlers       = new ArrayList<TypeHandler>();
+
+    protected ArrayList<TypeHandler> getTypehandlers() {
+        return typeHandlers;
+    }
+
+    /**
+     * @param last
+     * @return
+     */
+    public boolean isValue(Object last) {
+        if (last == null || last == KEY_DOES_NOT_EXIST || Clazz.isPrimitive(last.getClass()) || last instanceof String || Clazz.isEnum(last.getClass())) {
+            return true;
+        }
+        Object unwrapped = unwrap(last);
+        if (unwrapped != null) {
+            if (unwrapped == null || last == KEY_DOES_NOT_EXIST || Clazz.isPrimitive(unwrapped.getClass()) || unwrapped instanceof String || Clazz.isEnum(unwrapped.getClass())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    static {
+        GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
+        GLOBAL_TYPE_HANDLERS.add(new DateHandler());
+    }
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID          = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE                      = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                         };
+    private static final long                                  serialVersionUID = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                };
     static {
         IGNORE.add($OPTIONS);
-        IGNORE.add($IGNORE_GETTER_EXCEPTIONS);
     }
     static {
         OPS.put($GTE, new NumberOp(NumberOp.OP.GTE));
@@ -1809,7 +1599,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         OPS.put($ANY, new AnyOp());
         OPS.put($NOT, new NotOp());
         // aggregration
-        OPS.put($ADD, new AddOp());
         OPS.put($SUBTRACT, new SubtractOp());
         OPS.put($SUM, new SumOp());
         OPS.put($MIN, new MinOp());
@@ -1824,70 +1613,92 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         Map<String, OpHandler> map = Condition.OPERATIONS.get();
         if (map == null) {
             map = new HashMap<String, Condition.OpHandler>();
+            Condition.OPERATIONS.set(map);
         }
         return map.put(key, handler);
+    }
+
+    /**
+     * @param result
+     * @return
+     */
+    public Object createMap(HashMap<Object, Object> result) {
+        return result;
+    }
+
+    /**
+     * @param result
+     * @return
+     */
+    public Object createList(LinkedList<Object> result) {
+        return result;
+    }
+
+    /**
+     * @param matcherValue
+     * @param b
+     * @return
+     */
+    public Integer compare(Object a, Object b) {
+        for (final TypeHandler e : getTypeHandlerIterable()) {
+            final Integer ret = e.compare(a, b);
+            if (ret != null) {
+                return ret.intValue();
+            }
+        }
+        return CompareUtils.compare(a, b);
+    }
+
+    public ListAccessorInterface getListWrapper(final Object expression) {
+        if (expression instanceof ListAccessorInterface) {
+            return (ListAccessorInterface) expression;
+        }
+        for (final TypeHandler e : getTypeHandlerIterable()) {
+            final ListAccessorInterface ret = e.getListAccessor(expression);
+            if (ret != null) {
+                return ret;
+            }
+        }
+        if (expression == null) {
+            return null;
+        }
+        if (expression.getClass().isArray()) {
+            return new ArrayAccessor<MatcherType>(expression);
+        }
+        if (expression instanceof List) {
+            return new ListAccessor((List<Object>) expression);
+        }
+        if (expression instanceof Collection) {
+            return new CollectionAccessor(((Collection<Object>) expression));
+        }
+        return null;
+    }
+
+    public MapAccessorInterface getMapWrapper(final Object expression) {
+        if (expression instanceof MapAccessorInterface) {
+            return (MapAccessorInterface) expression;
+        }
+        for (final TypeHandler e : getTypeHandlerIterable()) {
+            final MapAccessorInterface ret = e.getMapAccessor(expression);
+            if (ret != null) {
+                return ret;
+            }
+        }
+        if (expression instanceof Map) {
+            return new MapAccessor((Map<String, Object>) expression);
+        }
+        return null;
     }
 
     /**
      * @param resolveValue
      * @return
      */
-    public Object unwrap(Object resolve) {
+    public Object unwrap(final Object resolve) {
         if (resolve instanceof ConditionResult) {
             return ((ConditionResult) resolve).getValue();
         }
         return resolve;
-    }
-
-    /**
-     * @param expression
-     * @return
-     * @throws CompareException
-     */
-    public Date toDate(Object expression) throws CompareException {
-        if (expression == null) {
-            return null;
-        }
-        if (expression instanceof Date) {
-            return ((Date) expression);
-        }
-        if (expression instanceof String) {
-            try {
-                // coupling to flexi.. not nice, but I do not want code duplication as well
-                return DateMapper.parseJsonDefault(String.valueOf(expression));
-            } catch (FlexiMapperException e) {
-                throw new CompareException(e);
-            }
-        }
-        if (expression instanceof Number) {
-            return new Date(((Number) expression).longValue());
-        }
-        throw new CompareException("Cannot compare " + expression + " to a Date instance");
-    }
-
-    /**
-     * @param expression
-     * @return
-     * @throws CompareException
-     */
-    public TimeSpan toTimeSpan(Object expression) throws CompareException {
-        if (expression == null) {
-            return null;
-        }
-        if (expression instanceof TimeSpan) {
-            return ((TimeSpan) expression);
-        }
-        if (expression instanceof String) {
-            try {
-                return TimeSpan.parse(String.valueOf(expression));
-            } catch (InvalidTimeSpanException e) {
-                throw new CompareException(e);
-            }
-        }
-        if (expression instanceof Number) {
-            return TimeSpan.fromMillis(((Number) expression).longValue());
-        }
-        throw new CompareException("Cannot compare " + expression + " to a TimeSpan instance");
     }
 
     public static <Input, Output> OpHandler putThreadResolver(final String key, final ConditionResolver<Input, Output> resolver) {
@@ -1895,7 +1706,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         if (map == null) {
             map = new HashMap<String, Condition.OpHandler>();
         }
-        OpHandler ret = map.put(key, new ResolverOPHandler<Input, Output>(key, resolver));
+        final OpHandler ret = map.put(key, new ResolverOPHandler<Input, Output>(key, resolver));
         Condition.OPERATIONS.set(map);
         return ret;
     }
@@ -1904,8 +1715,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @param handler
      * @return
      */
-    private static boolean removeThreadOPHandler(String key) {
-        Map<String, OpHandler> map = Condition.OPERATIONS.get();
+    public static boolean removeThreadOPHandler(final String key) {
+        final Map<String, OpHandler> map = Condition.OPERATIONS.get();
         if (map == null) {
             return false;
         }
@@ -1915,22 +1726,25 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static boolean removeThreadResolver(String key) {
+    public static boolean removeThreadResolver(final String key) {
         return removeThreadOPHandler(key);
     }
 
-    protected volatile HashMap<KeyOnClass, Condition.AccessMethod> accessCache    = new HashMap<KeyOnClass, AccessMethod>();
-    protected volatile HashMap<Object, Object>                     cache          = new HashMap<Object, Object>();
-    protected HashMap<String, PathHandler>                         customPathhandlers;
-    protected final boolean                                        useAccessCache = true;
-    private LogInterface                                           logger;
+    protected HashMap<String, PathHandler> customPathhandlers;
+    private LogInterface                   logger;
+    private int                            logPathLength;
 
     public LogInterface _getLogger() {
-        return logger;
+        return this.logger;
     }
 
-    public void _setLogger(LogInterface logger) {
+    public void _setLogger(final LogInterface logger) {
         this.logger = logger;
+    }
+
+    public Condition<MatcherType> logger(final LogInterface logger) {
+        this.logger = logger;
+        return this;
     }
 
     public static final String $FIRST = "§first";
@@ -1941,7 +1755,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     public Condition() {
     }
 
-    public Condition(Map<String, Object> condition) {
+    public Condition(final Map<String, Object> condition) {
         super(condition);
     }
 
@@ -1949,57 +1763,39 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @param string
      * @param i
      */
-    public Condition(String key, Object o) {
-        append(key, o);
+    public Condition(final String key, final Object o) {
+        this.append(key, o);
     }
 
     /**
      * @param key
      * @param o
      */
-    public Condition append(String key, Object o) {
-        put(key, o);
+    public Condition append(final String key, final Object o) {
+        this.put(key, o);
         return this;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see java.util.HashMap#clear()
-     */
-    @Override
-    public void clear() {
-        clearCache();
-        super.clear();
-    }
-
-    protected void clearCache() {
-        if (cache.size() > 0) {
-            cache = new HashMap<Object, Object>();
-        }
-        if (accessCache.size() > 0) {
-            accessCache = new HashMap<KeyOnClass, AccessMethod>();
-        }
-    }
-
-    public boolean equalsDeep(Condition container, final Object expressionA, Object expressionB, Scope scope) throws CompareException {
+    public boolean equalsDeep(final Condition container, final Object expressionA, final Object expressionB, final Scope scope) throws ConditionException {
+        ListAccessorInterface listA;
+        ListAccessorInterface listB;
+        MapAccessorInterface mapA;
+        MapAccessorInterface mapB;
         if (expressionA == expressionB) {
             return true;
         } else if (expressionA == null && expressionB != null) {
             return false;
         } else if (expressionB == null) {
             return false;
-        } else if (equalsShallow(container, expressionA, expressionB, scope)) {
+        } else if (this.equalsShallow(container, expressionA, expressionB, scope)) {
             // if equals says these objects equal, we trust
             return true;
-        } else if (ReflectionUtils.isListOrArray(expressionA) && ReflectionUtils.isListOrArray(expressionB)) {
-            final List<Object> listExpression = ReflectionUtils.wrapUnmodifiableList(expressionA, Object.class);
-            final List<Object> listMatcher = ReflectionUtils.wrapUnmodifiableList(expressionB, Object.class);
-            if (listExpression.size() != listMatcher.size()) {
+        } else if ((listA = container.getListWrapper(expressionA)) != null && (listB = container.getListWrapper(expressionB)) != null) {
+            if (listA.size() != listB.size()) {
                 return false;
             } else {
-                final ListIterator<Object> e1 = listExpression.listIterator();
-                final ListIterator<Object> e2 = listMatcher.listIterator();
+                final Iterator e1 = listA.iterator();
+                final Iterator e2 = listB.iterator();
                 int i = 0;
                 while (e1.hasNext() && e2.hasNext()) {
                     final Object o1 = e1.next();
@@ -2010,12 +1806,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     scope.add(o2, i++);
                     try {
                         if (o1 instanceof Condition) {
-                            Object result = ((Condition) o1).evaluateInternal(scope);
-                            if (isFalse(result)) {
+                            final Object result = ((Condition) o1).evaluateInternal(scope);
+                            if (this.isFalse(result)) {
                                 return false;
                             }
                         } else {
-                            if (!equalsDeep(container, o1, o2, scope)) {
+                            if (!this.equalsDeep(container, o1, o2, scope)) {
                                 return false;
                             }
                         }
@@ -2026,22 +1822,23 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 return true;
             }
         } else if (expressionA instanceof Condition) {
-            Object result = ((Condition) expressionA).evaluateInternal(scope);
+            // is it possible that expressionA is a Map that is actually a condition?
+            final Object result = ((Condition) expressionA).evaluateInternal(scope);
             return ((Condition) expressionA).isTrue(result);
-        } else if (expressionA instanceof Map && expressionB instanceof Map) {
+        } else if ((mapA = container.getMapWrapper(expressionA)) != null && (mapB = container.getMapWrapper(expressionB)) != null) {
             DebugMode.debugger();
             // this cannot be reached?
-            if (((Map<?, ?>) expressionA).size() != ((Map<?, ?>) expressionB).size()) {
+            if (mapA.size() != mapB.size()) {
                 return false;
             }
-            if (!CompareUtils.equals(((Map<?, ?>) expressionA).keySet(), ((Map<?, ?>) expressionB).keySet())) {
+            if (!CompareUtils.equals(mapA.keySet(), mapB.keySet())) {
                 return false;
             }
-            for (java.util.Map.Entry<?, ?> es : ((Map<?, ?>) expressionA).entrySet()) {
+            for (final java.util.Map.Entry<String, ?> es : mapA) {
                 try {
                     // scope.add(es.getValue());
                     // discuss...change scope`?
-                    if (!equalsDeep(container, es.getValue(), ((Map<?, ?>) expressionB).get(es.getKey()), scope)) {
+                    if (!this.equalsDeep(container, es.getValue(), mapB.get(es.getKey()), scope)) {
                         return false;
                     }
                 } finally {
@@ -2049,7 +1846,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 }
             }
             return true;
-        } else if (expressionA.getClass() == expressionB.getClass()) {
+        } else if (expressionA != null && expressionA.getClass() == expressionB.getClass()) {
             if (Clazz.isPrimitive(expressionA.getClass()) || Clazz.isEnum(expressionA.getClass()) || Clazz.isString(expressionA.getClass())) {
                 // if true, this would have exited in the } else if (objectX.equals(objectY)) { block above
                 return false;
@@ -2057,11 +1854,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             ClassCache cc;
             try {
                 cc = ClassCache.getClassCache(expressionA.getClass());
-                for (Getter c : cc.getGetter()) {
+                for (final Getter c : cc.getGetter()) {
                     try {
                         // scope.add(c.getValue(matcherValue));
                         // discuss...change scope`?
-                        if (!equalsDeep(container, c.getValue(expressionA), c.getValue(expressionB), scope)) {
+                        if (!this.equalsDeep(container, c.getValue(expressionA), c.getValue(expressionB), scope)) {
                             return false;
                         }
                     } finally {
@@ -2069,36 +1866,37 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     }
                 }
                 return true;
-            } catch (SecurityException e) {
+            } catch (final SecurityException e) {
                 throw new WTFException(e);
-            } catch (NoSuchMethodException e) {
+            } catch (final NoSuchMethodException e) {
                 return false;
-            } catch (IllegalArgumentException e) {
+            } catch (final IllegalArgumentException e) {
                 throw new WTFException(e);
-            } catch (IllegalAccessException e) {
+            } catch (final IllegalAccessException e) {
                 throw new WTFException(e);
-            } catch (InvocationTargetException e) {
+            } catch (final InvocationTargetException e) {
                 throw new WTFException(e);
             }
         } else {
-            return expressionA.equals(expressionB);
+            return expressionA != null && expressionA.equals(expressionB);
         }
     }
 
-    public boolean equalsShallow(Condition container, Object expression, Object matcherValue, Scope scope) throws CompareException {
+    public boolean equalsShallow(final Condition container, final Object expression, final Object matcherValue, final Scope scope) throws ConditionException {
         if (expression == matcherValue) {
             return true;
         }
         if (expression == null || matcherValue == null) {
             return false;
         }
-        Object resolvedExpression = resolveValue(container, expression, scope, false);
+        Object resolvedExpression = this.resolveValue(container, expression, scope, false);
         if (resolvedExpression == matcherValue) {
             DebugMode.debugger();
             return true;
         }
         if (resolvedExpression instanceof AggregationResult && ((AggregationResult) resolvedExpression) == matcherValue) {
             DebugMode.debugger();
+            // same logic as above?
             return true;
         }
         if (resolvedExpression instanceof Number && matcherValue instanceof Number) {
@@ -2109,16 +1907,20 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             return StringUtils.equals(matcherValue.toString(), (String) resolvedExpression);
         }
         if (resolvedExpression instanceof String && matcherValue instanceof String) {
-            Object options = get($OPTIONS);
-            if (options != null && options instanceof Map) {
-                if (Boolean.TRUE.equals(((Condition) options).get(CASE_INSENSITIVE))) {
-                    return StringUtils.equalsIgnoreCase((String) resolvedExpression, (String) matcherValue);
-                }
+            // no isMap - options is part of the conditions. TypeHandlers should handle the matcher only
+            if (Boolean.TRUE.equals(getOptions(Boolean.class, CASE_INSENSITIVE))) {
+                return StringUtils.equalsIgnoreCase((String) resolvedExpression, (String) matcherValue);
             }
         }
         if (resolvedExpression instanceof ConditionResult) {
             // DebugMode.debugger();
             resolvedExpression = container.unwrap(resolvedExpression);
+        }
+        for (final TypeHandler entry : getTypeHandlerIterable()) {
+            final Boolean res = entry.equals(resolvedExpression, matcherValue);
+            if (res != null) {
+                return res == Boolean.TRUE;
+            }
         }
         return CompareUtils.equals(matcherValue, resolvedExpression);
     }
@@ -2126,14 +1928,14 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     /**
      * @param test
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public Object evaluate(Object matcher) throws CompareException {
-        return unwrap(evaluateInternal(new Scope(matcher)));
+    public Object evaluate(final Object matcher) throws ConditionException {
+        return this.unwrap(this.evaluateInternal(new Scope(matcher)));
     }
 
     // MAY return AggregationResults!
-    public Object evaluateInternal(Scope scope) throws CompareException {
+    public Object evaluateInternal(final Scope scope) throws ConditionException {
         final boolean rootFlag;
         if (now.get() == null) {
             now.set(System.currentTimeMillis());
@@ -2141,22 +1943,24 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         } else {
             rootFlag = false;
         }
-        if (ROOT_CONDITION.get() == null) {
-            ROOT_CONDITION.set(this);
+        if (_isDebug()) {
+            log(scope.getPath(), " Root is  %s", ROOT_CONDITION.get());
         }
+        boolean unsetRoot = initRoot(scope);
         try {
-            fixInternalMapToCondition();
+            this.fixInternalMapToCondition();
             Object lastResult = null;
             boolean lastResultDefined = false;
             HashSet<String> keysMustBeEvaluated = null;
-            Object options = get($OPTIONS);
+            final Object options = this.getOptions(Object.class);
             SKIP: if (scope.getPath().size() > 0) {
-                final Object last = scope.getLast();
+                final Object last = this.unwrapType(scope.getLast());
+                // use map interface no map accessor required because this is part of the condition
                 if (options instanceof Map) {
                     if (((Map) options).get(FILTER_ROOT) == Boolean.TRUE) {
                         break SKIP;
                     } else if (((Map) options).get(FILTER_ROOT) == Boolean.FALSE) {
-                        keysMustBeEvaluated = new HashSet<String>(listKeys(last));
+                        keysMustBeEvaluated = new HashSet<String>(this.listKeys(last));
                         break SKIP;
                     }
                 }
@@ -2164,9 +1968,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     break SKIP;
                 } else if (last instanceof String) {
                     break SKIP;
-                } else if (ReflectionUtils.isListOrArray(scope.getLast())) {
-                    break SKIP;
-                } else if (last instanceof Collection) {
+                } else if (getListWrapper(scope.getLast()) != null) {
                     break SKIP;
                 } else if (last == KEY_DOES_NOT_EXIST) {
                     break SKIP;
@@ -2176,17 +1978,17 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     break SKIP;
                 }
                 if (scope.getPath().getLast() instanceof String) {
-                    String lastKey = (String) scope.getPath().getLast();
-                    Operator lastOP = OPS.get(lastKey);
+                    final String lastKey = (String) scope.getPath().getLast();
+                    final Operator lastOP = OPS.get(lastKey);
                     if (lastOP != null && lastOP.isFilterRoot()) {
                         break SKIP;
                     }
                 }
                 if (scope.getPath().size() >= 2) {
                     // Project Op adds the filtered key to the scope path, and thus the last element is never the OP itself
-                    Object maybeProjectOp = scope.getPath().get(-2);
+                    final Object maybeProjectOp = scope.getPath().get(-2);
                     if (maybeProjectOp instanceof String) {
-                        Operator lastOP = OPS.get(maybeProjectOp);
+                        final Operator lastOP = OPS.get(maybeProjectOp);
                         if (lastOP != null) {
                             if (lastOP instanceof ProjectOp) {
                                 break SKIP;
@@ -2201,17 +2003,17 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     }
                 }
                 // if we are not in root,ALL keys must match - only the condition root works like a filter
-                keysMustBeEvaluated = new HashSet<String>(listKeys(scope.getLast()));
+                keysMustBeEvaluated = new HashSet<String>(this.listKeys(scope.getLast()));
             }
             boolean couldHandleAllKeys = true;
-            NEXT_ENTRY: for (java.util.Map.Entry<String, Object> es : entrySet()) {
+            for (final java.util.Map.Entry<String, Object> es : this.entrySet()) {
                 final String key = es.getKey();
                 if (IGNORE.contains(key)) {
                     // for internal use only.
                     continue;
                 }
                 // Object value = evaluateAggregationExpression(this, es.getValue(), obj);
-                Map<String, OpHandler> localOps = OPERATIONS.get();
+                final Map<String, OpHandler> localOps = OPERATIONS.get();
                 Operator op = null;
                 if (localOps != null) {
                     op = localOps.get(key);
@@ -2221,24 +2023,24 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 }
                 if (op != null) {
                     // contains operators - object does not have to match complete.
-                    if (_isDebug()) {
-                        log(scope.getPath(), "Operator " + scope.getLast() + "." + key + "(" + es.getValue() + ")");
+                    if (this._isDebug()) {
+                        this.log(scope.getPath(), "Operator-Start " + this.toLog(scope.getLast()) + "." + key + "(" + es.getValue() + ")");
                     }
                     keysMustBeEvaluated = null;
                     lastResultDefined = true;
                     scope.add(scope.getLast(), key);
                     try {
                         lastResult = op.opEval(this, es.getValue(), scope);
-                        if (_isDebug()) {
-                            log(scope.getPath(), "Operator " + key + " = " + lastResult);
+                        if (this._isDebug()) {
+                            this.log(scope.getPath(), "Operator-Result " + key + " = " + lastResult);
                         }
                     } finally {
                         scope.removeLast();
                     }
                     // DebugMode.breakIf(lastResult instanceof AggregationResult, EMPTY);
-                    if (isFalse(lastResult)) {
-                        if (_isDebug()) {
-                            log(scope.getPath(), "Operator " + key + " on " + scope.getLast() + " = false");
+                    if (this.isFalse(lastResult)) {
+                        if (this._isDebug()) {
+                            this.log(scope.getPath(), "Operator-Result " + key + " on " + scope.getLast() + " = false");
                         }
                         return false;
                     }
@@ -2246,21 +2048,21 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     // we cannot simply extend scope, because the key might be absolute and not related to the current scope
                     Scope newScope;
                     try {
-                        JSPath keyPath = JSPath.fromPathString(key);
+                        final JSPath keyPath = JSPath.fromPathString(key);
                         if (keysMustBeEvaluated != null) {
                             couldHandleAllKeys &= keysMustBeEvaluated.remove(String.valueOf(keyPath.getFirst()));
                         }
-                        newScope = resolveKeyPath(scope, keyPath);
-                        if (_isDebug()) {
-                            log(newScope.getPath(), "Resolved to " + newScope.getLast());
+                        newScope = this.resolveKeyPath(scope, keyPath);
+                        if (this._isDebug()) {
+                            this.log(newScope.getPath(), "Resolved to " + this.toLog(newScope.getLast()));
                         }
-                    } catch (InvalidPathException e) {
-                        throw new CompareException(e);
+                    } catch (final InvalidPathException e) {
+                        throw new ConditionException(e);
                     }
-                    Object expression = es.getValue();
+                    final Object expression = es.getValue();
                     if (expression instanceof Condition) {
                         lastResultDefined = true;
-                        lastResult = ((Condition<?>) expression).evaluateInternal(newScope/* matcherValue, value */);
+                        lastResult = convert(((Condition<?>) expression)).evaluateInternal(newScope/* matcherValue, value */);
                         if (lastResult instanceof ConditionResult) {
                             // aggregation does not compare to the current path - this must be done here
                             lastResult = ((ConditionResult) lastResult).implicitEquals(this, newScope);
@@ -2293,8 +2095,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 if (!couldHandleAllKeys) {
                     // expression does not match the matcher object
                     // condition {a:true,b:true} equals matcher {a:true} -->False
-                    if (_isDebug()) {
-                        log(scope.getPath(), " = false - too many properties in condition -> " + KEY_DOES_NOT_EXIST);
+                    if (this._isDebug()) {
+                        this.log(scope.getPath(), " = false - too many properties in condition -> " + KEY_DOES_NOT_EXIST);
                     }
                     return false;
                 }
@@ -2302,8 +2104,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             if (keysMustBeEvaluated != null && keysMustBeEvaluated.size() > 0) {
                 // expression did not evaluate all of the matcher Objects keys
                 // condition{a:true} equals matcher {a:true,b:true} --> False
-                if (_isDebug()) {
-                    log(scope.getPath(), " = false - Keys not evaluated. Container is no filterRoot: " + keysMustBeEvaluated);
+                if (this._isDebug()) {
+                    this.log(scope.getPath(), " = false - Keys not evaluated. Container is no filterRoot: " + keysMustBeEvaluated);
                 }
                 return false;
             }
@@ -2315,10 +2117,66 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             if (rootFlag) {
                 now.set(null);
             }
-            if (ROOT_CONDITION.get() == this) {
-                ROOT_CONDITION.set(null);
+            clearRoot(scope, unsetRoot);
+        }
+    }
+
+    public void clearRoot(final Scope scope, boolean unsetRoot) {
+        if (unsetRoot) {
+            if (_isDebug()) {
+                log(scope.getPath(), "Unset Root %s", this);
+            }
+            ROOT_CONDITION.set(null);
+        }
+    }
+
+    public boolean initRoot(final Scope scope) {
+        if (ROOT_CONDITION.get() == null) {
+            if (_isDebug()) {
+                log(scope.getPath(), "Set Root to %s", this);
+            }
+            ROOT_CONDITION.set(this);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * overwrite to use a different type of condition - e.g. a extended one.
+     *
+     * @param condition
+     * @return
+     */
+    protected Condition<?> convert(Condition<?> condition) {
+        return condition;
+    }
+
+    /**
+     * @param last
+     * @return
+     */
+    private Object toLog(final Object last) {
+        final Object mapped = this.unwrapType(last);
+        if (mapped != last) {
+            return last + "( -> " + mapped + ")";
+        }
+        return last;
+    }
+
+    /**
+     * uses the type Handlers to return the actual type that should be used for operations.
+     *
+     * @param last
+     * @return
+     */
+    protected Object unwrapType(final Object value) {
+        for (final TypeHandler v : getTypeHandlerIterable()) {
+            final Object ret = v.unwrapType(value);
+            if (ret != value) {
+                return ret;
             }
         }
+        return value;
     }
 
     /**
@@ -2327,40 +2185,32 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @param lastResult
      * @return
      */
-    protected boolean isFalse(Object lastResult) {
+    protected boolean isFalse(final Object lastResult) {
         if (lastResult instanceof ConditionResult) {
             return ((ConditionResult) lastResult).isFalse();
         }
-        return lastResult == Boolean.FALSE;
+        return this.unwrapType(lastResult) == Boolean.FALSE;
     }
 
-    protected void fixInternalMapToCondition() throws CompareException {
-        for (java.util.Map.Entry<String, Object> es : entrySet()) {
+    protected void fixInternalMapToCondition() throws ConditionException {
+        for (final java.util.Map.Entry<String, Object> es : this.entrySet()) {
             // convert HashMap to Condition. Internal HashMaps may be created by deserializing Conditions. This is fixed in the first
             // run
             if (es.getValue() instanceof Map && !(es.getValue() instanceof Condition)) {
                 Condition condition;
-                condition = newInstance();
+                condition = this.newInstance();
                 condition.putAll((Map) es.getValue());
-                replace(es.getKey(), es.getValue(), condition);
+                this.replace(es.getKey(), es.getValue(), condition);
                 es.setValue(condition);
             }
         }
-    }
-
-    protected AccessMethod getAccessMethod(final KeyOnClass key) {
-        return useAccessCache ? accessCache.get(key) : null;
-    }
-
-    protected Object getCache(final Object key) {
-        return useAccessCache ? cache.get(key) : null;
     }
 
     /**
      * @param field
      * @return
      */
-    private boolean isForbiddenField(Field field) {
+    private boolean isForbiddenField(final Field field) {
         if (!Modifier.isPublic(field.getModifiers())) {
             return true;
         } else {
@@ -2372,7 +2222,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @param method
      * @return
      */
-    private boolean isForbiddenMethod(Method method) {
+    private boolean isForbiddenMethod(final Method method) {
         if (!Modifier.isPublic(method.getModifiers())) {
             return true;
         } else if (Clazz.isVoid(method.getReturnType())) {
@@ -2382,446 +2232,452 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
     }
 
-    public Scope resolveKeyPath(Scope scope, JSPath keyPath) throws CompareException {
-        Scope ret = scope.copy();
-        NEXT_PATH_ELEMENT: for (Object keyOrg : keyPath.getElements()) {
-            if (keyOrg instanceof Condition) {
-                Condition filter = (Condition) keyOrg;
-                ret.add(filter.evaluateInternal(ret), keyOrg);
-                continue NEXT_PATH_ELEMENT;
-            }
-            String key = StringUtils.valueOfOrNull(keyOrg);
-            if (customPathhandlers != null) {
-                for (java.util.Map.Entry<String, PathHandler> es : customPathhandlers.entrySet()) {
-                    if (es.getKey() == null || es.getKey().equalsIgnoreCase(key)) {
-                        Scope r = es.getValue().resolve(scope, ret, keyOrg);
-                        if (r != null) {
-                            ret = r;
-                            continue NEXT_PATH_ELEMENT;
-                        }
-                    }
-                }
-            }
-            Map<String, PathHandler> threadPathHandlers = PATH_HANDLERS.get();
-            if (threadPathHandlers != null) {
-                for (java.util.Map.Entry<String, PathHandler> es : threadPathHandlers.entrySet()) {
-                    if (es.getKey() == null || es.getKey().equalsIgnoreCase(key)) {
-                        Scope r = es.getValue().resolve(scope, ret, keyOrg);
-                        if (r != null) {
-                            ret = r;
-                            continue NEXT_PATH_ELEMENT;
-                        }
-                    }
-                }
-            }
-            if ($$ROOT.equalsIgnoreCase(key)) {
-                if (key != keyPath.getFirst()) {
-                    throw new CompareException("PathLink §§... must always be the first key element");
-                }
-                ret = new Scope(scope.getFirst());
-                continue;
-            } else if ($$THIS.equalsIgnoreCase(key) || $$CURRENT.equalsIgnoreCase(key)) {
-                if (key != keyPath.getFirst()) {
-                    throw new CompareException("PathLink §§... must always be the first key element");
-                }
-                // DebugMode.debugger();
-                ret.add(scope.getLast(), keyOrg);
-                // DebugMode.debugger();
-                continue;
-            } else if ($PARENT.equalsIgnoreCase(key)) {
-                ret = ret.getParent();
-                if (ret == null) {
-                    ret = new Scope(KEY_DOES_NOT_EXIST);
-                    onKeyDoesNotExist(scope, keyPath, ret);
-                    return ret;
-                }
-                continue;
-            } else if ($NOW.equalsIgnoreCase(key)) {
-                ret = new Scope(now.get());
-                continue;
-            } else if ($TYPE.equalsIgnoreCase(key)) {
-                ret.add(ret.getLast().getClass().getName(), key);
-                continue;
-            } else if ($KEYS.equalsIgnoreCase(key)) {
-                ret.add(listKeys(ret.getLast()), keyOrg);
-                continue;
-            } else if ($KEY.equalsIgnoreCase(key)) {
-                List<Object> loop = ret.getPath().getElements();
-                int backlog = 0;
-                while (backlog < loop.size()) {
-                    // search last non-op key
-                    Object el = loop.get(loop.size() - backlog - 1);
-                    if (el instanceof String && OPS.containsKey(el)) {
-                        backlog++;
-                        continue;
-                    } else {
-                        ret.add(el, keyOrg);
-                        break;
-                    }
-                }
-                continue;
-            } else if ($FIRST.equalsIgnoreCase(key)) {
-                if (ReflectionUtils.isListOrArray(ret.getLast())) {
-                    if (ReflectionUtils.getListLength(ret.getLast()) == 0) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                    } else {
-                        ret.add(ReflectionUtils.getListElement(ret.getLast(), 0), keyOrg);
-                    }
-                } else if (ret.getLast() instanceof Collection) {
-                    Iterator it = ((Collection) ret.getLast()).iterator();
-                    if (!it.hasNext()) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                    } else {
-                        ret.add(it.next(), keyOrg);
-                    }
-                } else if (ret.getLast() instanceof Map) {
-                    if (((Map) ret.getLast()).size() == 0) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                    } else {
-                        ret.add(((Map) ret.getLast()).values().iterator().next(), keyOrg);
-                    }
-                } else {
-                    ret.add((ret.getLast()), keyOrg);
-                }
-                continue;
-            } else if ($SIZE.equalsIgnoreCase(key)) {
-                if (ReflectionUtils.isListOrArray(ret.getLast())) {
-                    ret.add(ReflectionUtils.getListLength(ret.getLast()), keyOrg);
-                } else if (ret.getLast() instanceof Collection) {
-                    int i = 0;
-                    for (Object e : ((Collection) ret.getLast())) {
-                        i++;
-                    }
-                    ret.add(i, keyOrg);
-                } else if (ret.getLast() instanceof Map) {
-                    ret.add(((Map) ret.getLast()).size(), keyOrg);
-                } else if (ret.getLast() instanceof String) {
-                    ret.add(((String) ret.getLast()).length(), keyOrg);
-                } else {
-                    ret.add(listKeys(ret.getLast()).size(), keyOrg);
-                }
-                continue;
-            } else if (ret.getLast() == null) {
-                ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                onKeyDoesNotExist(scope, keyPath, ret);
-                return ret;
-            }
-            if (key != null && key.startsWith("§")) {
-                key = key.substring(1);
-            }
-            final KeyOnClass cacheKey = new KeyOnClass(ret.getLast().getClass(), key);
-            AccessMethod accessMethod = getAccessMethod(cacheKey);
-            if (accessMethod != null) {
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    DebugMode.debugger();
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                            onKeyDoesNotExist(scope, keyPath, ret);
-                        }
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            }
-            if (ret.getLast() instanceof ConditionObjectValueView) {
-                final ConditionObjectValueView view = (ConditionObjectValueView) ret.getLast();
-                final Object newValue = view.getConditionObjectValue(key);
-                if (newValue == null) {
-                    if (view.containsConditionObjectKey(key)) {
-                        // really return?
-                        System.out.println("Check of we can return here 1");
-                        ret.add(null, keyOrg);
-                        return ret;
-                    } else if (!view.isConditionObjectVisible()) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    }
-                } else {
-                    ret.add(newValue, keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                }
-            }
-            if (ret.getLast() instanceof Map) {
-                accessMethod = new AccessMapElement();
-                putAccessMethod(cacheKey, accessMethod);
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            } else if (ReflectionUtils.isListOrArray(ret.getLast())) {
-                final Class<?> raw = ReflectionUtils.getRaw(ret.getLast().getClass());
-                if (raw.isArray()) {
-                    accessMethod = new AccessArrayElement();
-                } else {
-                    accessMethod = new AccessListElement();
-                }
-                putAccessMethod(cacheKey, accessMethod);
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            } else if (ret.getLast() instanceof Collection) {
-                accessMethod = new AccessCollectionElement();
-                putAccessMethod(cacheKey, accessMethod);
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            }
-            // Search for methods that have the exact key name
-            Class<? extends Object> cls = ret.getLast().getClass();
-            Method method = null;
-            try {
-                ClassCache cc = ClassCache.getClassCache(cls);
-                Getter getter = cc.getGetter(key);
-                if (getter != null) {
-                    if (!isForbiddenMethod(getter.method)) {
-                        method = getter.method;
-                    }
-                }
-            } catch (SecurityException e) {
-                throw new CompareException("Cannot get value", e);
-            } catch (NoSuchMethodException e) {
-                throw new CompareException("Cannot get value", e);
-            }
-            if (method == null) {
-                // check getters with the key. get/is<Key>
-                method = null;
-                final String methodKey = Character.toUpperCase(key.charAt(0)) + key.substring(1);
-                while (cls != null) {
-                    try {
-                        method = cls.getDeclaredMethod("is" + methodKey, EMPTY);
-                        if (isForbiddenMethod(method)) {
-                            method = null;
-                        } else {
-                            break;
-                        }
-                    } catch (SecurityException e) {
-                        throw new CompareException("Cannot get value", e);
-                    } catch (IllegalArgumentException e) {
-                        throw new CompareException("Cannot get value", e);
-                    } catch (NoSuchMethodException ignore) {
-                    }
-                    try {
-                        method = cls.getDeclaredMethod("get" + methodKey, EMPTY);
-                        if (isForbiddenMethod(method)) {
-                            method = null;
-                        } else {
-                            break;
-                        }
-                    } catch (SecurityException e) {
-                        throw new CompareException("Cannot get value", e);
-                    } catch (IllegalArgumentException e) {
-                        throw new CompareException("Cannot get value", e);
-                    } catch (NoSuchMethodException ignore) {
-                    }
-                    cls = cls.getSuperclass();
-                }
-            }
-            if (method != null) {
-                method.setAccessible(true);
-                accessMethod = new AccessByMethod(method);
-                putAccessMethod(cacheKey, accessMethod);
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            }
-            cls = ret.getLast().getClass();
-            // check fields
-            Field field = null;
-            while (cls != null) {
-                try {
-                    field = cls.getDeclaredField(key);
-                    if (isForbiddenField(field)) {
-                        field = null;
-                    } else {
-                        break;
-                    }
-                } catch (SecurityException e) {
-                    throw new CompareException("Cannot get value", e);
-                } catch (IllegalArgumentException e) {
-                    throw new CompareException("Cannot get value", e);
-                } catch (NoSuchFieldException ignore) {
-                }
-                cls = cls.getSuperclass();
-            }
-            if (field != null) {
-                field.setAccessible(true);
-                accessMethod = new AccessByField(field);
-                putAccessMethod(cacheKey, accessMethod);
-                try {
-                    ret.add(accessMethod.getValue(ret.getLast(), key), keyOrg);
-                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                    }
-                    continue;
-                } catch (CannotGetValueException e) {
-                    if (Boolean.TRUE.equals(get($IGNORE_GETTER_EXCEPTIONS))) {
-                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-                        onKeyDoesNotExist(scope, keyPath, ret);
-                        return ret;
-                    } else {
-                        throw new CompareException(e);
-                    }
-                }
-            }
-            if (useAccessCache) {
-                // only put Accessnotfound in the cache if the class it not a map or list and the key is not found in the class
-                // declaration.
-                putAccessMethod(cacheKey, new AccessNotFound());
-            }
-            ret.add(KEY_DOES_NOT_EXIST, keyOrg);
-            onKeyDoesNotExist(scope, keyPath, ret);
-            return ret;
+    public Scope resolveKeyPath(final Scope scope, final JSPath keyPath) throws ConditionException {
+        if (_isDebug()) {
+            this.log(keyPath, "Resolve Path. Base: %s", scope.toString().replaceAll("\r\n", " -> "));
         }
-        return ret;
+        // because resolveKeyPath might get called externaly just to resolve a value
+        boolean unset = initRoot(scope);
+        try {
+            MapAccessorInterface map;
+            ListAccessorInterface list;
+            Scope ret = scope.copy();
+            NEXT_PATH_ELEMENT: for (final Object keyOrg : keyPath.getElements()) {
+                try {
+                    if (keyOrg instanceof Condition) {
+                        final Condition filter = (Condition) keyOrg;
+                        ret.add(convert(filter).evaluateInternal(ret), keyOrg);
+                        continue NEXT_PATH_ELEMENT;
+                    }
+                    String key = StringUtils.valueOfOrNull(keyOrg);
+                    {
+                        // custom Pathhandlers
+                        final ConcatIterator<java.util.Map.Entry<String, PathHandler>> it = this.getPathHandlerIterator();
+                        if (it != null) {
+                            for (final java.util.Map.Entry<String, PathHandler> es : it) {
+                                if (es.getKey() == null || es.getKey().equalsIgnoreCase(key)) {
+                                    final Scope r = es.getValue().resolve(scope, ret, keyOrg);
+                                    if (r != null) {
+                                        ret = r;
+                                        continue NEXT_PATH_ELEMENT;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if ($$ROOT.equalsIgnoreCase(key)) {
+                        if (key != keyPath.getFirst()) {
+                            throw new ConditionException("PathLink §§... must always be the first key element");
+                        }
+                        ret = new Scope(scope.getFirst());
+                        continue;
+                    } else if ($$THIS.equalsIgnoreCase(key) || $$CURRENT.equalsIgnoreCase(key)) {
+                        if (key != keyPath.getFirst()) {
+                            throw new ConditionException("PathLink §§... must always be the first key element");
+                        }
+                        ret.add(scope.getLast(), keyOrg);
+                        continue;
+                    } else if ("§this".equalsIgnoreCase(key) || "§current".equalsIgnoreCase(key)) {
+                        throw new WTFException(key + " is not allowed. Use §§this and §§current");
+                    } else if ($PARENT.equalsIgnoreCase(key)) {
+                        ret = ret.getParent();
+                        if (ret == null) {
+                            ret = new Scope(KEY_DOES_NOT_EXIST);
+                        }
+                        continue;
+                    } else if ($NOW.equalsIgnoreCase(key)) {
+                        ret = new Scope(now.get());
+                        continue;
+                    } else if ($TYPE.equalsIgnoreCase(key)) {
+                        ret.add(ret.getLast().getClass().getName(), key);
+                        continue;
+                    } else if ($KEYS.equalsIgnoreCase(key)) {
+                        ret.add(this.listKeys(ret.getLast()), keyOrg);
+                        continue;
+                    } else if ($KEY.equalsIgnoreCase(key)) {
+                        final List<Object> loop = ret.getPath().getElements();
+                        int backlog = 0;
+                        while (backlog < loop.size()) {
+                            // search last non-op key
+                            final Object el = loop.get(loop.size() - backlog - 1);
+                            if (el instanceof String && OPS.containsKey(el)) {
+                                backlog++;
+                                continue;
+                            } else {
+                                ret.add(el, keyOrg);
+                                break;
+                            }
+                        }
+                        continue;
+                    } else if ($FIRST.equalsIgnoreCase(key)) {
+                        if ((list = getListWrapper(ret.getLast())) != null) {
+                            if (list.size() == 0) {
+                                ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                            } else {
+                                ret.add(list.get(0), keyOrg);
+                            }
+                        } else if ((map = getMapWrapper(ret.getLast())) != null) {
+                            if (map.size() == 0) {
+                                ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                            } else {
+                                ret.add(map.iterator().next().getValue(), keyOrg);
+                            }
+                        } else {
+                            ret.add((ret.getLast()), keyOrg);
+                        }
+                        continue;
+                    } else if ($SIZE.equalsIgnoreCase(key)) {
+                        if ((list = getListWrapper(ret.getLast())) != null) {
+                            ret.add(list.size(), keyOrg);
+                        } else if ((map = getMapWrapper(ret.getLast())) != null) {
+                            ret.add(map.size(), keyOrg);
+                        } else if (ret.getLast() instanceof String) {
+                            ret.add(((String) ret.getLast()).length(), keyOrg);
+                        } else {
+                            ret.add(this.listKeys(ret.getLast()).size(), keyOrg);
+                        }
+                        continue;
+                    } else if (ret.getLast() == null) {
+                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                        continue;
+                    } else if (ret.getLast() == KEY_DOES_NOT_EXIST) {
+                        // we need the full path - there may be any pathmodifier that resolves keynotfound to anything else, and some
+                        // operators
+                        // may need the fullpath
+                        ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                        continue;
+                    }
+                    if (key != null && key.startsWith("§")) {
+                        key = key.substring(1);
+                    }
+                    if (ret.getLast() instanceof ConditionObjectValueView) {
+                        final ConditionObjectValueView view = (ConditionObjectValueView) ret.getLast();
+                        final Object newValue = view.getConditionObjectValue(key);
+                        if (newValue == null) {
+                            if (view.containsConditionObjectKey(key)) {
+                                ret.add(null, keyOrg);
+                                continue;
+                            } else if (!view.isConditionObjectVisible()) {
+                                ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                                continue;
+                            }
+                        } else {
+                            ret.add(newValue, keyOrg);
+                            continue;
+                        }
+                    } else if ((map = getMapWrapper(ret.getLast())) != null) {
+                        // do not use isMap here - this is for actual Map elements - not for TypeHandlers
+                        try {
+                            ret.add(map.get(key), keyOrg);
+                        } catch (Exception e) {
+                            throw new CannotGetValueException(e);
+                        }
+                        continue;
+                    } else if ((list = getListWrapper(ret.getLast())) != null) {
+                        try {
+                            ret.add(list.get(JSPath.toArrayIndex(key)), keyOrg);
+                        } catch (Exception e) {
+                            throw new CannotGetValueException(e);
+                        }
+                        continue;
+                    }
+                    // Search for methods that have the exact key name
+                    Class<? extends Object> cls = ret.getLast().getClass();
+                    Method method = null;
+                    try {
+                        final ClassCache cc = ClassCache.getClassCache(cls);
+                        final Getter getter = cc.getGetter(key);
+                        if (getter != null) {
+                            if (!this.isForbiddenMethod(getter.method)) {
+                                method = getter.method;
+                            }
+                        }
+                    } catch (final Exception e) {
+                        throw new CannotGetValueException(e);
+                    }
+                    if (method != null) {
+                        method.setAccessible(true);
+                        try {
+                            ret.add(method.invoke(ret.getLast(), new Object[0]), keyOrg);
+                        } catch (InvocationTargetException e) {
+                            if (e.getTargetException() instanceof InterruptedException) {
+                                Thread.currentThread().interrupt();
+                            }
+                            throw new CannotGetValueException(e);
+                        } catch (Exception e) {
+                            throw new CannotGetValueException(e);
+                        }
+                        continue;
+                    }
+                    ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                    continue;
+                } catch (final CannotGetValueException e) {
+                    ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                } finally {
+                    if (ret.getLast() == KEY_DOES_NOT_EXIST) {
+                        this.onKeyDoesNotExist(scope, keyPath, ret);
+                    }
+                }
+            }
+            return ret;
+        } finally {
+            clearRoot(scope, unset);
+        }
+    }
+
+    private ConcatIterator<java.util.Map.Entry<String, PathHandler>> getPathHandlerIterator() {
+        ConcatIterator<java.util.Map.Entry<String, PathHandler>> it = null;
+        final HashMap<String, PathHandler> custom = this.customPathhandlers;
+        if (custom != null) {
+            if (it == null) {
+                it = new ConcatIterator<java.util.Map.Entry<String, PathHandler>>();
+            }
+            it.add(custom.entrySet().iterator());
+        }
+        final Map<String, PathHandler> threadPathHandlers = PATH_HANDLERS.get();
+        if (threadPathHandlers != null) {
+            if (it == null) {
+                it = new ConcatIterator<java.util.Map.Entry<String, PathHandler>>();
+            }
+            it.add(threadPathHandlers.entrySet().iterator());
+        }
+        return it;
     }
 
     /**
      * @param scope
      * @param keyPath
      * @param ret
+     * @throws ConditionException
      */
-    protected void onKeyDoesNotExist(Scope scope, JSPath keyPath, Scope ret) {
-        if (_isDebug()) {
-            log(ret.getPath(), "Key Does not Exist: " + scope.getPath().toPathString(false) + " + " + keyPath.toPathString(false));
+    protected void onKeyDoesNotExist(final Scope scope, final JSPath keyPath, final Scope ret) throws ConditionException {
+        if (this._isDebug()) {
+            this.log(ret.getPath(), "Key Does not Exist: Base: %s -> %s", scope.getPath().toPathString(true), keyPath.toPathString(false));
         }
+        boolean auto = _isAutoCreateMissingNodes();
+        if (auto) {
+            if (ret.getLast() == KEY_DOES_NOT_EXIST && ret.getParent().getLast() == null) {
+                List<Object> path = ret.getPath().getElements();
+                // next Element is the next key Element after the missing one - we need it to decide if we need an array or objevt
+                Object nextElement = null;
+                // Missing key is the key for the element we create
+                Object missingKey = null;
+                int indexNext = -1;
+                int indexMissing = -1;
+                for (int i = path.size() - 1; i >= 0; i--) {
+                    // Search key Elements - skip operators
+                    Object el = path.get(i);
+                    if (el instanceof String) {
+                        if (((String) el).trim().startsWith("§")) {
+                            // Operator
+                            continue;
+                        }
+                    }
+                    if (nextElement == null) {
+                        nextElement = el;
+                        indexNext = i;
+                        continue;
+                    }
+                    if (missingKey == null) {
+                        if (ret.getScope().get(i + 1) != null) {
+                            ret.replaceLast(null);
+                            // the real parent already exists
+                            return;
+                        }
+                        missingKey = el;
+                        indexMissing = i;
+                        break;
+                    }
+                }
+                // remember: path.size() is always < than scope.size() - the scope contains the root elements
+                // search parent: it may not be the direct parent because the scope contains operators etc.
+                List<Object> scopeList = ret.getScope();
+                Object parent = null;
+                for (int i = indexMissing; i >= 0; i--) {
+                    parent = scopeList.get(i);
+                    if (parent != null) {
+                        break;
+                    }
+                }
+                DebugMode.breakIf(parent == null);
+                Object autoCreated = autoCreatePathElement(ret, parent, missingKey, nextElement);
+                if (autoCreated != null) {
+                    if (_isDebug()) {
+                        this.log(ret.getPath(), "Missing Element: %s - Next Element (defines object type): %s", missingKey, nextElement);
+                    }
+                    ret.set(indexMissing + 1, autoCreated);
+                    ret.set(indexNext + 1, null);
+                    if (_isDebug()) {
+                        this.log(ret.getPath(), "Auto Created %s", ret.getParent());
+                    }
+                }
+            } else {
+                ret.replaceLast(null);
+            }
+        }
+    }
+
+    public boolean _isAutoCreateMissingNodes() throws ConditionException {
+        boolean auto = false;
+        ;
+        Boolean fromOptions = getOptions(Boolean.class, "create");
+        if (fromOptions != null) {
+            auto = fromOptions == Boolean.TRUE;
+        }
+        if (!auto && ROOT_CONDITION.get() != this) {
+            auto |= ROOT_CONDITION.get()._isAutoCreateMissingNodes();
+        }
+        return auto;
+    }
+
+    public Object autoCreatePathElement(Scope scope, Object parent, Object missingKeyElement, Object nextPathElement) {
+        ListAccessorInterface list = getListWrapper(parent);
+        MapAccessorInterface map;
+        Object newNode;
+        if (list != null) {
+            // DebugMode.debugger();
+            int index = JSPath.toArrayIndex(missingKeyElement);
+            if (list.size() > index && list.get(index) != KEY_DOES_NOT_EXIST) {
+                DebugMode.breakIf(true, "should not happen");
+            }
+            if (JSPath.isArrayKey(nextPathElement)) {
+                newNode = newAutoCreateArray();
+            } else {
+                newNode = newAutoCreateMap();
+            }
+            for (int ii = list.size(); ii < index; ii++) {
+                list.add(null);
+                if (_isDebug()) {
+                    log(scope.getPath(), "AutoCreate: Add to array[%d] = %s", ii, list.get(ii));
+                }
+            }
+            list.add(newNode);
+            if (_isDebug()) {
+                log(scope.getPath(), "AutoCreate: Set array[%d] = %s", index, newNode);
+            }
+            return newNode;
+        } else if ((map = getMapWrapper(parent)) != null) {
+            Object existsButNotInScopeYet = map.get(String.valueOf(missingKeyElement));
+            if (existsButNotInScopeYet != KEY_DOES_NOT_EXIST) {
+                return existsButNotInScopeYet;
+            }
+            if (JSPath.isArrayKey(nextPathElement)) {
+                newNode = newAutoCreateArray();
+            } else {
+                newNode = newAutoCreateMap();
+            }
+            map.put(String.valueOf(missingKeyElement), newNode);
+            if (_isDebug()) {
+                log(scope.getPath(), "AutoCreate: Put object[%s] = %s", String.valueOf(missingKeyElement), newNode);
+            }
+            return newNode;
+        }
+        return null;
+    }
+
+    /**
+     * @return
+     */
+    protected Object newAutoCreateMap() {
+        for (final TypeHandler e : getTypeHandlerIterable()) {
+            final Object ret = e.newAutoCreateMap();
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return new HashMap<String, Object>();
+    }
+
+    /**
+     * @return
+     */
+    protected Object newAutoCreateArray() {
+        for (final TypeHandler e : getTypeHandlerIterable()) {
+            final Object ret = e.newAutoCreateArray();
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return new LinkedList<Object>();
     }
 
     /**
      * @param class1
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public List<String> listKeys(Object obj) throws CompareException {
+    public List<String> listKeys(final Object obj) throws ConditionException {
+        Iterable<Object> iterList;
+        Iterable<java.util.Map.Entry<String, Object>> iterMap;
         if (obj == null || Clazz.isPrimitive(obj.getClass()) || obj instanceof String) {
             return Arrays.asList();
-        }
-        if (obj instanceof ConditionObjectValueView) {
+        } else if (obj instanceof ConditionObjectValueView) {
             final ConditionObjectValueView view = (ConditionObjectValueView) obj;
             return view.listConditionKeys();
-        }
-        if (obj instanceof Map) {
+        } else if (obj instanceof Map) {
+            // faster than getMapIterable
             return new ArrayList<String>(((Map) obj).keySet());
-        } else if (ReflectionUtils.isListOrArray(obj)) {
-            final int length = ReflectionUtils.getListLength(obj);
-            final ArrayList<String> ret = new ArrayList<String>(length);
-            for (int i = 0; i < length; i++) {
-                ret.add(String.valueOf(i));
+        } else if ((iterMap = getMapWrapper(obj)) != null) {
+            ArrayList<String> ret = new ArrayList<String>();
+            for (java.util.Map.Entry<String, Object> es : iterMap) {
+                ret.add(es.getKey());
             }
             return ret;
-        } else if (obj instanceof Collection) {
+        } else if ((iterList = getListWrapper(obj)) != null) {
+            final ArrayList<String> ret = new ArrayList<String>();
             int i = 0;
-            final ArrayList<String> ret = new ArrayList<String>(0);
-            for (Object o : ((Collection) obj)) {
+            for (Object e : iterList) {
                 ret.add(String.valueOf(i++));
             }
             return ret;
-        }
-        HashSet<String> ret = new HashSet<String>();
-        Class<? extends Object> cls = obj.getClass();
-        // Scan method names
-        while (cls != null) {
+        } else {
             try {
-                for (final Method method : cls.getDeclaredMethods()) {
-                    if (ClassCache.getParameterCount(method) > 0) {
-                        continue;
-                    } else if (!isForbiddenMethod(method)) {
-                        ret.add(method.getName());
-                        if (method.getName().startsWith("is")) {
-                            ret.add(method.getName().substring(2, 3).toLowerCase(Locale.ROOT) + method.getName().substring(3));
-                        } else if (method.getName().startsWith("get")) {
-                            ret.add(method.getName().substring(3, 4).toLowerCase(Locale.ROOT) + method.getName().substring(4));
-                        }
-                    }
-                }
-                for (Field field : cls.getDeclaredFields()) {
-                    if (isForbiddenField(field)) {
-                        continue;
-                    }
-                    ret.add(field.getName());
-                }
-            } catch (SecurityException e) {
-                throw new CompareException("Cannot get value", e);
-            } catch (IllegalArgumentException e) {
-                throw new CompareException("Cannot get value", e);
+                return new ArrayList<String>(ClassCache.getClassCache(obj.getClass()).getKeys());
+            } catch (final SecurityException e) {
+                throw new ConditionException(e);
+            } catch (final NoSuchMethodException e) {
+                throw new ConditionException(e);
             }
-            cls = cls.getSuperclass();
         }
-        return new ArrayList<String>(ret);
+    }
+
+    /**
+     * @return
+     */
+    private ConcatIterator<TypeHandler> getTypeHandlerIterable() {
+        ConcatIterator<TypeHandler> it = new ConcatIterator<TypeHandler>(GLOBAL_TYPE_HANDLERS.iterator());
+        final List<TypeHandler> thread = TYPE_HANDLERS.get();
+        if (thread != null && thread.size() > 0) {
+            it.add(thread.iterator());
+        }
+        ArrayList<TypeHandler> local = getTypehandlers();
+        if (local != null && local.size() > 0) {
+            it.add(local.iterator());
+        }
+        final Condition root = ROOT_CONDITION.get();
+        if (root != null && root != this) {
+            ArrayList<TypeHandler> rootLocal = root.getTypehandlers();
+            if (rootLocal != null && rootLocal.size() > 0) {
+                it.add(rootLocal.iterator());
+            }
+        }
+        return it;
     }
 
     /**
      * @param value
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public boolean matches(final MatcherType obj) throws CompareException {
-        if (_isDebug()) {
-            log(new JSPath(), "Run " + this + ".matches(" + obj + ")");
+    public boolean matches(final MatcherType obj) throws ConditionException {
+        if (this._isDebug()) {
+            this.log(new JSPath(), "Run " + this + ".matches(" + obj + ")");
         }
-        Object result = evaluateInternal(new Scope(obj));
-        return isTrue(result);
+        final Object result = this.evaluateInternal(new Scope(obj));
+        return this.isTrue(result);
     }
 
-    private boolean isTrue(Object result) {
+    private boolean isTrue(final Object result) {
         if (result instanceof ConditionResult) {
             return ((ConditionResult) result).isTrue();
         }
@@ -2830,20 +2686,39 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
     /**
      * @param string
+     * @param exp
+     * @param object
+     * @param string2
      */
-    private void log(JSPath path, String string) {
-        if (logger != null) {
-            logger.info(path.toPathString(false) + " : " + string);
+    public void log(final JSPath path, String string, Object... args) {
+        for (int i = 0; i < args.length; i++) {
+            args[i] = toLog(args[i]);
+        }
+        if (this.logger != null) {
+            if (args != null && args.length > 0) {
+                string = String.format(string, args);
+            }
+            String pathString = path.toPathString(false);
+            logPathLength = Math.max(logPathLength, pathString.length());
+            this.logger.info(StringUtils.fillPost(pathString, " ", logPathLength) + " : " + string);
+            return;
         } else {
-            Condition root = ROOT_CONDITION.get();
+            final Condition root = ROOT_CONDITION.get();
             if (root != null && root != this && root.logger != null) {
-                root.log(path, string);
+                root.log(path, string, args);
                 return;
             }
         }
-        LogInterface log = THREAD_LOGGER.get();
+        final LogInterface log = THREAD_LOGGER.get();
         if (log != null) {
-            log.info(path.toPathString(false) + " : " + string);
+            if (args != null && args.length > 0) {
+                string = String.format(string, args);
+            }
+            String pathString = path.toPathString(false);
+            logPathLength = Math.max(logPathLength, pathString.length());
+            // LogV3.info(log, string, args);
+            log.info(StringUtils.fillPost(pathString, " ", logPathLength) + " : " + string);
+            return;
         }
     }
 
@@ -2852,28 +2727,33 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     public static final ThreadLocal<LogInterface> THREAD_LOGGER = new ThreadLocal<LogInterface>();
 
     public boolean _isDebug() {
-        if (debug) {
+        if (this.debug) {
             return true;
         }
-        Condition root = ROOT_CONDITION.get();
+        final Condition root = ROOT_CONDITION.get();
         if (root != null && root != this && root._isDebug()) {
             return true;
         }
         return THREAD_DEBUG.get() == Boolean.TRUE;
     }
 
-    public void _setDebug(boolean debug) {
+    public void _setDebug(final boolean debug) {
         this.debug = debug;
+    }
+
+    public Condition<MatcherType> debug(final boolean debug) {
+        this.debug = debug;
+        return this;
     }
 
     /**
      * @param request
      * @return
      */
-    public boolean matchesWithoutExceptions(MatcherType test) {
+    public boolean matchesWithoutExceptions(final MatcherType test) {
         try {
-            return matches(test);
-        } catch (CompareException e) {
+            return this.matches(test);
+        } catch (final ConditionException e) {
             LogV3.log(e);
             return false;
         }
@@ -2883,7 +2763,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @return
      */
     public Condition newInstance() {
-        return new Condition();
+        try {
+            return getClass().getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            Exceptions.resetInterruptFlag(e);
+            throw new WTFException("Implement a proper newINstance method!");
+        }
     }
 
     /*
@@ -2892,9 +2777,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @see java.util.HashMap#put(java.lang.Object, java.lang.Object)
      */
     @Override
-    public Object put(String key, Object value) {
-        key = correctKey(key);
-        clearCache();
+    public Object put(String key, final Object value) {
+        key = this.correctKey(key);
         return super.put(key, value);
     }
 
@@ -2907,31 +2791,15 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return key;
     }
 
-    protected void putAccessMethod(final KeyOnClass key, AccessMethod method) {
-        if (useAccessCache) {
-            final HashMap<KeyOnClass, AccessMethod> newCache = new HashMap<KeyOnClass, AccessMethod>(accessCache);
-            newCache.put(key, method);
-            accessCache = newCache;
-        }
-    }
-
     /*
      * (non-Javadoc)
      *
      * @see java.util.HashMap#putAll(java.util.Map)
      */
     @Override
-    public void putAll(Map<? extends String, ? extends Object> m) {
-        for (java.util.Map.Entry<? extends String, ? extends Object> es : m.entrySet()) {
-            put(es.getKey(), es.getValue());
-        }
-    }
-
-    protected void putCache(final Object key, Object object) {
-        if (useAccessCache) {
-            final HashMap<Object, Object> newCache = new HashMap<Object, Object>(cache);
-            newCache.put(key, object);
-            cache = newCache;
+    public void putAll(final Map<? extends String, ? extends Object> m) {
+        for (final java.util.Map.Entry<? extends String, ? extends Object> es : m.entrySet()) {
+            this.put(es.getKey(), es.getValue());
         }
     }
 
@@ -2941,8 +2809,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @see java.util.HashMap#remove(java.lang.Object)
      */
     @Override
-    public Object remove(Object key) {
-        clearCache();
+    public Object remove(final Object key) {
         return super.remove(key);
     }
 
@@ -2952,12 +2819,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @see java.util.HashMap#replace(java.lang.Object, java.lang.Object, java.lang.Object)
      */
     @Override
-    public boolean replace(String key, Object oldValue, Object newValue) {
-        clearCache();
+    public boolean replace(final String key, final Object oldValue, final Object newValue) {
         return super.replace(key, oldValue, newValue);
     }
 
-    protected final static CharSequence toCharSequence(Object value) {
+    protected final static CharSequence toCharSequence(final Object value) {
         if (value instanceof CharSequence) {
             return (CharSequence) value;
         } else {
@@ -2971,8 +2837,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @see java.util.HashMap#replaceAll(java.util.function.BiFunction)
      */
     @Override
-    public void replaceAll(BiFunction<? super String, ? super Object, ? extends Object> function) {
-        clearCache();
+    public void replaceAll(final BiFunction<? super String, ? super Object, ? extends Object> function) {
         super.replaceAll(function);
     }
 
@@ -2980,36 +2845,40 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * Resolves a value expression - MAY RETURN AGGREGATIONRESULT
      *
      * @param container
-     *            TODO
      * @param unwrapConditionResults
      * @param path
-     *            TODO
      **/
-    public Object resolveValue(Condition container, Object expression, Scope scope, boolean unwrapConditionResults) throws CompareException {
-        Object before = expression;
-        if (expression instanceof Map && !(expression instanceof Condition)) {
-            // fix map to condition. json deserializer will map internal conditions to maps
-            Map old = (Map) expression;
-            expression = newInstance();
-            ((Condition) expression).putAll(old);
-        }
+    public Object resolveValue(final Condition container, Object expression, final Scope scope, final boolean unwrapConditionResults) throws ConditionException {
+        final Object before = expression;
+        expression = autoConvertMapToCondition(expression);
         if (expression instanceof Condition) {
-            expression = ((Condition) expression).evaluateInternal(scope);
+            expression = convert(((Condition) expression)).evaluateInternal(scope);
         }
         if (expression instanceof String && ((String) expression).startsWith("§")) {
             try {
-                expression = resolveKeyPath(scope, JSPath.fromPathString((String) expression)).getLast();
-            } catch (InvalidPathException e) {
-                throw new CompareException(e);
+                expression = this.resolveKeyPath(scope, JSPath.fromPathString((String) expression)).getLast();
+            } catch (final InvalidPathException e) {
+                throw new ConditionException(e);
             }
         }
         if (before != expression) {
             if (container._isDebug()) {
-                container.log(scope.getPath(), "Resolved " + before + " = " + expression);
+                container.log(scope.getPath(), "Resolved " + before + " = " + this.toLog(expression));
             }
         }
         if (unwrapConditionResults) {
             return container.unwrap(expression);
+        }
+        return expression;
+    }
+
+    public Object autoConvertMapToCondition(Object expression) {
+        // no reason to check for isMap(...) here, this is for real maps - no TypeHandlers
+        if (expression instanceof Map && !(expression instanceof Condition)) {
+            // fix map to condition. json deserializer will map internal conditions to maps
+            final Map old = (Map) expression;
+            expression = this.newInstance();
+            ((Condition) expression).putAll(old);
         }
         return expression;
     }
@@ -3028,11 +2897,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     /**
      * @param values
      * @param condition
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public static <T> List<T> find(Collection<T> values, Condition condition) throws CompareException {
-        ArrayList<T> ret = new ArrayList<T>();
-        for (T v : values) {
+    public static <T> List<T> find(final Collection<T> values, final Condition condition) throws ConditionException {
+        final ArrayList<T> ret = new ArrayList<T>();
+        for (final T v : values) {
             if (condition.matches(v)) {
                 ret.add(v);
             }
@@ -3045,20 +2914,73 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @param regex
      * @return
      * @throws InvalidPathException
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public static Object resolve(String keyString, Object object) throws CompareException, InvalidPathException {
-        Condition c = new Condition();
-        Scope ret = c.resolveKeyPath(new Scope(object), JSPath.fromPathString(keyString));
+    public static Object resolve(final String keyString, final Object object) throws ConditionException, InvalidPathException {
+        final Condition c = new Condition();
+        final Scope ret = c.resolveKeyPath(new Scope(object), JSPath.fromPathString(keyString));
         return ret.getLast();
     }
 
-    public Object convertSpecialTypes(Object expression, final Object matcherValue) throws CompareException {
-        if (matcherValue instanceof TimeSpan) {
-            expression = toTimeSpan(expression);
-        } else if (matcherValue instanceof Date) {
-            expression = toDate(expression);
+    /**
+     * @param flexiTypeHandler
+     * @return
+     */
+    public static <T extends TypeHandler> T addThreadTypeHandler(T typeHandler) {
+        List<TypeHandler> list = TYPE_HANDLERS.get();
+        if (list == null) {
+            list = new ArrayList<TypeHandler>();
+            TYPE_HANDLERS.set(list);
         }
-        return expression;
+        if (!list.contains(typeHandler)) {
+            list.add(typeHandler);
+            return typeHandler;
+        }
+        return null;
+    }
+
+    /**
+     * @param remove
+     */
+    public static void removeThreadTypeHandler(TypeHandler remove) {
+        if (remove == null) {
+            return;
+        }
+        List<TypeHandler> list = TYPE_HANDLERS.get();
+        if (list == null) {
+            return;
+        }
+        list.remove(remove);
+    }
+
+    public <TYPE> TYPE getOptions(Class<TYPE> cls) throws ConditionException {
+        fixInternalMapToCondition();
+        Object options = get($OPTIONS);
+        if (options == null) {
+            return null;
+        }
+        return (TYPE) options;
+    }
+
+    /**
+     * @param <T>
+     * @return
+     * @throws InvalidPathException
+     * @throws ConditionException
+     */
+    public <TYPE> TYPE getOptions(Class<TYPE> cls, String key) throws ConditionException {
+        Object options = get($OPTIONS);
+        if (options == null) {
+            return null;
+        }
+        if (key != null) {
+            for (java.util.Map.Entry<String, Object> es : getMapWrapper(options)) {
+                if (StringUtils.equalsIgnoreCase(es.getKey(), key)) {
+                    return (TYPE) es.getValue();
+                }
+            }
+            return null;
+        }
+        return (TYPE) options;
     }
 }

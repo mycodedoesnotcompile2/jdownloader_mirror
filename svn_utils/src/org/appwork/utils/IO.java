@@ -54,13 +54,17 @@ import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URL;
+import java.nio.CharBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.zip.GZIPInputStream;
 
 import org.appwork.utils.Files.AbstractHandler;
 import org.appwork.utils.IO.BOM.BOMInputStream;
+import org.appwork.utils.net.Base64InputStream;
+import org.appwork.utils.net.CharSequenceInputStream;
 import org.appwork.utils.os.CrossSystem;
 
 public class IO {
@@ -250,6 +254,7 @@ public class IO {
         UTF16LE(new byte[] { (byte) 255, (byte) 254 }, "UTF-16LE"),
         UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 254, (byte) 255 }, "UTF-32BE"),
         UTF32LE(new byte[] { (byte) 0, (byte) 0, (byte) 255, (byte) 254 }, "UTF-32LE");
+
         public static class BOMInputStream extends FilterInputStream {
             private final BOM bom;
 
@@ -1025,6 +1030,37 @@ public class IO {
             if (finallyDeleteFileFlag) {
                 file.delete();
             }
+        }
+    }
+
+    /**
+     * @param ico
+     * @return
+     * @throws IOException
+     */
+    public static byte[] dataUrlToBytes(String dataURL) throws IOException {
+        return readStream(-1, dataUrlToInputStream(dataURL));
+    }
+
+    /**
+     * @param dataURL
+     * @return
+     * @throws IOException
+     */
+    public static InputStream dataUrlToInputStream(String dataURL) throws IOException {
+        final int base64Index = dataURL.indexOf(";base64,");
+        final CharBuffer cb;
+        if (base64Index > 0 && base64Index + 8 < dataURL.length()) {
+            cb = CharBuffer.wrap(dataURL, base64Index + 8, dataURL.length());
+        } else {
+            cb = CharBuffer.wrap(dataURL);
+        }
+        InputStream is = new Base64InputStream(new CharSequenceInputStream(cb, Charset.forName("UTF-8")));
+        String searchFor = "data:application/gzip;";
+        if (dataURL.length() > searchFor.length() && dataURL.substring(0, searchFor.length()).equalsIgnoreCase(searchFor)) {
+            return new GZIPInputStream(is);
+        } else {
+            return is;
         }
     }
 }

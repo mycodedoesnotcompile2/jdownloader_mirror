@@ -33,8 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson.mapper.typemapper;
 
-import java.util.List;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.moncompare.Condition;
 import org.appwork.moncompare.fromjson.FlexiConditionMapper;
@@ -42,6 +40,7 @@ import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
 import org.appwork.utils.reflection.CompiledType;
@@ -56,7 +55,7 @@ public class ConditionMapper implements FlexiTypeMapper {
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, List<CompiledType> typeHirarchy) {
+    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         throw new WTFException("Should not happen");
     }
     /*

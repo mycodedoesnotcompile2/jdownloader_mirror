@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 
+import org.appwork.utils.images.MultiResIcon;
+
 /**
  * @author daniel
  * @date Aug 11, 2023
@@ -63,5 +65,13 @@ public class NoSVGSupportFactory implements SVGFactory {
     @Override
     public boolean isSupported() {
         return false;
+    }
+
+    /**
+     * @see org.appwork.utils.images.svg.SVGFactory#getIconFromSVG(java.io.InputStream, int, int, java.awt.Color)
+     */
+    @Override
+    public MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+        return null;
     }
 }

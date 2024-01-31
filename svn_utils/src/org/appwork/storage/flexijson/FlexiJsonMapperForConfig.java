@@ -36,13 +36,12 @@ package org.appwork.storage.flexijson;
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
 
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
-import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;
 
@@ -67,8 +66,8 @@ public class FlexiJsonMapperForConfig extends FlexiJSonMapper {
     }
 
     @Override
-    protected KeyValueElement methodOrFieldAnnotationsToComments(final Getter g, final LinkedList<CompiledType> typeHirarchy, final KeyValueElement create, final Object defaultValue, final boolean addDefaultValueAnnotation) throws FlexiMapperException {
-        final KeyValueElement ret = super.methodOrFieldAnnotationsToComments(g, typeHirarchy, create, defaultValue, addDefaultValueAnnotation);
+    protected KeyValueElement methodOrFieldAnnotationsToComments(final Getter g, final DefaultObjectToJsonContext context, final KeyValueElement create, final Object defaultValue, final boolean addDefaultValueAnnotation) throws FlexiMapperException {
+        final KeyValueElement ret = super.methodOrFieldAnnotationsToComments(g, context, create, defaultValue, addDefaultValueAnnotation);
         if (ret.getCommentsBeforeKey() != null) {
             Collections.sort(ret.getCommentsBeforeKey(), new Comparator<FlexiCommentJsonNode>() {
                 @Override
@@ -121,15 +120,13 @@ public class FlexiJsonMapperForConfig extends FlexiJSonMapper {
         if (Clazz.isPrimitiveWrapper(type)) {
             return true;
         }
-        final Type componentType = ReflectionUtils.getComponentClass(type);
+        CompiledType ct = CompiledType.create(type, clazz);
+        final CompiledType componentType = ct.getComponentType();
         if (componentType != null) {
-            if (Clazz.isPrimitive(componentType)) {
+            if (componentType.isPrimitive()) {
                 return true;
             }
-            if (Clazz.isString(componentType)) {
-                return true;
-            }
-            if (Clazz.isPrimitiveWrapper(componentType)) {
+            if (componentType.isString()) {
                 return true;
             }
         }

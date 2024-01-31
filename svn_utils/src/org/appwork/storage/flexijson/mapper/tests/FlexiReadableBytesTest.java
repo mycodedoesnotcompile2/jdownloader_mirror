@@ -71,9 +71,11 @@ public class FlexiReadableBytesTest extends AWTest {
         assertThat(ReadableBytes.parse("1,5 MB 500kb").getBytes()).isNumber(2000 * 1000l);
         assertThat(ReadableBytes.parse("1,5MB").getBytes()).isNumber(1500 * 1000l);
         assertThat(ReadableBytes.parse("1,5MiB").getBytes()).isNumber(1.5 * 1024 * 1024);
+        assertThat(ReadableBytes.parse("1MiB").format()).equals("1MiB");
+        assertThat(ReadableBytes.parse("1MB").format()).equals("1MB");
+        assertFalse(ReadableBytes.parse("1b").isKibi());
+        assertTrue(ReadableBytes.parse("1 kib 1b").isKibi());
         assertTrue(FlexiUtils.jsonToObject("\"1B\"", ReadableBytes.TYPE).getBytes() == 1);
-        // Test if regular serialization works as well
-        assertTrue(FlexiUtils.jsonToObject("{\"bytes\":1}", ReadableBytes.TYPE).getBytes() == 1);
         // Restore from bytes
         assertTrue(FlexiUtils.jsonToObject("1024", ReadableBytes.TYPE).getBytes() == 1024);
         ReadableBytes bytes = ReadableBytes.fromBytes(System.currentTimeMillis());

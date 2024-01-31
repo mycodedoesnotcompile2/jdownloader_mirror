@@ -34,6 +34,8 @@
 package org.appwork.utils.images.svg;
 
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
@@ -45,12 +47,13 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.images.MultiResIcon;
+
 import com.kitfox.svg.SVGDiagram;
-import com.kitfox.svg.SVGElement;
 import com.kitfox.svg.SVGElementException;
-import com.kitfox.svg.SVGRoot;
+import com.kitfox.svg.SVGException;
 import com.kitfox.svg.SVGUniverse;
-import com.kitfox.svg.animation.AnimationElement;
 
 /**
  * @author daniel
@@ -92,17 +95,6 @@ public class SVGIO {
             if (diagram == null) {
                 return null;
             }
-            // Rectangle dp = diagram.getDeviceViewport();
-            // Rectangle2D vr = diagram.getViewRect();
-            // Rectangle2D bb = diagram.getRoot().getBoundingBox();
-            if (color != null) {
-                final SVGRoot root = diagram.getRoot();
-                // set color
-                final float alpha = color.getAlpha() / 255f;
-                final String hex = "#" + String.format("%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
-                // root.setAttribute("fill", AnimationElement.AT_CSS, hex);
-                setColor(root, alpha, hex);
-            }
             diagram.updateTime(0d);
             diagram.setIgnoringClipHeuristic(true);
             if (w <= 0) {
@@ -127,11 +119,8 @@ public class SVGIO {
                 diagram.getViewRect(rect);
                 final AffineTransform scaleXform = new AffineTransform();
                 scaleXform.setToScale(width / rect.width, height / rect.height);
-                final AffineTransform oldXform = g.getTransform();
                 g.transform(scaleXform);
                 diagram.render(g);
-                g.setTransform(oldXform);
-                g.translate(-x, -y);
             } finally {
                 g.dispose();
             }
@@ -143,20 +132,69 @@ public class SVGIO {
         }
     }
 
-    private static void setColor(SVGElement root, float alpha, String hex) throws SVGElementException {
-        if (root.hasAttribute("fill", AnimationElement.AT_CSS)) {
-            root.setAttribute("fill", AnimationElement.AT_CSS, hex);
-        } else {
-            root.addAttribute("fill", AnimationElement.AT_CSS, hex);
-        }
-        if (root.hasAttribute("fill-opacity", AnimationElement.AT_CSS)) {
-            root.setAttribute("fill-opacity", AnimationElement.AT_CSS, alpha + "");
-        } else {
-            root.addAttribute("fill-opacity", AnimationElement.AT_CSS, alpha + "");
-        }
-        for (int i = 0; i < root.getNumChildren(); i++) {
-            SVGElement child = root.getChild(i);
-            setColor(child, alpha, hex);
+    /**
+     * @param stream
+     * @param width
+     * @param height
+     * @param color
+     * @return
+     * @throws IOException
+     */
+    public static MultiResIcon getIconFromSVG(InputStream stream, int width, int height, Color color) throws IOException {
+        final SVGUniverse universe = new SVGUniverse();
+        URI uri;
+        try {
+            uri = universe.loadSVG(stream, "dummy.svg");
+            final SVGDiagram diagram = universe.getDiagram(uri);
+            if (diagram == null) {
+                return null;
+            }
+            diagram.updateTime(0d);
+            diagram.setIgnoringClipHeuristic(true);
+            return new SVGIcon(width, height) {
+                {
+                }
+
+                /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
+                 */
+                @Override
+                public void paintIcon(Component c, Graphics g1D, int x, int y, int width, int height) {
+                    if (width <= 0) {
+                        width = (int) diagram.getWidth();
+                    }
+                    if (height <= 0) {
+                        height = (int) diagram.getHeight();
+                    }
+                    final double faktor = 1d / Math.max((double) diagram.getWidth() / width, (double) diagram.getHeight() / height);
+                    width = Math.max((int) (diagram.getWidth() * faktor), 1);
+                    height = Math.max((int) (diagram.getHeight() * faktor), 1);
+                    final Graphics2D g = (Graphics2D) g1D;
+                    RenderingHints restoreHints = g.getRenderingHints();
+                    AffineTransform restoreTransform = g.getTransform();
+                    try {
+                        g.translate(x, y);
+                        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+                        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                        final Rectangle2D.Double rect = new Rectangle2D.Double();
+                        diagram.getViewRect(rect);
+                        g.scale(width / rect.width, height / rect.height);
+                        try {
+                            diagram.render(g);
+                        } catch (SVGException e) {
+                            throw new WTFException(e);
+                        }
+                    } finally {
+                        g.setRenderingHints(restoreHints);
+                        g.setTransform(restoreTransform);
+                    }
+                }
+            };
+        } catch (SVGElementException e) {
+            throw new IOException(e);
+        } catch (SVGException e1) {
+            throw new IOException(e1);
         }
     }
 }

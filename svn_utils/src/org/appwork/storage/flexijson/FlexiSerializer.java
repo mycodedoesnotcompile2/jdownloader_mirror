@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.commonInterface.AbstractSerializer;
@@ -237,5 +238,12 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
                 }
             }
         }
+    }
+
+    /**
+     *
+     */
+    public static void setAsDefault() {
+        Deser.set(new FlexiSerializer());
     }
 }

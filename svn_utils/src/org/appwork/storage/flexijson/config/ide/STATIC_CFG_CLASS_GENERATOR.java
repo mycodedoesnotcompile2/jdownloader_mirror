@@ -57,9 +57,9 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;
+import org.appwork.utils.reflection.CompiledType.AbstractNameScheme;
 import org.appwork.utils.reflection.CompiledType.PrimitiveWrapperStrategy;
-import org.appwork.utils.reflection.CompiledType.ToStringRule;
-import org.appwork.utils.reflection.CompiledType.ToStringSyntax;
+import org.appwork.utils.reflection.JavaSyntax;
 
 /**
  * @author thomas
@@ -184,8 +184,7 @@ public class STATIC_CFG_CLASS_GENERATOR {
             // public static final PropertyHandler<CommitClientConfig, HashMap<String, String>> PATH_MAP =
             // InterfaceStorage.getPropertyHandler(CFG, "PathMap", TypeRef.HASHMAP_STRING);
             addImport(cc.getType(key));
-            ToStringRule rules = new ToStringRule();
-            rules.setSyntax(ToStringSyntax.JAVA);
+            AbstractNameScheme rules = new JavaSyntax();
             CompiledType ct = CompiledType.create(cc.getType(key));
             addImport(ct.raw);
             for (CompiledType c : ct.componentTypes) {

@@ -47,9 +47,9 @@ public interface Operator {
      * @param matcherValue
      * @param test
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    public Object opEval(Condition<?> container, Object query, Scope scope) throws CompareException;
+    public Object opEval(Condition<?> container, Object query, Scope scope) throws ConditionException;
 
     /**
      * @return

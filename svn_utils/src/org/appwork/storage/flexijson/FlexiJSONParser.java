@@ -1261,7 +1261,6 @@ public class FlexiJSONParser {
      * @param keyToken
      */
     protected void onNewKeyValueElement(FlexiJSonObject ret, KeyValueElement element, Object keyToken) {
-        // TODO Auto-generated method stub
     }
 
     /**
@@ -1699,14 +1698,36 @@ public class FlexiJSONParser {
             } else if (stringQuoting == StringQuoting.NONE) {
                 if (container instanceof FlexiJSonObject) {
                     // these chars must be escaped if used in none-quoted strings
-                    if (type == Token.KEY && (c == COLON || c == COMMA || c == CURLY_BRACKET_CLOSE)) {
-                        return assignFinalType(path, type);
-                        // these chars must be escaped if used in none-quoted strings
-                    } else if (type == Token.VALUE && (c == COMMA || c == CURLY_BRACKET_CLOSE)) {
-                        return assignFinalType(path, type);
+                    if (type == Token.KEY) {
+                        switch (c) {
+                        case COLON: // set correct token for the current character - since it already belongs to the next entry
+                            setToken(path, Token.ASSIGN);
+                            return assignFinalType(path, type);
+                        case COMMA: // set correct token for the current character - since it already belongs to the next entry
+                            setToken(path, Token.COMMA);
+                            return assignFinalType(path, type);
+                        case CURLY_BRACKET_CLOSE:
+                            setToken(path, Token.END_OF_OBJECT);
+                            return assignFinalType(path, type);
+                        }
+                    } else if (type == Token.VALUE) {
+                        switch (c) {
+                        case COMMA: // set correct token for the current character - since it already belongs to the next entry
+                            setToken(path, Token.COMMA);
+                            return assignFinalType(path, type);
+                        case CURLY_BRACKET_CLOSE: // set correct token for the current character - since it already belongs to the next
+                                                  // entry
+                            setToken(path, Token.END_OF_OBJECT);
+                            return assignFinalType(path, type);
+                        }
                     }
                 } else if (container instanceof FlexiJSonArray) {
-                    if (c == COMMA || c == SQUARE_BRACKET_CLOSE) {
+                    switch (c) {
+                    case COMMA:
+                        setToken(path, Token.COMMA);
+                        return assignFinalType(path, type);
+                    case SQUARE_BRACKET_CLOSE:
+                        setToken(path, Token.END_OF_ARRAY);
                         return assignFinalType(path, type);
                     }
                 }
@@ -1920,6 +1941,7 @@ public class FlexiJSONParser {
                 }
                 break;
             default:
+                // not reached the end of the token -> continue;
                 if (!nextChar(path, null)) {
                     return assignFinalType(path, type);
                 }

@@ -51,6 +51,7 @@ import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.mapper.AbstractJsonMapper;
@@ -153,7 +154,7 @@ public class FlexiJSonBridge extends AbstractJsonMapper {
         private ThreadLocal<HashSet<Object>> bypass = new ThreadLocal<HashSet<Object>>();
 
         @Override
-        protected FlexiJSonNode handleMapperObjectToJsonNode(Getter reference, Object obj, LinkedList<CompiledType> typeHirarchy) throws FlexiMapperException {
+        protected FlexiJSonNode handleMapperObjectToJsonNode(Getter reference, Object obj, DefaultObjectToJsonContext context) throws FlexiMapperException {
             boolean mapped = false;
             {
                 List<JsonConverterForSerialization> matches = findBestTypeMatch(obj == null ? null : obj.getClass(), convertForSerialization, JsonConverterForSerialization.class);
@@ -181,7 +182,7 @@ public class FlexiJSonBridge extends AbstractJsonMapper {
             if (mapped) {
                 return mapper.objectToJsonNode(obj);
             }
-            return super.handleMapperObjectToJsonNode(reference, obj, typeHirarchy);
+            return super.handleMapperObjectToJsonNode(reference, obj, context);
         }
     }
 

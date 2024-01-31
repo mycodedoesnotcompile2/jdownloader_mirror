@@ -48,8 +48,12 @@ public class ConcatIterator<E> implements Iterator<E>, Iterable<E> {
     private E                                 next          = null;
     private boolean                           nextSet       = false;
 
+    public ConcatIterator() {
+        this.iterators = new ArrayList<Iterator<? extends E>>();
+    }
+
     public ConcatIterator(final Iterator<? extends E>... iterators) {
-        this.iterators = Arrays.asList(iterators);
+        this.iterators = new ArrayList<Iterator<? extends E>>(Arrays.asList(iterators));
     }
 
     public ConcatIterator(final Iterable<? extends E>... iterables) {
@@ -69,14 +73,37 @@ public class ConcatIterator<E> implements Iterator<E>, Iterable<E> {
             return true;
         }
         while (this.iteratorIndex < this.iterators.size()) {
-            if (this.iterators.get(iteratorIndex).hasNext()) {
-                this.next = this.iterators.get(iteratorIndex).next();
+            final Iterator<? extends E> nextIt = this.iterators.get(this.iteratorIndex);
+            if (nextIt == null && this.isIgnoreNull()) {
+                this.iteratorIndex++;
+                continue;
+            }
+            if (nextIt == null) {
+                throw new NullPointerException("set #IgnoreNull to ignore null entries");
+            }
+            if (nextIt.hasNext()) {
+                this.next = this.iterators.get(this.iteratorIndex).next();
                 this.nextSet = true;
                 return true;
             }
             this.iteratorIndex++;
         }
         return false;
+    }
+
+    private boolean ignoreNull = false;
+
+    public boolean isIgnoreNull() {
+        return this.ignoreNull;
+    }
+
+    public ConcatIterator<E> ignoreNull(final boolean ignoreNull) {
+        this.setIgnoreNull(ignoreNull);
+        return this;
+    }
+
+    public void setIgnoreNull(final boolean ignoreNull) {
+        this.ignoreNull = ignoreNull;
     }
 
     @Override
@@ -104,5 +131,9 @@ public class ConcatIterator<E> implements Iterator<E>, Iterable<E> {
 
     @Override
     public void remove() {
+    }
+
+    public void add(final Iterator<E> iterator) {
+        this.iterators.add(iterator);
     }
 }

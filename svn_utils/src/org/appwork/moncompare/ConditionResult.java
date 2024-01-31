@@ -48,9 +48,9 @@ public interface ConditionResult {
      * @param condition
      * @param newScope
      * @return
-     * @throws CompareException
+     * @throws ConditionException
      */
-    Object implicitEquals(Condition<?> condition, Scope newScope) throws CompareException;
+    Object implicitEquals(Condition<?> condition, Scope newScope) throws ConditionException;
 
     /**
      * @return

@@ -67,10 +67,10 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param string
      * @return
      */
-    private static TimeSpan parseWithoutException(String string) {
+    private static TimeSpan parseWithoutException(final String string) {
         try {
             return parse(string);
-        } catch (InvalidTimeSpanException e) {
+        } catch (final InvalidTimeSpanException e) {
             throw new WTFException(e);
         }
     }
@@ -84,16 +84,16 @@ public class TimeSpan implements Comparable<TimeSpan> {
         return new TimeSpan(durationInMS).normalized();
     }
 
-    protected TimeSpan(boolean negative, final long years, final long months, final long weeks, final long days, final long hours, final long minutes, final long seconds, final long milliseconds) {
+    protected TimeSpan(final boolean negative, final long years, final long months, final long weeks, final long days, final long hours, final long minutes, final long seconds, final long milliseconds) {
         this.negative = negative;
-        this.years = notNegative(years);
-        this.months = notNegative(months);
-        this.weeks = notNegative(weeks);
-        this.days = notNegative(days);
-        this.hours = notNegative(hours);
-        this.minutes = notNegative(minutes);
-        this.seconds = notNegative(seconds);
-        this.milliseconds = notNegative(milliseconds);
+        this.years = this.notNegative(years);
+        this.months = this.notNegative(months);
+        this.weeks = this.notNegative(weeks);
+        this.days = this.notNegative(days);
+        this.hours = this.notNegative(hours);
+        this.minutes = this.notNegative(minutes);
+        this.seconds = this.notNegative(seconds);
+        this.milliseconds = this.notNegative(milliseconds);
     }
 
     protected final long notNegative(final long value) {
@@ -104,7 +104,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
         }
     }
 
-    protected TimeSpan(TimeSpan timeSpan) {
+    protected TimeSpan(final TimeSpan timeSpan) {
         this(timeSpan.isNegative(), timeSpan.getYears(), timeSpan.getMonths(), timeSpan.getWeeks(), timeSpan.getDays(), timeSpan.getHours(), timeSpan.getMinutes(), timeSpan.getSeconds(), timeSpan.getMilliseconds());
     }
 
@@ -121,7 +121,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
      *
      * This method also parses the PnDTnHnMn.nS (ISO-8601) format like java.time.Duration
      *
-     * @param time
+     * @param from
      * @return
      * @throws InvalidTimeSpanException
      * @throws NumberFormatException
@@ -130,27 +130,22 @@ public class TimeSpan implements Comparable<TimeSpan> {
     public static TimeSpan parse(String spanAsString) throws InvalidTimeSpanException {
         try {
             spanAsString = spanAsString.trim();
-            long ms = 0;
             // fix for ms
             spanAsString = spanAsString.replace("ms", Unit.MILLISECONDS.unit + "");
-            char[] chars = spanAsString.toCharArray();
+            final char[] chars = spanAsString.toCharArray();
             TimeSpan ret = new TimeSpan(0);
-            StringBuilder sb = new StringBuilder();
+            final StringBuilder sb = new StringBuilder();
             char c;
             boolean contentStarted = false;
-            HashSet<Unit> dupe = new HashSet<Unit>();
+            final HashSet<Unit> dupe = new HashSet<Unit>();
             for (int i = 0; i < chars.length; i++) {
                 c = chars[i];
                 if (Character.isWhitespace(c)) {
                     continue;
                 }
                 if (c == 'P' || c == 'p') {
-                    if (ms == 0) {
-                        ret = parseIso8601(chars);
-                        return ret;
-                    } else {
-                        throw new InvalidTimeSpanException("Invalid usage of P (ISO8601 format)");
-                    }
+                    ret = parseIso8601(chars);
+                    return ret;
                 }
                 if (c == '!') {
                     if (sb.length() > 0) {
@@ -208,7 +203,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
             }
             ret.toMillis();
             return ret;
-        } catch (NumberFormatException e) {
+        } catch (final NumberFormatException e) {
             throw new InvalidTimeSpanException(e);
         }
     }
@@ -219,14 +214,14 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @return
      * @throws InvalidTimeSpanException
      */
-    public static TimeSpan parseIso8601(char[] chars) throws InvalidTimeSpanException {
-        StringBuilder sb = new StringBuilder();
+    public static TimeSpan parseIso8601(final char[] chars) throws InvalidTimeSpanException {
+        final StringBuilder sb = new StringBuilder();
         char c;
         boolean time = false;
         boolean p = false;
         // int invert = 1;
         TimeSpan ret = new TimeSpan(0);
-        HashSet<Unit> dupe = new HashSet<Unit>();
+        final HashSet<Unit> dupe = new HashSet<Unit>();
         for (int i = 0; i < chars.length; i++) {
             c = chars[i];
             if (Character.isWhitespace(c)) {
@@ -324,14 +319,14 @@ public class TimeSpan implements Comparable<TimeSpan> {
     private final long    years;
 
     public boolean isNegative() {
-        return negative;
+        return this.negative;
     }
 
     public TimeSpan withNegative(final boolean negative) {
-        if (isNegative() == negative) {
+        if (this.isNegative() == negative) {
             return this;
         } else {
-            final TimeSpan ret = new TimeSpan(negative, getYears(), getMonths(), getWeeks(), getDays(), getHours(), getMinutes(), getSeconds(), getMilliseconds());
+            final TimeSpan ret = new TimeSpan(negative, this.getYears(), this.getMonths(), this.getWeeks(), this.getDays(), this.getHours(), this.getMinutes(), this.getSeconds(), this.getMilliseconds());
             ret.toMillis();
             return ret;
         }
@@ -348,11 +343,11 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @throws IllegalTargetUnitsException
      * @throws InvalidTimeSpanException
      */
-    public TimeSpan convert(Unit... allowedTargetUnits) throws IllegalTargetUnitsException {
+    public TimeSpan convert(final Unit... allowedTargetUnits) throws IllegalTargetUnitsException {
         // WARNING: THIS METHOD MUST NOT THROW AN CannotConvertException if allowedTargetUnits is null
         long ms = this.toMillis();
         TimeSpan ret = new TimeSpan(0);
-        if (isNegative()) {
+        if (this.isNegative()) {
             ms = multiplyExact(ms, -1);
             ret = ret.withNegative(true);
         }
@@ -380,20 +375,20 @@ public class TimeSpan implements Comparable<TimeSpan> {
     }
 
     /**
-     * @return
+     * @return the full time in this timespan converted to MS
      */
     public long toMillis() {
         long ret = 0;
-        for (Unit unit : Unit.values()) {
-            ret = addExact(ret, multiplyExact(get(unit), unit.toMillis));
+        for (final Unit unit : Unit.values()) {
+            ret = addExact(ret, multiplyExact(this.get(unit), unit.toMillis));
         }
-        if (isNegative()) {
+        if (this.isNegative()) {
             ret = multiplyExact(ret, -1);
         }
         return ret;
     }
 
-    private static long addExact(long x, long y) {
+    private static long addExact(final long x, final long y) {
         final long r = x + y;
         // HD 2-12 Overflow iff both arguments have the opposite sign of the result
         if (((x ^ r) & (y ^ r)) < 0) {
@@ -403,7 +398,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
         }
     }
 
-    private static long multiplyExact(long x, long y) {
+    private static long multiplyExact(final long x, final long y) {
         final long r = x * y;
         final long ax = Math.abs(x);
         final long ay = Math.abs(y);
@@ -424,18 +419,18 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
         } else if (!(obj instanceof TimeSpan)) {
             return false;
         } else {
             final TimeSpan other = (TimeSpan) obj;
-            if (isNegative() != other.isNegative()) {
+            if (this.isNegative() != other.isNegative()) {
                 return false;
             }
             for (final Unit unit : Unit.values()) {
-                if (get(unit) != other.get(unit)) {
+                if (this.get(unit) != other.get(unit)) {
                     return false;
                 }
             }
@@ -450,13 +445,13 @@ public class TimeSpan implements Comparable<TimeSpan> {
      */
     public String format() {
         final StringBuilder ret = new StringBuilder();
-        if (isNegative()) {
+        if (this.isNegative()) {
             ret.append("-");
         }
         final Unit[] values = Unit.values();
         for (int i = values.length - 1; i >= 0; i--) {
             final Unit unit = values[i];
-            final long value = get(unit);
+            final long value = this.get(unit);
             if (value != 0) {
                 ret.append(value).append(unit.unit);
             }
@@ -468,47 +463,53 @@ public class TimeSpan implements Comparable<TimeSpan> {
     }
 
     public long getDays() {
-        return get(Unit.DAYS);
+        return this.get(Unit.DAYS);
     }
 
     public long getHours() {
-        return get(Unit.HOURS);
+        return this.get(Unit.HOURS);
     }
 
-    public long toLong(Unit targetUnit) {
-        return toMillis() / targetUnit.toMillis;
+    public long toLong(final Unit targetUnit) {
+        return this.toMillis() / targetUnit.toMillis;
     }
 
     /**
      * @param days2
      * @return
      */
-    public double toDouble(Unit targetUnit) {
-        return toLong(targetUnit);
+    public double toDouble(final Unit targetUnit) {
+        return this.toLong(targetUnit);
     }
 
+    /**
+     * WARNING: this method only returns the millisecnds field in this timespan. This does NOT return the full timespan. Use toMillis()
+     * instead
+     *
+     * @return
+     */
     public long getMilliseconds() {
-        return get(Unit.MILLISECONDS);
+        return this.get(Unit.MILLISECONDS);
     }
 
     public long getMinutes() {
-        return get(Unit.MINUTES);
+        return this.get(Unit.MINUTES);
     }
 
     public long getMonths() {
-        return get(Unit.MONTHS);
+        return this.get(Unit.MONTHS);
     }
 
     public long getSeconds() {
-        return get(Unit.SECONDS);
+        return this.get(Unit.SECONDS);
     }
 
     public long getWeeks() {
-        return get(Unit.WEEKS);
+        return this.get(Unit.WEEKS);
     }
 
     public long getYears() {
-        return get(Unit.YEARS);
+        return this.get(Unit.YEARS);
     }
 
     /*
@@ -518,31 +519,31 @@ public class TimeSpan implements Comparable<TimeSpan> {
      */
     @Override
     public int hashCode() {
-        int hashCode = isNegative() ? -1 : 1;
+        int hashCode = this.isNegative() ? -1 : 1;
         for (final Unit unit : Unit.values()) {
-            hashCode += (int) get(unit);
+            hashCode += (int) this.get(unit);
         }
         return hashCode;
     }
 
-    protected long get(Unit unit) {
+    protected long get(final Unit unit) {
         switch (unit) {
         case YEARS:
-            return years;
+            return this.years;
         case MONTHS:
-            return months;
+            return this.months;
         case WEEKS:
-            return weeks;
+            return this.weeks;
         case DAYS:
-            return days;
+            return this.days;
         case HOURS:
-            return hours;
+            return this.hours;
         case MINUTES:
-            return minutes;
+            return this.minutes;
         case SECONDS:
-            return seconds;
+            return this.seconds;
         case MILLISECONDS:
-            return milliseconds;
+            return this.milliseconds;
         default:
             throw new IllegalArgumentException("unsupported unit:" + unit);
         }
@@ -552,12 +553,12 @@ public class TimeSpan implements Comparable<TimeSpan> {
         if (getUnit.equals(setUnit)) {
             return setValue;
         } else {
-            return get(getUnit);
+            return this.get(getUnit);
         }
     }
 
     protected final long add(final Unit getUnit, final Unit setUnit, final long setValue) {
-        long getValue = get(getUnit);
+        final long getValue = this.get(getUnit);
         if (getUnit.equals(setUnit)) {
             return addExact(getValue, setValue);
         } else {
@@ -568,10 +569,10 @@ public class TimeSpan implements Comparable<TimeSpan> {
     public TimeSpan with(final Unit unit, final long value) {
         if (unit == null) {
             return this;
-        } else if (get(unit) == value) {
+        } else if (this.get(unit) == value) {
             return this;
         } else {
-            final TimeSpan ret = new TimeSpan(isNegative(), get(Unit.YEARS, unit, value), get(Unit.MONTHS, unit, value), get(Unit.WEEKS, unit, value), get(Unit.DAYS, unit, value), get(Unit.HOURS, unit, value), get(Unit.MINUTES, unit, value), get(Unit.SECONDS, unit, value), get(Unit.MILLISECONDS, unit, value));
+            final TimeSpan ret = new TimeSpan(this.isNegative(), this.get(Unit.YEARS, unit, value), this.get(Unit.MONTHS, unit, value), this.get(Unit.WEEKS, unit, value), this.get(Unit.DAYS, unit, value), this.get(Unit.HOURS, unit, value), this.get(Unit.MINUTES, unit, value), this.get(Unit.SECONDS, unit, value), this.get(Unit.MILLISECONDS, unit, value));
             ret.toMillis();
             return ret;
         }
@@ -583,7 +584,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
         } else if (value == 0) {
             return this;
         } else {
-            final TimeSpan ret = new TimeSpan(isNegative(), add(Unit.YEARS, unit, value), add(Unit.MONTHS, unit, value), add(Unit.WEEKS, unit, value), add(Unit.DAYS, unit, value), add(Unit.HOURS, unit, value), add(Unit.MINUTES, unit, value), add(Unit.SECONDS, unit, value), add(Unit.MILLISECONDS, unit, value));
+            final TimeSpan ret = new TimeSpan(this.isNegative(), this.add(Unit.YEARS, unit, value), this.add(Unit.MONTHS, unit, value), this.add(Unit.WEEKS, unit, value), this.add(Unit.DAYS, unit, value), this.add(Unit.HOURS, unit, value), this.add(Unit.MINUTES, unit, value), this.add(Unit.SECONDS, unit, value), this.add(Unit.MILLISECONDS, unit, value));
             ret.toMillis();
             return ret;
         }
@@ -596,14 +597,15 @@ public class TimeSpan implements Comparable<TimeSpan> {
             return this;
         } else {
             value = multiplyExact(value, -1);
-            final TimeSpan ret = new TimeSpan(isNegative(), add(Unit.YEARS, unit, value), add(Unit.MONTHS, unit, value), add(Unit.WEEKS, unit, value), add(Unit.DAYS, unit, value), add(Unit.HOURS, unit, value), add(Unit.MINUTES, unit, value), add(Unit.SECONDS, unit, value), add(Unit.MILLISECONDS, unit, value));
+            final TimeSpan ret = new TimeSpan(this.isNegative(), this.add(Unit.YEARS, unit, value), this.add(Unit.MONTHS, unit, value), this.add(Unit.WEEKS, unit, value), this.add(Unit.DAYS, unit, value), this.add(Unit.HOURS, unit, value), this.add(Unit.MINUTES, unit, value), this.add(Unit.SECONDS, unit, value), this.add(Unit.MILLISECONDS, unit, value));
             ret.toMillis();
             return ret;
         }
     }
 
+    @Override
     public String toString() {
-        return format();
+        return this.format();
     }
 
     /*
@@ -612,7 +614,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @see java.lang.Comparable#compareTo(java.lang.Object)
      */
     @Override
-    public int compareTo(TimeSpan o) {
+    public int compareTo(final TimeSpan o) {
         return CompareUtils.compareNumber(this.toMillis(), o.toMillis());
     }
 
@@ -620,8 +622,8 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param minutes1
      * @return
      */
-    public boolean isLessThan(TimeSpan other) {
-        return compareTo(other) < 0;
+    public boolean isLessThan(final TimeSpan other) {
+        return this.compareTo(other) < 0;
     }
 
     /**
@@ -629,8 +631,8 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @return
      * @throws ContextMissingException
      */
-    public boolean isLessThan(long milliseconds) {
-        return toMillis() < milliseconds;
+    public boolean isLessThan(final long milliseconds) {
+        return this.toMillis() < milliseconds;
     }
 
     /**
@@ -639,7 +641,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param minutes1
      * @return
      */
-    public TimeSpan max(TimeSpan other) {
+    public TimeSpan max(final TimeSpan other) {
         if (this.isLessThan(other)) {
             return other;
         } else {
@@ -647,7 +649,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
         }
     }
 
-    public TimeSpan min(TimeSpan other) {
+    public TimeSpan min(final TimeSpan other) {
         if (this.isLessThan(other)) {
             return this;
         } else {
@@ -661,9 +663,9 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @return
      * @throws InvalidTimeSpanException
      */
-    public TimeSpan limit(TimeSpan min, TimeSpan max) {
-        TimeSpan minWithContext = min;
-        TimeSpan maxWithContext = max;
+    public TimeSpan limit(final TimeSpan min, final TimeSpan max) {
+        final TimeSpan minWithContext = min;
+        final TimeSpan maxWithContext = max;
         TimeSpan ret = this;
         if (ret.isLessThan(minWithContext)) {
             ret = minWithContext;
@@ -678,7 +680,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param maxWithContext
      * @return
      */
-    public boolean isMoreThan(TimeSpan other) {
+    public boolean isMoreThan(final TimeSpan other) {
         return this.compareTo(other) > 0;
     }
 
@@ -686,7 +688,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param parse
      * @return
      */
-    public boolean isSameAs(TimeSpan other) {
+    public boolean isSameAs(final TimeSpan other) {
         return this.compareTo(other) == 0;
     }
 
@@ -694,13 +696,13 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @return
      */
     public String toReadableString() {
-        StringBuilder ret = new StringBuilder();
-        Unit[] values = Unit.values();
+        final StringBuilder ret = new StringBuilder();
+        final Unit[] values = Unit.values();
         for (int i = values.length - 1; i >= 0; i--) {
-            Unit u = values[i];
+            final Unit u = values[i];
             if (u.getValue(this) != 0) {
-                long v = u.getValue(this);
-                String unit = u.getReadableName(v);
+                final long v = u.getValue(this);
+                final String unit = u.getReadableName(v);
                 if (ret.length() > 0) {
                     ret.append(", ");
                 }
@@ -710,7 +712,7 @@ public class TimeSpan implements Comparable<TimeSpan> {
         if (ret.length() == 0) {
             return "0 " + Unit.SECONDS.getReadableName(0);
         }
-        if (isNegative()) {
+        if (this.isNegative()) {
             return "- " + ret.toString();
         } else {
             return ret.toString();
@@ -727,11 +729,11 @@ public class TimeSpan implements Comparable<TimeSpan> {
         TimeSpan best = null;
         while (all.size() > 0) {
             try {
-                final TimeSpan shorten = convert(all.toArray(new Unit[] {}));
+                final TimeSpan shorten = this.convert(all.toArray(new Unit[] {}));
                 if (best == null || shorten.format().length() < best.format().length()) {
                     best = shorten;
                 }
-            } catch (IllegalTargetUnitsException e) {
+            } catch (final IllegalTargetUnitsException e) {
                 break;
             }
             all.removeLast();
@@ -746,9 +748,9 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param hours2
      * @return
      */
-    public TimeSpan withZero(Unit... units) {
+    public TimeSpan withZero(final Unit... units) {
         TimeSpan ret = this;
-        for (Unit unit : units) {
+        for (final Unit unit : units) {
             ret = ret.with(unit, 0);
         }
         return ret;
@@ -770,8 +772,8 @@ public class TimeSpan implements Comparable<TimeSpan> {
      */
     public TimeSpan normalized() {
         try {
-            return convert(Unit.values());
-        } catch (IllegalTargetUnitsException e) {
+            return this.convert(Unit.values());
+        } catch (final IllegalTargetUnitsException e) {
             throw new WTFException("Cannot happen - because we use all values", e);
         }
     }
@@ -782,8 +784,8 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param lastSuccess
      * @return
      */
-    public boolean isExpired(long lastEventIndependentTimeStamp) {
-        return (Time.systemIndependentCurrentJVMTimeMillis() - lastEventIndependentTimeStamp) > toMillis();
+    public boolean isExpired(final long lastEventIndependentTimeStamp) {
+        return (Time.systemIndependentCurrentJVMTimeMillis() - lastEventIndependentTimeStamp) > this.toMillis();
     }
 
     /**
@@ -792,11 +794,11 @@ public class TimeSpan implements Comparable<TimeSpan> {
      * @param milliseconds2
      * @return
      */
-    public int toInt(Unit unit) throws ArithmeticException {
-        return toIntExact(toLong(unit));
+    public int toInt(final Unit unit) throws ArithmeticException {
+        return this.toIntExact(this.toLong(unit));
     }
 
-    public int toIntExact(long value) {
+    public int toIntExact(final long value) {
         final int iValue = (int) value;
         if (iValue != value) {
             throw new ArithmeticException("integer overflow:" + value + ">" + Integer.MAX_VALUE);

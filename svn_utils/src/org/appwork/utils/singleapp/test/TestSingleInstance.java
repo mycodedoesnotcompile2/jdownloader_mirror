@@ -145,8 +145,7 @@ public class TestSingleInstance extends AWTest {
                                                                }
 
                                                                @Override
-                                                               public void onConnected(String[] message) {
-                                                                   // TODO Auto-generated method stub
+                                                               public void onConnected(String[] message) {                                                                   
                                                                }
                                                            };
 
@@ -405,8 +404,7 @@ public class TestSingleInstance extends AWTest {
                     }.start();
                     client.start(new ResponseListener() {
                         @Override
-                        public void onConnected(String[] message) {
-                            // TODO Auto-generated method stub
+                        public void onConnected(String[] message) {                            
                         }
 
                         @Override
@@ -540,8 +538,7 @@ public class TestSingleInstance extends AWTest {
                                 }
                                 client.start(new ResponseListener() {
                                     @Override
-                                    public void onConnected(String[] message) {
-                                        // TODO Auto-generated method stub
+                                    public void onConnected(String[] message) {                                        
                                     }
 
                                     @Override
@@ -629,8 +626,7 @@ public class TestSingleInstance extends AWTest {
                 String toSend = "test" + System.currentTimeMillis();
                 ResponseListener callback = new ResponseListener() {
                     @Override
-                    public void onConnected(String[] message) {
-                        // TODO Auto-generated method stub
+                    public void onConnected(String[] message) {                        
                     }
 
                     @Override

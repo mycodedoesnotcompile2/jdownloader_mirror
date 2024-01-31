@@ -38,7 +38,7 @@ package org.appwork.moncompare;
  * @date 30.06.2021
  *
  */
-public class BadFormatException extends CompareException {
+public class BadFormatException extends ConditionException {
 
     /**
      * @param e

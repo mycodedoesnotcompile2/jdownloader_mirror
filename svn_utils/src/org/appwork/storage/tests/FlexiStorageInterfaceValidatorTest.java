@@ -67,6 +67,7 @@ import org.appwork.storage.StorableSee;
 import org.appwork.storage.StorableValidateCondition;
 import org.appwork.storage.StorableValidateMandatoryInJson;
 import org.appwork.storage.StorableValidateNotNull;
+import org.appwork.storage.StorableValidateRegex;
 import org.appwork.storage.StorableValidator;
 import org.appwork.storage.StorableValidator.ValidatorException;
 import org.appwork.storage.StorableValidatorIgnoresMissingGetter;
@@ -90,8 +91,8 @@ import org.appwork.storage.validator.classvalidator.StorableClassValidator1;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator2;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator3;
 import org.appwork.testframework.AWTest;
-import org.appwork.testframework.ClassPathScanner;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.duration.TimeSpan;
@@ -179,6 +180,7 @@ public class FlexiStorageInterfaceValidatorTest extends AWTest {
         allowed.add(ApiDoc.class);
         allowed.add(StorableClassValidator1.class);
         allowed.add(StorableClassValidator2.class);
+        allowed.add(StorableValidateRegex.class);
         allowed.add(StorableClassValidator3.class);
         allowed.add(StorableValidateMandatoryInJson.class);
         allowed.add(StorableValidateNotNull.class);
@@ -380,7 +382,6 @@ public class FlexiStorageInterfaceValidatorTest extends AWTest {
      * @return
      */
     private String link(Class<?> cls) {
-        // TODO Auto-generated method stub
         return cls.getPackage().toString() + "(" + cls.getSimpleName() + ".java:1)";
     }
 

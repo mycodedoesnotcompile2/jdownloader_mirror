@@ -38,7 +38,7 @@ package org.appwork.moncompare;
  * @date 20.06.2021
  *
  */
-public class AggregationException extends CompareException {
+public class AggregationException extends ConditionException {
     public AggregationException() {
         super();
     }

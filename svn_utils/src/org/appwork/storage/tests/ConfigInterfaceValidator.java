@@ -7,8 +7,8 @@ import java.util.List;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.ClassCache.Rules;
-import org.appwork.testframework.ClassPathScanner;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.utils.ClassPathScanner;
 
 public class ConfigInterfaceValidator extends StorableValidatorTest {
     public static void main(String[] args) {
