@@ -3,7 +3,7 @@
   "filter":null,
   "installed":{
     "date":"2023-11-30T16:01:52 CET",
-    "dependencies":[],
+    "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "hashes":{"jsvg.jar":"a215cf2a11dca182da9bc578ca6ab7c3e1728282df3a56f39ec8302f2c7895ef"},
     "licenses":[{
