@@ -60,13 +60,13 @@ import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.appwork.storage.simplejson.JSonArray;
 import org.appwork.storage.simplejson.JSonNode;
 import org.appwork.storage.simplejson.JSonObject;
 import org.appwork.storage.simplejson.JSonValue;
 import org.appwork.storage.simplejson.JsonObjectLinkedHashMap;
+import org.appwork.utils.XML;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -183,27 +183,26 @@ public class Xml2Json {
     }
 
     public String xml2json(final String xml) throws Exception {
-        final DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        final DocumentBuilder builder = XML.newSecureFactory().newDocumentBuilder();
         builder.setEntityResolver(new EntityResolver() {
             @Override
             public InputSource resolveEntity(final String publicId, final String systemId) throws SAXException, IOException {
-                
                 return new InputSource(new StringReader(""));
             }
         });
         builder.setErrorHandler(new ErrorHandler() {
             @Override
-            public void warning(final SAXParseException exception) throws SAXException {                
+            public void warning(final SAXParseException exception) throws SAXException {
                 exception.printStackTrace();
             }
 
             @Override
-            public void fatalError(final SAXParseException exception) throws SAXException {                
+            public void fatalError(final SAXParseException exception) throws SAXException {
                 exception.printStackTrace();
             }
 
             @Override
-            public void error(final SAXParseException exception) throws SAXException {                
+            public void error(final SAXParseException exception) throws SAXException {
                 exception.printStackTrace();
             }
         });

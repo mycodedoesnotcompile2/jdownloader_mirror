@@ -77,20 +77,20 @@ public class LogV3 {
         String load = LogV3FactoryImpl.class.getName();
         try {
             Class.forName(load = LogV3.class.getPackage().getName() + ".simple.SimpleLoggerFactory");
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
             load = LogV3FactoryImpl.class.getName();
         }
         try {
-            String clazz = System.getProperty("org.appwork.LoggerFactory", load);
-            LogV3Factory ret = (LogV3Factory) Class.forName(clazz).newInstance();
+            final String clazz = System.getProperty("org.appwork.LoggerFactory", load);
+            final LogV3Factory ret = (LogV3Factory) Class.forName(clazz).newInstance();
             try {
-                Method initDefaults = ret.getClass().getMethod("initDefaults", new Class[] {});
+                final Method initDefaults = ret.getClass().getMethod("initDefaults", new Class[] {});
                 initDefaults.invoke(ret, new Object[] {});
-            } catch (NoSuchMethodException e) {
+            } catch (final NoSuchMethodException e) {
                 // Thats ok, this method is optional
             }
             return ret;
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
             throw new RuntimeException("Error Initialising Logging facade", e);
         }
     }
@@ -98,49 +98,49 @@ public class LogV3 {
     /**
      * @param t
      */
-    public static void log(Throwable t) {
+    public static void log(final Throwable t) {
         I().getDefaultLogger().log(t);
     }
 
     /**
      * @param string
      */
-    public static void info(String string) {
+    public static void info(final String string) {
         I().getDefaultLogger().info(string);
     }
 
     /**
      * @param string
      */
-    public static void severe(String string) {
+    public static void severe(final String string) {
         I().getDefaultLogger().severe(string);
     }
 
     /**
      * @param string
      */
-    public static void warning(String string) {
+    public static void warning(final String string) {
         I().getDefaultLogger().warning(string);
     }
 
     /**
      * @param string
      */
-    public static void finest(String string) {
+    public static void finest(final String string) {
         I().getDefaultLogger().finest(string);
     }
 
     /**
      * @param string
      */
-    public static void finer(String string) {
+    public static void finer(final String string) {
         I().getDefaultLogger().finer(string);
     }
 
     /**
      * @param string
      */
-    public static void fine(String string) {
+    public static void fine(final String string) {
         I().getDefaultLogger().fine(string);
     }
 
@@ -155,14 +155,14 @@ public class LogV3 {
      * @param name
      * @return
      */
-    public static LogInterface logger(Object name) {
+    public static LogInterface logger(final Object name) {
         return I().getLogger(name);
     }
 
     /**
      * @param string
      */
-    public static void setFactory(LogV3Factory instance) {
+    public static void setFactory(final LogV3Factory instance) {
         if (instance == null) {
             INSTANCE = null;
         } else {
@@ -181,7 +181,7 @@ public class LogV3 {
      *
      */
     public static void disableSysout() {
-        LogV3Factory logFactory = getFactory();
+        final LogV3Factory logFactory = getFactory();
         if (logFactory != null && logFactory instanceof SimpleLoggerFactory) {
             // disable all logs. LogSinks have a cached Sysout and syserr field, and thus will be not affected by the stream redirection
             // below
@@ -192,7 +192,7 @@ public class LogV3 {
                 }
             });
         }
-        PrintStream nullStream = new java.io.PrintStream(new NullOutputStream()) {
+        final PrintStream nullStream = new java.io.PrintStream(new NullOutputStream()) {
             @Override
             public void flush() {
             }
@@ -202,51 +202,51 @@ public class LogV3 {
             }
 
             @Override
-            public void write(int b) {
+            public void write(final int b) {
             }
 
             @Override
-            public void write(byte[] b) {
+            public void write(final byte[] b) {
             }
 
             @Override
-            public void write(byte[] buf, int off, int len) {
+            public void write(final byte[] buf, final int off, final int len) {
             }
 
             @Override
-            public void print(boolean b) {
+            public void print(final boolean b) {
             }
 
             @Override
-            public void print(char c) {
+            public void print(final char c) {
             }
 
             @Override
-            public void print(int i) {
+            public void print(final int i) {
             }
 
             @Override
-            public void print(long l) {
+            public void print(final long l) {
             }
 
             @Override
-            public void print(float f) {
+            public void print(final float f) {
             }
 
             @Override
-            public void print(double d) {
+            public void print(final double d) {
             }
 
             @Override
-            public void print(char[] s) {
+            public void print(final char[] s) {
             }
 
             @Override
-            public void print(String s) {
+            public void print(final String s) {
             }
 
             @Override
-            public void print(Object obj) {
+            public void print(final Object obj) {
             }
 
             @Override
@@ -254,73 +254,73 @@ public class LogV3 {
             }
 
             @Override
-            public void println(boolean x) {
+            public void println(final boolean x) {
             }
 
             @Override
-            public void println(char x) {
+            public void println(final char x) {
             }
 
             @Override
-            public void println(int x) {
+            public void println(final int x) {
             }
 
             @Override
-            public void println(long x) {
+            public void println(final long x) {
             }
 
             @Override
-            public void println(float x) {
+            public void println(final float x) {
             }
 
             @Override
-            public void println(double x) {
+            public void println(final double x) {
             }
 
             @Override
-            public void println(char[] x) {
+            public void println(final char[] x) {
             }
 
             @Override
-            public void println(String x) {
+            public void println(final String x) {
             }
 
             @Override
-            public void println(Object x) {
+            public void println(final Object x) {
             }
 
             @Override
-            public java.io.PrintStream printf(String format, Object... args) {
+            public java.io.PrintStream printf(final String format, final Object... args) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream printf(java.util.Locale l, String format, Object... args) {
+            public java.io.PrintStream printf(final java.util.Locale l, final String format, final Object... args) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream format(String format, Object... args) {
+            public java.io.PrintStream format(final String format, final Object... args) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream format(java.util.Locale l, String format, Object... args) {
+            public java.io.PrintStream format(final java.util.Locale l, final String format, final Object... args) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream append(CharSequence csq) {
+            public java.io.PrintStream append(final CharSequence csq) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream append(CharSequence csq, int start, int end) {
+            public java.io.PrintStream append(final CharSequence csq, final int start, final int end) {
                 return this;
             }
 
             @Override
-            public java.io.PrintStream append(char c) {
+            public java.io.PrintStream append(final char c) {
                 return this;
             }
         };
@@ -335,11 +335,11 @@ public class LogV3 {
      * @param target
      * @param file
      */
-    public static void info(Object context, String formatString, Object... formatParams) {
+    public static void info(final Object context, String formatString, final Object... formatParams) {
         if (formatParams != null && formatParams.length > 0) {
             try {
                 formatString = String.format(formatString, formatParams);
-            } catch (IllegalFormatException e) {
+            } catch (final IllegalFormatException e) {
                 e.printStackTrace();
             }
         }
@@ -350,18 +350,18 @@ public class LogV3 {
      * @param logToFileSink
      * @param e
      */
-    public static void exception(Object context, Throwable e, String formatString, Object... formatParams) {
+    public static void exception(final Object context, final Throwable e, String formatString, final Object... formatParams) {
         if (formatParams != null && formatParams.length > 0) {
             try {
                 formatString = String.format(formatString, formatParams);
-            } catch (IllegalFormatException e1) {
+            } catch (final IllegalFormatException e1) {
                 e1.printStackTrace();
             }
         }
         logger(context).exception(formatString, e);
     }
 
-    public static void exception(Object context, Throwable e) {
+    public static void exception(final Object context, final Throwable e) {
         exception(context, e, null);
     }
 }

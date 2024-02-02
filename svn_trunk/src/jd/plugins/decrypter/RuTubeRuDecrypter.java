@@ -22,13 +22,13 @@ import java.util.List;
 import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.XML;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.w3c.dom.Document;
@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.RuTubeVariant;
 import jd.plugins.hoster.RuTubeRu;
 
-@DecrypterPlugin(revision = "$Revision: 48459 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
+@DecrypterPlugin(revision = "$Revision: 48637 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
 public class RuTubeRuDecrypter extends PluginForDecrypt {
     public RuTubeRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,7 +171,7 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             if (expireTimestampStr == null || !expireTimestampStr.matches("\\d+")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final DocumentBuilder parser = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            final DocumentBuilder parser = XML.newSecureFactory().newDocumentBuilder();
             final XPath xPath = XPathFactory.newInstance().newXPath();
             final Browser streamBR = getAjaxBR(br.cloneBrowser());
             streamBR.getPage(streamDefault);
