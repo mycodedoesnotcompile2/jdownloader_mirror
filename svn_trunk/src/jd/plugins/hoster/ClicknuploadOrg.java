@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48588 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48643 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicknuploadOrg extends XFileSharingProBasic {
     public ClicknuploadOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
     public int getMaxChunks(final Account account) {
         if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
-            return -2;
+            return 1;
         } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return -5;
@@ -139,14 +139,14 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        /* 2022-04-20, concurrent downloads were possible */
-        return 4;
+        /* 2024-02-02 */
+        return 3;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        /* 2021-07-19 */
-        return 10;
+        /* 2024-02-02 */
+        return 3;
     }
 
     @Override

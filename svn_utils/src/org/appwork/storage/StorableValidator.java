@@ -465,8 +465,15 @@ public class StorableValidator<T> {
     }
 
     public static class InvalidRegularExpressionException extends ValidatorException {
-        public InvalidRegularExpressionException(StorableValidator validator, JSPath path, FlexiJSonNode value, CompiledType targetType, String message, FailLevel failLevel) {
+        private Exception parsingException;
+
+        public Exception getParsingException() {
+            return parsingException;
+        }
+
+        public InvalidRegularExpressionException(StorableValidator validator, Exception e, JSPath path, FlexiJSonNode value, CompiledType targetType, String message, FailLevel failLevel) {
             super(validator, path, value, targetType, message, failLevel);
+            this.parsingException = e;
         }
     }
 
@@ -1421,22 +1428,55 @@ public class StorableValidator<T> {
                 // for (final StorableValidateRegex condition : toDo.regexValidator) {
                 if (c instanceof StorableValidateRegex) {
                     StorableValidateRegex condition = (StorableValidateRegex) c;
-                    if (toDo.node != null && ((FlexiJSonValue) toDo.node).getType() != org.appwork.storage.simplejson.ValueType.STRING && ((FlexiJSonValue) toDo.node).getType() != org.appwork.storage.simplejson.ValueType.NULL) {
-                        add(new InvalidTypeException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
-                        continue;
-                    }
-                    if (toDo.value == null) {
-                        if (condition.nullAllowed()) {
-                            return;
+                    if (toDo.node instanceof FlexiJSonValue) {
+                        if (((FlexiJSonValue) toDo.node).getType() != org.appwork.storage.simplejson.ValueType.STRING && ((FlexiJSonValue) toDo.node).getType() != org.appwork.storage.simplejson.ValueType.NULL) {
+                            add(new InvalidTypeException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
+                            continue;
                         }
-                        add(new NullException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
-                    } else if (StringUtils.isEmpty((String) toDo.value) && !condition.nullAllowed()) {
-                        add(new EmptyStringException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
-                    } else {
-                        try {
-                            Pattern.compile((String) toDo.value);
-                        } catch (final Exception e) {
-                            add(new InvalidRegularExpressionException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
+                    }
+                    CompiledType ct = toDo.value == null ? toDo.type : CompiledType.create(toDo.value.getClass());
+                    if (toDo.value instanceof String) {
+                        if (toDo.value == null) {
+                            if (condition.nullAllowed()) {
+                                return;
+                            }
+                            add(new NullException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
+                        }
+                        if (StringUtils.isEmpty((String) toDo.value) && !condition.nullAllowed()) {
+                            add(new EmptyStringException(StorableValidator.this, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
+                        } else {
+                            try {
+                                Pattern.compile((String) toDo.value);
+                            } catch (final Exception e) {
+                                add(new InvalidRegularExpressionException(StorableValidator.this, e, toDo.path, toDo.node, toDo.type, condition.message(), condition.level()));
+                            }
+                        }
+                    } else if (ct.isListContainer()) {
+                        // Check if all list elements are valid regexes.
+                        // Do not do a nullcheck on the list itself - this can be done with NotNull Annotation
+                        if (toDo.value != null) {
+                            FlexiJSonArray array = (FlexiJSonArray) toDo.node;
+                            for (int i = 0; i < ct.getListLength(toDo.value); i++) {
+                                Object v = ct.getListElement(toDo.value, i);
+                                FlexiJSonNode newNode = array == null ? null : array.get(i);
+                                if (v == null && !condition.nullAllowed()) {
+                                    add(new NullException(StorableValidator.this, toDo.path.derive(i), newNode, toDo.type.getComponentType(), condition.message(), condition.level()));
+                                    continue;
+                                }
+                                if (!(v instanceof String)) {
+                                    add(new InvalidTypeException(StorableValidator.this, toDo.path.derive(i), newNode, toDo.type.getComponentType(), condition.message(), condition.level()));
+                                    continue;
+                                }
+                                if (StringUtils.isEmpty((String) v) && !condition.nullAllowed()) {
+                                    add(new EmptyStringException(StorableValidator.this, toDo.path.derive(i), newNode, toDo.type.getComponentType(), condition.message(), condition.level()));
+                                    continue;
+                                }
+                                try {
+                                    Pattern.compile((String) v);
+                                } catch (final Exception e) {
+                                    add(new InvalidRegularExpressionException(StorableValidator.this, e, toDo.path.derive(i), newNode, toDo.type.getComponentType(), condition.message(), condition.level()));
+                                }
+                            }
                         }
                     }
                 }

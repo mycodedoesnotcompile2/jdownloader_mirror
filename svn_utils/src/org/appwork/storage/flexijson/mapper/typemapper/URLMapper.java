@@ -54,7 +54,7 @@ import org.appwork.utils.reflection.CompiledType;
 public class URLMapper implements FlexiTypeMapper {
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
     public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
@@ -64,18 +64,19 @@ public class URLMapper implements FlexiTypeMapper {
             return new FlexiJSonValue(((URL) obj).toExternalForm());
         }
     }
+
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#json2Obj(org.appwork.storage.simplejson.JSonNode)
      */
-
     public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode json, CompiledType type, Setter setter) throws FlexiMapperException {
         try {
             if (StringUtils.isEmpty(StringUtils.valueOfOrNull(((FlexiJSonValue) json).getValue()))) {
                 return null;
+            } else {
+                return new URL((String) ((FlexiJSonValue) json).getValue());
             }
-            return new URL((String) ((FlexiJSonValue) json).getValue());
         } catch (MalformedURLException e) {
             throw new FlexiMapperException(json, type, e);
         }

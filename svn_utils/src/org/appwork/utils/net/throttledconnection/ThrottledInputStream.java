@@ -167,7 +167,7 @@ public class ThrottledInputStream extends InputStream implements ThrottledConnec
                     this.wait(wait, (int) ns);
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw Exceptions.addSuppressed(new InterruptedIOException("throttle interrupted"), e);
+                    throw Exceptions.initCause(new InterruptedIOException("throttle interrupted"), e);
                 }
             }
             /* refill Limit */

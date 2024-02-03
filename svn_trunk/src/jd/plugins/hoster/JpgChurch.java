@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48638 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,6 +63,8 @@ public class JpgChurch extends PluginForHost {
     private String                     dllink             = null;
     private final String               PROPERTY_USER      = "user";
     public static final String         PROPERTY_PHPSESSID = "phpsessid";
+    /* Position of item if added as part of album (starts from 1). */
+    public static final String         PROPERTY_POSITION  = "position";
     /* Don't touch the following! */
     private static final AtomicInteger freeRunning        = new AtomicInteger(0);
 

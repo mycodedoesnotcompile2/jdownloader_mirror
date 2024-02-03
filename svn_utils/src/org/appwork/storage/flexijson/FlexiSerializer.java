@@ -58,7 +58,7 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class FlexiSerializer extends AbstractSerializer implements SerializerInterface {
-    private FlexiJSonMapper mapper;
+    private final FlexiJSonMapper mapper;
 
     /**
      *

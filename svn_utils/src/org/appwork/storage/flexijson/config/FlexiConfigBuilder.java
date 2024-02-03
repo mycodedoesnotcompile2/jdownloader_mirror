@@ -588,7 +588,11 @@ public class FlexiConfigBuilder<T> implements InterfaceStorageListener<Object> {
     }
 
     public FlexiJSONParser createParser(final String json) {
-        return new FlexiJSONParser(json).setDebug(new StringBuilder());
+        final FlexiJSONParser ret = new FlexiJSONParser(json);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            ret.setDebug(new StringBuilder());
+        }
+        return ret;
     }
 
     /**

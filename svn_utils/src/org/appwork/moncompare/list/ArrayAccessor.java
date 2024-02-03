@@ -89,12 +89,8 @@ public class ArrayAccessor<MatcherType> extends ListAccessorInterface {
      * @see org.appwork.moncompare.list.ListAccessorInterface#get(int)
      */
     @Override
-    public Object get(int i) {
-        try {
-            return Array.get(array, i);
-        } catch (Exception e) {
-            throw new IndexOutOfBoundsException(i);
-        }
+    public Object get(int arrayIndex) {
+        return Array.get(array, arrayIndex);
     }
 
     /**
@@ -103,9 +99,10 @@ public class ArrayAccessor<MatcherType> extends ListAccessorInterface {
     @Override
     public void set(int arrayIndex, Object value) {
         if (arrayIndex >= size()) {
-            throw new IndexOutOfBoundsException(arrayIndex);
+            throw new IndexOutOfBoundsException("size:" + size() + "|index:" + arrayIndex);
+        } else {
+            Array.set(array, arrayIndex, value);
         }
-        Array.set(array, arrayIndex, value);
     }
 
     /**

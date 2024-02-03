@@ -254,7 +254,6 @@ public class IO {
         UTF16LE(new byte[] { (byte) 255, (byte) 254 }, "UTF-16LE"),
         UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 254, (byte) 255 }, "UTF-32BE"),
         UTF32LE(new byte[] { (byte) 0, (byte) 0, (byte) 255, (byte) 254 }, "UTF-32LE");
-
         public static class BOMInputStream extends FilterInputStream {
             private final BOM bom;
 
@@ -1055,9 +1054,9 @@ public class IO {
         } else {
             cb = CharBuffer.wrap(dataURL);
         }
-        InputStream is = new Base64InputStream(new CharSequenceInputStream(cb, Charset.forName("UTF-8")));
-        String searchFor = "data:application/gzip;";
-        if (dataURL.length() > searchFor.length() && dataURL.substring(0, searchFor.length()).equalsIgnoreCase(searchFor)) {
+        final InputStream is = new Base64InputStream(new CharSequenceInputStream(cb, BOM.UTF8.charSet));
+        final String gzip = "data:application/gzip;";
+        if (dataURL.length() > gzip.length() && dataURL.substring(0, gzip.length()).equalsIgnoreCase(gzip)) {
             return new GZIPInputStream(is);
         } else {
             return is;

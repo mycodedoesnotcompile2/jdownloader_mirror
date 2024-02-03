@@ -1,5 +1,5 @@
 /**
- * 
+ *
  * ====================================================================================================================================================
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
@@ -7,16 +7,16 @@
  *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
  *         Schwabacher Straße 117
  *         90763 Fürth
- *         Germany   
+ *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
  *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
- * 	
+ *
  * === 3rd Party Licences ===
  *     Some parts of the [The Product] use or reference 3rd party libraries and classes. These parts may have different licensing conditions. Please check the *.license and *.info files of included libraries
- *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header. 	
- * 	
+ *     to ensure that they are compatible to your use-case. Further more, some *.java have their own license. In this case, they have their license terms in the java file header.
+ *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
  *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
@@ -25,9 +25,9 @@
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
  *     Contact AppWork for further details: <e-mail@appwork.org>
  * === Non-Commercial Usage ===
- *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the 
+ *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
- * 	
+ *
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
@@ -50,13 +50,11 @@ import java.util.zip.ZipInputStream;
 
 import org.appwork.utils.Files;
 
-
 /**
  * @author daniel
  *
  */
 public class ZipIOReader {
-
     private File       zipFile               = null;
     private ZipFile    zip                   = null;
     private ZipIOFile  rootFS                = null;
@@ -66,7 +64,6 @@ public class ZipIOReader {
     private byte[]     byteArray             = null;
     private int        zipEntriesSize        = -1;
     private ZipEntry[] zipEntries            = null;
-
     private boolean    breakOnError          = true;
 
     public ZipIOReader(final byte[] byteArray) {
@@ -123,51 +120,45 @@ public class ZipIOReader {
                     if (this.isBreakOnError()) {
                         throw new IOException("Cannot extract File to Directory " + output);
                     } else {
-                              org.appwork.loggingv3.LogV3.severe("Cannot extract File to Directory " + output);
+                        org.appwork.loggingv3.LogV3.severe("Cannot extract File to Directory " + output);
                     }
                 }
             }
             if (output.exists() && output.isDirectory()) {
-                      org.appwork.loggingv3.LogV3.finer("Skipped extraction: directory exists: " + output);
+                org.appwork.loggingv3.LogV3.finer("Skipped extraction: directory exists: " + output);
                 return ret;
-
             }
         }
         if (output.exists()) {
             if (this.isOverwrite()) {
                 output.delete();
                 if (output.exists()) {
-
                     if (this.isBreakOnError()) {
                         throw new IOException("Cannot overwrite File " + output);
                     } else {
-                              org.appwork.loggingv3.LogV3.severe("Cannot overwrite File " + output);
+                        org.appwork.loggingv3.LogV3.severe("Cannot overwrite File " + output);
                     }
-
                 }
             }
             if (output.exists()) {
-                      org.appwork.loggingv3.LogV3.finer("Skipped extraction: file exists: " + output);
+                org.appwork.loggingv3.LogV3.finer("Skipped extraction: file exists: " + output);
                 return ret;
             }
         }
         if (!output.getParentFile().exists()) {
-
             if (this.isAutoCreateSubDirs()) {
                 output.getParentFile().mkdirs();
                 ret.add(output.getParentFile());
                 if (!output.getParentFile().exists()) {
-
                     if (this.isBreakOnError()) {
                         throw new IOException("Cannot create folder for File " + output);
                     } else {
-                              org.appwork.loggingv3.LogV3.severe("Cannot create folder for File " + output);
+                        org.appwork.loggingv3.LogV3.severe("Cannot create folder for File " + output);
                     }
-
                 }
             }
             if (!output.getParentFile().exists()) {
-                      org.appwork.loggingv3.LogV3.finer("Skipped extraction: cannot create dir: " + output);
+                org.appwork.loggingv3.LogV3.finer("Skipped extraction: cannot create dir: " + output);
                 return ret;
             }
         }
@@ -195,7 +186,7 @@ public class ZipIOReader {
             if (this.isBreakOnError()) {
                 throw new ZipIOException("Cannot extract a directory", entry);
             } else {
-                      org.appwork.loggingv3.LogV3.severe("Cannot extract a directory " + entry.getName());
+                org.appwork.loggingv3.LogV3.severe("Cannot extract a directory " + entry.getName());
             }
         }
         CheckedInputStream in = null;
@@ -214,11 +205,9 @@ public class ZipIOReader {
                 if (this.isBreakOnError()) {
                     throw new ZipIOException("CRC32 Failed", entry);
                 } else {
-                          org.appwork.loggingv3.LogV3.severe("CRC32 Failed " + entry);
+                    org.appwork.loggingv3.LogV3.severe("CRC32 Failed " + entry);
                 }
-
             }
-
         } finally {
             try {
                 in.close();
@@ -229,7 +218,6 @@ public class ZipIOReader {
             } catch (final Throwable e) {
             }
         }
-
     }
 
     protected void notify(final ZipEntry entry, final long bytesWrite, final long bytesProcessed) {
@@ -237,23 +225,20 @@ public class ZipIOReader {
 
     public synchronized java.util.List<File> extractTo(final File outputDirectory) throws ZipIOException, IOException {
         if (outputDirectory.exists() && outputDirectory.isFile()) {
-
             if (this.isBreakOnError()) {
                 throw new IOException("cannot extract to a file " + outputDirectory);
             } else {
-                      org.appwork.loggingv3.LogV3.severe("cannot extract to a file " + outputDirectory);
+                org.appwork.loggingv3.LogV3.severe("cannot extract to a file " + outputDirectory);
             }
         }
         if (!outputDirectory.exists() && !(this.autoCreateExtractPath && outputDirectory.mkdirs())) {
             if (this.isBreakOnError()) {
                 throw new IOException("could not create outputDirectory " + outputDirectory);
             } else {
-                      org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + outputDirectory);
+                org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + outputDirectory);
             }
         }
-
         final java.util.List<File> ret = new ArrayList<File>();
-
         for (final ZipEntry entry : this.getZipFiles()) {
             final File out = new File(outputDirectory, entry.getName());
             if (entry.isDirectory()) {
@@ -263,16 +248,14 @@ public class ZipIOReader {
                             if (this.isBreakOnError()) {
                                 throw new IOException("could not create outputDirectory " + out);
                             } else {
-                                      org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + out);
+                                org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + out);
                             }
-
                         }
                         ret.add(out);
                     } else {
-                              org.appwork.loggingv3.LogV3.finer("SKipped creatzion of: " + out);
+                        org.appwork.loggingv3.LogV3.finer("SKipped creatzion of: " + out);
                     }
                 }
-
             } else {
                 ret.addAll(this.extract(entry, out));
             }
@@ -320,9 +303,7 @@ public class ZipIOReader {
      */
     public synchronized InputStream getInputStream(final ZipEntry entry) throws ZipIOException, IOException {
         if (entry == null) {
-
             throw new ZipIOException("invalid zipEntry");
-
         }
         if (this.zip != null) {
             return this.zip.getInputStream(entry);
@@ -332,7 +313,6 @@ public class ZipIOReader {
             try {
                 zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
                 ZipEntry ze = null;
-
                 while ((ze = zis.getNextEntry()) != null) {
                     /* find the entry that matches */
                     final String name = ze.getName();
@@ -384,7 +364,6 @@ public class ZipIOReader {
                             public long skip(final long n) throws IOException {
                                 return zis2.skip(n);
                             }
-
                         };
                     }
                 }
@@ -522,7 +501,6 @@ public class ZipIOReader {
                                 root.add(newFolder);
                             }
                             currentParent = newFolder;
-
                         }
                     }
                 }
@@ -542,7 +520,7 @@ public class ZipIOReader {
     /**
      * @return
      */
-    protected boolean isAutoCreateSubDirs() {        
+    protected boolean isAutoCreateSubDirs() {
         return this.autoCreateSubDirs;
     }
 
@@ -553,7 +531,7 @@ public class ZipIOReader {
     /**
      * @return
      */
-    protected boolean isOverwrite() {        
+    protected boolean isOverwrite() {
         return this.overwrite;
     }
 
@@ -647,4 +625,22 @@ public class ZipIOReader {
         root.getFilesInternal().trimToSize();
     }
 
+    /**
+     * @param file
+     * @param extracted
+     * @throws IOException
+     * @throws ZipException
+     * @throws ZipIOException
+     */
+    public static void extractTo(File zipFile, File targetFolder) throws ZipIOException, ZipException, IOException {
+        ZipIOReader ziper = new ZipIOReader(zipFile);
+        try {
+            if (!targetFolder.exists()) {
+                targetFolder.mkdirs();
+            }
+            ziper.extractTo(targetFolder);
+        } finally {
+            ziper.close();
+        }
+    }
 }

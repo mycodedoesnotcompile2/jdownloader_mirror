@@ -21,19 +21,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.XML;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -45,12 +39,21 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.RuTubeVariant;
 import jd.plugins.hoster.RuTubeRu;
 
-@DecrypterPlugin(revision = "$Revision: 48637 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+@DecrypterPlugin(revision = "$Revision: 48641 $", interfaceVersion = 3, names = { "rutube.ru" }, urls = { "https?://((?:www\\.)?rutube\\.ru/(tracks/\\d+\\.html|(play/|video/)?embed/\\w+(.*?p=[A-Za-z0-9\\-_]+)?|video/[a-f0-9]{32})|video\\.rutube.ru/([a-f0-9]{32}|\\d+))" })
 public class RuTubeRuDecrypter extends PluginForDecrypt {
     public RuTubeRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,6 +87,48 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             url += "p=" + Encoding.urlEncode(privatevalue);
         }
         br.getPage(url);
+    }
+
+    /**
+     * @return
+     */
+    public static DocumentBuilderFactory newSecureFactory(Plugin plugin) {
+        final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        // Enabling secure processing feature to prevent XML vulnerabilities
+        try {
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        } catch (final ParserConfigurationException e) {
+            plugin.getLogger().log(e);
+        }
+        // Disallowing Doctype Declarations to prevent XML External Entity (XXE) attacks
+        try {
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        } catch (final ParserConfigurationException e) {
+            plugin.getLogger().log(e);
+        }
+        // Disabling external general entities to enhance security against XXE
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        } catch (final ParserConfigurationException e) {
+            plugin.getLogger().log(e);
+        }
+        // Disabling external parameter entities for additional security
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        } catch (final ParserConfigurationException e) {
+            plugin.getLogger().log(e);
+        }
+        // Preventing the loading of external DTDs to secure against XXE attacks
+        try {
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        } catch (final ParserConfigurationException e) {
+            plugin.getLogger().log(e);
+        }
+        // Setting the factory to not be XInclude-aware and not to validate XML documents
+        factory.setXIncludeAware(false);
+        // Setting the factory to not validate XML documents against DTDs
+        factory.setValidating(false);
+        return factory;
     }
 
     protected DownloadLink crawlSingleVideo(final CryptedLink param) throws PluginException, Exception {
@@ -171,7 +216,7 @@ public class RuTubeRuDecrypter extends PluginForDecrypt {
             if (expireTimestampStr == null || !expireTimestampStr.matches("\\d+")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final DocumentBuilder parser = XML.newSecureFactory().newDocumentBuilder();
+            final DocumentBuilder parser = newSecureFactory(this).newDocumentBuilder();
             final XPath xPath = XPathFactory.newInstance().newXPath();
             final Browser streamBR = getAjaxBR(br.cloneBrowser());
             streamBR.getPage(streamDefault);

@@ -62,7 +62,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 48411 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48642 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -110,10 +110,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final TiktokCom hostPlg = (TiktokCom) this.getNewPluginForHostInstance(this.getHost());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (param.getCryptedUrl().matches(TYPE_REDIRECT) || param.getCryptedUrl().matches(TYPE_APP)) {
+        /* 2023-01-26: Replace photo -> video is just a cheap workaround for now. */
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://").replace("/photo/", "/video/");
+        if (contenturl.matches(TYPE_REDIRECT) || contenturl.matches(TYPE_APP)) {
             /* Single redirect URLs */
             br.setFollowRedirects(false);
-            final String initialURL = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+            final String initialURL = contenturl;
             String redirect = initialURL;
             int loops = 0;
             do {
@@ -146,14 +148,15 @@ public class TiktokComCrawler extends PluginForDecrypt {
             logger.info("Old URL: " + initialURL + " | New URL: " + redirect);
             ret.add(createDownloadlink(redirect));
             return ret;
-        } else if (hostPlg.canHandle(param.getCryptedUrl())) {
-            return crawlSingleMedia(hostPlg, param);
-        } else if (param.getCryptedUrl().matches(TYPE_USER_USERNAME) || param.getCryptedUrl().matches(TYPE_USER_USER_ID)) {
-            return crawlProfile(param);
-        } else if (param.getCryptedUrl().matches(TYPE_PLAYLIST_TAG)) {
-            return this.crawlPlaylistTag(param);
-        } else if (param.getCryptedUrl().matches(TYPE_PLAYLIST_MUSIC)) {
-            return this.crawlPlaylistMusic(param);
+        }
+        if (hostPlg.canHandle(contenturl)) {
+            return crawlSingleMedia(hostPlg, param, contenturl);
+        } else if (contenturl.matches(TYPE_USER_USERNAME) || contenturl.matches(TYPE_USER_USER_ID)) {
+            return crawlProfile(param, contenturl);
+        } else if (contenturl.matches(TYPE_PLAYLIST_TAG)) {
+            return this.crawlPlaylistTag(param, contenturl);
+        } else if (contenturl.matches(TYPE_PLAYLIST_MUSIC)) {
+            return this.crawlPlaylistMusic(param, contenturl);
         } else {
             // unsupported url pattern
             logger.warning("Unsupported URL: " + param.getCryptedUrl());
@@ -161,21 +164,21 @@ public class TiktokComCrawler extends PluginForDecrypt {
         }
     }
 
-    private ArrayList<DownloadLink> crawlSingleMedia(final TiktokCom hostPlg, final CryptedLink param) throws Exception {
-        return crawlSingleMedia(hostPlg, param, AccountController.getInstance().getValidAccount(this.getHost()), false);
+    private ArrayList<DownloadLink> crawlSingleMedia(final TiktokCom hostPlg, final CryptedLink param, final String contenturl) throws Exception {
+        return crawlSingleMedia(hostPlg, param, contenturl, AccountController.getInstance().getValidAccount(this.getHost()), false);
     }
 
-    public ArrayList<DownloadLink> crawlSingleMedia(final TiktokCom hostPlg, final CryptedLink param, final Account account, final boolean forceGrabAll) throws Exception {
+    public ArrayList<DownloadLink> crawlSingleMedia(final TiktokCom hostPlg, final CryptedLink param, final String contenturl, final Account account, final boolean forceGrabAll) throws Exception {
         final DownloadLink link = param.getDownloadLink();
         final boolean forceAPI = link != null ? link.getBooleanProperty(TiktokCom.PROPERTY_FORCE_API, false) : false;
         if (TiktokCom.getDownloadMode() == MediaCrawlMode.API || forceAPI) {
-            return this.crawlSingleMediaAPI(param.getCryptedUrl(), null, forceAPI, forceGrabAll);
+            return this.crawlSingleMediaAPI(contenturl, null, forceAPI, forceGrabAll);
         } else {
             try {
-                return crawlSingleMediaWebsite(hostPlg, param.getCryptedUrl(), null, forceGrabAll);
+                return crawlSingleMediaWebsite(hostPlg, contenturl, null, forceGrabAll);
             } catch (final PluginException e) {
                 if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && br.containsHTML("\"(?:status_msg|message)\"\\s*:\\s*\"Something went wrong\"")) {
-                    final ArrayList<DownloadLink> results = this.crawlSingleMediaAPI(param.getCryptedUrl(), null, true, forceGrabAll);
+                    final ArrayList<DownloadLink> results = this.crawlSingleMediaAPI(contenturl, null, true, forceGrabAll);
                     logger.info("Auto fallback to API worked fine");
                     return results;
                 } else {
@@ -450,15 +453,15 @@ public class TiktokComCrawler extends PluginForDecrypt {
         return this.processAwemeDetail(hostPlg, aweme_detail, forceGrabAll, isForcedAPIUsage);
     }
 
-    public ArrayList<DownloadLink> crawlProfile(final CryptedLink param) throws Exception {
+    public ArrayList<DownloadLink> crawlProfile(final CryptedLink param, final String contenturl) throws Exception {
         if (PluginJsonConfig.get(TiktokConfig.class).getProfileCrawlerMaxItemsLimit() == 0) {
             logger.info("User has disabled profile crawler --> Returning empty array");
             return new ArrayList<DownloadLink>();
         }
         if (PluginJsonConfig.get(TiktokConfig.class).getProfileCrawlMode() == ProfileCrawlMode.API) {
-            return crawlProfileAPI(param);
+            return crawlProfileAPI(param, contenturl);
         } else {
-            return crawlProfileWebsite(param);
+            return crawlProfileWebsite(param, contenturl);
         }
     }
 
@@ -466,7 +469,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
      * Use website to crawl all videos of a user. </br>
      * Pagination hasn't been implemented so this will only find the first batch of items - usually around 30 items!
      */
-    public ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param) throws Exception {
+    public ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String contenturl) throws Exception {
         prepBRWebsite(br);
         /* Login whenever possible */
         final TiktokCom hostPlg = (TiktokCom) this.getNewPluginForHostInstance(this.getHost());
@@ -475,7 +478,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             hostPlg.login(account, false);
         }
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* Profile does not exist */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -491,7 +494,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             br.getPage("https://www." + this.getHost() + "/api/search/general/preview/?" + query.toString());
             sleep(1000, param);// this somehow bypass the protection, maybe calling api twice sets a cookie?
             br.getPage("https://www." + this.getHost() + "/api/search/general/preview/?" + query.toString());
-            br.getPage(param.getCryptedUrl());
+            br.getPage(contenturl);
         }
         this.checkErrorsWebsite(br);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -670,14 +673,14 @@ public class TiktokComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    public ArrayList<DownloadLink> crawlProfileAPI(final CryptedLink param) throws Exception {
+    public ArrayList<DownloadLink> crawlProfileAPI(final CryptedLink param, final String contenturl) throws Exception {
         String user_id = null;
-        if (param.getCryptedUrl().matches(TYPE_USER_USER_ID)) {
+        if (contenturl.matches(TYPE_USER_USER_ID)) {
             /* user_id is given inside URL. */
-            user_id = new Regex(param.getCryptedUrl(), TYPE_USER_USER_ID).getMatch(0);
+            user_id = new Regex(contenturl, TYPE_USER_USER_ID).getMatch(0);
         } else {
             /* Only username is given and we need to find the user_id. */
-            final String usernameSlug = new Regex(param.getCryptedUrl(), TYPE_USER_USERNAME).getMatch(0);
+            final String usernameSlug = new Regex(contenturl, TYPE_USER_USERNAME).getMatch(0);
             if (usernameSlug == null) {
                 /* Developer mistake */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -701,12 +704,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
             }
             if (user_id == null) {
                 logger.info("Using fallback method to find userID!");
-                websitebrowser.getPage(param.getCryptedUrl());
+                websitebrowser.getPage(contenturl);
                 user_id = websitebrowser.getRegex("\"authorId\"\\s*:\\s*\"(.*?)\"").getMatch(0);
                 if (user_id == null && TiktokCom.isBotProtectionActive(websitebrowser)) {
                     sleep(1000, param);// This used to somehow bypass the protection, maybe calling api twice sets a cookie?
                     websitebrowser.getPage("https://www." + this.getHost() + "/api/search/general/preview/?" + query.toString());
-                    websitebrowser.getPage(param.getCryptedUrl());
+                    websitebrowser.getPage(contenturl);
                     user_id = websitebrowser.getRegex("\"authorId\"\\s*:\\s*\"(.*?)\"").getMatch(0);
                 }
             }
@@ -794,22 +797,22 @@ public class TiktokComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    public ArrayList<DownloadLink> crawlPlaylistTag(final CryptedLink param) throws Exception {
+    public ArrayList<DownloadLink> crawlPlaylistTag(final CryptedLink param, final String contenturl) throws Exception {
         if (PluginJsonConfig.get(TiktokConfig.class).getTagCrawlerMaxItemsLimit() == 0) {
             logger.info("User has disabled tag crawler --> Returning empty array");
             return new ArrayList<DownloadLink>();
         }
-        return crawlPlaylistAPI(param);
+        return crawlPlaylistAPI(param, contenturl);
     }
 
-    public ArrayList<DownloadLink> crawlPlaylistAPI(final CryptedLink param) throws Exception {
-        final String tagName = new Regex(param.getCryptedUrl(), TYPE_PLAYLIST_TAG).getMatch(0);
+    public ArrayList<DownloadLink> crawlPlaylistAPI(final CryptedLink param, final String contenturl) throws Exception {
+        final String tagName = new Regex(contenturl, TYPE_PLAYLIST_TAG).getMatch(0);
         if (tagName == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         prepBRWebsite(br);
-        br.getPage(param.getCryptedUrl());
+        br.getPage(contenturl);
         checkErrorsWebsite(br);
         final String tagID = br.getRegex("snssdk\\d+://challenge/detail/(\\d+)").getMatch(0);
         if (tagID == null) {
@@ -821,20 +824,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
     }
 
     /** Under development */
-    public ArrayList<DownloadLink> crawlPlaylistMusic(final CryptedLink param) throws Exception {
-        // TODO
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        // if (PluginJsonConfig.get(TiktokConfig.class).getTagCrawlerMaxItemsLimit() == 0) {
-        // logger.info("User has disabled tag crawler --> Returning empty array");
-        // return new ArrayList<DownloadLink>();
-        // }
-        return crawlPlaylistMusicAPI(param);
-    }
-
-    /** Under development */
-    public ArrayList<DownloadLink> crawlPlaylistMusicAPI(final CryptedLink param) throws Exception {
+    public ArrayList<DownloadLink> crawlPlaylistMusic(final CryptedLink param, final String contenturl) throws Exception {
         // TODO
         if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -842,6 +832,19 @@ public class TiktokComCrawler extends PluginForDecrypt {
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_PLAYLIST_MUSIC);
         final String musicPlaylistTitle = urlinfo.getMatch(0);
         final String musicID = urlinfo.getMatch(1);
+        if (musicPlaylistTitle == null || musicID == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        return crawlPlaylistMusicAPI(param, musicPlaylistTitle, musicID);
+    }
+
+    /** Under development */
+    public ArrayList<DownloadLink> crawlPlaylistMusicAPI(final CryptedLink param, final String musicPlaylistTitle, final String musicID) throws Exception {
+        // TODO
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         if (musicPlaylistTitle == null || musicID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

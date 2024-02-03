@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.commonInterface;
 
+import java.io.InterruptedIOException;
+
 /**
  * @author thomas
  * @date 15.09.2023
@@ -50,12 +52,13 @@ public class SerializerException extends RuntimeException {
      * @param e
      * @return
      */
-    public static SerializerException wrap(Exception e) {
+    public static SerializerException wrap(final Exception e) {
         if (e instanceof SerializerException) {
             return (SerializerException) e;
-        }
-        if (e instanceof InterruptedException) {
+        } else if (e instanceof InterruptedException) {
             // reset flag - because we swallowed the INterruptedException
+            Thread.currentThread().interrupt();
+        } else if (e instanceof InterruptedIOException) {
             Thread.currentThread().interrupt();
         }
         return new SerializerException(e);

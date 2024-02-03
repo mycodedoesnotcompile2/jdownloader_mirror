@@ -49,8 +49,8 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public class FlexiDeligateMapper<T> extends TypeMapper<T> {
-    private CompiledType    type;
-    private FlexiTypeMapper delegate;
+    private final CompiledType    type;
+    private final FlexiTypeMapper delegate;
 
     /**
      * @param simpleTypeRef
@@ -63,11 +63,10 @@ public class FlexiDeligateMapper<T> extends TypeMapper<T> {
 
     @Override
     public JSonNode obj2Json(T obj) {
-        FlexiJSonValue node;
         try {
-            FlexiJSonNode mapped = delegate.obj2JSon(null, obj, null, null);
+            final FlexiJSonNode mapped = delegate.obj2JSon(null, obj, null, null);
             if (mapped instanceof FlexiJSonValue) {
-                node = (FlexiJSonValue) mapped;
+                final FlexiJSonValue node = (FlexiJSonValue) mapped;
                 switch (node.getType()) {
                 case BOOLEAN:
                     return new JSonValue((Boolean) node.getValue());
@@ -81,7 +80,7 @@ public class FlexiDeligateMapper<T> extends TypeMapper<T> {
                 case STRING:
                     return new JSonValue((String) node.getValue());
                 default:
-                    throw new WTFException("Unexpected Type");
+                    throw new WTFException("Unexpected Type:" + node.getType());
                 }
             } else {
                 throw new WTFException("Not supported yet");
@@ -96,12 +95,17 @@ public class FlexiDeligateMapper<T> extends TypeMapper<T> {
         try {
             final JSonValue value = (JSonValue) json;
             switch (value.getType()) {
-            case STRING:
-                return (T) delegate.json2Obj(null, new FlexiJSonValue(((String) value.getValue())), type, null);
+            case BOOLEAN:
+                return (T) delegate.json2Obj(null, new FlexiJSonValue(((Boolean) value.getValue())), type, null);
+            case DOUBLE:
             case LONG:
                 return (T) delegate.json2Obj(null, new FlexiJSonValue(((Number) value.getValue())), type, null);
             case NULL:
                 return (T) delegate.json2Obj(null, new FlexiJSonValue((String) null), type, null);
+            case UNDEFINED:
+                return (T) delegate.json2Obj(null, new FlexiJSonValue(), type, null);
+            case STRING:
+                return (T) delegate.json2Obj(null, new FlexiJSonValue(((String) value.getValue())), type, null);
             default:
                 final Object nodeValue = value.getValue();
                 if (nodeValue == null) {

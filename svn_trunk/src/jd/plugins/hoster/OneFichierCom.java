@@ -73,7 +73,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48328 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48638 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -630,7 +630,7 @@ public class OneFichierCom extends PluginForHost {
         loginWebsite(account, true);
         /* And yet another workaround for broken API case ... */
         br.getPage("https://" + this.getHost() + "/en/console/index.pl");
-        final boolean isPremium = br.containsHTML("(?i)>\\s*Premium\\s*(offer)\\s*Account\\s*<");
+        final boolean isPremium = br.containsHTML("(?i)>\\s*Premium\\s*(offer)?\\s*Account\\s*<");
         final boolean isAccess = br.containsHTML("(?i)>\\s*Access\\s*(offer)\\s*Account\\s*<");
         // final boolean isFree = br.containsHTML(">\\s*Free\\s*(offer)\\s*Account\\s*<");
         String accountStatus = null;

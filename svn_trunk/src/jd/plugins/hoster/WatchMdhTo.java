@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48642 $", interfaceVersion = 3, names = {}, urls = {})
 public class WatchMdhTo extends KernelVideoSharingComV2 {
     public WatchMdhTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +44,7 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultNoVideosNoFUID(getPluginDomains());
+        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPatternWithoutFileID(getPluginDomains());
     }
 
     @Override
@@ -57,6 +57,11 @@ public class WatchMdhTo extends KernelVideoSharingComV2 {
         if (host == null || urlTitle == null) {
             return null;
         }
-        return this.getProtocol() + "www." + this.getHost() + "/" + urlTitle + "/";
+        return this.getProtocol() + this.getHost() + "/video/" + urlTitle + "/";
+    }
+
+    @Override
+    protected boolean isRequiresWWW() {
+        return false;
     }
 }

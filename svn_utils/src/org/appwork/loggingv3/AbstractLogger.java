@@ -45,10 +45,10 @@ import org.appwork.utils.logging2.LogInterface;
  *
  */
 public abstract class AbstractLogger implements LogInterface {
-    private static Method TO_STACKTRACE;
+    private static final Method TO_STACKTRACE = getToStackTraceMethod();
 
     protected StackTraceElement getThrownAt() {
-        Exception e = new Exception();
+        final Exception e = new Exception();
         StackTraceElement last = null;
         for (StackTraceElement es : e.getStackTrace()) {
             last = es;
@@ -58,6 +58,23 @@ public abstract class AbstractLogger implements LogInterface {
             return es;
         }
         return last;
+    }
+
+    /**
+     * @return
+     */
+    private static Method getToStackTraceMethod() {
+        try {
+            final Method ret = Class.forName("org.appwork.utils.Exceptions").getMethod("getStackTrace", new Class[] { Throwable.class });
+            if (ret.getReturnType() != String.class) {
+                throw new Exception("org.appwork.utils.Exceptions.getStacktrace does not return String");
+            } else {
+                return ret;
+            }
+        } catch (Exception e) {
+            LogV3.log(e);
+        }
+        return null;
     }
 
     /**
@@ -92,18 +109,6 @@ public abstract class AbstractLogger implements LogInterface {
     @Override
     public void log(Throwable e) {
         info(getStackTrace(e));
-    }
-
-    static {
-        try {
-            TO_STACKTRACE = Class.forName("org.appwork.utils.Exceptions").getMethod("getStackTrace", new Class[] { Throwable.class });
-            if (TO_STACKTRACE.getReturnType() != String.class) {
-                TO_STACKTRACE = null;
-                throw new Exception("org.appwork.utils.Exceptions.getStacktrace does not return String");
-            }
-        } catch (Exception e) {
-            LogV3.log(e);
-        }
     }
 
     public static String getStackTrace(final Throwable thrown) {
