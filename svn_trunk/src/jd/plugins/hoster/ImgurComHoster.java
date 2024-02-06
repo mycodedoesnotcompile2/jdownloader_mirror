@@ -69,7 +69,7 @@ import jd.plugins.decrypter.ImgurComGallery;
  * IMPORTANT: Never grab IDs bigger than 7 characters because these are Thumbnails - see API description: https://api.imgur.com/models/image
  * --> New docs 2020-04-27: https://apidocs.imgur.com/?version=latest (scroll down to "Image thumbnails").
  */
-@HostPlugin(revision = "$Revision: 48642 $", interfaceVersion = 3, names = { "imgur.com" }, urls = { "https?://(?:www\\.)?imgur\\.com/download/([A-Za-z0-9]{7}|[A-Za-z0-9]{5})" })
+@HostPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = { "imgur.com" }, urls = { "https?://(?:www\\.)?imgur\\.com/download/([A-Za-z0-9]{7}|[A-Za-z0-9]{5})" })
 public class ImgurComHoster extends PluginForHost {
     public ImgurComHoster(PluginWrapper wrapper) {
         super(wrapper);
@@ -1364,6 +1364,7 @@ public class ImgurComHoster extends PluginForHost {
         final String username = link.getStringProperty(PROPERTY_DOWNLOADLINK_USERNAME, "-");
         final String title = link.getStringProperty(PROPERTY_DOWNLOADLINK_TITLE, "-");
         final String imgid = getImgUID(link);
+        final String galleryid = link.getStringProperty(PROPERTY_DOWNLOADLINK_GALLERY_ID);
         final String orderid = link.getStringProperty(PROPERTY_DOWNLOADLINK_ORDERID, "-");
         String formattedFilename = cfg.getStringProperty(SETTING_CUSTOM_FILENAME, defaultCustomFilename);
         if (!formattedFilename.contains("*imgid*") && !formattedFilename.contains("*ext*")) {
@@ -1371,6 +1372,9 @@ public class ImgurComHoster extends PluginForHost {
         }
         formattedFilename = formattedFilename.replace("*orderid*", orderid);
         formattedFilename = formattedFilename.replace("*imgid*", imgid);
+        if (galleryid != null) {
+            formattedFilename = formattedFilename.replace("*galleryid*", galleryid);
+        }
         formattedFilename = formattedFilename.replace("*ext*", "." + ext);
         if (username != null) {
             formattedFilename = formattedFilename.replace("*username*", username);

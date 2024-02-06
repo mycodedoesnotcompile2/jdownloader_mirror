@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48625 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
 public class SafegoCc extends PluginForDecrypt {
     public SafegoCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,20 +79,28 @@ public class SafegoCc extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Form form0 = br.getFormByInputFieldKeyValue("id", "comment_form");
-        final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
-        form0.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-        br.submitForm(form0);
-        final String finallink = br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*<button[^>]*>\\s*Proceed to video").getMatch(0);
+        String finallink = this.findFinalLink(br);
         if (finallink == null) {
-            if (br.containsHTML("Proceed to video")) {
-                /* Item is broken or offline e.g. https://safego.cc/safe.php?url=bla */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* Captcha required */
+            final Form form0 = br.getFormByInputFieldKeyValue("id", "comment_form");
+            final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+            form0.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            br.submitForm(form0);
+            finallink = this.findFinalLink(br);
+            if (finallink == null) {
+                if (br.containsHTML("Proceed to video")) {
+                    /* Item is broken or offline e.g. https://safego.cc/safe.php?url=bla */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
         }
         ret.add(createDownloadlink(finallink));
         return ret;
+    }
+
+    private String findFinalLink(final Browser br) {
+        return br.getRegex("href=\"(https?://[^\"]+)\"[^>]*>\\s*<button[^>]*>\\s*Proceed to video").getMatch(0);
     }
 }

@@ -37,7 +37,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PhotobucketComAlbum;
 
-@HostPlugin(revision = "$Revision: 48623 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PhotobucketComAlbum.class })
 public class PhotobucketCom extends PluginForHost {
     public PhotobucketCom(PluginWrapper wrapper) {
@@ -65,7 +65,7 @@ public class PhotobucketCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("^https?://(?:(?:next|app)\\.)?" + buildHostsPatternPart(domains) + "/u/([^/]+)/a/([a-f0-9\\-]+)/p/([a-f0-9\\-]+)");
+            ret.add("https?://(?:(?:next|app)\\.)?" + buildHostsPatternPart(domains) + "/u/([^/]+)/a/([a-f0-9\\-]+)/p/([a-f0-9\\-]+)");
         }
         return ret.toArray(new String[0]);
     }

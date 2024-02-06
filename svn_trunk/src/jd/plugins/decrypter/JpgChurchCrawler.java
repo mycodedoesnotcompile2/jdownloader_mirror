@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 48638 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -98,6 +98,7 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             contentURLCleaned = URLHelper.getUrlWithoutParams(param.getCryptedUrl());
         }
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
+        contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/albums/?$", "");
         br.getPage(contentURLCleaned);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

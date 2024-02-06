@@ -30,11 +30,18 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48178 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48645 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class FlexShareCore extends antiDDoSForHost {
     public FlexShareCore(PluginWrapper wrapper) {
         super(wrapper);
         // this.enablePremium("https://" + this.getHost() + "/get-premium.php");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -218,12 +225,14 @@ public abstract class FlexShareCore extends antiDDoSForHost {
 
     protected void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformationWebsite(link, account);
-        br.setFollowRedirects(true);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, this.getContentURL(link), isResumeable(link, account), this.getMaxChunks(account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
+            boolean isSpecialJDLink = false;
             String getLink = br.getRegex("<a\\s*id\\s*=\\s*'jd_support'\\s*href\\s*=\\s*\"(https?://[^<>\"\\']*?)\"").getMatch(0);
-            if (getLink == null) {
+            if (getLink != null) {
+                isSpecialJDLink = true;
+            } else {
                 getLink = findFreeGetLink(br);
             }
             Form dlform = br.getFormbyProperty("name", "pipi");
@@ -251,8 +260,13 @@ public abstract class FlexShareCore extends antiDDoSForHost {
                 }
             }
             if (dlform != null) {
+                // POST-request (Form)
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, isResumeable(link, account), this.getMaxChunks(account));
+            } else if (isSpecialJDLink) {
+                // GET-request
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, getLink, isResumeable(link, account), this.getMaxChunks(account));
             } else {
+                // POST-request
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, getLink, "task=download", isResumeable(link, account), this.getMaxChunks(account));
             }
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -303,7 +317,6 @@ public abstract class FlexShareCore extends antiDDoSForHost {
         synchronized (account) {
             try {
                 br.setCookiesExclusive(false);
-                br.setFollowRedirects(true);
                 final Cookies cookies = account.loadCookies("");
                 boolean loggedIN = false;
                 if (cookies != null) {
