@@ -52,11 +52,18 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.PinterestCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 48363 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48648 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -103,7 +110,6 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
         enable_description_inside_filenames = hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_DESCRIPTION_IN_FILENAMES, PinterestCom.defaultENABLE_DESCRIPTION_IN_FILENAMES);
         enable_crawl_alternative_URL = hostPlugin.getPluginConfig().getBooleanProperty(PinterestCom.ENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS, PinterestCom.defaultENABLE_CRAWL_ALTERNATIVE_SOURCE_URLS);
-        br.setFollowRedirects(true);
         final Regex singlepinregex = (new Regex(param.getCryptedUrl(), TYPE_PIN));
         if (singlepinregex.patternFind()) {
             return crawlSinglePIN(singlepinregex.getMatch(0));
@@ -113,6 +119,10 @@ public class PinterestComDecrypter extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlSinglePIN(final String pinID) throws Exception {
+        if (pinID == null) {
+            /* Developer mistake */
+            throw new IllegalArgumentException();
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String contenturl = "https://www." + this.getHost() + "/pin/" + pinID + "/";
         final DownloadLink singlePIN = this.createDownloadlink(contenturl);
@@ -152,7 +162,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         final String pin_id = jd.plugins.hoster.PinterestCom.getPinID(dl.getPluginPatternMatcher());
         String filename = null;
         final Map<String, Object> data = pinMap.containsKey("data") ? (Map<String, Object>) pinMap.get("data") : pinMap;
-        String directlink = getDirectlinkFromPINMap(data);
+        final String directlink = getDirectlinkFromPINMap(data);
         if (StringUtils.isEmpty(filename)) {
             filename = (String) data.get("title");
         }
@@ -233,8 +243,9 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (redirect != null) {
             if (redirect.contains("show_error=true")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                br.getPage(redirect);
             }
-            br.getPage(redirect);
         }
     }
 
@@ -243,6 +254,8 @@ public class PinterestComDecrypter extends PluginForDecrypt {
         if (pinMap == null) {
             return null;
         }
+        // TODO: Return list of possible URLs here since sometimes e.g. one/the "best" image quality is unavailable while another one is
+        // available.
         /* First check if we have a video */
         final Map<String, Object> video_list = (Map<String, Object>) (JavaScriptEngineFactory.walkJson(pinMap, "videos/video_list"));
         if (video_list != null) {
@@ -253,32 +266,35 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 }
             }
         }
-        /* No video --> Look for photo link */
-        final Map<String, Object> imagesO = (Map<String, Object>) pinMap.get("images");
-        Map<String, Object> single_pinterest_images_original = null;
-        if (imagesO != null) {
-            single_pinterest_images_original = (Map<String, Object>) imagesO.get("orig");
-        }
-        // final Object pinner_nameo = single_pinterest_pinner != null ? single_pinterest_pinner.get("full_name") : null;
-        Map<String, Object> tempmap = null;
-        String directlink = null;
-        if (single_pinterest_images_original != null) {
-            /* Original image available --> Take that */
-            directlink = (String) single_pinterest_images_original.get("url");
-        } else {
-            if (imagesO != null) {
-                /* Original image NOT available --> Take the best we can find */
-                final Iterator<Entry<String, Object>> it = imagesO.entrySet().iterator();
-                while (it.hasNext()) {
-                    final Entry<String, Object> ipentry = it.next();
-                    tempmap = (Map<String, Object>) ipentry.getValue();
-                    /* First image = highest (but original is somewhere 'in the middle') */
-                    break;
+        /* No video --> Must be photo item */
+        final Map<String, Object> imagesmap = (Map<String, Object>) pinMap.get("images");
+        if (imagesmap != null) {
+            /* Original image NOT available --> Take the best we can find */
+            String originalImageURL = null;
+            String bestNonOriginalImage = null;
+            int bestHeight = -1;
+            final Iterator<Entry<String, Object>> it = imagesmap.entrySet().iterator();
+            while (it.hasNext()) {
+                final Entry<String, Object> entry = it.next();
+                final String label = entry.getKey();
+                final Map<String, Object> imagemap = (Map<String, Object>) entry.getValue();
+                final int height = ((Number) imagemap.get("height")).intValue();
+                final String imageurl = imagemap.get("url").toString();
+                if (label.equalsIgnoreCase("orig")) {
+                    originalImageURL = imageurl;
                 }
-                directlink = tempmap != null ? (String) tempmap.get("url") : null;
+                if (bestNonOriginalImage == null || height > bestHeight) {
+                    bestNonOriginalImage = imageurl;
+                    bestHeight = height;
+                }
+            }
+            if (originalImageURL != null) {
+                return originalImageURL;
+            } else {
+                return bestNonOriginalImage;
             }
         }
-        return directlink;
+        return null;
     }
 
     /** Returns e.g. an alternative, probably higher quality imgur.com URL to the same image which we have as Pinterest PIN here. */

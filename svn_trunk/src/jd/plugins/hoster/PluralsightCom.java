@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.WeakHashMap;
@@ -58,8 +59,9 @@ import jd.plugins.decrypter.PluralsightComDecrypter;
  * @author Neokyuubi
  *
  */
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 48648 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
 public class PluralsightCom extends antiDDoSForHost {
+    private static final boolean                    cookieLoginOnly                          = true;
     private static WeakHashMap<Account, List<Long>> map100PerHour                            = new WeakHashMap<Account, List<Long>>();
     private static WeakHashMap<Account, List<Long>> map200Per4Hours                          = new WeakHashMap<Account, List<Long>>();
     public static final String                      PROPERTY_DURATION_SECONDS                = "duration";
@@ -90,7 +92,11 @@ public class PluralsightCom extends antiDDoSForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+        if (cookieLoginOnly) {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
+        } else {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+        }
     }
 
     @Override
@@ -120,41 +126,38 @@ public class PluralsightCom extends antiDDoSForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
-        if (!StringUtils.equals(br.getURL(), WEBSITE_BASE_APP + "/web-analytics/api/v1/users/current")) {
-            getRequest(br, this, br.createGetRequest(WEBSITE_BASE_APP + "/web-analytics/api/v1/users/current"));
-        }
-        final Map<String, Object> map = restoreFromString(br.toString(), TypeRef.MAP);
-        List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) map.get("userSubscriptions");
+        // Old API request for obtaining subscription data: /web-analytics/api/v1/users/current
+        getRequest(br, this, br.createGetRequest(WEBSITE_BASE_APP + "/subscription-lifecycle/api/bootstrap"));
+        final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(root, "data/applicationData/subscriptionAccount/subscriptions");
         if (subscriptions == null) {
-            subscriptions = (List<Map<String, Object>>) map.get("subscriptions");
+            subscriptions = (List<Map<String, Object>>) root.get("subscriptions");
         }
         final AccountInfo ai = new AccountInfo();
         if (subscriptions == null) {
             account.setType(AccountType.UNKNOWN);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Something went wrong with account verification type.");
         }
-        if (subscriptions.size() == 0) {
-            account.setType(AccountType.FREE);
-        } else {
-            boolean isPremium = false;
-            /* Check if this is a premium account by looking through all subscription packages. */
-            for (final Map<String, Object> subscription : subscriptions) {
-                final String expiresAt = subscription.get("expiresAt") != null ? (String) subscription.get("expiresAt") : null;
-                if (expiresAt != null) {
-                    final long validUntil = TimeFormatter.getMilliSeconds(expiresAt.replace("Z", "+0000"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ", null);
-                    if (validUntil > System.currentTimeMillis()) {
-                        isPremium = true;
-                        account.setType(AccountType.PREMIUM);
-                        ai.setStatus("Premium Account: " + subscription.get("name"));
-                        ai.setValidUntil(validUntil, br);
-                        break;
-                    }
+        boolean isPremium = false;
+        /* Check if this is a premium account by looking through all subscription packages. */
+        for (final Map<String, Object> subscription : subscriptions) {
+            final Object expiresAtDateO = subscription.get("termEndDate");
+            final String expiresAtDateStr = expiresAtDateO != null ? expiresAtDateO.toString() : null;
+            if (expiresAtDateStr != null) {
+                /* Parse ISO 8601 Date / Time Zone */
+                final long validUntil = TimeFormatter.getMilliSeconds(expiresAtDateStr, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH);
+                if (validUntil > System.currentTimeMillis()) {
+                    isPremium = true;
+                    account.setType(AccountType.PREMIUM);
+                    ai.setStatus("Premium Account | Auto renew: " + subscription.get("autoRenew"));
+                    ai.setValidUntil(validUntil, br);
+                    break;
                 }
             }
-            if (!isPremium) {
-                account.setType(AccountType.FREE);
-                ai.setStatus("Free (Expired) Account");
-            }
+        }
+        if (!isPremium) {
+            account.setType(AccountType.FREE);
+            ai.setStatus("Free (Expired) Account");
         }
         account.setMaxSimultanDownloads(1);
         account.setConcurrentUsePossible(true);
@@ -202,7 +205,12 @@ public class PluralsightCom extends antiDDoSForHost {
                         }
                     }
                 }
+                if (cookieLoginOnly) {
+                    showCookieLoginInfo();
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
+                }
                 try {
+                    /* 2024-02-06: This has been broken/incomplete for a long time thus we allow cookie-login only. */
                     logger.info("Performing full login");
                     getRequest(br, this, br.createGetRequest(WEBSITE_BASE_APP + "/id/"));
                     final Form form = br.getFormbyKey("Username");
@@ -797,7 +805,7 @@ public class PluralsightCom extends antiDDoSForHost {
 
     @Override
     public String getDescription() {
-        return "Download course videos from Pluralsight.com";
+        return "Download course video streams and files from Pluralsight.com";
     }
 
     @Override

@@ -31,7 +31,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48648 $", interfaceVersion = 3, names = {}, urls = {})
 /** Helper plugin to download image hotlinks from photobucket.com without serverside "watermark protection". */
 public class PhotobucketComDirectImages extends PluginForHost {
     public PhotobucketComDirectImages(PluginWrapper wrapper) {
@@ -64,7 +64,7 @@ public class PhotobucketComDirectImages extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://i\\d+.photobucket\\.com/albums/\\w+/\\w+/[^/]+\\.jpg");
+            ret.add("https?://(?:i\\d+|hosting)\\.photobucket\\.com/albums/\\w+/\\w+/[^/]+\\.(jpg|png|gif|webp)");
         }
         return ret.toArray(new String[0]);
     }

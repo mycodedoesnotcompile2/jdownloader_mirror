@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 48645 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48646 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,7 +120,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             final Browser brc = br.cloneBrowser();
             brc.getHeaders().put("Accept", "application/json, text/plain, */*");
             brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            // brc.getHeaders().put("X-Xsrf-Token", "TODO");
+            // brc.getHeaders().put("X-Xsrf-Token", "NOT_NEEDED");
             final int maxItemsPerPage = 30;
             final UrlQuery query = new UrlQuery();
             query.add("category", "all");

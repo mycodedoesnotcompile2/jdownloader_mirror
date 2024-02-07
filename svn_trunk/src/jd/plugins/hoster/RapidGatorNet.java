@@ -71,7 +71,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48619 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48648 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -304,9 +304,7 @@ public class RapidGatorNet extends PluginForHost {
         } else {
             /* Not a direct-URL */
             br.followConnection();
-            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("File not found")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+            this.handleErrorsWebsite(br, link, account, null, true);
             String filename = br.getRegex("Downloading\\s*:\\s*</strong>\\s*<a href=\"\"[^>]*>([^<>\"]+)<").getMatch(0);
             if (filename == null) {
                 filename = br.getRegex("<title>\\s*Download file\\s*([^<>\"]+)</title>").getMatch(0);
@@ -426,7 +424,7 @@ public class RapidGatorNet extends PluginForHost {
                     }
                     logger.info("blockedIPsMap: " + blockedIPsMap);
                 }
-                handleErrorsWebsite(this.br, link, account, currentIP);
+                handleErrorsWebsite(this.br, link, account, currentIP, true);
                 if (account != null && !this.isLoggedINWebsite(br)) {
                     throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000l);
                 }
@@ -501,7 +499,7 @@ public class RapidGatorNet extends PluginForHost {
                     /* This should be a very very rare case. */
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Downloading is not possible at the moment", FREE_RECONNECTWAIT_OTHERS_MILLIS);
                 }
-                handleErrorsWebsite(this.br, link, account, currentIP);
+                handleErrorsWebsite(br, link, account, currentIP);
                 final Form captchaform = br.getFormbyProperty("id", "captchaform");
                 if (captchaform != null) {
                     boolean captchaSuccess = false;
@@ -1315,7 +1313,6 @@ public class RapidGatorNet extends PluginForHost {
         logger.info("Error 404 happened --> Trying to find out whether session is invalid or file is offline");
         if (trustError404) {
             /* File offline */
-            logger.info("Error 404 --> Trusted file offline");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
             /*
@@ -1447,6 +1444,10 @@ public class RapidGatorNet extends PluginForHost {
     }
 
     private void handleErrorsWebsite(final Browser br, final DownloadLink link, final Account account, final String currentIP) throws PluginException {
+        handleErrorsWebsite(br, link, account, currentIP, false);
+    }
+
+    private void handleErrorsWebsite(final Browser br, final DownloadLink link, final Account account, final String currentIP, final boolean doExtendedOfflineCheck) throws PluginException {
         if (account != null) {
             /* Errors which should only happen in account mode */
             if (br.containsHTML("You have reached quota|You have reached daily quota of downloaded information for premium accounts")) {
@@ -1456,6 +1457,15 @@ public class RapidGatorNet extends PluginForHost {
                 throw new AccountUnavailableException("Session expired?", 1 * 60 * 1000);
             }
         }
+        /* Check for offline file */
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*404 File not found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (doExtendedOfflineCheck && !br.getURL().contains(this.getFID(link))) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* Check if item is only downloadable for premium users. */
         final String freedlsizelimit = br.getRegex("(?i)'You can download files up to ([\\d\\.]+ ?(MB|GB)) in free mode\\s*<").getMatch(0);
         if (freedlsizelimit != null) {
             throw new AccountRequiredException();
