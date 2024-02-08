@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46550 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48649 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -74,15 +74,5 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
-    }
-
-    @Override
-    protected String removeUnwantedURLTitleStuff(String urltitle) {
-        if (urltitle == null) {
-            return null;
-        }
-        urltitle = super.removeUnwantedURLTitleStuff(urltitle);
-        urltitle = urltitle.replaceFirst("(-| )[a-f0-9]{16}$", "");
-        return urltitle;
     }
 }

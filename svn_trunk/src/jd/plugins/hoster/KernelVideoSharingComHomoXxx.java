@@ -21,9 +21,9 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48649 $", interfaceVersion = 3, names = {}, urls = {})
-public class KernelVideoSharingPornadoXxx extends KernelVideoSharingComV2 {
-    public KernelVideoSharingPornadoXxx(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 48650 $", interfaceVersion = 3, names = {}, urls = {})
+public class KernelVideoSharingComHomoXxx extends KernelVideoSharingComV2 {
+    public KernelVideoSharingComHomoXxx(final PluginWrapper wrapper) {
         super(wrapper);
     }
 
@@ -31,8 +31,7 @@ public class KernelVideoSharingPornadoXxx extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        /* Not to be mistaken with pornado.co!! */
-        ret.add(new String[] { "pornado.xxx" });
+        ret.add(new String[] { "homo.xxx" });
         return ret;
     }
 
@@ -46,11 +45,19 @@ public class KernelVideoSharingPornadoXxx extends KernelVideoSharingComV2 {
     }
 
     public static String[] getAnnotationUrls() {
-        return KernelVideoSharingComV2.buildAnnotationUrlsDefaultVideosPattern(getPluginDomains());
+        return KernelVideoSharingComHomoXxx.buildAnnotationUrlsDefaultVideosPattern(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrlsDefaultVideosPattern(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(embed|videos)/\\d+/?");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
-        return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
+        return "https://" + appendWWWIfRequired(host) + getHost() + "/videos/" + fuid + "/";
     }
 }
