@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48643 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48651 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2370,7 +2370,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final int preDownloadWaittimeMillis = Integer.parseInt(waitStr) * 1000;
                 if (preDownloadWaittimeMillis > captchaTimeoutMillis) {
                     final int prePrePreDownloadWait = preDownloadWaittimeMillis - captchaTimeoutMillis;
-                    logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid timeouts");
+                    logger.info("Waittime is higher than interactive captcha timeout --> Waiting a part of it before solving captcha to avoid captcha-token-timeout");
                     logger.info("Pre-pre download waittime seconds: " + (prePrePreDownloadWait / 1000));
                     this.sleep(prePrePreDownloadWait, link);
                 }

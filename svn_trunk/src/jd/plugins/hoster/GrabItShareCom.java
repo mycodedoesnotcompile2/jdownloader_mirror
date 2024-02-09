@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48354 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "http://(www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|((en|ru|fr|es)/)?file/[0-9]+/)" })
+@HostPlugin(revision = "$Revision: 48651 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "http://(www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|((en|ru|fr|es)/)?file/[0-9]+/)" })
 public class GrabItShareCom extends PluginForHost {
     private static final String COOKIE_HOST      = "http://grabitshare.com";
     private static final String IPBLOCKED        = "(You have got max allowed bandwidth size per hour|You have got max allowed download sessions from the same IP|\">Dostigli ste download limit\\. Pričekajte 1h za nastavak)";
@@ -56,6 +56,13 @@ public class GrabItShareCom extends PluginForHost {
     public GrabItShareCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(COOKIE_HOST + "/en/register.php");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     private String findLink() throws Exception {
@@ -90,7 +97,6 @@ public class GrabItShareCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.setCustomCharset("utf-8");
         br.setCookie(COOKIE_HOST, "mfh_mylang", "en");
         br.setCookie(COOKIE_HOST, "yab_mylang", "en");
@@ -268,7 +274,6 @@ public class GrabItShareCom extends PluginForHost {
                         return;
                     }
                 }
-                br.setFollowRedirects(true);
                 br.setCookie(COOKIE_HOST, "mfh_mylang", "en");
                 br.setCookie(COOKIE_HOST, "yab_mylang", "en");
                 br.getPage(COOKIE_HOST + "/en/login.php");
@@ -359,7 +364,7 @@ public class GrabItShareCom extends PluginForHost {
         login(account, true);
         br.setFollowRedirects(false);
         br.setCookie(COOKIE_HOST, "mfh_mylang", "en");
-        br.getPage(link.getDownloadURL());
+        br.getPage(link.getPluginPatternMatcher());
         checkOffline();
         if (account.getType() == AccountType.FREE) {
             doFree(link);
