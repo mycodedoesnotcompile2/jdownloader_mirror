@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 48653 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48654 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,6 +117,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             }
             String mvtoken = br.getRegex("data-mvtoken=\"([^\"]+)").getMatch(0);
             if (mvtoken == null) {
+                /* 2024-02-08: Workaround since mvtoken seems to be missing at the place it was before. */
                 final Browser brc = br.cloneBrowser();
                 brc.getPage("/Login");
                 mvtoken = brc.getRegex("data-mvtoken=\"([^\"]+)").getMatch(0);

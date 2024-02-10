@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48457 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 48654 $", interfaceVersion = 2, names = { "filer.net" }, urls = { "https?://(?:www\\.)?filer\\.net/(?:app\\.php/)?(?:get|dl)/([a-z0-9]+)" })
 public class FilerNet extends PluginForHost {
     private int                 statusCode                                             = 0;
     private String              statusMessage                                          = null;
@@ -515,10 +515,15 @@ public class FilerNet extends PluginForHost {
 
     private void handleErrors(final Account account, final boolean afterDownload) throws PluginException {
         // Temporary errorhandling for a bug which isn't handled by the API
-        final String errorIDStr = new Regex(br.getURL(), "(?i).+/error/(\\d+)").getMatch(0);
-        if (errorIDStr != null) {
-            // final int errorID = Integer.parseInt(errorIDStr);
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error " + errorIDStr, 15 * 60 * 1000l);
+        final String errorcodeStr = new Regex(br.getURL(), "(?i).+/error/(\\d+)").getMatch(0);
+        if (errorcodeStr != null) {
+            final int errorcode = Integer.parseInt(errorcodeStr);
+            if (errorcode == 415) {
+                /* 2024-02-09: This error may happen frequently thus I've lowered the wait time. */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 415", 5 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error " + errorcodeStr, 15 * 60 * 1000l);
+            }
         }
         if (afterDownload && br.containsHTML("filer\\.net/register")) {
             errorNoFreeSlotsAvailable();

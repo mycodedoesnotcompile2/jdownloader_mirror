@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47755 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48656 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,6 +182,10 @@ public class SharingWtf extends YetiShareCore {
             /* 2023-05-09 */
             continue_link = br.getRegex("(?i)href='(https?://[^<>\"\\']+)' target='_top'[^>]*>\\s*Download\\s*</a>").getMatch(0);
         }
+        if (continue_link == null) {
+            /* 2024-02-09: Premium */
+            continue_link = br.getRegex("data-url=\"(https?://[^\"]+)\" data-fileserver").getMatch(0);
+        }
         if (continue_link != null) {
             return continue_link;
         } else {
@@ -190,9 +194,15 @@ public class SharingWtf extends YetiShareCore {
     }
 
     @Override
-    public void checkErrors(Browser br, final DownloadLink link, final Account account) throws PluginException {
+    public void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         /* 2020-02-17: Special */
         if (br.containsHTML("(?i)you need to be a registered user to download any files")) {
+            throw new AccountRequiredException();
+        } else if (br.containsHTML(">\\s*You must be a registered member account to download files more than")) {
+            /* 2024-02-09 */
+            throw new AccountRequiredException();
+        } else if (br.containsHTML(">\\s*You must be a premium member to download files more")) {
+            /* 2024-02-09 */
             throw new AccountRequiredException();
         }
         String errorMsg = null;
