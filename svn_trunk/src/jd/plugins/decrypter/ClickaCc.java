@@ -18,31 +18,33 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48661 $", interfaceVersion = 3, names = {}, urls = {})
-public class XiaoshenkeNetCrawler extends PluginForDecrypt {
-    public XiaoshenkeNetCrawler(PluginWrapper wrapper) {
+@DecrypterPlugin(revision = "$Revision: 48660 $", interfaceVersion = 3, names = {}, urls = {})
+public class ClickaCc extends PluginForDecrypt {
+    public ClickaCc(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(false);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xiaoshenke.net" });
+        ret.add(new String[] { "clicka.cc" });
         return ret;
     }
 
@@ -62,29 +64,22 @@ public class XiaoshenkeNetCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/video(h|videotr|x)/([a-f0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/.+");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = param.getCryptedUrl();
-        final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
-        final String urltype = urlinfo.getMatch(0);
-        final String contentID = urlinfo.getMatch(1);
-        if (urltype.equalsIgnoreCase("h")) {
-            ret.add(createDownloadlink("https://mydaddy.cc/video/" + contentID + "/"));
-        } else if (urltype.equalsIgnoreCase("videotr")) {
-            /* 2024-02-12 */
-            ret.add(createDownloadlink("https://www.porntrex.com/embed/" + contentID));
-        } else if (urltype.equalsIgnoreCase("x")) {
-            /* 2023-12-04 */
-            ret.add(createDownloadlink(SxyprnComCrawler.getContentURL("sxyprn.com", contentID)));
-        } else {
-            /* Pass result to hosterplugin */
-            ret.add(this.createDownloadlink(contenturl));
+        br.getPage(param.getCryptedUrl());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String finallink = br.getRedirectLocation();
+        if (finallink == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        ret.add(createDownloadlink(finallink));
         return ret;
     }
 }

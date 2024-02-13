@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.MissavComCrawler;
 
-@HostPlugin(revision = "$Revision: 48657 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48660 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MissavComCrawler.class })
 public class MissavCom extends PluginForHost {
     public MissavCom(PluginWrapper wrapper) {
@@ -97,13 +97,19 @@ public class MissavCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String fid = this.getFID(link);
         final String extDefault = ".mp4";
         if (!link.isNameSet()) {
-            link.setName(this.getFID(link) + extDefault);
+            link.setName(fid + extDefault);
         }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final boolean isSelfhostedVideo = br.containsHTML("dvdId: '" + Encoding.urlEncode(fid));
+        if (!isSelfhostedVideo) {
+            /* E.g. https://missav.com/pt/new */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("<title>([^<]+)").getMatch(0);
