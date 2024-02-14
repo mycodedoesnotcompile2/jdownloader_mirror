@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48057 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48664 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -296,17 +296,12 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             selectedLanguages.add(langFromURL);
         }
         final HashSet<Language> existingLanguages = new HashSet<Language>();
-        boolean containsUnknownLanguage = false;
         /* Look ahead and collect existing languages */
         for (final List<Map<String, Object>> videoStreamsByLanguage : languagePacks.values()) {
             for (final Map<String, Object> videoStream : videoStreamsByLanguage) {
                 final String audioCode = videoStream.get("audioCode").toString();
                 final VersionInfo versionInfo = parseVersionInfo(audioCode);
-                if (versionInfo.getAudioLanguage() == Language.OTHER) {
-                    containsUnknownLanguage = true;
-                } else {
-                    existingLanguages.add(versionInfo.getAudioLanguage());
-                }
+                existingLanguages.add(versionInfo.getAudioLanguage());
             }
         }
         final QualitySelectionFallbackMode qualitySelectionFallbackMode = cfg.getQualitySelectionFallbackMode();
@@ -398,14 +393,14 @@ public class ArteMediathekV3 extends PluginForDecrypt {
                         /* Allow only selected languages, skip the rest */
                         if (!selectedLanguages.contains(versionInfo.getAudioLanguage())) {
                             /* Skip unwanted languages */
-                            logger.info("Skipping videoStreamId because of unselected language: " + videoStreamId);
+                            logger.info("Skipping videoStreamId because of unselected language: " + versionInfo.getAudioLanguage() + " | videoStreamId: " + videoStreamId);
                             continue;
                         }
                     } else {
                         /* Allow only language by URL and original version, skip the rest */
                         if (existingLanguages.size() > 1 && versionInfo.getAudioLanguage() != langFromURL) {
                             /* Multiple languages available --> Allow "stupid" filtering by language / skip unwanted languages */
-                            logger.info("Skipping videoStreamId because of unselected language: " + videoStreamId);
+                            logger.info("Skipping videoStreamId because of unselected language: " + versionInfo.getAudioLanguage() + " | videoStreamId: " + videoStreamId);
                             continue;
                         } else if (versionInfo.getAudioLanguage() != langFromURL && !versionInfo.isOriginalVersion()) {
                             /* Skip unwanted languages */

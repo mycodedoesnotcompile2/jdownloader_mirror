@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48662 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "https?://(?:www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|([a-z]{2}/)?file/[0-9]+/)" })
+@HostPlugin(revision = "$Revision: 48665 $", interfaceVersion = 2, names = { "grabitshare.com" }, urls = { "https?://(?:www\\.)?grabitshare\\.com/((\\?d|download\\.php\\?id)=[A-Z0-9]+|([a-z]{2}/)?file/[0-9]+/)" })
 public class GrabItShareCom extends PluginForHost {
     private static final String RECAPTCHATEXT    = "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)";
     private static final String CHEAPCAPTCHATEXT = "captcha\\.php";
@@ -112,11 +112,12 @@ public class GrabItShareCom extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
-        if (account != null) {
-            this.login(account, false);
-        }
         final String contenturl = link.getPluginPatternMatcher().replaceFirst("(?i)https://", PROTOCOL);
-        br.getPage(contenturl);
+        if (account != null) {
+            this.login(account, contenturl, true);
+        } else {
+            br.getPage(contenturl);
+        }
         final String redirect = br.getRegex("<p>The document has moved <a href=\"(.*?)\">here</a>\\.</p>").getMatch(0);
         if (redirect != null) {
             br.getPage(redirect);
@@ -136,7 +137,11 @@ public class GrabItShareCom extends PluginForHost {
         if (filename != null && filename.matches("")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(filename.trim());
+        if (filename != null) {
+            link.setFinalFileName(filename.trim());
+        } else {
+            logger.warning("Failed to find filename");
+        }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         } else {
@@ -269,7 +274,7 @@ public class GrabItShareCom extends PluginForHost {
         }
     }
 
-    public void login(final Account account, final boolean validateCookies) throws Exception {
+    public void login(final Account account, final String checkURL, final boolean validateCookies) throws Exception {
         synchronized (account) {
             /** Load cookies */
             br.setCookiesExclusive(true);
@@ -281,8 +286,15 @@ public class GrabItShareCom extends PluginForHost {
                     return;
                 } else {
                     logger.info("Validating cookies...");
-                    br.getPage(PROTOCOL + "www." + getHost() + "/");
-                    return;
+                    br.getPage(checkURL);
+                    if (isLoggedin(br)) {
+                        logger.info("Cookie login successful");
+                        account.saveCookies(br.getCookies(getHost()), "");
+                        return;
+                    } else {
+                        logger.info("Cookie login failed");
+                        br.clearCookies(null);
+                    }
                 }
             }
             br.getPage(PROTOCOL + "www." + getHost() + "/en/login.php");
@@ -316,6 +328,7 @@ public class GrabItShareCom extends PluginForHost {
                 account.setType(AccountType.PREMIUM);
             }
             account.saveCookies(br.getCookies(getHost()), "");
+            br.getPage(checkURL);
         }
     }
 
@@ -326,8 +339,7 @@ public class GrabItShareCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account, true);
-        br.getPage("/en/members.php");
+        login(account, PROTOCOL + "www." + getHost() + "/en/members.php", true);
         String expired = getData("Aktivno");
         if (expired != null) {
             expired = expired.trim();
