@@ -168,7 +168,7 @@ public class CrossSystem {
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -185,7 +185,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -197,9 +197,9 @@ public class CrossSystem {
         RASPBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -274,13 +274,20 @@ public class CrossSystem {
         WINDOWS_8_1(OSFamily.WINDOWS),
         WINDOWS_SERVER_2012_R2(OSFamily.WINDOWS),
         WINDOWS_10(OSFamily.WINDOWS),
+        WINDOWS_10_20H2(OSFamily.WINDOWS),
+        WINDOWS_10_21H1(OSFamily.WINDOWS),
+        WINDOWS_10_21H2(OSFamily.WINDOWS),
+        WINDOWS_10_22H2(OSFamily.WINDOWS),
         WINDOWS_SERVER_2016(OSFamily.WINDOWS),
         WINDOWS_SERVER_2019(OSFamily.WINDOWS),
         WINDOWS_SERVER_2020(OSFamily.WINDOWS),
         WINDOWS_SERVER_2022(OSFamily.WINDOWS),
         WINDOWS_SERVER_2025(OSFamily.WINDOWS),
-        WINDOWS_11(OSFamily.WINDOWS),
-        WINDOWS_12(OSFamily.WINDOWS);
+        WINDOWS_11(OSFamily.WINDOWS), // WINDOWS_11_21H2
+        WINDOWS_11_21H2(OSFamily.WINDOWS),
+        WINDOWS_11_22H2(OSFamily.WINDOWS),
+        WINDOWS_11_23H2(OSFamily.WINDOWS),
+        WINDOWS_11_24H2(OSFamily.WINDOWS);
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -561,7 +568,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -725,19 +732,114 @@ public class CrossSystem {
         return CrossSystem.OS;
     }
 
+    private static OperatingSystem getWindowsReleaseCMD() {
+        final Object initialValue = new Object();
+        final AtomicReference<Object> reference = new AtomicReference<Object>(initialValue);
+        final Thread thread = new Thread("query: cmd -c ver") {
+            private void set(OperatingSystem operatingSystem) {
+                synchronized (reference) {
+                    reference.compareAndSet(initialValue, operatingSystem);
+                    reference.notify();
+                }
+            }
+
+            @Override
+            public void run() {
+                Process process = null;
+                try {
+                    final ProcessBuilder builder = new ProcessBuilder("cmd", "-c", "ver");
+                    process = builder.start();
+                    final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                    final String line = reader.readLine();
+                    process.destroy();
+                    process = null;
+                    final String buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.([^\\.]+)").getMatch(0);
+                    final int buildNumber = Integer.parseInt(buildNumberString);
+                    // https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
+                    // https://en.wikipedia.org/wiki/Windows_11_version_history
+                    // https://ss64.com/nt/ver.html
+                    if (buildNumber >= 26052) {
+                        // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
+                        // TODO: update buildNumber
+                        set(OperatingSystem.WINDOWS_11_24H2);
+                    } else if (buildNumber >= 22631) {
+                        set(OperatingSystem.WINDOWS_11_23H2);
+                    } else if (buildNumber >= 22621) {
+                        set(OperatingSystem.WINDOWS_11_22H2);
+                    } else if (buildNumber >= 22000) {
+                        // return OperatingSystem.WINDOWS_11_21H2;
+                        set(OperatingSystem.WINDOWS_11);
+                    } else if (buildNumber >= 19045) {
+                        set(OperatingSystem.WINDOWS_10_22H2);
+                    } else if (buildNumber >= 19044) {
+                        set(OperatingSystem.WINDOWS_10_21H2);
+                    } else if (buildNumber >= 19043) {
+                        set(OperatingSystem.WINDOWS_10_21H1);
+                    } else if (buildNumber >= 19042) {
+                        set(OperatingSystem.WINDOWS_10_20H2);
+                    } else if (buildNumber >= 10240) {
+                        set(OperatingSystem.WINDOWS_10);
+                    } else if (buildNumber >= 9600) {
+                        set(OperatingSystem.WINDOWS_8_1);
+                    } else if (buildNumber >= 9200) {
+                        set(OperatingSystem.WINDOWS_8);
+                    } else if (buildNumber >= 7601) {
+                        set(OperatingSystem.WINDOWS_7);
+                    } else if (buildNumber >= 6002) {
+                        set(OperatingSystem.WINDOWS_VISTA);
+                    } else if (buildNumber >= 2600) {
+                        set(OperatingSystem.WINDOWS_XP);
+                    }
+                } catch (Throwable ignore) {
+                    ignore.printStackTrace();
+                } finally {
+                    set(null);
+                    if (process != null) {
+                        try {
+                            process.destroy();
+                        } catch (final Throwable ignore2) {
+                        }
+                    }
+                }
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
+        try {
+            synchronized (reference) {
+                if (reference.get() == initialValue && thread.isAlive()) {
+                    reference.wait(1000);
+                }
+            }
+        } catch (InterruptedException ignore) {
+        }
+        final Object resultValue = reference.get();
+        if (resultValue instanceof OperatingSystem) {
+            return (OperatingSystem) resultValue;
+        } else {
+            return null;
+        }
+    }
+
     public static OperatingSystem getWindowsRelease(final String osName) {
         if (osName != null) {
+            final boolean forceProbeCMD = true;
             final String os = osName.toLowerCase(Locale.ENGLISH);
-            if (os.contains("windows 12")) {
-                return OperatingSystem.WINDOWS_12;
-            } else if (os.contains("windows 11")) {
+            if (os.contains("windows 11")) {
+                if (forceProbeCMD) {
+                    final OperatingSystem ret = getWindowsReleaseCMD();
+                    if (ret != null) {
+                        return ret;
+                    }
+                }
                 return OperatingSystem.WINDOWS_11;
             } else if (os.contains("windows 10")) {
-                Process process = null;
                 try {// see https://bugs.openjdk.org/browse/JDK-8274840
                     final long jvmVersion = JVMVersion.get();
                     final boolean trustFlag;
-                    if (jvmVersion >= JVMVersion.JAVA_18) {
+                    if (forceProbeCMD) {
+                        trustFlag = false;
+                    } else if (jvmVersion >= JVMVersion.JAVA_18) {
                         trustFlag = true;
                     } else if (jvmVersion >= JVMVersion.JAVA_17) {
                         trustFlag = JVMVersion.isMinimum(JVMVersion.parseJavaVersionString("17.0.2"));
@@ -751,29 +853,22 @@ public class CrossSystem {
                         trustFlag = false;
                     }
                     if (!trustFlag) {
-                        final ProcessBuilder builder = new ProcessBuilder("cmd", "-c", "ver");
-                        process = builder.start();
-                        final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                        final String line = reader.readLine();
-                        process.destroy();
-                        process = null;
-                        final String buildNumber = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.([^\\.]+)").getMatch(0);
-                        if (Integer.parseInt(buildNumber) >= 22000) {
-                            return OperatingSystem.WINDOWS_11;
+                        final OperatingSystem ret = getWindowsReleaseCMD();
+                        if (ret != null) {
+                            return ret;
                         }
                     }
                 } catch (Throwable ignore) {
                     ignore.printStackTrace();
-                } finally {
-                    if (process != null) {
-                        try {
-                            process.destroy();
-                        } catch (final Throwable e2) {
-                        }
-                    }
                 }
                 return OperatingSystem.WINDOWS_10;
             } else if (os.contains("windows 8")) {
+                if (forceProbeCMD) {
+                    final OperatingSystem ret = getWindowsReleaseCMD();
+                    if (ret != null) {
+                        return ret;
+                    }
+                }
                 if (os.contains("8.1")) {
                     return OperatingSystem.WINDOWS_8_1;
                 } else {

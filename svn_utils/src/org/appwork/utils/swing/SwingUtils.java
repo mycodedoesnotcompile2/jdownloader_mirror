@@ -49,6 +49,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.NoninvertibleTransformException;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.text.JTextComponent;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.StringUtils;
 
 public class SwingUtils {
@@ -340,5 +343,54 @@ public class SwingUtils {
             timer.setRepeats(false);
             timer.start();
         }
+    }
+
+    /**
+     * @param device
+     * @param point
+     * @return
+     */
+    public static Point convertToUnscaled(GraphicsDevice device, Point target) {
+        GraphicsDevice[] screens = device != null ? new GraphicsDevice[] { device } : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        for (final GraphicsDevice screen : screens) {
+            Point point = target;
+            final GraphicsConfiguration screenConfiguration = screen.getDefaultConfiguration();
+            // OS DPI Scaling support.
+            final AffineTransform transformation = screenConfiguration.getDefaultTransform();
+            final Point2D p2d = transformation.transform(target, null);
+            point = new Point((int) p2d.getX(), (int) p2d.getY());
+            if (device != null) {
+                return point;
+            }
+            final Rectangle bounds = screenConfiguration.getBounds();
+            if (bounds.contains(point)) {
+                return point;
+            }
+        }
+        return null;
+    }
+
+    public static Point convertToScaled(Point target, GraphicsDevice device) {
+        GraphicsDevice[] screens = device != null ? new GraphicsDevice[] { device } : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices();
+        for (final GraphicsDevice screen : screens) {
+            Point point = target;
+            final GraphicsConfiguration screenConfiguration = screen.getDefaultConfiguration();
+            try {
+                // OS DPI Scaling support.
+                final AffineTransform transformation = screenConfiguration.getDefaultTransform();
+                final Point2D p2d = transformation.inverseTransform(target, null);
+                point = new Point((int) p2d.getX(), (int) p2d.getY());
+            } catch (NoninvertibleTransformException e1) {
+                LogV3.log(e1);
+            }
+            if (device != null) {
+                return point;
+            }
+            final Rectangle bounds = screenConfiguration.getBounds();
+            if (bounds.contains(point)) {
+                return point;
+            }
+        }
+        return null;
     }
 }

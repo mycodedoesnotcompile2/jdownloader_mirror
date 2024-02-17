@@ -64,7 +64,7 @@ public class JVMVersion {
     @Deprecated
     public final static long  JAVA17   = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long  JAVA_1_8 = JavaVersion.JVM_1_8.longID;  // LTS Dec 2030
+    public final static long  JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
     @Deprecated
     public final static long  JAVA18   = JavaVersion.JVM_1_8.longID;
     @Deprecated
