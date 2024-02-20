@@ -69,6 +69,7 @@ import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.JavaVersion;
+import org.appwork.utils.ReadableBytes;
 import org.appwork.utils.Time;
 
 /**
@@ -178,10 +179,11 @@ public class LogToFileSink extends AbstractSink {
         Collections.sort(logFolders, new Comparator<LogFolder>() {
             @Override
             public int compare(LogFolder o1, LogFolder o2) {
-                return CompareUtils.compare(o2.from, o1.from);
+                return CompareUtils.compareLong(o2.from, o1.from);
             }
         });
         long sizeSoFar = 0l;
+        long after = 0l;
         for (final LogFolder f : logFolders) {
             sizeSoFar += f.getSize();
             if (sizeSoFar > bytes) {
@@ -191,8 +193,11 @@ public class LogToFileSink extends AbstractSink {
                 } catch (IOException e) {
                     LogV3.defaultLogger().exception("Could not delete Logfolder: " + f.path, e);
                 }
+            } else {
+                after = sizeSoFar;
             }
         }
+        LogV3.info("Used Log Space (before/after cleanup): " + ReadableBytes.fromBytes(sizeSoFar, true).format() + "/" + ReadableBytes.fromBytes(after, true).format());
     }
 
     /**
@@ -896,7 +901,7 @@ public class LogToFileSink extends AbstractSink {
             Collections.sort(logFolders, new Comparator<LogFolder>() {
                 @Override
                 public int compare(LogFolder o1, LogFolder o2) {
-                    return CompareUtils.compare(o1.from, o2.from);
+                    return CompareUtils.compareLong(o1.from, o2.from);
                 }
             });
             String name;

@@ -42,14 +42,14 @@ public interface IntegerInterface {
 
                                                                   @Override
                                                                   public int compare(IntegerInterface o1, IntegerInterface o2) {
-                                                                      return CompareUtils.compare(o1.getInt(), o2.getInt());
+                                                                      return CompareUtils.compareInt(o1.getInt(), o2.getInt());
                                                                   }
                                                               };
     final static Comparator<IntegerInterface> COMPARATOR_DESC = new Comparator<IntegerInterface>() {
 
                                                                   @Override
                                                                   public int compare(IntegerInterface o1, IntegerInterface o2) {
-                                                                      return CompareUtils.compare(o2.getInt(), o1.getInt());
+                                                                      return CompareUtils.compareInt(o2.getInt(), o1.getInt());
                                                                   }
                                                               };
 

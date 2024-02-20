@@ -71,6 +71,9 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public String toString(Object o, Object... context) throws SerializerException {
         try {
+            if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+                o = new CleanedJSonObject(o).getCleanedData();
+            }
             return getMapper(context).objectToString(o);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
@@ -149,6 +152,9 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public void toStream(Object o, OutputStream os, boolean closeOutputStream, Object... context) throws SerializerException {
         try {
+            if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+                o = new CleanedJSonObject(o).getCleanedData();
+            }
             getMapper(context).writeObject(os, o);
         } catch (Exception e) {
             throw SerializerException.wrap(e);

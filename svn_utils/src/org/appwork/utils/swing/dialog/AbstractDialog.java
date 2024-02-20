@@ -318,7 +318,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
         return okButton;
     }
 
-    protected final String                                 okButtonText;
+    protected String                                       okButtonText;
     private Point                                          orgLocationOnScreen;
     protected JComponent                                   panel;
     protected Dimension                                    preferredSize;

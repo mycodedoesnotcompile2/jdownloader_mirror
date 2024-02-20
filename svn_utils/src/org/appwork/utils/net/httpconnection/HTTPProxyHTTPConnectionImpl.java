@@ -43,17 +43,16 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.encoding.Base64;
 
 public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
-
     private StringBuilder                    proxyRequest;
     private final boolean                    preferConnectMethod;
     protected InetSocketAddress              proxyInetSocketAddress = null;
-
     protected volatile SocketStreamInterface proxySocket            = null;
 
     protected SocketStreamInterface getProxySocket() {
@@ -63,7 +62,7 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
     public HTTPProxyHTTPConnectionImpl(final URL url, final HTTPProxy p) {
         super(url, p);
         this.preferConnectMethod = p.isConnectMethodPrefered();
-        this.setRequestProperty("Proxy-Connection", "close");
+        this.setRequestProperty(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION, "close");
         if (!url.getProtocol().startsWith("https") && !preferConnectMethod) {
             this.httpPath = getRequestPath(url, true);
         }
@@ -142,11 +141,12 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
             }
             SSL_STATE state = SSL_STATE.NA;
             try {
-                if (this.proxy.getPass() != null && this.proxy.getPass().length() > 0 || this.proxy.getUser() != null && this.proxy.getUser().length() > 0) {
+                if (StringUtils.isNotEmpty(proxy.getUser()) || StringUtils.isNotEmpty(proxy.getPass())) {
                     /* add proxy auth in case username/pw are set */
-                    final String user = this.proxy.getUser() == null ? "" : this.proxy.getUser();
-                    final String pass = this.proxy.getPass() == null ? "" : this.proxy.getPass();
-                    this.requestProperties.put("Proxy-Authorization", "Basic " + new String(Base64.encodeToByte((user + ":" + pass).getBytes(), false)));
+                    final String user = StringUtils.valueOrEmpty(proxy.getUser());
+                    final String pass = StringUtils.valueOrEmpty(proxy.getPass());
+                    final String basicAuth = "Basic " + new String(Base64.encodeToByte((user + ":" + pass).getBytes(), false));
+                    this.requestProperties.put(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION, basicAuth);
                 }
                 IOException ee = null;
                 final InetAddress proxyIPs[] = getRemoteIPs(getProxy(), true);
@@ -194,27 +194,30 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                     this.proxyRequest.append("CONNECT ");
                     this.proxyRequest.append(getConnectHostname() + ":" + hostPort);
                     this.proxyRequest.append(" HTTP/1.1\r\n");
-                    if (this.requestProperties.get("User-Agent") != null) {
-                        this.proxyRequest.append("User-Agent: " + this.requestProperties.get("User-Agent") + "\r\n");
+                    if (this.requestProperties.get(HTTPConstants.HEADER_REQUEST_USER_AGENT) != null) {
+                        this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_USER_AGENT + ": " + this.requestProperties.get(HTTPConstants.HEADER_REQUEST_USER_AGENT) + "\r\n");
                     }
-                    if (this.requestProperties.get("Host") != null) {
+                    if (this.requestProperties.get(HTTPConstants.HEADER_REQUEST_HOST) != null) {
                         /* use existing host header */
-                        final String host = this.requestProperties.get("Host");
+                        final String host = this.requestProperties.get(HTTPConstants.HEADER_REQUEST_HOST);
                         if (!host.contains(":") && addHostPort) {
-                            this.proxyRequest.append("Host: " + host + ":" + hostPort + "\r\n");
+                            this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_HOST + ": " + host + ":" + hostPort + "\r\n");
                         } else {
-                            this.proxyRequest.append("Host: " + host + "\r\n");
+                            this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_HOST + ": " + host + "\r\n");
                         }
                     } else {
                         /* add host from url as fallback */
                         if (addHostPort) {
-                            this.proxyRequest.append("Host: " + this.httpURL.getHost() + ":" + hostPort + "\r\n");
+                            this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_HOST + ": " + this.httpURL.getHost() + ":" + hostPort + "\r\n");
                         } else {
-                            this.proxyRequest.append("Host: " + this.httpURL.getHost() + "\r\n");
+                            this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_HOST + ": " + this.httpURL.getHost() + "\r\n");
                         }
                     }
-                    if (this.requestProperties.get("Proxy-Authorization") != null) {
-                        this.proxyRequest.append("Proxy-Authorization: " + this.requestProperties.get("Proxy-Authorization") + "\r\n");
+                    if (this.requestProperties.get(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION) != null) {
+                        this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION + ": " + this.requestProperties.remove(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION) + "\r\n");
+                    }
+                    if (this.requestProperties.get(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION) != null) {
+                        this.proxyRequest.append(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION + ": " + this.requestProperties.remove(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION) + "\r\n");
                     }
                     this.proxyRequest.append("\r\n");
                     /* send CONNECT to proxy */
@@ -317,7 +320,7 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.utils.net.httpconnection.HTTPConnectionImpl#disconnect()
      */
     @Override

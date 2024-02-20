@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48652 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48678 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxTo extends PluginForHost {
     public LinkboxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +119,7 @@ public class LinkboxTo extends PluginForHost {
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
         this.setBrowserExclusive();
         br.getPage("https://www." + this.getHost() + "/api/file/detail?itemId=" + fid + "&needUser=1&needTpInfo=1&token=");
@@ -180,7 +180,7 @@ public class LinkboxTo extends PluginForHost {
     private void preDownloadErrorCheck(final URLConnectionAdapter con) throws PluginException {
         final String etag = con.getRequest().getResponseHeader("etag");
         if (StringUtils.equalsIgnoreCase(etag, "\"28a14757bfe1522e447b544b7d7e5885\"")) {
-            /* 2023-11-13: Dummy video for abused video content. */
+            /* 2023-11-13: Dummy video-file for abused video content. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
     }

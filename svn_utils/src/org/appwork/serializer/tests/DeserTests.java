@@ -39,6 +39,7 @@ import org.appwork.serializer.SC;
 import org.appwork.storage.SimpleSerializer;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.commonInterface.SerializerInterface;
+import org.appwork.storage.config.test.TestObject;
 import org.appwork.storage.flexijson.FlexiSerializer;
 import org.appwork.testframework.AWTest;
 
@@ -69,6 +70,13 @@ public class DeserTests extends AWTest {
         for (SerializerInterface c : serializers) {
             Object o = c.fromString("{\"a\":\"line1\\r\\nline2\",\"b\":\"line1\\r\\nline2\",\"c\":\"line1\\r\\nline2\",\"d\":\"line1\\r\\nline2\",\"e\":\"line1\\r\\nline2\"}", TypeRef.OBJECT);
             assertTrue(c.toString(o, SC.READABLE).split("[\r\n]+").length > 1);
+            // test default values
+            String toString = c.toString(new TestObject(), SC.IGNORE_DEFAULT_VALUES, SC.HASH_CONTENT);
+            assertTrue("{}".equals(toString));
+            TestObject t = new TestObject();
+            t.setA(82923);
+            toString = c.toString(t, SC.IGNORE_DEFAULT_VALUES, SC.HASH_CONTENT);
+            assertTrue("{\"a\":82923}".equals(toString));
         }
         // more to do -
     }

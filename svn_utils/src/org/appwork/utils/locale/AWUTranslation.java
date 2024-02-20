@@ -572,4 +572,10 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "hour", "Stunde" })
     String lit_hour();
+
+    @Default(lngs = { "en", "de" }, values = { "Yes", "Ja" })
+    String lit_yes_upper();
+
+    @Default(lngs = { "en", "de" }, values = { "No", "Nein" })
+    String lit_no_upper();
 }

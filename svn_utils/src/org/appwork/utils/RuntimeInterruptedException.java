@@ -31,48 +31,20 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.tests;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import org.appwork.storage.flexijson.JSPath;
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.CompareUtils;
+package org.appwork.utils;
 
 /**
  * @author thomas
- * @date 21.07.2023
+ * @date 09.02.2024
  *
  */
-public class JSPathTest extends AWTest {
-    public static void main(String[] args) {
-        run();
-    }
-
-    /*
-     * (non-Javadoc)
+public class RuntimeInterruptedException extends RuntimeException {
+    /**
      *
-     * @see org.appwork.testframework.TestInterface#runTest()
      */
-    @Override
-    public void runTest() throws Exception {
-        ObjectContainsAll o = new ObjectContainsAll();
-        assertEquals(JSPath.fromPathString("hashMap.eins").resolve(o), 1);
-        assertEquals(JSPath.fromPathString("map[{\"§concat\":[\"§eins\",\" & \",\"§zwei\"]}]").resolve(o), "1 & 2");
-        assertEqualsDeep(org.appwork.storage.flexijson.JSPath.fromPathString("objArray[1].intArray.0"), new JSPath(Arrays.asList("objArray", 1, "intArray", "0")));
-        assertEqualsDeep(org.appwork.storage.flexijson.JSPath.fromPathString("genericClass[\"\\k\\\\e\\]y\"]"), new JSPath(Arrays.asList("genericClass", "k\\e]y")));
-        JSPath path = JSPath.fromPathString("[0].conditions[0][\"connectSetup.applicationLaunchers[0].execute.cmd\"]");
-        assertEquals(path, JSPath.fromPathElements(0, "conditions", 0, "connectSetup.applicationLaunchers[0].execute.cmd"));
-        List<JSPath> toSort = Arrays.asList(JSPath.fromPathString("a.b"), JSPath.fromPathString("a.b[1]"), JSPath.fromPathString("a.b.c"));
-        CompareUtils.compareNumber(new Double(1d), new Long(1));
-        Collections.sort(toSort);
-        ArrayList<String> stringsSorted = new ArrayList<String>();
-        for (JSPath p : toSort) {
-            stringsSorted.add(p.toPathString(false));
+    public static void throwWithoutClear() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new RuntimeInterruptedException();
         }
-        assertEqualsDeep(new String[] { "a.b", "a.b[1]", "a.b.c" }, stringsSorted);
     }
 }

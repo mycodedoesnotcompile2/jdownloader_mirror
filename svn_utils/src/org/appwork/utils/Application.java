@@ -61,6 +61,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -1063,35 +1064,44 @@ public class Application {
      * @return
      */
     public static long getBuildTimeStamp() {
-        HashMap<String, String> mf = getManifest();
-        String ts = mf.get("build-timestamp");
-        if (ts == null) {
-            return -1;
-        }
         try {
-            return Long.parseLong(ts);
+            final String value = getManifestEntry("build-timestamp");
+            if (value == null) {
+                return -1;
+            } else {
+                return Long.parseLong(value);
+            }
         } catch (NumberFormatException e) {
             return -1;
         }
     }
 
     public static String getBuildHotFix() {
-        HashMap<String, String> mf = getManifest();
-        String ts = mf.get("hotfix-base");
-        if (ts == null) {
+        return getManifestEntry("hotfix-base");
+    }
+
+    public static String getManifestEntry(String key) {
+        final Map<String, String> mf = getManifest();
+        if (mf == null) {
             return null;
+        } else {
+            final String ts = mf.get(key.toLowerCase(Locale.ROOT));
+            if (ts == null) {
+                return null;
+            } else {
+                return ts;
+            }
         }
-        return ts;
     }
 
     public static int getBuildID() {
-        HashMap<String, String> mf = getManifest();
-        String ts = mf.get("build-id");
-        if (ts == null) {
-            return -1;
-        }
         try {
-            return Integer.parseInt(ts);
+            final String value = getManifestEntry("build-id");
+            if (value == null) {
+                return -1;
+            } else {
+                return Integer.parseInt(value);
+            }
         } catch (NumberFormatException e) {
             return -1;
         }

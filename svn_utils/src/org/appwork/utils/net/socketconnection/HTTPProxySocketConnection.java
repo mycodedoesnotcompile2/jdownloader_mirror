@@ -40,7 +40,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
@@ -125,12 +127,13 @@ public class HTTPProxySocketConnection extends SocketConnection {
         connectRequest.append("CONNECT ");
         connectRequest.append(getConnectHostname(endPointAddress) + ":" + endPointAddress.getPort());
         connectRequest.append(" HTTP/1.1\r\n");
-        final String username = proxy.getUser() == null ? "" : proxy.getUser();
-        final String password = proxy.getPass() == null ? "" : proxy.getPass();
-        if (username.length() > 0 || password.length() > 0) {
-            final String basicAuth = "Basic " + new String(Base64.encodeToByte((username + ":" + password).getBytes(), false));
-            connectRequest.append("Proxy-Authorization: " + basicAuth + "\r\n");
+        if (StringUtils.isNotEmpty(proxy.getUser()) || StringUtils.isNotEmpty(proxy.getPass())) {
+            final String user = StringUtils.valueOrEmpty(proxy.getUser());
+            final String pass = StringUtils.valueOrEmpty(proxy.getPass());
+            final String basicAuth = "Basic " + new String(Base64.encodeToByte((user + ":" + pass).getBytes(), false));
+            connectRequest.append(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION + ": " + basicAuth + "\r\n");
         }
+        connectRequest.append(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION + ": " + "close" + "\r\n");
         connectRequest.append("\r\n");
         /* send CONNECT to proxy */
         os.write(connectRequest.toString().getBytes("ISO-8859-1"));

@@ -84,7 +84,7 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
                 try {
                     Long l1 = o1.get(HTTPConnectionProfiler.this) != null ? ((Long) o1.get(HTTPConnectionProfiler.this)) : null;
                     Long l2 = o2.get(HTTPConnectionProfiler.this) != null ? ((Long) o2.get(HTTPConnectionProfiler.this)) : null;
-                    return CompareUtils.compare(l1, l2);
+                    return CompareUtils.compareComparable(l1, l2);
                 } catch (IllegalArgumentException e) {
                     return 0;
                 } catch (IllegalAccessException e) {

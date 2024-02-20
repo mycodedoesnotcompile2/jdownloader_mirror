@@ -240,7 +240,7 @@ public class ShutdownController extends Thread {
                     Collections.sort(this.vetoListeners, new Comparator<ShutdownVetoListener>() {
                         @Override
                         public int compare(final ShutdownVetoListener o1, final ShutdownVetoListener o2) {
-                            return CompareUtils.compare(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
+                            return CompareUtils.compareLong(o1.getShutdownVetoPriority(), o2.getShutdownVetoPriority());
                         }
                     });
                 } catch (final Throwable e) {

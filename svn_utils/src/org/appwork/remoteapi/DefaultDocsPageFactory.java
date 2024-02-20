@@ -538,7 +538,7 @@ public class DefaultDocsPageFactory extends InterfaceHandler<Object> {
             Collections.sort(lst, new Comparator<Type>() {
                 @Override
                 public int compare(Type o1, Type o2) {
-                    int ret = CompareUtils.compare(o2 instanceof Class && ((Class) o2).isEnum(), o1 instanceof Class && ((Class) o1).isEnum());
+                    int ret = CompareUtils.compareBoolean(o2 instanceof Class && ((Class) o2).isEnum(), o1 instanceof Class && ((Class) o1).isEnum());
                     if (ret != 0) {
                         return ret;
                     }

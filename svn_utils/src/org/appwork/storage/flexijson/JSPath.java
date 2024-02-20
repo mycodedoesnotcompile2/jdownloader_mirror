@@ -56,7 +56,7 @@ import org.appwork.utils.reflection.Clazz;
  * @date 27.06.2022
  *
  */
-public class JSPath implements Iterable<Object> {
+public class JSPath implements Iterable<Object>, Comparable<JSPath> {
     private LinkedList<Object> elements;
 
     /**
@@ -556,5 +556,32 @@ public class JSPath implements Iterable<Object> {
             ret.elements.addAll(this.elements.subList(sameUntil, elements.size()));
         }
         return ret;
+    }
+
+    /**
+     * @see java.lang.Comparable#compareTo(java.lang.Object)
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compareTo(JSPath o) {
+        if (o == null) {
+            return 1;
+        }
+        int ret = 0;
+        Object me;
+        Object other;
+        for (int i = 0; i < Math.max(size(), o.size()); i++) {
+            me = i < size() ? get(i) : null;
+            other = i < o.size() ? o.get(i) : null;
+            if (me instanceof String || other instanceof String) {
+                me = String.valueOf(me);
+                other = String.valueOf(other);
+            }
+            ret = CompareUtils.compareComparable((Comparable) me, (Comparable) other);
+            if (ret != 0) {
+                return ret;
+            }
+        }
+        return 0;
     }
 }

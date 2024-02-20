@@ -91,7 +91,7 @@ public class MultiResIconImpl implements MultiResIcon {
         Collections.sort(this.images, new Comparator<BufferedImage>() {
             @Override
             public int compare(BufferedImage o1, BufferedImage o2) {
-                return CompareUtils.compare(o1.getWidth() * o1.getHeight(), o2.getWidth() * o2.getHeight());
+                return CompareUtils.compareInt(o1.getWidth() * o1.getHeight(), o2.getWidth() * o2.getHeight());
             }
         });
         this.largest = images.get(images.size() - 1);

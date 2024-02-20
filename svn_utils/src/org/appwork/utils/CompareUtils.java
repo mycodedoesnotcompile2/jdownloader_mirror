@@ -11,17 +11,63 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.utils.reflection.Clazz;
 
 public class CompareUtils {
     /**
+     *
+     * @deprecated Use the compareInt instead
+     */
+    @Deprecated
+    public static int compare(final int x, final int y) {
+        return compareInt(x, y);
+    }
+
+    /**
+     *
+     * @deprecated Use the compareLong instead
+     */
+    @Deprecated
+    public static int compare(final long x, final long y) {
+        return compareLong(x, y);
+    }
+
+    /**
+     *
+     * @deprecated Use the compareBoolean instead
+     */
+    @Deprecated
+    public static int compare(final boolean x, final boolean y) {
+        return compareBoolean(x, y);
+    }
+
+    /**
+     *
+     * @deprecated Use the compareDouble instead
+     */
+    @Deprecated
+    public static int compare(final double x, final double y) {
+        return compareDouble(x, y);
+    }
+
+    /**
+     *
+     * @deprecated Use the compareFloat instead
+     */
+    @Deprecated
+    public static int compare(final float x, final float y) {
+        return compareFloat(x, y);
+    }
+
+    /**
      * @param x
      * @param y
      * @return
      */
-    public static int compare(boolean x, boolean y) {
+    public static int compareBoolean(final boolean x, final boolean y) {
         return (x == y) ? 0 : (x ? 1 : -1);
     }
 
@@ -29,12 +75,14 @@ public class CompareUtils {
      * @param height
      * @param height2
      * @return
+     *
+     *
      */
-    public static int compare(int x, int y) {
+    public static int compareInt(final int x, final int y) {
         return (x < y) ? -1 : ((x == y) ? 0 : 1);
     }
 
-    public static int compare(long x, long y) {
+    public static int compareLong(final long x, final long y) {
         return (x < y) ? -1 : ((x == y) ? 0 : 1);
     }
 
@@ -44,22 +92,29 @@ public class CompareUtils {
      * @param y
      * @return <0 if x<y >0 if x>y 0 if x==y
      */
-    public static int compare(double x, double y) {
+    public static int compareDouble(final double x, final double y) {
         // since 1.4
         return Double.compare(x, y);
     }
 
-    public static int compare(float x, float y) {
+    public static int compareFloat(final float x, final float y) {
         // since 1.4
         return Float.compare(x, y);
     }
 
     /**
+     * @param <T>
      * @param projection
      * @param projection2
      * @return
+     * @deprecated - Use compareTo instead to avoid type issues.
      */
-    public static int compare(Comparable x, Comparable y) {
+    @Deprecated
+    public static int compare(final Comparable x, final Comparable y) {
+        return compareComparable(x, y);
+    }
+
+    public static <T> int compareComparable(final Comparable<T> x, final Comparable<T> y) {
         if (x == y) {
             return 0;
         } else if (x == null) {
@@ -67,7 +122,11 @@ public class CompareUtils {
         } else if (y == null) {
             return 1;
         } else {
-            return x.compareTo(y);
+            if (x instanceof Number && y instanceof Number) {
+                return compareNumber((Number) x, (Number) y);
+            } else {
+                return x.compareTo((T) y);
+            }
         }
     }
 
@@ -77,7 +136,8 @@ public class CompareUtils {
      * @deprecated use Arrays.equals instead
      * @return
      */
-    public static boolean equals(byte[] hash, byte[] hash2) {
+    @Deprecated
+    public static boolean equals(final byte[] hash, final byte[] hash2) {
         return Arrays.equals(hash, hash2);
     }
 
@@ -88,7 +148,7 @@ public class CompareUtils {
      * @param b
      * @return
      */
-    public static boolean equals(Object a, Object b) {
+    public static boolean equals(final Object a, final Object b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -109,7 +169,7 @@ public class CompareUtils {
      * @param extensions2
      * @return
      */
-    public static boolean equals(Map<?, ?> a, Map<?, ?> b) {
+    public static boolean equals(final Map<?, ?> a, final Map<?, ?> b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -117,7 +177,7 @@ public class CompareUtils {
         } else if (a.size() != b.size()) {
             return false;
         } else {
-            for (Entry<?, ?> es : a.entrySet()) {
+            for (final Entry<?, ?> es : a.entrySet()) {
                 if (!equals(es.getValue(), b.get(es.getKey()))) {
                     return false;
                 }
@@ -126,7 +186,7 @@ public class CompareUtils {
         }
     }
 
-    public static boolean equals(Set<?> a, Set<?> b) {
+    public static boolean equals(final Set<?> a, final Set<?> b) {
         if (a == b) {
             return true;
         } else if (a == null || b == null) {
@@ -137,7 +197,7 @@ public class CompareUtils {
         }
     }
 
-    public static boolean equalsDeep(final Object objectX, final Object objectY, Equalator equalator) {
+    public static boolean equalsDeep(final Object objectX, final Object objectY, final Equalator equalator) {
         return equalsDeep(objectX, objectY, equalator, new HashSet<Couple>());
     }
 
@@ -150,9 +210,9 @@ public class CompareUtils {
          * @param objectX
          * @param objectY
          */
-        public Couple(Object objectX, Object objectY) {
-            a = objectX;
-            b = objectY;
+        public Couple(final Object objectX, final Object objectY) {
+            this.a = objectX;
+            this.b = objectY;
         }
 
         private int          hashCode = -1;
@@ -166,16 +226,16 @@ public class CompareUtils {
          */
         @Override
         public int hashCode() {
-            int ret = hashCode;
+            int ret = this.hashCode;
             if (ret == -1) {
                 ret = 0;
-                if (a != null) {
-                    ret += a.hashCode();
+                if (this.a != null) {
+                    ret += this.a.hashCode();
                 }
-                if (b != null) {
-                    ret += b.hashCode();
+                if (this.b != null) {
+                    ret += this.b.hashCode();
                 }
-                hashCode = ret;
+                this.hashCode = ret;
             }
             return ret;
         }
@@ -186,18 +246,18 @@ public class CompareUtils {
          * @see java.lang.Object#equals(java.lang.Object)
          */
         @Override
-        public boolean equals(Object obj) {
+        public boolean equals(final Object obj) {
             if (obj == this) {
                 return true;
             } else if (!(obj instanceof Couple)) {
                 return false;
             } else {
-                return CompareUtils.equals(a, ((Couple) obj).a) && CompareUtils.equals(b, ((Couple) obj).b);
+                return CompareUtils.equals(this.a, ((Couple) obj).a) && CompareUtils.equals(this.b, ((Couple) obj).b);
             }
         }
     }
 
-    public static boolean equalsDeep(final Object objectX, final Object objectY, Equalator customEuualator, HashSet<Couple> dupeCheck) {
+    public static boolean equalsDeep(final Object objectX, final Object objectY, final Equalator customEuualator, final HashSet<Couple> dupeCheck) {
         if (objectX == objectY) {
             return true;
         } else if (objectX == null || objectY == null) {
@@ -238,8 +298,8 @@ public class CompareUtils {
             if (((Set) objectX).size() != ((Set) objectY).size()) {
                 return false;
             }
-            main: for (Object x : ((Set) objectX)) {
-                for (Object y : ((Set) objectY)) {
+            main: for (final Object x : ((Set) objectX)) {
+                for (final Object y : ((Set) objectY)) {
                     if (equalsDeep(x, y, customEuualator, dupeCheck)) {
                         continue main;
                     }
@@ -252,7 +312,7 @@ public class CompareUtils {
             if (((Map<?, ?>) objectX).size() != ((Map<?, ?>) objectY).size()) {
                 return false;
             }
-            for (Entry<?, ?> es : ((Map<?, ?>) objectX).entrySet()) {
+            for (final Entry<?, ?> es : ((Map<?, ?>) objectX).entrySet()) {
                 final Object other = ((Map<?, ?>) objectY).get(es.getKey());
                 if (other == null && !((Map<?, ?>) objectY).containsKey(es.getKey())) {
                     return false;
@@ -274,28 +334,28 @@ public class CompareUtils {
                         return false;
                     }
                 }
-            } catch (NoSuchMethodException e1) {
+            } catch (final NoSuchMethodException e1) {
                 throw new WTFException(e1);
-            } catch (SecurityException e1) {
+            } catch (final SecurityException e1) {
                 throw new WTFException(e1);
             }
             try {
                 final ClassCache cc = ClassCache.getClassCache(objectX.getClass());
-                for (Getter c : cc.getGetter()) {
+                for (final Getter c : cc.getGetter()) {
                     if (!equalsDeep(c.getValue(objectX), c.getValue(objectY), customEuualator, dupeCheck)) {
                         return false;
                     }
                 }
                 return true;
-            } catch (SecurityException e) {
+            } catch (final SecurityException e) {
                 throw new WTFException(e);
-            } catch (NoSuchMethodException e) {
+            } catch (final NoSuchMethodException e) {
                 return false;
-            } catch (IllegalArgumentException e) {
+            } catch (final IllegalArgumentException e) {
                 throw new WTFException(e);
-            } catch (IllegalAccessException e) {
+            } catch (final IllegalAccessException e) {
                 throw new WTFException(e);
-            } catch (InvocationTargetException e) {
+            } catch (final InvocationTargetException e) {
                 throw new WTFException(e);
             }
         } else {
@@ -308,15 +368,15 @@ public class CompareUtils {
      * @param number2
      * @return
      */
-    public static int compareNumber(Number a, Number b) {
+    public static int compareNumber(final Number a, final Number b) {
         final Class<?> ac = a.getClass();
         final Class<?> bc = b.getClass();
         if (ac == Double.class || bc == Double.class) {
-            return compare(a.doubleValue(), b.doubleValue());
+            return compareDouble(a.doubleValue(), b.doubleValue());
         } else if (ac == Float.class || bc == Float.class) {
-            return compare(a.floatValue(), b.floatValue());
+            return compareFloat(a.floatValue(), b.floatValue());
         } else {
-            return compare(a.longValue(), b.longValue());
+            return compareLong(a.longValue(), b.longValue());
         }
     }
 
@@ -325,7 +385,7 @@ public class CompareUtils {
      * @param query
      * @return
      */
-    public static boolean equalsNumber(Number a, Number b) {
+    public static boolean equalsNumber(final Number a, final Number b) {
         if (a == null && b == null) {
             return true;
         } else if (a == null || b == null) {
@@ -335,7 +395,7 @@ public class CompareUtils {
         }
     }
 
-    public static int hashCodeDeep(Object obj) {
+    public static int hashCodeDeep(final Object obj) {
         return hashCodeDeep(obj, null);
     }
 
@@ -343,7 +403,7 @@ public class CompareUtils {
      * @param addressDetails
      * @return
      */
-    public static int hashCodeDeep(Object obj, CompareUtilsHashCodeCalculator hashCode) {
+    public static int hashCodeDeep(final Object obj, final CompareUtilsHashCodeCalculator hashCode) {
         if (obj == null) {
             return 0;
         }
@@ -353,7 +413,7 @@ public class CompareUtils {
             if (!(obj instanceof ClassUsesDeepHashCode)) {
                 return obj.hashCode();
             }
-        } catch (NoSuchMethodException e) {
+        } catch (final NoSuchMethodException e) {
             // continue deep
         }
         if (obj instanceof java.util.Collection) {
@@ -384,7 +444,7 @@ public class CompareUtils {
             return ret;
         } else if (obj instanceof Map) {
             int ret = 0;
-            for (Entry<?, ?> es : ((Map<?, ?>) obj).entrySet()) {
+            for (final Entry<?, ?> es : ((Map<?, ?>) obj).entrySet()) {
                 final Object key = es.getKey();
                 if (hashCode != null && hashCode.hasCustomHashCode(key, true)) {
                     ret = hashCode.calcKeyHashCode(ret, key);
@@ -408,7 +468,7 @@ public class CompareUtils {
             try {
                 final ClassCache cc = ClassCache.getClassCache(obj.getClass());
                 int ret = 0;
-                for (Getter c : cc.getGetter()) {
+                for (final Getter c : cc.getGetter()) {
                     final Object key = c.key;
                     if (hashCode != null && hashCode.hasCustomHashCode(key, true)) {
                         ret = hashCode.calcKeyHashCode(ret, key);
@@ -423,15 +483,15 @@ public class CompareUtils {
                     }
                 }
                 return ret;
-            } catch (SecurityException e) {
+            } catch (final SecurityException e) {
                 throw new WTFException(e);
-            } catch (NoSuchMethodException e) {
+            } catch (final NoSuchMethodException e) {
                 throw new WTFException(e);
-            } catch (IllegalArgumentException e) {
+            } catch (final IllegalArgumentException e) {
                 throw new WTFException(e);
-            } catch (IllegalAccessException e) {
+            } catch (final IllegalAccessException e) {
                 throw new WTFException(e);
-            } catch (InvocationTargetException e) {
+            } catch (final InvocationTargetException e) {
                 throw new WTFException(e);
             }
         }
@@ -442,11 +502,15 @@ public class CompareUtils {
      * @param unwrapType2
      * @return
      */
-    public static Integer compare(Object a, Object b) {
+    public static Integer tryToCompare(final Object a, final Object b) {
         if (a instanceof Number && b instanceof Number) {
             return compareNumber((Number) a, (Number) b);
         } else if (a instanceof Comparable && b instanceof Comparable) {
-            return compare((Comparable) a, (Comparable) b);
+            try {
+                return compareComparable((Comparable) a, (Comparable) b);
+            } catch (final RuntimeException e) {
+                LogV3.exception(CompareUtils.class, e);
+            }
         }
         return null;
     }

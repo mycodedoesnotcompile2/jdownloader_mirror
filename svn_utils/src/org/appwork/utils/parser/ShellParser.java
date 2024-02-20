@@ -40,7 +40,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * @author thomas
@@ -174,6 +176,15 @@ public class ShellParser {
     }
 
     public static String createCommandLine(Style style, String... commandline) {
+        if (style == null) {
+            switch (CrossSystem.getOSFamily()) {
+            case WINDOWS:
+                style = Style.WINDOWS;
+                break;
+            default:
+                DebugMode.debugger("OS not supported!");
+            }
+        }
         String[] cmd = commandline;
         String exe = cmd[0];
         exe = removeQuotes(exe);

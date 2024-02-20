@@ -510,7 +510,7 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
             Collections.sort(newextComponentRowHighlighters, new Comparator<ExtComponentRowHighlighter<E>>() {
                 @Override
                 public int compare(final ExtComponentRowHighlighter<E> o1, final ExtComponentRowHighlighter<E> o2) {
-                    return CompareUtils.compare(o1.getPriority(), o2.getPriority());
+                    return CompareUtils.compareInt(o1.getPriority(), o2.getPriority());
                 }
             });
             this.extComponentRowHighlighters = newextComponentRowHighlighters;

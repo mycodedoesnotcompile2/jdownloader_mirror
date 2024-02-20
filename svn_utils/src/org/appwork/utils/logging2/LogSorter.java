@@ -96,7 +96,7 @@ public class LogSorter {
          */
         @Override
         public int compareTo(LogLine o) {            
-            return CompareUtils.compare(ts, o.ts);
+            return CompareUtils.compareLong(ts, o.ts);
         }
     }
 

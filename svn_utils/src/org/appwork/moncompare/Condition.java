@@ -677,7 +677,11 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 } else if (expression instanceof Condition) {
                     DebugMode.debugger();
                     final Object b = container.resolveValue(container, expression, scope, true);
-                    final boolean ret = this.op.opEval(container.compare(scope.getLast(), b));
+                    Integer result = container.compare(scope.getLast(), b);
+                    if (result == null) {
+                        throw new ConditionException("Unsupported expression: " + container.toLog(b) + " on " + container.toLog(scope.getLast()));
+                    }
+                    final boolean ret = this.op.opEval(result);
                     if (container._isDebug()) {
                         container.log(scope.getPath(), "%s: %s.%s(%s)" + " = %s", this.getClass().getSimpleName(), scope.getLast(), this.op.name(), b, ret);
                         ;
@@ -1646,7 +1650,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 return ret.intValue();
             }
         }
-        return CompareUtils.compare(a, b);
+        return CompareUtils.tryToCompare(a, b);
     }
 
     public ListAccessorInterface getListWrapper(final Object expression) {

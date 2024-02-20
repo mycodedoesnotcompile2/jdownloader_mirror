@@ -235,7 +235,8 @@ public abstract class AbstractTray implements TrayMouseListener {
         }
         // if the tray icon is more left than the left edge of the popup, enlarge the popup
         try {
-            int betterX = Math.min(position.x, ma.getEstimatedTopLeft().x);
+            Rectangle bounds = ma.getUnscaledBounds();
+            int betterX = Math.min(position.x, bounds.x);
             if (betterX < position.x) {
                 popup.setPreferredSize(new Dimension(ps.width + position.x - betterX, ps.height));
             }

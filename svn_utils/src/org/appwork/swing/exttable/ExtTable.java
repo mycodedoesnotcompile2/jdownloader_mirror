@@ -142,7 +142,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
      * true if search is enabled
      */
     private boolean                                        searchEnabled        = false;
-    private SearchDialog                                   searchDialog;
+    protected SearchDialog                                 searchDialog;
     private final ExtTableEventSender                      eventSender;
     private JComponent                                     columnButton         = null;
     private boolean                                        columnButtonVisible  = true;
@@ -1209,9 +1209,6 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
      * @param g
      */
     private void paintHighlighters(final Graphics g) {
-        /*
-         * highlighter TODO: this might get slow for many rows TODO: change order? highlighting columns "overpaint" the text
-         */
         if (this.getRowCount() == 0) {
             return;
         }
@@ -1221,17 +1218,15 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
         first = this.getCellRect(0, 0, true);
         last = this.getCellRect(0, this.getColumnCount() - 1, true);
         final int width = last.x + last.width - first.x;
+        int firstVisibleRow = rowAtPoint(new Point(0, visibleRect.y));
+        int lastVisibleRow = rowAtPoint(new Point(0, visibleRect.y + visibleRect.height - 1));
+        if (lastVisibleRow == -1) {
+            lastVisibleRow = getRowCount() - 1;
+        }
         for (final ExtOverlayRowHighlighter rh : this.rowHighlighters) {
-            for (int i = 0; i < this.getRowCount(); i++) {
-                first = this.getCellRect(i, 0, true);
-                // skip if the row is not in visible rec
-                if (first.y + first.height < visibleRect.y) {
-                    continue;
-                }
-                if (first.y > visibleRect.y + visibleRect.height) {
-                    continue;
-                }
+            for (int i = firstVisibleRow; i <= lastVisibleRow; i++) {
                 if (rh.doHighlight(this, i)) {
+                    first = this.getCellRect(i, 0, true);
                     rh.paint((Graphics2D) g, 0, first.y, width, first.height - 1);
                 }
             }
@@ -1859,6 +1854,46 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     }
 
     /**
+     * @param text
+     * @param b
+     * @param regex
+     */
+    public void runSearch(final String text, final boolean caseSensitive, final boolean regex) {
+        final int[] sel = this.getSelectedRows();
+        int startRow = -1;
+        if (sel != null && sel.length > 0) {
+            startRow = sel[sel.length - 1];
+        }
+        final int startAt = startRow;
+        new Thread("Run Table Search") {
+            {
+                setDaemon(true);
+            }
+
+            @Override
+            public void run() {
+                final E found = getModel().searchNextObject(startAt + 1, text, caseSensitive, regex);
+                if (found != null) {
+                    new EDTRunner() {
+                        @Override
+                        protected void runInEDT() {
+                            getModel().setSelectedObject(found);
+                            final int row = getSelectedRow();
+                            final Rectangle rowRect = getCellRect(row, 0, true);
+                            if (!getVisibleRect().intersects(rowRect)) {
+                                // only scrill if the row is not visible
+                                scrollToRow(row, row);
+                            }
+                        }
+                    };
+                } else {
+                    CrossSystem.playErrorSound();
+                }
+            };;
+        }.start();
+    }
+
+    /**
      * Starts a Search Prozess. Usualy opens a Search Dialog
      */
     public synchronized void startSearch() {
@@ -1872,14 +1907,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                 public void actionPerformed(final ActionEvent e) {
                     final String ret = ExtTable.this.searchDialog.getReturnID();
                     if (ret != null) {
-                        final int[] sel = ExtTable.this.getSelectedRows();
-                        int startRow = -1;
-                        if (sel != null & sel.length > 0) {
-                            startRow = sel[sel.length - 1];
-                        }
-                        final E found = ExtTable.this.getModel().searchNextObject(startRow + 1, ret, ExtTable.this.searchDialog.isCaseSensitive(), ExtTable.this.searchDialog.isRegex());
-                        ExtTable.this.getModel().setSelectedObject(found);
-                        ExtTable.this.scrollToSelection(-1);
+                        runSearch(ret, ExtTable.this.searchDialog.isCaseSensitive(), ExtTable.this.searchDialog.isRegex());
                     }
                 }
             };

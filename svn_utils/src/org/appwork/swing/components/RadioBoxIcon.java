@@ -40,6 +40,7 @@ import javax.swing.Icon;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 
+import org.appwork.swing.synthetica.SyntheticaHelper;
 import org.appwork.utils.ImageProvider.ImageProvider;
 
 public final class RadioBoxIcon implements Icon {
@@ -76,7 +77,7 @@ public final class RadioBoxIcon implements Icon {
         panel.add(cb);// Substance laf, special handling SubstanceColorUtilities.getBackgroundFillColor, component.getParent
         // we need this workaround.
         // if we would use cb.paint(g); for every paintIcon call, this might habe sideeffects on the LAF painter.
-        size = 16;
+        size = Math.max(cb.getPreferredSize().width, cb.getPreferredSize().height);
         if (!enabled) {
             internalIcon = org.appwork.resources.AWUTheme.I().getDisabledIcon(ImageProvider.toImageIcon(this));
         } else {
@@ -93,18 +94,12 @@ public final class RadioBoxIcon implements Icon {
         if (internalIcon != null) {
             internalIcon.paintIcon(c, g, x, y);
         } else {
-            // g.setColor(Color.RED);
-            // g.drawRect(0, 0, 14, 14);
             g = g.create(x, y, size, size);
-            // g.translate(x, y);
-            g.translate(-4, -4);
+            if (SyntheticaHelper.isSynthetica()) {
+                g.translate(-4, -4);
+            }
             cb.paint(g);
             g.dispose();
-            // g.translate(4, 4);
-            // g.translate(-x, -y);
-
-            // g.dispose();
-            // g.translate(0, -10);
         }
     }
 

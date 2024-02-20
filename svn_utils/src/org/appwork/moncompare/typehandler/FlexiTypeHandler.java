@@ -54,7 +54,7 @@ public class FlexiTypeHandler implements TypeHandler {
     @Override
     public Integer compare(Object a, Object b) {
         if (a instanceof FlexiJSonNode || b instanceof FlexiJSonNode) {
-            return CompareUtils.compare(unwrapType(a), unwrapType(b));
+            return CompareUtils.tryToCompare(unwrapType(a), unwrapType(b));
         }
         return null;
     }

@@ -80,5 +80,9 @@ public enum SC {
     /**
      * Ensure that the result does not contain and newlines
      */
-    SINGLE_LINE
+    SINGLE_LINE,
+    /**
+     * do not serialize default values
+     */
+    IGNORE_DEFAULT_VALUES
 }

@@ -502,9 +502,9 @@ public class FlexiJSonMapper {
                             if (id2 == null) {
                                 id2 = 0;
                             }
-                            int result = CompareUtils.compare(id1, id2);
+                            int result = CompareUtils.compareComparable(id1, id2);
                             if (result == 1) {
-                                return CompareUtils.compare(o1.getKey(), o2.getKey());
+                                return CompareUtils.compareComparable(o1.getKey(), o2.getKey());
                             } else {
                                 return result;
                             }

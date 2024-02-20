@@ -20,6 +20,7 @@ import java.awt.Dimension;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.PointerInfo;
+import java.awt.Rectangle;
 import java.awt.TrayIcon;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -28,6 +29,7 @@ import java.awt.event.MouseMotionListener;
 import javax.swing.SwingUtilities;
 
 import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.SwingUtils;
 
 public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
     private final TrayMouseListener deligate;
@@ -39,11 +41,13 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
     private final Dimension         size;
     private MouseEvent              lastEvent;
     private final Component         dummy;
+    private Rectangle               bounds;
+    private TrayIcon                trayIcon;
     private static int              TOOLTIP_DELAY = 1000;
 
     public TrayMouseAdapter(TrayMouseListener lightTray, TrayIcon trayIcon) {
         this.deligate = lightTray;
-        // this.trayIcon = trayIcon;
+        this.trayIcon = trayIcon;
         this.dummy = new Component() {
             private static final long serialVersionUID = 1L;
         };
@@ -74,7 +78,11 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
                             protected void runInEDT() {
                                 PointerInfo pi = MouseInfo.getPointerInfo();
                                 if (pi != null) {
+                                    if (bounds == null) {
+                                        return;
+                                    }
                                     Point point = pi.getLocation();
+                                    point = SwingUtils.convertToUnscaled(pi.getDevice(), point);
                                     if (!TrayMouseAdapter.this.isOver(point)) {
                                         MouseEvent me;
                                         me = new MouseEvent(TrayMouseAdapter.this.dummy, 0, System.currentTimeMillis(), 0, point.x, point.y, 0, false);
@@ -114,7 +122,9 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
             new Exception().printStackTrace();
         }
         this.mouseover = false;
+        System.out.println("Exit");
         this.min = this.max = null;
+        bounds = null;
         this.deligate.mouseExited(e);
     }
 
@@ -159,24 +169,26 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
             this.min = new Point(e.getPoint().x, e.getPoint().y);
             this.max = new Point(e.getPoint().x, e.getPoint().y);
         } else {
-            // System.out.println(this.min + " - " + this.max);
             this.min.x = Math.min(e.getPoint().x, this.min.x);
             this.min.y = Math.min(e.getPoint().y, this.min.y);
             this.max.x = Math.max(e.getPoint().x, this.max.x);
             this.max.y = Math.max(e.getPoint().y, this.max.y);
             //
         }
+        bounds = new Rectangle(min.x, min.y, max.x - min.x, max.y - min.y);
+        if (bounds.width < size.width) {
+            bounds.x -= (size.width - bounds.width) / 2;
+            bounds.width = size.width;
+        }
+        if (bounds.height < size.height) {
+            bounds.y -= (size.height - bounds.height) / 2;
+            bounds.height = size.height;
+        }
         if (!this.mouseover) {
             this.mouseEntered(e);
         } else {
             this.deligate.mouseMoved(e);
         }
-    }
-
-    public Point getEstimatedTopLeft() {
-        int midx = (this.max.x + this.min.x) / 2;
-        int midy = (this.max.y + this.min.y) / 2;
-        return new Point(midx - this.size.width / 2, midy - this.size.height / 2);
     }
 
     /**
@@ -186,23 +198,13 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
      * @return
      */
     protected boolean isOver(Point point) {
-        if (max == null || min == null) {
+        if (bounds == null) {
             return false;
         }
-        int midx = (this.max.x + this.min.x) / 2;
-        int midy = (this.max.y + this.min.y) / 2;
-        int width = Math.min(this.size.width, this.max.x - this.min.x);
-        int height = Math.min(this.size.height, this.max.y - this.min.y);
-        int minx = midx - width / 2;
-        int miny = midy - height / 2;
-        int maxx = midx + width / 2;
-        int maxy = midy + height / 2;
-        // java.awt.Point[x=1274,y=1175] - java.awt.Point[x=1309,y=1185]
-        if (point.x >= minx && point.x <= maxx) {
-            if (point.y >= miny && point.y <= maxy) {
-                return true;
-            }
-        }
-        return false;
+        return bounds.contains(point);
+    }
+
+    public Rectangle getUnscaledBounds() {
+        return bounds;
     }
 }

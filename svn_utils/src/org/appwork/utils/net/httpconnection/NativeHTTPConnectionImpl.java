@@ -75,7 +75,6 @@ import org.appwork.utils.net.NullOutputStream;
  *
  */
 public class NativeHTTPConnectionImpl implements HTTPConnection {
-
     protected final static ProxySelector                DEFAULT_PROXY_SELECTOR      = ProxySelector.getDefault();
     protected final URL                                 httpURL;
     protected final HTTPProxy                           proxy;
@@ -98,7 +97,6 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     protected long                                      requestTime                 = -1;
     protected long[]                                    ranges;
     protected boolean                                   contentDecoded              = false;
-
     private boolean                                     connected                   = false;
     private boolean                                     wasConnected                = false;
     private boolean                                     sslTrustALL                 = false;
@@ -140,7 +138,6 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         }
         try {
             ProxySelector.setDefault(new ProxySelector() {
-
                 @Override
                 public List<Proxy> select(URI uri) {
                     final Proxy nativeProxy;
@@ -208,7 +205,6 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                 handlerField.setAccessible(true);
                 final URLStreamHandler handler = (URLStreamHandler) handlerField.get(url);
                 final URL ret = new URL(null, url.toExternalForm(), new URLStreamHandler() {
-
                     @Override
                     protected int getDefaultPort() {
                         if (Exceptions.getStackTrace(new Exception()).contains("sendCONNECT")) {
@@ -260,7 +256,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
             switch (proxy.getType()) {
             case HTTP:
             case HTTPS:
-                this.setRequestProperty("Proxy-Connection", "close");
+                this.setRequestProperty(HTTPConstants.HEADER_REQUEST_PROXY_CONNECTION, "close");
                 break;
             default:
                 break;
@@ -285,10 +281,8 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     protected SSLSocketStreamOptions getNewSSLSocketStreamOptionsInstance(String host, int port, boolean trustAllFlag) {
         final String id = getSSLSocketStreamOptionsID(host, port, trustAllFlag);
         final SSLSocketStreamOptions ret = new SSLSocketStreamOptions(id, trustAllFlag) {
-
             @Override
             protected void initCipherSuitesLists() {
-
             }
         };
         return getSSLSocketStreamOptions(ret);

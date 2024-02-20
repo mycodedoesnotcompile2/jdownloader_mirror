@@ -88,6 +88,7 @@ import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.RuntimeInterruptedException;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.duration.TimeSpan;
 import org.appwork.utils.reflection.CompiledType;
@@ -188,23 +189,6 @@ public class StorableValidator<T> {
         @Override
         protected Object createProxy(CompiledType cType, FlexiJSonObject obj) throws IllegalArgumentException, SecurityException, NoSuchMethodException {
             Object ret = super.createProxy(cType, obj);
-            // ClassCache cc = cType.getClassCache();
-            // // toDos.add(new ValidatetoDoss(obj, ret, cType, cc, null));
-            // for (String key : cc.getKeys()) {
-            // Property prop = cc.getProperty(key);
-            // KeyValueElement el = obj.getElement(key);
-            // Object mapped = null;
-            // try {
-            // mapped = prop.getter == null ? null : prop.getter.getValue(ret);
-            // } catch (IllegalArgumentException e) {
-            // throw new WTFException(e);
-            // } catch (IllegalAccessException e) {
-            // throw new WTFException(e);
-            // } catch (InvocationTargetException e) {
-            // throw new WTFException(e);
-            // }
-            // toDos.add(new ValidatetoDoss(el == null ? null : el.getValue(), mapped, prop.type, cc, key));
-            // }
             return ret;
         }
 
@@ -222,7 +206,7 @@ public class StorableValidator<T> {
             if (cc.getClassCache().getAnnotations(key, StorableValidatorIgnoresMissingSetter.class).size() > 0) {
                 return;
             }
-            // add(new UnknownPropertyException(StorableValidator.this, fromFlexiNode(value), value, null));
+            RuntimeInterruptedException.throwWithoutClear();
         }
 
         /*
@@ -233,19 +217,24 @@ public class StorableValidator<T> {
          */
         @Override
         protected Object returnFallbackOrThrowException(FlexiMapperException ex) throws FlexiMapperException {
-            // toDos Auto-generated method stub
-            if (ex.getCause() instanceof ClassCastException) {
-                String structure;
-                if (ex.node instanceof FlexiJSonObject) {
-                    structure = "Object/Map";
-                } else if (ex.node instanceof FlexiJSonArray) {
-                    structure = "Array/List/Set";
+            RuntimeInterruptedException.throwWithoutClear();
+            try {
+                if (ex.getCause() instanceof ClassCastException) {
+                    String structure;
+                    if (ex.node instanceof FlexiJSonObject) {
+                        structure = "Object/Map";
+                    } else if (ex.node instanceof FlexiJSonArray) {
+                        structure = "Array/List/Set";
+                    } else {
+                        structure = "Number/String/Enum/Boolean/null";
+                    }
+                    add(new ValidatorException(StorableValidator.this, ex, fromFlexiNode(ex.node), ex.node, ex.type, "Unexpected data structure: '" + structure + "' for target type '" + ex.type.toString(new JsonSyntax()) + "" + "'", FailLevel.ERROR));
                 } else {
-                    structure = "Number/String/Enum/Boolean/null";
+                    add(ex);
                 }
-                add(new ValidatorException(StorableValidator.this, ex, fromFlexiNode(ex.node), ex.node, ex.type, "Unexpected data structure: '" + structure + "' for target type '" + ex.type.toString(new JsonSyntax()) + "" + "'", FailLevel.ERROR));
-            } else {
-                add(ex);
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
             }
             return null;
         }
@@ -262,58 +251,35 @@ public class StorableValidator<T> {
                 return super.nodeToEnum(node, type);
             } catch (IllegalArgumentException e) {
                 Enum alt = findAlternative(node, type.type);
-                add(new UnknownEnumException(StorableValidator.this, node, type, alt));
+                try {
+                    add(new UnknownEnumException(StorableValidator.this, node, type, alt));
+                } catch (InterruptedException e1) {
+                    Thread.currentThread().interrupt();
+                    RuntimeInterruptedException.throwWithoutClear();
+                }
                 return alt;
             }
         }
 
         @Override
         public Object jsonToObject(final FlexiJSonNode json, CompiledType type, Setter setter) throws FlexiMapperException {
+            RuntimeInterruptedException.throwWithoutClear();
             type = StorableValidator.this.dynamicTypeMapping(json, type, setter);
             final Object ret = super.jsonToObject(json, type, setter);
-            // ClassCache cc;
-            // try {
-            // if (type.raw == null) {
-            // type = CompiledType.OBJECT;
-            // }
-            // cc = type.getClassCache();
-            // if (cc != null) {
-            // // do not ceck annotations in the class header if the value is null - only for the roottype
-            // if (type == rootType.type || !(json instanceof FlexiJSonValue) || ((FlexiJSonValue) json).getValue() != null) {
-            // toDos.add(new ValidatetoDoss(json, ret, type, cc, null));
-            // }
-            // // validate(node, ret, type, cc.getAnnotations(null, StorableValidateCondition.class), cc.getAnnotations(null,
-            // // StorableValidateCondition2.class), cc.getAnnotations(null, StorableValidateCondition3.class),
-            // // cc.getAnnotations(null, StorableValidateRegex.class));
-            // if (type.isObjectContainer() && !type.isMap()) {
-            // for (String key : cc.getKeys()) {
-            // Property property = cc.getProperty(key);
-            // if (json instanceof FlexiJSonObject) {
-            // if (((FlexiJSonObject) json).getElement(key) == null) {
-            // toDos.add(new ValidatetoDoss(null, null, property.type, cc, key, fromFlexiNode(json).add(key)));
-            // }
-            // }
-            // }
-            // }
-            // }
-            // } catch (final Exception e) {
-            // add(new FlexiMapperException(json, type, e));
-            // }
             return ret;
         }
 
         @Override
         protected void setValueToObject(final FlexiJSonNode node, final Object inst, final CompiledType cType, final Object value, final Setter setter) throws IllegalAccessException, InvocationTargetException, FlexiMapperException {
-            // toDos.add(new ValidatetoDoss(node, value, CompiledType.create(setter.getType(), setter.method.getDeclaringClass()),
-            // cType.getClassCache(), setter.getKey()));
-            // validate(node, value, setter.getType(), cc.getAnnotations(setter.getKey(), StorableValidateCondition.class),
-            // cc.getAnnotations(setter.getKey(), StorableValidateCondition2.class), cc.getAnnotations(setter.getKey(),
-            // StorableValidateCondition3.class), cc.getAnnotations(setter.getKey(), StorableValidateRegex.class));
+            RuntimeInterruptedException.throwWithoutClear();
             super.setValueToObject(node, inst, cType, value, setter);
         }
     }
 
-    protected void add(FlexiMapperException ex) {
+    protected void add(FlexiMapperException ex) throws InterruptedException {
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
         if (ex instanceof ValidatorException) {
             exceptions.add((ValidatorException) ex);
         } else {
@@ -357,7 +323,12 @@ public class StorableValidator<T> {
 
         @Override
         protected Object convertStringToNumber(FlexiJSonValue node, String value, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            try {
+                add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
             return super.convertStringToNumber(node, value, destType);
         }
 
@@ -369,25 +340,45 @@ public class StorableValidator<T> {
          */
         @Override
         protected Object convertStringToBoolean(FlexiJSonValue node, String value, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            try {
+                add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
             return super.convertStringToBoolean(node, value, destType);
         }
 
         @Override
         protected Object convertToString(FlexiJSonValue node) {
-            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.STRING, null, FailLevel.ERROR));
+            try {
+                add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.STRING, null, FailLevel.ERROR));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
             return super.convertToString(node);
         }
 
         @Override
         protected Object convertNullToBoolean(FlexiJSonValue node) {
-            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.BOOLEAN_PRIMITIVE, null, FailLevel.ERROR));
+            try {
+                add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, CompiledType.BOOLEAN_PRIMITIVE, null, FailLevel.ERROR));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
             return super.convertNullToBoolean(node);
         }
 
         @Override
         protected Object convertNullToNumber(FlexiJSonValue node, CompiledType destType) {
-            add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            try {
+                add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(node), node, destType, null, FailLevel.ERROR));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
             return super.convertNullToNumber(node, destType);
         }
 
@@ -397,7 +388,12 @@ public class StorableValidator<T> {
                 return super.nodeToEnum(node, type);
             } catch (IllegalArgumentException e) {
                 Enum alt = findAlternative(node, type.type);
-                add(new UnknownEnumException(StorableValidator.this, node, type, alt));
+                try {
+                    add(new UnknownEnumException(StorableValidator.this, node, type, alt));
+                } catch (InterruptedException e1) {
+                    Thread.currentThread().interrupt();
+                    RuntimeInterruptedException.throwWithoutClear();
+                }
                 return alt;
             }
         }
@@ -433,7 +429,12 @@ public class StorableValidator<T> {
         // adding defaults will removed missing fields
         @Override
         protected void onClassFieldMissing(Object inst, String key, FlexiJSonNode value, CompiledType cc) throws FlexiMapperException {
-            add(new UnknownPropertyException(StorableValidator.this, fromFlexiNode(value), value, null));
+            try {
+                add(new UnknownPropertyException(StorableValidator.this, fromFlexiNode(value), value, null));
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                RuntimeInterruptedException.throwWithoutClear();
+            }
         }
     }
 
@@ -1059,9 +1060,10 @@ public class StorableValidator<T> {
 
     /**
      * @return
+     * @throws InterruptedException
      * @throws FlexiMapperException
      */
-    public List<ValidatorException> validate() {
+    public List<ValidatorException> validate() throws InterruptedException {
         toDos = new ArrayList<ValidatetoDoss>();
         exceptions = new ArrayList<ValidatorException>();
         final FlexiJSonMapper mapper = createMapper();
@@ -1160,6 +1162,10 @@ public class StorableValidator<T> {
             add(new InvalidTypeException(StorableValidator.this, fromFlexiNode(e.node), e.node, e.type, e.getMessage(), FailLevel.ERROR));
         } catch (FlexiMapperException e) {
             add(e);
+        } catch (RuntimeInterruptedException e) {
+            // we throw an actual interruptexception - time to clear the flag
+            Thread.interrupted();
+            throw new InterruptedException();
         }
         return exceptions;
     }
@@ -1181,11 +1187,12 @@ public class StorableValidator<T> {
      * @param result2
      * @param extended
      * @param rootType2
+     * @throws InterruptedException
      * @throws InvocationTargetException
      * @throws IllegalAccessException
      * @throws IllegalArgumentException
      */
-    private void run(Object object, FlexiJSonNode node, CompiledType type, JSPath path, Property context) {
+    private void run(Object object, FlexiJSonNode node, CompiledType type, JSPath path, Property context) throws InterruptedException {
         StorableValidator<T>.ValidatetoDoss todo = new ValidatetoDoss(node, object, type, context, path);
         if (type.hasAnnotation(StorableHidden.class)) {
             return;
@@ -1302,8 +1309,14 @@ public class StorableValidator<T> {
         return result;
     }
 
-    protected void validateToDo(StorableValidator<T>.ValidatetoDoss toDo) {
+    protected void validateToDo(StorableValidator<T>.ValidatetoDoss toDo) throws InterruptedException {
         for (final Annotation c : toDo.annotations) {
+            if (Thread.interrupted()) {
+                throw new InterruptedException();
+            }
+            if (isIgnore(toDo, c)) {
+                continue;
+            }
             try {
                 if (c instanceof StorableDeprecatedSince && toDo.node != null) {
                     StorableDeprecatedSince condition = (StorableDeprecatedSince) c;
@@ -1516,6 +1529,15 @@ public class StorableValidator<T> {
         }
     }
 
+    /**
+     * @param toDo
+     * @param c
+     * @return
+     */
+    protected boolean isIgnore(StorableValidator<T>.ValidatetoDoss toDo, Annotation c) {
+        return false;
+    }
+
     private FlexiJSonObject getTargetBuildsNode(FlexiJSonNode node) {
         while (node != null) {
             if (node instanceof FlexiJSonObject) {
@@ -1552,8 +1574,9 @@ public class StorableValidator<T> {
      * @throws NoSuchMethodException
      * @throws IllegalAccessException
      * @throws InstantiationException
+     * @throws InterruptedException
      */
-    private void validateClassValidator(StorableValidator<T>.ValidatetoDoss toDo, Class<? extends StorableAbstractValidator> cls, String parameter, FailLevel level, String message) throws NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException {
+    private void validateClassValidator(StorableValidator<T>.ValidatetoDoss toDo, Class<? extends StorableAbstractValidator> cls, String parameter, FailLevel level, String message) throws NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, InterruptedException {
         List<? extends ValidatorException> toadd = ((StorableAbstractValidator) cls.newInstance()).validate(this, result, toDo.value, toDo.node, toDo.path, toDo.type, parameter, level, message);
         if (toadd != null) {
             for (ValidatorException e : toadd) {
@@ -1585,15 +1608,16 @@ public class StorableValidator<T> {
      * @param exceptions2
      * @param toDo
      * @param a
+     * @throws InterruptedException
      */
-    private void validateMandatory(StorableValidator<T>.ValidatetoDoss toDo, StorableValidateMandatoryInJson a) {
+    private void validateMandatory(StorableValidator<T>.ValidatetoDoss toDo, StorableValidateMandatoryInJson a) throws InterruptedException {
         if (toDo.node != null) {
             return;
         }
         add(new ValidatorMandatoryPropertyMissingException(this, toDo.type, toDo.path, a));
     }
 
-    private void validateUnique(StorableValidator<T>.ValidatetoDoss toDo, StorableUnique a) {
+    private void validateUnique(StorableValidator<T>.ValidatetoDoss toDo, StorableUnique a) throws InterruptedException {
         if (toDo.node == null) {
             return;
         }
@@ -1633,8 +1657,9 @@ public class StorableValidator<T> {
      * @param level
      * @param logic
      * @param description
+     * @throws InterruptedException
      */
-    private void validateCondition(StorableValidator<T>.ValidatetoDoss toDo, String value, FailLevel level, StorableValidationLogic logic, String desc) {
+    private void validateCondition(StorableValidator<T>.ValidatetoDoss toDo, String value, FailLevel level, StorableValidationLogic logic, String desc) throws InterruptedException {
         if (StringUtils.isEmpty(desc)) {
             switch (logic) {
             case FAIL_ON_MATCH:

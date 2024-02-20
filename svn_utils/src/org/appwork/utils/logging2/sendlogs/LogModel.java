@@ -65,7 +65,7 @@ public class LogModel extends ExtTableModel<LogFolder> {
 
             @Override
             public int compare(final LogFolder o1, final LogFolder o2) {
-                return CompareUtils.compare(o2.getCreated(), o1.getCreated());
+                return CompareUtils.compareLong(o2.getCreated(), o1.getCreated());
             }
         });
         for (final LogFolder folder : folders) {
@@ -120,9 +120,9 @@ public class LogModel extends ExtTableModel<LogFolder> {
                     @Override
                     public int compare(final LogFolder o1, final LogFolder o2) {
                         if (this.getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
-                            return CompareUtils.compare(o1.getCreated(), o2.getCreated());
+                            return CompareUtils.compareLong(o1.getCreated(), o2.getCreated());
                         } else {
-                            return CompareUtils.compare(o2.getCreated(), o1.getCreated());
+                            return CompareUtils.compareLong(o2.getCreated(), o1.getCreated());
                         }
 
                     }

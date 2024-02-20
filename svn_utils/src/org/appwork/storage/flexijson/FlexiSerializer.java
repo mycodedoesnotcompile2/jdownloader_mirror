@@ -86,14 +86,27 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
     public String toString(Object o, Object... context) throws SerializerException {
         DebugMode.breakIf(context == null || (context.length == 1 && context[0] == null), context);
         try {
-            if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
-                final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
-                final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
-                FlexiJSonNode node;
-                node = mapper.objectToJsonNode(o);
-                toString.toJSONString(node);
+            FlexiJSonNode node = null;
+            if (o instanceof FlexiJSonNode) {
+                node = (FlexiJSonNode) o;
+            } else {
+                if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
+                    final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
+                    final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
+                    node = mapper.objectToJsonNode(o);
+                    return toString.toJSONString(node);
+                }
+                if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+                    FlexiJSonMapper mapper = new FlexiJSonMapper();
+                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
+                    node = mapper.objectToJsonNode(o);
+                } else {
+                    node = toNode(o);
+                }
             }
-            FlexiJSonNode node = toNode(o);
+            if (node == null) {
+                node = toNode(o);
+            }
             String ret = getStringifier(context).toJSONString(node);
             return ret;
         } catch (Exception e) {
@@ -217,15 +230,27 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
     @Override
     public void toStream(Object o, OutputStream os, boolean closeOutputStream, Object... context) throws SerializerException {
         DebugMode.breakIf(context == null || (context.length == 1 && context[0] == null), context);
-        FlexiJSonNode node;
+        FlexiJSonNode node = null;
         try {
-            if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
-                final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
-                final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
-                node = mapper.objectToJsonNode(o);
-                toString.toJSONString(node, os, null);
+            if (o instanceof FlexiJSonNode) {
+                node = (FlexiJSonNode) o;
+            } else {
+                if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
+                    final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
+                    final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
+                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
+                    node = mapper.objectToJsonNode(o);
+                    toString.toJSONString(node, os, null);
+                }
+                if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+                    FlexiJSonMapper mapper = new FlexiJSonMapper();
+                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
+                    node = mapper.objectToJsonNode(o);
+                }
+                if (node == null) {
+                    node = toNode(o);
+                }
             }
-            node = toNode(o);
             getStringifier(context).toJSONString(node, os, null);
         } catch (Exception e) {
             throw SerializerException.wrap(e);

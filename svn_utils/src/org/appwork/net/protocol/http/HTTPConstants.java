@@ -123,7 +123,6 @@ public class HTTPConstants {
         SERVERERROR_SERVICE_UNAVAILABLE(503, "Service Unavailable"),
         GATEWAY_TIMEOUT(504, "Gateway Time-out"),
         WEB_SERVER_DOWN(521, "Cloudflare, Web server is down");
-
         /**
          * @param responseCode
          * @return
@@ -259,6 +258,7 @@ public class HTTPConstants {
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
      */
     public static final String           HEADER_REQUEST_PROXY_AUTHORIZATION            = "Proxy-Authorization";
+    public static final String           HEADER_REQUEST_PROXY_CONNECTION               = "Proxy-Connection";
     /**
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
      */
@@ -317,7 +317,7 @@ public class HTTPConstants {
     public static final String           HEADER_RESPONSE_REFERRER_POLICY               = "Referrer-Policy";
     /*
      * https://www.rfc-editor.org/rfc/rfc2616#page-141
-     *
+     * 
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
      */
     public static final String           HEADER_RESPONSE_RETRY_AFTER                   = "Retry-After";
@@ -340,4 +340,5 @@ public class HTTPConstants {
     public static final SimpleDateFormat DATE_FORMAT_HTTP_DATE_RFC1036                 = new SimpleDateFormat("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.UK);
     public static final String           HEADER_VALUE_ENCODING_DEFLATE                 = "deflate";
     public static final String           HEADER_RESPONSE_LAST_MODFIED                  = "Last-Modified";
+    public static final String           HEADER_REQUEST_UPGRADE_INSECURE_REQUESTS      = "Upgrade-Insecure-Requests";
 }

@@ -76,7 +76,7 @@ public class ExtMergedIcon implements Icon, IDIcon {
 
                                                     @Override
                                                     public int compare(final Entry o1, final Entry o2) {
-                                                        return CompareUtils.compare(o1.z, o2.z);
+                                                        return CompareUtils.compareInt(o1.z, o2.z);
                                                     }
                                                 });
 

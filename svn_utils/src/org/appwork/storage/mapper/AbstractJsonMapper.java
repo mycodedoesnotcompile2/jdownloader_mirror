@@ -341,7 +341,7 @@ public abstract class AbstractJsonMapper implements JSONMapper {
             @Override
             public int compare(KeyValue<T> o1, KeyValue<T> o2) {
                 // best match first
-                return CompareUtils.compare(o1.getTypeHirarchyDepths(), o2.getTypeHirarchyDepths());
+                return CompareUtils.compareInt(o1.getTypeHirarchyDepths(), o2.getTypeHirarchyDepths());
             }
         });
         LinkedList<T> ret = new LinkedList<T>();

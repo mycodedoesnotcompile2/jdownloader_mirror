@@ -46,24 +46,23 @@ import org.appwork.utils.CompareUtils;
  *
  */
 public class CompareUtilsTest extends AWTest {
-
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {
-
         HashSet<Integer> intSet = new HashSet<Integer>(Arrays.asList(1, 2, 3));
         ArrayList<Integer> intList = new ArrayList<Integer>(intSet);
         HashSet<Long> longSet = new HashSet<Long>(Arrays.asList(Long.valueOf(1), Long.valueOf(2), Long.valueOf(3)));
         assertTrue(CompareUtils.equalsDeep(intSet, longSet));
         assertFalse(CompareUtils.equalsDeep(intSet, intList));
+        Integer a = CompareUtils.tryToCompare(1, "a");
+        assertTrue(a == null);
     }
 
     public static void main(String[] args) {
         run();
     }
-
 }
