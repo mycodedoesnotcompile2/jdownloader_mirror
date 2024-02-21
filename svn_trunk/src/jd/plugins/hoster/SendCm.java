@@ -48,7 +48,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48544 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48682 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -589,7 +589,6 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
-        // TODO: Refactor/remove this after next Fullbuild
         if (account == null) {
             return false;
         } else {

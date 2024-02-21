@@ -42,11 +42,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48678 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48684 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                      = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     public static final String  Q_SUBTITLES                     = "Q_SUBTITLES";
+    public static final boolean Q_SUBTITLES_default             = true;
     public static final String  Q_THUMBNAIL                     = "Q_THUMBNAIL";
+    public static final boolean Q_THUMBNAIL_default             = true;
     public static final String  Q_BEST                          = "Q_BEST_2";
     public static final String  Q_LOW                           = "Q_LOW";
     public static final String  Q_VERYLOW                       = "Q_VERYLOW";
@@ -57,7 +59,7 @@ public class ORFMediathek extends PluginForHost {
     public static final String  SETTING_PREFER_VIDEO_GAPLESS    = "VIDEO_GAPLESS";
     public static final String  HTTP_STREAM                     = "HTTP_STREAM";
     public static final String  HLS_STREAM                      = "HLS_STREAM";
-    public static final String  HDS_STREAM                      = "HDS_STREAM";
+    public static final String  HDS_STREAM                      = "HDS_STREAM_2024_02_20";
     public static final String  PROPERTY_TITLE                  = "title";
     public static final String  PROPERTY_VIDEO_POSITION         = "video_position";
     public static final String  PROPERTY_VIDEO_POSITION_MAX     = "video_position_max";
@@ -407,7 +409,7 @@ public class ORFMediathek extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -416,7 +418,7 @@ public class ORFMediathek extends PluginForHost {
 
     @Override
     public String getDescription() {
-        return "JDownloader's ORF Plugin helps downloading videoclips from orf.at. ORF provides different video qualities.";
+        return "JDownloader's ORF Plugin helps downloading videos from on.orf.at. ORF provides different video qualities and types of media.";
     }
 
     private void setConfigElements() {
@@ -437,6 +439,6 @@ public class ORFMediathek extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HTTP_STREAM, "Load http streams").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HLS_STREAM, "Load hls streams").setDefaultValue(true));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HDS_STREAM, "Load hds streams").setDefaultValue(true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), HDS_STREAM, "Load hds streams (unavailable since 2024-02-20)").setDefaultValue(false).setEnabled(false));
     }
 }

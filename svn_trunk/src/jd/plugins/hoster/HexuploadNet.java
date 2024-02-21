@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48609 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48682 $", interfaceVersion = 3, names = {}, urls = {})
 public class HexuploadNet extends XFileSharingProBasic {
     public HexuploadNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -155,9 +155,9 @@ public class HexuploadNet extends XFileSharingProBasic {
         Form form = super.findFormDownload2Premium(downloadLink, account, br);
         if (form == null) {
             form = br.getFormbyProperty("name", "FDL");
-        }
-        if (form == null) {
-            form = br.getFormByInputFieldPropertyKeyValue("op", "download2");
+            if (form == null) {
+                form = br.getFormByInputFieldPropertyKeyValue("op", "download2");
+            }
         }
         return form;
     }
