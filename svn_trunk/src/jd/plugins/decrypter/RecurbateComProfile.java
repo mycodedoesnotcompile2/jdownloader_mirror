@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RecurbateCom;
 
-@DecrypterPlugin(revision = "$Revision: 48569 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48686 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RecurbateCom.class })
 public class RecurbateComProfile extends PluginForDecrypt {
     public RecurbateComProfile(PluginWrapper wrapper) {
@@ -110,7 +110,7 @@ public class RecurbateComProfile extends PluginForDecrypt {
                     continue;
                 }
                 numberofNewItems++;
-                final String videoDetails = br.getRegex(Pattern.quote(videourl) + "\">(.*?<div\\s*class\\s*=\\s*\"video-info-sub.*?</div>)").getMatch(0);
+                final String videoDetails = br.getRegex(Pattern.quote(videourl) + "\">(.*?<div[^\"]*class\\s*=\\s*\"video-info-sub.*?</div>)").getMatch(0);
                 final DownloadLink dlvideo = createDownloadlink(br.getURL(videourl).toExternalForm());
                 if (videoDetails != null) {
                     final String dateStr = new Regex(videoDetails, "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})").getMatch(0);

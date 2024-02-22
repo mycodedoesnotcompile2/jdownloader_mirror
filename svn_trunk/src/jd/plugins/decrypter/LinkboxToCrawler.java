@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 48678 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48688 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -86,7 +86,7 @@ public class LinkboxToCrawler extends PluginForDecrypt {
         final String subfolderID = urlinfo.getMatch(3);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final int maxItemsPerPage = 50;
-        final UrlQuery query = new UrlQuery();
+        final UrlQuery query = LinkboxTo.getBaseQuery();
         query.add("sortField", "name");
         query.add("sortAsc", "1");
         query.add("pageSize", Integer.toString(maxItemsPerPage));
@@ -108,9 +108,6 @@ public class LinkboxToCrawler extends PluginForDecrypt {
         } else {
             query.add("pid", "0");
         }
-        query.add("platform", "web");
-        query.add("pf", "web");
-        query.add("lan", "en");
         // query.add("name", "");
         final HashSet<String> dupes = new HashSet<String>();
         int page = 1;
@@ -173,7 +170,7 @@ public class LinkboxToCrawler extends PluginForDecrypt {
                     }
                     numberofNewItemsOnCurrentPage++;
                     link = this.createDownloadlink(createFileURL(fileID));
-                    LinkboxTo.parseFileInfoAndSetFilename(link, ressource);
+                    LinkboxTo.parseFileInfoAndSetFilename(link, null, ressource);
                     if (!StringUtils.isEmpty(path)) {
                         link.setRelativeDownloadFolderPath(path);
                     }

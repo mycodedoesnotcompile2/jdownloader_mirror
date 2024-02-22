@@ -59,7 +59,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 48598 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 48688 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean             fastlinkcheck             = false;
     private final String        TYPE_ZDF                  = "https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -427,6 +427,8 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             streamInfoMap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(relsTarget, "streams", "default");
             final String player_url_template = (String) streamInfoMap.get("http://zdf.de/rels/streams/ptmd-template");
             /* E.g. "/tmd/2/{playerId}/vod/ptmd/mediathek/161215_sendungroyale065ddm_nmg" */
+            /** 2024-02-21: Possible values: zdf_pd_download_1, ngplayer_2_3, android_native_5 */
+            /* Regarding android_native_5: See also: https://github.com/mediathekview/MServer/issues/592 */
             streamsJsonURL = player_url_template.replace("{playerId}", "ngplayer_2_3");
             downloadsJsonURL = player_url_template.replace("{playerId}", "zdf_pd_download_1");
         } else {
