@@ -60,6 +60,7 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSession;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JVMVersion;
@@ -96,7 +97,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     protected String                                    customcharset               = null;
     protected long                                      requestTime                 = -1;
     protected long[]                                    ranges;
-    protected boolean                                   contentDecoded              = false;
+    protected boolean                                   contentDecoded              = true;
     private boolean                                     connected                   = false;
     private boolean                                     wasConnected                = false;
     private boolean                                     sslTrustALL                 = false;
@@ -595,6 +596,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                     if (getContentLength() == 0) {
                         // Content-Length is 0, return EmptyInputStream
                         this.convertedInputStream = new EmptyInputStream();
+                        this.contentDecoded = false;
                     } else {
                         /**
                          * java.net.HttpURLConnection transparently handles Content-Transfer-Encoding as it already handles chunked
@@ -606,21 +608,25 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                         if (encoding == null || encoding.length() == 0 || "none".equalsIgnoreCase(encoding) || "identity".equalsIgnoreCase(encoding)) {
                             /* no encoding */
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
+                            this.contentDecoded = false;
                         } else if ("gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
                             this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
+                            this.contentDecoded = true;
                         } else if ("deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
                             this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
+                            this.contentDecoded = true;
                         } else {
                             /* unsupported */
-                            this.contentDecoded = false;
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
+                            this.contentDecoded = false;
                         }
                     }
                 } else {
                     /* use original inputstream */
                     this.convertedInputStream = new CountingInputStream(rawInputStream);
+                    this.contentDecoded = false;
                 }
             }
             return this.convertedInputStream;
@@ -769,6 +775,13 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
 
     @Override
     public boolean isContentDecoded() {
+        if (convertedInputStream == null && contentDecoded && isConnected()) {
+            try {
+                getInputStream();
+            } catch (IOException e) {
+                LogV3.log(e);
+            }
+        }
         return this.contentDecoded;
     }
 

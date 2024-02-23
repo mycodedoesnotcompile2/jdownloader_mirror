@@ -480,12 +480,12 @@ public abstract class Request {
         if (Application.getJavaVersion() >= Application.JAVA16) {
             /* deflate only java >=1.6 */
             if (this.isBrotliAcceptEncodingEnabled()) {
-                headers.put("Accept-Encoding", "gzip, deflate, br");
+                headers.put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "gzip, deflate, br");
             } else {
-                headers.put("Accept-Encoding", "gzip, deflate");
+                headers.put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "gzip, deflate");
             }
         } else {
-            headers.put("Accept-Encoding", "gzip");
+            headers.put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "gzip");
         }
         // headers.put("DNT", "1");
         // headers.put("Connection", "keep-alive");

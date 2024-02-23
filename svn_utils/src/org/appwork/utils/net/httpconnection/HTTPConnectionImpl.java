@@ -89,7 +89,6 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 
 public class HTTPConnectionImpl implements HTTPConnection {
-
     protected static enum SSL_STATE {
         NA,
         PROXY,
@@ -190,7 +189,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
     protected int                                lastConnectionPort   = -1;
     protected String                             hostName;
     private boolean                              legacyConnectFlag    = true;
-
     private final static PublicSuffixList        PSL                  = PublicSuffixList.getInstance();
 
     public KEEPALIVE getKeepAlive() {
@@ -795,7 +793,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
     }
 
     protected static HashMap<String, SSLSocketStreamOptions>             SSL_SOCKETSTREAM_OPTIONS          = new HashMap<String, SSLSocketStreamOptions>();
-
     protected static WeakHashMap<SSLSocketStreamOptionsModifier, Object> SSL_SOCKETSTREAM_OPTIONS_MODIFIER = new WeakHashMap<SSLSocketStreamOptionsModifier, Object>();
 
     public static void addSSLSocketStreamOptionsModifier(SSLSocketStreamOptionsModifier sslSocketStreamModifier) {
@@ -978,7 +975,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                 }
                             }
                         }
-
                         if (profiler != null) {
                             profiler.onConnected(this);
                         }
@@ -1118,7 +1114,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
             /* first read http header */
             ByteBuffer header = null;
             try {
-
                 header = HTTPConnectionUtils.readheader(new CountingInputStream(inputStream) {
                     private boolean first = true;
 
@@ -1131,7 +1126,6 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                 profiler.onFirstHeaderByteRead(HTTPConnectionImpl.this);
                             }
                         }
-
                     }
                 }, true);
                 if (header.limit() == 0) {
@@ -1437,6 +1431,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     if (getContentLength() == 0) {
                         // Content-Length is 0, return EmptyInputStream
                         this.convertedInputStream = new EmptyInputStream();
+                        this.contentDecoded = false;
                     } else {
                         final String encodingTransfer = this.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_TRANSFER_ENCODING);
                         if ("base64".equalsIgnoreCase(encodingTransfer)) {
@@ -1452,18 +1447,21 @@ public class HTTPConnectionImpl implements HTTPConnection {
                         if (encoding == null || encoding.length() == 0 || "none".equalsIgnoreCase(encoding) || "identity".equalsIgnoreCase(encoding)) {
                             /* no encoding */
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
+                            this.contentDecoded = false;
                         } else if ("gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
                             this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
+                            this.contentDecoded = true;
                         } else if ("deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
                             this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
+                            this.contentDecoded = true;
                         } else {
                             /* unsupported */
-                            this.contentDecoded = false;
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
+                            this.contentDecoded = false;
                         }
                     }
                 } else {
@@ -1471,6 +1469,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                      * use original inputstream OR LimitedInputStream from HeadRequest
                      */
                     this.convertedInputStream = new CountingInputStream(rawInputStream);
+                    this.contentDecoded = false;
                 }
             }
             return this.convertedInputStream;
@@ -1684,6 +1683,13 @@ public class HTTPConnectionImpl implements HTTPConnection {
 
     @Override
     public boolean isContentDecoded() {
+        if (convertedInputStream == null && contentDecoded && isConnected()) {
+            try {
+                getInputStream();
+            } catch (IOException e) {
+                LogV3.log(e);
+            }
+        }
         return this.contentDecoded;
     }
 

@@ -351,10 +351,10 @@ public class Browser {
             file.createNewFile();
             fos = new FileOutputStream(file, false);
             final long length;
-            if (con.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING) == null) {
-                length = con.getCompleteContentLength();
-            } else {
+            if (con.isContentDecoded()) {
                 length = -1;
+            } else {
+                length = con.getCompleteContentLength();
             }
             final byte[] b = new byte[32767];
             long done = 0;
@@ -640,7 +640,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -964,8 +964,8 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
-     * 
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     *
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1761,8 +1761,8 @@ public class Browser {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
-     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
+     * facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request != null) {
@@ -2419,8 +2419,7 @@ public class Browser {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br>
-     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2565,8 +2564,7 @@ public class Browser {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br>
-     * To be called after a sent request.
+     * Checks for block by firewalls and similar. </br> To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (this.getThrowExceptionOnBlockedBy(request)) {
@@ -2598,8 +2596,7 @@ public class Browser {
             // TODO: Add separate BlockedType for Cloudflare-Captcha, see: https://svn.jdownloader.org/issues/90281
             /**
              * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-             * Cloudflare block happens. </br>
-             * I've just added code 502 to the list of "Cloudflare response-codes".
+             * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
              */
             /*
              * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login ->
@@ -3170,8 +3167,8 @@ public class Browser {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
-     * See also: https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
+     * https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

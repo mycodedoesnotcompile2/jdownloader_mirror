@@ -20,6 +20,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 import jd.http.Request;
+import jd.http.RequestHeader;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
@@ -63,6 +64,13 @@ public class HeadRequest extends Request {
     @Override
     public HeadRequest cloneRequest() {
         return new HeadRequest(this);
+    }
+
+    @Override
+    protected RequestHeader getDefaultRequestHeader(URL url) {
+        final RequestHeader ret = super.getDefaultRequestHeader(url);
+        ret.put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
+        return ret;
     }
 
     /** {@inheritDoc} */
