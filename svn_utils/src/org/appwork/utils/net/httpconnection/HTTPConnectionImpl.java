@@ -1440,12 +1440,16 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             // anyway to have access to it if we need it some day
                             // https://tools.ietf.org/html/rfc7230#section-3.3.1
                             rawInputStream = new CountingBase64InputStream(rawInputStream);
+                        } else if ("binary".equalsIgnoreCase(encodingTransfer)) {
+                            /* binary encoded content */
+                            rawInputStream = rawInputStream;
                         }
                         /* we convert different content-encodings to normal inputstream */
                         final String encoding = this.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING);
                         // TODO: multiple encodings in one header are allowed. The code below does not support this
                         if (encoding == null || encoding.length() == 0 || "none".equalsIgnoreCase(encoding) || "identity".equalsIgnoreCase(encoding)) {
                             /* no encoding */
+                            // Any data acceptable. CRLF may or may not indicate a line break.
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
                             this.contentDecoded = false;
                         } else if ("gzip".equalsIgnoreCase(encoding)) {

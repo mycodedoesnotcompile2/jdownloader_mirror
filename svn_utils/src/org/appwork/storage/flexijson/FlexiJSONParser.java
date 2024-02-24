@@ -34,11 +34,11 @@
 package org.appwork.storage.flexijson;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.lang.ref.WeakReference;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -48,6 +48,9 @@ import java.util.WeakHashMap;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 import org.appwork.storage.simplejson.ValueType;
+import org.appwork.utils.IO;
+import org.appwork.utils.IO.BOM;
+import org.appwork.utils.IO.BOM.BOMInputStream;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.CompiledType;
 
@@ -132,35 +135,35 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char SQUARE_BRACKET_CLOSE = ']';
+    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
     /**
      *
      */
-    private static final char CURLY_BRACKET_CLOSE  = '}';
+    private static final char                 CURLY_BRACKET_CLOSE               = '}';
     /**
      *
      */
-    private static final char COLON                = ':';
+    private static final char                 COLON                             = ':';
     /**
      *
      */
-    private static final char ASTERISK             = '*';
+    private static final char                 ASTERISK                          = '*';
     /**
      *
      */
-    private static final char SLASH                = '/';
+    private static final char                 SLASH                             = '/';
     /**
      *
      */
-    private static final char SQUARE_BRACKET_OPEN  = '[';
+    private static final char                 SQUARE_BRACKET_OPEN               = '[';
     /**
      *
      */
-    private static final char CURLY_BRACKET_OPEN   = '{';
+    private static final char                 CURLY_BRACKET_OPEN                = '{';
     /**
      *
      */
-    private static final char COMMA                = ',';
+    private static final char                 COMMA                             = ',';
 
     public class NumberParser {
         /**
@@ -734,7 +737,7 @@ public class FlexiJSONParser {
     private NumberParser         isNumber;
     private StringParser         isTrue;
     private int                  lastNonWhitespaceIndex;
-    public final Reader          reader;
+    private Reader               reader       = null;
     final StringBuilder          sb;
     private final StringBuilder  sb2;
     private Token                token;
@@ -751,8 +754,41 @@ public class FlexiJSONParser {
     /**
      * @param byteArrayInputStream
      */
-    public FlexiJSONParser(java.io.InputStream is) {
-        this(new InputStreamReader(is, Charset.forName("UTF-8")));
+    public FlexiJSONParser(InputStream is) {
+        this.reader = wrap(this, is);
+        sb = new StringBuilder();
+        sb2 = new StringBuilder();
+        initParsers();
+    }
+
+    private static Reader wrap(final FlexiJSONParser parser, final InputStream is) {
+        return new Reader() {
+            volatile Reader reader = null;
+
+            private Reader getReader() throws IOException {
+                if (reader == null) {
+                    final BOMInputStream bis = IO.BOM.wrap(is);
+                    final BOM bom = bis.getBOM();
+                    if (bom != null) {
+                        reader = new InputStreamReader(bis, bom.getCharSet());
+                    } else {
+                        reader = new InputStreamReader(bis, BOM.UTF8.getCharSet());
+                    }
+                    parser.reader = reader;
+                }
+                return reader;
+            }
+
+            @Override
+            public int read(char[] cbuf, int off, int len) throws IOException {
+                return getReader().read(cbuf, off, len);
+            }
+
+            @Override
+            public void close() throws IOException {
+                getReader().close();
+            }
+        };
     }
 
     /**

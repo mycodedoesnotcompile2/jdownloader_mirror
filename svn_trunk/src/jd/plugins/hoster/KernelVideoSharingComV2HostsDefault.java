@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48667 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48699 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "zbporn.com" });
         ret.add(new String[] { "xozilla.com", "xozilla.xxx" });
         ret.add(new String[] { "femdomtb.com" });
-        ret.add(new String[] { "cutscenes.net" });
         ret.add(new String[] { "fetishshrine.com" });
         ret.add(new String[] { "sheshaft.com" });
         ret.add(new String[] { "yeswegays.com" });
@@ -128,8 +127,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "pornditt.com" });
         /* 2022-10-17 */
         ret.add(new String[] { "donkparty.com" });
-        /* 2022-10-25 */
-        ret.add(new String[] { "myxvids.com" });
         /* 2022-11-14 */
         ret.add(new String[] { "femefun.com" });
         /* 2022-11-21 */

@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48682 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48699 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecurbateCom extends PluginForHost {
     public RecurbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -255,7 +255,7 @@ public class RecurbateCom extends PluginForHost {
              * Official downloadlinks are only available for "Ultimate" users. Those can download much faster and with an "unlimited"
              * amount.
              */
-            String officialHighspeedDownloadlink = br.getRegex("recu-link download\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
+            final String officialHighspeedDownloadlink = br.getRegex("(/video/\\d+/download/?)").getMatch(0);
             if (officialHighspeedDownloadlink != null) {
                 dllink = officialHighspeedDownloadlink;
                 logger.info("Found highspeed downloadurl: " + officialHighspeedDownloadlink);
@@ -333,7 +333,7 @@ public class RecurbateCom extends PluginForHost {
         /*
          * Save direct-url for later.
          */
-        link.setProperty(directurlproperty, dllink);
+        link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

@@ -34,6 +34,7 @@
 package org.appwork.serializer.tests;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 
 import org.appwork.serializer.SC;
 import org.appwork.storage.SimpleSerializer;
@@ -42,6 +43,7 @@ import org.appwork.storage.commonInterface.SerializerInterface;
 import org.appwork.storage.config.test.TestObject;
 import org.appwork.storage.flexijson.FlexiSerializer;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.IO.BOM;
 
 /**
  * @author thomas
@@ -100,21 +102,29 @@ public class DeserTests extends AWTest {
             }
         }
         first = null;
-        for (SerializerInterface s : serializers) {
-            T res = s.fromStream(new ByteArrayInputStream(input.getBytes("UTF-8")), type, context);
-            if (first == null) {
-                first = res;
-            } else {
-                assertEqualsDeep(first, res);
+        for (BOM bom : BOM.values()) {
+            for (SerializerInterface s : serializers) {
+                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                bos.write(bom.getBOM());
+                bos.write(input.getBytes(bom.getCharSet()));
+                T res = s.fromStream(new ByteArrayInputStream(bos.toByteArray()), type, context);
+                if (first == null) {
+                    first = res;
+                } else {
+                    assertEqualsDeep(first, res);
+                }
             }
-        }
-        first = null;
-        for (SerializerInterface s : serializers) {
-            T res = s.fromByteArray(input.getBytes("UTF-8"), type, context);
-            if (first == null) {
-                first = res;
-            } else {
-                assertEqualsDeep(first, res);
+            first = null;
+            for (SerializerInterface s : serializers) {
+                final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                bos.write(bom.getBOM());
+                bos.write(input.getBytes(bom.getCharSet()));
+                T res = s.fromByteArray(bos.toByteArray(), type, context);
+                if (first == null) {
+                    first = res;
+                } else {
+                    assertEqualsDeep(first, res);
+                }
             }
         }
         String firstResult = null;
