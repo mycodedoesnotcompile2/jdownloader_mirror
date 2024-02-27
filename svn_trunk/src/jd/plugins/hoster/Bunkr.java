@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 48671 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -39,7 +39,7 @@ public class Bunkr extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

@@ -53,7 +53,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 48032 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -70,7 +70,7 @@ public class UlozTo extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setCustomCharset("utf-8");
         br.setAllowedResponseCodes(new int[] { 400, 401, 410, 451 });
         br.setCookie(this.getHost(), "adblock_detected", "false");

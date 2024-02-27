@@ -22,7 +22,6 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.config.ChipDeConfig;
@@ -43,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48557 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
 public class ChipDe extends PluginForHost {
     public ChipDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -317,6 +316,7 @@ public class ChipDe extends PluginForHost {
             if (!attemptStoredDownloadurlDownload(link, directlinkproperty, resume, maxchunks)) {
                 requestFileInformation(link);
                 if (isExternalDownload(link)) {
+                    /* This will throw an Exception. */
                     errorExternalDownloadImpossible();
                 }
                 final boolean looksLikeDownloadIsPossible = br.containsHTML("js_manual_installation");
@@ -331,19 +331,29 @@ public class ChipDe extends PluginForHost {
                     // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     throw new PluginException(LinkStatus.ERROR_FATAL, textNoDownloadAvailable);
                 }
-                final boolean useStep1Better = false;
-                final String step1decoded = URLEncode.decodeURIComponent(step1);
-                final String step1better = new Regex(step1decoded, "(https?://[^/]+/downloads/c1_downloads_auswahl_.*s=[^&]+)").getMatch(0);
-                if (step1better != null && useStep1Better) {
-                    br.getPage(step1better);
-                } else {
-                    br.getPage(step1decoded);
-                }
-                String step2 = br.getRegex("(/downloads/c1_downloads_hs_getfile[^<>\"]+)\"").getMatch(0);
+                final String step1decoded = Encoding.htmlOnlyDecode(step1);
+                br.getPage(step1decoded);
+                final String step2 = br.getRegex("(/downloads/c1_downloads_hs_getfile[^<>\"]+)\"").getMatch(0);
                 if (step2 != null) {
-                    br.getPage(step2);
+                    final String step2decoded = Encoding.htmlOnlyDecode(step2);
+                    br.getPage(step2decoded);
+                } else {
+                    logger.warning("Failed to find step2 URL");
                 }
-                dllink = applicationDownloadsGetDllink();
+                // dllink = applicationDownloadsGetDllink();
+                dllink = br.getRegex("Falls der Download nicht beginnt,\\&nbsp;<a class=\"b\" href=\"(http.*?)\"").getMatch(0);
+                if (dllink == null) {
+                    dllink = br.getRegex("class=\"dl\\-btn\"><a href=\"(http.*?)\"").getMatch(0);
+                }
+                if (dllink == null) {
+                    dllink = br.getRegex("</span></a></div><a href=\"(http.*?)\"").getMatch(0);
+                }
+                if (dllink == null) {
+                    dllink = br.getRegex("var adtech_dl_url = \\'(https?://[^<>\"]*?)\\';").getMatch(0);
+                }
+                if (dllink == null) {
+                    dllink = br.getRegex("(?:\"|\\')(https?://dl\\.cdn\\.chip\\.de/downloads/\\d+/.*?)(?:\"|\\')").getMatch(0);
+                }
                 if (dllink == null) {
                     if (!looksLikeDownloadIsPossible) {
                         /* 2023-12-04: Example: https://www.chip.de/downloads/Adobe-Flash-Player_13003561.html */
@@ -446,23 +456,6 @@ public class ChipDe extends PluginForHost {
         } else if (dl.getConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
         }
-    }
-
-    private String applicationDownloadsGetDllink() {
-        String dllink = br.getRegex("Falls der Download nicht beginnt,\\&nbsp;<a class=\"b\" href=\"(http.*?)\"").getMatch(0);
-        if (dllink == null) {
-            dllink = br.getRegex("class=\"dl\\-btn\"><a href=\"(http.*?)\"").getMatch(0);
-        }
-        if (dllink == null) {
-            dllink = br.getRegex("</span></a></div><a href=\"(http.*?)\"").getMatch(0);
-        }
-        if (dllink == null) {
-            dllink = br.getRegex("var adtech_dl_url = \\'(https?://[^<>\"]*?)\\';").getMatch(0);
-        }
-        if (dllink == null) {
-            dllink = br.getRegex("(?:\"|\\')(https?://dl\\.cdn\\.chip\\.de/downloads/\\d+/.*?)(?:\"|\\')").getMatch(0);
-        }
-        return dllink;
     }
 
     public static void accessURL(final Browser br, final String url) throws PluginException, IOException {

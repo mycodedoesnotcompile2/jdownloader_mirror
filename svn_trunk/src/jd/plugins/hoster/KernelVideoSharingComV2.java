@@ -74,7 +74,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48675 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

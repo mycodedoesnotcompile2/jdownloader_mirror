@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48279 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonfilesMe extends PluginForHost {
     public AnonfilesMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class AnonfilesMe extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(410);
         return br;

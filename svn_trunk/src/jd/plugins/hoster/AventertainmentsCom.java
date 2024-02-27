@@ -40,7 +40,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48100 $", interfaceVersion = 3, names = { "imgs.aventertainments.com", "aventertainments.com" }, urls = { "https?://imgs\\d+\\.aventertainments\\.com/.+", "https?://www\\.aventertainments\\.com/newdlsample\\.aspx.+\\.mp4|https?://ppvclips\\d+\\.aventertainments\\.com/.+\\.m3u9|https?://(?:www\\.)?aventertainments\\.com/ppv/new_detail\\.aspx\\?ProID=\\d+.*|https?://(?:www\\.)?aventertainments\\.com/ppv/Download\\.aspx\\?.+" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "imgs.aventertainments.com", "aventertainments.com" }, urls = { "https?://imgs\\d+\\.aventertainments\\.com/.+", "https?://www\\.aventertainments\\.com/newdlsample\\.aspx.+\\.mp4|https?://ppvclips\\d+\\.aventertainments\\.com/.+\\.m3u9|https?://(?:www\\.)?aventertainments\\.com/ppv/new_detail\\.aspx\\?ProID=\\d+.*|https?://(?:www\\.)?aventertainments\\.com/ppv/Download\\.aspx\\?.+" })
 public class AventertainmentsCom extends PluginForHost {
     public AventertainmentsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class AventertainmentsCom extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         prepBR(br);
         return br;
     }

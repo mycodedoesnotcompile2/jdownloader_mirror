@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48604 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -71,7 +71,7 @@ public class EHentaiOrg extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         prepBR(br);
         return br;
     }

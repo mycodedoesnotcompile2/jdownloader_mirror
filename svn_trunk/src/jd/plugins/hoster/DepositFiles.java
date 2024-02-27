@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48014 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -122,7 +122,7 @@ public class DepositFiles extends antiDDoSForHost {
     }
 
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

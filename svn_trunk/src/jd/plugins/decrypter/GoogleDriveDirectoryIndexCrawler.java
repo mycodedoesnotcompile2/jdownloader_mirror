@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GoogleDriveDirectoryIndex;
 
-@DecrypterPlugin(revision = "$Revision: 48412 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.hoster.GoogleDriveDirectoryIndex.class })
 public class GoogleDriveDirectoryIndexCrawler extends PluginForDecrypt {
     private static final String PROPERTY_FOLDER_USE_OLD_POST_REQUEST = "folder_use_old_post_request";
@@ -99,7 +99,7 @@ public class GoogleDriveDirectoryIndexCrawler extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 500 });
         return br;

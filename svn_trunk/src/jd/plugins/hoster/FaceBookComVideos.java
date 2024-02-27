@@ -51,7 +51,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FaceBookComGallery;
 
-@HostPlugin(revision = "$Revision: 48087 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 public class FaceBookComVideos extends PluginForHost {
     private final boolean enforceCookieLogin = true;
 
@@ -66,7 +66,7 @@ public class FaceBookComVideos extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         FaceBookComGallery.prepBR(br);
         return br;
     }

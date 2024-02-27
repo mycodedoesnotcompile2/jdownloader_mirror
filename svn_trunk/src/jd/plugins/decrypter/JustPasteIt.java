@@ -32,7 +32,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48201 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 public class JustPasteIt extends AbstractPastebinCrawler {
     public JustPasteIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class JustPasteIt extends AbstractPastebinCrawler {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.setLoadLimit(3 * br.getLoadLimit());
         br.setAllowedResponseCodes(451);

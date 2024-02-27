@@ -61,7 +61,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48638 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = {}, urls = {})
 public class FikperCom extends PluginForHost {
     public FikperCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -567,20 +567,24 @@ public class FikperCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting more downloads", waitMillisOnRetry);
             }
         }
-        if ("File size limit".equals(message)) {
-            // You can download files up to 2GB in free mode.
-            // {"code":403,"message":"File size limit"}
-            throw new AccountRequiredException("You can download files up to 2GB in free mode");
-        } else if ("Invalid captcha.".equals(message)) {
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-        } else {
-            final String lastResortErrormsg = "Code:" + codeStr + "|Message:" + message;
-            /* Last resort for unknown errormessages. */
-            if (link == null) {
-                throw new AccountUnavailableException(lastResortErrormsg, waitMillisOnRetry);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_FATAL, lastResortErrormsg);
+        if (message != null) {
+            if (message.matches("(?i)File size limit")) {
+                // You can download files up to 2GB in free mode.
+                // {"code":403,"message":"File size limit"}
+                throw new AccountRequiredException("(?i)You can download files up to 2GB in free mode");
+            } else if (message.matches("(?i)Invalid captcha")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else if (message.matches("(?i)Bandwidth limit")) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED);
             }
+        }
+        /* Last resort */
+        final String lastResortErrormsg = "Code:" + codeStr + "|Message:" + message;
+        /* Last resort for unknown errormessages. */
+        if (link == null) {
+            throw new AccountUnavailableException(lastResortErrormsg, waitMillisOnRetry);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_FATAL, lastResortErrormsg);
         }
     }
 

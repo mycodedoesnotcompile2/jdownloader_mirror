@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.LinkboxTo;
 
-@DecrypterPlugin(revision = "$Revision: 48688 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { LinkboxTo.class })
 public class LinkboxToCrawler extends PluginForDecrypt {
     public LinkboxToCrawler(PluginWrapper wrapper) {
@@ -124,6 +124,14 @@ public class LinkboxToCrawler extends PluginForDecrypt {
             if (data == null) {
                 /* 2023-11-13: E.g. content abused: {"data":null,"msg":"data removed","status":700} */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            /* Check if this folder leads to a single file */
+            final String shareType = (String) data.get("shareType");
+            if ("singleItem".equalsIgnoreCase(shareType)) {
+                /* {"data":{"itemId":"redacted","shareType":"singleItem"},"status":1302} */
+                final DownloadLink singleFile = this.createDownloadlink(createFileURL(data.get("itemId").toString()));
+                ret.add(singleFile);
+                return ret;
             }
             final String currentFolderName = (String) data.get("dirName");
             final List<Map<String, Object>> ressources = (List<Map<String, Object>>) data.get("list");

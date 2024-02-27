@@ -65,7 +65,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48317 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,8 +74,8 @@ public class PixeldrainCom extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
-        br.getHeaders().put("User-Agent", "JDownloader");
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.setFollowRedirects(true);
         return br;
     }

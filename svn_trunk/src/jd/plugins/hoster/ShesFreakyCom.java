@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48379 $", interfaceVersion = 2, names = { "shesfreaky.com" }, urls = { "https?://(?:www\\.)?shesfreaky\\.com/(?:video/[A-Za-z0-9\\-_]+-\\d+\\.html|embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = { "shesfreaky.com" }, urls = { "https?://(?:www\\.)?shesfreaky\\.com/(?:video/[A-Za-z0-9\\-_]+-\\d+\\.html|embed/\\d+)" })
 public class ShesFreakyCom extends PluginForHost {
     public ShesFreakyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class ShesFreakyCom extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

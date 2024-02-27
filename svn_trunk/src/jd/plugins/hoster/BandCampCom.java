@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BandCampComDecrypter;
 
-@HostPlugin(revision = "$Revision: 48377 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 public class BandCampCom extends PluginForHost {
     public BandCampCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -58,7 +58,7 @@ public class BandCampCom extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         BandCampComDecrypter.prepBR(br);
         return br;
     }

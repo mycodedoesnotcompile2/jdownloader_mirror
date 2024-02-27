@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48431 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class HdencodeOrg extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

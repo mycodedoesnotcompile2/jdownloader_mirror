@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48692 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                            = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -434,7 +434,7 @@ public class ORFMediathek extends PluginForHost {
         return "JDownloader's ORF Plugin helps downloading videos from on.orf.at. ORF provides different video qualities and types of media.";
     }
 
-    private static final String[] VIDEO_FORMATS = new String[] { "Multiple video chapters", "Single video (\"gapless\")" };
+    private static final String[] VIDEO_FORMATS = new String[] { "All formats", "Multiple video chapters", "Single video (\"gapless\")" };
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), Q_SUBTITLES, "Download subtitle").setDefaultValue(Q_SUBTITLES_default));

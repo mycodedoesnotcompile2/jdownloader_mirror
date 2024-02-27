@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48407 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 public class PonyFm extends PluginForDecrypt {
     public PonyFm(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,7 +41,7 @@ public class PonyFm extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

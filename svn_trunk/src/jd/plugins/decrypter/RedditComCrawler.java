@@ -71,7 +71,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -80,7 +80,7 @@ public class RedditComCrawler extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         RedditCom.prepBRAPI(br);
         return br;
     }

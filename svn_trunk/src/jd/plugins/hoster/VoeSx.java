@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 48699 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48709 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -172,10 +172,18 @@ public class VoeSx extends XFileSharingProBasic {
         if (altSourceB64 == null) {
             /* 2024-02-23 */
             altSourceB64 = br.getRegex("let [^=]+ = '(ey[^\\']+)").getMatch(0);
+            if (altSourceB64 == null) {
+                /* 2024-02-26 */
+                altSourceB64 = br.getRegex("let [a-f0-9]+ = '([^\\']+)").getMatch(0);
+            }
         }
         if (altSourceB64 != null && hlsMaster == null) {
             /* 2024-01-23 */
-            final String json = Encoding.Base64Decode(altSourceB64);
+            String json = Encoding.Base64Decode(altSourceB64);
+            if (json.startsWith("}")) {
+                /* 2024-02-26 */
+                json = new StringBuilder(json).reverse().toString();
+            }
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             hlsMaster = (String) entries.get("file");
         }

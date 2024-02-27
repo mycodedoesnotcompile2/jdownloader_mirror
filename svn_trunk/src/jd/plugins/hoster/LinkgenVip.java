@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 47920 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
 public class LinkgenVip extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME    = true;
@@ -61,7 +61,7 @@ public class LinkgenVip extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

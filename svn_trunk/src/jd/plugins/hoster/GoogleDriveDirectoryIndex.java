@@ -38,7 +38,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDriveDirectoryIndex extends PluginForHost {
     public GoogleDriveDirectoryIndex(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +47,7 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }

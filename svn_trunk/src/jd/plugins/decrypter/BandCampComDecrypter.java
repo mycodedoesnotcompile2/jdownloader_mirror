@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BandCampCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48377 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { BandCampCom.class })
 public class BandCampComDecrypter extends PluginForDecrypt {
     public BandCampComDecrypter(PluginWrapper wrapper) {
@@ -60,7 +60,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         prepBR(br);
         return br;
     }

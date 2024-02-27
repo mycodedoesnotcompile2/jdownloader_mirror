@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FaceBookComVideos;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 48482 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
 public class FaceBookComGallery extends PluginForDecrypt {
     public FaceBookComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,7 @@ public class FaceBookComGallery extends PluginForDecrypt {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         prepBR(br);
         return br;
     }

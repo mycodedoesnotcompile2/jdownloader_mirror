@@ -41,7 +41,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.RomHustlerCrawler;
 
-@HostPlugin(revision = "$Revision: 47928 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { RomHustlerCrawler.class })
 public class RomHustler extends PluginForHost {
     public RomHustler(PluginWrapper wrapper) {
@@ -82,7 +82,7 @@ public class RomHustler extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         if (agent.get() == null) {
             agent.set(UserAgents.stringUserAgent());
         }

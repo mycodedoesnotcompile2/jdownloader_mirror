@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48322 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -77,7 +77,7 @@ public class LeechallIo extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_CONTENT_TYPE, "application/json;charset=UTF-8");

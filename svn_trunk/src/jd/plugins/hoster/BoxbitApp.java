@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48610 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -78,7 +78,7 @@ public class BoxbitApp extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = new Browser();
+        final Browser br = super.createNewBrowserInstance();
         br.setCookiesExclusive(true);
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT, "application/json");
