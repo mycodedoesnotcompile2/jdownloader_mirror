@@ -1442,7 +1442,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             rawInputStream = new CountingBase64InputStream(rawInputStream);
                         } else if ("binary".equalsIgnoreCase(encodingTransfer)) {
                             /* binary encoded content */
-                            rawInputStream = rawInputStream;
+                            rawInputStream = new CountingInputStream(rawInputStream);
                         }
                         /* we convert different content-encodings to normal inputstream */
                         final String encoding = this.getHeaderField(HTTPConstants.HEADER_RESPONSE_CONTENT_ENCODING);

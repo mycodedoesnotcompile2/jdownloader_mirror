@@ -74,7 +74,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48712 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -684,7 +684,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                     con = openAntiDDoSRequestConnection(brc, brc.createGetRequest(workaroundURL));
                 }
                 this.handleConnectionErrors(brc, con);
-                if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
                 this.dllink = con.getRequest().getUrl();
@@ -831,7 +833,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 try {
                     con = openAntiDDoSRequestConnection(br, br.createHeadRequest(dllink));
                     this.handleConnectionErrors(br, con);
-                    if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 } finally {

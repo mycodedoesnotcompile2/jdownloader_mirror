@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48707 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48717 $", interfaceVersion = 3, names = {}, urls = {})
 public class RecurbateCom extends PluginForHost {
     public RecurbateCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -307,12 +307,16 @@ public class RecurbateCom extends PluginForHost {
             }
         }
         try {
-            if (dllink.contains(".m3u8")) {
+            if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
                 /* HLS download (new 2023-12-19) */
                 checkFFmpeg(link, "Download a HLS Stream");
                 dl = new HLSDownloader(link, br, dllink);
+                /*
+                 * Save direct-url for later.
+                 */
+                link.setProperty(directurlproperty, dllink);
             } else {
-                /* HTTP download / progressive stream */
+                /* Progressive HTTP video stream download */
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(account));
                 if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                     br.followConnection(true);
@@ -326,6 +330,10 @@ public class RecurbateCom extends PluginForHost {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error");
                     }
                 }
+                /*
+                 * Save direct-url for later.
+                 */
+                link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
@@ -335,10 +343,6 @@ public class RecurbateCom extends PluginForHost {
                 throw e;
             }
         }
-        /*
-         * Save direct-url for later.
-         */
-        link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

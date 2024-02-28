@@ -51,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
+@HostPlugin(revision = "$Revision: 48712 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
 public class NicoVideoJp extends PluginForHost {
     private static final String  CUSTOM_DATE               = "CUSTOM_DATE";
     private static final String  CUSTOM_FILENAME           = "CUSTOM_FILENAME";
@@ -73,6 +73,15 @@ public class NicoVideoJp extends PluginForHost {
         super(wrapper);
         this.enablePremium("https://site.nicovideo.jp/premium_contents/");
         setConfigElements();
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setCustomCharset("utf-8");
+        br.setFollowRedirects(true);
+        br.setAllowedResponseCodes(400);
+        return br;
     }
 
     @Override
@@ -101,15 +110,12 @@ public class NicoVideoJp extends PluginForHost {
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         link.removeProperty(PROPERTY_ACCOUNT_REQUIRED);
+        final String extDefault = ".mp4";
         final String fid = getFID(link);
         if (!link.isNameSet()) {
-            link.setName(fid + ".mp4");
+            link.setName(fid + extDefault);
         }
         link.setProperty("extension", default_extension);
-        this.setBrowserExclusive();
-        br.setCustomCharset("utf-8");
-        br.setFollowRedirects(true);
-        br.setAllowedResponseCodes(400);
         if (account != null) {
             this.login(account, false);
         }
@@ -145,7 +151,7 @@ public class NicoVideoJp extends PluginForHost {
         if (fallbackTitle != null) {
             fallbackTitle = Encoding.htmlDecode(fallbackTitle).trim();
             fallbackTitle = fallbackTitle.replaceFirst("(?i)\\s*Niconico Video$", "");
-            link.setName(fallbackTitle + ".mp4");
+            link.setName(fallbackTitle + extDefault);
         }
         String jsonapi = br.getRegex("data-api-data=\"([^\"]+)").getMatch(0);
         if (jsonapi != null) {
@@ -212,7 +218,7 @@ public class NicoVideoJp extends PluginForHost {
         if (delivery == null) {
             /* 2024-02-26: New json and no possibility to get audio + video as one stream(?) */
             // delivery = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "media/domand");
-            throw new PluginException(LinkStatus.ERROR_FATAL, "UNSUPPORTED_STREAMING_TYPE_HLS_SPLIT_AUDIO_VIDEO");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "DRM_PROTECTED_AND_UNSUPPORTED_STREAMING_TYPE_HLS_SPLIT_AUDIO_VIDEO");
         }
         final Map<String, Object> movie = (Map<String, Object>) delivery.get("movie");
         final List<Map<String, Object>> audios = (List<Map<String, Object>>) movie.get("audios");
