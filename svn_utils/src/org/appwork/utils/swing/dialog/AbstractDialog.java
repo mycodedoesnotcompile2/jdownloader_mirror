@@ -39,8 +39,10 @@ import java.awt.Component;
 import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.GraphicsDevice;
 import java.awt.Image;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
@@ -95,6 +97,7 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.Base64OutputStream;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.dimensor.DialogDimensor;
 import org.appwork.utils.swing.dialog.locator.CenterOfScreenDialogLocator;
 import org.appwork.utils.swing.dialog.locator.DialogLocator;
@@ -534,6 +537,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             this.focusButton = focus;
             this.registerEscape();
             this.packed();
+            // find location AFTER dimensor - the locator needs the dimensions in order to find "Center of X" Locations
             Point location = null;
             final DialogLocator locator = getLocator();
             if (locator != null) {
@@ -631,6 +635,29 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
                 } else {
                     // System.out.println(w.getName() + " - " + w);
                 }
+            }
+            try {
+                Rectangle dialogBounds = dialog.getBounds();
+                // GraphicsDevice screen = SwingUtils.getScreenByBounds(dialogBounds);
+                boolean fullyVisible = SwingUtils.isRectangleFullyDisplayableOnScreens(dialogBounds);
+                if (!fullyVisible) {
+                    GraphicsDevice screenWithMajorIntersection = SwingUtils.getScreenByBounds(dialogBounds);
+                    Rectangle usableBounds = SwingUtils.getUsableScreenBounds(screenWithMajorIntersection);
+                    if (locator == null) {
+                        Point old = dialog.getLocation();
+                        dialog.setLocation(Math.max(old.x, usableBounds.x), Math.max(old.y, usableBounds.y));
+                    } else {
+                        // the location has already been fixed in the locator
+                    }
+                    Point newLoc = dialog.getLocation();
+                    Dimension pref = dialog.getPreferredSize();
+                    Dimension newDim = new Dimension(Math.min(pref.width, usableBounds.x + usableBounds.width - newLoc.x), Math.min(pref.height, usableBounds.y + usableBounds.height - newLoc.y));
+                    LogV3.info(this, "Fixed Dimensions for dialog from %s to %s", dialogBounds, newDim);
+                    dialog.setPreferredSize(newDim);
+                    dialog.pack();
+                }
+            } catch (Exception e) {
+                // try catch as long as we are sure that this cannot throw anything
             }
             this.setVisible(true);
             // if the dt has been interrupted,s setVisible will return even for
@@ -1160,6 +1187,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             width = Math.max(rawPreferredSize.width, width);
         }
         try {
+            // TODO:this ignores insets and multimonitor setups
             final Dimension ret = new Dimension(Math.min(Toolkit.getDefaultToolkit().getScreenSize().width, width), Math.min(Toolkit.getDefaultToolkit().getScreenSize().height, height));
             return ret;
         } catch (final Throwable e) {

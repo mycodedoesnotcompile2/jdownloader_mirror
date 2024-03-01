@@ -49,6 +49,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Area;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -265,6 +266,27 @@ public class SwingUtils {
         bounds.width -= insets.left + insets.right;
         bounds.height -= insets.top + insets.bottom;
         return bounds;
+    }
+
+    /**
+     * Returns true if the rectangle can be fully shown on the current screen setup. If any part of the rectangle is offscreen, or behind
+     * insets like taskbars, this method will return false;
+     *
+     * @param dialogBounds
+     * @return
+     */
+    public static boolean isRectangleFullyDisplayableOnScreens(Rectangle bounds) {
+        Area p = new Area(bounds);
+        final GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        final GraphicsDevice[] screens = ge.getScreenDevices();
+        for (final GraphicsDevice screen : screens) {
+            Rectangle usableBounds = SwingUtils.getUsableScreenBounds(screen);
+            p.subtract(new Area(usableBounds));
+            if (p.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

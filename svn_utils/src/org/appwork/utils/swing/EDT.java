@@ -37,7 +37,10 @@ import java.awt.HeadlessException;
 
 import javax.swing.SwingUtilities;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
+import org.appwork.utils.reflection.CompiledType;
 
 /**
  * This class should be used to run gui code in the edt and return the generic datatype to the parent thread.
@@ -45,56 +48,34 @@ import org.appwork.utils.Application;
  * Implement edtRun to asure Thread safe executio of this gui code.
  *
  * @author $Author: Thomas$
- * @deprecated Use EDT.class instead
+ *
  * @param <T>
  */
-@Deprecated
-public abstract class EDTHelper<T> implements Runnable {
+public abstract class EDT<T, ExceptionType extends Throwable> implements Runnable {
     /**
      * flag. If Runnable has terminated yet
      */
-    private volatile boolean              done    = false;
+    private volatile boolean   done    = false;
     /**
      * flag, has runnable already started, invoked in edt
      */
-    private volatile boolean              started = false;
+    private volatile boolean   started = false;
     /**
      * lock used for EDT waiting
      */
     /**
      * Stores The returnvalue. This Value if of the Generic Datatype T
      */
-    private volatile T                    returnValue;
-    private volatile RuntimeException     exception;
-    private volatile InterruptedException interruptException;
-    private volatile Error                error;
-    private volatile Exception            caller;
+    private volatile T         returnValue;
+    private volatile Throwable exception;
+    private volatile Exception caller;
 
     /**
      * Implement this method. Gui code should be used ONLY in this Method.
      *
      * @return
      */
-    public abstract T edtRun();
-
-    public InterruptedException getInterruptException() {
-        return this.interruptException;
-    }
-
-    /**
-     * Call this method if you want to wait for the EDT to finish the runnable. It is assured that the returnvalue is available after this
-     * methjod has returned.
-     *
-     * @return
-     */
-    public T getReturnValue() {
-        this.waitForEDT();
-        return this.returnValue;
-    }
-
-    public boolean isInterrupted() {
-        return this.interruptException != null;
-    }
+    protected abstract T runInEDT() throws ExceptionType;
 
     /**
      * Run the runnable
@@ -102,40 +83,26 @@ public abstract class EDTHelper<T> implements Runnable {
     public void run() {
         this.started = true;
         try {
-            if (Application.isHeadless()) {
-                if (this.caller != null) {
-                    org.appwork.loggingv3.LogV3.log(this.caller);
-                }
+            if (this.caller != null && Application.isHeadless()) {
+                LogV3.exception(this, caller, "Unhandled Headless Exception in EDT");
             }
-            this.returnValue = this.edtRun();
-        } catch (HeadlessException e) {
+            this.returnValue = this.runInEDT();
+        } catch (final Throwable e) {
             this.exception = e;
-            org.appwork.loggingv3.LogV3.log(e);
-            org.appwork.loggingv3.LogV3.severe("Unhandled Headless Exception in EDT");
-            if (this.caller != null) {
-                org.appwork.loggingv3.LogV3.log(this.caller);
+            LogV3.exception(this, e, null);
+            if (this.caller != null && e instanceof HeadlessException) {
+                LogV3.exception(this, caller, "Unhandled Headless Exception in EDT");
             }
-        } catch (final RuntimeException e) {
-            this.exception = e;
-            org.appwork.loggingv3.LogV3.log(e);
-        } catch (final Error e) {
-            this.error = e;
-            org.appwork.loggingv3.LogV3.log(e);
         } finally {
             this.done = true;
         }
     }
 
-    public void start() {
-        this.start(false);
+    protected void start() {
+        start(true);
     }
 
-    /**
-     * starts the runnable
-     *
-     * returns true in case we are in EDT or false if it got invoked later
-     */
-    public void start(final boolean invokeLater) {
+    private void start(boolean invokeDirectIfEDT) {
         if (this.started) {
             return;
         }
@@ -143,21 +110,18 @@ public abstract class EDTHelper<T> implements Runnable {
             this.caller = new Exception("EventDispatchThread in headless mode!?");
         }
         this.started = true;
-        if (!invokeLater && SwingUtilities.isEventDispatchThread()) {
+        if (SwingUtilities.isEventDispatchThread()) {
             this.run();
         } else {
             SwingUtilities.invokeLater(this);
         }
     }
 
-    /**
-     * Wait until the runnable has been finished by the EDT. If the Runnable has not started yet, it gets started.
-     */
-    public void waitForEDT() {
-        // long c = -1;
+    public T waitFor() throws InterruptedException, ExceptionType {
+        InterruptedException interrupted = null;
         try {
             if (this.done) {
-                return;
+                return returnValue;
             }
             this.start(false);
             // The following loop will never be reached if the edthelper has
@@ -169,7 +133,7 @@ public abstract class EDTHelper<T> implements Runnable {
             // has been interrupted and will be shut down.
             // I guess it would be best practise not ti interrupt the edt
             if (this.done) {
-                return;
+                return returnValue;
             }
             // c = System.currentTimeMillis();
             try {
@@ -182,22 +146,43 @@ public abstract class EDTHelper<T> implements Runnable {
                     /* Object.wait releases all locks! */
                     Thread.sleep(1);
                 }
-            } catch (final InterruptedException e) {
-                this.interruptException = e;
-                return;
+            } catch (InterruptedException e) {
+                interrupted = e;
             }
+            return returnValue;
         } finally {
-            // if (c != -1 && System.currentTimeMillis() - c > 1000) {
-            // new
-            // WTFException("EDT blocked longer than 1sec!").printStackTrace();
-            // }
-            /* make sure we remove the interrupted flag */
-            if (this.exception != null) {
-                throw this.exception;
+            if (interrupted != null) {
+                throw interrupted;
             }
-            if (this.error != null) {
-                throw this.error;
+            if (this.exception != null) {
+                if (exception instanceof Error) {
+                    throw (Error) this.exception;
+                } else if (exception instanceof RuntimeException) {
+                    throw (RuntimeException) this.exception;
+                } else {
+                    CompiledType ct = CompiledType.create(this.getClass());
+                    CompiledType actualExceptionType = ct.getComponentTypes(EDT.class)[1];
+                    if (actualExceptionType.isInstanceOf(exception.getClass())) {
+                        throw (ExceptionType) this.exception;
+                    } else {
+                        // something went wrong
+                        throw new WTFException(exception);
+                    }
+                }
             }
         }
+    }
+
+    /**
+     * @param runnable
+     */
+    public static void run(final Runnable runnable) {
+        new EDT<Object, RuntimeException>() {
+            @Override
+            protected Object runInEDT() throws RuntimeException {
+                runnable.run();
+                return null;
+            }
+        }.start();
     }
 }

@@ -69,7 +69,7 @@ public class D extends PluginsC {
     private HashMap<String, String> header;
 
     public D() {
-        super("DLC", "file:/.+\\.dlc$", "$Revision: 48637 $");
+        super("DLC", "file:/.+\\.dlc$", "$Revision: 48725 $");
         b3 = new byte[] { 77, 69, 84, 65, 45, 73, 78, 70, 47, 74, 68, 79, 87, 78, 76, 79, 65, 46, 68, 83, 65 };
         d = new byte[] { -44, 47, 74, 116, 56, -46, 20, 9, 17, -53, 0, 8, -47, 121, 1, 75 };
         // kk = (byte[]) SubConfiguration.getConfig(new String(new byte[] { 97,
@@ -653,7 +653,7 @@ public class D extends PluginsC {
             // TODO: 2023-11-23: Why is this check for "n.A." here?
             if (packagename != null && !"n.A.".equals(packagename)) {
                 // n.A. is no good default packageName
-                dpi.setName(LinknameCleaner.cleanPackagenameNew(packagename, false));
+                dpi.setName(LinknameCleaner.cleanPackagename(packagename, false));
             }
             if (ca3 != null && ca3.trim().length() > 0) {
                 // dpi.setComment("[" + ca3 + "] " + cs2);

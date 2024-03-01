@@ -35,19 +35,27 @@ package org.appwork.utils.net.httpconnection;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ConnectException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.IPVERSION;
 
 public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
     private StringBuilder                    proxyRequest;
@@ -149,15 +157,16 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                     this.requestProperties.put(HTTPConstants.HEADER_REQUEST_PROXY_AUTHORIZATION, basicAuth);
                 }
                 IOException ee = null;
-                final InetAddress proxyIPs[] = getRemoteIPs(getProxy(), true);
+                List<InetAddress> proxyIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(getProxy(), true)));
                 long startTime = Time.systemIndependentCurrentJVMTimeMillis();
-                for (final InetAddress host : proxyIPs) {
+                while (proxyIPs.size() > 0) {
+                    final InetAddress host = proxyIPs.remove(0);
                     this.resetConnection();
                     startTime = Time.systemIndependentCurrentJVMTimeMillis();
                     this.connectionSocket = createConnectionSocket(null);
+                    final InetSocketAddress connectedInetSocketAddress = new InetSocketAddress(host, this.proxy.getPort());
                     try {
                         /* create and connect to socks5 proxy */
-                        final InetSocketAddress connectedInetSocketAddress = new InetSocketAddress(host, this.proxy.getPort());
                         proxyInetSocketAddress = connectedInetSocketAddress;
                         this.connectionSocket.getSocket().connect(proxyInetSocketAddress, getConnectTimeout());
                         setReadTimeout(getReadTimeout());
@@ -166,6 +175,13 @@ public class HTTPProxyHTTPConnectionImpl extends HTTPConnectionImpl {
                         break;
                     } catch (final IOException e) {
                         this.disconnect();
+                        if (connectedInetSocketAddress.getAddress() instanceof Inet6Address && Exceptions.containsInstanceOf(e, new Class[] { SocketException.class, ConnectException.class, SocketTimeoutException.class })) {
+                            if (StringUtils.containsIgnoreCase(e.getMessage(), "Network is unreachable")) {
+                                proxyIPs = new ArrayList<InetAddress>(Arrays.asList(HTTPConnectionUtils.sortAndFilter(proxyIPs.toArray(new InetAddress[0]), IPVERSION.IPV4_ONLY)));
+                            } else if (StringUtils.containsIgnoreCase(e.getMessage(), "timed out")) {
+                                proxyIPs = new ArrayList<InetAddress>(Arrays.asList(HTTPConnectionUtils.sortAndFilter(proxyIPs.toArray(new InetAddress[0]), IPVERSION.IPV4_IPV6)));
+                            }
+                        }
                         this.connectExceptions.add(this.proxyInetSocketAddress + "|" + getExceptionMessage(e));
                         /* connection failed, try next available ip */
                         ee = e;

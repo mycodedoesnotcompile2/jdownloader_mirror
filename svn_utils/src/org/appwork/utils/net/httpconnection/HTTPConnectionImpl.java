@@ -47,6 +47,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -54,6 +55,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,6 +91,12 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 
 public class HTTPConnectionImpl implements HTTPConnection {
+    protected class TryNextConnectException extends IOException {
+        protected TryNextConnectException(Throwable cause) {
+            super(cause);
+        }
+    }
+
     protected static enum SSL_STATE {
         NA,
         PROXY,
@@ -910,8 +918,9 @@ public class HTTPConnectionImpl implements HTTPConnection {
             if (this.connectionSocket == null) {
                 /* try all different ip's until one is valid and connectable */
                 IOException ee = null;
-                final InetAddress[] remoteIPs = getRemoteIPs(getHostname(), true);
-                for (final InetAddress host : remoteIPs) {
+                List<InetAddress> remoteIPs = new ArrayList<InetAddress>(Arrays.asList(getRemoteIPs(getHostname(), true)));
+                while (remoteIPs.size() > 0) {
+                    final InetAddress host = remoteIPs.remove(0);
                     this.resetConnection();
                     final int port = getPort(httpURL);
                     long startMS = Time.systemIndependentCurrentJVMTimeMillis();
@@ -949,6 +958,15 @@ public class HTTPConnectionImpl implements HTTPConnection {
                                     break;
                                 } catch (final IOException e) {
                                     closeConnectionSocket(this.connectionSocket);
+                                    if (connectedInetSocketAddress.getAddress() instanceof Inet6Address && Exceptions.containsInstanceOf(e, new Class[] { SocketException.class, ConnectException.class, SocketTimeoutException.class })) {
+                                        if (StringUtils.containsIgnoreCase(e.getMessage(), "Network is unreachable")) {
+                                            remoteIPs = new ArrayList<InetAddress>(Arrays.asList(HTTPConnectionUtils.sortAndFilter(remoteIPs.toArray(new InetAddress[0]), IPVERSION.IPV4_ONLY)));
+                                            throw new TryNextConnectException(e);
+                                        } else if (StringUtils.containsIgnoreCase(e.getMessage(), "timed out")) {
+                                            remoteIPs = new ArrayList<InetAddress>(Arrays.asList(HTTPConnectionUtils.sortAndFilter(remoteIPs.toArray(new InetAddress[0]), IPVERSION.IPV4_IPV6)));
+                                            throw new TryNextConnectException(e);
+                                        }
+                                    }
                                     if (Exceptions.containsInstanceOf(e, new Class[] { ConnectException.class, SocketTimeoutException.class }) && StringUtils.containsIgnoreCase(e.getMessage(), "timed out")) {
                                         long timeout = Time.systemIndependentCurrentJVMTimeMillis() - beforeConnectMS;
                                         if (timeout < 1000) {
@@ -989,6 +1007,25 @@ public class HTTPConnectionImpl implements HTTPConnection {
                         this.connectTime = Time.systemIndependentCurrentJVMTimeMillis() - startMS;
                         ee = null;
                         break;
+                    } catch (final TryNextConnectException e) {
+                        final IOException cause;
+                        if (e.getCause() instanceof IOException) {
+                            cause = (IOException) e.getCause();
+                        } else if (e.getCause() != null) {
+                            cause = new IOException(e.getCause());
+                        } else {
+                            cause = new IOException(e);
+                        }
+                        try {
+                            this.connectExceptions.add(connectedInetSocketAddress + "|" + getExceptionMessage(cause));
+                        } finally {
+                            this.disconnect();
+                        }
+                        if (bindInetAddress != null) {
+                            ee = new ProxyConnectException(cause, lProxy);
+                        } else {
+                            ee = cause;
+                        }
                     } catch (final IOException e) {
                         final String retrySSL;
                         try {
