@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 48686 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48728 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,6 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         /* Please try to sort website based on old/new style */
         /* Websites using the NEW style: */
-        ret.add(new String[] { "letsupload.io", "letsupload.org", "letsupload.to", "letsupload.co" });
         ret.add(new String[] { "truefile.cc" });
         ret.add(new String[] { "devdrive.cloud" });
         ret.add(new String[] { "przeslij.com" });

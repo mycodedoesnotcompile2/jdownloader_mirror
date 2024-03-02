@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48728 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     /**
      *
@@ -138,6 +138,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "easybytez.com", "easybytez.me", "easybytez.eu", "easybytez.co", "easybytez.to", "zingload.com", "easyload.to", "ezbytez.com", "ebytez.com" });
         ret.add(new String[] { "stahomat.cz", "stahomat.sk" });
         ret.add(new String[] { "storjshare.io" });
+        ret.add(new String[] { "letsupload.io", "letsupload.org", "letsupload.to", "letsupload.co" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }
