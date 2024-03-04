@@ -63,7 +63,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 48718 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 48731 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -316,15 +316,34 @@ public class WeTransferCom extends PluginForHost {
         try {
             ZipEntry zipEntry = null;
             final Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
+            boolean multipleEntriesFound = false;
             while (zipEntries.hasMoreElements()) {
                 if (zipEntry != null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "more than 1 entry in zip file!");
+                    multipleEntriesFound = true;
+                    break;
                 } else {
                     zipEntry = zipEntries.nextElement();
                 }
             }
-            if (zipEntry == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "no entry in zip file!");
+            final String fileName = getFileNameFromDispositionHeader(dl.getConnection());
+            if (multipleEntriesFound) {
+                logger.info("Skip extract as we found multiple ZipEntries!");
+                return;
+            } else {
+                if (zipEntry == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "no entry in zip file!");
+                } else {
+                    ZipEntry checkZipEntry = zipFile.getEntry(fileName);
+                    if (checkZipEntry != null) {
+                        logger.info("Full matching ZipEntry found:" + checkZipEntry.getName());
+                        zipEntry = checkZipEntry;
+                    } else if ((checkZipEntry = zipFile.getEntry(fileName.replaceFirst("^(.+/)", ""))) != null) {
+                        logger.info("Filename only matching ZipEntry found:" + checkZipEntry.getName());
+                        zipEntry = checkZipEntry;
+                    } else {
+                        logger.info("Single ZipEntry found:" + zipEntry.getName());
+                    }
+                }
             }
             final ShutdownVetoListener vetoListener = new ShutdownVetoListener() {
                 @Override
