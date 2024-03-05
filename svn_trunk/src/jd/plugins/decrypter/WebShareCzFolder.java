@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.WebShareCz;
 
-@DecrypterPlugin(revision = "$Revision: 48550 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48734 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { WebShareCz.class })
 public class WebShareCzFolder extends PluginForDecrypt {
     public WebShareCzFolder(PluginWrapper wrapper) {
@@ -131,7 +131,7 @@ public class WebShareCzFolder extends PluginForDecrypt {
                 logger.info("Stopping because: Aborted by user");
                 break;
             } else if (numberofNewItemsThisPage < maxItemsPerPage) {
-                logger.info("Stopping because: Current page contains less items than full page pagination");
+                logger.info("Stopping because: Current page contains less items than full page pagination -> Reached end?");
                 break;
             } else {
                 /* Continue to next page */

@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48728 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48733 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -788,7 +788,11 @@ public class TwitterComCrawler extends PluginForDecrypt {
             replyTextForFilename += "_reply";
         }
         final String username = link.getStringProperty(PROPERTY_USERNAME);
-        final String directurl = link.getStringProperty(TwitterCom.PROPERTY_DIRECTURL);
+        String directurl = link.getStringProperty(TwitterCom.PROPERTY_DIRECTURL);
+        if (new Regex(link.getPluginPatternMatcher(), TwitterCom.TYPE_DIRECT).patternFind()) {
+            /* Single added direct-URLs do not have the direct-URL set as a property. */
+            directurl = link.getPluginPatternMatcher();
+        }
         final String relatedOriginalFilename = link.getStringProperty(PROPERTY_RELATED_ORIGINAL_FILENAME);
         String originalFilename = null;
         if (directurl != null) {
