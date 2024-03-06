@@ -58,7 +58,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.TwitterComCrawler;
 
-@HostPlugin(revision = "$Revision: 48733 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48740 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterCom extends PluginForHost {
     public TwitterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -565,7 +565,8 @@ public class TwitterCom extends PluginForHost {
 
     /** Returns text of this tweet. Can be null as not all tweets have a post-text! */
     private String getTweetText(final DownloadLink link) {
-        return link.getStringProperty(TwitterComCrawler.PROPERTY_TWEET_TEXT);
+        final String tweetText = link.getStringProperty(TwitterComCrawler.PROPERTY_TWEET_TEXT);
+        return TwitterComCrawler.sanitizeTweetText(tweetText);
     }
 
     private static String regexVideoVmapHighestQualityURL(final Browser br) {
