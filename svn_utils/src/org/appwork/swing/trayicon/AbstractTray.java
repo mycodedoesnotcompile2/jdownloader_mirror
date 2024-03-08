@@ -127,7 +127,7 @@ public abstract class AbstractTray implements TrayMouseListener {
         return id.image(-1);
     }
 
-    public void showAbout() {
+    public void showAbout(MouseEvent mouseevent) {
     }
 
     @Override
@@ -178,7 +178,7 @@ public abstract class AbstractTray implements TrayMouseListener {
      * @param e
      */
     protected void onDoubleClick(MouseEvent e) {
-        this.showAbout();
+        this.showAbout(e);
     }
 
     protected void onSingleClick(MouseEvent e) {

@@ -46,7 +46,6 @@ import java.nio.charset.CodingErrorAction;
  *
  */
 public class CharSequenceUtils {
-
     public static boolean contentEquals(final CharSequence x, final CharSequence y) {
         if (x instanceof String) {
             return ((String) x).contentEquals(y);
@@ -118,7 +117,6 @@ public class CharSequenceUtils {
                 for (int k = targetOffset + 1; j < end && source.charAt(j) == target.charAt(k); j++, k++) {
                     ;
                 }
-
                 if (j == end) {
                     /* Found whole string. */
                     return i - sourceOffset;
@@ -212,5 +210,4 @@ public class CharSequenceUtils {
             return true;
         }
     }
-
 }

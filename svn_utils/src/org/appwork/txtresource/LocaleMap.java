@@ -33,9 +33,9 @@
  * ==================================================================================================================================================== */
 package org.appwork.txtresource;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.storage.FailLevel;
@@ -96,11 +96,11 @@ public class LocaleMap extends LinkedHashMap<String, String> implements Storable
     /**
      * @param message
      */
-    public LocaleMap(HashMap<String, String> message) {
+    public LocaleMap(Map<String, String> message) {
         putAll(message);
     }
 
-    public static String getBestMatch(HashMap<String, String> message) {
+    public static String getBestMatch(Map<String, String> message) {
         if (message == null) {
             return null;
         }
@@ -113,7 +113,7 @@ public class LocaleMap extends LinkedHashMap<String, String> implements Storable
      * @param message
      * @return
      */
-    public static String getBestMatch(HashMap<String, String> message, String localeID) {
+    public static String getBestMatch(Map<String, String> message, String localeID) {
         if (message == null || message.size() == 0) {
             return null;
         }

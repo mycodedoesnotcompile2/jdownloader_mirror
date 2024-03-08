@@ -396,8 +396,8 @@ public class FlexiJSonMapper {
                 Collection<Getter> getters = cc.getGetterMap().values();
                 HashMap<KeyValueElement, Integer> orderMap = null;
                 for (final Getter g : getters) {
-                    CompiledType t=CompiledType.create(g.getMethod().getGenericReturnType(), cType.type);
-                    try {                        
+                    CompiledType t = CompiledType.create(g.getMethod().getGenericReturnType(), cType.type);
+                    try {
                         context.add(t, g.getKey());
                         if (cType.getClassCache().getAnnotations(g.key, StorableHidden.class).size() > 0) {
                             continue;
@@ -1402,7 +1402,15 @@ public class FlexiJSonMapper {
     }
 
     protected Object getInstance(final CompiledType cType) throws InstantiationException, IllegalAccessException, InvocationTargetException {
-        return cType.newInstance();
+        try {
+            return cType.newInstance();
+        } catch (InstantiationException e) {
+            LogV3.info(this, "Cannot create instance (InstantiationException) for %s", cType);
+            throw e;
+        } catch (IllegalAccessException e) {
+            LogV3.info(this, "Cannot create instance (IllegalAccessException) for %s", cType);
+            throw e;
+        }
     }
 
     /**

@@ -272,7 +272,11 @@ public class FlexiJSONParser {
                 case 'D':
                 case 'e':
                 case 'E':
+                case 'f':
+                case 'F':
                     return true;
+                default:
+                    return false;
                 }
             }
             if (c == '.') {
@@ -508,6 +512,8 @@ public class FlexiJSONParser {
                     case 'D':
                     case 'e':
                     case 'E':
+                    case 'f':
+                    case 'F':
                         hasDigit = true;
                         return true;
                     }
@@ -558,6 +564,115 @@ public class FlexiJSONParser {
         /**
          *
          */
+    }
+
+    public class ReferenceParser {
+        private int     index;
+        private boolean invalid;
+        private int     finished = 0;
+        private String  str      = "";
+
+        public ReferenceParser() {
+        }
+
+        /**
+         * @param c
+         * @return
+         */
+        private boolean check(char c, boolean setFinished) {
+            if (invalid) {
+                return false;
+            }
+            str += c;
+            // no isFinished
+            if (finished > 0 && !Character.isWhitespace(c)) {
+                return false;
+            } else if (isFinished() && Character.isWhitespace(c)) {
+                return true;
+            }
+            if (index == 0) {
+                if (c == '$') {
+                    return true;
+                }
+            } else if (index == 1) {
+                if (c == '{') {
+                    return true;
+                }
+            } else {
+                if (c == '}') {
+                    if (index <= 2) {
+                        // ${}
+                        return false;
+                    }
+                    if (setFinished) {
+                        finished = index;
+                    }
+                    return true;
+                } else {
+                    if (Character.isAlphabetic(c)) {
+                        return true;
+                    }
+                    if (Character.isDigit(c)) {
+                        return true;
+                    }
+                    switch (c) {
+                    case '[':
+                    case ']':
+                    case '.':
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @return
+         */
+        public boolean isFinished() {
+            return !invalid && finished > 0;
+        }
+
+        public void reset() {
+            index = 0;
+            invalid = false;
+            finished = 0;
+        }
+
+        /**
+         * @param ac
+         * @return
+         */
+        public boolean validate(char c) {
+            if (invalid) {
+                return false;
+            }
+            if (check(c, true)) {
+                index++;
+                return true;
+            }
+            invalid = true;
+            return false;
+        }
+
+        /**
+         *
+         */
+        /**
+         * @param string
+         * @param path
+         * @return
+         */
+        public String getValue(String string, Object path) {
+            return string.substring(2, finished);
+        }
+
+        /**
+         * @return
+         */
+        public boolean mayBeALink() {
+            return check('}', false);
+        }
     }
 
     public class StringParser {
@@ -736,6 +851,7 @@ public class FlexiJSONParser {
     private StringParser         isNull;
     private NumberParser         isNumber;
     private StringParser         isTrue;
+    private ReferenceParser      isReference;
     private int                  lastNonWhitespaceIndex;
     private Reader               reader       = null;
     final StringBuilder          sb;
@@ -807,10 +923,25 @@ public class FlexiJSONParser {
         isUndefined = new StringParser(CHAR_ARRAY_UNDEFINED);
         isTrue = new StringParser(CHAR_ARRAY_TRUE);
         isFalse = new StringParser(CHAR_ARRAY_FALSE);
+        isReference = new ReferenceParser();
+    }
+
+    private boolean parseReferencesEnabled = false;
+
+    public boolean isParseReferencesEnabled() {
+        return parseReferencesEnabled;
+    }
+
+    public void setParseReferencesEnabled(boolean parseReferencesEnabled) {
+        this.parseReferencesEnabled = parseReferencesEnabled;
     }
 
     public FlexiJSONParser(final String json) {
         this(new StringReader(json));
+    }
+
+    public FlexiJSONParser(final CharSequence json) {
+        this(new CharSequenceReader(json));
     }
 
     protected void appendC(char c) {
@@ -819,6 +950,9 @@ public class FlexiJSONParser {
         isTrue.validate(c);
         isFalse.validate(c);
         isUndefined.validate(c);
+        if (isParseReferencesEnabled()) {
+            isReference.validate(c);
+        }
         if (tokenParserExtensions != null) {
             for (FlexiJSONParserExtension sp : tokenParserExtensions) {
                 sp.validate(c);
@@ -855,6 +989,9 @@ public class FlexiJSONParser {
                     }
                 }
             }
+        }
+        if (isParseReferencesEnabled() && isReference.isFinished()) {
+            return this.createJSonReference(isReference.getValue(sb.toString(), path));
         }
         switch (stringQuoting) {
         case DOUBLE:
@@ -906,6 +1043,14 @@ public class FlexiJSONParser {
         }
         throwParserExceptionInternal(ParsingError.ERROR_STRING_TOKEN_WITHOUT_QUOTES, path, null, container, null);
         return dedupeString(sb.substring(0, lastNonWhitespaceIndex));
+    }
+
+    /**
+     * @param value
+     * @return
+     */
+    private FlexiJSonValue createJSonReference(String value) {
+        return new FlexiJSonValue(value, true);
     }
 
     public FlexiJSonArray createJSonArray() {
@@ -1685,6 +1830,7 @@ public class FlexiJSONParser {
         isTrue.reset();
         isFalse.reset();
         isUndefined.reset();
+        isReference.reset();
         if (tokenParserExtensions != null) {
             for (FlexiJSONParserExtension sp : tokenParserExtensions) {
                 sp.reset();
@@ -1753,8 +1899,12 @@ public class FlexiJSONParser {
                             return assignFinalType(path, type);
                         case CURLY_BRACKET_CLOSE: // set correct token for the current character - since it already belongs to the next
                                                   // entry
-                            setToken(path, Token.END_OF_OBJECT);
-                            return assignFinalType(path, type);
+                            if (isParseReferencesEnabled() && isReference.mayBeALink()) {
+                                // this is the end of a reference
+                            } else {
+                                setToken(path, Token.END_OF_OBJECT);
+                                return assignFinalType(path, type);
+                            }
                         }
                     }
                 } else if (container instanceof FlexiJSonArray) {
@@ -1763,7 +1913,11 @@ public class FlexiJSONParser {
                         setToken(path, Token.COMMA);
                         return assignFinalType(path, type);
                     case SQUARE_BRACKET_CLOSE:
-                        setToken(path, Token.END_OF_ARRAY);
+                        if (isParseReferencesEnabled() && isReference.isFinished()) {
+                            // this is the end of a reference
+                        } else {
+                            setToken(path, Token.END_OF_ARRAY);
+                        }
                         return assignFinalType(path, type);
                     }
                 }
@@ -2066,7 +2220,7 @@ public class FlexiJSONParser {
                 json = "[...]" + debug.toString().substring(Math.max(0, debug.length() - 100)) + " ";
             }
             json += error.name() + ": " + error.description + " at index " + index;
-            throw new FlexiParserException(index, path, json, cause);
+            throw new FlexiParserException(error, index, path, json, cause);
         }
     }
 

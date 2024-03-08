@@ -244,10 +244,6 @@ public class IO {
         return null;
     }
 
-    public static String importFileToString(final File file) throws IOException {
-        return IO.importFileToString(file, -1);
-    }
-
     public static enum BOM {
         UTF8(new byte[] { (byte) 239, (byte) 187, (byte) 191 }, "UTF-8"),
         UTF16BE(new byte[] { (byte) 254, (byte) 255 }, "UTF-16BE"),
@@ -405,8 +401,9 @@ public class IO {
 
     public static byte[] readFile(final File ressource) throws IOException {
         final int maxRead;
-        if (ressource.length() < Integer.MAX_VALUE) {
-            maxRead = (int) ressource.length();
+        final long fileSize = ressource.length();
+        if (fileSize > 0 && fileSize < Integer.MAX_VALUE) {
+            maxRead = (int) fileSize;
         } else {
             maxRead = -1;
         }
@@ -416,7 +413,7 @@ public class IO {
     /*
      * this function reads a line from a bufferedinputstream up to a maxLength. in case the line is longer than maxLength the rest of the
      * line is read but not returned
-     *
+     * 
      * this function skips emtpy lines
      */
     public static byte[] readFile(final File ressource, final int maxSize) throws IOException {
@@ -432,27 +429,42 @@ public class IO {
     }
 
     public static String importFileToString(final File file, final int maxSize) throws IOException {
-        final byte[] bytes = IO.readFile(file, maxSize);
-        if (bytes == null) {
-            return null;
-        } else {
-            return BOM.read(bytes, BOM.UTF8.getCharSet());
+        final FileInputStream fis = new FileInputStream(file);
+        try {
+            return readStreamToString(fis, maxSize, true);
+        } finally {
+            try {
+                fis.close();
+            } catch (final Throwable e) {
+            }
         }
     }
 
+    public static String readStreamToString(final InputStream is, final int maxSize, final boolean closeStream) throws IOException {
+        try {
+            final BOMInputStream bis;
+            if (is instanceof BOMInputStream) {
+                bis = (BOMInputStream) is;
+            } else {
+                bis = BOM.wrap(is);
+            }
+            final ReusableByteArrayOutputStream os = new ReusableByteArrayOutputStream(maxSize > 0 ? maxSize : 32);
+            IO.readStreamToOutputStream(maxSize, bis, os, false);// closed in finally
+            final String ret = new String(os.getInternalBuffer(), 0, os.size(), bis.getBOM() != null ? bis.getBOM().getCharSet() : BOM.UTF8.getCharSet());
+            return ret;
+        } finally {
+            if (closeStream) {
+                try {
+                    is.close();
+                } catch (final Exception e) {
+                }
+            }
+        }
+    }
+
+    @Deprecated
     public static String readStreamToString(final InputStream is, final int maxSize) throws IOException {
-        final BOMInputStream bis;
-        if (is instanceof BOMInputStream) {
-            bis = (BOMInputStream) is;
-        } else {
-            bis = BOM.wrap(is);
-        }
-        final byte[] bytes = readStream(maxSize, bis);
-        if (bytes == null) {
-            return null;
-        } else {
-            return new String(bytes, bis.getBOM() != null ? bis.getBOM().getCharSet() : BOM.UTF8.getCharSet());
-        }
+        return readStreamToString(is, maxSize, true);
     }
 
     public static String readFileToString(final File file) throws IOException {
@@ -552,18 +564,23 @@ public class IO {
     }
 
     public static byte[] readStream(final int maxSize, final InputStream input) throws IOException {
+        final ByteArrayOutputStream baos;
         if (maxSize > 0) {
-            return IO.readStream(maxSize, input, new ByteArrayOutputStream(maxSize));
+            baos = new ByteArrayOutputStream(maxSize);
         } else {
-            return IO.readStream(maxSize, input, new ByteArrayOutputStream());
+            baos = new ByteArrayOutputStream();
         }
+        return IO.readStream(maxSize, input, baos, true);
     }
 
     public static byte[] readStream(final int maxSize, final InputStream input, final ByteArrayOutputStream baos) throws IOException {
         return IO.readStream(maxSize, input, baos, true);
     }
 
-    public static byte[] readStream(final int maxSize, final InputStream input, final ByteArrayOutputStream baos, boolean closeInput) throws IOException {
+    public static byte[] readStream(final int maxSize, final InputStream input, ByteArrayOutputStream baos, boolean closeInput) throws IOException {
+        if (baos == null) {
+            baos = new ByteArrayOutputStream();
+        }
         IO.readStreamToOutputStream(maxSize, input, baos, closeInput);
         return baos.toByteArray();
     }

@@ -60,11 +60,11 @@ public class KeyValueElement {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {        
+    public String toString() {
         StringBuilder sb = new StringBuilder();
         if (commentsBeforeKey != null) {
             for (FlexiCommentJsonNode c : commentsBeforeKey) {
@@ -90,7 +90,7 @@ public class KeyValueElement {
         this.path = path;
     }
 
-    public void setKey(String key) {
+    protected void setKey(String key) {
         this.key = key;
     }
 

@@ -201,6 +201,8 @@ public class FlexiJSonStringBuilder {
     protected byte[]             trueString;
     protected byte[]             falseString;
     protected byte[]             newLineRN;
+    private byte[]               referenceStartTag;
+    private byte[]               referenceEndTag;
 
     /**
     *
@@ -242,6 +244,8 @@ public class FlexiJSonStringBuilder {
         arrayCloseTag = "]".getBytes(charset);
         objectOpenTag = "{".getBytes(charset);
         objectCloseTag = "}".getBytes(charset);
+        referenceStartTag = "${".getBytes(charset);
+        referenceEndTag = "}".getBytes(charset);
         trueString = "true".getBytes(charset);
         falseString = "false".getBytes(charset);
         newLineRN = "\r\n".getBytes(charset);
@@ -319,9 +323,23 @@ public class FlexiJSonStringBuilder {
         case UNDEFINED:
             appendUndefined(value, out);
             break;
+        case REFERENCE:
+            appendReference(value, out);
+            break;
         default:
             new WTFException("Not supported:" + value.getType());
         }
+    }
+
+    /**
+     * @param value
+     * @param out
+     * @throws IOException
+     */
+    private void appendReference(FlexiJSonValue value, JSONBuilderOutputStream out) throws IOException {
+        bytesToStream(out, referenceStartTag);
+        appendStringWithoutQuotes(out, value.getStringValue());
+        bytesToStream(out, referenceEndTag);
     }
 
     /**
@@ -392,6 +410,11 @@ public class FlexiJSonStringBuilder {
 
     protected void appendString(JSONBuilderOutputStream out, String s) throws IOException, CharacterCodingException {
         bytesToStream(out, escapedQuotationMarks);
+        appendStringWithoutQuotes(out, s);
+        bytesToStream(out, escapedQuotationMarks);
+    }
+
+    private void appendStringWithoutQuotes(JSONBuilderOutputStream out, String s) throws IOException {
         try {
             for (int i = 0; i < s.length(); i++) {
                 final char ch = s.charAt(i);
@@ -400,10 +423,10 @@ public class FlexiJSonStringBuilder {
                     finalizeAppendString(out);
                     bytesToStream(out, escapedEscapedQuotationMarks);
                     continue;
-                // case '\'':
-                // We support only " in the stringifier
-                // bytesToStream(out, "\\'".getBytes(charset));
-                // continue;
+                    // case '\'':
+                    // We support only " in the stringifier
+                    // bytesToStream(out, "\\'".getBytes(charset));
+                    // continue;
                 case '\\':
                     finalizeAppendString(out);
                     bytesToStream(out, escapedEscaped);
@@ -455,7 +478,6 @@ public class FlexiJSonStringBuilder {
             // ensure that the buffers are cleared
             finalizeAppendString(out);
         }
-        bytesToStream(out, escapedQuotationMarks);
     }
 
     /**

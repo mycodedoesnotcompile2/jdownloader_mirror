@@ -42,6 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
+import org.appwork.loggingv3.LoggerProvider;
 import org.appwork.loggingv3.simple.sink.LogToFileSink;
 import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.loggingv3.simple.sink.Sink;
@@ -85,7 +86,7 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
 
     protected LogToStdOutSink sinkToConsole;
 
-    public SimpleLoggerFactory() {      
+    public SimpleLoggerFactory() {
     }
 
     public void initDefaults() {
@@ -97,17 +98,24 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     @Override
-    public LogInterface getLogger(Object name) {
-        if (name == null) {
+    public LogInterface getLogger(Object context) {
+        if (context == null) {
             return getDefaultLogger();
         } else {
-            synchronized (logger) {
-                final String id = name.toString();
-                LoggerToSink ret = logger.get(id);
-                if (ret == null) {
-                    logger.put(id, ret = createLogger(name));
+            if (context instanceof LogInterface) {
+                return (LogInterface) context;
+            } else if (context instanceof LoggerProvider) {
+                return ((LoggerProvider) context).getLogger();
+            } else {
+                synchronized (logger) {
+                    final String id = context.toString();
+                    LoggerToSink ret = logger.get(id);
+                    if (ret == null) {
+                        logger.put(id, ret = createLogger(context));
+                        ret.info("Created Logger " + logger.size() + ": " + context);
+                    }
+                    return ret;
                 }
-                return ret;
             }
         }
     }

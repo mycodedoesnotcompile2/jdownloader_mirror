@@ -31,115 +31,63 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.simplejson.mapper;
+package org.appwork.storage.flexijson.tests;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
+import java.io.File;
+import java.io.UnsupportedEncodingException;
 
-import org.appwork.utils.reflection.CompiledType;
+import org.appwork.loggingv3.LogV3;
+import org.appwork.serializer.SC;
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiJSonObject;
+import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.FlexiParserException;
+import org.appwork.storage.flexijson.FlexiSerializer;
+import org.appwork.storage.flexijson.ParsingError;
+import org.appwork.storage.simplejson.ValueType;
+import org.appwork.testframework.AWTest;
+import org.appwork.testframework.IDETestRunner;
 
 /**
  * @author thomas
- * @date 20.10.2022
+ * @date 26.03.2021
  *
  */
-public class Property {
-    public final String       key;
-    public final CompiledType type;
-    public final Getter       getter;
-    public final Setter       setter;
-    public final ClassCache   classCache;
-
-    /**
-     * @param cc
-     *            TODO
-     * @param key
-     * @param type
-     * @param getter
-     * @param setter
+public class FlexiReferenceTest extends AWTest {
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.appwork.tests.TestInterface#runTest()
      */
-    public Property(ClassCache cc, String key, CompiledType type, Getter getter, Setter setter) {
-        this.classCache = cc;
-        this.key = key;
-        this.type = type;
-        this.getter = getter;
-        this.setter = setter;
+    @Override
+    public void runTest() throws Exception {
+        FlexiJSONParser parser = new FlexiJSONParser("{target:1,link:${target}}");
+        parser.setIgnoreIssues(FlexiJSONParser.IGNORE_LIST_ENSURE_CORRECT_VALUES, ParsingError.ERROR_STRING_VALUE_WITHOUT_QUOTES);
+        parser.setParseReferencesEnabled(true);
+        parser.setDebug(new StringBuilder());
+        FlexiJSonNode node = parser.parse();
+        FlexiJSonNode target = ((FlexiJSonObject) node).getNode("link");
+        assertTrue(target instanceof FlexiJSonValue);
+        assertTrue(((FlexiJSonValue) target).getType() == ValueType.REFERENCE);
+        String hashContent = new FlexiSerializer().toString(node, SC.HASH_CONTENT);
+        assertEquals("{\"target\":1,\"link\":${target}}", hashContent);
+        System.out.println(node);
+    }
+
+    public static void main(String[] args) throws FlexiParserException, UnsupportedEncodingException, InterruptedException {
+        IDETestRunner.run(FlexiReferenceTest.class);
+        // runWayToExtensiveWhateverTest();
+        LogV3.disableSysout();
     }
 
     /*
      * (non-Javadoc)
      *
-     * @see java.lang.Object#hashCode()
+     * @see org.appwork.tests.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
-    public int hashCode() {
-        return type.hashCode() + key.hashCode();
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see java.lang.Object#equals(java.lang.Object)
-     */
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof Property) {
-            Property other = (Property) obj;
-            if (type.equals(other.type)) {
-                if (key.equals(other.key)) {
-                    if (getGetterMethod() == other.getGetterMethod()) {
-                        if (getSetterMethod() == other.getSetterMethod()) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    public Method getSetterMethod() {
-        return setter == null ? null : setter.getMethod();
-    }
-
-    public Method getGetterMethod() {
-        return getter == null ? null : getter.getMethod();
-    }
-
-    /**
-     * @return
-     *
-     */
-    public ClassCache getClassCache() {
-        return classCache;
-    }
-
-    /**
-     * @return
-     */
-    public Type getGenericType() {
-        Field field = null;
-        if (getter != null) {
-            final Method method = getter.getMethod();
-            if (method != null) {
-                return method.getGenericReturnType();
-            } else {
-                field = getter.getField();
-            }
-        }
-        if (setter != null) {
-            final Method method = setter.getMethod();
-            if (method != null) {
-                return method.getGenericParameterTypes()[0];
-            } else if (field == null) {
-                field = setter.getField();
-            }
-        }
-        if (field != null) {
-            return field.getGenericType();
-        } else {
-            return null;
-        }
+    public void runPostBuildTest(String[] args, File workingDirectory) throws Exception {
+        runTest();
     }
 }

@@ -70,8 +70,7 @@ public class StringUtils {
     }
 
     /**
-     * Returns formatted number as String according to given padLength. </br>
-     * E.g. number 1 with padLength 3 will return "001".
+     * Returns formatted number as String according to given padLength. </br> E.g. number 1 with padLength 3 will return "001".
      */
     public static String formatByPadLength(final int padLength, final int num) {
         return String.format(Locale.US, "%0" + padLength + "d", num);
@@ -122,62 +121,62 @@ public class StringUtils {
     final private static String whitespace_chars = "[" /*
                                                         * dummy empty string for homogeneity
                                                         */
-            + "\\u0009" // CHARACTER
-            // TABULATION
-            + "\\u000A" // LINE
-            // FEED
-            // (LF)
-            + "\\u000B" // LINE
-            // TABULATION
-            + "\\u000C" // FORM
-            // FEED
-            // (FF)
-            + "\\u000D" // CARRIAGE
-            // RETURN
-            // (CR)
-            + "\\u0020" // SPACE
-            + "\\u0085" // NEXT
-            // LINE
-            // (NEL)
-            + "\\u00A0" // NO-BREAK
-            // SPACE
-            + "\\u1680" // OGHAM
-            // SPACE
-            // MARK
-            + "\\u180E" // MONGOLIAN
-            // VOWEL
-            // SEPARATOR
-            + "\\u2000" // EN QUAD
-            + "\\u2001" // EM QUAD
-            + "\\u2002" // EN SPACE
-            + "\\u2003" // EM SPACE
-            + "\\u2004" // THREE-PER-EM
-            // SPACE
-            + "\\u2005" // FOUR-PER-EM
-            // SPACE
-            + "\\u2006" // SIX-PER-EM
-            // SPACE
-            + "\\u2007" // FIGURE
-            // SPACE
-            + "\\u2008" // PUNCTUATION
-            // SPACE
-            + "\\u2009" // THIN
-            // SPACE
-            + "\\u200A" // HAIR
-            // SPACE
-            + "\\u2028" // LINE
-            // SEPARATOR
-            + "\\u2029" // PARAGRAPH
-            // SEPARATOR
-            + "\\u202F" // NARROW
-            // NO-BREAK
-            // SPACE
-            + "\\u205F" // MEDIUM
-            // MATHEMATICAL
-            // SPACE
-            + "\\u3000" // IDEOGRAPHIC
-            // SPACE
-            + "]";
+                                                         + "\\u0009" // CHARACTER
+                                                         // TABULATION
+                                                         + "\\u000A" // LINE
+                                                         // FEED
+                                                         // (LF)
+                                                         + "\\u000B" // LINE
+                                                         // TABULATION
+                                                         + "\\u000C" // FORM
+                                                         // FEED
+                                                         // (FF)
+                                                         + "\\u000D" // CARRIAGE
+                                                         // RETURN
+                                                         // (CR)
+                                                         + "\\u0020" // SPACE
+                                                         + "\\u0085" // NEXT
+                                                         // LINE
+                                                         // (NEL)
+                                                         + "\\u00A0" // NO-BREAK
+                                                         // SPACE
+                                                         + "\\u1680" // OGHAM
+                                                         // SPACE
+                                                         // MARK
+                                                         + "\\u180E" // MONGOLIAN
+                                                         // VOWEL
+                                                         // SEPARATOR
+                                                         + "\\u2000" // EN QUAD
+                                                         + "\\u2001" // EM QUAD
+                                                         + "\\u2002" // EN SPACE
+                                                         + "\\u2003" // EM SPACE
+                                                         + "\\u2004" // THREE-PER-EM
+                                                         // SPACE
+                                                         + "\\u2005" // FOUR-PER-EM
+                                                         // SPACE
+                                                         + "\\u2006" // SIX-PER-EM
+                                                         // SPACE
+                                                         + "\\u2007" // FIGURE
+                                                         // SPACE
+                                                         + "\\u2008" // PUNCTUATION
+                                                         // SPACE
+                                                         + "\\u2009" // THIN
+                                                         // SPACE
+                                                         + "\\u200A" // HAIR
+                                                         // SPACE
+                                                         + "\\u2028" // LINE
+                                                         // SEPARATOR
+                                                         + "\\u2029" // PARAGRAPH
+                                                         // SEPARATOR
+                                                         + "\\u202F" // NARROW
+                                                         // NO-BREAK
+                                                         // SPACE
+                                                         + "\\u205F" // MEDIUM
+                                                         // MATHEMATICAL
+                                                         // SPACE
+                                                         + "\\u3000" // IDEOGRAPHIC
+                                                         // SPACE
+                                                         + "]";
 
     public static String trim(String input) {
         if (input != null) {
@@ -800,86 +799,161 @@ public class StringUtils {
     private static final Pattern MATCHES_NEVER       = Pattern.compile("$^");
     public static final Pattern  DEFAULT_WRAP_AFTER  = MATCHES_NEVER;
 
-    public static String wrapText(String trim, int size, String patternWrapBefore, String patternWrapAfter, boolean forceWrapLongWords) {
-        if (size == 0) {
-            throw new IllegalArgumentException("Size must be > 0");
+    private final static class ReferencedCharArrayCharSequence implements CharSequence {
+        private final char[] value;
+        private final int    offset;
+        private final int    length;
+
+        private ReferencedCharArrayCharSequence(final CharSequence charSequence) {
+            final int length = charSequence.length();
+            value = new char[length];
+            charSequence.toString().getChars(0, length, value, 0);
+            this.offset = 0;
+            this.length = length;
         }
-        Pattern patBefore = patternWrapBefore == null ? DEFAULT_WRAP_BEFORE : Pattern.compile(patternWrapBefore);
-        Pattern paAfter = patternWrapAfter == null ? DEFAULT_WRAP_AFTER : Pattern.compile(patternWrapAfter);
-        return wrap(trim, size, forceWrapLongWords, patBefore, paAfter);
+
+        private ReferencedCharArrayCharSequence(final int offset, final int start, final int end, char[] value) {
+            this.value = value;
+            this.offset = offset + start;
+            this.length = end - start;
+        }
+
+        @Override
+        public final int length() {
+            return this.length;
+        }
+
+        protected final void appendTo(StringBuilder sb, int length) {
+            sb.append(value, offset, length);
+        }
+
+        @Override
+        public final String toString() {
+            return new String(value, offset, length);
+        }
+
+        @Override
+        public final char charAt(int index) {
+            return value[index + this.offset];
+        }
+
+        @Override
+        public final ReferencedCharArrayCharSequence subSequence(int start, int end) {
+            return new ReferencedCharArrayCharSequence(this.offset, start, end, value);
+        }
+    }
+
+    public static String wrapText(String stringToWrap, int maxCharsPerLine, String patternWrapBefore, String patternWrapAfter, boolean forceWrapLongWords) {
+        if (maxCharsPerLine == 0) {
+            throw new IllegalArgumentException("Size must be > 0");
+        } else {
+            final Pattern patBefore = patternWrapBefore == null ? DEFAULT_WRAP_BEFORE : Pattern.compile(patternWrapBefore);
+            final Pattern paAfter = patternWrapAfter == null ? DEFAULT_WRAP_AFTER : Pattern.compile(patternWrapAfter);
+            return wrap(stringToWrap, maxCharsPerLine, forceWrapLongWords, patBefore, paAfter);
+        }
     }
 
     public static String wrap(String stringToWrap, int maxCharsPerLine, boolean forceWrapLongWords, Pattern patternBefore, Pattern patternAfter) {
         if (maxCharsPerLine == 0) {
             throw new IllegalArgumentException("Size must be > 0");
+        } else {
+            final ReferencedCharArrayCharSequence value = new ReferencedCharArrayCharSequence(stringToWrap);
+            return wrapInternal(value, new StringBuilder(), maxCharsPerLine, forceWrapLongWords, NEWLINE, patternBefore, patternAfter).toString();
         }
-        StringBuilder ret = new StringBuilder();
-        Pattern newLine = NEWLINE;
-        while (stringToWrap.length() > 0) {
-            Matcher newLineMatcher = newLine.matcher(stringToWrap);
-            if (newLineMatcher.find()) {
-                if (newLineMatcher.start() <= maxCharsPerLine) {
-                    if (ret.length() > 0) {
-                        ret.append("\r\n");
+    }
+
+    private static StringBuilder wrapInternal(ReferencedCharArrayCharSequence input, StringBuilder output, int maxCharsPerLine, boolean forceWrapLongWords, Pattern patternNewline, Pattern patternBefore, Pattern patternAfter) {
+        Matcher newLineMatcherInstance = patternNewline == null ? null : patternNewline.matcher("");
+        Matcher matcherBeforeInstance = patternBefore == null ? null : patternBefore.matcher("");
+        Matcher matcherAfterInstance = patternAfter == null ? null : patternAfter.matcher("");
+        boolean appendNewLine = output.length() > 0;
+        while (input.length() > 0) {
+            if (newLineMatcherInstance != null) {
+                if (newLineMatcherInstance.reset(input).find()) {
+                    final int start = newLineMatcherInstance.start();
+                    if (start <= maxCharsPerLine) {
+                        if (appendNewLine) {
+                            output.append("\r\n");
+                            input.appendTo(output, start);
+                        } else {
+                            input.appendTo(output, start);
+                            appendNewLine = output.length() > 0;
+                        }
+                    } else {
+                        final ReferencedCharArrayCharSequence subSequence = input.subSequence(0, start);
+                        wrapInternal(subSequence, output, maxCharsPerLine, forceWrapLongWords, null, patternBefore, patternAfter);
+                        if (!appendNewLine) {
+                            appendNewLine = output.length() > 0;
+                        }
                     }
-                    ret.append(stringToWrap.substring(0, newLineMatcher.start()));
-                    stringToWrap = stringToWrap.substring(newLineMatcher.end());
+                    input = input.subSequence(newLineMatcherInstance.end(), input.length());
                     continue;
+                } else {
+                    newLineMatcherInstance = null;
                 }
             }
-            if (stringToWrap.length() < maxCharsPerLine) {
-                if (ret.length() > 0) {
-                    ret.append("\r\n");
+            if (input.length() < maxCharsPerLine) {
+                if (appendNewLine) {
+                    output.append("\r\n");
                 }
-                ret.append(stringToWrap);
-                return ret.toString();
+                input.appendTo(output, input.length);
+                return output;
             }
-            Matcher matcherBefore = patternBefore == null ? null : patternBefore.matcher(stringToWrap);
-            Matcher matcherAfter = patternAfter == null ? null : patternAfter.matcher(stringToWrap);
             int splitBeforeAt = 0;
             int splitAfterAt = 0;
             int last = 0;
-            String replaceBefore = null;
-            while (true) {
-                if (matcherBefore != null && matcherBefore.find()) {
-                    int start = matcherBefore.start();
-                    int end = matcherBefore.end();
+            int replaceBeforeLength = -1;
+            if (matcherBeforeInstance != null) {
+                matcherBeforeInstance.reset(input);
+                while (true) {
+                    if (!matcherBeforeInstance.find()) {
+                        matcherBeforeInstance = null;
+                        break;
+                    }
+                    final int start = matcherBeforeInstance.start();
                     if (start > maxCharsPerLine) {
                         if (last == 0 && !forceWrapLongWords) {
-                            replaceBefore = null;
+                            replaceBeforeLength = -1;
                             splitBeforeAt = start;
                         } else {
                             splitBeforeAt = last;
                         }
                         break;
                     } else {
-                        replaceBefore = null;
-                        int gc = matcherBefore.groupCount();
+                        replaceBeforeLength = -1;
+                        int gc = matcherBeforeInstance.groupCount();
                         for (int i = 1; i < gc + 1; i++) {
-                            // search matcher groups, because we skip these groups. example: "split this" at space. if the space is within a
+                            // search matcher groups, because we skip these groups. example: "split this" at space. if the space is
+                            // within a
                             // matcher group, the result will be "split\r\nthis",else "split\r\n this"
-                            String gourp = matcherBefore.group(i);
-                            if (gourp != null && replaceBefore == null) {
-                                replaceBefore = gourp;
+                            final int groupStart = matcherBeforeInstance.start(i);
+                            final int groupEnd = matcherBeforeInstance.end(i);
+                            if (groupStart != -1 && groupEnd != -1) {
+                                replaceBeforeLength = groupEnd - groupStart;
+                                break;
                             }
                             // System.out.println(i + " - _" + matcherBefore.group(i) + "_");
                         }
                         last = start;
-                        if (end == stringToWrap.length()) {
+                        final int end = matcherBeforeInstance.end();
+                        if (end == input.length()) {
                             splitBeforeAt = start;
                             break;
                         }
                     }
-                } else {
-                    splitBeforeAt = last;
-                    break;
                 }
             }
+            splitBeforeAt = last;
             last = 0;
-            while (true) {
-                if (patternAfter != null && patternAfter != DEFAULT_WRAP_AFTER && matcherAfter.find()) {
-                    int end = matcherAfter.end();
-                    if (end > maxCharsPerLine || end == stringToWrap.length()) {
+            if (matcherAfterInstance != null && patternAfter != DEFAULT_WRAP_AFTER) {
+                matcherAfterInstance.reset(input);
+                while (true) {
+                    if (!matcherAfterInstance.find()) {
+                        matcherAfterInstance = null;
+                        break;
+                    }
+                    int end = matcherAfterInstance.end();
+                    if (end > maxCharsPerLine || end == input.length()) {
                         if (last == 0 && !forceWrapLongWords) {
                             splitAfterAt = end;
                         } else {
@@ -889,11 +963,9 @@ public class StringUtils {
                     } else {
                         last = end;
                     }
-                } else {
-                    splitAfterAt = last;
-                    break;
                 }
             }
+            splitAfterAt = last;
             int splitAT = Math.max(splitAfterAt, splitBeforeAt);
             if (splitAfterAt > maxCharsPerLine && splitBeforeAt <= maxCharsPerLine) {
                 splitAT = splitBeforeAt;
@@ -905,20 +977,23 @@ public class StringUtils {
                 if (forceWrapLongWords) {
                     splitAT = maxCharsPerLine;
                 } else {
-                    splitAT = stringToWrap.length();
+                    splitAT = input.length();
                 }
             }
-            if (ret.length() > 0) {
-                ret.append("\r\n");
+            splitAT = Math.min(splitAT, input.length());
+            if (appendNewLine) {
+                output.append("\r\n");
+                input.appendTo(output, splitAT);
+            } else {
+                input.appendTo(output, splitAT);
+                appendNewLine = output.length() > 0;
             }
-            splitAT = Math.min(splitAT, stringToWrap.length());
-            ret.append(stringToWrap.substring(0, splitAT));
-            if (replaceBefore != null && splitAT == splitBeforeAt) {
-                splitAT += replaceBefore.length();
+            if (replaceBeforeLength > 0 && splitAT == splitBeforeAt) {
+                splitAT += replaceBeforeLength;
             }
-            stringToWrap = stringToWrap.substring(splitAT);
+            input = input.subSequence(splitAT, input.length());
         }
-        return ret.toString();
+        return output;
     }
 
     /**

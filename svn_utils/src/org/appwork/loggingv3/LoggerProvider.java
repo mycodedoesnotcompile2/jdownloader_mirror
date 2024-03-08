@@ -31,115 +31,18 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.simplejson.mapper;
+package org.appwork.loggingv3;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-
-import org.appwork.utils.reflection.CompiledType;
+import org.appwork.utils.logging2.LogInterface;
 
 /**
  * @author thomas
- * @date 20.10.2022
+ * @date 27.02.2024
  *
  */
-public class Property {
-    public final String       key;
-    public final CompiledType type;
-    public final Getter       getter;
-    public final Setter       setter;
-    public final ClassCache   classCache;
-
-    /**
-     * @param cc
-     *            TODO
-     * @param key
-     * @param type
-     * @param getter
-     * @param setter
-     */
-    public Property(ClassCache cc, String key, CompiledType type, Getter getter, Setter setter) {
-        this.classCache = cc;
-        this.key = key;
-        this.type = type;
-        this.getter = getter;
-        this.setter = setter;
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see java.lang.Object#hashCode()
-     */
-    @Override
-    public int hashCode() {
-        return type.hashCode() + key.hashCode();
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see java.lang.Object#equals(java.lang.Object)
-     */
-    @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof Property) {
-            Property other = (Property) obj;
-            if (type.equals(other.type)) {
-                if (key.equals(other.key)) {
-                    if (getGetterMethod() == other.getGetterMethod()) {
-                        if (getSetterMethod() == other.getSetterMethod()) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    public Method getSetterMethod() {
-        return setter == null ? null : setter.getMethod();
-    }
-
-    public Method getGetterMethod() {
-        return getter == null ? null : getter.getMethod();
-    }
-
-    /**
-     * @return
-     *
-     */
-    public ClassCache getClassCache() {
-        return classCache;
-    }
-
+public interface LoggerProvider {
     /**
      * @return
      */
-    public Type getGenericType() {
-        Field field = null;
-        if (getter != null) {
-            final Method method = getter.getMethod();
-            if (method != null) {
-                return method.getGenericReturnType();
-            } else {
-                field = getter.getField();
-            }
-        }
-        if (setter != null) {
-            final Method method = setter.getMethod();
-            if (method != null) {
-                return method.getGenericParameterTypes()[0];
-            } else if (field == null) {
-                field = setter.getField();
-            }
-        }
-        if (field != null) {
-            return field.getGenericType();
-        } else {
-            return null;
-        }
-    }
+    LogInterface getLogger();
 }

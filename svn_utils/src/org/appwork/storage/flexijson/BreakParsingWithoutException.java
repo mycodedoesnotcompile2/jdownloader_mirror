@@ -39,25 +39,7 @@ package org.appwork.storage.flexijson;
  *
  */
 public class BreakParsingWithoutException extends FlexiParserException {
-
-    public BreakParsingWithoutException(int index, Object path, String message, Throwable cause) {
-        super(index, path, message, cause);
-        // TODO Auto-generated constructor stub
+    public BreakParsingWithoutException(ParsingError parsingError, int index, Object path, String message, Throwable cause) {
+        super(parsingError, index, path, message, cause);
     }
-
-    public BreakParsingWithoutException(int index, Object path, String message) {
-        super(index, path, message);
-        // TODO Auto-generated constructor stub
-    }
-
-    public BreakParsingWithoutException(int index, Object path, Throwable cause) {
-        super(index, path, cause);
-        // TODO Auto-generated constructor stub
-    }
-
-    public BreakParsingWithoutException(int index, Object path) {
-        super(index, path);
-        // TODO Auto-generated constructor stub
-    }
-
 }

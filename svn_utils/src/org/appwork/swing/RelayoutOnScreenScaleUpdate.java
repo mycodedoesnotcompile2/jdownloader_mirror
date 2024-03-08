@@ -38,9 +38,6 @@ import java.awt.Container;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.os.CrossSystem;
-
 /**
  * @author thomas
  * @date 13.12.2023
@@ -54,17 +51,12 @@ public class RelayoutOnScreenScaleUpdate implements PropertyChangeListener {
     }
 
     public static void init(Component comp) {
-        if (CrossSystem.isWindows()) {
-            for (PropertyChangeListener l : comp.getPropertyChangeListeners("graphicsConfiguration")) {
-                if (l instanceof RelayoutOnScreenScaleUpdate) {
-                    return;
-                }
+        for (PropertyChangeListener l : comp.getPropertyChangeListeners("graphicsConfiguration")) {
+            if (l instanceof RelayoutOnScreenScaleUpdate) {
+                return;
             }
-            comp.addPropertyChangeListener("graphicsConfiguration", new RelayoutOnScreenScaleUpdate());
-        } else {
-            // check on linux/mac/...
-            DebugMode.debugger();
         }
+        comp.addPropertyChangeListener("graphicsConfiguration", new RelayoutOnScreenScaleUpdate());
     }
 
     private void revalidate(final Component dialog) {

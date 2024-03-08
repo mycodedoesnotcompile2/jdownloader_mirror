@@ -43,5 +43,6 @@ public enum ValueType {
     BOOLEAN,
     DOUBLE,
     LONG,
-    UNDEFINED
+    UNDEFINED,
+    REFERENCE
 }

@@ -721,7 +721,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(int)
          */
         @Override
@@ -744,7 +744,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
@@ -767,7 +767,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
@@ -790,7 +790,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#flush()
          */
         @Override
@@ -811,7 +811,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#close()
          */
         @Override
@@ -1147,7 +1147,7 @@ public class Application {
                 try {
                     final ZipEntry manifestEntry = zip.getEntry("META-INF/MANIFEST.MF");
                     if (manifestEntry != null) {
-                        final String manifest = IO.readStreamToString(zip.getInputStream(manifestEntry), -1);
+                        final String manifest = IO.readStreamToString(zip.getInputStream(manifestEntry), -1, true);
                         manifestMap.clear();
                         for (String line : manifest.split("[\r\n]+")) {
                             if (StringUtils.isNotEmpty(line)) {

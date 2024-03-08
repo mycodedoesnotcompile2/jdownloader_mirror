@@ -138,7 +138,7 @@ public class FlexiMergerTest extends AWTest {
             }
             {
                 FlexiCondition.parse("{a.b:{§set:{§PARENT.b:3}}}").evaluate(base2);
-                assertEquals("{\"a\":{\"array\":[null,4],\"c\":1,\"b\":3}}", FlexiUtils.serializeMinimizedWithWTF(base2));
+                assertEquals("{\"a\":{\"array\":[null,4],\"b\":3,\"c\":1}}", FlexiUtils.serializeMinimizedWithWTF(base2));
             }
             {
                 FlexiCondition.parse("{a.c:{§unset:[§§THIS,§PARENT.b]}}").evaluate(base2);

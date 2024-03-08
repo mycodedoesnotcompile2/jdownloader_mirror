@@ -38,8 +38,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
@@ -53,6 +55,7 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
 import org.appwork.storage.simplejson.JSonUtils;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -84,10 +87,10 @@ public class FlexiJSonObject implements FlexiJSonNode {
         return this.tags;
     }
 
-    private int                         size = 0;
-    private final LinkedHashSet<String> keys;
-    private FlexiJSonComments           commentsBefore;
-    private FlexiJSonComments           commentsInside;
+    private int                                                size = 0;
+    private final LinkedHashMap<String, List<KeyValueElement>> keys;
+    private FlexiJSonComments                                  commentsBefore;
+    private FlexiJSonComments                                  commentsInside;
 
     public FlexiJSonComments getCommentsInside() {
         return this.commentsInside;
@@ -140,7 +143,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
     public FlexiJSonObject() {
         super();
         this.elements = new LinkedList<KeyValueElement>();
-        this.keys = new LinkedHashSet<String>();
+        this.keys = new LinkedHashMap<String, List<KeyValueElement>>();
     }
 
     /**
@@ -148,7 +151,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
      * @return
      */
     public boolean containsKey(final String key) {
-        return this.keys.contains(key);
+        return this.keys.containsKey(key);
     }
 
     /**
@@ -160,7 +163,17 @@ public class FlexiJSonObject implements FlexiJSonNode {
     }
 
     public KeyValueElement add(final KeyValueElement element, boolean removeExisting) {
-        final KeyValueElement removed = removeExisting ? this.remove(element.getKey()) : null;
+        int addAt = -1;
+        final String elementKey = element.getKey();
+        KeyValueElement removed = null;
+        if (removeExisting && containsKey(elementKey)) {
+            for (final KeyValueElement e : this.elements) {
+                addAt++;
+                if (StringUtils.equals(e.getKey(), elementKey)) {
+                    break;
+                }
+            }
+        }
         element.getValue().setParent(this);
         // forward correct parent to comments
         FlexiJSonComments comment = element.getCommentsAfterKey();
@@ -171,10 +184,22 @@ public class FlexiJSonObject implements FlexiJSonNode {
         if (comment != null) {
             comment.setParent(this);
         }
-        this.elements.add(element);
-        if (element.getKey() != null) {
-            this.keys.add(element.getKey());
-            this.size++;
+        if (addAt < 0) {
+            this.elements.add(element);
+        } else {
+            removed = this.elements.set(addAt, element);
+        }
+        if (elementKey != null) {
+            List<KeyValueElement> list = keys.get(elementKey);
+            if (list == null) {
+                list = new LinkedList<KeyValueElement>();
+                keys.put(elementKey, list);
+            }
+            if (removed != null && list.remove(removed)) {
+                size--;
+            }
+            list.add(element);
+            size++;
         }
         return removed;
     }
@@ -207,7 +232,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
      * @return
      */
     public int size() {
-        return this.size;
+        return size;
     }
 
     protected String     close                    = "\r\n}";
@@ -297,8 +322,9 @@ public class FlexiJSonObject implements FlexiJSonNode {
     public KeyValueElement last() {
         if (this.elements.size() == 0) {
             return null;
+        } else {
+            return this.elements.get(this.elements.size() - 1);
         }
-        return this.elements.get(this.elements.size() - 1);
     }
 
     /*
@@ -323,14 +349,13 @@ public class FlexiJSonObject implements FlexiJSonNode {
     public boolean hasComments() {
         if (this.getCommentsInside() != null && this.getCommentsInside().size() > 0) {
             return true;
-        }
-        if (this.getCommentsAfter() != null && this.getCommentsAfter().size() > 0) {
+        } else if (this.getCommentsAfter() != null && this.getCommentsAfter().size() > 0) {
             return true;
-        }
-        if (this.getCommentsBefore() != null && this.getCommentsBefore().size() > 0) {
+        } else if (this.getCommentsBefore() != null && this.getCommentsBefore().size() > 0) {
             return true;
+        } else {
+            return false;
         }
-        return false;
     }
 
     /**
@@ -339,14 +364,8 @@ public class FlexiJSonObject implements FlexiJSonNode {
      */
     public KeyValueElement getElement(final String key) {
         for (final KeyValueElement e : this.elements) {
-            if (key == null) {
-                if (e.getKey() == null) {
-                    return e;
-                }
-            } else {
-                if (key.equals(e.getKey())) {
-                    return e;
-                }
+            if (StringUtils.equals(e.getKey(), key)) {
+                return e;
             }
         }
         return null;
@@ -432,17 +451,26 @@ public class FlexiJSonObject implements FlexiJSonNode {
      * @param string
      */
     public KeyValueElement remove(final String key) {
-        if (!this.keys.contains(key)) {
+        if (!containsKey(key)) {
             return null;
         }
-        for (final KeyValueElement e : this.elements) {
-            if (e.getKey().equals(key)) {
-                this.elements.remove(e);
+        final Iterator<KeyValueElement> it = this.elements.iterator();
+        while (it.hasNext()) {
+            final KeyValueElement next = it.next();
+            if (StringUtils.equals(next.getKey(), key)) {
+                it.remove();
                 if (key != null) {
-                    this.keys.remove(key);
-                    this.size--;
+                    final List<KeyValueElement> entries = keys.get(key);
+                    if (entries != null) {
+                        if (entries.remove(next)) {
+                            size--;
+                        }
+                        if (entries.size() == 0) {
+                            keys.remove(key);
+                        }
+                    }
                 }
-                return e;
+                return next;
             }
         }
         return null;
@@ -457,19 +485,18 @@ public class FlexiJSonObject implements FlexiJSonNode {
     public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
-        }
-        if (obj == null || !(obj instanceof FlexiJSonObject)) {
+        } else if (obj == null || !(obj instanceof FlexiJSonObject)) {
             return false;
         }
         final FlexiJSonObject other = (FlexiJSonObject) obj;
         if (other.size() != this.size()) {
             return false;
-        }
-        if (!other.keys.equals(this.keys)) {
+        } else if (!other.keys.keySet().equals(this.keys.keySet())) {
             return false;
+        } else {
+            final FlexiJSonStringBuilder stringify = new FlexiJSonStringBuilder();
+            return stringify.toJSONString(other).equals(stringify.toJSONString(this));
         }
-        final FlexiJSonStringBuilder stringify = new FlexiJSonStringBuilder();
-        return stringify.toJSONString(other).equals(stringify.toJSONString(this));
     }
 
     /**
@@ -502,8 +529,21 @@ public class FlexiJSonObject implements FlexiJSonNode {
             }
         }
         for (final Iterator<KeyValueElement> it = this.elements.iterator(); it.hasNext();) {
-            if (it.next().getValue() == node) {
+            final KeyValueElement next = it.next();
+            if (next.getValue() == node) {
                 it.remove();
+                final String key = next.getKey();
+                if (key != null) {
+                    final List<KeyValueElement> entries = keys.get(key);
+                    if (entries != null) {
+                        if (entries.remove(next)) {
+                            size--;
+                        }
+                        if (entries.size() == 0) {
+                            keys.remove(key);
+                        }
+                    }
+                }
                 return true;
             }
         }
@@ -552,13 +592,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
      * @return
      */
     public Set<String> getKeys() {
-        // Why not return this.keys? Pls validate
-        final LinkedHashSet<String> ret = new LinkedHashSet<String>();
-        for (final KeyValueElement e : this.elements) {
-            if (e.getKey() != null) {
-                ret.add(e.getKey());
-            }
-        }
+        final LinkedHashSet<String> ret = new LinkedHashSet<String>(keys.keySet());
         return ret;
     }
 
@@ -590,8 +624,9 @@ public class FlexiJSonObject implements FlexiJSonNode {
         final CompiledType ct = CompiledType.create(type);
         if (value == null || ct.isInstanceOf(value.getClass())) {
             return (T) value;
+        } else {
+            return (T) new FlexiJSonMapper().jsonToObject(value, ct);
         }
-        return (T) new FlexiJSonMapper().jsonToObject(value, ct);
     }
 
     /**

@@ -43,10 +43,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.appwork.storage.StorableDateFormat;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
-import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -110,12 +110,12 @@ public class DateMapper implements FlexiTypeMapper {
     public void addFormat(String format) {
         formats.add(new LocalTimeFormat(format));
     }
+
     /*
      * (non-Javadoc)
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
      */
-
     public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
         SimpleDateFormat formater = getSerializationFormater(reference);
         if (formater == null) {
@@ -143,12 +143,12 @@ public class DateMapper implements FlexiTypeMapper {
         }
         return formats.get(0).get();
     }
+
     /*
      * (non-Javadoc)
      *
      * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#json2Obj(org.appwork.storage.simplejson.JSonNode)
      */
-
     public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode node, CompiledType type, Setter reference) throws FlexiMapperException {
         if (node instanceof FlexiJSonValue) {
             switch (((FlexiJSonValue) node).getType()) {
@@ -160,12 +160,13 @@ public class DateMapper implements FlexiTypeMapper {
                 if (((FlexiJSonValue) node).getValue().equals("")) {
                     return null;
                 }
-                String s = (String) ((FlexiJSonValue) node).getValue();
-                Date ret = parseString(s);
+                final String s = (String) ((FlexiJSonValue) node).getValue();
+                final Date ret = parseString(s);
                 if (ret != null) {
                     return ret;
+                } else {
+                    throw new FlexiMapperException(node, type, "Cannot Map node to Date " + (String) ((FlexiJSonValue) node).getValue());
                 }
-                throw new FlexiMapperException(node, type, "Cannot Map node to Date " + (String) ((FlexiJSonValue) node).getValue());
             case NULL:
                 return null;
             default:
@@ -178,25 +179,27 @@ public class DateMapper implements FlexiTypeMapper {
     protected Date numberToDate(Number number) {
         if (number == null || number.longValue() <= 0) {
             return null;
+        } else {
+            return new Date(number.longValue());
         }
-        return new Date(number.longValue());
     }
 
     public Date parseString(String s) {
         if ("$NOW".equalsIgnoreCase(s)) {
             return new Date();
-        }
-        s = s.replaceAll("Z$", "+0000");
-        s = s.replaceAll("(\\+|\\-)\\s*(\\d{2}):(\\d{2})$", "$1$2$3");
-        s = s.replaceAll("(\\+|\\-)\\s*(\\d{2})$", "$1$200");
-        for (final LocalTimeFormat f : formats) {
-            final ParsePosition pp = new ParsePosition(0);
-            final Date ret = f.get().parse(s, pp);
-            if (pp.getErrorIndex() < 0 && pp.getIndex() == s.length()) {
-                return ret;
+        } else {
+            s = s.replaceAll("Z$", "+0000");
+            s = s.replaceAll("(\\+|\\-)\\s*(\\d{2}):(\\d{2})$", "$1$2$3");
+            s = s.replaceAll("(\\+|\\-)\\s*(\\d{2})$", "$1$200");
+            for (final LocalTimeFormat f : formats) {
+                final ParsePosition pp = new ParsePosition(0);
+                final Date ret = f.get().parse(s, pp);
+                if (pp.getErrorIndex() < 0 && pp.getIndex() == s.length()) {
+                    return ret;
+                }
             }
+            return null;
         }
-        return null;
     }
 
     @Override

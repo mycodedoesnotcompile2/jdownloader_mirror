@@ -94,6 +94,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.flexijson.CharSequenceReader;
 import org.appwork.storage.flexijson.FlexiJSONParser;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonObject;

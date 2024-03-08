@@ -40,23 +40,15 @@ import org.appwork.storage.simplejson.ParserException;
  *
  */
 public class FlexiParserException extends ParserException {
+    private static final long    serialVersionUID = 6884218748788291881L;
+    protected final ParsingError parsingError;
 
-    private static final long serialVersionUID = 6884218748788291881L;
+    public ParsingError getParsingError() {
+        return parsingError;
+    }
 
-    public FlexiParserException(int index, Object path, String message, Throwable cause) {
+    public FlexiParserException(ParsingError parsingError, int index, Object path, String message, Throwable cause) {
         super(index, path, message, cause);
+        this.parsingError = parsingError;
     }
-
-    public FlexiParserException(int index, Object path, String message) {
-        super(index, path, message);
-    }
-
-    public FlexiParserException(int index, Object path, Throwable cause) {
-        super(index, path, cause);
-    }
-
-    public FlexiParserException(int index, Object path) {
-        super(index, path);
-    }
-
 }

@@ -93,6 +93,7 @@ public class JSonMapper {
         typeMapper = new HashMap<Class<?>, TypeMapper<?>>();
         this.addMapper(Date.class, new DateMapper());
         this.addMapper(TimeSpan.class, new TimeSpanMapper());
+        // TODO: keep in Sync with FlexiJsonMapper DefaultMapper
     }
 
     /**
@@ -168,7 +169,7 @@ public class JSonMapper {
             return createJsonValue(((Class<?>) obj).getName());
         } else if ((mapper = typeMapper.get(clazz)) != null) {
             return mapper.map(obj);
-        } else/* if (obj instanceof Storable) */ {
+        } else/* if (obj instanceof Storable) */{
             final JSonObject ret = createJSonObject(null);
             try {
                 final ClassCache cc = getClassCache(clazz);

@@ -192,8 +192,8 @@ public class FlexiJSonValue implements FlexiJSonNode {
         setType(org.appwork.storage.simplejson.ValueType.UNDEFINED);
     }
 
-    public FlexiJSonValue(boolean b) {
-        value = b;
+    public FlexiJSonValue(final boolean value) {
+        this.value = value;
         type = ValueType.BOOLEAN;
     }
 
@@ -206,21 +206,30 @@ public class FlexiJSonValue implements FlexiJSonNode {
         }
     }
 
-    public FlexiJSonValue(final Number number) {
-        value = number;
-        if (Clazz.isFloatingPointNumber(number.getClass())) {
+    public FlexiJSonValue(final Number value) {
+        this.value = value;
+        if (Clazz.isFloatingPointNumber(value.getClass())) {
             type = ValueType.DOUBLE;
         } else {
             type = ValueType.LONG;
         }
     }
 
-    public FlexiJSonValue(String str) {
-        if (str == null) {
-            value = null;
+    public FlexiJSonValue(final String value) {
+        this(value, false);
+    }
+
+    /**
+     * @param value2
+     * @param b
+     */
+    public FlexiJSonValue(final String value, final boolean reference) {
+        this.value = value;
+        if (value == null) {
             type = ValueType.NULL;
+        } else if (reference) {
+            type = ValueType.REFERENCE;
         } else {
-            value = str;
             type = ValueType.STRING;
         }
     }
@@ -290,8 +299,9 @@ public class FlexiJSonValue implements FlexiJSonNode {
         Object v = getValue();
         if (Clazz.objectIsTypeOf(v, type)) {
             return (T) v;
+        } else {
+            return (T) ReflectionUtils.cast(v, type);
         }
-        return (T) ReflectionUtils.cast(v, type);
     }
 
     /*

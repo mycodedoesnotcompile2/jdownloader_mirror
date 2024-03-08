@@ -42,7 +42,7 @@ public class MenuHeader extends MigPanel implements MouseListener {
 
     @Override
     public void mouseClicked(final MouseEvent mouseevent) {
-        this.tray.showAbout();
+        this.tray.showAbout(mouseevent);
     }
 
     @Override

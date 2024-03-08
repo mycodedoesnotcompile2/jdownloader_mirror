@@ -837,7 +837,7 @@ public class ClassCache {
      * @param class1
      * @return
      */
-    public <TT extends Annotation> List<TT> getAnnotations(String key, Class<TT> class1) {
+    public <TT extends Annotation> List<TT> getAnnotations(final String key, final Class<TT> class1) {
         final String cacheKey = key + "_" + class1.getName();
         synchronized (annotationsCache) {
             final List<? extends Annotation> ret = annotationsCache.get(cacheKey);
@@ -854,7 +854,7 @@ public class ClassCache {
             if (!(t instanceof Class)) {
                 continue;
             }
-            final Class c = (Class) t;
+            final Class<?> c = (Class<?>) t;
             if (g != null) {
                 try {
                     final Method method = c.getDeclaredMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
@@ -868,12 +868,6 @@ public class ClassCache {
                 } catch (SecurityException e) {
                     throw new WTFException();
                 }
-                if (g.field != null && g.field.getDeclaringClass() == t) {
-                    final TT an = g.field.getAnnotation(class1);
-                    if (an != null) {
-                        ret.add(an);
-                    }
-                }
             }
             if (s != null) {
                 try {
@@ -885,6 +879,20 @@ public class ClassCache {
                         }
                     }
                 } catch (NoSuchMethodException e) {
+                } catch (SecurityException e) {
+                    throw new WTFException();
+                }
+            }
+            if (key != null) {
+                try {
+                    final Field field = c.getDeclaredField(key);
+                    if (field != null) {
+                        final TT an = field.getAnnotation(class1);
+                        if (an != null) {
+                            ret.add(an);
+                        }
+                    }
+                } catch (NoSuchFieldException e) {
                 } catch (SecurityException e) {
                     throw new WTFException();
                 }
@@ -949,6 +957,6 @@ public class ClassCache {
         if (g == null && s == null) {
             return null;
         }
-        return new Property(key, CompiledType.create(getType(key), this.clazz.get()), g, s);
+        return new Property(this, key, CompiledType.create(getType(key), this.clazz.get()), g, s);
     }
 }

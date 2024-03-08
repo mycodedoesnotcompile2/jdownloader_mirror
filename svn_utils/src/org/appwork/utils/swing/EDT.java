@@ -34,12 +34,15 @@
 package org.appwork.utils.swing;
 
 import java.awt.HeadlessException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.SwingUtilities;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.reflection.CompiledType;
 
 /**
@@ -52,23 +55,25 @@ import org.appwork.utils.reflection.CompiledType;
  * @param <T>
  */
 public abstract class EDT<T, ExceptionType extends Throwable> implements Runnable {
+    private final static boolean             HEADLESS = Application.isHeadless();
     /**
      * flag. If Runnable has terminated yet
      */
-    private volatile boolean   done    = false;
+    private volatile boolean                 done     = false;
     /**
      * flag, has runnable already started, invoked in edt
      */
-    private volatile boolean   started = false;
+    private final AtomicBoolean              started  = new AtomicBoolean(false);
+    private volatile AtomicReference<Object> runMode  = new AtomicReference<Object>(null);
     /**
      * lock used for EDT waiting
      */
     /**
      * Stores The returnvalue. This Value if of the Generic Datatype T
      */
-    private volatile T         returnValue;
-    private volatile Throwable exception;
-    private volatile Exception caller;
+    private volatile T                       returnValue;
+    private volatile Throwable               exception;
+    private volatile Exception               caller;
 
     /**
      * Implement this method. Gui code should be used ONLY in this Method.
@@ -81,40 +86,43 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
      * Run the runnable
      */
     public void run() {
-        this.started = true;
-        try {
-            if (this.caller != null && Application.isHeadless()) {
-                LogV3.exception(this, caller, "Unhandled Headless Exception in EDT");
+        if (started.compareAndSet(false, true)) {
+            try {
+                runMode.compareAndSet(null, this);
+                this.returnValue = this.runInEDT();
+            } catch (final Throwable e) {
+                this.exception = e;
+                if (this.caller != null && e instanceof HeadlessException) {
+                    LogV3.exception(this, caller, "Unhandled Headless Exception in EDT");
+                }
+            } finally {
+                this.done = true;
             }
-            this.returnValue = this.runInEDT();
-        } catch (final Throwable e) {
-            this.exception = e;
-            LogV3.exception(this, e, null);
-            if (this.caller != null && e instanceof HeadlessException) {
-                LogV3.exception(this, caller, "Unhandled Headless Exception in EDT");
-            }
-        } finally {
-            this.done = true;
         }
     }
 
-    protected void start() {
-        start(true);
+    public EDT<T, ExceptionType> start() {
+        return start(false);
     }
 
-    private void start(boolean invokeDirectIfEDT) {
-        if (this.started) {
-            return;
-        }
-        if (org.appwork.utils.Application.isHeadless()) {
+    public EDT<T, ExceptionType> invokeLater() {
+        return start(true);
+    }
+
+    protected EDT<T, ExceptionType> start(final boolean invokeLater) {
+        if (caller == null && HEADLESS) {
             this.caller = new Exception("EventDispatchThread in headless mode!?");
         }
-        this.started = true;
-        if (SwingUtilities.isEventDispatchThread()) {
-            this.run();
+        if (!invokeLater && SwingUtilities.isEventDispatchThread()) {
+            if (runMode.compareAndSet(null, Boolean.FALSE) || runMode.compareAndSet(Boolean.TRUE, Boolean.FALSE)) {
+                this.run();
+            }
         } else {
-            SwingUtilities.invokeLater(this);
+            if (runMode.compareAndSet(null, Boolean.TRUE)) {
+                SwingUtilities.invokeLater(this);
+            }
         }
+        return this;
     }
 
     public T waitFor() throws InterruptedException, ExceptionType {
@@ -153,15 +161,15 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
         } finally {
             if (interrupted != null) {
                 throw interrupted;
-            }
-            if (this.exception != null) {
+            } else if (this.exception != null) {
+                Exceptions.addSuppressed(exception, new Exception("caused here").fillInStackTrace());
                 if (exception instanceof Error) {
                     throw (Error) this.exception;
                 } else if (exception instanceof RuntimeException) {
                     throw (RuntimeException) this.exception;
                 } else {
-                    CompiledType ct = CompiledType.create(this.getClass());
-                    CompiledType actualExceptionType = ct.getComponentTypes(EDT.class)[1];
+                    final CompiledType ct = CompiledType.create(this.getClass());
+                    final CompiledType actualExceptionType = ct.getComponentTypes(EDT.class)[1];
                     if (actualExceptionType.isInstanceOf(exception.getClass())) {
                         throw (ExceptionType) this.exception;
                     } else {
@@ -176,13 +184,23 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
     /**
      * @param runnable
      */
-    public static void run(final Runnable runnable) {
-        new EDT<Object, RuntimeException>() {
+    public static EDT<Object, RuntimeException> run(final Runnable runnable) {
+        return new EDT<Object, RuntimeException>() {
             @Override
             protected Object runInEDT() throws RuntimeException {
                 runnable.run();
                 return null;
             }
         }.start();
+    }
+
+    public static EDT<Object, RuntimeException> invokeLater(final Runnable runnable) {
+        return new EDT<Object, RuntimeException>() {
+            @Override
+            protected Object runInEDT() throws RuntimeException {
+                runnable.run();
+                return null;
+            }
+        }.invokeLater();
     }
 }

@@ -390,7 +390,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 try {
                     Condition filter = container.getOptions(Condition.class, "filter");
                     for (final String g : container.listKeys(scope.getLast())) {
-                        final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathString(g));
+                        final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathElements(g));
                         if (filter != null) {
                             if (!filter.matchesWithoutExceptions(newScope.getLast())) {
                                 continue;
@@ -402,8 +402,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         }
                     }
                 } catch (final SecurityException e) {
-                    throw new ConditionException(e);
-                } catch (final InvalidPathException e) {
                     throw new ConditionException(e);
                 }
             }
@@ -1998,6 +1996,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                                 break SKIP;
                             }
                             if (lastOP instanceof AnyOp) {
+                                break SKIP;
+                            }
+                            if (lastOP instanceof EachOp) {
                                 break SKIP;
                             }
                             if (lastOP instanceof AndOp) {

@@ -42,7 +42,6 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class JSonValue implements JSonNode, Storable {
-
     public final static JSonValue BOOLEAN_TRUE  = new JSonValue(true) {
                                                     public void setValue(Object value) {
                                                         throw new IllegalStateException();
@@ -70,7 +69,6 @@ public class JSonValue implements JSonNode, Storable {
                                                         throw new IllegalStateException();
                                                     };
                                                 };
-
     public final static JSonValue NULL          = new JSonValue((String) null) {
                                                     public void setValue(Object value) {
                                                         throw new IllegalStateException();
@@ -80,7 +78,6 @@ public class JSonValue implements JSonNode, Storable {
                                                         throw new IllegalStateException();
                                                     };
                                                 };
-
     protected Object              value;
 
     public void setValue(final Object value) {
@@ -101,14 +98,14 @@ public class JSonValue implements JSonNode, Storable {
     /**
      * @param b
      */
-    public JSonValue(final Boolean b) {
-        value = b;
+    public JSonValue(final Boolean value) {
+        this.value = value;
         type = ValueType.BOOLEAN;
     }
 
-    public JSonValue(final Number number) {
-        value = number;
-        if (Clazz.isFloatingPointNumber(number.getClass())) {
+    public JSonValue(final Number value) {
+        this.value = value;
+        if (Clazz.isFloatingPointNumber(value.getClass())) {
             type = ValueType.DOUBLE;
         } else {
             type = ValueType.LONG;
@@ -118,12 +115,21 @@ public class JSonValue implements JSonNode, Storable {
     /**
      * @param object
      */
-    public JSonValue(final String str) {
-        if (str == null) {
-            value = null;
+    public JSonValue(final String value) {
+        this(value, false);
+    }
+
+    /**
+     * @param value2
+     * @param b
+     */
+    public JSonValue(final String value, final boolean reference) {
+        this.value = value;
+        if (value == null) {
             type = ValueType.NULL;
+        } else if (reference) {
+            type = ValueType.REFERENCE;
         } else {
-            value = str;
             type = ValueType.STRING;
         }
     }
@@ -150,6 +156,8 @@ public class JSonValue implements JSonNode, Storable {
             return "null";
         case UNDEFINED:
             return "undefined";
+        case REFERENCE:
+            return "reference:" + getValue().toString();
         default:
             return null;
         }

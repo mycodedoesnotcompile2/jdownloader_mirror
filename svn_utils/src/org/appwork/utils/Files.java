@@ -295,7 +295,7 @@ public class Files {
     }
 
     /**
-     * Returns the relative path of file based on root.
+     * The method always returns relative path with / as Path Separator Returns the relative path of file based on root.
      *
      * @param root
      * @param f
@@ -305,6 +305,13 @@ public class Files {
         return Files.getRelativePath(root.getAbsolutePath(), file.getAbsolutePath());
     }
 
+    /**
+     * The method always returns relative path with / as Path Separator
+     *
+     * @param root
+     * @param file
+     * @return
+     */
     public static String getRelativePath(String root, final String file) {
         final String rootPath, filePath;
         if (CrossSystem.isWindows() || CrossSystem.isOS2()) {

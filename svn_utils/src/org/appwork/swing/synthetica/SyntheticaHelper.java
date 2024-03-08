@@ -335,8 +335,8 @@ public class SyntheticaHelper {
             return false;
         }
         try {
-            Class<?> synthetica = Class.forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel");
-            LookAndFeel laf = UIManager.getLookAndFeel();
+            final Class<?> synthetica = Class.forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel", false, SyntheticaHelper.class.getClassLoader());
+            final LookAndFeel laf = UIManager.getLookAndFeel();
             return synthetica.isAssignableFrom(laf.getClass());
         } catch (ClassNotFoundException e) {
             return false;

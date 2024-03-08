@@ -38,7 +38,6 @@ public enum JavaVersion {
             return this.next;
         }
     };
-
     public final long    longID;
     public final int     classID;
     public final String  string;
@@ -66,8 +65,9 @@ public enum JavaVersion {
         final int index = this.ordinal() + 1;
         if (index < values().length) {
             return values()[index].longID;
+        } else {
+            return -1;
         }
-        return -1;
     }
 
     private JavaVersion(final int classMajorVersion, final String stringID) {
@@ -84,14 +84,32 @@ public enum JavaVersion {
     public boolean isHigherThan(final JavaVersion v) {
         if (this == UNKNOWN) {
             return false;
+        } else {
+            return v != null && v != UNKNOWN && this.longID > v.longID;
         }
-        return v != null && v != UNKNOWN && this.longID > v.longID;
+    }
+
+    public boolean isMinimum(final JavaVersion v) {
+        if (this == UNKNOWN) {
+            return false;
+        } else {
+            return v != null && v != UNKNOWN && this.longID >= v.longID;
+        }
+    }
+
+    public boolean isMaximum(final JavaVersion v) {
+        if (this == UNKNOWN) {
+            return false;
+        } else {
+            return v != null && v != UNKNOWN && this.longID <= v.longID;
+        }
     }
 
     public boolean isLowerThan(final JavaVersion v) {
         if (this == UNKNOWN) {
             return false;
+        } else {
+            return v != null && v != UNKNOWN && this.longID < v.longID;
         }
-        return v != null && v != UNKNOWN && this.longID < v.longID;
     }
 }

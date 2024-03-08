@@ -56,7 +56,6 @@ import org.appwork.utils.os.CrossSystem;
  *
  */
 public abstract class QNAP implements HardwareTypeInterface {
-
     @Override
     public ID getHardwareType() {
         return ID.QNAP;
@@ -66,14 +65,18 @@ public abstract class QNAP implements HardwareTypeInterface {
         if (CrossSystem.isLinux()) {
             /*
              * /sbin/getcfg system version
-             * 
+             *
              * /sbin/getcfg system model
-             * 
+             *
              * /sbin/get_display_name
              */
             final boolean hasShellCommands = new File("/sbin/get_display_name").isFile() || new File("/sbin/getcfg").isFile();
-            final boolean hasDataMount = new File("/share/HDA_DATA").isDirectory() || new File("/share/MD0_DATA").isDirectory() || new File("/share/CACHEDEV1_DATA").isDirectory();
+            final boolean hasDataMount = new File("/share/HDA_DATA").isDirectory() || new File("/share/MD0_DATA").isDirectory() || new File("/share/CACHEDEV1_DATA").isDirectory() || new File("/share/CE_CACHEDEV1_DATA").isDirectory();
             if (hasShellCommands && hasDataMount) {
+                QNAP qnap = QNAP.parseConfFiles();
+                if (qnap != null) {
+                    return qnap;
+                }
                 // add default ports
                 final ArrayList<String> hosts = new ArrayList<String>(Arrays.asList(new String[] { "http://127.0.0.1:8080", "https://127.0.0.1:443" }));
                 final int webinterfaceHTTPsPort = findWebinterfaceHTTPsPort();
@@ -91,7 +94,6 @@ public abstract class QNAP implements HardwareTypeInterface {
                         if (connection instanceof HttpsURLConnection) {
                             ((HttpsURLConnection) connection).setSSLSocketFactory(JavaSSLSocketStreamFactory.getInstance().getSSLSocketFactory(null, url.getHost()));
                             ((HttpsURLConnection) connection).setHostnameVerifier(new HostnameVerifier() {
-
                                 @Override
                                 public boolean verify(String hostname, SSLSession session) {
                                     return true;
@@ -107,7 +109,7 @@ public abstract class QNAP implements HardwareTypeInterface {
                         } finally {
                             connection.disconnect();
                         }
-                        final QNAP qnap = QNAP.parse(new String(response, "UTF-8"));
+                        qnap = QNAP.parse(new String(response, "UTF-8"));
                         if (qnap != null) {
                             return qnap;
                         }
@@ -116,6 +118,50 @@ public abstract class QNAP implements HardwareTypeInterface {
                     }
                 }
             }
+        }
+        return null;
+    }
+
+    private static QNAP parseConfFiles() {
+        final File uLinuxConf = new File("/etc/config/uLinux.conf");
+        final File platformConf = new File("/etc/platform.conf");
+        String model = readValue(platformConf, "DISPLAY_NAME");
+        if (model == null) {
+            model = readValue(uLinuxConf, "Model");
+        }
+        if (model != null) {
+            final String version = readValue(uLinuxConf, "Version");
+            final String platform = readValue(platformConf, "Platform");
+            final String finalModel = model;
+            return new QNAP() {
+                @Override
+                public String getVersion() {
+                    return version;
+                }
+
+                @Override
+                public String getPlatform() {
+                    return platform;
+                }
+
+                @Override
+                public String getModel() {
+                    return finalModel;
+                }
+            };
+        } else {
+            return null;
+        }
+    }
+
+    private final static String readValue(final File file, String key) {
+        try {
+            if (file.isFile()) {
+                final String content = IO.readFileToString(file);
+                final String value = new Regex(content, Pattern.quote(key) + "\\s=\\s*([^\r\n]+)").getMatch(0);
+                return value;
+            }
+        } catch (Exception ignore) {
         }
         return null;
     }
@@ -173,7 +219,7 @@ public abstract class QNAP implements HardwareTypeInterface {
                 connection.setConnectTimeout(2500);
                 connection.setReadTimeout(5000);
                 connection.connect();
-                final String html = IO.readStreamToString(connection.getInputStream(), -1);
+                final String html = IO.readStreamToString(connection.getInputStream(), -1, true);
                 final String port = new Regex(html, "\\s*\\+\\s*(\\d+)\\s*\\+").getMatch(0);
                 if (port != null) {
                     return Integer.parseInt(port);
@@ -187,8 +233,6 @@ public abstract class QNAP implements HardwareTypeInterface {
     }
 
     private static QNAP parse(final String xml) {
-        final String version = getXMLFieldValue(xml, "version");
-        final String platform = getXMLFieldValue(xml, "platform");
         String model = getXMLFieldValue(xml, "displayModelName");
         if (model == null) {
             model = getXMLFieldValue(xml, "modelName");
@@ -197,9 +241,10 @@ public abstract class QNAP implements HardwareTypeInterface {
             }
         }
         if (model != null) {
+            final String version = getXMLFieldValue(xml, "version");
+            final String platform = getXMLFieldValue(xml, "platform");
             final String finalModel = model;
             return new QNAP() {
-
                 @Override
                 public String getPlatform() {
                     return platform;
@@ -232,5 +277,4 @@ public abstract class QNAP implements HardwareTypeInterface {
     public abstract String getModel();
 
     public abstract String getVersion();
-
 }

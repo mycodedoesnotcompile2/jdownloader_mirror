@@ -41,7 +41,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.RomHustlerCrawler;
 
-@HostPlugin(revision = "$Revision: 48749 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48752 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { RomHustlerCrawler.class })
 public class RomHustler extends PluginForHost {
     public RomHustler(PluginWrapper wrapper) {
@@ -239,7 +239,7 @@ public class RomHustler extends PluginForHost {
         if (StringUtils.isEmpty(directurl) || !directurl.startsWith("http") || directurl.length() > 500) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, account), account != null && AccountType.PREMIUM.equals(account.getType()) ? -10 : -4);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 503) {

@@ -152,11 +152,13 @@ public class LogV3 {
     }
 
     /**
+     * returns the logger for the given context. if the context is a logger itself, the context is returned
+     *
      * @param name
      * @return
      */
-    public static LogInterface logger(final Object name) {
-        return I().getLogger(name);
+    public static LogInterface logger(final Object context) {
+        return I().getLogger(context);
     }
 
     /**
@@ -335,30 +337,38 @@ public class LogV3 {
      * @param target
      * @param file
      */
-    public static void info(final Object context, String formatString, final Object... formatParams) {
-        if (formatParams != null && formatParams.length > 0) {
-            try {
-                formatString = String.format(formatString, formatParams);
-            } catch (final IllegalFormatException e) {
-                e.printStackTrace();
+    public static void info(final Object context, final String formatString, final Object... formatParams) {
+        final LogInterface logger = logger(context);
+        if (logger != null) {
+            String logMessage = formatString;
+            if (formatParams != null && formatParams.length > 0) {
+                try {
+                    logMessage = String.format(logMessage, formatParams);
+                } catch (final IllegalFormatException e) {
+                    e.printStackTrace();
+                }
             }
+            logger.info(logMessage);
         }
-        logger(context).info(formatString);
     }
 
     /**
      * @param logToFileSink
      * @param e
      */
-    public static void exception(final Object context, final Throwable e, String formatString, final Object... formatParams) {
-        if (formatParams != null && formatParams.length > 0) {
-            try {
-                formatString = String.format(formatString, formatParams);
-            } catch (final IllegalFormatException e1) {
-                e1.printStackTrace();
+    public static void exception(final Object context, final Throwable e, final String formatString, final Object... formatParams) {
+        final LogInterface logger = logger(context);
+        if (logger != null) {
+            String logMessage = formatString;
+            if (formatParams != null && formatParams.length > 0) {
+                try {
+                    logMessage = String.format(logMessage, formatParams);
+                } catch (final IllegalFormatException e1) {
+                    e1.printStackTrace();
+                }
             }
+            logger.exception(logMessage, e);
         }
-        logger(context).exception(formatString, e);
     }
 
     public static void exception(final Object context, final Throwable e) {

@@ -41,10 +41,15 @@ import org.appwork.utils.logging2.LogInterface;
  *
  */
 public class LogV3FactoryImpl extends ToConsoleLogger implements LogV3Factory, LogInterface {
-
     @Override
-    public LogInterface getLogger(Object name) {
-        return this;
+    public LogInterface getLogger(Object context) {
+        if (context instanceof LogInterface) {
+            return (LogInterface) context;
+        } else if (context instanceof LoggerProvider) {
+            return ((LoggerProvider) context).getLogger();
+        } else {
+            return getDefaultLogger();
+        }
     }
 
     @Override

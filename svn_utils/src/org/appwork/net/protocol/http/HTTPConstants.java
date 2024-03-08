@@ -258,6 +258,7 @@ public class HTTPConstants {
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
      */
     public static final String           HEADER_REQUEST_PROXY_AUTHORIZATION            = "Proxy-Authorization";
+    public static final String           HEADER_RESPONSE_PROXY_AUTHORIZATION           = "Proxy-Authorization";
     public static final String           HEADER_REQUEST_PROXY_CONNECTION               = "Proxy-Connection";
     /**
      * Implementation-specific headers that may have various effects anywhere along the request-response chain. Pragma: no-cache
@@ -317,7 +318,7 @@ public class HTTPConstants {
     public static final String           HEADER_RESPONSE_REFERRER_POLICY               = "Referrer-Policy";
     /*
      * https://www.rfc-editor.org/rfc/rfc2616#page-141
-     * 
+     *
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
      */
     public static final String           HEADER_RESPONSE_RETRY_AFTER                   = "Retry-After";

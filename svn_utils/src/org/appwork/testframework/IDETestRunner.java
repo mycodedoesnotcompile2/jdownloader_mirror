@@ -206,6 +206,7 @@ public class IDETestRunner {
                 fos.close();
             }
             AWTest.logInfoAnyway("[** START **]" + cls.getName());
+            System.setProperty("AWTEST.CLASS", cls.getName());
             ((TestInterface) ClassCache.getClassCache(cls).getInstance()).runTest();
             if (!CompiledType.isThreadLocalCacheEmpty()) {
                 throw new AWTException("CompiledType.ThreadLocalCache is not empty!");
