@@ -111,7 +111,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.YoutubeDashV2;
 import jd.utils.locale.JDL;
 
-@DecrypterPlugin(revision = "$Revision: 48756 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48759 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1076,7 +1076,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     fp.setName(fpName);
                     // let the packagizer merge several packages that have the same name
                     fp.setAllowMerge(true);
-                    fp.setPackageKey("ytvideo://" + clip.videoID);
+                    // fp.setPackageKey("ytvideo://" + clip.videoID);
                     fp.add(ret);
                 }
             }
