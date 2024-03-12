@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47705 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48760 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornhatCom extends KernelVideoSharingComV2 {
     public PornhatCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -46,8 +46,8 @@ public class PornhatCom extends KernelVideoSharingComV2 {
     }
 
     /** 2020-10-27: Special: Their URLs are always available via 2 types: With- and without FUID! */
-    private static final String TYPE1 = "https?://[^/]+/video/(\\d+)/([a-z0-9\\-]+)/$";
-    private static final String TYPE2 = "https?://[^/]+/video/([a-z0-9\\-]+)/$";
+    private static final String TYPE1 = "(?i)https?://[^/]+/video/(\\d+)/([a-z0-9\\-]+)/$";
+    private static final String TYPE2 = "(?i)https?://[^/]+/video/([a-z0-9\\-]+)/$";
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();

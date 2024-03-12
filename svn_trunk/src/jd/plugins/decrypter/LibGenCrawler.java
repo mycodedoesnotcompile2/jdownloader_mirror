@@ -42,7 +42,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.LibGenInfo;
 
-@DecrypterPlugin(revision = "$Revision: 48580 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48760 $", interfaceVersion = 2, names = {}, urls = {})
 public class LibGenCrawler extends PluginForDecrypt {
     public LibGenCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -247,7 +247,7 @@ public class LibGenCrawler extends PluginForDecrypt {
                     /* This is the better packagename! */
                     title = book.getName();
                 }
-                if (urls.length > 0) {
+                if (urls != null && urls.length > 0) {
                     for (final String url : urls) {
                         if (this.canHandle(url) && url.contains(md5)) {
                             ret.add(createDownloadlink(url));

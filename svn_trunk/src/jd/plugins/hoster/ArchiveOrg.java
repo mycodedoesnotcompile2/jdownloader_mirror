@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 48759 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 48760 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -179,7 +179,7 @@ public class ArchiveOrg extends PluginForHost {
         }
         final int playlistPosition = link.getIntegerProperty(PROPERTY_PLAYLIST_POSITION, -1);
         String fileExtension = Plugin.getFileNameExtensionFromString(originalFilename);
-        if (fileExtension.startsWith(".")) {
+        if (fileExtension != null && fileExtension.startsWith(".")) {
             fileExtension = fileExtension.substring(1);
         }
         final ExtensionsFilterInterface fileType = CompiledFiletypeFilter.getExtensionsFilterInterface(fileExtension);
