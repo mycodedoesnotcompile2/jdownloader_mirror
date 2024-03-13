@@ -20,6 +20,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -38,13 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
 public class TransloadMe extends PluginForHost {
     private static final String          API_BASE                     = "https://api.transload.me/";
     private static final String          NORESUME                     = "transload_me_NORESUME";
@@ -296,8 +295,7 @@ public class TransloadMe extends PluginForHost {
                 break;
             case 1:
                 // "error": "1" - the File is not found or has been deleted.
-                /* 2017-10-12: Do not trust this API response! */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error:1", 60 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             case 2:
                 // "error": "2" - file Sharing is not supported.
                 // should be mh wide

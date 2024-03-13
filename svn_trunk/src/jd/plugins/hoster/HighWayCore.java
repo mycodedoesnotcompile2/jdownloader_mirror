@@ -69,7 +69,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48419 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -956,7 +956,7 @@ public abstract class HighWayCore extends UseNet {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);
             case 9:
                 /* File not found --> Do not trust this error whenever a multihoster is answering with it */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             case 10:
                 /* Host is not supported or not supported for free account users */
                 getMultiHosterManagement().putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);

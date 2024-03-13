@@ -76,7 +76,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -534,7 +534,7 @@ public class AllDebridCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message, 30 * 1000l);
         } else if (code.equalsIgnoreCase("LINK_DOWN")) {
             /* URL is offline according to multihoster --> Do not trust this error --> Skip to next download candidate instead! */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Untrusted offline error", 5 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (code.equalsIgnoreCase("LINK_PASS_PROTECTED")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "URL is password protected", 5 * 60 * 1000l);
         } else if (code.equalsIgnoreCase("LINK_HOST_UNAVAILABLE")) {
