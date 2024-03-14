@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.StackstorageCom;
 
-@DecrypterPlugin(revision = "$Revision: 48488 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 48767 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
 public class StackstorageComCrawler extends PluginForDecrypt {
     public StackstorageComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,12 +56,14 @@ public class StackstorageComCrawler extends PluginForDecrypt {
         final boolean useApiV2 = true;
         if (useApiV2) {
             /* 2023-11-20 */
+            br.setAllowedResponseCodes(503);
             final String apiurl = "https://" + subdomain + ".stackstorage.com/api/v2/share/" + folderID;
             /* Obtain token / cookie */
             br.postPageRaw(apiurl, "{\"password\":\"\"}");
             if (br.getHttpConnection().getResponseCode() == 404) {
-                logger.info("Item offline or account required to access it");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Item offline or account required to access it");
+            } else if (br.getHttpConnection().getResponseCode() == 503) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Error 503 offline");
             }
             final String sharetoken = br.getRequest().getResponseHeader("X-Sharetoken");
             final String csrftoken = br.getRequest().getResponseHeader("X-Csrf-Token");

@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48611 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48766 $", interfaceVersion = 3, names = {}, urls = {})
 public class SkyveIo extends XFileSharingProBasic {
     public SkyveIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,6 +59,17 @@ public class SkyveIo extends XFileSharingProBasic {
 
     public static String[] getAnnotationUrls() {
         return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+    }
+
+    @Override
+    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
+        /* 2024-03-13 */
+        String dllink = br.getRegex("<a href=\"(https?://[^\"]+)\" class=\"dButton\"").getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        } else {
+            return super.getDllink(link, account, br, src);
+        }
     }
 
     @Override

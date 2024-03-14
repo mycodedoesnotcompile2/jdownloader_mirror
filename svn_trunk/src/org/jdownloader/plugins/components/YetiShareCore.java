@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48712 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48767 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -957,7 +957,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
          * Save directurl before download-attempt as it should be valid even if it e.g. fails because of server issue 503 (= too many
          * connections) --> Should work fine after the next try.
          */
-        link.setProperty(getDownloadModeDirectlinkProperty(account), dl.getConnection().getURL().toString());
+        link.setProperty(getDownloadModeDirectlinkProperty(account), dl.getConnection().getURL().toExternalForm());
         try {
             checkResponseCodeErrors(dl.getConnection());
         } catch (final PluginException e) {
@@ -2801,7 +2801,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
          * Save directurl before download-attempt as it should be valid even if it e.g. fails because of server issue 503 (= too many
          * connections) --> Should work fine after the next try.
          */
-        link.setProperty(directlinkproperty, con.getURL().toString());
+        link.setProperty(directlinkproperty, con.getURL().toExternalForm());
         try {
             checkResponseCodeErrors(con);
         } catch (final PluginException e) {

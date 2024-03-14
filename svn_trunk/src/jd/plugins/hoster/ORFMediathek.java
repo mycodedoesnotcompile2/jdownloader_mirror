@@ -17,11 +17,13 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hds.HDSDownloader;
 import org.jdownloader.downloader.hls.HLSDownloader;
@@ -35,60 +37,63 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.CryptedLink;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 48710 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48767 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
-    private static final String TYPE_AUDIO                            = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
+    private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
-    public static final String  Q_SUBTITLES                           = "Q_SUBTITLES";
-    public static final boolean Q_SUBTITLES_default                   = true;
-    public static final String  Q_THUMBNAIL                           = "Q_THUMBNAIL";
-    public static final boolean Q_THUMBNAIL_default                   = true;
-    public static final String  Q_BEST                                = "Q_BEST_2";
-    public static final boolean Q_BEST_default                        = true;
-    public static final String  Q_VERYLOW                             = "Q_VERYLOW";
-    public static final boolean Q_VERYLOW_default                     = true;
-    public static final String  Q_LOW                                 = "Q_LOW";
-    public static final boolean Q_LOW_default                         = true;
-    public static final String  Q_MEDIUM                              = "Q_MEDIUM";
-    public static final boolean Q_MEDIUM_default                      = true;
-    public static final String  Q_HIGH                                = "Q_HIGH";
-    public static final boolean Q_HIGH_default                        = true;
-    public static final String  Q_VERYHIGH                            = "Q_VERYHIGH";
-    public static final boolean Q_VERYHIGH_default                    = true;
-    public static final String  PROGRESSIVE_STREAM                    = "PROGRESSIVE_STREAM";
-    public static final boolean PROGRESSIVE_STREAM_default            = true;
-    public static final String  HLS_STREAM                            = "HLS_STREAM_2024_02_22";
-    public static final boolean HLS_STREAM_default                    = false;
-    public static final String  HDS_STREAM                            = "HDS_STREAM_2024_02_22";
-    public static final boolean HDS_STREAM_default                    = false;
-    public final static String  SETTING_SELECTED_VIDEO_FORMAT         = "selected_video_format";
-    public static final int     SETTING_SELECTED_VIDEO_FORMAT_default = 0;
-    public static final String  SETTING_ENABLE_FAST_CRAWL             = "enable_fast_crawl";
-    public static final boolean SETTING_ENABLE_FAST_CRAWL_default     = true;
+    public static final String  Q_SUBTITLES                                    = "Q_SUBTITLES";
+    public static final boolean Q_SUBTITLES_default                            = true;
+    public static final String  Q_THUMBNAIL                                    = "Q_THUMBNAIL";
+    public static final boolean Q_THUMBNAIL_default                            = true;
+    public static final String  Q_BEST                                         = "Q_BEST_2";
+    public static final boolean Q_BEST_default                                 = true;
+    public static final String  Q_VERYLOW                                      = "Q_VERYLOW";
+    public static final boolean Q_VERYLOW_default                              = true;
+    public static final String  Q_LOW                                          = "Q_LOW";
+    public static final boolean Q_LOW_default                                  = true;
+    public static final String  Q_MEDIUM                                       = "Q_MEDIUM";
+    public static final boolean Q_MEDIUM_default                               = true;
+    public static final String  Q_HIGH                                         = "Q_HIGH";
+    public static final boolean Q_HIGH_default                                 = true;
+    public static final String  Q_VERYHIGH                                     = "Q_VERYHIGH";
+    public static final boolean Q_VERYHIGH_default                             = true;
+    public static final String  PROGRESSIVE_STREAM                             = "PROGRESSIVE_STREAM";
+    public static final boolean PROGRESSIVE_STREAM_default                     = true;
+    public static final String  HLS_STREAM                                     = "HLS_STREAM_2024_02_22";
+    public static final boolean HLS_STREAM_default                             = false;
+    public static final String  HDS_STREAM                                     = "HDS_STREAM_2024_02_22";
+    public static final boolean HDS_STREAM_default                             = false;
+    public final static String  SETTING_SELECTED_VIDEO_FORMAT                  = "selected_video_format";
+    public static final int     SETTING_SELECTED_VIDEO_FORMAT_default          = 0;
+    public static final String  SETTING_ENABLE_FAST_CRAWL                      = "enable_fast_crawl";
+    public static final boolean SETTING_ENABLE_FAST_CRAWL_default              = true;
     /* DownloadLink properties */
-    public static final String  PROPERTY_TITLE                        = "title";
-    public static final String  PROPERTY_VIDEO_POSITION               = "video_position";
-    public static final String  PROPERTY_VIDEO_POSITION_MAX           = "video_position_max";
-    public static final String  PROPERTY_INTERNAL_QUALITY             = "directQuality";
-    public static final String  PROPERTY_STREAMING_TYPE               = "streamingType";
-    public static final String  PROPERTY_CONTENT_TYPE                 = "contentType";
-    public static final String  PROPERTY_QUALITY_HUMAN_READABLE       = "directFMT";
-    public static final String  PROPERTY_SEGMENT_ID                   = "segment_id";
-    public static final String  PROPERTY_VIDEO_ID                     = "video_id";
-    public static final String  PROPERTY_DELIVERY                     = "delivery";
-    public static final String  PROPERTY_DIRECTURL                    = "directURL";
-    public static final String  PROPERTY_SOURCEURL                    = "mainlink";
-    public static final String  PROPERTY_AGE_RESTRICTED               = "age_restricted";
-    public static String        CONTENT_TYPE_IMAGE                    = "image";
-    public static String        CONTENT_TYPE_SUBTITLE                 = "subtitle";
-    public static String        CONTENT_TYPE_VIDEO                    = "video";
+    public static final String  PROPERTY_TITLE                                 = "title";
+    public static final String  PROPERTY_VIDEO_POSITION                        = "video_position";
+    public static final String  PROPERTY_VIDEO_POSITION_MAX                    = "video_position_max";
+    public static final String  PROPERTY_INTERNAL_QUALITY                      = "directQuality";
+    public static final String  PROPERTY_STREAMING_TYPE                        = "streamingType";
+    public static final String  PROPERTY_CONTENT_TYPE                          = "contentType";
+    public static final String  PROPERTY_QUALITY_HUMAN_READABLE                = "directFMT";
+    public static final String  PROPERTY_SEGMENT_ID                            = "segment_id";
+    public static final String  PROPERTY_VIDEO_ID                              = "video_id";
+    public static final String  PROPERTY_DELIVERY                              = "delivery";
+    public static final String  PROPERTY_DIRECTURL                             = "directURL";
+    public static final String  PROPERTY_SOURCEURL                             = "mainlink";
+    public static final String  PROPERTY_AGE_RESTRICTED                        = "age_restricted";
+    public static final String  PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP = "age_restricted_last_recrawl_timestamp";
+    public static String        CONTENT_TYPE_IMAGE                             = "image";
+    public static String        CONTENT_TYPE_SUBTITLE                          = "subtitle";
+    public static String        CONTENT_TYPE_VIDEO                             = "video";
 
     public ORFMediathek(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,11 +126,11 @@ public class ORFMediathek extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, false);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         URLConnectionAdapter con = null;
         String dllink = null;
         if (link.getPluginPatternMatcher().matches(TYPE_AUDIO)) {
@@ -197,7 +202,7 @@ public class ORFMediathek extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    private void handleConnectionErrors(final Browser br, final DownloadLink link, final URLConnectionAdapter con) throws PluginException, IOException {
+    private void handleConnectionErrors(final Browser br, final DownloadLink link, final URLConnectionAdapter con) throws Exception {
         if (!this.looksLikeDownloadableContent(con, link)) {
             br.followConnection(true);
             if (con.getResponseCode() == 403) {
@@ -212,9 +217,15 @@ public class ORFMediathek extends PluginForHost {
         handleURLBasedErrors(br, link);
     }
 
-    private void handleURLBasedErrors(final Browser br, final DownloadLink link) throws PluginException {
+    private void handleURLBasedErrors(final Browser br, final DownloadLink link) throws Exception {
         if (isAgeRestrictedByCurrentTime(br.getURL())) {
-            // Account.setNextDayAsTempTimeout
+            if (System.currentTimeMillis() - link.getLongProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, 0) < 10 * 60 * 1000) {
+                /**
+                 * Recrawl has just happened and we were still unable to download the item :( </br>
+                 * This should never happen!
+                 */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen", 10 * 60 * 1000l);
+            }
             /*
              * E.g. progressive:
              * https://apasfpd.sf.apa.at/gp/online/14ed5a0157632458580f9bc7bfd1feba/1708297200/Jugendschutz0600b2000_Q8C.mp4
@@ -231,18 +242,50 @@ public class ORFMediathek extends PluginForHost {
             c.set(c.SECOND, 0);
             final long tsLater = c.getTimeInMillis();
             final long timeUntilLater = tsLater - System.currentTimeMillis();
+            final boolean videoShouldBeAvailable;
             final long waitMillisUntilVideoIsAvailable;
             if (timeUntilLater > 0) {
                 waitMillisUntilVideoIsAvailable = timeUntilLater;
+                videoShouldBeAvailable = false;
             } else {
                 /**
                  * This should never happen. Either server time is wrong/offset or user has wrong local OS time. </br>
                  * Video should already be available -> Wait static wait time
                  */
                 waitMillisUntilVideoIsAvailable = 30 * 60 * 1000;
+                videoShouldBeAvailable = true;
             }
             link.setProperty(ORFMediathek.PROPERTY_AGE_RESTRICTED, true);
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Dieses Video ist im Sinne des Jugendschutzes nur von 20.00 bis 6.00 Uhr verfügbar.", waitMillisUntilVideoIsAvailable);
+            if (videoShouldBeAvailable && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                /* Re-crawl item in order to find a fresh streaming URL which should enable us to download the item. */
+                final OrfAt crawler = (OrfAt) this.getNewPluginForDecryptInstance(this.getHost());
+                if (link.getContainerUrl() == null || !crawler.canHandle(link.getContainerUrl())) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                /* Hack to force crawler to crawl all items regardless of user configuration. */
+                crawler.cfg = null;
+                DownloadLink freshItem = null;
+                final ArrayList<DownloadLink> results = crawler.decryptIt(new CryptedLink(link.getContainerUrl()), null);
+                final String thisLinkID = this.getLinkID(link);
+                for (final DownloadLink result : results) {
+                    if (StringUtils.equals(this.getLinkID(result), thisLinkID)) {
+                        freshItem = result;
+                        break;
+                    }
+                }
+                if (freshItem == null) {
+                    /* Video version we are looking for doesn't exist anymore -> Item offline? Should be a very rare case. */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final String freshDirecturl = freshItem.getStringProperty(PROPERTY_DIRECTURL);
+                if (StringUtils.isEmpty(freshDirecturl)) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                link.setProperty(PROPERTY_DIRECTURL, freshDirecturl);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Retry after Jugenschutz recrawl");
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Dieses Video ist im Sinne des Jugendschutzes nur von 20.00 bis 6.00 Uhr verfügbar.", waitMillisUntilVideoIsAvailable);
+            }
         } else {
             final String errortextGeoBlocked1 = "Error 403: GEO-blocked content or video temporarily unavailable via this streaming method. Check your orf.at plugin settings.";
             final String errortextGeoBlocked2 = "GEO-blocked";
