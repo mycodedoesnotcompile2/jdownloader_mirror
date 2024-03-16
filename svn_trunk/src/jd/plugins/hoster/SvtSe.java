@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -39,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "svt.se" }, urls = { "https?://(?:www\\.)?(?:svt|svtplay)\\.se/.+" })
+@HostPlugin(revision = "$Revision: 48773 $", interfaceVersion = 3, names = { "svt.se" }, urls = { "https?://(?:www\\.)?(?:svt|svtplay)\\.se/.+" })
 public class SvtSe extends PluginForHost {
     public SvtSe(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +52,7 @@ public class SvtSe extends PluginForHost {
     private String              videoid = null;
     private Map<String, Object> entries = null;
 
-    @SuppressWarnings({ "deprecation", "unchecked" })
+    @SuppressWarnings({ "deprecation" })
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         link.setMimeHint(CompiledFiletypeFilter.VideoExtensions.MP4);
@@ -98,7 +97,7 @@ public class SvtSe extends PluginForHost {
             /* Strange result on 404: {"message":"To many retry attempts to video API","status":404} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
+        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (((Boolean) entries.get("live")).booleanValue()) {
             logger.info("Livestreams are not supported");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

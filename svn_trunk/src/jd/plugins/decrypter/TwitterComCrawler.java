@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48767 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48775 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -1292,6 +1292,10 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 for (final Map.Entry<String, Object> entry : map.entrySet()) {
                     // final String key = entry.getKey();
                     final Object value = entry.getValue();
+                    if (value instanceof String && value.toString().startsWith("promoted-tweet")) {
+                        // Skip ads / "fake-tweets"
+                        return;
+                    }
                     if (value instanceof List || value instanceof Map) {
                         recursiveFindTweetMaps(value, results);
                     }
