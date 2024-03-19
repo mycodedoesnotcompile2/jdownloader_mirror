@@ -28,6 +28,22 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.BrowserSettingsThread;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.Account.AccountPropertyChangeHandler;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountProperty;
+import jd.plugins.PluginForHost;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -38,7 +54,6 @@ import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.Eventsender;
 import org.appwork.utils.logging2.LogInterface;
@@ -58,33 +73,17 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.AccountData;
 import org.jdownloader.settings.AccountSettings;
 
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.BrowserSettingsThread;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.Account.AccountPropertyChangeHandler;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountProperty;
-import jd.plugins.PluginForHost;
-
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
     private final HashMap<String, List<Account>>                                 MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-                                                                                                      @Override
-                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-                                                                                                          listener.onAccountControllerEvent(event);
-                                                                                                      }
-                                                                                                  };
+        @Override
+        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+            listener.onAccountControllerEvent(event);
+        }
+    };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -581,23 +580,6 @@ public class AccountController implements AccountControllerListener, AccountProp
         return list(null);
     }
 
-    /* do we have accounts for this host */
-    public boolean hasAccounts(final String host) {
-        if (host != null) {
-            synchronized (AccountController.this) {
-                final List<Account> ret = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-                if (ret != null && ret.size() > 0) {
-                    for (final Account acc : ret) {
-                        if (acc.isValid() && acc.getPlugin() != null) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
     public int getAccountsSize(final String host) {
         if (host != null) {
             synchronized (AccountController.this) {
@@ -620,53 +602,63 @@ public class AccountController implements AccountControllerListener, AccountProp
      * If password of new account differs from existing accounts' password, existing accounts' password will be updated.
      */
     public void addAccount(final Account account, final boolean forceAccountCheckOnPropertyChange) {
-        if (account != null) {
-            if (account.getPlugin() == null) {
-                new PluginFinder().assignPlugin(account, true);
+        if (account == null) {
+            return;
+        } else if (account.getPlugin() == null) {
+            new PluginFinder().assignPlugin(account, true);
+        } else if (account.getHoster() == null) {
+            return;
+        }
+        Account existingAccount = null;
+        synchronized (AccountController.this) {
+            final String host = account.getHoster().toLowerCase(Locale.ENGLISH);
+            List<Account> accs = ACCOUNTS.get(host);
+            if (accs == null) {
+                accs = new ArrayList<Account>();
+                ACCOUNTS.put(host, accs);
             }
-            if (account.getHoster() != null) {
-                Account existingAccount = null;
-                synchronized (AccountController.this) {
-                    existingAccount = this.getExistingAccount(account);
-                    /* 2021-11-25: TODO: Lowercase required? Host names should be unique already! */
-                    final String host = account.getHoster().toLowerCase(Locale.ENGLISH);
-                    List<Account> accs = ACCOUNTS.get(host);
-                    if (accs == null) {
-                        accs = new ArrayList<Account>();
-                        ACCOUNTS.put(host, accs);
-                    }
-                    if (existingAccount == null) {
-                        /* No existing account found -> Add this account to list of accounts. */
-                        account.setAccountController(this);
-                        accs.add(account);
-                    }
-                }
-                if (existingAccount != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        /* Update password of existing account */
-                        if (!StringUtils.equals(existingAccount.getPass(), account.getPass())) {
-                            existingAccount.setPass(account.getPass(), forceAccountCheckOnPropertyChange);
-                        }
-                        // reuse properties and accountInfos from new account
-                        existingAccount.setError(null, -1, null, forceAccountCheckOnPropertyChange);
-                        existingAccount.setAccountInfo(account.getAccountInfo());
-                        existingAccount.setProperties(account.getProperties());
-                        existingAccount.setEnabled(true, forceAccountCheckOnPropertyChange);
-                        getEventSender().fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ACCOUNT_CHECKED, existingAccount));
-                    } else {
-                        if (!existingAccount.isEnabled() || existingAccount.getError() != null) {
-                            // reuse properties and accountInfos from new account
-                            existingAccount.setError(null, -1, null);
-                            existingAccount.setAccountInfo(account.getAccountInfo());
-                            existingAccount.setProperties(account.getProperties());
-                            existingAccount.setEnabled(true);
-                            getEventSender().fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ACCOUNT_CHECKED, existingAccount));
-                        }
-                    }
-                } else {
-                    this.broadcaster.fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ADDED, account));
+            final String hasUsername = StringUtils.isNotEmpty(account.getUser()) ? account.getUser() : null;
+            for (final Account acc : accs) {
+                if (acc == account) {
+                    existingAccount = acc;
+                    break;
+                } else if (hasUsername != null && StringUtils.equals(hasUsername, account.getUser()) && StringUtils.equals(acc.getPass(), account.getPass())) {
+                    /* Check for same user + pw. */
+                    existingAccount = acc;
+                    break;
                 }
             }
+            if (existingAccount == null && hasUsername != null) {
+                /*
+                 * Check for same username only --> Username is supposed to be unique so this should also be a safe method of finding an
+                 * existing same account.
+                 */
+                for (final Account acc : accs) {
+                    if (StringUtils.equals(hasUsername, account.getUser())) {
+                        existingAccount = acc;
+                        break;
+                    }
+                }
+            }
+            if (existingAccount == null) {
+                /* No existing account found -> Add this account to list of accounts. */
+                account.setAccountController(this);
+                accs.add(account);
+            }
+        }
+        if (existingAccount != null) {
+            /* Existing account found -> Update password of existing account */
+            if (!StringUtils.equals(existingAccount.getPass(), account.getPass())) {
+                existingAccount.setPass(account.getPass(), forceAccountCheckOnPropertyChange);
+            }
+            // reuse properties and accountInfos from new account
+            existingAccount.setError(null, -1, null, forceAccountCheckOnPropertyChange);
+            existingAccount.setAccountInfo(account.getAccountInfo());
+            existingAccount.setProperties(account.getProperties());
+            existingAccount.setEnabled(true, forceAccountCheckOnPropertyChange);
+            getEventSender().fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ACCOUNT_CHECKED, existingAccount));
+        } else {
+            getEventSender().fireEvent(new AccountControllerEvent(this, AccountControllerEvent.Types.ADDED, account));
         }
     }
 
@@ -803,25 +795,6 @@ public class AccountController implements AccountControllerListener, AccountProp
         }
     }
 
-    /** Checks if given account already exists. */
-    public Account getExistingAccount(final Account account) {
-        if (account == null || account.getHoster() == null) {
-            return null;
-        }
-        synchronized (AccountController.this) {
-            final String host = account.getHoster().toLowerCase(Locale.ENGLISH);
-            List<Account> accs = ACCOUNTS.get(host);
-            if (accs != null) {
-                for (final Account acc : accs) {
-                    if (acc.equals(account)) {
-                        return acc;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
     /** Checks if account with expected properties exists. */
     public boolean hasAccount(final String host, final Boolean isEnabled, final Boolean isValid, final Boolean isPremium, final Boolean isExpired) {
         if (StringUtils.isEmpty(host)) {
@@ -834,14 +807,11 @@ public class AccountController implements AccountControllerListener, AccountProp
                     if (account.getPlugin() != null) {
                         if (isEnabled != null && isEnabled != account.isEnabled()) {
                             continue;
-                        }
-                        if (isValid != null && isValid != (account.getError() == null)) {
+                        } else if (isValid != null && isValid != (account.getError() == null)) {
                             continue;
-                        }
-                        if (isPremium != null && isPremium != AccountType.PREMIUM.equals(account.getType())) {
+                        } else if (isPremium != null && isPremium != AccountType.PREMIUM.equals(account.getType())) {
                             continue;
-                        }
-                        if (isExpired != null) {
+                        } else if (isExpired != null) {
                             final AccountInfo ai = account.getAccountInfo();
                             if (ai != null) {
                                 final long validUntilTimeStamp = ai.getValidUntil();

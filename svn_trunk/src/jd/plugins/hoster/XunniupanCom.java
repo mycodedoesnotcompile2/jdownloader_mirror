@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48550 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48781 $", interfaceVersion = 2, names = {}, urls = {})
 public class XunniupanCom extends PluginForHost {
     public XunniupanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class XunniupanCom extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xunniuwp.com", "xunniufxp.com", "xunniu-pan.com", "xunniufile.com", "xunniupan.co", "xunniupan.com", "xun-niu.com" });
+        ret.add(new String[] { "xunniufxpan.com", "xunniuwp.com", "xunniufxp.com", "xunniu-pan.com", "xunniufile.com", "xunniupan.co", "xunniupan.com", "xun-niu.com" });
         return ret;
     }
 
@@ -73,6 +73,7 @@ public class XunniupanCom extends PluginForHost {
     public String rewriteHost(final String host) {
         /* This filehost is frequently changing its domain which is why we need this. */
         /* 2023-12-01: Main domain has changed to xunniuwp.com */
+        /* 2024-03-18: New main domain: xunniufxpan.com */
         return this.rewriteHost(getPluginDomains(), host);
     }
 

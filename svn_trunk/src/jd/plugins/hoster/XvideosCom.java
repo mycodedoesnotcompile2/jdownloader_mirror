@@ -18,15 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.config.XvideosComConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 48555 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.XvideosComConfig;
+
+@HostPlugin(revision = "$Revision: 48784 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -79,6 +79,7 @@ public class XvideosCom extends XvideosCore {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             String pattern = "https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(";
+            pattern += "video\\.[a-z0-9]+/.*|";
             pattern += "video\\d+/.*|";
             pattern += "embedframe/\\d+|";
             // pattern += "[a-z0-9\\-]+/upload/[^/]+/\\d+/[a-z0-9_\\-]+|";
@@ -109,7 +110,12 @@ public class XvideosCom extends XvideosCore {
         final String videoID = this.getVideoID(link);
         if (videoID != null) {
             /* 2021-07-23: This needs to end with a slash otherwise the URL will be invalid! */
-            String newURL = "https://www." + urlHost + "/video" + videoID;
+            String newURL;
+            if (link.getPluginPatternMatcher().matches(type_normal_dot)) {
+                newURL = "https://www." + urlHost + "/video." + videoID;
+            } else {
+                newURL = "https://www." + urlHost + "/video" + videoID;
+            }
             final String urlTitle = getURLTitle(link);
             if (urlTitle != null) {
                 newURL += "/" + urlTitle;

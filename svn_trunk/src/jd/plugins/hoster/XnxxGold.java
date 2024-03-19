@@ -18,14 +18,14 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.config.XvideosComXnxxGoldConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48306 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.XvideosComXnxxGoldConfig;
+
+@HostPlugin(revision = "$Revision: 48784 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxGold extends XvideosCore {
     public XnxxGold(PluginWrapper wrapper) {
         super(wrapper);
