@@ -16,14 +16,19 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -32,9 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-
-@HostPlugin(revision = "$Revision: 48776 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48795 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastPicRu extends PluginForHost {
     public FastPicRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,12 +47,9 @@ public class FastPicRu extends PluginForHost {
     // Tags:
     // protocol: no https
     // other:
-    /* Connection stuff */
-    private static final boolean free_resume       = true;
     /* We're only downloading small files so 1 chunk is enough. */
-    private static final int     free_maxchunks    = 1;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final int free_maxchunks = 1;
+    private String           dllink         = null;
 
     @Override
     public String getAGBLink() {
@@ -99,6 +99,11 @@ public class FastPicRu extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         String title = getFID(link);
         title = Encoding.htmlDecode(title);
@@ -107,16 +112,41 @@ public class FastPicRu extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(this.correctOrApplyFileNameExtension(title, extDefault));
         }
-        dllink = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.getPage(link.getPluginPatternMatcher());
+        dllink = null;
+        if (false) {
+            final GetRequest request = new GetRequest(link.getPluginPatternMatcher()) {
+                @Override
+                protected String getSuggestedAcceptHeader(URL url) {
+                    // text/html will cause redirect to website
+                    return DEFAULTACCEPTHEADER;
+                }
+            };
+            br.getPage(request);
+        } else {
+            final URLConnectionAdapter con = br.openGetConnection(link.getPluginPatternMatcher());
+            try {
+                // may return direct image or website
+                if (StringUtils.contains(con.getContentType(), "text/html")) {
+                    br.followConnection();
+                } else {
+                    handleConnectionErrors(br, con);
+                    dllink = con.getRequest().getUrl();
+                }
+            } catch (PluginException e) {
+                logger.log(e);
+            } finally {
+                con.disconnect();
+            }
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        dllink = br.getRegex("<span class=\"text-muted d-lg-none\">нажмите для увеличения</span>\\s*<img src=\"(https://[^\"]+)\"").getMatch(0);
-        if (dllink == null) {
-            dllink = br.getRegex("\"(https?://[a-z0-9]+\\.[^/]+/big/[^/]+/[^/]+/[^/]+/_?[a-f0-9]{32}\\.[A-Za-z]+[^\"]*)\"").getMatch(0);
+        } else if (dllink == null) {
+            dllink = br.getRegex("<span class=\"text-muted d-lg-none\">нажмите для увеличения</span>\\s*<img src=\"(https://[^\"]+)\"").getMatch(0);
+            if (dllink == null) {
+                dllink = br.getRegex("\"(https?://[a-z0-9]+\\.[^/]+/big/[^/]+/[^/]+/[^/]+/_?[a-f0-9]{32}\\.[A-Za-z]+[^\"]*)\"").getMatch(0);
+            }
         }
         if (!StringUtils.isEmpty(dllink)) {
             URLConnectionAdapter con = null;
@@ -150,13 +180,13 @@ public class FastPicRu extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), free_maxchunks);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
     private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (con.getURL().toString().contains("/not_found.gif")) {
+        if (con.getURL().toExternalForm().contains("/not_found.gif")) {
             /* https://static.fastpic.org/not_found.gif */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -174,7 +204,7 @@ public class FastPicRu extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

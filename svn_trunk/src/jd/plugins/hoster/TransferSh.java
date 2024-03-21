@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48374 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48796 $", interfaceVersion = 3, names = {}, urls = {})
 public class TransferSh extends PluginForHost {
     public TransferSh(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class TransferSh extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         String filenameFromURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
-        link.setName(Encoding.htmlDecode(filenameFromURL));
+        link.setName(Encoding.htmlDecode(filenameFromURL).trim());
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());

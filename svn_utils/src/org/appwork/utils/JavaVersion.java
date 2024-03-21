@@ -27,10 +27,12 @@ public enum JavaVersion {
     JVM_20_0(64, "20"),
     JVM_21_0(65, "21", true),
     JVM_22_0(66, "22"),
-    JVM_23_0(67, "23") {
+    JVM_23_0(67, "23"),
+    JVM_24_0(68, "24"),
+    JVM_25_0(69, "25") {
         private final long next;
         {
-            this.next = JVMVersion.parseJavaVersionString("24");
+            this.next = JVMVersion.parseJavaVersionString("26");
         }
 
         @Override
