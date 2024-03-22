@@ -65,7 +65,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 48797 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 48799 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -627,7 +627,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             isMultiVolumeBook = false;
         }
         final String pageFormat;
-        if (bookAjaxURL.matches(".*/page/n\\d+.*")) {
+        if (bookAjaxURL.matches("(?i).*/page/n\\d+.*")) {
             pageFormat = "/page/n%d";
         } else {
             pageFormat = "/page/%d";
@@ -1135,11 +1135,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final String mediatype = root_metadata.get("mediatype").toString();
         // final String server = root.get("server").toString();
         // final String dir = root.get("dir").toString();
-        final String description = (String) root_metadata.get("description");
+        final Object descriptionO = root_metadata.get("description");
         final FilePackage fpRoot = FilePackage.getInstance();
         fpRoot.setName(identifier);
-        if (!StringUtils.isEmpty(description)) {
-            fpRoot.setComment(description);
+        if (descriptionO instanceof String) {
+            fpRoot.setComment(descriptionO.toString());
         }
         final Map<String, FilePackage> fpmap = new HashMap<String, FilePackage>();
         fpmap.put(identifier, fpRoot);

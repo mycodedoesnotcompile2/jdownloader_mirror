@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.MissavComCrawler;
 
-@HostPlugin(revision = "$Revision: 48660 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48799 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MissavComCrawler.class })
 public class MissavCom extends PluginForHost {
     public MissavCom(PluginWrapper wrapper) {
@@ -128,6 +128,7 @@ public class MissavCom extends PluginForHost {
         if (videoHash == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        br.getHeaders().put("Origin", "https://" + br.getHost());
         br.getPage("https://surrit.com/" + videoHash + "/playlist.m3u8");
         final List<HlsContainer> hlscontainers = HlsContainer.getHlsQualities(br);
         final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(hlscontainers);

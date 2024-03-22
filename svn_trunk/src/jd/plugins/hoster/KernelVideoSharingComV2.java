@@ -74,7 +74,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48742 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48803 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1155,7 +1155,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         return ai;
     }
 
-    protected void login(final Account account, final boolean validateCookies) throws Exception {
+    public void login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies;

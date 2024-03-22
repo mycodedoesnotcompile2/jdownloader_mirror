@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48381 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48803 $", interfaceVersion = 3, names = {}, urls = {})
 public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     public MulherespeladasvipCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +118,7 @@ public class MulherespeladasvipCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected void login(final Account account, final boolean validateCookies) throws Exception {
+    public void login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
             try {
                 br.setCookiesExclusive(true);
