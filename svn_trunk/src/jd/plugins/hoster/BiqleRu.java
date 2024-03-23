@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,7 +31,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47801 $", interfaceVersion = 3, names = { "biqle.ru" }, urls = { "biqledecrypted://.+" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+
+@HostPlugin(revision = "$Revision: 48804 $", interfaceVersion = 3, names = { "biqle.ru" }, urls = { "biqledecrypted://.+" })
 public class BiqleRu extends PluginForHost {
     public BiqleRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,7 +103,6 @@ public class BiqleRu extends PluginForHost {
 
     private String getFreshDirecturl(final DownloadLink link) throws PluginException {
         logger.info("Trying to find fresh directurl");
-        String freshDirecturl = null;
         final PluginForDecrypt decrypterplugin = getNewPluginForDecryptInstance(getHost());
         /* Match variants via filename */
         final String target_filename = link.getFinalFileName();
@@ -114,12 +113,11 @@ public class BiqleRu extends PluginForHost {
                 correctDownloadLink(dl);
                 final String filenameTmp = dl.getFinalFileName();
                 if (filenameTmp != null && filenameTmp.equals(target_filename)) {
-                    freshDirecturl = dl.getPluginPatternMatcher();
-                    break;
+                    return dl.getPluginPatternMatcher();
                 }
             }
         } catch (final Throwable e) {
-            if (decrypterplugin.getBrowser().getHttpConnection().getResponseCode() == 404) {
+            if (decrypterplugin.getBrowser().getHttpConnection() != null && decrypterplugin.getBrowser().getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, null, e);
             } else {
                 logger.log(e);
@@ -127,7 +125,7 @@ public class BiqleRu extends PluginForHost {
         } finally {
             decrypterplugin.clean();
         }
-        return freshDirecturl;
+        return null;
     }
 
     @Override
