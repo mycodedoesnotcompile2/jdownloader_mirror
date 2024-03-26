@@ -364,14 +364,14 @@ public class HTMLParser {
         }
 
         public int count(final CharSequence str, int countMax) {
-            return count(str, 0, countMax);
+            return this.count(str, 0, countMax);
         }
 
         public int count(final CharSequence str, final int fromIndex, int countMax) {
             int ret = 0;
             int lastIndex = fromIndex;
             while (true) {
-                final int index = indexOf(str, lastIndex);
+                final int index = this.indexOf(str, lastIndex);
                 if (index != -1) {
                     ret++;
                     lastIndex = index;
@@ -721,7 +721,7 @@ public class HTMLParser {
 
     final private static Httppattern[] linkAndFormPattern     = new Httppattern[] { new Httppattern(Pattern.compile("src\\s*=\\s*('|\\\\\"|\")(.*?)(\\1)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2), new Httppattern(Pattern.compile("(<\\s*a[^>]*href\\s*=\\s*|<\\s*form[^>]*action\\s*=\\s*)('|\\\\\"|\")(.*?)(\\2)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 3), new Httppattern(Pattern.compile("(<\\s*a[^>]*href\\s*=\\s*|<\\s*form[^>]*action\\s*=\\s*)([^'\"][^\\s]*)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2), new Httppattern(Pattern.compile("\\[(link|url)\\](.*?)\\[/(link|url)\\]", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2) };
     public final static String         protocolFile           = "file:/";
-    final private static String        protocolPrefixes       = "((?:chrome|directhttp://https?|usenet|flashget|https?viajd|https?|ccf|dlc|ftp|ftpviajd|jd|rsdf|jdlist|ipfs|nxm|youtubev2" + (!Application.isJared(null) ? "|jdlog" : "") + ")(?:://|\\\\x3A\\\\x2F\\\\x2F)|" + HTMLParser.protocolFile + "|magnet:|mega:)";
+    final private static String        protocolPrefixes       = "((?:chrome|directhttp://https?|usenet|flashget|https?viajd|https?|ccf|dlc|ftp|ftpviajd|jd|rsdf|jdlist|ipfs|nxm|youtubev2" + (!Application.isJared(null) ? "|jdlog" : "") + ")(?:(:|\\\\x3A|\\\\u003A)(/|\\\\x2F|\\\\u002F)(/|\\\\x2F|\\\\u002F))|" + HTMLParser.protocolFile + "|magnet:|mega:)";
     final private static Pattern[]     basePattern            = new Pattern[] { Pattern.compile("<[^>]*base[^>]*href\\s*=\\s*('|\")(.*?)\\1", Pattern.CASE_INSENSITIVE), Pattern.compile("<[^>]*base[^>]*(href)\\s*=\\s*([^'\"][^\\s]*)", Pattern.CASE_INSENSITIVE) };
     final private static Pattern[]     hrefPattern            = new Pattern[] { Pattern.compile("data-\\w+\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE), Pattern.compile("href\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE), Pattern.compile("src\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE) };
     final private static Pattern       pat1                   = Pattern.compile("(" + HTMLParser.protocolPrefixes + "|(?<!://)www\\.)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -758,54 +758,65 @@ public class HTMLParser {
             return this.urlEncoded;
         }
 
+        private boolean isUnicode() {
+            return this.unicode;
+        }
+
         private boolean hex;
         private boolean base64;
         private boolean urlEncoded;
         private boolean unescape;
+        private boolean unicode;
 
         private boolean isUnescape() {
             return this.unescape;
         }
 
         private HtmlParserOptions() {
-            this(true, true, true, true, true);
+            this(true, true, true, true, true, true);
         }
 
-        private HtmlParserOptions(final boolean reverse, final boolean hex, final boolean base64, final boolean urlEncoded, final boolean unescape) {
+        private HtmlParserOptions(final boolean reverse, final boolean hex, final boolean base64, final boolean urlEncoded, final boolean unescape, final boolean unicode) {
             this.reverse = reverse;
             this.hex = hex;
             this.base64 = base64;
             this.urlEncoded = urlEncoded;
             this.unescape = unescape;
+            this.unicode = unicode;
         }
 
         private HtmlParserOptions reverse(final boolean reverse) {
-            return new HtmlParserOptions(reverse, this.hex, this.base64, this.urlEncoded, this.unescape);
+            return new HtmlParserOptions(reverse, this.hex, this.base64, this.urlEncoded, this.unescape, this.unicode);
         }
 
         private HtmlParserOptions hex(final boolean hex) {
-            return new HtmlParserOptions(this.reverse, hex, this.base64, this.urlEncoded, this.unescape);
+            return new HtmlParserOptions(this.reverse, hex, this.base64, this.urlEncoded, this.unescape, this.unicode);
         }
 
         private HtmlParserOptions base64(final boolean base64) {
-            return new HtmlParserOptions(this.reverse, this.hex, base64, this.urlEncoded, this.unescape);
-        }
-
-        private HtmlParserOptions unescape(final boolean unescape) {
-            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, unescape);
+            return new HtmlParserOptions(this.reverse, this.hex, base64, this.urlEncoded, this.unescape, this.unicode);
         }
 
         private HtmlParserOptions urlEncoded(final boolean urlEncoded) {
-            return new HtmlParserOptions(this.reverse, this.hex, this.base64, urlEncoded, this.unescape);
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, urlEncoded, this.unescape, this.unicode);
+        }
+
+        private HtmlParserOptions unescape(final boolean unescape) {
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, unescape, this.unicode);
+        }
+
+        private HtmlParserOptions unicode(final boolean unicode) {
+            return new HtmlParserOptions(this.reverse, this.hex, this.base64, this.urlEncoded, this.unescape, unicode);
         }
     }
 
     private final static int                    MIN_VALID                   = "ftp://1.23".length();
     final private static Pattern                checkPatternBase64          = Pattern.compile("([A-Za-z0-9+/]{16,}={0,2})", Pattern.DOTALL);
+    final private static Pattern                checkPatternUnicode         = Pattern.compile("(\\\\u[0-9a-fA-F]{2,})", Pattern.DOTALL);
     final private static Pattern                unescapePattern             = Pattern.compile("unescape\\(('|\")(.*?)(\\1)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     final private static Pattern                checkPatternHREFUNESCAPESRC = Pattern.compile("(href\\s*=|unescape|src\\s*=).", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     final private static Pattern                checkPatternHREFSRC         = Pattern.compile(".*?(href\\s*=|src\\s*=).+", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-    final private static Pattern                unhexPattern                = Pattern.compile("(([0-9a-fA-F]{2}){" + MIN_VALID + ",})");
+    final private static Pattern                unhexPattern                = Pattern.compile("(([0-9a-fA-F]{2}){" + HTMLParser.MIN_VALID + ",})");
     final private static Pattern                paramsCut1                  = Pattern.compile("://[^\r\n\"' ]*?/[^\r\n\"']+\\?.[^\r\n\"']*?=([^\r\n\"']*?)($|\r|\n|\"|')", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     final private static Pattern                paramsCut2                  = Pattern.compile("://[^\r\n\"' ]*?/[^\r\n\"']*?\\?([^\r\n\"']*?)($|\r|\n|\"|')", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern                inTagsPattern               = Pattern.compile("<([^<]*)>");
@@ -857,7 +868,7 @@ public class HTMLParser {
         if ((data.startsWith(HTMLParser.directHTTP) || data.startsWith(HTMLParser.httpviajd) || data.startsWith(HTMLParser.httpsviajd)) && results.contains(data)) {
             /* we don't have to further check urls with those prefixes */
             return results.stop();
-        } else if (data.matches(dummyCnl)) {
+        } else if (data.matches(HTMLParser.dummyCnl)) {
             return results.stop();
         }
         final int indexBefore = results.getLastResultIndex();
@@ -949,6 +960,22 @@ public class HTMLParser {
                         }
                     } catch (final Throwable e) {
                         org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
+                    }
+                }
+            }
+        }
+        if (options.isUnicode()) {
+            if (HTMLParser.deepWalkCheck(path, options, results, indexBefore)) {
+                /* no changes in results size, and data contains unicode */
+                final HtmlParserCharSequence next = new HtmlParserCharSequence(Encoding.unicodeDecode(urlDecoded));
+                final boolean historyContains = path.contains(next);
+                if (!historyContains) {
+                    if (urlDecoded.find(HTMLParser.checkPatternUnicode)) {
+                        HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options);
+                        HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
+                    } else {
+                        HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options.unicode(false));
+                        HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
                     }
                 }
             }
@@ -1298,6 +1325,7 @@ public class HTMLParser {
             } else if (HTMLParser.checkForReverse(options, data)) {
             } else if (HTMLParser.checkForUrlEncoded(options, data)) {
             } else if (HTMLParser.checkForUnescape(options, data)) {
+            } else if (HTMLParser.checkForUnicode(options, data)) {
                 /* maybe easy encrypted website or a href */
             } else {
                 return results.stop();
@@ -1333,6 +1361,10 @@ public class HTMLParser {
         return (options == null || options.isBase64()) && data.find(HTMLParser.checkPatternBase64);
     }
 
+    private static boolean checkForUnicode(HtmlParserOptions options, HtmlParserCharSequence data) {
+        return (options == null || options.isUnicode()) && data.find(HTMLParser.checkPatternUnicode);
+    }
+
     private static boolean checkForUnescape(HtmlParserOptions options, HtmlParserCharSequence data) {
         return (options == null || options.isUnescape()) && data.find(HTMLParser.checkPatternHREFUNESCAPESRC);
     }
@@ -1359,7 +1391,9 @@ public class HTMLParser {
 
     private static HtmlParserCharSequence correctURL(HtmlParserCharSequenceHierarchy path, HtmlParserResultSet results, HtmlParserOptions options) {
         HtmlParserCharSequence input = path.lastElement();
-        if (input.contains("\\x3A\\x2F\\x2F")) {
+        if (input.contains("\\x3A)") || input.contains("\\x2F")) {
+            input = new HtmlParserCharSequence(Encoding.unicodeDecode(input));
+        } else if (input.contains("\\u003A)") || input.contains("\\u002F")) {
             input = new HtmlParserCharSequence(Encoding.unicodeDecode(input));
         }
         final int specialCutOff = input.indexOf("', ");
@@ -1474,6 +1508,8 @@ public class HTMLParser {
                     return true;
                 } else if (HTMLParser.checkForBase64(options, check)) {
                     return true;
+                } else if (HTMLParser.checkForUnicode(options, check)) {
+                    return true;
                 }
             }
         } else {
@@ -1486,6 +1522,8 @@ public class HTMLParser {
                 return true;
             } else if (HTMLParser.checkForBase64(options, data)) {
                 return true;
+            } else if (HTMLParser.checkForUnicode(options, data)) {
+                return true;
             }
         }
         return ret;
@@ -1494,8 +1532,8 @@ public class HTMLParser {
     /**
      * Diese Methode sucht die vordefinierten input type="hidden" und formatiert sie zu einem poststring z.b. wÃ¼rde bei:
      *
-     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" />
-     * <input type="hidden" name="b" value="9" />
+     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" /> <input type="hidden"
+     * name="b" value="9" />
      *
      * f=f50b0f&h=390b4be0182b85b0&b=9 ausgegeben werden
      *
@@ -1666,11 +1704,15 @@ public class HTMLParser {
     }
 
     private static HtmlParserCharSequence getProtocol(final HtmlParserCharSequence url) {
-        if (url != null) {
-            return url.group(1, HTMLParser.LINKPROTOCOL);
-        } else {
-            return null;
+        HtmlParserCharSequence ret = url != null ? url.group(1, HTMLParser.LINKPROTOCOL) : null;
+        if (ret != null) {
+            if (ret.contains("\\x3A)") || ret.contains("\\x2F")) {
+                ret = new HtmlParserCharSequence(Encoding.unicodeDecode(ret));
+            } else if (ret.contains("\\u003A)") || ret.contains("\\u002F")) {
+                ret = new HtmlParserCharSequence(Encoding.unicodeDecode(ret));
+            }
         }
+        return ret;
     }
 
     public static String getProtocol(final String url) {

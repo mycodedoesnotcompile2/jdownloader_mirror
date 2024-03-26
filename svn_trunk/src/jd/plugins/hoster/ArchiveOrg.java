@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 48797 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 48809 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -730,7 +730,7 @@ public class ArchiveOrg extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final ArrayList<String> pageURLs = new ArrayList<String>();
-            final ArrayList<DownloadLink> results = crawler.crawlBook(br, new CryptedLink(bookURL), account);
+            final ArrayList<DownloadLink> results = crawler.crawlBookWebsite(br, new CryptedLink(bookURL), account);
             for (final DownloadLink result : results) {
                 if (!this.isLendAtThisMoment(result)) {
                     /* This should never happen */

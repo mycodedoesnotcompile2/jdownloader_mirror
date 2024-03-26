@@ -21,6 +21,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -45,14 +51,8 @@ import jd.plugins.hoster.FileupOrg;
 import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 48805 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48809 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "restfile.ca", "restfilee.com", "storagely.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "uppit.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "userupload.net", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
@@ -448,7 +448,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         /* Make sure to get the next page so we don't accidently parse the same page multiple times! */
         String nextPageUrl = br.getRegex("<div class=(\"|')paging\\1>.*?<a href=('|\")([^']+\\&amp;page=" + nextPage + "|/go/[a-zA-Z0-9]{12}/\\d+/?)\\2>").getMatch(2);
         if (nextPageUrl == null) {
-            // send.cm
+            // 2024-03-22: send.cm
             nextPageUrl = br.getRegex("<a class\\s*=\\s*(\"|')page-link\\1[^>]*href\\s*=\\s*('|\")(/\\?[^\"']*op=user_public[^\"']*page=" + nextPage + ")").getMatch(2);
         }
         if (nextPageUrl != null) {

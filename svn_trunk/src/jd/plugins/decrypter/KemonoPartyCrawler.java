@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 48646 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48813 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -385,6 +385,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             kemonoResult.setAvailable(true);
             /* Add kemono item to our list of total results. */
             ret.add(kemonoResult);
+        }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            // Test 2024-03-25, see: https://board.jdownloader.org/showthread.php?t=95398
+            /* Set post-URL as container URL on all items. */
+            for (final DownloadLink result : ret) {
+                result.setContainerUrl(posturl);
+            }
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             fp.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) + fp.getName());
