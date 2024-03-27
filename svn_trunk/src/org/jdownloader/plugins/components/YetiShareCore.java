@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48767 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48824 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1567,8 +1567,21 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                  * premium.
                  */
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, errorMsgURL, 3 * 60 * 1000l);
+            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "Plik nie jest publicznie")) {
+                /* File is not publicly available */
+                // throw new AccountRequiredException(errorMsgURL);
+                /**
+                 * 2024-03-26: This happens when requesting file via "<fileID>~i" but when accessing it normally this error will change to
+                 * "Plik został usunięty z powodu braku aktywności" or a different one. </br>
+                 * --> Treat this as offline.
+                 */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             } else if (StringUtils.containsIgnoreCase(errorMsgURL, "Nie znaleziono pliku")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                /* File not found */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
+            } else if (StringUtils.containsIgnoreCase(errorMsgURL, "Plik został usunięty z powodu braku aktywności")) {
+                /* The file has been deleted due to inactivity. */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errorMsgURL);
             }
             logger.info("Found unidentified errormessage inside URL: " + errorMsgURL);
             logger.info("checkErrorsURL did not do anything --> Throwing Exception ERROR_TEMPORARILY_UNAVAILABLE because of errorMsgURL: " + errorMsgURL);

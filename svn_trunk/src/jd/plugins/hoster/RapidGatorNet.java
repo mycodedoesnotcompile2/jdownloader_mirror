@@ -29,25 +29,7 @@ import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
-import org.jdownloader.plugins.components.config.RapidGatorConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
-
 import jd.PluginWrapper;
-import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
 import jd.http.Browser;
@@ -71,11 +53,47 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48818 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
+import org.jdownloader.plugins.components.config.RapidGatorConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+
+@HostPlugin(revision = "$Revision: 48828 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://rapidgator.net/article/premium");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        /* Define custom browser headers and language settings */
+        br.getHeaders().put("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.3");
+        br.getHeaders().put("Accept-Language", "en-US,en;q=0.8");
+        br.getHeaders().put("Cache-Control", null);
+        br.getHeaders().put("Pragma", null);
+        br.setCookie(getHost(), "lang", "en");
+        br.setCustomCharset("UTF-8");
+        final int customReadTimeoutSeconds = PluginJsonConfig.get(RapidGatorConfig.class).getReadTimeout();
+        br.setReadTimeout(customReadTimeoutSeconds * 1000);
+        br.setConnectTimeout(1 * 60 * 1000);
+        /* For API */
+        br.addAllowedResponseCodes(401, 402, 501, 423);
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -105,25 +123,7 @@ public class RapidGatorNet extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    @Override
-    public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        /* Define custom browser headers and language settings */
-        br.getHeaders().put("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.3");
-        br.getHeaders().put("Accept-Language", "en-US,en;q=0.8");
-        br.getHeaders().put("Cache-Control", null);
-        br.getHeaders().put("Pragma", null);
-        br.setCookie(getHost(), "lang", "en");
-        br.setCustomCharset("UTF-8");
-        final int customReadTimeoutSeconds = PluginJsonConfig.get(RapidGatorConfig.class).getReadTimeout();
-        br.setReadTimeout(customReadTimeoutSeconds * 1000);
-        br.setConnectTimeout(1 * 60 * 1000);
-        /* For API */
-        br.addAllowedResponseCodes(401, 402, 501, 423);
-        return br;
-    }
-
-    private final int                  API_SESSION_ID_REFRESH_TIMEOUT_MINUTES      = 30;
+    private final int                  API_SESSION_ID_REFRESH_TIMEOUT_MINUTES      = 45;
     /*
      * 2020-01-07: Use 120 minutes for the website login for now. Consider disabling this on negative feedback as frequent website logins
      * may lead to login-captchas!
@@ -298,45 +298,52 @@ public class RapidGatorNet extends PluginForHost {
             this.loginWebsite(account, false);
         }
         prepDownloadHeader(br);
-        br.setFollowRedirects(true);
         final URLConnectionAdapter con = br.openGetConnection(this.getContentURL(link));
-        if (this.looksLikeDownloadableContent(con)) {
-            /**
-             * Looks like direct-downloadable item. </br>
-             * Either we're logged in as a premium user or this item was made hot-linked by a premium user.
-             */
-            if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
-            }
-            if (link.getFinalFileName() == null) {
-                final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
-                if (filenameFromHeader != null) {
-                    link.setFinalFileName(filenameFromHeader);
+        try {
+            if (this.looksLikeDownloadableContent(con)) {
+                /**
+                 * Looks like direct-downloadable item. </br> Either we're logged in as a premium user or this item was made hot-linked by a
+                 * premium user.
+                 */
+                if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
+                }
+                if (link.getFinalFileName() == null) {
+                    final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
+                    if (filenameFromHeader != null) {
+                        link.setFinalFileName(filenameFromHeader);
+                    }
+                }
+                link.setProperty(PROPERTY_HOTLINK, true);
+                hotlinkDirectURL = con.getURL().toExternalForm();
+            } else {
+                /* Not a direct-URL */
+                br.followConnection();
+                this.checkOfflineWebsite(br, link, true);
+                String filename = br.getRegex("Downloading\\s*:\\s*</strong>\\s*<a href=\"\"[^>]*>([^<>\"]+)<").getMatch(0);
+                if (filename == null) {
+                    filename = br.getRegex("<title>\\s*Download file\\s*([^<>\"]+)</title>").getMatch(0);
+                }
+                final String filesize = br.getRegex("File size:\\s*<strong>([^<>\"]+)</strong>").getMatch(0);
+                if (StringUtils.isNotEmpty(filename)) {
+                    /* Prevent encoding issues when using Content-disposition filenames. */
+                    filename = Encoding.htmlDecode(filename).trim();
+                    link.setFinalFileName(filename);
+                }
+                if (filesize != null) {
+                    link.setDownloadSize(SizeFormatter.getSize(filesize));
+                }
+                final String md5 = br.getRegex(">\\s*MD5\\s*:\\s*([A-Fa-f0-9]{32})<").getMatch(0);
+                if (md5 != null) {
+                    link.setMD5Hash(md5);
                 }
             }
-            link.setProperty(PROPERTY_HOTLINK, true);
-            hotlinkDirectURL = con.getURL().toExternalForm();
-        } else {
-            /* Not a direct-URL */
-            br.followConnection();
-            this.checkOfflineWebsite(br, link, true);
-            String filename = br.getRegex("Downloading\\s*:\\s*</strong>\\s*<a href=\"\"[^>]*>([^<>\"]+)<").getMatch(0);
-            if (filename == null) {
-                filename = br.getRegex("<title>\\s*Download file\\s*([^<>\"]+)</title>").getMatch(0);
-            }
-            final String filesize = br.getRegex("File size:\\s*<strong>([^<>\"]+)</strong>").getMatch(0);
-            if (StringUtils.isNotEmpty(filename)) {
-                /* Prevent encoding issues when using Content-disposition filenames. */
-                filename = Encoding.htmlDecode(filename).trim();
-                link.setFinalFileName(filename);
-            }
-            if (filesize != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesize));
-            }
-            final String md5 = br.getRegex(">\\s*MD5\\s*:\\s*([A-Fa-f0-9]{32})<").getMatch(0);
-            if (md5 != null) {
-                link.setMD5Hash(md5);
-            }
+        } finally {
+            con.disconnect();
         }
         return AvailableStatus.TRUE;
     }
@@ -407,7 +414,7 @@ public class RapidGatorNet extends PluginForHost {
             }
             this.dl = null;
             logger.info("No direct-URL -> Tring to generate fresh directurl");
-            br.followConnection();
+            br.followConnection(true);
             if (isPremiumAccount && isBuyFile(br, link, account)) {
                 /* 2022-11-07: can be *bypassed* for premium users by using API mode */
                 logger.info("File needs to be bought separately -> Trying to work around this limitation");
@@ -480,9 +487,8 @@ public class RapidGatorNet extends PluginForHost {
                 if (allowSolvemediaCaptchaDuringWait) {
                     /**
                      * 2023-10-03: A small trick: We know their Solvemedia key and can thus always obtain captcha solutions at any point of
-                     * time. </br>
-                     * Requesting the captcha here basically allows us to solve it during the serverside wait time which is impossible to do
-                     * in browser.
+                     * time. </br> Requesting the captcha here basically allows us to solve it during the serverside wait time which is
+                     * impossible to do in browser.
                      */
                     final long timeBeforeCaptchaInput = Time.systemIndependentCurrentJVMTimeMillis();
                     final SolveMedia sm = new SolveMedia(br);
@@ -717,11 +723,10 @@ public class RapidGatorNet extends PluginForHost {
     public int getChallengeTimeout(Challenge<?> challenge) {
         /**
          * If users need more than X seconds to enter the captcha [in free download mode before final download-step] and we actually send
-         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br>
-         * RG will first display a precise errormessage but then it will display the same message which is displayed when the user has
-         * reached the daily/hourly download-limit. </br>
-         * This function exists to avoid this. Instead of sending the captcha it can throw a retry exception, avoiding the 60+ minutes IP
-         * 'ban'.
+         * the captcha input after this time has passed, rapidgator will 'ban' the IP of the user for at least 60 minutes. </br> RG will
+         * first display a precise errormessage but then it will display the same message which is displayed when the user has reached the
+         * daily/hourly download-limit. </br> This function exists to avoid this. Instead of sending the captcha it can throw a retry
+         * exception, avoiding the 60+ minutes IP 'ban'.
          */
         if (useShortChallengeTimeoutToAvoidServersideBan) {
             return FREE_CAPTCHA_EXPIRE_TIME_MILLIS;
@@ -950,93 +955,102 @@ public class RapidGatorNet extends PluginForHost {
      */
     private boolean loginWebsite(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
-            /* Keep followRedirects information */
-            final boolean ifr = br.isFollowingRedirects();
-            try {
-                br.setCookiesExclusive(true);
-                br.setFollowRedirects(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    /*
-                     * Make sure that we're logged in. Doing this for every downloadlink might sound like a waste of server capacity but
-                     * really it doesn't hurt anybody.
-                     */
-                    br.setCookies(getHost(), cookies);
-                    if (!validateCookies) {
-                        /* Do not validate cookies */
-                        return false;
-                    }
-                    accessMainpage(br);
-                    if (isLoggedINWebsite(br)) {
-                        logger.info("Successfully validated last session");
-                        if (sessionReUseAllowed(account, PROPERTY_timestamp_session_create_website, WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
-                            setAccountTypeWebsite(account, br);
-                            account.saveCookies(br.getCookies(br.getHost()), "");
-                            return true;
-                        }
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                /*
+                 * Make sure that we're logged in. Doing this for every downloadlink might sound like a waste of server capacity but really
+                 * it doesn't hurt anybody.
+                 */
+                br.setCookies(getHost(), cookies);
+                if (!validateCookies) {
+                    /* Do not validate cookies */
+                    return false;
                 }
+                final long cookies_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_website, 0);
+                logger.info("VerifyCookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
                 accessMainpage(br);
-                boolean loginSuccess = false;
-                for (int i = 1; i <= 3; i++) {
-                    logger.info("Website login attempt " + i + " of 3");
-                    br.getPage("/auth/login");
-                    String loginPostData = "LoginForm%5Bemail%5D=" + Encoding.urlEncode(account.getUser()) + "&LoginForm%5Bpassword%5D=" + Encoding.urlEncode(account.getPass());
-                    final Form loginForm = br.getFormbyProperty("id", "login");
-                    final String captcha_url = br.getRegex("\"(/auth/captcha/v/[a-z0-9]+)\"").getMatch(0);
-                    String code = null;
-                    if (captcha_url != null) {
-                        final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
-                        code = getCaptchaCode(captcha_url, dummyLink);
-                        loginPostData += "&LoginForm%5BverifyCode%5D=" + Encoding.urlEncode(code);
-                    }
-                    if (loginForm != null) {
-                        String user = loginForm.getBestVariable("email");
-                        String pass = loginForm.getBestVariable("password");
-                        if (user == null) {
-                            user = "LoginForm%5Bemail%5D";
-                        }
-                        if (pass == null) {
-                            pass = "LoginForm%5Bpassword%5D";
-                        }
-                        loginForm.put(user, Encoding.urlEncode(account.getUser()));
-                        loginForm.put(pass, Encoding.urlEncode(account.getPass()));
-                        if (captcha_url != null) {
-                            loginForm.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(code));
-                        }
-                        br.submitForm(loginForm);
-                        loginPostData = loginForm.getPropertyString();
+                if (isLoggedINWebsite(br)) {
+                    logger.info("Successfully validated cookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
+                    if (sessionReUseAllowed(account, PROPERTY_timestamp_session_create_website, WEBSITE_SESSION_ID_REFRESH_TIMEOUT_MINUTES)) {
+                        setAccountTypeWebsite(account, br);
+                        setAccountSession(account, br);
+                        return true;
                     } else {
-                        br.postPage("/auth/login", loginPostData);
+                        logger.info("Session is valid but we aren't allowed to re-use it:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
                     }
-                    if (!isLoggedINWebsite(br)) {
-                        logger.info("Login failed");
-                        continue;
-                    } else {
-                        logger.info("Login success");
-                        loginSuccess = true;
-                        break;
-                    }
+                } else {
+                    logger.info("Cookie login failed:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
                 }
-                if (!loginSuccess) {
+            }
+            clearAccountSession(account, br);
+            accessMainpage(br);
+            boolean loginSuccess = false;
+            // TODO: add 2fa support
+            for (int i = 1; i <= 3; i++) {
+                logger.info("Website login attempt " + i + " of 3");
+                br.getPage("/auth/login");
+                final Form loginForm = br.getFormbyProperty("id", "login");
+                if (loginForm == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                String user = loginForm.getBestVariable("email");
+                String pass = loginForm.getBestVariable("password");
+                if (user == null) {
+                    user = "LoginForm%5Bemail%5D";
+                }
+                if (pass == null) {
+                    pass = "LoginForm%5Bpassword%5D";
+                }
+                loginForm.put(user, Encoding.urlEncode(account.getUser()));
+                loginForm.put(pass, Encoding.urlEncode(account.getPass()));
+                final String captcha_url = br.getRegex("\"(/auth/captcha/v/[a-z0-9]+)\"").getMatch(0);
+                if (captcha_url != null) {
+                    /* Login-captcha */
+                    final DownloadLink dummyLink = new DownloadLink(this, "Account", this.getHost(), "https://" + this.getHost(), true);
+                    final String code = getCaptchaCode(captcha_url, dummyLink);
+                    loginForm.put("LoginForm%5BverifyCode%5D", Encoding.urlEncode(code));
+                } else if (i > 1) {
                     throw new AccountInvalidException();
                 }
-                setAccountTypeWebsite(account, br);
-                account.saveCookies(br.getCookies(br.getHost()), "");
-                account.setProperty(PROPERTY_timestamp_session_create_website, System.currentTimeMillis());
-                return true;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.setType(null);
-                    account.setProperty("cookies", Property.NULL);
+                br.submitForm(loginForm);
+                if (isLoggedINWebsite(br)) {
+                    logger.info("Login success");
+                    loginSuccess = true;
+                    break;
+                } else if (br.containsHTML(">\\s*Wrong e-mail or password.\\s*<")) {
+                    throw new AccountInvalidException();
+                } else {
+                    logger.info("Login failed");
+                    continue;
                 }
-                throw e;
-            } finally {
-                br.setFollowRedirects(ifr);
             }
+            if (!loginSuccess) {
+                throw new AccountInvalidException();
+            } else {
+                setAccountTypeWebsite(account, br);
+                setAccountSession(account, br);
+                return true;
+            }
+        }
+    }
+
+    private void clearAccountSession(Account account, Browser br) {
+        synchronized (account) {
+            br.clearCookies(null);
+            final long cookies_timestamp = account.getLongProperty(PROPERTY_timestamp_session_create_website, 0);
+            account.clearCookies("");
+            account.removeProperty(PROPERTY_timestamp_session_create_website);
+            if (cookies_timestamp > 0) {
+                logger.info("ClearCookies:Timestamp:" + cookies_timestamp + "|Age:" + TimeFormatter.formatMilliSeconds((System.currentTimeMillis() - cookies_timestamp), 0));
+            }
+        }
+    }
+
+    private void setAccountSession(Account account, Browser br) {
+        synchronized (account) {
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            account.setProperty(PROPERTY_timestamp_session_create_website, System.currentTimeMillis());
         }
     }
 
@@ -1115,16 +1129,15 @@ public class RapidGatorNet extends PluginForHost {
                     }
                 } catch (final PluginException e) {
                     logger.log(e);
-                    clearAccountSession(account, session_id);
-                    br.clearCookies(null);
                 }
             }
+            clearAccountSession(account, session_id);
+            br.clearCookies(null);
             /* Avoid full logins - RG will temporarily block accounts on too many full logins in a short time! */
             logger.info("Performing full login");
             /* Docs: https://rapidgator.net/article/api/user#login */
             br.getPage(getAPIBase() + "user/login?login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
             final Map<String, Object> response = handleErrors_api(null, null, account, br);
-            /* 2019-12-14: session_id == PHPSESSID cookie */
             session_id = getAccountSession(response);
             if (StringUtils.isEmpty(session_id)) {
                 /* This should never happen */
