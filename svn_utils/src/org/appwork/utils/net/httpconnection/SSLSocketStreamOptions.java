@@ -34,7 +34,6 @@
 package org.appwork.utils.net.httpconnection;
 
 import java.net.SocketException;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -58,7 +57,6 @@ import org.appwork.utils.os.CrossSystem.ARCHFamily;
  *
  */
 public class SSLSocketStreamOptions implements Cloneable {
-
     protected final boolean trustAllFlag;
 
     public List<String> getRetryReasons() {
@@ -239,6 +237,33 @@ public class SSLSocketStreamOptions implements Cloneable {
                 removeRetryReason(factoryRetry);
                 return addRetryReason("Factory:" + factory + "=" + factoryRetry);
             }
+            if (eMessage != null) {
+                if (eMessage.matches("(?i).*\\s+DH\\s*key\\s*pair.*")) {
+                    if (disabledCipherSuites.add("_DHE_")) {
+                        return addRetryReason("(KeyPair(DH))disable cipher:DHE");
+                    } else if (disabledCipherSuites.add("_ECDHE_")) {
+                        return addRetryReason("(KeyPair(DH))disable cipher:ECDHE");
+                    } else if (disabledCipherSuites.add("_ECDH_")) {
+                        return addRetryReason("(KeyPair(DH))disable cipher:ECDH");
+                    }
+                } else if (eMessage.matches("(?i).*\\s+ECDH\\s*key\\s*pair.*")) {
+                    if (disabledCipherSuites.add("_ECDHE_")) {
+                        return addRetryReason("(KeyPair(ECDH))disable cipher:ECDHE");
+                    } else if (disabledCipherSuites.add("_ECDH_")) {
+                        return addRetryReason("(KeyPair(ECDH))disable cipher:ECDH");
+                    }
+                } else if (eMessage.matches("(?i).*(on|in)\\s+DH.*") || eMessage.matches("(?i).*\\s+DH\\s*Server\\s*Key\\s*Exchange.*")) {
+                    if (disabledCipherSuites.add("_DHE_")) {
+                        return addRetryReason("(ServerKeyExchange(DH))disable cipher:DHE");
+                    }
+                } else if (eMessage.matches("(?i).*(on|in)\\s+ECDH.*") || eMessage.matches("(?i).*\\s+ECDH\\s*Server\\s*Key\\s*Exchange.*")) {
+                    if (disabledCipherSuites.add("_ECDHE_")) {
+                        return addRetryReason("(ServerKeyExchange(ECDH))disable cipher:ECDHE");
+                    } else if (disabledCipherSuites.add("_ECDH_")) {
+                        return addRetryReason("(ServerKeyExchange(ECDH))disable cipher:ECDH");
+                    }
+                }
+            }
             if (isTLSConfigurationException(e)) {
                 // enable next disabled GCM cipherSuite and retry
                 final String enabledCipher = enableNextDisabledCipher("GCM");
@@ -258,12 +283,6 @@ public class SSLSocketStreamOptions implements Cloneable {
                 final String enabledCipher = enableNextDisabledCipher("GCM");
                 if (enabledCipher != null) {
                     return addRetryReason("(Reset)enable cipher:" + enabledCipher);
-                }
-            }
-            if (StringUtils.containsIgnoreCase(eMessage, "Could not generate DH keypair")) {
-                // disable all DHE,ECDHE cipherSuites
-                if (disabledCipherSuites.addAll(Arrays.asList(new String[] { "_DHE", "_ECDHE" }))) {
-                    return addRetryReason("disable cipher:DHE,ECDHE");
                 }
             }
             valid.set(false);

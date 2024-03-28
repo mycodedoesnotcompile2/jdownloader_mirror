@@ -34,13 +34,19 @@
 package org.appwork.utils.net.httpconnection;
 
 import java.io.UnsupportedEncodingException;
+import java.net.Socket;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.List;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.X509ExtendedTrustManager;
 
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
@@ -51,6 +57,80 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class SSLSocketStreamFactory18 {
+    protected static X509TrustManagerBridge bridge(final X509ExtendedTrustManager trustMaster) {
+        return new X509TrustManagerBridge() {
+            @Override
+            public X509Certificate[] getAcceptedIssuers() {
+                return trustMaster.getAcceptedIssuers();
+            }
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                if (socket != null) {
+                    trustMaster.checkServerTrusted(chain, authType, socket);
+                } else if (engine != null) {
+                    trustMaster.checkServerTrusted(chain, authType, engine);
+                } else {
+                    trustMaster.checkServerTrusted(chain, authType);
+                }
+            }
+
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                if (socket != null) {
+                    trustMaster.checkClientTrusted(chain, authType, socket);
+                } else if (engine != null) {
+                    trustMaster.checkClientTrusted(chain, authType, engine);
+                } else {
+                    trustMaster.checkClientTrusted(chain, authType);
+                }
+            }
+
+            @Override
+            public X509ExtendedTrustManager getTrustManager() {
+                return trustMaster;
+            }
+        };
+    }
+
+    protected static X509ExtendedTrustManager bridge(final X509TrustManagerBridge trustManagerBridge) throws SSLException {
+        return new X509ExtendedTrustManager() {
+            @Override
+            public void checkClientTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                trustManagerBridge.checkClientTrusted(chain, authType, null, null);
+            }
+
+            @Override
+            public void checkServerTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                trustManagerBridge.checkServerTrusted(chain, authType, null, null);
+            }
+
+            @Override
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return trustManagerBridge.getAcceptedIssuers();
+            }
+
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+                trustManagerBridge.checkClientTrusted(chain, authType, socket, null);
+            }
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) throws CertificateException {
+                trustManagerBridge.checkServerTrusted(chain, authType, socket, null);
+            }
+
+            @Override
+            public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+                trustManagerBridge.checkClientTrusted(chain, authType, null, engine);
+            }
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) throws CertificateException {
+                trustManagerBridge.checkServerTrusted(chain, authType, null, engine);
+            }
+        };
+    }
 
     public static void setSNIServerName(final SSLSocketStreamOptions options, SSLSocket sslSocket, final String sniHostName) {
         if (options.isSNIEnabled() && StringUtils.isNotEmpty(sniHostName)) {
@@ -82,4 +162,26 @@ public class SSLSocketStreamFactory18 {
             sslSocket.setSSLParameters(sslParams);
         }
     }
+    // AlgorithmConstraints are checked ONLY (without default jdk constraints) for X509ExtendedTrustManager !
+    // public static void removeAlgorithmConstraints(final SSLSocketStreamOptions options, SSLSocket sslSocket) {
+    // final SSLParameters sslParams = sslSocket.getSSLParameters();
+    // final AlgorithmConstraints algorithmConstraints = new AlgorithmConstraints() {
+    // @Override
+    // public boolean permits(Set<CryptoPrimitive> primitives, String algorithm, AlgorithmParameters parameters) {
+    // return true;
+    // }
+    //
+    // @Override
+    // public boolean permits(Set<CryptoPrimitive> primitives, Key key) {
+    // return true;
+    // }
+    //
+    // @Override
+    // public boolean permits(Set<CryptoPrimitive> primitives, String algorithm, Key key, AlgorithmParameters parameters) {
+    // return true;
+    // }
+    // };
+    // sslParams.setAlgorithmConstraints(algorithmConstraints);
+    // sslSocket.setSSLParameters(sslParams);
+    // }
 }

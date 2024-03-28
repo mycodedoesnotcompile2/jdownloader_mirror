@@ -51,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48453 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48829 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidguardTo extends PluginForHost {
     public VidguardTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class VidguardTo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net" });
+        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net", "bembed.net" });
         return ret;
     }
 
@@ -198,6 +198,9 @@ public class VidguardTo extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Video download has been disabled by uploader");
             }
             br.getPage(nextStepURL);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
+            }
             final Browser brc = br.cloneBrowser();
             brc.setAllowedResponseCodes(400);
             brc.getPage("/captcha?v=" + System.currentTimeMillis());
@@ -280,6 +283,8 @@ public class VidguardTo extends PluginForHost {
             if (brc.getHttpConnection().getResponseCode() == 400) {
                 /* Comes with json response: {"msg":"Verification failed"} */
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else if (brc.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
             }
             // Valid answer: {"token":"<hash[a-f]{32}>"}
             /* Access that same URL. Now we should get downloadable direct-urls. */

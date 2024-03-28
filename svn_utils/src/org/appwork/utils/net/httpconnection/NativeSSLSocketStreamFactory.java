@@ -42,11 +42,13 @@ import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
@@ -56,6 +58,7 @@ import javax.net.ssl.X509TrustManager;
 
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 
 /**
@@ -74,27 +77,53 @@ public class NativeSSLSocketStreamFactory implements SSLSocketStreamFactory {
         return getSSLSocketFactory(getSSLContext(options), options, sniEnabled ? sniHostName : null);
     }
 
-    // TODO: add 1.7 support for X509ExtendedTrustManager
-    protected TrustManager[] getTrustCerts(final SSLSocketStreamOptions options) throws SSLException {
-        if (options == null || options.isTrustAll()) {
-            return new TrustManager[] { new X509TrustManager() {
-
+    protected X509TrustManager bridge(final X509TrustManagerBridge trustManagerBridge) throws SSLException {
+        if (JVMVersion.isAtLeast(JavaVersion.JVM_1_8)) {
+            return SSLSocketStreamFactory18.bridge(trustManagerBridge);
+        } else {
+            return new X509TrustManager() {
                 @Override
                 public void checkClientTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                    trustManagerBridge.checkClientTrusted(chain, authType, null, null);
                 }
 
                 @Override
                 public void checkServerTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                    trustManagerBridge.checkServerTrusted(chain, authType, null, null);
                 }
 
                 @Override
                 public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                    return trustManagerBridge.getAcceptedIssuers();
+                }
+            };
+        }
+    }
+
+    protected TrustManager[] getTrustCerts(final SSLSocketStreamOptions options) throws SSLException {
+        if (options == null || options.isTrustAll()) {
+            return new TrustManager[] { bridge(new X509TrustManagerBridge() {
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
                     /*
                      * returning null here can cause a NPE in some java versions!
                      */
                     return new java.security.cert.X509Certificate[0];
                 }
-            } };
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                }
+
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                }
+
+                @Override
+                public X509TrustManager getTrustManager() {
+                    return null;
+                }
+            }) };
         } else {
             return null;
         }
@@ -127,7 +156,7 @@ public class NativeSSLSocketStreamFactory implements SSLSocketStreamFactory {
     }
 
     protected SSLSocket modify(SSLSocket sslSocket, final SSLSocketFactory factory, final SSLContext sslContext, final SSLSocketStreamOptions options, final String sniHostName) {
-        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_8) && options != null) {
+        if (JVMVersion.isAtLeast(JavaVersion.JVM_1_8) && options != null) {
             SSLSocketStreamFactory18.setSNIServerName(options, sslSocket, sniHostName);
         }
         return sslSocket;
@@ -136,7 +165,6 @@ public class NativeSSLSocketStreamFactory implements SSLSocketStreamFactory {
     protected SSLSocketFactory getSSLSocketFactory(final SSLContext sslContext, final SSLSocketStreamOptions options, final String sniHostName) throws IOException {
         final SSLSocketFactory factory = sslContext.getSocketFactory();
         return new SSLSocketFactory() {
-
             @Override
             public Socket createSocket(Socket arg0, String arg1, int arg2, boolean arg3) throws IOException {
                 final SSLSocket ret = (SSLSocket) factory.createSocket(arg0, arg1, arg2, arg3);
@@ -176,7 +204,6 @@ public class NativeSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 final SSLSocket ret = (SSLSocket) factory.createSocket(arg0, arg1, arg2, arg3);
                 return modify(ret, factory, sslContext, options, sniHostName);
             }
-
         };
     }
 

@@ -44,6 +44,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -51,6 +52,7 @@ import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
@@ -63,6 +65,7 @@ import javax.net.ssl.X509TrustManager;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 
 /**
@@ -71,7 +74,6 @@ import org.appwork.utils.StringUtils;
  */
 public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
     private static final JavaSSLSocketStreamFactory INSTANCE          = new JavaSSLSocketStreamFactory();
-
     private final static String                     TLS13_ENABLED     = "JSSE_TLS1.3_ENABLED";
     private final static String                     TLS10_11_DISABLED = "JSSE_TLS10_11_DISABLED";
 
@@ -108,27 +110,53 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         }
     }
 
-    // TODO: add 1.7 support for X509ExtendedTrustManager
-    protected TrustManager[] getTrustCerts(final SSLSocketStreamOptions options) throws SSLException {
-        if (options == null || options.isTrustAll()) {
-            return new TrustManager[] { new X509TrustManager() {
-
+    protected X509TrustManager bridge(final X509TrustManagerBridge trustManagerBridge) throws SSLException {
+        if (JVMVersion.isAtLeast(JavaVersion.JVM_1_8)) {
+            return SSLSocketStreamFactory18.bridge(trustManagerBridge);
+        } else {
+            return new X509TrustManager() {
                 @Override
                 public void checkClientTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                    trustManagerBridge.checkClientTrusted(chain, authType, null, null);
                 }
 
                 @Override
                 public void checkServerTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
+                    trustManagerBridge.checkServerTrusted(chain, authType, null, null);
                 }
 
                 @Override
                 public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                    return trustManagerBridge.getAcceptedIssuers();
+                }
+            };
+        }
+    }
+
+    protected TrustManager[] getTrustCerts(final SSLSocketStreamOptions options) throws SSLException {
+        if (options == null || options.isTrustAll()) {
+            return new TrustManager[] { bridge(new X509TrustManagerBridge() {
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
                     /*
                      * returning null here can cause a NPE in some java versions!
                      */
                     return new java.security.cert.X509Certificate[0];
                 }
-            } };
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                }
+
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket, SSLEngine engine) throws CertificateException {
+                }
+
+                @Override
+                public X509TrustManager getTrustManager() {
+                    return null;
+                }
+            }) };
         } else {
             if (false && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 final TrustManager[] custom;
@@ -141,7 +169,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("PKIX");
                     trustManagerFactory.init(caKeyStore);
                     custom = trustManagerFactory.getTrustManagers();
-
                     trustManagerFactory = TrustManagerFactory.getInstance("PKIX");
                     trustManagerFactory.init((KeyStore) null);
                     def = trustManagerFactory.getTrustManagers();
@@ -149,7 +176,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                     return null;
                 }
                 return new TrustManager[] { new X509TrustManager() {
-
                     @Override
                     public void checkClientTrusted(final java.security.cert.X509Certificate[] chain, final String authType) throws CertificateException {
                     }
@@ -247,13 +273,11 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
         TLS_1_2("TLSv1.2"),
         TLS_1_1("TLSv1.1"),
         TLS_1_0("TLSv1");
-
         protected final String id;
 
         private TLS(final String id) {
             this.id = id;
         }
-
     }
 
     protected SSLSocket modifyProtocols(final SSLSocket sslSocket, final SSLSocketFactory factory, final SSLContext sslContext, final SSLSocketStreamOptions options) {
@@ -314,9 +338,11 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                     disableLoop: while (it.hasNext()) {
                         final String next = it.next();
                         if (StringUtils.containsIgnoreCase(next, disabledEntry)) {
-                            for (String enabledEntry : options.getEnabledCipherSuites()) {
-                                if (StringUtils.containsIgnoreCase(next, enabledEntry)) {
-                                    continue disableLoop;
+                            if (!disabledEntry.endsWith("_")) {
+                                for (String enabledEntry : options.getEnabledCipherSuites()) {
+                                    if (StringUtils.containsIgnoreCase(next, enabledEntry)) {
+                                        continue disableLoop;
+                                    }
                                 }
                             }
                             it.remove();
@@ -373,7 +399,7 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
     protected SSLSocket modify(SSLSocket sslSocket, final SSLSocketFactory factory, final SSLContext sslContext, final SSLSocketStreamOptions options, final String sniHostName) {
         sslSocket = modifyCipherSuites(modifyProtocols(sslSocket, factory, sslContext, options), options);
-        if (JVMVersion.isMinimum(JVMVersion.JAVA_1_8) && options != null) {
+        if (JVMVersion.isAtLeast(JavaVersion.JVM_1_8) && options != null) {
             SSLSocketStreamFactory18.setSNIServerName(options, sslSocket, sniHostName);
         }
         return sslSocket;
@@ -389,7 +415,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
              *
              * @param socket
              */
-
             @Override
             public Socket createSocket(Socket arg0, String arg1, int arg2, boolean arg3) throws IOException {
                 final SSLSocket ret = (SSLSocket) factory.createSocket(arg0, arg1, arg2, arg3);
@@ -429,7 +454,6 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 final SSLSocket ret = (SSLSocket) factory.createSocket(arg0, arg1, arg2, arg3);
                 return modify(ret, factory, sslContext, options, sniHostName);
             }
-
         };
     }
 
@@ -552,6 +576,11 @@ public class JavaSSLSocketStreamFactory implements SSLSocketStreamFactory {
                 // retry with TLS1.3 enabled
                 return options.addRetryReason("(Reset)enable TLS1.3");
             }
+        }
+        // always check for TLS1.3
+        if (isTLSSupported(TLS.TLS_1_3, options, null) && options.getCustomFactorySettings().add(TLS13_ENABLED)) {
+            // retry with TLS1.3 enabled
+            return options.addRetryReason("(Retry)Enable TLS1.3");
         }
         return null;
     }

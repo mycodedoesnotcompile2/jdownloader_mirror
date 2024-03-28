@@ -53,7 +53,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48622 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48832 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -307,6 +307,8 @@ public class UpstoRe extends antiDDoSForHost {
                 }
                 handleErrorsJson();
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            } else if (PluginJsonConfig.get(UpstoReConfig.class).isDowngradeToHTTP()) {
+                dllink = dllink.replaceAll("https://", "http://");
             }
         }
         dllink = correctProtocolInFinalDownloadurl(dllink);
