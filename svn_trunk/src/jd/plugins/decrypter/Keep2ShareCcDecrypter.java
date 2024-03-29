@@ -25,7 +25,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.DebugMode;
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -42,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.K2SApi;
 
-@DecrypterPlugin(revision = "$Revision: 48443 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48834 $", interfaceVersion = 2, names = {}, urls = {})
 public class Keep2ShareCcDecrypter extends PluginForDecrypt {
     public Keep2ShareCcDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,12 +109,9 @@ public class Keep2ShareCcDecrypter extends PluginForDecrypt {
         }
         final String contentid = fixContentID(contentidFromURL);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        // TODO: Use plugin setting for this
         final K2SApi plugin = (jd.plugins.hoster.K2SApi) getNewPluginForHostInstance(this.getHost());
-        // final Keep2shareConfig cfg = PluginJsonConfig.get(plugin.getConfigInterface());
-        // if (looksLikeSingleFileItem && !cfg.isEnableFolderWorkaround()) {
-        final boolean handleFileLinksInCrawler = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
-        if (looksLikeSingleFileItem && !handleFileLinksInCrawler) {
+        final Keep2shareConfig cfg = PluginJsonConfig.get(plugin.getConfigInterface());
+        if (looksLikeSingleFileItem && !cfg.isEnableFolderWorkaround()) {
             /* URL looks like single file URL -> Pass to hosterplugin so we can make use of mass-linkchecking feature. */
             ret.add(this.createDownloadlink(param.getCryptedUrl().replaceFirst(Pattern.quote(contentidFromURL), contentid)));
             return ret;

@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
+import org.jdownloader.plugins.components.config.KVSConfigXfreehdCom;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48745 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48835 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfreehdCom extends KernelVideoSharingComV2 {
     public XfreehdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,13 +71,6 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    public Class<? extends KVSConfig> getConfigInterface() {
-        /* TODO: Change to KVSConfigXfreehdCom once next CORE-update is released. */
-        // return KVSConfigXfreehdCom.class;
-        return KVSConfigRule34videoCom.class;
-    }
-
-    @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
         final int userSelectedQuality = this.getPreferredStreamQuality();
         final String urlsd = br.getRegex("src=\"(https?://[^\"]+)\" title=\"SD\" [^>]*/>").getMatch(0);
@@ -91,5 +84,10 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
             /* Fallback */
             return super.getDllink(link, br);
         }
+    }
+
+    @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        return KVSConfigXfreehdCom.class;
     }
 }

@@ -19,13 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfigTabooheatCom;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfigGloryholesecretsCom;
 
 import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48396 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelGloryholesecretsCom extends EvilangelCore {
     public EvilangelGloryholesecretsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,8 +62,7 @@ public class EvilangelGloryholesecretsCom extends EvilangelCore {
 
     @Override
     public Class<? extends EvilangelCoreConfig> getConfigInterface() {
-        return EvilangelCoreConfigTabooheatCom.class;
-        // return EvilangelCoreConfigGloryholesecretsCom.class;
+        return EvilangelCoreConfigGloryholesecretsCom.class;
     }
 
     @Override

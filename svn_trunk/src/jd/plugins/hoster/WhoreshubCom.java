@@ -18,11 +18,14 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigWhoreshubCom;
+
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46534 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48835 $", interfaceVersion = 3, names = {}, urls = {})
 public class WhoreshubCom extends KernelVideoSharingComV2 {
     public WhoreshubCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -68,5 +71,10 @@ public class WhoreshubCom extends KernelVideoSharingComV2 {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return 5;
+    }
+
+    @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        return KVSConfigWhoreshubCom.class;
     }
 }

@@ -74,7 +74,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48803 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48833 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1013,7 +1013,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             try {
                 if (StringUtils.isEmpty(this.dllink)) {
                     if (this.isPrivateVideo(link)) {
-                        throw new AccountRequiredException();
+                        throw new AccountRequiredException("Private videos can only be watched by registered users");
                     } else {
                         /* Broken video or broken plugin. */
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Broken video (?)");

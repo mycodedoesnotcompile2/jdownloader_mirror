@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PornxpNet.PornxpNetConfig.VideoQuality;
 
-@HostPlugin(revision = "$Revision: 48831 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornxpNet extends PluginForHost {
     public PornxpNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -245,11 +245,11 @@ public class PornxpNet extends PluginForHost {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             if (con.getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403 | Wait or try different video quality", 60 * 60 * 1000l);
             } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404 | Wait or try different video quality", 60 * 60 * 1000l);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken? | Wait or try different video quality");
             }
         }
     }

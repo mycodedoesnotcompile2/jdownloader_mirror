@@ -19,13 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfigTabooheatCom;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfigGangbangcreampieCom;
 
 import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48396 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelGangbangcreampieCom extends EvilangelCore {
     public EvilangelGangbangcreampieCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,8 +62,7 @@ public class EvilangelGangbangcreampieCom extends EvilangelCore {
 
     @Override
     public Class<? extends EvilangelCoreConfig> getConfigInterface() {
-        return EvilangelCoreConfigTabooheatCom.class;
-        // return EvilangelCoreConfigGangbangcreampieCom.class;
+        return EvilangelCoreConfigGangbangcreampieCom.class;
     }
 
     @Override

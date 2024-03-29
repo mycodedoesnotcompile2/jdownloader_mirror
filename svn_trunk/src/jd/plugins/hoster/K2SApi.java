@@ -26,6 +26,7 @@ import org.jdownloader.captcha.blacklist.CaptchaBlackList;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
@@ -65,7 +66,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 48534 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -239,7 +240,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 48534 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 48834 $"));
     }
 
     /**
@@ -849,14 +850,19 @@ public abstract class K2SApi extends PluginForHost {
 
     @Override
     public void onCaptchaTimeout(DownloadLink link, Challenge<?> challenge) throws CaptchaException, PluginException, InterruptedException {
-        CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
-        final boolean isAccountLoginCaptchaChallenge = isAccountLoginCaptchaChallenge(link, challenge);
-        if (isAccountLoginCaptchaChallenge) {
-            final String text = "You did not answer the login captcha on time | Waiting in order to avoid IP ban";
-            final long waitMillis = 3 * 60 * 60 * 1000;
-            throw new AccountUnavailableException(text, waitMillis);
+        final CaptchaTimeoutBehavior captchaTimeoutBehavior = PluginJsonConfig.get(Keep2shareConfig.class).getCaptchaTimeoutBehavior();
+        if (captchaTimeoutBehavior == CaptchaTimeoutBehavior.GLOBAL_SETTING) {
+            super.onCaptchaTimeout(link, challenge);
         } else {
-            throw new CaptchaException(SkipRequest.BLOCK_HOSTER);
+            CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
+            final boolean isAccountLoginCaptchaChallenge = isAccountLoginCaptchaChallenge(link, challenge);
+            if (isAccountLoginCaptchaChallenge) {
+                final String text = "You did not answer the login captcha on time | Waiting in order to avoid IP ban";
+                final long waitMillis = 3 * 60 * 60 * 1000;
+                throw new AccountUnavailableException(text, waitMillis);
+            } else {
+                throw new CaptchaException(SkipRequest.BLOCK_HOSTER);
+            }
         }
     }
 

@@ -25,7 +25,6 @@ import java.util.Map;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 
@@ -44,13 +43,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48831 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48839 $", interfaceVersion = 3, names = {}, urls = {})
 public class MooncloudSite extends PluginForHost {
     public MooncloudSite(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/pricing");
-        }
+        this.enablePremium("https://" + getHost() + "/pricing");
     }
 
     @Override

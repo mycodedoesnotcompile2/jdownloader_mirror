@@ -35,9 +35,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.MooncloudSite;
 
-@DecrypterPlugin(revision = "$Revision: 48831 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48839 $", interfaceVersion = 3, names = {}, urls = {})
 public class MooncloudSiteCrawler extends PluginForDecrypt {
     public MooncloudSiteCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,14 +98,21 @@ public class MooncloudSiteCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(contentid);
         final List<Object> ressourcelist = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.LIST);
+        final boolean tempUseDirecthttp = true;
         for (final Object item : ressourcelist) {
             final String url = item.toString();
-            final DownloadLink link = this.createDownloadlink(url);
-            link.setDefaultPlugin(hosterplugin);
-            link.setHost(hosterplugin.getHost());
+            final DownloadLink link;
+            if (tempUseDirecthttp) {
+                link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+            } else {
+                link = this.createDownloadlink(url);
+                link.setDefaultPlugin(hosterplugin);
+                link.setHost(hosterplugin.getHost());
+            }
             MooncloudSite.directurlFindAndSetFilehash(link, url);
             link.setAvailable(true);
             link._setFilePackage(fp);
+            link.setContainerUrl(param.getCryptedUrl());
             ret.add(link);
         }
         return ret;
