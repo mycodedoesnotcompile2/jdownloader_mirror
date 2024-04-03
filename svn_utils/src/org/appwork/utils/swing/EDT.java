@@ -76,6 +76,22 @@ public abstract class EDT<T, ExceptionType extends Throwable> implements Runnabl
     private volatile Exception               caller;
 
     /**
+     * LIke {@link #waitFor()}, but swallows InterruptedException and resets the interrupt flag instead. Returns null in case of an
+     * interrupt.
+     *
+     * @return
+     * @throws ExceptionType
+     */
+    public T waitForAndSwallowInterrupt() throws ExceptionType {
+        try {
+            return waitFor();
+        } catch (InterruptedException e) {
+            Exceptions.resetInterruptFlag(e);
+            return null;
+        }
+    }
+
+    /**
      * Implement this method. Gui code should be used ONLY in this Method.
      *
      * @return

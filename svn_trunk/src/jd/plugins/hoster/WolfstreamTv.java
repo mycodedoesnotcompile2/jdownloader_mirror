@@ -30,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48623 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 3, names = {}, urls = {})
 public class WolfstreamTv extends XFileSharingProBasic {
     public WolfstreamTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +49,14 @@ public class WolfstreamTv extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "wolfstream.tv", "aparat.cam", "wolfstream.top" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("aparat.cam");
+        deadDomains.add("wolfstream.top"); // 2024-04-02: Is home of another project now
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -127,10 +135,11 @@ public class WolfstreamTv extends XFileSharingProBasic {
 
     @Override
     public String[] scanInfo(final String[] fileInfo) {
-        // required
-        if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, "<h1\\s+[^>]*>\\s*(.*?)\\s*<\\s*\\w+").getMatch(0);
+        final String betterFileTitle = new Regex(correctedBR, "CONTENT=\"Watch video ([^\"]+)\"").getMatch(0);
+        if (betterFileTitle != null) {
+            fileInfo[0] = betterFileTitle;
         }
+        /* Find filesize */
         if (StringUtils.isEmpty(fileInfo[1])) {
             fileInfo[1] = new Regex(correctedBR, "<span\\s+class\\s*=\\s*\"\\s*uploadate\\s*\"\\s*>\\s*Size\\s*:\\s*([0-9\\.]+\\s*[KMGTP]{0,1}B)\\s*").getMatch(0);
         }

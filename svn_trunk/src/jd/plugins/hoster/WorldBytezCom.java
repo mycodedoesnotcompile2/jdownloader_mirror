@@ -30,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48626 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -122,6 +122,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
             super.doFree(link, account);
         } catch (final PluginException e) {
             if (e.getLinkStatus() == LinkStatus.ERROR_PLUGIN_DEFECT && this.findFormDownload2Free(br) == null) {
+                /* Account required to download this file */
                 throw new AccountRequiredException();
             } else {
                 throw e;

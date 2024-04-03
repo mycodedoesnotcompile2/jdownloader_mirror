@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48774 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastfileCc extends XFileSharingProBasic {
     public FastfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -169,7 +169,7 @@ public class FastfileCc extends XFileSharingProBasic {
                 }
             }
             if (twoFAForm == null) {
-                /* Login failed */
+                /* Login failed, not due the need of 2FA login */
                 throw e;
             }
             logger.info("2FA code required");

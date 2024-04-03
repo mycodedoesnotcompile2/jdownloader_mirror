@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48824 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48846 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -430,7 +430,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             parseAndSetYetiShareVersion(this.br, account);
             scanInfo(link, fileInfo);
             if (!StringUtils.isEmpty(fileInfo[0])) {
-                link.setName(fileInfo[0]);
+                final String filename = Encoding.htmlDecode(fileInfo[0]).trim();
+                link.setName(filename);
             }
             if (fileInfo[1] != null) {
                 link.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(fileInfo[1].replace(",", ""))));
@@ -465,7 +466,8 @@ public abstract class YetiShareCore extends antiDDoSForHost {
             parseAndSetYetiShareVersion(this.br, account);
             scanInfo(link, fileInfo);
             if (!StringUtils.isEmpty(fileInfo[0])) {
-                link.setName(fileInfo[0]);
+                final String filename = Encoding.htmlDecode(fileInfo[0]).trim();
+                link.setName(filename);
             }
             if (fileInfo[1] != null) {
                 link.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(fileInfo[1].replace(",", ""))));
