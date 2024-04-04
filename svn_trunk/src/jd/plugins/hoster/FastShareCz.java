@@ -45,7 +45,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48809 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48851 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastShareCz extends PluginForHost {
     public FastShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -443,6 +443,13 @@ public class FastShareCz extends PluginForHost {
             /* [Premium-] account related error messages */
             if (br.containsHTML("(?i)máte dostatečný kredit pro stažení tohoto souboru")) {
                 throw new AccountUnavailableException("Traffic limit reached", 5 * 60 * 1000l);
+            }
+        }
+        final URLConnectionAdapter con = br.getRequest().getHttpConnection();
+        if (con.getResponseCode() == 200 && con.getCompleteContentLength() == 0 && StringUtils.containsIgnoreCase(con.getContentType(), "text/html")) {
+            final String directurlproperty = getDirecturlProperty(account);
+            if (link.removeProperty(directurlproperty)) {
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired");
             }
         }
         final String errortextMaxConcurrentDownloadsLimit = "Reached max concurrent downloads limit";

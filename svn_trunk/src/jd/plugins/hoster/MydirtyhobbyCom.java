@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48852 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydirtyhobbyCom extends PluginForHost {
     public MydirtyhobbyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,7 +57,9 @@ public class MydirtyhobbyCom extends PluginForHost {
         br.setAllowedResponseCodes(410);
         br.setFollowRedirects(true);
         /* Important else we'll get redirected to a "Are you 18+" page. */
-        br.setCookie(getHost(), "AGEGATEPASSED", "1");
+        for (final String site : siteSupportedNames()) {
+            br.setCookie(site, "AGEGATEPASSED", "1");
+        }
         return br;
     }
 
@@ -323,6 +325,7 @@ public class MydirtyhobbyCom extends PluginForHost {
         final String coinsHumanReadable;
         if (coinsStr != null) {
             coinsHumanReadable = coinsStr;
+            ai.setPremiumPoints(Long.parseLong(coinsStr));
         } else {
             coinsHumanReadable = "Unknown";
         }

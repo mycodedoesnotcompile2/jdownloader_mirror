@@ -93,16 +93,10 @@ public interface Keep2shareConfig extends PluginConfigInterface {
                 return "Pass to hoster plugin for file linkcheck";
             }
         },
-        CRAWLER_PLUGIN_VIA_API_GETFILESINFO {
-            @Override
-            public String getLabel() {
-                return "[Not recommended] Check for folder via '/api/v2/getfilesinfo'";
-            }
-        },
         CRAWLER_PLUGIN_VIA_API_GETFILESTATUS {
             @Override
             public String getLabel() {
-                return "Check for folder via '/api/v2/getfilestatus'";
+                return "Check for folder: Use this if you plan to add single file links that are folders";
             }
         },
         DEFAULT {
@@ -116,7 +110,7 @@ public interface Keep2shareConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT")
     @Order(50)
-    @DescriptionForConfigEntry("Configure how '/file/' links are processed when they are initially added. Documentation of used API: keep2share.github.io/api/")
+    @DescriptionForConfigEntry("Configure how '/file/' links are processed when they are initially added.")
     FileLinkAddMode getFileLinkAddMode();
 
     void setFileLinkAddMode(FileLinkAddMode mode);
@@ -153,7 +147,7 @@ public interface Keep2shareConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("DEFAULT")
     @Order(51)
-    @DescriptionForConfigEntry("Configure how file links are checked. Documentation of used API: keep2share.github.io/api/")
+    @DescriptionForConfigEntry("Configure how '/file/' links are checked.")
     LinkcheckMode getFileLinkcheckMode();
 
     void setFileLinkcheckMode(LinkcheckMode mode);
@@ -176,7 +170,7 @@ public interface Keep2shareConfig extends PluginConfigInterface {
     @AboutConfig
     @DefaultEnumValue("GLOBAL_SETTING")
     @Order(60)
-    @DescriptionForConfigEntry("Define what should happen when a captcha of this hoster runs into a timeout.")
+    @DescriptionForConfigEntry("Define what should happen when a captcha runs into a timeout.")
     CaptchaTimeoutBehavior getCaptchaTimeoutBehavior();
 
     void setCaptchaTimeoutBehavior(CaptchaTimeoutBehavior behavior);

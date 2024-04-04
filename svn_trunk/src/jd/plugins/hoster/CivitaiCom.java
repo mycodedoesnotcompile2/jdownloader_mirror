@@ -39,7 +39,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48813 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48851 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -214,7 +214,8 @@ public class CivitaiCom extends PluginForHost {
              * 2024-03-25: They're sometimes returning wrong content-type information for images, see:
              * https://board.jdownloader.org/showthread.php?t=95419
              */
-            return "text/plain".equals(urlConnection.getContentType()) && urlConnection.getCompleteContentLength() > 1024;
+            final long completeContentLength = urlConnection.getCompleteContentLength();
+            return "text/plain".equals(urlConnection.getContentType()) && (completeContentLength == -1 || completeContentLength > 1024);
         } else {
             return false;
         }

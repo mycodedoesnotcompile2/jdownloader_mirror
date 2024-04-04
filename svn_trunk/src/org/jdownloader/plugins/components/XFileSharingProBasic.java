@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48851 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3657,9 +3657,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (new Regex(html, "(?i)>\\s*Video is processing now").patternFind()) {
             /* E.g. '<div id="over_player_msg">Video is processing now. <br>Conversion stage: <span id='enc_pp'>...</span></div>' */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not (yet) downloadable: Video is still being encoded or broken", 10 * 60 * 1000l);
-        }
-        if (br.containsHTML("(?i)>\\s*Downloads disabled for this file")) {
+        } else if (br.containsHTML("(?i)>\\s*Downloads disabled for this file")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
+        } else if (br.containsHTML("(?i)>\\s*Downloads are disabled for your country")) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Downloads are disabled for your country", 60 * 60 * 1000l);
         }
         /*
          * Errorhandling for accounts that are valid but cannot be used yet because the user has to add his mail to the account via website.
