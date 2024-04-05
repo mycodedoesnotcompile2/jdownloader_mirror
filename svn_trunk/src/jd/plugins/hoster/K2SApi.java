@@ -66,7 +66,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 48847 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48859 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -227,7 +227,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 48847 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 48859 $"));
     }
 
     /**
@@ -499,7 +499,7 @@ public abstract class K2SApi extends PluginForHost {
     public static void parseFileInfo(final DownloadLink link, final Map<String, Object> fileInfo, final String sourceFileID) {
         final String id = (String) fileInfo.get("id");
         if (id != null && isSpecialFileID(sourceFileID) && !StringUtils.equals(id, sourceFileID)) {
-            /* Save internal ID as we use this for dupe-checking. */
+            /* ID from URL is special fileID -> Find internal/"real" fileID as we use this for better dupe-checking. */
             link.setProperty(PROPERTY_FILE_ID, id);
         }
         if (Boolean.TRUE.equals(fileInfo.get("is_available"))) {

@@ -52,7 +52,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 48448 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48855 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -266,7 +266,11 @@ public class TeraboxCom extends PluginForHost {
             // }
             // }
             logger.info("Performing full user-cookie login");
-            br.getPage("https://www." + this.getHost() + "/disk/home");
+            br.getPage("https://www." + this.getHost() + "/main?category=all");
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                /* Fallback if link changes e.g. old link was: https://www.terabox.com/disk/home -> Leads to error 404 now */
+                br.getPage("https://www." + this.getHost() + "/");
+            }
             final String bdstoken = br.getRegex("\"bdstoken\":\"([a-f0-9]{32})\"").getMatch(0);
             if (bdstoken == null) {
                 errorAccountInvalid(account);
@@ -313,6 +317,7 @@ public class TeraboxCom extends PluginForHost {
 
     private void setCookies(final Cookies cookies) {
         /* Set given cookies for all domains we know. */
+        br.setCookies(cookies);
         final List<String[]> domains = TeraboxComFolder.getPluginDomains();
         for (final String[] domainsarray : domains) {
             for (final String domain : domainsarray) {

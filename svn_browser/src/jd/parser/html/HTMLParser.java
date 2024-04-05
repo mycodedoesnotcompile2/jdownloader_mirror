@@ -967,7 +967,7 @@ public class HTMLParser {
         if (options.isUnicode()) {
             if (HTMLParser.deepWalkCheck(path, options, results, indexBefore)) {
                 /* no changes in results size, and data contains unicode */
-                final HtmlParserCharSequence next = new HtmlParserCharSequence(Encoding.unicodeDecode(urlDecoded));
+                final HtmlParserCharSequence next = HTMLParser.unicodeDecode(urlDecoded);
                 final boolean historyContains = path.contains(next);
                 if (!historyContains) {
                     if (urlDecoded.find(HTMLParser.checkPatternUnicode)) {
@@ -1392,9 +1392,9 @@ public class HTMLParser {
     private static HtmlParserCharSequence correctURL(HtmlParserCharSequenceHierarchy path, HtmlParserResultSet results, HtmlParserOptions options) {
         HtmlParserCharSequence input = path.lastElement();
         if (input.contains("\\x3A)") || input.contains("\\x2F")) {
-            input = new HtmlParserCharSequence(Encoding.unicodeDecode(input));
+            input = HTMLParser.unicodeDecode(input);
         } else if (input.contains("\\u003A)") || input.contains("\\u002F")) {
-            input = new HtmlParserCharSequence(Encoding.unicodeDecode(input));
+            input = HTMLParser.unicodeDecode(input);
         }
         final int specialCutOff = input.indexOf("', ");
         if (specialCutOff >= 0) {
@@ -1707,12 +1707,16 @@ public class HTMLParser {
         HtmlParserCharSequence ret = url != null ? url.group(1, HTMLParser.LINKPROTOCOL) : null;
         if (ret != null) {
             if (ret.contains("\\x3A)") || ret.contains("\\x2F")) {
-                ret = new HtmlParserCharSequence(Encoding.unicodeDecode(ret));
+                ret = HTMLParser.unicodeDecode(ret);
             } else if (ret.contains("\\u003A)") || ret.contains("\\u002F")) {
-                ret = new HtmlParserCharSequence(Encoding.unicodeDecode(ret));
+                ret = HTMLParser.unicodeDecode(ret);
             }
         }
         return ret;
+    }
+
+    private static HtmlParserCharSequence unicodeDecode(CharSequence cs) {
+        return new HtmlParserCharSequence(Encoding.unicodeDecode(cs, true));
     }
 
     public static String getProtocol(final String url) {

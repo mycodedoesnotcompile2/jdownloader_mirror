@@ -203,6 +203,8 @@ public class ChunkedInputStream extends InputStream implements StreamValidEOF {
      * @throws IOException
      */
     private void readTrailers() throws IOException {
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/TE
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Trailer
         this.exhaustInputStream();
     }
 

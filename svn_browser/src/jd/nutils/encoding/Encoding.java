@@ -55,8 +55,9 @@ public class Encoding {
     public static String Base64Decode(final String base64) {
         if (base64 == null) {
             return null;
+        } else {
+            return Encoding.Base64Decode((CharSequence) base64).toString();
         }
-        return Encoding.Base64Decode((CharSequence) base64).toString();
     }
 
     public static CharSequence Base64Decode(final CharSequence base64) {
@@ -226,7 +227,15 @@ public class Encoding {
     }
 
     public static String unicodeDecode(final String input) {
-        final Object ret = Encoding.unicodeDecode((CharSequence) input);
+        return Encoding.unicodeDecode(input, false);
+    }
+
+    public static CharSequence unicodeDecode(final CharSequence input) {
+        return Encoding.unicodeDecode(input, false);
+    }
+
+    public static String unicodeDecode(final String input, final boolean ignoreInvalidSequences) {
+        final Object ret = Encoding.unicodeDecode((CharSequence) input, ignoreInvalidSequences);
         if (ret != null) {
             return ret.toString();
         } else {
@@ -240,7 +249,7 @@ public class Encoding {
      * @param s
      * @return
      */
-    public static CharSequence unicodeDecode(final CharSequence input) {
+    public static CharSequence unicodeDecode(final CharSequence input, final boolean ignoreInvalidSequences) {
         if (input == null) {
             return null;
         }
@@ -269,54 +278,104 @@ public class Encoding {
             }
         }
         final StringBuilder sb = new StringBuilder();
+        final StringBuilder decode = new StringBuilder();
         int ii;
         int i;
-        for (i = 0; i < s.length(); i++) {
-            char ch = s.charAt(i);
+        loop: for (i = 0; i < s.length(); i++) {
+            final char ch = s.charAt(i);
             // prevents StringIndexOutOfBoundsException with ending char equals case trigger
             if (s.length() != i + 1) {
                 switch (ch) {
                 case '%':
                 case '\\':
                     final char escape = ch;
-                    ch = s.charAt(++i);
-                    StringBuilder sb2 = null;
-                    switch (ch) {
+                    final char encoding = s.charAt(++i);
+                    final int length;
+                    switch (encoding) {
                     case 'u':
-                        /* unicode */
-                        sb2 = new StringBuilder();
-                        i++;
-                        ii = i + 4;
-                        for (; i < ii; i++) {
-                            ch = s.charAt(i);
-                            sb2.append(ch);
-                        }
-                        i--;
-                        sb.append((char) Long.parseLong(sb2.toString(), 16));
-                        continue;
+                        /* unicode encoding */
+                        length = 4;
+                        break;
                     case 'x':
-                        /* normal hex coding */
-                        sb2 = new StringBuilder();
-                        i++;
-                        ii = i + 2;
-                        for (; i < ii; i++) {
-                            ch = s.charAt(i);
-                            sb2.append(ch);
-                        }
-                        i--;
-                        sb.append((char) Long.parseLong(sb2.toString(), 16));
-                        continue;
+                        /* hex encoding */
+                        length = 2;
+                        break;
                     default:
                         /* normal escaping */
                         sb.append(escape);
-                        sb.append(ch);
+                        sb.append(encoding);
                         continue;
                     }
+                    decode.setLength(0);
+                    i++;
+                    ii = i + length;
+                    try {
+                        for (; i < ii; i++) {
+                            final char decode_ch = s.charAt(i);
+                            if (!ignoreInvalidSequences) {
+                                decode.append(decode_ch);
+                            } else if (decode_ch >= '0' && decode_ch <= '9') {
+                                decode.append(decode_ch);
+                            } else if (decode_ch >= 'a' && decode_ch <= 'f') {
+                                decode.append(decode_ch);
+                            } else if (decode_ch >= 'A' && decode_ch <= 'F') {
+                                decode.append(decode_ch);
+                            } else {
+                                sb.append(escape);
+                                sb.append(encoding);
+                                sb.append(decode);
+                                i--;
+                                continue loop;
+                            }
+                        }
+                    } catch (StringIndexOutOfBoundsException e) {
+                        if (ignoreInvalidSequences) {
+                            sb.append(escape);
+                            sb.append(encoding);
+                            sb.append(decode);
+                            return sb;
+                        } else {
+                            throw e;
+                        }
+                    }
+                    i--;
+                    sb.append((char) Encoding.parseLong(decode));
+                    continue;
                 }
             }
             sb.append(ch);
         }
         return sb;
+    }
+
+    // Taken from Long.parseLong, modified to have CharSequence parameter with fixed radix 16
+    private static long parseLong(final CharSequence s) throws NumberFormatException {
+        final int radix = 16;
+        long result = 0;
+        int i = 0, len = s.length();
+        final long limit = -Long.MAX_VALUE;
+        int digit;
+        if (len > 0) {
+            final long multmin = limit / radix;
+            while (i < len) {
+                digit = Character.digit(s.charAt(i++), radix);
+                if (digit < 0) {
+                    throw new NumberFormatException("For input string: \"" + s + "\"");
+                } else if (result < multmin) {
+                    throw new NumberFormatException("For input string: \"" + s + "\"");
+                } else {
+                    result *= radix;
+                    if (result < limit + digit) {
+                        throw new NumberFormatException("For input string: \"" + s + "\"");
+                    } else {
+                        result -= digit;
+                    }
+                }
+            }
+        } else {
+            throw new NumberFormatException("For input string: \"" + s + "\"");
+        }
+        return result;
     }
 
     @Deprecated
