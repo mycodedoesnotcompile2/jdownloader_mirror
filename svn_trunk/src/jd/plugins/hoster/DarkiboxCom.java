@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48642 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
 public class DarkiboxCom extends XFileSharingProBasic {
     public DarkiboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -277,12 +277,6 @@ public class DarkiboxCom extends XFileSharingProBasic {
         if (br.containsHTML(">\\s*You are not able to download Files")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Website error 'You are not able to download Files'");
         }
-    }
-
-    @Override
-    protected boolean containsInvalidLoginsMessage(final Browser br) {
-        // TODO: Remove this once it is implemented in upper codebase
-        return br != null && br.containsHTML("(?i)>\\s*Incorrect (Login|Username) or Password\\s*<");
     }
 
     @Override

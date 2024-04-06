@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48851 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -194,9 +194,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return ret.toArray(new LazyPlugin.FEATURE[0]);
     }
 
-    /* TODO: Maybe add thumbnail -> Fullsize support for all XFS plugins, see ImagetwistCom and ImgSpiceCom */
-    // private static final String TYPE_DIRECT_IMAGE_FULLSIZE = "(?i)https?:///i/\\d+/[a-z0-9]{12}\\.jpg";
-    // private static final String TYPE_DIRECT_IMAGE_THUMBNAIL = "(?i)https?:///th/\\d+/[a-z0-9]{12}\\.jpg";
     /**
      * DEV NOTES XfileSharingProBasic Version 4.4.3.8<br />
      * See official changelogs for upcoming XFS changes: https://sibsoft.net/xfilesharing/changelog.html |
@@ -873,7 +870,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else if (StringUtils.containsIgnoreCase(br.getURL(), "/?op=login&redirect=")) {
             return true;
         } else if (br.getURL().matches("(?i).*/login\\?redirect=.*")) {
-            /* 2023-11-15 e.g. rapidbytez.com, EzvnNet */
+            /* 2023-11-15 e.g. rapidbytez.com, EzvnNet, TerabytezOrg */
             return true;
         } else {
             return false;
@@ -3774,7 +3771,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         if (this.enableAccountApiOnlyMode()) {
-            account.setPass(correctPasswordAsApikey(account.getPass()));
             return this.fetchAccountInfoAPI(this.br, account);
         } else {
             return this.fetchAccountInfoWebsite(account);
@@ -4115,13 +4111,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * automatically.
          */
         if (StringUtils.isEmpty(apikey) && generateApikeyUrl != null && allowToGenerateAPIKeyInWebsiteMode()) {
-            if (Encoding.isHtmlEntityCoded(generateApikeyUrl)) {
-                /*
-                 * 2019-07-28: Some hosts have "&&amp;" inside URL (= buggy) - also some XFS hosts will only allow apikey generation once
-                 * and when pressing "change key" afterwards, it will always be the same. This may also be a serverside XFS bug.
-                 */
-                generateApikeyUrl = Encoding.htmlDecode(generateApikeyUrl);
-            }
+            generateApikeyUrl = Encoding.htmlOnlyDecode(generateApikeyUrl);
             logger.info("Failed to find apikey but host has api-mod enabled --> Trying to generate first apikey for this account via: " + generateApikeyUrl);
             try {
                 brc.setFollowRedirects(true);
@@ -4159,13 +4149,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info("Unable to find API domain - assuming it is the same es the plugins'");
         } else {
             try {
-                if (Encoding.isHtmlEntityCoded(url_with_apikey)) {
-                    /*
-                     * 2019-07-28: Some hosts have "&&amp;" inside URL (= buggy) - also some XFS hosts will only allow apikey generation
-                     * once and when pressing "change key" afterwards, it will always be the same. This may also be a serverside XFS bug.
-                     */
-                    url_with_apikey = Encoding.htmlDecode(url_with_apikey);
-                }
+                url_with_apikey = Encoding.htmlOnlyDecode(url_with_apikey);
                 final URL apiurl = new URL(url_with_apikey);
                 final String apihost = Browser.getHost(apiurl, true);
                 if (!apihost.equalsIgnoreCase(this.getHost())) {
@@ -4719,6 +4703,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         resolveShortURL(this.br.cloneBrowser(), link, account);
         if (this.attemptStoredDownloadurlDownload(link, account)) {
+            /* Re-use stored directurl */
             try {
                 if (dl.getConnection() != null) {
                     fixFilename(dl.getConnection(), link);
@@ -4744,7 +4729,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* API-only mode */
             handleDownload(link, account, null, this.getDllinkAPI(link, account), null);
         } else {
-            /* Website mode (this will still prefer API whenever possible) */
+            /* Website mode */
             final String contentURL = this.getContentURL(link);
             if (AccountType.FREE.equals(account.getType())) {
                 /*
@@ -5055,18 +5040,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return true;
     }
 
-    /** Generates final downloadurl via API if API usage is allowed and apikey is available. */
+    /**
+     * Generates final downloadurl via API if API usage is allowed and apikey is available. Only execute this if you know that the currently
+     * used host supports this! </br>
+     * Only execute this if an apikey is given! </br>
+     * Only execute this if you know that a particular host has enabled this API call! </br>
+     * Important: For some hosts, this API call will only be available for premium accounts, not for free accounts!
+     */
     /*
      * TODO: check/add support for URL_TYPE.FILE
      */
     protected String getDllinkAPI(final DownloadLink link, final Account account) throws Exception {
-        /**
-         * Only execute this if you know that the currently used host supports this! </br>
-         * Only execute this if an apikey is given! </br>
-         * Only execude this if you know that a particular host has enabled this API call! </br>
-         * Important: For some hosts, this API call will only be available for premium accounts, no for free accounts!
-         */
-        /* 2019-11-04: Linkcheck is not required here - download API will return offline status. */
+        /* Linkcheck is not required here - download API will return appropriate offline status if file is not available anymore. */
         // requestFileInformationAPI(link, account);
         logger.info("Trying to get dllink via API");
         final String apikey = getAPIKeyFromAccount(account);
@@ -5232,7 +5217,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * More info see supports_api()
      */
     protected final Map<String, Object> loginAPI(final Browser br, final Account account) throws Exception {
-        Map<String, Object> entries = null;
         synchronized (account) {
             br.setCookiesExclusive(true);
             final String apikey = this.getAPIKeyFromAccount(account);
@@ -5240,35 +5224,38 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 throw new AccountInvalidException("Invalid API Key format!\r\nFind your API Key here: " + this.getAPILoginHelpURL());
             }
             getPage(br, this.getAPIBase() + "/account/info?key=" + apikey);
-            entries = this.checkErrorsAPI(br, null, account);
-            /* 2023-11-30: Experiment to find out whether or not we can download via API with this account */
-            boolean apiDownloadsPossible = false;
-            try {
-                final Browser brc = br.cloneBrowser();
-                getPage(brc, this.getAPIBase() + "/file/direct_link?key=" + apikey + "&file_code=xxxxxxyyyyyy");
-                this.checkErrorsAPI(brc, null, account);
-            } catch (final PluginException ple) {
-                if (ple.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
-                    /**
-                     * Typically this happens when downloads are not possible via API: {"msg":"This function not allowed in
-                     * API","server_time":"2023-11-30 15:53:27","status":403} </br>
-                     */
-                    /* {"server_time":"2023-11-30 15:53:33","status":404,"msg":"no file"} */
-                    apiDownloadsPossible = true;
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
-                logger.info("Exception occured API download check");
-            } finally {
-                logger.info("API download status: " + apiDownloadsPossible);
-                if (apiDownloadsPossible) {
-                    account.setProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE, true);
-                } else {
-                    account.removeProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE);
+            final Map<String, Object> entries = this.checkErrorsAPI(br, null, account);
+            final boolean loginAPICheckIfDownloadsAreAllowed = true;
+            if (loginAPICheckIfDownloadsAreAllowed) {
+                /* Find out whether or not we can download via API with this account */
+                boolean apiDownloadsPossible = false;
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    getPage(brc, this.getAPIBase() + "/file/direct_link?key=" + apikey + "&file_code=xxxxxxyyyyyy");
+                    this.checkErrorsAPI(brc, null, account);
+                } catch (final PluginException ple) {
+                    if (ple.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                        /**
+                         * Typically this happens when downloads are not possible via API: {"msg":"This function not allowed in
+                         * API","server_time":"2023-11-30 15:53:27","status":403} </br>
+                         */
+                        /* {"server_time":"2023-11-30 15:53:33","status":404,"msg":"no file"} */
+                        apiDownloadsPossible = true;
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    logger.info("Exception occured API download check");
+                } finally {
+                    logger.info("API download status: " + apiDownloadsPossible);
+                    if (apiDownloadsPossible) {
+                        account.setProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE, true);
+                    } else {
+                        account.removeProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE);
+                    }
                 }
             }
+            return entries;
         }
-        return entries;
     }
 
     protected final AvailableStatus requestFileInformationAPI(final DownloadLink link, final String apikey) throws Exception {
@@ -5504,10 +5491,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     protected final String getAPIKeyFromAccount(final Account account) {
         synchronized (account) {
-            final String apikey;
+            String apikey;
             if (this.enableAccountApiOnlyMode()) {
-                /* In API only mode, apikey is stored in password field. */
+                /* In API only mode, apikey is entered by user into password field. */
                 apikey = account.getPass();
+                if (apikey != null) {
+                    apikey = apikey.trim();
+                }
             } else {
                 /* In website mode we store apikey as a property on our current account object. */
                 apikey = account.getStringProperty(PROPERTY_ACCOUNT_apikey);
@@ -5579,14 +5569,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    private static String correctPasswordAsApikey(final String pw) {
-        if (pw != null) {
-            return pw.trim();
-        } else {
-            return null;
-        }
-    }
-
     /**
      * pseudo redirect control!
      */
@@ -5636,12 +5618,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Names are either enforced if the configuration of the script implies this or if it detects that embedding videos is possible. </br>
      * Do not override - at least try to avoid having to!!
      */
-    private final boolean internal_isVideohoster_enforce_video_filename(final DownloadLink link) {
+    protected final boolean internal_isVideohoster_enforce_video_filename(final DownloadLink link) {
         return internal_isVideohosterEmbed(this.br) || isVideohoster_enforce_video_filename() || isEmbedURL(link);
     }
 
     @Override
-    public boolean internal_supportsMassLinkcheck() {
+    public final boolean internal_supportsMassLinkcheck() {
         return this.supportsAPIMassLinkcheck() || this.supportsMassLinkcheckOverWebsite() || this.enableAccountApiOnlyMode();
     }
 
@@ -5669,7 +5651,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * Example: uploadboy.com</br>
      * Do not override - at least try to avoid having to!!
      */
-    protected boolean internal_supports_availablecheck_filename_abuse() {
+    protected final boolean internal_supports_availablecheck_filename_abuse() {
         final boolean supportedByIndicatingHtmlCode = new Regex(getCorrectBR(br), "op=report_file&(?:amp;)?id=" + this.getFUIDFromURL(this.getDownloadLink())).matches();
         boolean allowedByAutoHandling = true;
         final SubConfiguration config = this.getPluginConfig();
@@ -5686,7 +5668,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return (this.supports_availablecheck_filename_abuse() || supportedByIndicatingHtmlCode) && allowedByAutoHandling;
     }
 
-    protected boolean internal_supports_availablecheck_alt() {
+    protected final boolean internal_supports_availablecheck_alt() {
         boolean allowedByAutoHandling = true;
         final SubConfiguration config = this.getPluginConfig();
         final long timestampLastFailure = config.getLongProperty(PROPERTY_PLUGIN_ALT_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP, 0);

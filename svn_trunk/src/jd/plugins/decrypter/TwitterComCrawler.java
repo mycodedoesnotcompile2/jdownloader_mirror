@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48831 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -140,7 +140,6 @@ public class TwitterComCrawler extends PluginForDecrypt {
     public static final String             PROPERTY_PINNED_TWEET                                            = "is_pinned_tweet";
     public static final String             PROPERTY_TWEET_ID                                                = "tweetid";
     public static final String             PROPERTY_RELATED_ORIGINAL_FILENAME                               = "related_original_filename";
-    private final String                   API_BASE_v2                                                      = "https://api.twitter.com/2";
     private final String                   API_BASE_GRAPHQL                                                 = "https://twitter.com/i/api/graphql";
     private static Map<String, String>     graphqlQueryids                                                  = new HashMap<String, String>();
     /**

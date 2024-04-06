@@ -22,6 +22,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -30,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48853 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -204,5 +205,14 @@ public class StreamwishCom extends XFileSharingProBasic {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Video temporarily not available");
         }
         super.checkErrors(br, html, link, account, checkAll);
+        final String errorsMisc = br.getRegex("class=\"icon icon-info icon-size-16 me-3\"[^>]*></i>\\s*<div>([^<]+)</div>").getMatch(0);
+        if (errorsMisc != null) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, Encoding.htmlDecode(errorsMisc).trim());
+        }
+    }
+
+    @Override
+    protected boolean isVideohoster_enforce_video_filename() {
+        return true;
     }
 }

@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48556 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -190,15 +190,6 @@ public class TerabytezOrg extends XFileSharingProBasic {
         } else {
             final URL_TYPE type = getURLType(link);
             return getFUID(link, type);
-        }
-    }
-
-    @Override
-    public boolean isPremiumOnly(final Browser br) {
-        if (br.getURL().matches("(?i).*/login\\?redirect=.*")) {
-            return true;
-        } else {
-            return super.isPremiumOnly(br);
         }
     }
 }

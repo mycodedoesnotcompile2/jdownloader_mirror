@@ -58,7 +58,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 48854 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -605,7 +605,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
 
     protected void getPage(final Browser br, final String url) throws Exception {
         boolean errorRateLimit = true;
-        final int maxtries = 4;
+        final int maxtries = 15;
         for (int i = 0; i <= maxtries; i++) {
             br.getPage(url);
             if (this.isAbort()) {
@@ -613,12 +613,12 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 throw new InterruptedException();
             } else if (br.getHttpConnection().getResponseCode() == 429) {
                 logger.info("Error 429 too many requests - add less URLs and/or perform a reconnect!");
-                final int retrySeconds = 5;
+                final int retrySeconds = 10;
                 final String title = "Rate-Limit reached";
                 String text = "Time until rate-limit reset: Unknown | Attempt " + (i + 1) + "/" + maxtries;
                 text += "\nTry again later or change your IP | Auto retry in " + retrySeconds + " seconds";
                 this.displayBubblenotifyMessage(title, text);
-                this.sleep(5000l, this.cl);
+                this.sleep(retrySeconds * 1000, this.cl);
                 continue;
             } else {
                 errorRateLimit = false;

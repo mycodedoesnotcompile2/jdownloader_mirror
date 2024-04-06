@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamsbNet extends XFileSharingProBasic {
     public StreamsbNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class StreamsbNet extends XFileSharingProBasic {
     private final String IS_OFFICIALLY_DOWNLOADABLE = "is_officially_downloadable";
 
     @Override
-    protected boolean internal_supports_availablecheck_filename_abuse() {
+    protected boolean supports_availablecheck_filename_abuse() {
         return false;
     }
 

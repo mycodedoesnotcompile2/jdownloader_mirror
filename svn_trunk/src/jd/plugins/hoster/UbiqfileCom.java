@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48390 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -133,7 +133,7 @@ public class UbiqfileCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean internal_supports_availablecheck_alt() {
+    protected boolean supports_availablecheck_alt() {
         /* 2023-01-01, no longer supported without captcha and different url */
         return false;
     }
