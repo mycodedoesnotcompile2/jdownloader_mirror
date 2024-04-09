@@ -26,6 +26,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.config.EpornerComConfig;
 import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideoCodec;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -50,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,7 +102,6 @@ public class EPornerCom extends PluginForHost {
 
     private final Pattern      PATTERN_VIDEO      = Pattern.compile("(?i)https?://[^/]+/(?:hd\\-porn/|video-)(\\w+)(/([^/]+))?");
     private final Pattern      PATTERN_PHOTO      = Pattern.compile("(?i)https?://[^/]+/photo/([A-Za-z0-9]+)(/([\\w\\-]+)/)?");
-    private String             vq                 = null;
     public static final String PROPERTY_DIRECTURL = "directurl";
 
     @Override
@@ -185,7 +185,12 @@ public class EPornerCom extends PluginForHost {
             if (betterTitleByURL != null) {
                 fallbackFilename = betterTitleByURL.replace("-", " ").trim() + extDefault;
             }
-            vq = getPreferredStreamQuality();
+            final String vq = getPreferredStreamQuality();
+            final EpornerComConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
+            PreferredVideoCodec codec = cfg.getPreferredVideoCodec();
+            if (codec == PreferredVideoCodec.DEFAULT) {
+                codec = PreferredVideoCodec.H264;
+            }
             /* Official downloadurls */
             final String[][] dloadinfo = br.getRegex("(?i)href=\"(/dload/[^<>\"]+)\"[^>]*>[^<]* MP4 \\((\\d+)p, ([^<>\"]+)\\)</a>").getMatches();
             if (dloadinfo != null && dloadinfo.length != 0) {
@@ -195,7 +200,7 @@ public class EPornerCom extends PluginForHost {
                     final String filesizeStr = dlinfo[2];
                     final long tempsize = SizeFormatter.getSize(filesizeStr);
                     if (StringUtils.containsIgnoreCase(directurl, "av1")) {
-                        if (tempsize > filesizeBestAV1 || dllinkBestAV1 == null) {
+                        if (dllinkBestAV1 == null || tempsize > filesizeBestAV1) {
                             filesizeBestAV1 = tempsize;
                             dllinkBestAV1 = directurl;
                         }
@@ -204,7 +209,7 @@ public class EPornerCom extends PluginForHost {
                             filesizeSelectedAV1 = tempsize;
                         }
                     } else {
-                        if (tempsize > filesizeBestH264 || dllinkBestH264 == null) {
+                        if (dllinkBestH264 == null || tempsize > filesizeBestH264) {
                             filesizeBestH264 = tempsize;
                             dllinkBestH264 = directurl;
                         }
@@ -213,21 +218,39 @@ public class EPornerCom extends PluginForHost {
                             filesizeSelectedH264 = tempsize;
                         }
                     }
+                    /* Determine best candidate for fallback / "global best" */
+                    // if (dllink == null || tempsize > filesize) {
+                    // filesize = tempsize;
+                    // dllink = directurl;
+                    // }
                 }
             }
-            // TODO: Implement setting for preferred video codec
-            if (dllinkSelectedAV1 != null) {
+            if (dllinkSelectedAV1 != null && codec == PreferredVideoCodec.AV1) {
                 dllink = dllinkSelectedAV1;
                 filesize = filesizeSelectedAV1;
-            } else if (dllinkSelectedH264 != null) {
+            } else if (dllinkSelectedH264 != null && codec == PreferredVideoCodec.H264) {
                 dllink = dllinkSelectedH264;
                 filesize = filesizeSelectedH264;
-            } else if (dllinkBestAV1 != null) {
-                dllink = dllinkBestAV1;
-                filesize = filesizeBestAV1;
-            } else if (dllinkBestH264 != null) {
+            } else if (dllinkBestH264 != null && codec == PreferredVideoCodec.H264) {
+                /* Best H264 */
                 dllink = dllinkBestH264;
                 filesize = filesizeBestH264;
+            } else if (dllinkBestAV1 != null && codec == PreferredVideoCodec.AV1) {
+                /* Fallback / best AV1 */
+                dllink = dllinkBestAV1;
+                filesize = filesizeBestAV1;
+            }
+            if (dllink == null) {
+                /* Fallback */
+                if (dllinkBestH264 != null) {
+                    /* Fallback / best H264 */
+                    dllink = dllinkBestH264;
+                    filesize = filesizeBestH264;
+                } else if (dllinkBestAV1 != null) {
+                    /* Fallback / best AV1 */
+                    dllink = dllinkBestAV1;
+                    filesize = filesizeBestAV1;
+                }
             }
             if (dllink == null && isDownload) {
                 /* Fallback to stream download */
@@ -236,7 +259,7 @@ public class EPornerCom extends PluginForHost {
                 if (continueLink == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                br.getPage(Encoding.htmlDecode(continueLink) + (continueLink.endsWith("/") ? "1920" : "/1920"));
+                br.getPage(Encoding.htmlOnlyDecode(continueLink) + (continueLink.endsWith("/") ? "1920" : "/1920"));
                 dllink = br.getRegex("<hd\\.file>(https?://.*?)</hd\\.file>").getMatch(0);
                 if (dllink == null) {
                     dllink = br.getRegex("<file>(https?://.*?)</file>").getMatch(0);

@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 48876 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -625,7 +625,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     throw new InterruptedException();
                 } else if (con.getResponseCode() == 429) {
                     br.followConnection(true);
-                    logger.info("Error 429 too many requests - add less URLs and/or perform a reconnect!");
+                    logger.info("Error 429 too many requests");
                     final int retrySeconds = 10;
                     final String title = "Rate-Limit reached";
                     String text = "Time until rate-limit reset: Unknown | Attempt " + (i + 1) + "/" + maxtries;

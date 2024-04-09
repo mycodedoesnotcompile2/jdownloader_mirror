@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamsbNet extends XFileSharingProBasic {
     public StreamsbNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -77,12 +77,12 @@ public class StreamsbNet extends XFileSharingProBasic {
          * </br>
          * streamsb.com is basically only a dummy entry here as no downloadlinks exist that can be used via this domain.
          */
-        ret.add(new String[] { "streamsb.com", "sblanh.com", "streamsb.net", "embedsb.com", "sbembed.com", "sbembed1.com", "sbembed2.com", "sbcloud1.com", "tubesb.com", "sbvideo.net", "playersb.com", "sbplay2.com", "sbplay2.xyz", "sbembed4.com", "javside.com", "watchsb.com", "sbfast.com", "sbfull.com", "javplaya.com", "streamsss.net", "kbjrecord.com", "lvturbo.com", "sbface.com", "sbrapid.com", "sblona.com" });
+        ret.add(new String[] { "streamsb.com", "sblanh.com", "streamsb.net", "embedsb.com", "sbembed.com", "sbembed1.com", "sbembed2.com", "sbcloud1.com", "tubesb.com", "sbvideo.net", "playersb.com", "sbplay2.com", "sbplay2.xyz", "sbembed4.com", "javside.com", "watchsb.com", "sbfast.com", "sbfull.com", "streamsss.net", "kbjrecord.com", "lvturbo.com", "sbface.com", "sbrapid.com", "sblona.com" });
         return ret;
     }
 
     protected String[] getDownloadDomains() {
-        return new String[] { "sblanh.com", "streamsb.net", "embedsb.com", "sbembed.com", "sbembed1.com", "sbembed2.com", "sbcloud1.com", "tubesb.com", "sbvideo.net", "playersb.com", "sbplay2.com", "sbplay2.xyz", "sbembed4.com", "javside.com", "watchsb.com", "sbfast.com", "sbfull.com", "javplaya.com", "streamsss.net", "kbjrecord.com", "lvturbo.com", "sbface.com", "sbrapid.com", "sblona.com" };
+        return new String[] { "sblanh.com", "streamsb.net", "embedsb.com", "sbembed.com", "sbembed1.com", "sbembed2.com", "sbcloud1.com", "tubesb.com", "sbvideo.net", "playersb.com", "sbplay2.com", "sbplay2.xyz", "sbembed4.com", "javside.com", "watchsb.com", "sbfast.com", "sbfull.com", "streamsss.net", "kbjrecord.com", "lvturbo.com", "sbface.com", "sbrapid.com", "sblona.com" };
     }
 
     private boolean isDownloadDomain(final String domain) {

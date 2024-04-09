@@ -111,7 +111,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.YoutubeDashV2;
 import jd.utils.locale.JDL;
 
-@DecrypterPlugin(revision = "$Revision: 48759 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -585,7 +585,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (this.playlistID != null) {
                         channelOrPlaylistPackageNamePattern = cfg.getPackagePatternForPlaylists();
                     } else {
-                        channelOrPlaylistPackageNamePattern = cfg.getPackagePatternForChannels();
+                        channelOrPlaylistPackageNamePattern = cfg.getPackagePatternForChannelPackages();
                     }
                     if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                         /* Dev only: Include number of expected items in packagename for better overview/debugging. */
