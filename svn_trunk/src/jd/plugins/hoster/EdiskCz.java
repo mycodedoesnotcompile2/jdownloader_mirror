@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.nutils.encoding.Encoding;
@@ -35,11 +36,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 47476 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 2, names = {}, urls = {})
 public class EdiskCz extends PluginForHost {
     public EdiskCz(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www.edisk.eu/credit/");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     public static List<String[]> getPluginDomains() {

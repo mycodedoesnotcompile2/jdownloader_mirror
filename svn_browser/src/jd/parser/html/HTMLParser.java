@@ -964,19 +964,17 @@ public class HTMLParser {
                 }
             }
         }
-        if (options.isUnicode()) {
-            if (HTMLParser.deepWalkCheck(path, options, results, indexBefore)) {
-                /* no changes in results size, and data contains unicode */
-                final HtmlParserCharSequence next = HTMLParser.unicodeDecode(urlDecoded);
-                final boolean historyContains = path.contains(next);
-                if (!historyContains) {
-                    if (urlDecoded.find(HTMLParser.checkPatternUnicode)) {
-                        HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options);
-                        HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
-                    } else {
-                        HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options.unicode(false));
-                        HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
-                    }
+        if (checkForUnicode(options, data)) {
+            /* no changes in results size, and data contains unicode */
+            final HtmlParserCharSequence next = HTMLParser.unicodeDecode(urlDecoded);
+            final boolean historyContains = path.contains(next);
+            if (!historyContains) {
+                if (urlDecoded.find(HTMLParser.checkPatternUnicode)) {
+                    HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options);
+                    HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
+                } else {
+                    HTMLParser._getHttpLinksFinder(HTMLParser.next(path, next), results, options.unicode(false));
+                    HTMLParser._getHttpLinksDeepWalker(HTMLParser.next(path, next), results, options);
                 }
             }
         }
@@ -1532,8 +1530,8 @@ public class HTMLParser {
     /**
      * Diese Methode sucht die vordefinierten input type="hidden" und formatiert sie zu einem poststring z.b. wÃ¼rde bei:
      *
-     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" /> <input type="hidden"
-     * name="b" value="9" />
+     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" />
+     * <input type="hidden" name="b" value="9" />
      *
      * f=f50b0f&h=390b4be0182b85b0&b=9 ausgegeben werden
      *

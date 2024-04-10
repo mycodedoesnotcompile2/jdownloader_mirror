@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48887 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,8 +150,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         }
         final HashSet<String> dupes = new HashSet<String>();
         final boolean useAdvancedDupecheck = PluginJsonConfig.get(getConfigInterface()).isEnableProfileCrawlerAdvancedDupeFiltering();
+        final boolean perPostPackageEnabled = PluginJsonConfig.get(getConfigInterface()).isPerPostURLPackageEnabled();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final FilePackage fp = getFilePackageForProfileCrawler(portal, userID);
+        final FilePackage profileFilePackage = getFilePackageForProfileCrawler(portal, userID);
         int offset = 0;
         int page = 1;
         final int maxItemsPerPage = 50;
@@ -173,7 +174,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             for (final HashMap<String, Object> post : posts) {
                 final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(dupes, useAdvancedDupecheck, post);
                 for (final DownloadLink thisresult : thisresults) {
-                    thisresult._setFilePackage(fp);
+                    if (!perPostPackageEnabled) {
+                        thisresult._setFilePackage(profileFilePackage);
+                    }
                     distribute(thisresult);
                 }
                 ret.addAll(thisresults);
@@ -364,7 +367,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         }
         logger.info("Portal: " + portal + " | UserID: " + userID + " | PostID: " + postID + " | File items in API response: " + numberofResultsSimpleCount + " | Number of unique file items: " + kemonoResults.size());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final FilePackage fp = getFilePackageForPostCrawler(portal, userID, postID, postTitle);
+        final FilePackage postFilePackage = getFilePackageForPostCrawler(portal, userID, postID, postTitle);
         final String postTextContent = (String) postmap.get("content");
         if (!StringUtils.isEmpty(postTextContent)) {
             final KemonoPartyConfig cfg = PluginJsonConfig.get(getConfigInterface());
@@ -381,7 +384,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                 ensureInitHosterplugin();
                 final DownloadLink textfile = new DownloadLink(this.hostPlugin, this.getHost(), posturl);
                 textfile.setProperty(KemonoParty.PROPERTY_TEXT, postTextContent);
-                textfile.setFinalFileName(fp.getName() + ".txt");
+                textfile.setFinalFileName(postFilePackage.getName() + ".txt");
                 try {
                     textfile.setDownloadSize(postTextContent.getBytes("UTF-8").length);
                 } catch (final UnsupportedEncodingException ignore) {
@@ -412,9 +415,9 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            fp.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) + fp.getName());
+            postFilePackage.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) + postFilePackage.getName());
         }
-        fp.addLinks(ret);
+        postFilePackage.addLinks(ret);
         return ret;
     }
 
@@ -633,10 +636,13 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     this.displayBubblenotifyMessage(title, text);
                     this.sleep(retrySeconds * 1000, this.cl);
                     continue;
-                } else {
+                } else if (con.getResponseCode() == 200) {
                     br.followConnection();
                     errorRateLimit = false;
                     break;
+                } else {
+                    br.followConnection(true);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             } finally {
                 con.disconnect();

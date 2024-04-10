@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48457 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48886 $", interfaceVersion = 3, names = {}, urls = {})
 public class XxembedCom extends XFileSharingProBasic {
     public XxembedCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +103,29 @@ public class XxembedCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        /* 2024-04-09 */
+        return false;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        return false;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filename_abuse() {
+        return false;
+    }
+
+    @Override
+    public String[] scanInfo(final String[] fileInfo) {
+        super.scanInfo(fileInfo);
+        /* 2024-04-09: Ugly workaround to remove invalid values; filesize is not given by this filehost. */
+        fileInfo[1] = null;
+        return fileInfo;
     }
 }

@@ -71,7 +71,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48885 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -464,7 +464,6 @@ public class RedditComCrawler extends PluginForDecrypt {
                 }
                 final Map<String, Object> preview = (Map<String, Object>) data.get("preview");
                 if (preview != null) {
-                    /* TODO: Add setting so user can select the preferred format here */
                     final List<Map<String, Object>> images = (List<Map<String, Object>>) preview.get("images");
                     for (final Map<String, Object> image : images) {
                         final Map<String, Object> variants = (Map<String, Object>) image.get("variants");

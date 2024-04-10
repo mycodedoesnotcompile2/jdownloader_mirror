@@ -66,7 +66,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 48880 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 48884 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -649,8 +649,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             return this.crawlProfile(identifier, sourceurl);
         }
         if (sourceurl != null) {
+            /* Correct source-URL */
             /* Remove params so that URL-paths will be correct down below. */
             sourceurl = URLHelper.getUrlWithoutParams(sourceurl);
+            /* Prevent handling down below from picking up specific parts of the URL as used desired file-path. */
+            sourceurl = sourceurl.replaceAll("(?i)/start/\\d+/end/\\d+$", "");
         }
         /* The following request will return an empty map if the given identifier is invalid. */
         final Browser brc = br.cloneBrowser();
@@ -799,14 +802,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 file.setSha1Hash(sha1);
             }
             file.setProperty(ArchiveOrg.PROPERTY_TIMESTAMP_FROM_API_LAST_MODIFIED, filemap.get("mtime"));
-            if (isRestrictedDownload) {
-                file.setProperty(ArchiveOrg.PROPERTY_IS_RESTRICTED, true);
-                /*
-                 * Item is not downloadable at all -> Disable it so download will not even be attempted and also as a visual indicator for
-                 * the user.
-                 */
-                file.setEnabled(false);
-            } else if (isAccountRequiredForDownload) {
+            // if (isAccountRequiredForDownload && isAccessRestricted) {
+            // file.setProperty(ArchiveOrg.PROPERTY_IS_RESTRICTED, true);
+            // }
+            if (isAccountRequiredForDownload) {
                 file.setProperty(ArchiveOrg.PROPERTY_IS_ACCOUNT_REQUIRED, true);
             }
             if (audioTrackPositionO != null) {
@@ -885,7 +884,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         if (playlistCrawlMode == PlaylistCrawlMode.DEFAULT) {
             playlistCrawlMode = PlaylistCrawlMode.AUTO;
         }
-        if (StringUtils.equalsIgnoreCase(mediatype, "texts")) {
+        if (desiredSubpathItems.size() > 0) {
+            /* User desired item(s) are available -> Return only them */
+            return desiredSubpathItems;
+        } else if (StringUtils.equalsIgnoreCase(mediatype, "texts")) {
             /* Book crawl handling */
             final BookCrawlMode mode = cfg.getBookCrawlMode();
             /* Decide whether or not we need to crawl the loose book pages. */
@@ -1042,15 +1044,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             } else {
                 /* Do not return any playlist items but only original files. */
             }
-        } else {
-            /* No special mediatype given -> Check for used specified return-items */
-            if (desiredSubpathDecoded != null) {
-                /* Return only links below desired subpath if desired subpath is available. */
-                if (desiredSubpathItems.isEmpty()) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                return desiredSubpathItems;
-            }
+        }
+        if (desiredSubpathDecoded != null && desiredSubpathItems.isEmpty()) {
+            logger.info("User wanted specific path/file but that hasn't been found -> Returning all globally allowed items instead");
         }
         /* "Normal" file handling */
         if (crawlOriginalFilesOnly && originalItems.size() > 0) {

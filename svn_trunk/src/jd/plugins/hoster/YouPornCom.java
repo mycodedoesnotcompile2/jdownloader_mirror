@@ -34,6 +34,7 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -41,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48842 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48886 $", interfaceVersion = 2, names = {}, urls = {})
 public class YouPornCom extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -145,26 +146,34 @@ public class YouPornCom extends PluginForHost {
         this.server_issues = false;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        br.setCookie(this.getHost(), "age_verified", "1");
-        br.setCookie(this.getHost(), "yp-device", "1");
-        br.setCookie(this.getHost(), "language", "en");
+        final String host = Browser.getHost(link.getPluginPatternMatcher());
+        br.setCookie(host, "age_verified", "1");
+        br.setCookie(host, "yp-device", "1");
+        br.setCookie(host, "language", "en");
         br.getPage(link.getPluginPatternMatcher());
-        if (br.containsHTML("<div id=\"video-not-found-related\"|watchRemoved\"|class=\\'video-not-found\\'")) {
+        if (br.getURL().endsWith("/video-removed")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getURL().endsWith("/video-inactive")) {
+            /* 2024-04-09: "This video has been deactivated" */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("<div id=\"video-not-found-related\"|watchRemoved\"|class=\\'video-not-found\\'")) {
             /* Offline link */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("404 \\- Page Not Found<|id=\"title_404\"") || this.br.getHttpConnection().getResponseCode() == 404) {
             /* Invalid link */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)<div class='geo-blocked-content'>\\s*This video has been disabled") || br.getURL().contains("/video-disabled")) {
+        } else if (br.containsHTML("(?i)<div class\\s*=\\s*(\"|')geo-blocked-content(\"|')>\\s*This video has been disabled") || br.getURL().contains("/video-disabled")) {
             /* 2021-01-18 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Video has been disabled / flagged for review");
-        } else if (this.br.containsHTML("(?i)<div class='geo-blocked-content'>\\s*This video has been removed by the uploader")) {
-            /* 2021-01-18 */
+        } else if (this.br.containsHTML(">\\s*This video has been removed")) {
+            /* 22024-04-09 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (this.br.containsHTML("(?i)<div class='geo-blocked-content'>\\s*Video has been flagged for verification")) {
+        } else if (this.br.containsHTML("(?i)<div class\\s*=\\s*(\"|')geo-blocked-content(\"|')>\\s*This page is not available in your location")) {
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "This page is not available in your location", 60 * 60 * 1000l);
+        } else if (this.br.containsHTML("(?i)<div class\\s*=\\s*(\"|')geo-blocked-content(\"|')>\\s*Video has been flagged for verification")) {
             /* 2021-01-18 */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video has been flagged for verification", 3 * 60 * 60 * 1000l);
-        } else if (this.br.containsHTML("(?i)class='geo-blocked-content'")) {
+        } else if (this.br.containsHTML("(?i)class\\s*=\\s*(\"|')geo-blocked-content(\"|')>")) {
             /* 2020-07-02: New: E.g. if you go to youpornru.com with a german IP and add specific URLs (not all content is GEO-blocked!). */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "GEO-blocked", 3 * 60 * 60 * 1000l);
         } else if (this.br.containsHTML("onload=\"go\\(\\)\"")) {
@@ -182,18 +191,15 @@ public class YouPornCom extends PluginForHost {
         if (otherReasonForTempUnavailable != null) {
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, otherReasonForTempUnavailable, 5 * 60 * 1000l);
         }
-        String title = br.getRegex("<title>(.*?) \\- Free Porn Videos[^<>]+</title>").getMatch(0);
-        if (title == null) {
-            title = br.getRegex("<title>(.*?) Video \\- Youporn\\.com</title>").getMatch(0);
-        }
-        if (title == null) {
-            title = br.getRegex("addthis:title=\"YouPorn \\- (.*?)\"></a>").getMatch(0);
-        }
-        if (title == null) {
-            title = br.getRegex("\\'video_title\\'\\s*:\\s*\"([^<>\"]*?)\"").getMatch(0);
-        }
+        String title = br.getRegex("<h1 class=\"videoTitle tm_videoTitle\"[^>]*>([^<]+)</h1>").getMatch(0);
         if (title == null) {
             title = br.getRegex("videoTitle\\s*:\\s*\'([^<>\']*?)\'").getMatch(0);
+        }
+        if (title == null || true) {
+            title = HTMLSearch.searchMetaTag(br, "og:title");
+        }
+        if (title == null) {
+            title = br.getRegex("<title>(.*?)</title>").getMatch(0);
         }
         if (title == null) {
             /* Final fallback */
@@ -201,6 +207,8 @@ public class YouPornCom extends PluginForHost {
         }
         if (title != null) {
             title = Encoding.htmlDecode(title).trim().replaceAll("   ", "-");
+            title = title.replaceFirst("(?i) - Free Porn Videos.*$", "");
+            title = title.replaceFirst("(?i) Video - Youporn\\.com$", "");
             link.setFinalFileName(title + defaultEXT);
         }
         final String channelname = br.getRegex("class=\"submitByLink\"[^>]*>\\s*<[^>]*href=\"/(?:channel|uservids)/([^\"/]+)").getMatch(0);
@@ -324,7 +332,11 @@ public class YouPornCom extends PluginForHost {
                 con = brc.openHeadConnection(dllink);
                 if (looksLikeDownloadableContent(con)) {
                     if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
                     }
                 } else {
                     server_issues = true;

@@ -795,7 +795,37 @@ public class SingleAppInstance {
         }
     }
 
-    private final Map<Socket, ClientConnection> connections = new HashMap<Socket, ClientConnection>();
+    private final Map<Socket, ClientConnection> connections          = new HashMap<Socket, ClientConnection>();
+    private volatile long                       lastClosedConnection = -1;
+    private volatile long                       lastOpenedConnection = -1;
+
+    /**
+     * Return the ms since the last connection or 0 if there is a connection or -1 if there has never been a connection
+     */
+    public long getIdleTime() {
+        synchronized (connections) {
+            if (connections.size() > 0) {
+                return 0;
+            } else if (lastClosedConnection < 0) {
+                return -1;
+            } else {
+                return Time.systemIndependentCurrentJVMTimeMillis() - lastClosedConnection;
+            }
+        }
+    }
+
+    /**
+     * Returns ms since the last connection was opened or -1 of there has never been a connection
+     *
+     * @return
+     */
+    public long getTimeSinceLastMessage() {
+        if (lastOpenedConnection > 0) {
+            return Time.systemIndependentCurrentJVMTimeMillis() - lastOpenedConnection;
+        } else {
+            return -1;
+        }
+    }
 
     protected ClientConnection buildConnection(final Socket socket) throws IOException {
         socket.setSoTimeout(getReadtimeoutForReadingIncommingMessages());
@@ -812,6 +842,7 @@ public class SingleAppInstance {
                 if (connections.containsKey(socket)) {
                     connections.put(socket, client);
                 }
+                lastOpenedConnection = Time.systemIndependentCurrentJVMTimeMillis();
             }
             final String clientID = client.readLine();
             if (!StringUtils.equals(clientID, getServerID())) {
@@ -924,6 +955,7 @@ public class SingleAppInstance {
                     connections.remove(socket);
                 }
             }
+            lastClosedConnection = Time.systemIndependentCurrentJVMTimeMillis();
         }
     }
 

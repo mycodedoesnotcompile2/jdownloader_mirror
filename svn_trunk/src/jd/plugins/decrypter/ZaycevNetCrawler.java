@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48559 $", interfaceVersion = 2, names = { "zaycev.net" }, urls = { "https?://(?:www\\.)?zaycev\\.net/artist/\\d+(\\?page=\\d+)?" })
+@DecrypterPlugin(revision = "$Revision: 48886 $", interfaceVersion = 2, names = { "zaycev.net" }, urls = { "https?://(?:www\\.)?zaycev\\.net/artist/\\d+(\\?page=\\d+)?" })
 public class ZaycevNetCrawler extends PluginForDecrypt {
     public ZaycevNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +51,9 @@ public class ZaycevNetCrawler extends PluginForDecrypt {
         final String artist = br.getRegex("schema.org/MusicGroup\"[^>]+><meta content=\"([^\"]+)\"").getMatch(0);
         final String[] urls = br.getRegex("href=\"(/pages/\\d+/\\d+\\.shtml)\"[^>]*track-link").getColumn(0);
         if (urls == null || urls.length == 0) {
-            if (br.containsHTML(">\\s*Нет информации\\s*<|>\\s*Композиций не найдено\\s*<")) {
+            if (br.containsHTML(">\\s*0\\s*треков\\s*<")) {
+                return ret;
+            } else if (br.containsHTML(">\\s*Нет информации\\s*<|>\\s*Композиций не найдено\\s*<")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

@@ -331,7 +331,7 @@ public class Exceptions {
     /**
      * @param e
      */
-    public static void resetInterruptFlag(Exception e) {
+    public static void resetInterruptFlag(Throwable e) {
         if (containsInstanceOf(e, InterruptedException.class)) {
             Thread.currentThread().interrupt();
         }

@@ -8,6 +8,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -23,11 +24,16 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47116 $", interfaceVersion = 3, names = { "pureusenet.nl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "pureusenet.nl" }, urls = { "" })
 public class PureUseNetNL extends UseNet {
     public PureUseNetNL(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www.pureusenet.nl/en/packages");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     private final String PROPERTY_USENET_USERNAME = "usenet_username";
