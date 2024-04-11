@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 48886 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48890 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1127,7 +1127,7 @@ public class PornHubCom extends PluginForHost {
             if ((freeCookies != null && premiumCookies != null) || userCookies != null) {
                 /* Check cookies - only perform a full login if they're not valid anymore. */
                 if (userCookies != null) {
-                    br.setCookies(userCookies);
+                    this.setCookies(br, userCookies);
                 } else {
                     br.setCookies(freeCookieDomain, freeCookies);
                     br.setCookies(preferredLoginPremiumDomain, premiumCookies);
@@ -1207,6 +1207,7 @@ public class PornHubCom extends PluginForHost {
             }
             final String redirect = (String) entries.get("redirect");
             final Boolean expiredPremiumUser = (Boolean) entries.get("expiredPremiumUser");
+            final String message = (String) entries.get("message");
             /*
              * 2022-06-27: remember_me is always "false" even though we check the "remember_me" checkbox/field. It's the same in browser
              * though!
@@ -1215,7 +1216,11 @@ public class PornHubCom extends PluginForHost {
             // final String username = (String) entries.get("username");
             final String defaultTextLoginFailed_EN = "Login failed.\r\nIf you believe this message is incorrect, try cookie login.\r\nInstructions:\r\nsupport.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions";
             if ((Integer) ReflectionUtils.cast(entries.get("success"), Integer.class) != 1) {
-                throw new AccountInvalidException(defaultTextLoginFailed_EN);
+                if (message != null) {
+                    throw new AccountInvalidException(defaultTextLoginFailed_EN + "\r\nServerside error message:\r\n" + message);
+                } else {
+                    throw new AccountInvalidException(defaultTextLoginFailed_EN);
+                }
             }
             if (redirect != null && (redirect.startsWith("http") || redirect.startsWith("/"))) {
                 /* Required to get the (premium) cookies (multiple redirects). */
@@ -1267,6 +1272,17 @@ public class PornHubCom extends PluginForHost {
                 }
             }
             return true;
+        }
+    }
+
+    /** Sets given cookies on all domains we know. */
+    private void setCookies(final Browser br, final Cookies cookies) {
+        final List<String> domains = new ArrayList<String>();
+        domains.addAll(Arrays.asList(domainsFree));
+        domains.addAll(Arrays.asList(domainsPremium));
+        br.setCookies(cookies);
+        for (final String domain : domains) {
+            br.setCookies(domain, cookies);
         }
     }
 
