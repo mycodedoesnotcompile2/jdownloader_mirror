@@ -20,10 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -40,7 +36,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48396 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
+
+@HostPlugin(revision = "$Revision: 48895 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -414,6 +414,7 @@ public class HotlinkCc extends XFileSharingProBasic {
         qualityMap.put("n", 40); // normal
         qualityMap.put("h", 60); // high
         qualityMap.put("o", 80); // original
+        qualityMap.put("x", 100); // download
         long maxInternalQualityValue = 0;
         String filesizeStr = null;
         String videoQualityStr = null;

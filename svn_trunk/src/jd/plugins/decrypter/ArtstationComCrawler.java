@@ -50,15 +50,15 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ArtstationCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48796 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://(?:www\\.)?artstation\\.com/((?:artist|artwork|marketplace/p/[^^/\\s]+)/[^/\\s]+|(?!about|jobs|contests|blogs|users)[^/\\s]+(/likes)?)" })
+@DecrypterPlugin(revision = "$Revision: 48896 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://(?:www\\.)?artstation\\.com/((?:artist|artwork|marketplace/p/[^^/\\s]+)/[^/\\s]+|(?!about|jobs|contests|blogs|users)[^/\\s]+(/likes)?)" })
 public class ArtstationComCrawler extends PluginForDecrypt {
     public ArtstationComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     private static final String TYPE_ARTIST      = "(?i)https?://[^/]+/(?:artist/)?([^/]+)(/likes)?$";
-    private static final String TYPE_ALBUM       = "(?i)https?://[^/]+/artwork/([a-zA-Z0-9]+)";
-    private static final String TYPE_MARKETPLACE = "(?i)https?://[^/]+/marketplace/p/([a-zA-Z0-9\\-]+)/([a-zA-Z0-9\\-]+)";
+    private static final String TYPE_ALBUM       = "(?i)https?://[^/]+/artwork/([a-zA-Z0-9]+).*";
+    private static final String TYPE_MARKETPLACE = "(?i)https?://[^/]+/marketplace/p/([a-zA-Z0-9\\-]+)/([a-zA-Z0-9\\-]+).*";
     Object                      modifier         = null;
 
     @Override

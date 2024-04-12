@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46517 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48896 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -72,6 +72,13 @@ public class IsraCloud extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "isra.cloud", "isracloud.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("isracloud.com");
+        return deadDomains;
     }
 
     @Override
@@ -122,7 +129,7 @@ public class IsraCloud extends XFileSharingProBasic {
         super.scanInfo(fileInfo);
         /* 2020-10-21: Special */
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, "lass=\"desc\">\\s*<span>([^<>\"]+)<").getMatch(0);
+            fileInfo[0] = new Regex(correctedBR, "class=\"desc\"[^>]*>\\s*<span>([^<>\"]+)<").getMatch(0);
         }
         return fileInfo;
     }
