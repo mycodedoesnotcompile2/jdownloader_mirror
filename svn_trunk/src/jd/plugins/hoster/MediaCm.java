@@ -33,7 +33,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48905 $", interfaceVersion = 3, names = {}, urls = {})
 public class MediaCm extends XFileSharingProBasic {
     public MediaCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -236,6 +236,11 @@ public class MediaCm extends XFileSharingProBasic {
 
     @Override
     protected String getContentURL(final DownloadLink link) {
+        return "https://" + this.getHost() + "/d/" + this.getFUIDFromURL(link);
+    }
+
+    @Override
+    protected String getContentURLV2(final DownloadLink link) {
         return "https://" + this.getHost() + "/d/" + this.getFUIDFromURL(link);
     }
 

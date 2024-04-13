@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47633 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class GounlimitedTo extends XFileSharingProBasic {
     public GounlimitedTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -156,13 +156,13 @@ public class GounlimitedTo extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String html) {
-        boolean offline = super.isOffline(link, br, html);
-        if (!offline) {
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("<title>Watch 404 not found</title>|content=\"Watch video 404 not found\"")) {
             /* 2020-10-14: Offline content will be liked to a sample video instead lol example: https://gounlimited.to/jdexamplebla */
-            offline = new Regex(html, "<title>Watch 404 not found</title>|content=\"Watch video 404 not found\"").matches();
+            return true;
+        } else {
+            return super.isOffline(link, br);
         }
-        return offline;
     }
 
     /**

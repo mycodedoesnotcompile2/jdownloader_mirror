@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46542 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidozaNet extends XFileSharingProBasic {
     public VidozaNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -140,13 +140,12 @@ public class VidozaNet extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String html) {
-        boolean isOffline = super.isOffline(link, br, html);
-        if (!isOffline && html != null) {
-            /* 2019-07-04: Special: */
-            isOffline = html.contains("/embed-.html\"") || html.contains("Reason for deletion:");
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("/embed-\\.html\"|Reason for deletion:")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
         }
-        return isOffline;
     }
 
     @Override

@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47880 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class IndiShareMe extends XFileSharingProBasic {
     public IndiShareMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -173,10 +173,10 @@ public class IndiShareMe extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String correctedBR) {
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (containsFakeError(br)) {
             return false;
-        } else if (super.isOffline(link, br, correctedBR)) {
+        } else if (super.isOffline(link, br)) {
             return true;
         } else {
             return false;

@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47633 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExLoadCom extends XFileSharingProBasic {
     public ExLoadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -81,7 +81,7 @@ public class ExLoadCom extends XFileSharingProBasic {
     @Override
     protected String getContentURL(final DownloadLink link) {
         final Regex special = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL);
-        if (special.matches()) {
+        if (special.patternFind()) {
             /* Return links for "normal" linktype */
             return this.getMainPage(link) + "/" + special.getMatch(0);
         } else {

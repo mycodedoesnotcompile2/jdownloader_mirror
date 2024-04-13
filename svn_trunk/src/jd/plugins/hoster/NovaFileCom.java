@@ -42,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48503 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     public NovaFileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -174,13 +174,16 @@ public class NovaFileCom extends XFileSharingProBasicSpecialFilejoker {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
+    public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2019-08-21: Special */
-        fileInfo[0] = new Regex(correctedBR, "class=\"name\">([^<>\"]+)<").getMatch(0);
-        fileInfo[1] = new Regex(correctedBR, "class=\"size\">([^<>\"]+)<").getMatch(0);
-        if (StringUtils.isEmpty(fileInfo[0]) || StringUtils.isEmpty(fileInfo[1])) {
-            /* Fallback to template method */
-            super.scanInfo(fileInfo);
+        super.scanInfo(html, fileInfo);
+        final String filename = new Regex(html, "class=\"name\">([^<>\"]+)<").getMatch(0);
+        if (filename != null) {
+            fileInfo[0] = filename;
+        }
+        final String filesize = new Regex(html, "class=\"size\">([^<>\"]+)<").getMatch(0);
+        if (filesize != null) {
+            fileInfo[1] = filesize;
         }
         return fileInfo;
     }

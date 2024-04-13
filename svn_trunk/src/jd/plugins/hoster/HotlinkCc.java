@@ -40,7 +40,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
 
-@HostPlugin(revision = "$Revision: 48895 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48911 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -245,16 +245,6 @@ public class HotlinkCc extends XFileSharingProBasic {
         super.doFree(link, account);
     }
 
-    private boolean isPremium(final Account account) {
-        if (account == null) {
-            return false;
-        } else if (account.getType() == AccountType.PREMIUM) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     @Override
     public String regExTrafficLeft(final Browser br) {
         String trafficleft = super.regExTrafficLeft(br);
@@ -298,19 +288,22 @@ public class HotlinkCc extends XFileSharingProBasic {
 
     public String[] scanInfo(final String[] fileInfo) {
         /* 2021-01-22: Prefer this as template will pickup filename without extension */
-        fileInfo[0] = new Regex(correctedBR, "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
-        if (StringUtils.isEmpty(fileInfo[0])) {
-            /* 2021-03-02 */
-            fileInfo[0] = new Regex(correctedBR, "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
-        }
         super.scanInfo(fileInfo);
+        String filename = new Regex(correctedBR, "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
+        if (StringUtils.isEmpty(filename)) {
+            /* 2021-03-02 */
+            filename = new Regex(correctedBR, "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
+        }
         /* 2021-04-15: Important workaround or we might set video filenames without file-extension. */
         final boolean isVideoFile = br.containsHTML(">\\s*Select quality for download video|id=\"over_player_msg\"");
         /* Do not check for Form because file could be premiumonly -> No Form present! */
         // final Form videoDL = this.getOfficialVideoDownloadForm(this.br);
-        if (isVideoFile && !StringUtils.isEmpty(fileInfo[0]) && !fileInfo[0].toLowerCase(Locale.ENGLISH).endsWith(".mp4")) {
-            fileInfo[0] = Encoding.htmlDecode(fileInfo[0]).trim();
-            fileInfo[0] = fileInfo[0] += ".mp4";
+        if (isVideoFile && !StringUtils.isEmpty(filename) && !filename.toLowerCase(Locale.ENGLISH).endsWith(".mp4")) {
+            filename = Encoding.htmlDecode(filename).trim();
+            filename = filename += ".mp4";
+        }
+        if (filename != null) {
+            fileInfo[0] = filename;
         }
         return fileInfo;
     }
@@ -624,6 +617,12 @@ public class HotlinkCc extends XFileSharingProBasic {
     public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
         /* 2022-05-31: No captchas at all */
         return false;
+    }
+
+    @Override
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        // Last changed: 2024-04-12
+        return Boolean.FALSE;
     }
 
     @Override

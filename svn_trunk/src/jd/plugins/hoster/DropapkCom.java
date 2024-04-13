@@ -33,7 +33,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48119 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class DropapkCom extends XFileSharingProBasic {
     public DropapkCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,12 +64,12 @@ public class DropapkCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(String[] fileInfo) {
-        String[] ret = super.scanInfo(fileInfo);
-        if (StringUtils.isEmpty(ret[1])) {
-            ret[1] = new Regex(correctedBR, "\\(\\s*(\\d+(?:\\.\\d+)?(?: |\\&nbsp;)?(KB|MB|GB|B))").getMatch(0);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        if (StringUtils.isEmpty(fileInfo[1])) {
+            fileInfo[1] = new Regex(html, "\\(\\s*(\\d+(?:\\.\\d+)?(?: |\\&nbsp;)?(KB|MB|GB|B))").getMatch(0);
         }
-        return ret;
+        return fileInfo;
     }
 
     @Override

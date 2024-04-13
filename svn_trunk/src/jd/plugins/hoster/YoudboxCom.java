@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48265 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class YoudboxCom extends XFileSharingProBasic {
     public YoudboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,7 @@ public class YoudboxCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected String getFUID(final String url, URL_TYPE type) {
+    protected String getFUID(final String url, final URL_TYPE type) {
         final String idFromSpecialPattern = new Regex(url, PATTERN_SPECIAL).getMatch(0);
         if (idFromSpecialPattern != null) {
             return idFromSpecialPattern;

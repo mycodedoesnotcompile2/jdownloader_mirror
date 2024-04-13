@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48886 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48905 $", interfaceVersion = 3, names = {}, urls = {})
 public class XxembedCom extends XFileSharingProBasic {
     public XxembedCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +44,7 @@ public class XxembedCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xxembed.com" });
+        ret.add(new String[] { "xxembed.com", "rutood.com" });
         return ret;
     }
 
@@ -122,10 +123,17 @@ public class XxembedCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        /* 2024-04-09: Ugly workaround to remove invalid values; filesize is not given by this filehost. */
-        fileInfo[1] = null;
-        return fileInfo;
+    protected boolean supports_availablecheck_filesize_bytes_from_sharebox() {
+        return false;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("<h2>Download video</h2>")) {
+            /* Empty page without download options e.g.https://rutood.com/xxxxxxyyyyyy.html */
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }

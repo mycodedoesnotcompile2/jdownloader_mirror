@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -25,10 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 40964 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class BeatexsCom extends XFileSharingProBasic {
     public BeatexsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -86,9 +86,9 @@ public class BeatexsCom extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
+    public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2019-07-03: Special */
-        super.scanInfo(fileInfo);
+        super.scanInfo(html, fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
             fileInfo[0] = new Regex(correctedBR, "script>document\\.write\\(\"([^<>\"]+)\"\\);</script>").getMatch(0);
         }

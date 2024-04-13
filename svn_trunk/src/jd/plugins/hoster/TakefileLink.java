@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48444 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class TakefileLink extends XFileSharingProBasic {
     public TakefileLink(final PluginWrapper wrapper) {
         super(wrapper);
@@ -108,14 +108,14 @@ public class TakefileLink extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String html) {
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
         final String fuid = super.getFUIDFromURL(link);
-        boolean isOffline = super.isOffline(link, br, html);
-        if (!br.getURL().contains(fuid) || (br.getRedirectLocation() != null && !br.getRedirectLocation().contains(fuid))) {
+        if (fuid != null && !br.getURL().contains(fuid) || (br.getRedirectLocation() != null && !br.getRedirectLocation().contains(fuid))) {
             /* 2018-11-15: Special - redirect to: https://takefile.link/upgrade */
-            isOffline = true;
+            return true;
+        } else {
+            return super.isOffline(link, br);
         }
-        return isOffline;
     }
 
     @Override

@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 45080 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48905 $", interfaceVersion = 3, names = {}, urls = {})
 public class ApkadminCom extends XFileSharingProBasic {
     public ApkadminCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,16 +103,5 @@ public class ApkadminCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        /* 2021-10-04 */
-        final String betterFilename = br.getRegex("(?i)File\\s*:\\s*<strong>([^<>\"]+)</strong>").getMatch(0);
-        if (betterFilename != null) {
-            fileInfo[0] = betterFilename;
-        }
-        return fileInfo;
     }
 }

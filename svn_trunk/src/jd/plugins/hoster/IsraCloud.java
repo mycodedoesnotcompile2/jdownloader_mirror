@@ -31,7 +31,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48896 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class IsraCloud extends XFileSharingProBasic {
     public IsraCloud(final PluginWrapper wrapper) {
         super(wrapper);
@@ -125,11 +125,11 @@ public class IsraCloud extends XFileSharingProBasic {
     }
 
     @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
         /* 2020-10-21: Special */
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, "class=\"desc\"[^>]*>\\s*<span>([^<>\"]+)<").getMatch(0);
+            fileInfo[0] = new Regex(html, "class=\"desc\"[^>]*>\\s*<span>([^<>\"]+)<").getMatch(0);
         }
         return fileInfo;
     }

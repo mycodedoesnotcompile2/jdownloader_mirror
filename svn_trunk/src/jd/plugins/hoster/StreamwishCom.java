@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48872 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -191,11 +191,11 @@ public class StreamwishCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String correctedBR) {
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (br.containsHTML("<div>\\s*This video has been locked watch or does not exist")) {
             return true;
         } else {
-            return super.isOffline(link, br, correctedBR);
+            return super.isOffline(link, br);
         }
     }
 

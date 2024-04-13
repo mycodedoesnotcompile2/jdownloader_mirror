@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47022 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class DaofileCom extends XFileSharingProBasic {
     public DaofileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -107,10 +107,11 @@ public class DaofileCom extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String html, final String[] fileInfo) {
         /* 2022-04-04 */
+        super.scanInfo(html, fileInfo);
         final String betterFilesize = new Regex(html, "style=\"[^\"]+\"[^>]*>[^<]*</b>\\s*\\[<b [^>]*>(\\d+ [^<]*)</b>\\]").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }
-        return super.scanInfo(html, fileInfo);
+        return fileInfo;
     }
 }

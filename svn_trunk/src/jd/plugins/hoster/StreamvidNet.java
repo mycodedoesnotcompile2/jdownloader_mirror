@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47705 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamvidNet extends XFileSharingProBasic {
     public StreamvidNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -125,12 +125,12 @@ public class StreamvidNet extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br, final String correctedBR) {
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
         /* 2023-04-27 */
         if (br.containsHTML("class=\"not-found-text\"")) {
             return true;
         } else {
-            return super.isOffline(link, br, correctedBR);
+            return super.isOffline(link, br);
         }
     }
 }
