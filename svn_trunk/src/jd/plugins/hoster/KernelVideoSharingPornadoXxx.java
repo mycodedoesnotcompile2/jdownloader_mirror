@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48913 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingPornadoXxx extends KernelVideoSharingComV2 {
     public KernelVideoSharingPornadoXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -32,8 +32,15 @@ public class KernelVideoSharingPornadoXxx extends KernelVideoSharingComV2 {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         /* Not to be mistaken with pornado.co!! */
-        ret.add(new String[] { "pornado.xxx" });
+        ret.add(new String[] { "pornado.xxx", "anon-v.com", "private-shows.net" });
         return ret;
+    }
+
+    @Override
+    protected ArrayList<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("private-shows.net"); // 2024-04-15
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

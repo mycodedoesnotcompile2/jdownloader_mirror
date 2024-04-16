@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48912 $", interfaceVersion = 3, names = {}, urls = {})
 public class DailyuploadsNet extends XFileSharingProBasic {
     public DailyuploadsNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,13 +115,5 @@ public class DailyuploadsNet extends XFileSharingProBasic {
             return null;
         }
         return dllink;
-    }
-
-    @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br) {
-        final Browser brc = br.cloneBrowser();
-        /* Small workaround */
-        brc.getRequest().setHtmlCode(this.correctedBR);
-        return super.isOffline(link, brc);
     }
 }

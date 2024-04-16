@@ -23,6 +23,10 @@ import java.util.Locale;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -38,11 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48913 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -327,7 +327,7 @@ public class SubyShareCom extends XFileSharingProBasic {
                 handleCaptcha(link, br, download2);
                 /* 2019-02-08: MD5 can be on the subsequent pages - it is to be found very rare in current XFS versions */
                 if (link.getMD5Hash() == null) {
-                    final String md5hash = new Regex(correctedBR, "<b>MD5.*?</b>.*?nowrap>(.*?)<").getMatch(0);
+                    final String md5hash = new Regex(correctedBR, "<b>\\s*MD5.*?</b>.*?nowrap>(.*?)<").getMatch(0);
                     if (md5hash != null) {
                         link.setMD5Hash(md5hash.trim());
                     }

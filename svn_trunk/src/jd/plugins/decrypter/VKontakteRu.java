@@ -71,7 +71,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 48646 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://(?:www\\.|m\\.|new\\.)?(?:(?:vk\\.com|vkontakte\\.ru|vkontakte\\.com)/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+)" })
+@DecrypterPlugin(revision = "$Revision: 48913 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://(?:www\\.|m\\.|new\\.)?(?:(?:vk\\.com|vkontakte\\.ru|vkontakte\\.com)/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+)" })
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -1097,7 +1097,13 @@ public class VKontakteRu extends PluginForDecrypt {
         if (numberOfItemsStr != null && numberOfItemsStr.equals("0")) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
-        final String startOffset = albumInfo != null ? (String) albumInfo.get("offset") : null;
+        String startOffset = null;
+        if (albumInfo != null) {
+            final Object offsetO = albumInfo.get("offset");
+            if (offsetO != null) {
+                startOffset = offsetO.toString();
+            }
+        }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(new Regex(contenturl, "(-?(\\d+_)?\\d+)$").getMatch(0));
         fp.setCleanupPackageName(false);

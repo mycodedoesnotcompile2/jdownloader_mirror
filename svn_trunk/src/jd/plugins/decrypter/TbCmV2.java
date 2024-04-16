@@ -111,7 +111,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.YoutubeDashV2;
 import jd.utils.locale.JDL;
 
-@DecrypterPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48914 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -202,7 +202,7 @@ public class TbCmV2 extends PluginForDecrypt {
         }
     }
 
-    private String getVideoIDFromUrl(final String url) {
+    public static String getVideoIDFromUrl(final String url) {
         String vuid = new Regex(url, "(?i)v=" + VIDEO_ID_PATTERN).getMatch(0);
         if (vuid == null) {
             vuid = new Regex(url, "(?i)/v/" + VIDEO_ID_PATTERN).getMatch(0);

@@ -54,7 +54,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48912 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -323,16 +323,6 @@ public class DoodstreamCom extends XFileSharingProBasic {
         } else {
             /* Free(anonymous) and unknown account type */
             return -2;
-        }
-    }
-
-    @Override
-    protected String getContentURL(final DownloadLink link) {
-        final String linkpart = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/(.+)").getMatch(0);
-        if (linkpart != null) {
-            return getMainPage(link) + "/" + linkpart;
-        } else {
-            return super.getContentURL(link);
         }
     }
 
