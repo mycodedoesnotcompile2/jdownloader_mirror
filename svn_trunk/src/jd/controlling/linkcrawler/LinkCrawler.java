@@ -1544,7 +1544,7 @@ public class LinkCrawler {
                         } else {
                             brURL = request.getAuthentication().getURLWithUserInfo(request.getURL());
                         }
-                        List<CrawledLink> possibleCryptedLinks = find(generation, source, brURL, null, false, false);
+                        final List<CrawledLink> possibleCryptedLinks = find(generation, source, brURL, null, false, false);
                         if (possibleCryptedLinks == null) {
                             return;
                         }
@@ -1577,16 +1577,12 @@ public class LinkCrawler {
                         if (deepLink == null) {
                             return;
                         }
-                        final boolean scanForHttpDirectory = false;
+                        final boolean scanForHttpDirectory = true;
                         if (scanForHttpDirectory && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                             // TODO: 2024-03-07: Unfinished feature, properly implement this
                             /* Check if http directory crawler would return results for current item */
                             ArrayList<DownloadLink> httpDirectoryResults = null;
                             try {
-                                // final LazyCrawlerPlugin lazyC = getDeepCrawlingPlugin();
-                                // if (lazyC == null) {
-                                // throw new UpdateRequiredClassNotFoundException("could not find 'LinkCrawlerDeepHelper' crawler plugin");
-                                // }
                                 final LazyCrawlerPlugin lazyHttpDirectoryCrawler = this.getLazyGenericHttpDirectoryCrawlerPlugin();
                                 final GenericHTTPDirectoryIndexCrawler httpDirectoryCrawler = (GenericHTTPDirectoryIndexCrawler) lazyHttpDirectoryCrawler.newInstance(getPluginClassLoaderChild());
                                 httpDirectoryResults = httpDirectoryCrawler.parseHTTPDirectory(null, br);
@@ -1616,33 +1612,39 @@ public class LinkCrawler {
                             /* Crawl links according to pattern of rule. */
                             deepPatternContent = true;
                             final String[][] matches = new Regex(request.getHtmlCode(), matchingRule._getDeepPattern()).getMatches();
-                            if (matches != null && matches.length > 0) {
-                                final HashSet<String> dups = new HashSet<String>();
-                                final StringBuilder sb = new StringBuilder();
-                                for (final String matcharray[] : matches) {
-                                    for (final String match : matcharray) {
-                                        if (StringUtils.isNotEmpty(match) && !brURL.equals(match) && dups.add(match)) {
-                                            if (sb.length() > 0) {
-                                                sb.append("\r\n");
-                                            }
-                                            sb.append(match);
-                                            if (match.matches("^[^<>\"]+$")) {
-                                                // TODO: 2024-03-08: What is this doing?
-                                                try {
-                                                    final String url = br.getURL(match).toExternalForm();
-                                                    if (dups.add(url)) {
-                                                        sb.append("\r\n").append(url);
-                                                    }
-                                                } catch (final Throwable e) {
+                            if (matches == null || matches.length == 0) {
+                                /*
+                                 * Users' deep pattern is bad and/or currently processed link is broken/offline and thus we get no results.
+                                 */
+                                if (matchingRule.isLogging()) {
+                                    final LogInterface ruleLogger = LogController.getFastPluginLogger("LinkCrawlerRule." + matchingRule.getId());
+                                    ruleLogger.info("Got no matches based on user defined DeepPattern");
+                                }
+                                return;
+                            }
+                            final HashSet<String> dups = new HashSet<String>();
+                            final StringBuilder sb = new StringBuilder();
+                            for (final String matcharray[] : matches) {
+                                for (final String match : matcharray) {
+                                    if (StringUtils.isNotEmpty(match) && !brURL.equals(match) && dups.add(match)) {
+                                        if (sb.length() > 0) {
+                                            sb.append("\r\n");
+                                        }
+                                        sb.append(match);
+                                        if (match.matches("^[^<>\"]+$")) {
+                                            // TODO: 2024-03-08: What is this doing?
+                                            try {
+                                                final String url = br.getURL(match).toExternalForm();
+                                                if (dups.add(url)) {
+                                                    sb.append("\r\n").append(url);
                                                 }
+                                            } catch (final Throwable e) {
                                             }
                                         }
                                     }
                                 }
-                                crawlContent = sb.toString();
-                            } else {
-                                crawlContent = null;
                             }
+                            crawlContent = sb.toString();
                         } else {
                             deepPatternContent = false;
                             crawlContent = request.getHtmlCode();
@@ -1694,8 +1696,7 @@ public class LinkCrawler {
                              * deepLink is our source and a matching deepPattern, crawl the links directly and don't wait for
                              * UnknownCrawledLinkHandler
                              */
-                            // Explanation please
-                            possibleCryptedLinks = null;
+                            // TODO: 2024-04-16: psp: Explanation please
                             crawl(generation, possibleDeepCryptedLinks);
                         } else {
                             /* first check if the url itself can be handled */
@@ -1706,8 +1707,6 @@ public class LinkCrawler {
                                     lc.crawl(generation, possibleDeepCryptedLinks);
                                 }
                             });
-                        }
-                        if (possibleCryptedLinks != null) {
                             crawl(generation, possibleCryptedLinks);
                         }
                     }

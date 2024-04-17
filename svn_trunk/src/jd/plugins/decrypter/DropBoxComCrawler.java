@@ -60,10 +60,17 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 48563 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 48918 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -143,9 +150,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 Map<String, Object> galleryInfo = restoreFromString(gallery_json, TypeRef.MAP);
                 galleryInfo = (Map<String, Object>) galleryInfo.get("props");
                 currentGalleryName = (String) JavaScriptEngineFactory.walkJson(galleryInfo, "collection/name");
-                FilePackage fp = null;
+                final FilePackage fp = FilePackage.getInstance();
                 if (!StringUtils.isEmpty(currentGalleryName)) {
-                    fp = FilePackage.getInstance();
                     fp.setName(currentGalleryName);
                 }
                 final List<Map<String, Object>> galleryElements = (List<Map<String, Object>>) galleryInfo.get("collectionFiles");
@@ -190,9 +196,8 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 DropBoxComCrawler.setPasswordCookie(br, storedPasswordCookieValue);
                 passwordCookieValue = storedPasswordCookieValue;
             }
-            br.setFollowRedirects(true);
             br.getPage(contentURL);
-            if (br.getHttpConnection().getResponseCode() == 404 || this.br.containsHTML("sharing/error_shmodel|class=\"not-found\">")) {
+            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("sharing/error_shmodel|class=\"not-found\">")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.getHttpConnection().getResponseCode() == 429) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -212,10 +217,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             brc.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
             brc.getHeaders().put("Origin", "https://www." + this.getHost());
             if (DropboxCom.isPasswordProtectedWebsite(br)) {
-                String content_id = new Regex(br.getURL(), "(?i)content_id=([^\\&;]+)").getMatch(0);
-                if (content_id == null) {
-                    content_id = new Regex(br.getRedirectLocation(), "(?i)content_id=([^\\&;]+)").getMatch(0);
-                }
+                String content_id = UrlQuery.parse(br.getURL()).get("content_id");
                 if (content_id == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -270,7 +272,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 /* Login required to access item. */
                 throw new AccountRequiredException();
             } else if (br.containsHTML("invitation-claimed-access-request-container")) {
-                /* User is logged in but has no access to this folderitem */
+                /* User is logged in but has no access to this folder item */
                 throw new AccountRequiredException();
             }
             /**
