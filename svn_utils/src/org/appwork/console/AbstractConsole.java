@@ -76,4 +76,6 @@ public abstract class AbstractConsole {
      * @param returnStrPos
      */
     abstract public void print(String string);
+
+    abstract public void flush();
 }

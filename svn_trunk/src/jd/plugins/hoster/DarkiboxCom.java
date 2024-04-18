@@ -22,6 +22,7 @@ import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -30,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48912 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48934 $", interfaceVersion = 3, names = {}, urls = {})
 public class DarkiboxCom extends XFileSharingProBasic {
     public DarkiboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -109,12 +110,20 @@ public class DarkiboxCom extends XFileSharingProBasic {
         return -1;
     }
 
+    private boolean uglyTempWorkaround = false;
+
     @Override
     protected String getDllinkViaOfficialVideoDownload(final Browser br, final DownloadLink link, final Account account, final boolean returnFilesize) throws Exception {
-        final URL_TYPE type = getURLType(br.getURL());
-        if (type != URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD) {
-            /* 2023-10-06: This skips pre download wait */
-            this.getPage(buildURLPath(link, this.getFUIDFromURL(link), URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD));
+        /* 2024-04-17: Removed special handling as it looks like this website has disabled official video downloads for free-users. */
+        // final URL_TYPE type = getURLType(br.getURL());
+        // if (type != URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD) {
+        // /* 2023-10-06: This skips pre download wait */
+        // this.getPage(buildURLPath(link, this.getFUIDFromURL(link), URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD));
+        // }
+        if (!uglyTempWorkaround && Thread.currentThread() instanceof SingleDownloadController) {
+            // Wait before download1 form is sent
+            Thread.sleep(3100l);
+            uglyTempWorkaround = true;
         }
         return super.getDllinkViaOfficialVideoDownload(br, link, account, returnFilesize);
     }
@@ -146,5 +155,15 @@ public class DarkiboxCom extends XFileSharingProBasic {
     @Override
     protected boolean isVideohoster_enforce_video_filename() {
         return true;
+    }
+
+    @Override
+    protected String regexWaittime(final String html) {
+        final String waitSeconds = new Regex(html, ">(\\d+)</span>\\s*seconds\\s*</span>").getMatch(0);
+        if (waitSeconds != null) {
+            return waitSeconds;
+        } else {
+            return super.regexWaittime(html);
+        }
     }
 }

@@ -48,11 +48,11 @@ public class ConsoleDialog implements ConsoleDialogInterface {
     private boolean               errBefore;
     private final String          title;
 
-    public ConsoleDialog(AbstractConsole console, String string) {
-        this.console = console;
-        if (this.console == null) {
+    public ConsoleDialog(final AbstractConsole console, String string) {
+        if (console == null) {
             throw new RuntimeException("No Console Available!");
         }
+        this.console = console;
         this.title = string;
     }
 
@@ -154,6 +154,10 @@ public class ConsoleDialog implements ConsoleDialogInterface {
         this.println(string);
         this.print("|>\t");
         return this.console.readPassword();
+    }
+
+    public void flush() {
+        this.console.flush();
     }
 
     /**

@@ -48,74 +48,101 @@ import java.util.Arrays;
  *
  */
 public class JVMVersion {
+    public interface JavaVersionInterface {
+        public boolean isHigherThan(final JavaVersionInterface v);
+
+        public boolean isMinimum(final JavaVersionInterface v);
+
+        public boolean isMaximum(final JavaVersionInterface v);
+
+        public boolean isLowerThan(final JavaVersionInterface v);
+
+        public boolean is(JavaVersionInterface version);
+
+        public long getLongID();
+
+        public int getClassID();
+
+        public String getVersionString();
+
+        public boolean isLTS();
+
+        public JavaVersion getBase();
+    }
+
     // https://en.wikipedia.org/wiki/Java_version_history
     // https://www.java.com/releases/matrix/
     // https://endoflife.date/java
     @Deprecated
-    public final static long  JAVA_1_5 = JavaVersion.JVM_1_5.longID;
+    public final static long                  JAVA_1_5 = JavaVersion.JVM_1_5.longID;
     @Deprecated
-    public final static long  JAVA15   = JavaVersion.JVM_1_5.longID;
+    public final static long                  JAVA15   = JavaVersion.JVM_1_5.longID;
     @Deprecated
-    public final static long  JAVA_1_6 = JavaVersion.JVM_1_6.longID;
+    public final static long                  JAVA_1_6 = JavaVersion.JVM_1_6.longID;
     @Deprecated
-    public final static long  JAVA16   = JavaVersion.JVM_1_6.longID;
+    public final static long                  JAVA16   = JavaVersion.JVM_1_6.longID;
     @Deprecated
-    public final static long  JAVA_1_7 = JavaVersion.JVM_1_7.longID;
+    public final static long                  JAVA_1_7 = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long  JAVA17   = JavaVersion.JVM_1_7.longID;
+    public final static long                  JAVA17   = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long  JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
+    public final static long                  JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
     @Deprecated
-    public final static long  JAVA18   = JavaVersion.JVM_1_8.longID;
+    public final static long                  JAVA18   = JavaVersion.JVM_1_8.longID;
     @Deprecated
-    public final static long  JAVA_9   = JavaVersion.JVM_9_0.longID;
+    public final static long                  JAVA_9   = JavaVersion.JVM_9_0.longID;
     @Deprecated
-    public final static long  JAVA19   = JavaVersion.JVM_9_0.longID;
+    public final static long                  JAVA19   = JavaVersion.JVM_9_0.longID;
     @Deprecated
-    public final static long  JAVA_10  = JavaVersion.JVM_10_0.longID;
+    public final static long                  JAVA_10  = JavaVersion.JVM_10_0.longID;
     @Deprecated
-    public final static long  JAVA_11  = JavaVersion.JVM_11_0.longID; // LTS Sep 2026
+    public final static long                  JAVA_11  = JavaVersion.JVM_11_0.longID; // LTS Sep 2026
     @Deprecated
-    public final static long  JAVA_12  = JavaVersion.JVM_12_0.longID; // March 2019
+    public final static long                  JAVA_12  = JavaVersion.JVM_12_0.longID; // March 2019
     @Deprecated
-    public final static long  JAVA_13  = JavaVersion.JVM_13_0.longID; // September 2019
+    public final static long                  JAVA_13  = JavaVersion.JVM_13_0.longID; // September 2019
     @Deprecated
-    public final static long  JAVA_14  = JavaVersion.JVM_14_0.longID; // March 2020
+    public final static long                  JAVA_14  = JavaVersion.JVM_14_0.longID; // March 2020
     @Deprecated
-    public final static long  JAVA_15  = JavaVersion.JVM_15_0.longID; // September 2020
+    public final static long                  JAVA_15  = JavaVersion.JVM_15_0.longID; // September 2020
     @Deprecated
-    public final static long  JAVA_16  = JavaVersion.JVM_16_0.longID; // March 2021
+    public final static long                  JAVA_16  = JavaVersion.JVM_16_0.longID; // March 2021
     @Deprecated
-    public final static long  JAVA_17  = JavaVersion.JVM_17_0.longID; // September 2021, LTS Sep 2029
+    public final static long                  JAVA_17  = JavaVersion.JVM_17_0.longID; // September 2021, LTS Sep 2029
     @Deprecated
-    public final static long  JAVA_18  = JavaVersion.JVM_18_0.longID; // March 2022, EA
+    public final static long                  JAVA_18  = JavaVersion.JVM_18_0.longID; // March 2022, EA
     @Deprecated
-    public final static long  JAVA_19  = JavaVersion.JVM_19_0.longID; // September 2022, EA
+    public final static long                  JAVA_19  = JavaVersion.JVM_19_0.longID; // September 2022, EA
     @Deprecated
-    public final static long  JAVA_20  = JavaVersion.JVM_20_0.longID; // March 2023
+    public final static long                  JAVA_20  = JavaVersion.JVM_20_0.longID; // March 2023
     @Deprecated
-    public final static long  JAVA_21  = JavaVersion.JVM_21_0.longID; // September 2023, LTS Sep 2031
+    public final static long                  JAVA_21  = JavaVersion.JVM_21_0.longID; // September 2023, LTS Sep 2031
     @Deprecated
-    public final static long  JAVA_22  = JavaVersion.JVM_22_0.longID; // March 2024
-    private static final long VERSION;
+    public final static long                  JAVA_22  = JavaVersion.JVM_22_0.longID; // March 2024
+    private static final JavaVersionInterface VERSION;
     static {
-        long version = -1;
+        JavaVersionInterface version = JavaVersion.UNKNOWN;
         try {
             final String versionString = getJVMVersion();
-            version = parseJavaVersionString(versionString);
+            version = toJavaVersion(versionString);
         } catch (final Throwable ignore) {
             ignore.printStackTrace();
-            version = -1;
         }
         VERSION = version;
     }
 
+    @Deprecated
     public static final long get() {
+        return getVersion().getLongID();
+    }
+
+    public static final JavaVersionInterface getVersion() {
         return VERSION;
     }
 
+    @Deprecated
     public static final boolean isMinimum(final long version) {
-        return VERSION >= version;
+        return getVersion().getLongID() >= version;
     }
 
     public static String getJVMVersion() {
@@ -229,23 +256,74 @@ public class JVMVersion {
         return ret;
     }
 
-    /**
-     * @param l
-     * @return
-     */
-    public static JavaVersion toJavaVersion(long longID) {
+    public static JavaVersionInterface toJavaVersion(final String versionString) {
+        final long longID = parseJavaVersionString(versionString);
+        JavaVersion base = JavaVersion.UNKNOWN;
         for (JavaVersion v : JavaVersion.values()) {
             if (v.is(longID)) {
-                return v;
+                base = v;
+                break;
             }
         }
-        return JavaVersion.UNKNOWN;
+        final JavaVersion finalBase = base;
+        return new JavaVersionInterface() {
+            public boolean is(JavaVersionInterface version) {
+                return getBase().is(version);
+            }
+
+            public boolean isHigherThan(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() > v.getLongID();
+            }
+
+            public boolean isMinimum(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() >= v.getLongID();
+            }
+
+            public boolean isMaximum(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() <= v.getLongID();
+            }
+
+            public boolean isLowerThan(final JavaVersionInterface v) {
+                return v != null && v != JavaVersion.UNKNOWN && getLongID() != -1 && v.getLongID() != -1 && getLongID() < v.getLongID();
+            }
+
+            @Override
+            public long getLongID() {
+                return longID;
+            }
+
+            @Override
+            public JavaVersion getBase() {
+                return finalBase;
+            }
+
+            @Override
+            public int getClassID() {
+                return getBase().getClassID();
+            }
+
+            @Override
+            public boolean isLTS() {
+                return getBase().isLTS();
+            }
+
+            @Override
+            public String getVersionString() {
+                return versionString;
+            }
+
+            @Override
+            public String toString() {
+                return "Base:" + getBase().name() + (isLTS() ? "(LTS)" : "") + "|Version:" + getLongID() + "(" + getVersionString() + ")|ClassID:" + getClassID();
+            }
+        };
     }
 
     /**
      * @param javaVersion
      * @return
      */
+    @Deprecated
     public static boolean is(JavaVersion version) {
         return version != null && version.is(get());
     }
@@ -254,7 +332,8 @@ public class JVMVersion {
      * @param jvm6
      * @return
      */
-    public static boolean isAtLeast(JavaVersion v) {
-        return v != null && get() > v.longID;
+    @Deprecated
+    public static boolean isAtLeast(JavaVersion version) {
+        return version != null && get() > version.getLongID();
     }
 }

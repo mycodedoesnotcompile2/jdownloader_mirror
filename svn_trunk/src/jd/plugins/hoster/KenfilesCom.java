@@ -19,9 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -33,7 +30,10 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48682 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
 public class KenfilesCom extends XFileSharingProBasic {
     public KenfilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -188,11 +188,11 @@ public class KenfilesCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected String regexWaittime() {
-        String waitStr = super.regexWaittime();
+    protected String regexWaittime(Browser br) {
+        String waitStr = super.regexWaittime(br);
         if (waitStr == null) {
             /* 2020-09-02: Special */
-            waitStr = new Regex(correctedBR, ">(\\d+)</span> seconds<").getMatch(0);
+            waitStr = new Regex(br.getRequest().getHtmlCode(), ">(\\d+)</span> seconds<").getMatch(0);
         }
         return waitStr;
     }

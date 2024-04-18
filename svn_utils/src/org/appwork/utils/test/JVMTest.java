@@ -35,6 +35,7 @@ package org.appwork.utils.test;
 
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JVMVersion.JavaVersionInterface;
 import org.appwork.utils.JavaVersion;
 
 /**
@@ -90,8 +91,95 @@ public class JVMTest extends AWTest {
         assertTrue(JavaVersion.JVM_1_0.is("1.0.1"));
         assertTrue(!JavaVersion.JVM_22_0.is("23.1"));
         assertTrue(JavaVersion.JVM_22_0.is("22.0.1"));
-        assertTrue(JVMVersion.is(JVMVersion.toJavaVersion(JVMVersion.get())));
         assertTrue(JVMVersion.isAtLeast(JavaVersion.JVM_1_8));
+        assertTrue(JVMVersion.getVersion().isMinimum(JVMVersion.getVersion()));
+        assertTrue(JVMVersion.getVersion().isMaximum(JVMVersion.getVersion()));
+        assertTrue(JVMVersion.getVersion().isHigherThan(JavaVersion.JVM_1_5));
+        assertTrue(JVMVersion.getVersion().isHigherThan(JavaVersion.JVM_1_6));
+        assertTrue(JVMVersion.getVersion().isHigherThan(JavaVersion.JVM_1_7));
+        assertFalse(JVMVersion.getVersion().isHigherThan(JVMVersion.getVersion()));
+        assertTrue(JVMVersion.getVersion().isMinimum(JavaVersion.JVM_1_8));
+        assertTrue(JVMVersion.getVersion().isMinimum(JVMVersion.getVersion().getBase()));
+        final JavaVersionInterface current = JVMVersion.getVersion();
+        boolean found = false;
+        final JavaVersion[] versions = JavaVersion.values();
+        for (JavaVersion version : versions) {
+            if (found || version.is(current)) {
+                if (found) {
+                    assertTrue(version.isHigherThan(current.getBase()));
+                }
+                found = true;
+                assertTrue(version.isMinimum(current.getBase()));
+                if (version.ordinal() + 1 < versions.length) {
+                    final JavaVersion next = versions[version.ordinal() + 1];
+                    assertTrue(current.isLowerThan(next));
+                    assertTrue(current.isMaximum(next));
+                    assertTrue(!current.isHigherThan(next));
+                    assertTrue(!current.isMinimum(next));
+                    assertTrue(next.isHigherThan(current));
+                    assertTrue(next.isMinimum(current));
+                    assertTrue(!next.isLowerThan(current));
+                    assertTrue(!next.isMaximum(current));
+                    assertTrue(!current.is(next));
+                }
+            }
+        }
+        for (JavaVersion version : versions) {
+            if (JavaVersion.UNKNOWN.equals(version)) {
+                continue;
+            }
+            final JavaVersionInterface check = JVMVersion.toJavaVersion(version.getVersionString());
+            assertTrue(check.getBase().equals(version.getBase()));
+            assertTrue(check.isMinimum(version));
+            assertTrue(check.is(version));
+            if (version.ordinal() + 1 < versions.length) {
+                final JavaVersion next = versions[version.ordinal() + 1];
+                assertTrue(check.isLowerThan(next));
+                assertTrue(check.isMaximum(next));
+                assertTrue(!check.isHigherThan(next));
+                assertTrue(!check.isMinimum(next));
+                assertTrue(next.isHigherThan(check));
+                assertTrue(next.isMinimum(check));
+                assertTrue(!next.isLowerThan(check));
+                assertTrue(!next.isMaximum(check));
+                assertTrue(!check.is(next));
+            }
+        }
+        final JavaVersionInterface farFarAway = JVMVersion.toJavaVersion("100");
+        assertTrue(JavaVersion.UNKNOWN.equals(farFarAway.getBase()));
+        assertTrue(farFarAway.is(farFarAway));
+        for (JavaVersion version : versions) {
+            if (JavaVersion.UNKNOWN.equals(version)) {
+                continue;
+            }
+            assertTrue(farFarAway.isMinimum(version));
+            assertTrue(farFarAway.isHigherThan(version));
+            assertTrue(!farFarAway.isLowerThan(version));
+            assertTrue(!farFarAway.isMaximum(version));
+            assertTrue(version.isLowerThan(farFarAway));
+            assertTrue(version.isMaximum(farFarAway));
+            assertTrue(!version.isHigherThan(farFarAway));
+            assertTrue(!version.isMinimum(farFarAway));
+            assertTrue(!version.is(farFarAway));
+            assertTrue(!farFarAway.is(version));
+        }
+        final JavaVersionInterface isThisJava = JVMVersion.toJavaVersion("Punkt Punkt Komma Strich Fertig Ist das Mondgesicht");
+        assertTrue(JavaVersion.UNKNOWN.equals(isThisJava.getBase()));
+        for (JavaVersion version : versions) {
+            if (JavaVersion.UNKNOWN.equals(version)) {
+                continue;
+            }
+            assertTrue(!isThisJava.isMinimum(version));
+            assertTrue(!isThisJava.isHigherThan(version));
+            assertTrue(!isThisJava.isLowerThan(version));
+            assertTrue(!isThisJava.isMaximum(version));
+            assertTrue(!version.isLowerThan(isThisJava));
+            assertTrue(!version.isMaximum(isThisJava));
+            assertTrue(!version.isHigherThan(isThisJava));
+            assertTrue(!version.isMinimum(isThisJava));
+            assertTrue(!version.is(isThisJava));
+            assertTrue(!isThisJava.is(version));
+        }
     }
 
     private void check(String string, long i) throws Exception {

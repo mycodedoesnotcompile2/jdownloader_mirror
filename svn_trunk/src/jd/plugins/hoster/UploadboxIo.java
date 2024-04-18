@@ -18,16 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46513 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadboxIo extends XFileSharingProBasic {
     public UploadboxIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -107,11 +108,11 @@ public class UploadboxIo extends XFileSharingProBasic {
     }
 
     @Override
-    protected String regexWaittime() {
+    protected String regexWaittime(Browser br) {
         /* 2020-06-03: Special */
-        String waitStr = super.regexWaittime();
+        String waitStr = super.regexWaittime(br);
         if (waitStr == null) {
-            waitStr = new Regex(correctedBR, "<span[^>]*?class=\"seconds count\"[^>]*?>\\s*(\\d+)").getMatch(0);
+            waitStr = new Regex(br.getRequest().getHtmlCode(), "<span[^>]*?class=\"seconds count\"[^>]*?>\\s*(\\d+)").getMatch(0);
         }
         return waitStr;
     }

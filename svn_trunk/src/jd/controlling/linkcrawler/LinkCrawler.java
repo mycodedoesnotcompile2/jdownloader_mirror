@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -53,6 +54,7 @@ import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.controlling.UrlProtection;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.myjdownloader.client.json.AvailableLinkState;
+import org.jdownloader.plugins.components.abstractGenericHTTPDirectoryIndexCrawler;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader;
@@ -87,7 +89,6 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.PluginsC;
-import jd.plugins.decrypter.GenericHTTPDirectoryIndexCrawler;
 import jd.plugins.hoster.DirectHTTP;
 
 public class LinkCrawler {
@@ -95,7 +96,8 @@ public class LinkCrawler {
         STOP,
         BLACKLISTED,
         NEXT,
-        CONTINUE
+        CONTINUE,
+        PARTIAL_MATCH
     }
 
     protected static enum DUPLICATE {
@@ -618,17 +620,16 @@ public class LinkCrawler {
     protected final AtomicReference<LazyCrawlerPlugin> lazyGenericHttpDirectoryCrawlerPlugin = new AtomicReference<LazyCrawlerPlugin>();
 
     protected LazyCrawlerPlugin getLazyGenericHttpDirectoryCrawlerPlugin() {
-        // TODO: 2024-03-07: Make use of this
         if (parentCrawler != null) {
             return parentCrawler.getLazyGenericHttpDirectoryCrawlerPlugin();
         } else {
-            LazyCrawlerPlugin ret = lazyGenericHttpDirectoryCrawlerPlugin.get();
+            final LazyCrawlerPlugin ret = lazyGenericHttpDirectoryCrawlerPlugin.get();
             if (ret == null) {
                 final List<LazyCrawlerPlugin> lazyCrawlerPlugins = getSortedLazyCrawlerPlugins();
                 final ListIterator<LazyCrawlerPlugin> it = lazyCrawlerPlugins.listIterator();
                 while (it.hasNext()) {
                     final LazyCrawlerPlugin pDecrypt = it.next();
-                    if (StringUtils.equals("httpdirectorycrawler", pDecrypt.getDisplayName())) {
+                    if ("httpdirectorycrawler".equals(pDecrypt.getDisplayName())) {
                         lazyGenericHttpDirectoryCrawlerPlugin.set(pDecrypt);
                         return pDecrypt;
                     }
@@ -1583,8 +1584,12 @@ public class LinkCrawler {
                             /* Check if http directory crawler would return results for current item */
                             ArrayList<DownloadLink> httpDirectoryResults = null;
                             try {
+                                // final LazyCrawlerPlugin lazyC = getDeepCrawlingPlugin();
+                                // if (lazyC == null) {
+                                // throw new UpdateRequiredClassNotFoundException("could not find 'LinkCrawlerDeepHelper' crawler plugin");
+                                // }
                                 final LazyCrawlerPlugin lazyHttpDirectoryCrawler = this.getLazyGenericHttpDirectoryCrawlerPlugin();
-                                final GenericHTTPDirectoryIndexCrawler httpDirectoryCrawler = (GenericHTTPDirectoryIndexCrawler) lazyHttpDirectoryCrawler.newInstance(getPluginClassLoaderChild());
+                                final abstractGenericHTTPDirectoryIndexCrawler httpDirectoryCrawler = (abstractGenericHTTPDirectoryIndexCrawler) lazyHttpDirectoryCrawler.newInstance(getPluginClassLoaderChild());
                                 httpDirectoryResults = httpDirectoryCrawler.parseHTTPDirectory(null, br);
                                 if (httpDirectoryResults != null && httpDirectoryResults.size() > 0) {
                                     /*
@@ -1606,11 +1611,10 @@ public class LinkCrawler {
                             }
                         }
                         final String finalBaseUrl = new Regex(brURL, "(https?://.*?)(\\?|$)").getMatch(0);
-                        final String crawlContent;
                         final boolean deepPatternContent;
+                        final List<CrawledLink> possibleDeepCryptedLinks;
                         if (matchingRule != null && matchingRule._getDeepPattern() != null) {
                             /* Crawl links according to pattern of rule. */
-                            deepPatternContent = true;
                             final String[][] matches = new Regex(request.getHtmlCode(), matchingRule._getDeepPattern()).getMatches();
                             if (matches == null || matches.length == 0) {
                                 /*
@@ -1632,7 +1636,6 @@ public class LinkCrawler {
                                         }
                                         sb.append(match);
                                         if (match.matches("^[^<>\"]+$")) {
-                                            // TODO: 2024-03-08: What is this doing?
                                             try {
                                                 final String url = br.getURL(match).toExternalForm();
                                                 if (dups.add(url)) {
@@ -1644,15 +1647,12 @@ public class LinkCrawler {
                                     }
                                 }
                             }
-                            crawlContent = sb.toString();
+                            deepPatternContent = true;
+                            possibleDeepCryptedLinks = find(generation, source, sb.toString(), finalBaseUrl, false, false);
                         } else {
                             deepPatternContent = false;
-                            crawlContent = request.getHtmlCode();
+                            possibleDeepCryptedLinks = find(generation, source, request.getHtmlCode(), finalBaseUrl, false, false);
                         }
-                        if (crawlContent == null) {
-                            return;
-                        }
-                        final List<CrawledLink> possibleDeepCryptedLinks = find(generation, source, crawlContent, finalBaseUrl, false, false);
                         if (possibleDeepCryptedLinks == null || possibleDeepCryptedLinks.size() == 0) {
                             return;
                         }
@@ -1696,7 +1696,6 @@ public class LinkCrawler {
                              * deepLink is our source and a matching deepPattern, crawl the links directly and don't wait for
                              * UnknownCrawledLinkHandler
                              */
-                            // TODO: 2024-04-16: psp: Explanation please
                             crawl(generation, possibleDeepCryptedLinks);
                         } else {
                             /* first check if the url itself can be handled */
@@ -1831,14 +1830,15 @@ public class LinkCrawler {
                     return DISTRIBUTE.BLACKLISTED;
                 }
                 if (!breakPluginForDecryptLoop(pDecrypt, link)) {
-                    final java.util.List<CrawledLink> allPossibleCryptedLinks = getCryptedLinks(pDecrypt, link, link.getCustomCrawledLinkModifier());
-                    if (allPossibleCryptedLinks != null) {
+                    final List<CrawledLink> cryptedLinks = new ArrayList<CrawledLink>();
+                    final DISTRIBUTE result = getCryptedLinks(cryptedLinks, pDecrypt, link, link.getCustomCrawledLinkModifier());
+                    if (cryptedLinks != null && cryptedLinks.size() > 0) {
                         if (insideCrawlerPlugin()) {
                             /*
                              * direct decrypt this link because we are already inside a LinkCrawlerThread and this avoids deadlocks on
                              * plugin waiting for linkcrawler results
                              */
-                            for (final CrawledLink decryptThis : allPossibleCryptedLinks) {
+                            for (final CrawledLink decryptThis : cryptedLinks) {
                                 if (!generation.isValid()) {
                                     /* LinkCrawler got aborted! */
                                     return DISTRIBUTE.STOP;
@@ -1849,7 +1849,7 @@ public class LinkCrawler {
                             /*
                              * enqueue these cryptedLinks for decrypting
                              */
-                            for (final CrawledLink decryptThis : allPossibleCryptedLinks) {
+                            for (final CrawledLink decryptThis : cryptedLinks) {
                                 final LinkCrawlerTask innerTask;
                                 if ((innerTask = checkStartNotify(generation, "distributePluginForDecrypt:" + pDecrypt + "|" + link.getURL() + "|" + decryptThis.getURL())) != null) {
                                     threadPool.execute(new LinkCrawlerRunnable(LinkCrawler.this, generation, innerTask) {
@@ -1879,7 +1879,7 @@ public class LinkCrawler {
                             }
                         }
                     }
-                    return DISTRIBUTE.NEXT;
+                    return result;
                 } else {
                     return DISTRIBUTE.CONTINUE;
                 }
@@ -2192,14 +2192,19 @@ public class LinkCrawler {
                              */
                             final List<LazyCrawlerPlugin> lazyCrawlerPlugins = getSortedLazyCrawlerPlugins();
                             final ListIterator<LazyCrawlerPlugin> it = lazyCrawlerPlugins.listIterator();
-                            loop: while (it.hasNext()) {
+                            lazyCrawlerPlugin: while (it.hasNext()) {
                                 final LazyCrawlerPlugin pDecrypt = it.next();
                                 final DISTRIBUTE ret = distributePluginForDecrypt(pDecrypt, generation, url, possibleCryptedLink);
                                 switch (ret) {
+                                case PARTIAL_MATCH:
+                                    if (it.previousIndex() > lazyCrawlerPlugins.size() / 50) {
+                                        resetSortedLazyCrawlerPlugins(lazyCrawlerPlugins);
+                                    }
+                                    continue lazyCrawlerPlugin;
                                 case STOP:
                                     return;
                                 case CONTINUE:
-                                    break;
+                                    continue lazyCrawlerPlugin;
                                 case BLACKLISTED:
                                     continue mainloop;
                                 case NEXT:
@@ -2217,14 +2222,14 @@ public class LinkCrawler {
                             /* now we will walk through all available hoster plugins */
                             final List<LazyHostPlugin> sortedLazyHostPlugins = getSortedLazyHostPlugins();
                             final ListIterator<LazyHostPlugin> it = sortedLazyHostPlugins.listIterator();
-                            loop: while (it.hasNext()) {
+                            lazyHosterPlugin: while (it.hasNext()) {
                                 final LazyHostPlugin pHost = it.next();
                                 final DISTRIBUTE ret = distributePluginForHost(pHost, generation, url, possibleCryptedLink);
                                 switch (ret) {
                                 case STOP:
                                     return;
                                 case CONTINUE:
-                                    break;
+                                    continue lazyHosterPlugin;
                                 case BLACKLISTED:
                                     continue mainloop;
                                 case NEXT:
@@ -2772,18 +2777,34 @@ public class LinkCrawler {
         return directHTTPPermission;
     }
 
-    public List<CrawledLink> getCryptedLinks(LazyCrawlerPlugin lazyC, CrawledLink source, CrawledLinkModifier modifier) {
+    public DISTRIBUTE getCryptedLinks(List<CrawledLink> results, LazyCrawlerPlugin lazyC, CrawledLink source, CrawledLinkModifier modifier) {
         final String[] matches = getMatchingLinks(lazyC.getPattern(), source, modifier);
         if (matches == null || matches.length == 0) {
-            return null;
+            return DISTRIBUTE.NEXT;
         }
-        final ArrayList<CrawledLink> ret = new ArrayList<CrawledLink>();
+        DISTRIBUTE result = null;
+        final String sourceURL = source.getURL();
         for (final String match : matches) {
             final CryptedLink cryptedLink;
-            if (matches.length == 1 && match.equals(source.getURL())) {
+            if (matches.length == 1 && match.equals(sourceURL)) {
                 cryptedLink = new CryptedLink(source);
             } else {
                 cryptedLink = new CryptedLink(match, source);
+            }
+            if (result == null) {
+                if (match.equals(source.getURL())) {
+                    result = DISTRIBUTE.NEXT;
+                } else {
+                    final Matcher firstHttp = Pattern.compile("https?://").matcher(sourceURL);
+                    final int firstHttpIndex = firstHttp.find() ? firstHttp.start() : -1;
+                    if (firstHttpIndex == sourceURL.indexOf(match)) {
+                        result = DISTRIBUTE.NEXT;
+                    } else {
+                        // match is part of another URL(eg: http://site1.com/dosomethingwith_/http://site2.com
+                        // site2.com is match here, but we want to continue, maybe another plugin can handle full site1+site2 URL
+                        result = DISTRIBUTE.PARTIAL_MATCH;
+                    }
+                }
             }
             cryptedLink.setLazyC(lazyC);
             final CrawledLink link = crawledLinkFactorybyCryptedLink(cryptedLink);
@@ -2802,9 +2823,9 @@ public class LinkCrawler {
                     link.setMatchingRule(source.getMatchingRule());
                 }
             }
-            ret.add(link);
+            results.add(link);
         }
-        return ret;
+        return result;
     }
 
     protected String[] getMatchingLinks(Pattern pattern, CrawledLink source, CrawledLinkModifier modifier) {
@@ -3522,7 +3543,8 @@ public class LinkCrawler {
                 set = new HashSet<String>();
                 duplicateFinderCrawler.put(lazyC, set);
             }
-            return !set.add(url);
+            final boolean ret = !set.add(url);
+            return ret;
         }
     }
 

@@ -1,6 +1,8 @@
 package org.appwork.utils;
 
-public enum JavaVersion {
+import org.appwork.utils.JVMVersion.JavaVersionInterface;
+
+public enum JavaVersion implements JavaVersionInterface {
     // UNKNOWN IS ALWAYS FIRST!
     UNKNOWN(0, "Unknown"),
     // ORDERR IS IMPORTANT! ALWAYS ORDER ENUMS ACCORDING TO THEIR VERSION!
@@ -63,6 +65,10 @@ public enum JavaVersion {
         return false;
     }
 
+    public boolean is(JavaVersionInterface version) {
+        return getBase() == version.getBase() || is(version.getLongID());
+    }
+
     public long nextVersionsLongID() {
         final int index = this.ordinal() + 1;
         if (index < values().length) {
@@ -83,35 +89,65 @@ public enum JavaVersion {
         this.lts = lts;
     }
 
-    public boolean isHigherThan(final JavaVersion v) {
-        if (this == UNKNOWN) {
+    public boolean isHigherThan(final JavaVersionInterface v) {
+        if (getBase() == UNKNOWN) {
             return false;
         } else {
-            return v != null && v != UNKNOWN && this.longID > v.longID;
+            return v != null && v != UNKNOWN && this.getLongID() != -1 && v.getLongID() != -1 && getLongID() > v.getLongID();
         }
     }
 
-    public boolean isMinimum(final JavaVersion v) {
-        if (this == UNKNOWN) {
+    public boolean isMinimum(final JavaVersionInterface v) {
+        if (getBase() == UNKNOWN) {
             return false;
         } else {
-            return v != null && v != UNKNOWN && this.longID >= v.longID;
+            return v != null && v != UNKNOWN && this.getLongID() != -1 && v.getLongID() != -1 && getLongID() >= v.getLongID();
         }
     }
 
-    public boolean isMaximum(final JavaVersion v) {
-        if (this == UNKNOWN) {
+    public boolean isMaximum(final JavaVersionInterface v) {
+        if (getBase() == UNKNOWN) {
             return false;
         } else {
-            return v != null && v != UNKNOWN && this.longID <= v.longID;
+            return v != null && v != UNKNOWN && this.getLongID() != -1 && v.getLongID() != -1 && getLongID() <= v.getLongID();
         }
     }
 
-    public boolean isLowerThan(final JavaVersion v) {
-        if (this == UNKNOWN) {
+    public boolean isLowerThan(final JavaVersionInterface v) {
+        if (getBase() == UNKNOWN) {
             return false;
         } else {
-            return v != null && v != UNKNOWN && this.longID < v.longID;
+            return v != null && v != UNKNOWN && this.getLongID() != -1 && v.getLongID() != -1 && getLongID() < v.getLongID();
         }
+    }
+
+    @Override
+    public long getLongID() {
+        return longID;
+    }
+
+    @Override
+    public JavaVersion getBase() {
+        return this;
+    }
+
+    @Override
+    public int getClassID() {
+        return classID;
+    }
+
+    @Override
+    public boolean isLTS() {
+        return lts;
+    }
+
+    @Override
+    public String getVersionString() {
+        return string;
+    }
+
+    @Override
+    public String toString() {
+        return "Base:" + name() + (isLTS() ? "(LTS)" : "") + "|Version:" + getLongID() + "(" + getVersionString() + ")|ClassID:" + getClassID();
     }
 }

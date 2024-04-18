@@ -69,6 +69,7 @@ import javax.swing.JFrame;
 import org.appwork.storage.config.MinTimeWeakReference;
 import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.URLStream;
@@ -292,6 +293,10 @@ public class ImageProvider {
                 // at sun.awt.FontConfiguration.readFontConfigFile(FontConfiguration.java:219)
                 // at sun.awt.FontConfiguration.init(FontConfiguration.java:107)
                 return true;
+            } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                // unknown exception, do not crash standalone headless
+                org.appwork.loggingv3.LogV3.log(throwable);
+                return true;
             } else {
                 return false;
             }
@@ -402,7 +407,7 @@ public class ImageProvider {
         }
     }
 
-    public static ImageIcon getImageIconUnCached(final String name, final int x, final int y) {        
+    public static ImageIcon getImageIconUnCached(final String name, final int x, final int y) {
         try {
             return ImageProvider.getImageIcon(name, x, y, true, false);
         } catch (final IOException e) {

@@ -42,7 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48913 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48932 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -182,11 +182,11 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected String regexWaittime() {
-        String waitStr = super.regexWaittime();
+    protected String regexWaittime(Browser br) {
+        String waitStr = super.regexWaittime(br);
         if (StringUtils.isEmpty(waitStr)) {
             /* 2018-07-19: Special */
-            waitStr = new Regex(correctedBR, "class\\s*=\\s*\"seconds\"[^>]*?>\\s*?(\\d+)\\s*?<").getMatch(0);
+            waitStr = new Regex(br.getRequest().getHtmlCode(), "class\\s*=\\s*\"seconds\"[^>]*?>\\s*?(\\d+)\\s*?<").getMatch(0);
         }
         return waitStr;
     }
@@ -348,7 +348,6 @@ public class SubyShareCom extends XFileSharingProBasic {
                 }
                 logger.info("Submitted Form download2");
                 checkErrors(br, correctedBR, link, account, true);
-                /* 2020-03-02: E.g. akvideo.stream */
                 dllink = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
                 if (dllink == null) {
                     dllink = getDllink(link, account, br, correctedBR);
