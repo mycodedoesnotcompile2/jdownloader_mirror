@@ -258,6 +258,7 @@ public class JVMVersion {
 
     public static JavaVersionInterface toJavaVersion(final String versionString) {
         final long longID = parseJavaVersionString(versionString);
+        final boolean isLTS = versionString != null && versionString.contains("LTS");
         JavaVersion base = JavaVersion.UNKNOWN;
         for (JavaVersion v : JavaVersion.values()) {
             if (v.is(longID)) {
@@ -304,7 +305,7 @@ public class JVMVersion {
 
             @Override
             public boolean isLTS() {
-                return getBase().isLTS();
+                return isLTS || getBase().isLTS();
             }
 
             @Override

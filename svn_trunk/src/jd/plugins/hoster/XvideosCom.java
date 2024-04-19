@@ -18,15 +18,15 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.config.XvideosComConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 48845 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.XvideosComConfig;
+
+@HostPlugin(revision = "$Revision: 48936 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -84,7 +84,7 @@ public class XvideosCom extends XvideosCore {
             pattern += "|embedframe/\\d+";
             pattern += "|[a-z0-9\\-]+/(upload|pornstar|model)/[a-z0-9\\-_]+/\\d+/[^/#\\?]+";
             /* 2024-04-02 */
-            pattern += "|prof-video-click/upload/[a-z0-9\\-]+/[a-z0-9\\-]+/[a-z0-9\\-_]+";
+            pattern += "|prof-video-click/upload/[a-z0-9\\-_]+/[a-z0-9\\-]+/[a-z0-9\\-_]+";
             pattern += ")";
             ret.add(pattern);
         }

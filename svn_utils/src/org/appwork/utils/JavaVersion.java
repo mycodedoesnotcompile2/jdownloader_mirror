@@ -4,7 +4,7 @@ import org.appwork.utils.JVMVersion.JavaVersionInterface;
 
 public enum JavaVersion implements JavaVersionInterface {
     // UNKNOWN IS ALWAYS FIRST!
-    UNKNOWN(0, "Unknown"),
+    UNKNOWN(-1, "Unknown"),
     // ORDERR IS IMPORTANT! ALWAYS ORDER ENUMS ACCORDING TO THEIR VERSION!
     JVM_1_0(45, "1.0"),
     JVM_1_1(45, "1.1"),

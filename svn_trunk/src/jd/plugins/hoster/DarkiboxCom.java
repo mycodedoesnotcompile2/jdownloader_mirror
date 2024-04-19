@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48934 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48940 $", interfaceVersion = 3, names = {}, urls = {})
 public class DarkiboxCom extends XFileSharingProBasic {
     public DarkiboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,15 @@ public class DarkiboxCom extends XFileSharingProBasic {
         // }
         if (!uglyTempWorkaround && Thread.currentThread() instanceof SingleDownloadController) {
             // Wait before download1 form is sent
-            Thread.sleep(3100l);
+            final int waitSeconds;
+            final String waitStr = this.regexWaittime(br);
+            if (waitStr != null) {
+                waitSeconds = Integer.parseInt(waitStr);
+            } else {
+                /* Fallback */
+                waitSeconds = 3;
+            }
+            this.sleep(waitSeconds * 1001l, this.getDownloadLink());
             uglyTempWorkaround = true;
         }
         return super.getDllinkViaOfficialVideoDownload(br, link, account, returnFilesize);
@@ -149,6 +157,8 @@ public class DarkiboxCom extends XFileSharingProBasic {
         super.checkErrors(br, html, link, account, checkAll);
         if (br.containsHTML(">\\s*You are not able to download Files")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Website error 'You are not able to download Files'");
+        } else if (br.containsHTML(">\\s*File was locked by administrator")) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Website error 'File was locked by administrator'");
         }
     }
 

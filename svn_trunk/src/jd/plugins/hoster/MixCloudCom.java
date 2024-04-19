@@ -41,7 +41,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 48902 $", interfaceVersion = 3, names = { "mixcloud.com" }, urls = { "https?://stream\\d+\\.mixcloud\\.com/.+|https://thumbnailer\\.mixcloud\\.com/unsafe/.+" })
+@HostPlugin(revision = "$Revision: 48937 $", interfaceVersion = 3, names = { "mixcloud.com" }, urls = { "https?://stream\\d+\\.mixcloud\\.com/.+|https://thumbnailer\\.mixcloud\\.com/unsafe/.+" })
 public class MixCloudCom extends PluginForHost {
     public MixCloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -185,7 +185,8 @@ public class MixCloudCom extends PluginForHost {
                 }
                 br.getPage("https://" + this.getHost() + "/");
                 csrftoken = MixCloudComCrawler.findCsrftoken(br);
-                br.postPageRaw("https://app.mixcloud.com/graphql", "{\"id\":\"q33\",\"query\":\"query DashboardStatsCardQuery {viewer {id,...F1}} fragment F0 on Stats {comments {totalCount},favorites {totalCount},reposts {totalCount},plays {totalCount},minutes {totalCount},__typename} fragment F1 on Viewer {me {username,hasProFeatures,isUploader,stats {...F0},id},id}\",\"variables\":{}}");
+                PostRequest request = br.createJSonPostRequest("https://app.mixcloud.com/graphql", "{\"id\":\"q33\",\"query\":\"query DashboardStatsCardQuery {viewer {id,...F1}} fragment F0 on Stats {comments {totalCount},favorites {totalCount},reposts {totalCount},plays {totalCount},minutes {totalCount},__typename} fragment F1 on Viewer {me {username,hasProFeatures,isUploader,stats {...F0},id},id}\",\"variables\":{}}");
+                br.getPage(request);
                 final String username = PluginJSonUtils.getJson(br, "username");
                 if (!StringUtils.isEmpty(username)) {
                     logger.info("Cookie login successful");

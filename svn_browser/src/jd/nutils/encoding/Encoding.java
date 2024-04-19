@@ -375,7 +375,8 @@ public class Encoding {
         } else {
             throw new NumberFormatException("For input string: \"" + s + "\"");
         }
-        return result;
+        // Accumulating negatively avoids surprises near MAX_VALUE
+        return -result;
     }
 
     @Deprecated
