@@ -44,6 +44,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 
 import org.appwork.exceptions.WTFException;
@@ -423,10 +424,10 @@ public class FlexiJSonStringBuilder {
                     finalizeAppendString(out);
                     bytesToStream(out, escapedEscapedQuotationMarks);
                     continue;
-                    // case '\'':
-                    // We support only " in the stringifier
-                    // bytesToStream(out, "\\'".getBytes(charset));
-                    // continue;
+                // case '\'':
+                // We support only " in the stringifier
+                // bytesToStream(out, "\\'".getBytes(charset));
+                // continue;
                 case '\\':
                     finalizeAppendString(out);
                     bytesToStream(out, escapedEscaped);
@@ -593,7 +594,7 @@ public class FlexiJSonStringBuilder {
             object.getCommentsInside().writeToStream(this, out, 0, path);
         }
         boolean first = true;
-        for (KeyValueElement es : object.getElements()) {
+        for (KeyValueElement es : getObjectElementsList(object)) {
             writeIfNotEOL(out);
             if (first) {
                 first = false;
@@ -619,6 +620,10 @@ public class FlexiJSonStringBuilder {
         if (a != null) {
             a.writeToStream(this, out, 0, path);
         }
+    }
+
+    protected List<KeyValueElement> getObjectElementsList(FlexiJSonObject object) {
+        return object.getElements();
     }
 
     /**

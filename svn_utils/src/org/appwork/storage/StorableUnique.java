@@ -52,6 +52,8 @@ import java.lang.annotation.Target;
 public @interface StorableUnique {
     String value();
 
+    boolean caseInSensitive() default false;
+
     String message() default "";
 
     FailLevel level() default FailLevel.ERROR;

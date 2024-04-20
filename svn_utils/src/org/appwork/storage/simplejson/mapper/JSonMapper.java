@@ -128,7 +128,7 @@ public class JSonMapper {
                 throw new WTFException("Unknown Primitive Type: " + clazz);
             }
         } else if (clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) {
-            return createJsonValue(obj + "");
+            return createJsonValue(((Enum) obj).name());
         } else if (obj instanceof Boolean) {
             return createJsonValue(((Boolean) obj));
         } else if (obj instanceof Character) {
@@ -169,7 +169,7 @@ public class JSonMapper {
             return createJsonValue(((Class<?>) obj).getName());
         } else if ((mapper = typeMapper.get(clazz)) != null) {
             return mapper.map(obj);
-        } else/* if (obj instanceof Storable) */{
+        } else/* if (obj instanceof Storable) */ {
             final JSonObject ret = createJSonObject(null);
             try {
                 final ClassCache cc = getClassCache(clazz);

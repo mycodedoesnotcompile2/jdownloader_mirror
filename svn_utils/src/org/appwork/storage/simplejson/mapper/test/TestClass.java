@@ -59,6 +59,16 @@ public class TestClass implements Storable {
         BLUMM
     }
 
+    private enum EnumOverriddenToString {
+        @StorableDoc("error")
+        OVERRIDDEN_TOSTRING() {
+            @Override
+            public String toString() {
+                return "ERROR...";
+            }
+        }
+    }
+
     public static java.util.List<TestClass> createList() {
         final java.util.List<TestClass> ret = new ArrayList<TestClass>();
         ret.add(TestClass.createObject());
@@ -90,18 +100,18 @@ public class TestClass implements Storable {
     private KeyValueEntry<Integer, Boolean> genericDefinitionByContainerClass = new KeyValueEntry<Integer, Boolean>(1, true);
 
     public KeyValueEntry<Integer, Boolean> getGenericDefinitionByContainerClass() {
-        return genericDefinitionByContainerClass;
+        return this.genericDefinitionByContainerClass;
     }
 
-    public void setGenericDefinitionByContainerClass(KeyValueEntry<Integer, Boolean> genericDefinitionByContainerClass) {
+    public void setGenericDefinitionByContainerClass(final KeyValueEntry<Integer, Boolean> genericDefinitionByContainerClass) {
         this.genericDefinitionByContainerClass = genericDefinitionByContainerClass;
     }
 
     public KeyValueStringEntry getGenericDefinitionBySuperclass() {
-        return genericDefinitionBySuperclass;
+        return this.genericDefinitionBySuperclass;
     }
 
-    public void setGenericDefinitionBySuperclass(KeyValueStringEntry genericDefinitionBySuperclass) {
+    public void setGenericDefinitionBySuperclass(final KeyValueStringEntry genericDefinitionBySuperclass) {
         this.genericDefinitionBySuperclass = genericDefinitionBySuperclass;
     }
 
@@ -110,10 +120,10 @@ public class TestClass implements Storable {
     private KeyValueLong        genericLongClass              = new KeyValueLong(Long.valueOf(1), Long.valueOf(2));
 
     public KeyValueLong getGenericLongClass() {
-        return genericLongClass;
+        return this.genericLongClass;
     }
 
-    public void setGenericLongClass(KeyValueLong genericLongClass) {
+    public void setGenericLongClass(final KeyValueLong genericLongClass) {
         this.genericLongClass = genericLongClass;
     }
 
@@ -121,14 +131,14 @@ public class TestClass implements Storable {
      * @return the genericClass
      */
     public KeyValueStringEntry getGenericClass() {
-        return genericClass;
+        return this.genericClass;
     }
 
     /**
      * @param genericClass
      *            the genericClass to set
      */
-    public void setGenericClass(KeyValueStringEntry genericClass) {
+    public void setGenericClass(final KeyValueStringEntry genericClass) {
         this.genericClass = genericClass;
     }
 
@@ -154,6 +164,15 @@ public class TestClass implements Storable {
     private HashMap<String, TestClass> map      = new HashMap<String, TestClass>();
     private java.util.List<Integer>    list     = new ArrayList<Integer>();
     private TestClass                  obj;
+    private EnumOverriddenToString     numtoString;
+
+    public EnumOverriddenToString getNumtoString() {
+        return this.numtoString;
+    }
+
+    public void setNumtoString(final EnumOverriddenToString numtoString) {
+        this.numtoString = numtoString;
+    }
 
     public TestClass() {
     }
@@ -170,6 +189,7 @@ public class TestClass implements Storable {
         this.pFloat = 0.423f;
         this.pLong = 4355543543l;
         this.pInt = 2435253;
+        this.numtoString = EnumOverriddenToString.OVERRIDDEN_TOSTRING;
         this.pByte = 0x14;
         this.pChar = 0x13;
         this.pBoolean = false;

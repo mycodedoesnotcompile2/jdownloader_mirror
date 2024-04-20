@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -77,6 +78,7 @@ import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
+import org.appwork.storage.simplejson.ValueType;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Property;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -750,7 +752,7 @@ public class StorableValidator<T> {
          * @param value
          */
         public ValidatorNonUniqueKeyException(StorableValidator storableValidator, CompiledType type, JSPath path, FlexiJSonNode flexiJSonNode, StorableUnique a, Object value) {
-            this(storableValidator, path, flexiJSonNode, type, StringUtils.isEmpty(a.message()) ? ("There may be only a single entry with " + a.value() + "=" + FlexiUtils.serializeMinimizedWithWTF(value)) : a.message(), a, value, a.level());
+            this(storableValidator, path, flexiJSonNode, type, StringUtils.isEmpty(a.message()) ? ("There may be only a single(" + (a.caseInSensitive() ? "Case INsensitive" : "Case Sensitive") + ") entry with " + a.value() + "=" + FlexiUtils.serializeMinimizedWithWTF(value)) : a.message(), a, value, a.level());
         }
 
         /**
@@ -1627,6 +1629,13 @@ public class StorableValidator<T> {
                 try {
                     Object uniqueValue;
                     uniqueValue = JSPath.fromPathString(a.value()).resolve(entry);
+                    if (a.caseInSensitive()) {
+                        if (uniqueValue instanceof String) {
+                            uniqueValue = ((String) uniqueValue).toLowerCase(Locale.ROOT);
+                        } else if (uniqueValue instanceof FlexiJSonValue && ((FlexiJSonValue) uniqueValue).getType() == ValueType.STRING) {
+                            uniqueValue = ((String) (((FlexiJSonValue) uniqueValue).getValue())).toLowerCase(Locale.ROOT);
+                        }
+                    }
                     try {
                         if (dupeCheck.contains(uniqueValue)) {
                             add(new ValidatorNonUniqueKeyException(this, toDo.type, toDo.path, toDo.node, a, uniqueValue));

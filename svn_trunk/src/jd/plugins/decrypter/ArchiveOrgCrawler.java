@@ -39,6 +39,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -66,7 +67,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 48941 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 48945 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -887,12 +888,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 /* User desired item(s) are available -> Return only them */
                 return desiredSubpathItems;
             }
-            // final SingleFilePathNotFoundMode mode = cfg.getSingleFilePathNonFoundMode();
-            // if (mode == SingleFilePathNotFoundMode.ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE) {
-            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            // } else {
-            // logger.info("Single desired path was not found -> Adding all results instead");
-            // }
+            final SingleFilePathNotFoundMode mode = cfg.getSingleFilePathNonFoundMode();
+            if (mode == SingleFilePathNotFoundMode.ADD_NOTHING_AND_DISPLAY_ADDED_URL_AS_OFFLINE) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                logger.info("Single desired path was not found -> Adding all results instead");
+            }
         }
         if (StringUtils.equalsIgnoreCase(mediatype, "texts")) {
             /* Book crawl handling */

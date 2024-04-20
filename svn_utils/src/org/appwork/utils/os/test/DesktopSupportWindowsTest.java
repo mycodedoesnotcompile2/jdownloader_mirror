@@ -31,59 +31,35 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.serializer;
+package org.appwork.utils.os.test;
 
-public enum SC {
+import org.appwork.testframework.AWTest;
+import org.appwork.utils.Application;
+import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.os.DesktopSupportWindows;
+
+public class DesktopSupportWindowsTest extends AWTest {
+    public static void main(String[] args) {
+        run();
+    }
+
     /**
-     * Ignore syntax and format issues as long as we can assure that the values are 100% correct
+     * @see org.appwork.testframework.TestInterface#runTest()
      */
-    NON_STRICT,
-    /**
-     * We need a new instance - do not reuse any cached instances
-     */
-    ENSURE_NEW_INSTANCES,
-    /**
-     * Try to optimize the serialized data for network transfer
-     */
-    NETWORK_TRANSFER,
-    /**
-     * Optimize for human readable config files
-     */
-    CONFIG_FILE,
-    /**
-     * MAY RESULT IN INVALID SYNTAX AND ERRORS IF YOU TRY TO DESERIALIZE THE RESULT! Optimized to print to a single log line - the focus is
-     * on readability - not on proper Serialization/Deserialization.
-     */
-    LOG_SINGLELINE,
-    /**
-     * Append Documentation comments - keep correct syntax.
-     *
-     */
-    WITH_DOCUMENTATION,
-    /**
-     * MAY RESULT IN INVALID SYNTAX AND ERRORS IF YOU TRY TO DESERIALIZE THE RESULT! Optimized to print to multiple log lines - the focus is
-     * on readability - not on proper Serialization/Deserialization.
-     */
-    LOG_MULTILINE,
-    /**
-     * Optimized to read/write from disk - THE RESULT MAY BE BINARY _ NOT HUMAN READABLE.
-     */
-    STORAGE,
-    /**
-     * We and to hash the result - if possible it should always be the same and never change. Same Input -> Same Output. Serilizers must
-     * sort properties case sensitive alphanumeric. NO whitespace!
-     */
-    HASH_CONTENT,
-    /**
-     * optimized For human readable output
-     */
-    READABLE,
-    /**
-     * Ensure that the result does not contain and newlines
-     */
-    SINGLE_LINE,
-    /**
-     * do not serialize default values
-     */
-    IGNORE_DEFAULT_VALUES
+    @Override
+    public void runTest() throws Exception {
+        if (CrossSystem.isWindows() && CrossSystem.is64BitOperatingSystem()) {
+            if (Application.is64BitJvm()) {
+                String pf32 = DesktopSupportWindows.get32BitProgramFiles(null);
+                String pf64 = DesktopSupportWindows.getProgramFiles(null);
+                System.out.println("On a 64 bit os, these folder should never be the same - no matter that jvm is used");
+                assertFalse(pf32.equals(pf64));
+            } else {
+                String pf32 = DesktopSupportWindows.get32BitProgramFiles(null);
+                String pf64 = DesktopSupportWindows.getProgramFiles(null);
+                System.out.println("On a 64 bit os, these folder should never be the same - no matter that jvm is used");
+                assertFalse(pf32.equals(pf64));
+            }
+        }
+    }
 }

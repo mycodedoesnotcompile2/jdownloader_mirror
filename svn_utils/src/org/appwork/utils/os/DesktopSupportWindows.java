@@ -139,7 +139,6 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
                 }
                 return true;
             } else {
-
                 /* older windows versions */
                 try {
                     ProcessBuilderFactory.runCommand(new String[] { "RUNDLL32.EXE", "user,ExitWindowsExec" });
@@ -156,7 +155,6 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
                     org.appwork.loggingv3.LogV3.log(e);
                 }
                 return true;
-
             }
         default:
             if (force) {
@@ -192,7 +190,6 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
                     org.appwork.loggingv3.LogV3.log(e);
                 }
             }
-
             // not tested
             if (os == OperatingSystem.WINDOWS_2000 || os == OperatingSystem.WINDOWS_NT) {
                 /* also try extra methods for windows2000 and nt */

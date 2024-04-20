@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48941 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48944 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1306,7 +1306,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean isXFSOld(final URL_TYPE urltype) {
-        if (urltype == null || urltype == URL_TYPE.IMAGE || urltype == URL_TYPE.NORMAL || urltype == URL_TYPE.EMBED_VIDEO || urltype == URL_TYPE.SHORT) {
+        if (urltype == null || urltype == URL_TYPE.IMAGE || urltype == URL_TYPE.NORMAL || urltype == URL_TYPE.EMBED_VIDEO || urltype == URL_TYPE.SHORT || urltype == URL_TYPE.FILE) {
             /* Old XFS */
             return true;
         } else {
@@ -2463,7 +2463,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    /** 2023-07-25:For new style XFS websites with links like /d/[a-z0-9]{12} e.g. filelions.to, streamhide.com */
+    /** 2023-07-25:For new style XFS websites with links like /d/[a-z0-9]{12} e.g. streamhide.com */
     protected String getDllinkViaOfficialVideoDownloadNew(final Browser br, final DownloadLink link, final Account account, final boolean returnFilesize) throws Exception {
         if (returnFilesize) {
             logger.info("[FilesizeMode] Trying to find official video downloads");

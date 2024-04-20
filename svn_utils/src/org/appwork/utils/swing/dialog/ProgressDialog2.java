@@ -42,8 +42,7 @@ import javax.swing.Icon;
  * @date 06.03.2021
  *
  */
-public abstract class ProgressDialog2 extends ProgressDialog implements ProgressDialog.ProgressGetter {
-
+public abstract class ProgressDialog2 extends ProgressDialog implements ProgressDialog.ProgressGetter, ProgressInterface {
     /**
      * @param progressGetter
      * @param flags
@@ -61,5 +60,4 @@ public abstract class ProgressDialog2 extends ProgressDialog implements Progress
     public ProgressDialog2(int flags, String title, String message, Icon icon) {
         this(null, flags, title, message, icon);
     }
-
 }

@@ -37,10 +37,10 @@ import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
-import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;

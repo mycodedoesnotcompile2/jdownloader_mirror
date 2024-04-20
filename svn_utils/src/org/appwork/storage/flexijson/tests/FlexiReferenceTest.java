@@ -71,7 +71,7 @@ public class FlexiReferenceTest extends AWTest {
         assertTrue(target instanceof FlexiJSonValue);
         assertTrue(((FlexiJSonValue) target).getType() == ValueType.REFERENCE);
         String hashContent = new FlexiSerializer().toString(node, SC.HASH_CONTENT);
-        assertEquals("{\"target\":1,\"link\":${target}}", hashContent);
+        assertEquals("{\"link\":${target},\"target\":1}", hashContent);
         System.out.println(node);
     }
 

@@ -114,7 +114,6 @@ public class JsonObjectLinkedHashMap extends LinkedHashMap<String, JSonNode> imp
             if (sb.length() > 3) {
                 sb.append(fieldDeliminator);
             }
-
             sb.append(PRETTY_PRINT_LAYER_INSET + StringUtils.fillPost(toStringKey(key), " ", keyLength));
             sb.append(keyValueDeliminator);
             String value = get(key).toPrettyString();

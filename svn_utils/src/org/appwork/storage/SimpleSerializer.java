@@ -36,11 +36,21 @@ package org.appwork.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 
 import org.appwork.serializer.SC;
 import org.appwork.storage.commonInterface.AbstractSerializer;
 import org.appwork.storage.commonInterface.SerializerException;
 import org.appwork.storage.commonInterface.SerializerInterface;
+import org.appwork.storage.simplejson.JSonNode;
+import org.appwork.storage.simplejson.JSonObject;
+import org.appwork.storage.simplejson.JsonObjectLinkedHashMap;
+import org.appwork.storage.simplejson.mapper.MapperException;
+import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
 
@@ -50,17 +60,13 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class SimpleSerializer extends AbstractSerializer implements SerializerInterface {
-    private SimpleMapper mapperMinified;
-    private SimpleMapper mapperPretty;
+    private SimpleMapper mapperMinified = null;
+    private SimpleMapper mapperPretty   = null;
 
     /**
      *
      */
     public SimpleSerializer() {
-        mapperMinified = new SimpleMapper();
-        mapperMinified.setPrettyPrintEnabled(false);
-        mapperPretty = new SimpleMapper();
-        mapperPretty.setPrettyPrintEnabled(true);
     }
 
     /*
@@ -69,14 +75,29 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
      * @see org.appwork.storage.commonInterface.SerializerInterface#toString(java.lang.Object, boolean)
      */
     @Override
-    public String toString(Object o, Object... context) throws SerializerException {
+    public String toString(final Object o, final Object... context) throws SerializerException {
         try {
-            if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
-                o = new CleanedJSonObject(o).getCleanedData();
-            }
-            return getMapper(context).objectToString(o);
+            return getMapper(context).objectToString(toObject(o, context));
         } catch (Exception e) {
             throw SerializerException.wrap(e);
+        }
+    }
+
+    private class SortedKeysJsonObjectLinkedHashMap extends JsonObjectLinkedHashMap {
+        private SortedKeysJsonObjectLinkedHashMap() {
+            super();
+        }
+
+        private SortedKeysJsonObjectLinkedHashMap(Map<String, JSonNode> map) {
+            super(map);
+        }
+    }
+
+    private Object toObject(Object o, Object... context) throws SerializerException {
+        if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+            return new CleanedJSonObject(o).getCleanedData();
+        } else {
+            return o;
         }
     }
 
@@ -85,9 +106,61 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
      * @return
      */
     private SimpleMapper getMapper(Object... context) {
-        if (isContextPretty(context)) {
+        if (contextContainsAll(context, SC.HASH_CONTENT)) {
+            SimpleMapper hash = new SimpleMapper() {
+                protected org.appwork.storage.simplejson.mapper.JSonMapper buildMapper() {
+                    return new SimpleMapper.InnerMapper() {
+                        @Override
+                        public JSonNode create(Object obj) throws MapperException {
+                            final JSonNode ret = super.create(obj);
+                            if (ret instanceof JSonObject && !(ret instanceof SortedKeysJsonObjectLinkedHashMap)) {
+                                return createJSonObject((JSonObject) ret);
+                            } else {
+                                return ret;
+                            }
+                        }
+
+                        @Override
+                        protected JSonObject createJSonObject(JSonObject map) {
+                            if (map == null) {
+                                return super.createJSonObject(map);
+                            } else if (map.size() <= 1) {
+                                return new SortedKeysJsonObjectLinkedHashMap(map);
+                            } else {
+                                final List<String> sortedKeys = new ArrayList<String>(map.keySet());
+                                Collections.sort(sortedKeys, new Comparator<String>() {
+                                    @Override
+                                    public int compare(String o1, String o2) {
+                                        return CompareUtils.compareComparable(o1, o2);
+                                    }
+                                });
+                                final SortedKeysJsonObjectLinkedHashMap ret = new SortedKeysJsonObjectLinkedHashMap();
+                                for (final String key : sortedKeys) {
+                                    ret.put(key, map.get(key));
+                                }
+                                return ret;
+                            }
+                        }
+                    };
+                };
+            };
+            hash.setPrettyPrintEnabled(false);
+            return hash;
+        } else if (isContextPretty(context)) {
+            if (mapperPretty == null) {
+                final SimpleMapper mapperPretty = new SimpleMapper();
+                mapperPretty.setPrettyPrintEnabled(true);
+                this.mapperPretty = mapperPretty;
+                return mapperPretty;
+            }
             return mapperPretty;
         } else {
+            if (mapperMinified == null) {
+                final SimpleMapper mapperMinified = new SimpleMapper();
+                mapperMinified.setPrettyPrintEnabled(false);
+                this.mapperMinified = mapperMinified;
+                return mapperMinified;
+            }
             return mapperMinified;
         }
     }
@@ -100,7 +173,7 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public <T> T fromString(String json, TypeRef<T> type, Object... context) throws SerializerException {
         try {
-            return mapperMinified.stringToObject(json, type);
+            return getMapper(context).stringToObject(json, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -114,7 +187,7 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public <T> T fromStream(InputStream stream, TypeRef<T> type, Object... context) throws SerializerException {
         try {
-            return mapperMinified.inputStreamToObject(stream, type);
+            return getMapper(context).inputStreamToObject(stream, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -128,17 +201,13 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public <T> T convert(Object o, TypeRef<T> type, Object... context) throws SerializerException {
         try {
-            boolean ensureNewInstances = false;
-            for (Object c : context) {
-                if (c == SC.ENSURE_NEW_INSTANCES) {
-                    ensureNewInstances = true;
-                    break;
-                }
-            }
+            o = toObject(o, context);
+            final boolean ensureNewInstances = contextContainsAll(context, SC.ENSURE_NEW_INSTANCES);
             if (!ensureNewInstances && Clazz.isInstanceof(o.getClass(), ReflectionUtils.getRaw(type.getType()))) {
                 return (T) o;
+            } else {
+                return getMapper(context).convert(o, type);
             }
-            return mapperMinified.convert(o, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -152,10 +221,7 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
     @Override
     public void toStream(Object o, OutputStream os, boolean closeOutputStream, Object... context) throws SerializerException {
         try {
-            if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
-                o = new CleanedJSonObject(o).getCleanedData();
-            }
-            getMapper(context).writeObject(os, o);
+            getMapper(context).writeObject(os, toObject(o, context));
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         } finally {

@@ -54,6 +54,105 @@ import org.appwork.utils.Exceptions;
  *
  */
 public class SimpleMapper extends AbstractJsonMapper {
+    /**
+     * @author thomas
+     * @date 16.04.2024
+     *
+     */
+    public class InnerMapper extends JSonMapper {
+        protected Object jsonToObjectByPassDeserializers(final JSonNode json, Type type) throws MapperException {
+            return super.jsonToObject(json, type);
+        }
+
+        @Override
+        public Object jsonToObject(final JSonNode json, Type type) throws MapperException {
+            try {
+                Class<?> raw = getRawTypeForDeserialization(type);
+                SimpleTypeRef<Object> typeRef = null;
+                {
+                    List<JsonConverterForDeserialization> matches = findBestTypeMatch(raw, convertForDeserialization, JsonConverterForDeserialization.class);
+                    if (matches != null && matches.size() > 0) {
+                        ConverterInput input = new ConverterInput(json) {
+                            @Override
+                            protected Object lazyGenericRepresentationInit() {
+                                try {
+                                    return jsonToObjectByPassDeserializers(json, Object.class);
+                                } catch (MapperException e) {
+                                    throw new WTFException();
+                                }
+                            }
+                        };
+                        if (typeRef == null) {
+                            typeRef = new SimpleTypeRef<Object>(type);
+                        }
+                        Object ret = handleDeserializationConverterMatches(input, typeRef, matches);
+                        if (ret != input) {
+                            return ret;
+                        }
+                    }
+                }
+                {
+                    List<JsonDeSerializer> matches = findBestTypeMatch(raw, deSerializer, JsonDeSerializer.class);
+                    if (matches != null && matches.size() > 0) {
+                        DeSerializerInput input = new DeSerializerInput(json) {
+                            @Override
+                            protected String lazyJSONRepresentationInit() {
+                                return json.toString();
+                            }
+                        };
+                        if (typeRef == null) {
+                            typeRef = new SimpleTypeRef<Object>(type);
+                        }
+                        Object ret = handleDeserializationMatches(input, typeRef, matches);
+                        if (ret != input) {
+                            return ret;
+                        }
+                    }
+                }
+                return jsonToObjectByPassDeserializers(json, type);
+            } catch (WTFException e) {
+                MapperException hiddenMapperException = Exceptions.getInstanceof(e, MapperException.class);
+                if (hiddenMapperException != null) {
+                    throw hiddenMapperException;
+                }
+                throw e;
+            }
+        }
+
+        @Override
+        public JSonNode create(Object obj) throws MapperException {
+            {
+                List<JsonConverterForSerialization> matches = findBestTypeMatch(obj == null ? null : obj.getClass(), convertForSerialization, JsonConverterForSerialization.class);
+                if (matches != null && matches.size() > 0) {
+                    Object ret = handleSerializationConverterMatches(obj, matches);
+                    if (ret != JsonConverterForSerialization.SKIP && ret != obj) {
+                        obj = ret;
+                    }
+                }
+            }
+            {
+                List<JsonSerializer> matches = findBestTypeMatch(obj == null ? null : obj.getClass(), serializer, JsonSerializer.class);
+                if (matches != null && matches.size() > 0) {
+                    final String ret = handleSerializationMatches(obj, matches);
+                    if (ret != JsonSerializer.SKIP) {
+                        return new JSonNode() {
+                            @Override
+                            public String toString() {
+                                return ret;
+                            }
+
+                            @Override
+                            public String toPrettyString() {
+                                return ret;
+                            }
+                        };
+                    }
+                }
+            }
+            return super.create(obj);
+        }
+    }
+
     protected final JSonMapper mapper;
 
     public SimpleMapper() {
@@ -61,99 +160,7 @@ public class SimpleMapper extends AbstractJsonMapper {
     }
 
     protected JSonMapper buildMapper() {
-        return new JSonMapper() {
-            protected Object jsonToObjectByPassDeserializers(final JSonNode json, Type type) throws MapperException {
-                return super.jsonToObject(json, type);
-            }
-
-            @Override
-            public Object jsonToObject(final JSonNode json, Type type) throws MapperException {
-                try {
-                    Class<?> raw = getRawTypeForDeserialization(type);
-                    SimpleTypeRef<Object> typeRef = null;
-                    {
-                        List<JsonConverterForDeserialization> matches = findBestTypeMatch(raw, convertForDeserialization, JsonConverterForDeserialization.class);
-                        if (matches != null && matches.size() > 0) {
-                            ConverterInput input = new ConverterInput(json) {
-                                @Override
-                                protected Object lazyGenericRepresentationInit() {
-                                    try {
-                                        return jsonToObjectByPassDeserializers(json, Object.class);
-                                    } catch (MapperException e) {
-                                        throw new WTFException();
-                                    }
-                                }
-                            };
-                            if (typeRef == null) {
-                                typeRef = new SimpleTypeRef<Object>(type);
-                            }
-                            Object ret = handleDeserializationConverterMatches(input, typeRef, matches);
-                            if (ret != input) {
-                                return ret;
-                            }
-                        }
-                    }
-                    {
-                        List<JsonDeSerializer> matches = findBestTypeMatch(raw, deSerializer, JsonDeSerializer.class);
-                        if (matches != null && matches.size() > 0) {
-                            DeSerializerInput input = new DeSerializerInput(json) {
-                                @Override
-                                protected String lazyJSONRepresentationInit() {
-                                    return json.toString();
-                                }
-                            };
-                            if (typeRef == null) {
-                                typeRef = new SimpleTypeRef<Object>(type);
-                            }
-                            Object ret = handleDeserializationMatches(input, typeRef, matches);
-                            if (ret != input) {
-                                return ret;
-                            }
-                        }
-                    }
-                    return jsonToObjectByPassDeserializers(json, type);
-                } catch (WTFException e) {
-                    MapperException hiddenMapperException = Exceptions.getInstanceof(e, MapperException.class);
-                    if (hiddenMapperException != null) {
-                        throw hiddenMapperException;
-                    }
-                    throw e;
-                }
-            }
-
-            @Override
-            public JSonNode create(Object obj) throws MapperException {
-                {
-                    List<JsonConverterForSerialization> matches = findBestTypeMatch(obj == null ? null : obj.getClass(), convertForSerialization, JsonConverterForSerialization.class);
-                    if (matches != null && matches.size() > 0) {
-                        Object ret = handleSerializationConverterMatches(obj, matches);
-                        if (ret != JsonConverterForSerialization.SKIP && ret != obj) {
-                            obj = ret;
-                        }
-                    }
-                }
-                {
-                    List<JsonSerializer> matches = findBestTypeMatch(obj == null ? null : obj.getClass(), serializer, JsonSerializer.class);
-                    if (matches != null && matches.size() > 0) {
-                        final String ret = handleSerializationMatches(obj, matches);
-                        if (ret != JsonSerializer.SKIP) {
-                            return new JSonNode() {
-                                @Override
-                                public String toString() {
-                                    return ret;
-                                }
-
-                                @Override
-                                public String toPrettyString() {
-                                    return ret;
-                                }
-                            };
-                        }
-                    }
-                }
-                return super.create(obj);
-            }
-        };
+        return new InnerMapper();
     }
 
     public JSonMapper getMapper() {

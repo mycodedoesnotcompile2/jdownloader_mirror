@@ -36,6 +36,10 @@ package org.appwork.storage.flexijson;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
@@ -48,7 +52,7 @@ import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
-import org.appwork.utils.DebugMode;
+import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
 
@@ -58,20 +62,22 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public class FlexiSerializer extends AbstractSerializer implements SerializerInterface {
-    private final FlexiJSonMapper mapper;
+    private FlexiJSonMapper defaultMapper = null;
 
     /**
      *
      */
     public FlexiSerializer() {
-        mapper = new FlexiJSonMapper();
     }
 
-    public FlexiJSonNode toNode(Object o) throws FlexiMapperException {
+    protected FlexiJSonNode toNode(Object o, Object... context) throws FlexiMapperException {
         try {
-            FlexiJSonNode node;
-            node = o instanceof FlexiJSonNode ? (FlexiJSonNode) o : mapper.objectToJsonNode(o);
-            return node;
+            if (o instanceof FlexiJSonNode) {
+                return (FlexiJSonNode) o;
+            } else {
+                final FlexiJSonNode node = getMapper(context).objectToJsonNode(o);
+                return node;
+            }
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -84,31 +90,9 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      */
     @Override
     public String toString(Object o, Object... context) throws SerializerException {
-        DebugMode.breakIf(context == null || (context.length == 1 && context[0] == null), context);
         try {
-            FlexiJSonNode node = null;
-            if (o instanceof FlexiJSonNode) {
-                node = (FlexiJSonNode) o;
-            } else {
-                if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
-                    final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
-                    final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
-                    node = mapper.objectToJsonNode(o);
-                    return toString.toJSONString(node);
-                }
-                if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
-                    FlexiJSonMapper mapper = new FlexiJSonMapper();
-                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
-                    node = mapper.objectToJsonNode(o);
-                } else {
-                    node = toNode(o);
-                }
-            }
-            if (node == null) {
-                node = toNode(o);
-            }
-            String ret = getStringifier(context).toJSONString(node);
-            return ret;
+            final FlexiJSonNode node = toNode(o, context);
+            return getStringifier(context).toJSONString(node);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -121,9 +105,56 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
     private static final ThreadLocal<FlexiJSonPrettyStringify> PRETTIES  = new ThreadLocal<FlexiJSonPrettyStringify>();
     private static final ThreadLocal<FlexiJSonStringBuilder>   MINIFIEDS = new ThreadLocal<FlexiJSonStringBuilder>();
 
-    private FlexiJSonStringBuilder getStringifier(Object... context) {
-        boolean pretty = isContextPretty(context);
-        if (pretty) {
+    public void cleanup() {
+        PRETTIES.set(null);
+        MINIFIEDS.set(null);
+    }
+
+    protected FlexiJSonMapper getMapper(Object... context) {
+        FlexiJSonMapper ret = null;
+        if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
+            ret = new FlexiJsonMapperForConfig();
+        }
+        if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
+            if (ret == null) {
+                ret = new FlexiJSonMapper();
+            }
+            ret.setIgnoreDefaultValuesEnabled(true);
+        }
+        if (ret == null) {
+            ret = defaultMapper;
+            if (ret == null) {
+                ret = new FlexiJSonMapper();
+                defaultMapper = ret;
+            }
+        }
+        return ret;
+    }
+
+    protected FlexiJSonStringBuilder getStringifier(Object... context) {
+        if (contextContainsAll(context, SC.HASH_CONTENT)) {
+            return new FlexiJSonStringBuilder() {
+                @Override
+                protected List<KeyValueElement> getObjectElementsList(FlexiJSonObject object) {
+                    final List<KeyValueElement> elems = super.getObjectElementsList(object);
+                    if (elems.size() <= 1) {
+                        return elems;
+                    } else {
+                        // sort properties according to SC.HASH_CONTENT docs
+                        final List<KeyValueElement> ret = new ArrayList<KeyValueElement>(elems);
+                        Collections.sort(ret, new Comparator<KeyValueElement>() {
+                            @Override
+                            public int compare(KeyValueElement o1, KeyValueElement o2) {
+                                return CompareUtils.compareComparable(o1.getKey(), o2.getKey());
+                            }
+                        });
+                        return ret;
+                    }
+                }
+            };
+        } else if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
+            return new FlexiJSonPrettyPrinterForConfig(null);
+        } else if (isContextPretty(context)) {
             // no threadsafe - we cannot use a single instance
             FlexiJSonPrettyStringify inst = PRETTIES.get();
             if (inst == null) {
@@ -149,16 +180,15 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      */
     @Override
     public <T> T fromString(String json, TypeRef<T> type, Object... context) throws SerializerException {
-        FlexiJSonNode node;
         try {
-            node = createParser(json, context).parse();
-            return mapper.jsonToObject(node, type);
+            final FlexiJSonNode node = createParser(json, context).parse();
+            return getMapper(context).jsonToObject(node, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
     }
 
-    public FlexiJSONParser createParser(String json, Object[] context) {
+    protected FlexiJSONParser createParser(String json, Object[] context) {
         FlexiJSONParser ret = new FlexiJSONParser(json);
         setIgnoreIssuesByContext(ret, context);
         return ret;
@@ -171,10 +201,9 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      */
     @Override
     public <T> T fromStream(InputStream stream, TypeRef<T> type, Object... context) throws SerializerException {
-        FlexiJSonNode node;
         try {
-            node = createParser(stream, context).parse();
-            return mapper.jsonToObject(node, type);
+            final FlexiJSonNode node = createParser(stream, context).parse();
+            return getMapper(context).jsonToObject(node, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -206,17 +235,12 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
     @Override
     public <T> T convert(Object o, TypeRef<T> type, Object... context) throws SerializerException {
         try {
-            boolean ensureNewInstances = false;
-            for (Object c : context) {
-                if (c == SC.ENSURE_NEW_INSTANCES) {
-                    ensureNewInstances = true;
-                    break;
-                }
-            }
+            final boolean ensureNewInstances = contextContainsAll(context, SC.ENSURE_NEW_INSTANCES);
             if (!ensureNewInstances && Clazz.isInstanceof(o.getClass(), ReflectionUtils.getRaw(type.getType()))) {
                 return (T) o;
+            } else {
+                return getMapper(context).convert(o, type);
             }
-            return mapper.convert(o, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
         }
@@ -229,28 +253,8 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      */
     @Override
     public void toStream(Object o, OutputStream os, boolean closeOutputStream, Object... context) throws SerializerException {
-        DebugMode.breakIf(context == null || (context.length == 1 && context[0] == null), context);
-        FlexiJSonNode node = null;
         try {
-            if (o instanceof FlexiJSonNode) {
-                node = (FlexiJSonNode) o;
-            } else {
-                if (contextContainsAll(context, SC.WITH_DOCUMENTATION)) {
-                    final FlexiJSonPrettyStringify toString = new FlexiJSonPrettyPrinterForConfig(null);
-                    final FlexiJSonMapper mapper = new FlexiJsonMapperForConfig();
-                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
-                    node = mapper.objectToJsonNode(o);
-                    toString.toJSONString(node, os, null);
-                }
-                if (contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES)) {
-                    FlexiJSonMapper mapper = new FlexiJSonMapper();
-                    mapper.setIgnoreDefaultValuesEnabled(contextContainsAll(context, SC.IGNORE_DEFAULT_VALUES));
-                    node = mapper.objectToJsonNode(o);
-                }
-                if (node == null) {
-                    node = toNode(o);
-                }
-            }
+            final FlexiJSonNode node = toNode(o, context);
             getStringifier(context).toJSONString(node, os, null);
         } catch (Exception e) {
             throw SerializerException.wrap(e);

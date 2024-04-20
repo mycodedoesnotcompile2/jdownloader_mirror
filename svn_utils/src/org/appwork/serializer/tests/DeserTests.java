@@ -35,6 +35,9 @@ package org.appwork.serializer.tests;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.appwork.serializer.SC;
 import org.appwork.storage.SimpleSerializer;
@@ -55,7 +58,7 @@ public class DeserTests extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -69,17 +72,33 @@ public class DeserTests extends AWTest {
         }
         String result = test("{\"a\":\"line1\\r\\nline2\"}", "", TypeRef.HASHMAP, SC.SINGLE_LINE);
         assertTrue(result.split("[\r\n]+").length == 1);
+        Set<String> HASH_TEST = new HashSet<String>();
         for (SerializerInterface c : serializers) {
             Object o = c.fromString("{\"a\":\"line1\\r\\nline2\",\"b\":\"line1\\r\\nline2\",\"c\":\"line1\\r\\nline2\",\"d\":\"line1\\r\\nline2\",\"e\":\"line1\\r\\nline2\"}", TypeRef.OBJECT);
             assertTrue(c.toString(o, SC.READABLE).split("[\r\n]+").length > 1);
             // test default values
             String toString = c.toString(new TestObject(), SC.IGNORE_DEFAULT_VALUES, SC.HASH_CONTENT);
+            HASH_TEST.add(toString);
             assertTrue("{}".equals(toString));
             TestObject t = new TestObject();
             t.setA(82923);
             toString = c.toString(t, SC.IGNORE_DEFAULT_VALUES, SC.HASH_CONTENT);
+            HASH_TEST.add(toString);
             assertTrue("{\"a\":82923}".equals(toString));
+            HashMap<String, Object> toHash = new HashMap<String, Object>();
+            HashMap<String, Object> toHash2 = new HashMap<String, Object>();
+            toHash2.put("c", 3);
+            toHash2.put("submap", null);
+            toHash2.put("12", 2);
+            toHash2.put("120", 2);
+            toHash.put("b", 1);
+            toHash.put("submap", toHash2);
+            toHash.put("a", 2);
+            toString = c.toString(toHash, SC.HASH_CONTENT);
+            HASH_TEST.add(toString);
+            assertTrue("{\"a\":2,\"b\":1,\"submap\":{\"12\":2,\"120\":2,\"c\":3,\"submap\":null}}".equals(toString));
         }
+        assertEquals(3, HASH_TEST.size());
         // more to do -
     }
 
