@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SoundcloudCom;
 
-@DecrypterPlugin(revision = "$Revision: 48797 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 48951 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -517,13 +517,18 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
                 final String permalinkURL = item.get("permalink_url").toString();
                 ret.add(createDownloadlink(permalinkURL));
             } else if (StringUtils.equalsIgnoreCase(type, "track")) {
-                ret.addAll(this.crawlProcessSingleTrack(item));
+                if (trackmap == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else {
+                    ret.addAll(this.crawlProcessSingleTrack(trackmap));
+                }
             } else {
                 /* Expect us to either have a single track item or have-found a single track item. */
                 if (trackmap == null) {
-                    throw new IllegalArgumentException("WTF");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                } else {
+                    ret.addAll(this.crawlProcessSingleTrack(trackmap));
                 }
-                ret.addAll(this.crawlProcessSingleTrack(trackmap));
             }
         }
         if (fp != null) {

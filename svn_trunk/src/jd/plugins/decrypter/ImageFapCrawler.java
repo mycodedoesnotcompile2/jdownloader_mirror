@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImageFap;
 
-@DecrypterPlugin(revision = "$Revision: 48790 $", interfaceVersion = 2, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap\\.com/(gallery\\.php\\?p?gid=.+|gallery/.+|pictures/\\d+/.*|photo/\\d+|organizer/\\d+|(usergallery|showfavorites)\\.php\\?userid=\\d+(&folderid=-?\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 48951 $", interfaceVersion = 2, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap\\.com/(gallery\\.php\\?p?gid=.+|gallery/.+|pictures/\\d+/.*|photo/\\d+|organizer/\\d+|(usergallery|showfavorites)\\.php\\?userid=\\d+(&folderid=-?\\d+)?)" })
 public class ImageFapCrawler extends PluginForDecrypt {
     public ImageFapCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -221,6 +221,9 @@ public class ImageFapCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(authorsName + " - " + galleryName + " - " + galleryIDStr);
         final String baseURL = URLHelper.getUrlWithoutParams(br._getURL());
+        // required to have correct page 0 with correct view param -> finds correct maxPage(depending from view param) and more results on
+        // first(0) page
+        getPage(this.br, baseURL + "?" + query.toString());
         int maxPage = this.findMaxPage(br);
         int page = 0;
         while (!this.isAbort()) {

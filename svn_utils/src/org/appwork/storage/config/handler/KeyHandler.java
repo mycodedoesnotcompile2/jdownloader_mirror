@@ -80,22 +80,27 @@ import org.appwork.utils.reflection.Clazz;
  *
  */
 public abstract class KeyHandler<RawClass> {
-    private final static Class<?>[]               OK_FOR_ALL                  = new Class<?>[] { DefaultOnNull.class, HexColorString.class, DefaultStorageSyncMode.class, CustomValueGetter.class, ValidatorFactory.class, DefaultJsonObject.class, DefaultFactory.class, AboutConfig.class, NoHeadless.class, DevConfig.class, RequiresRestart.class, AllowNonStorableObjects.class, DescriptionForConfigEntry.class, ConfigEntryKeywords.class, CryptedStorage.class, PlainStorage.class };
-    private static final String                   ANNOTATION_PACKAGE_NAME     = CryptedStorage.class.getPackage().getName();
-    private static final String                   PACKAGE_NAME                = PlainStorage.class.getPackage().getName();
+    private final static Class<?>[]               OK_FOR_ALL              = new Class<?>[] { DefaultOnNull.class, HexColorString.class, DefaultStorageSyncMode.class, CustomValueGetter.class, ValidatorFactory.class, DefaultJsonObject.class, DefaultFactory.class, AboutConfig.class, NoHeadless.class, DevConfig.class, RequiresRestart.class, AllowNonStorableObjects.class, DescriptionForConfigEntry.class, ConfigEntryKeywords.class, CryptedStorage.class, PlainStorage.class };
+    private static final String                   ANNOTATION_PACKAGE_NAME = CryptedStorage.class.getPackage().getName();
+    private static final String                   PACKAGE_NAME            = PlainStorage.class.getPackage().getName();
     private final String                          key;
-    protected Method                              getMethod                   = null;
-    protected Method                              setMethod                   = null;                                                                                                                                                                                                                                                                                                                                                                                                         ;
+    protected Method                              getMethod               = null;
+    protected Method                              setMethod               = null;                                                                                                                                                                                                                                                                                                                                                                                                         ;
     protected final StorageHandler<?>             storageHandler;
     protected RawClass                            defaultValue;
-    protected boolean                             factoryDefaultValueSet      = false;
+    protected boolean                             factoryDefaultValueSet  = false;
     private ConfigEventSender<RawClass>           eventSender;
     private AbstractValidator<RawClass>           validatorFactory;
     protected AbstractCustomValueGetter<RawClass> customValueGetter;
     protected String[]                            backwardsCompatibilityLookupKeys;
-    private boolean                               defaultOnNull               = false;
-    private IO.SYNC                               storageSyncMode             = IO.SYNC.NONE;
-    protected Boolean                             hasDefaultFactoryAnnotation = null;
+
+    public String[] getBackwardsCompatibilityLookupKeys() {
+        return backwardsCompatibilityLookupKeys;
+    }
+
+    private boolean   defaultOnNull               = false;
+    private IO.SYNC   storageSyncMode             = IO.SYNC.NONE;
+    protected Boolean hasDefaultFactoryAnnotation = null;
 
     public IO.SYNC getStorageSyncMode() {
         return storageSyncMode;
@@ -368,7 +373,6 @@ public abstract class KeyHandler<RawClass> {
         } else {
             return (RawClass) value;
         }
-
     }
 
     protected RawClass applyCustomValueGetter(final RawClass value) {
@@ -601,8 +605,9 @@ public abstract class KeyHandler<RawClass> {
             }
             // we have no value yet. call the getDefaultMethod to calculate the
             // default value
-            if (this.backwardsCompatibilityLookupKeys != null) {
-                for (final String key : this.backwardsCompatibilityLookupKeys) {
+            final String[] backwardsCompatibilityLookupKeys = getBackwardsCompatibilityLookupKeys();
+            if (backwardsCompatibilityLookupKeys != null) {
+                for (final String key : backwardsCompatibilityLookupKeys) {
                     if (storage.hasProperty(key)) {
                         final boolean apv = storage.isAutoPutValues();
                         try {
@@ -867,7 +872,6 @@ public abstract class KeyHandler<RawClass> {
         } else {
             return false;
         }
-
     }
 
     @Override
