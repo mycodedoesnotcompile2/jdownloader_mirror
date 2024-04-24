@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -19,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48941 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48957 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
     private static final Pattern PATTERN_DIRECT = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OTHER  = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
@@ -59,10 +61,13 @@ public class WebArchiveOrg extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://" + buildHostsPatternPart(domains) + "/web/[0-9]+.+");
             // TODO: Testing a better Regex down below
-            // ret.add("https?://" + buildHostsPatternPart(domains) + "/[0-9]+((if|im|oe)_|\\*)?/.+");
-            // https?://web\.archive\.org/web/[0-9]+((if|im|oe)_|\*)?/.+
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                ret.add("https?://" + buildHostsPatternPart(domains) + "/[0-9]+((if|im|oe)_|\\*)?/.+");
+                // https?://web\.archive\.org/web/[0-9]+((if|im|oe)_|\*)?/.+
+            } else {
+                ret.add("https?://" + buildHostsPatternPart(domains) + "/web/[0-9]+.+");
+            }
         }
         return ret.toArray(new String[0]);
     }

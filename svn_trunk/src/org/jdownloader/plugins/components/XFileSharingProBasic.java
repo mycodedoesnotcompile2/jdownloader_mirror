@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48944 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48956 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,9 +127,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     // return this.rewriteHost(getPluginDomains(), host);
     // }
     public static final String getDefaultAnnotationPatternPart() {
-        return "/(?:d/[A-Za-z0-9]+|(?:embed-|e/)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?)";
+        return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed-[a-z0-9]{12}\\.html|[a-z0-9]{12}(/[^/]+(?:\\.html)?)?)";
     }
 
+    @Deprecated
+    /** Deprecated since 2024-04-23, use getDefaultAnnotationPatternPart instead! */
     public static final String getDefaultAnnotationPatternPartXFSNew() {
         return "/(d|e)/[a-z0-9]{12}";
     }
@@ -1183,12 +1185,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (br.getRequest().getHtmlCode().equalsIgnoreCase("File was deleted")) {
             /* Should be valid for all XFS hosts e.g. speedvideo.net, uqload.com */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        this.checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
-        if (isOffline(link, br)) {
+        } else if (isOffline(link, br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        this.checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
         final String dllink = getDllink(link, account, br, getCorrectBR(br));
+        boolean isFilesizeSet = false;
         if (!StringUtils.isEmpty(dllink)) {
             this.videoStreamDownloadurl = dllink;
             if (findAndSetFilesize && !dllink.contains(".m3u8")) {
@@ -1196,8 +1198,23 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 if (checkDirectLinkAndSetFilesize(link, dllink, true) != null) {
                     /* Directurl is valid -> Store it */
                     storeDirecturl(link, account, dllink);
+                    isFilesizeSet = true;
                 }
             }
+        }
+        final String[] fileInfo = internal_getFileInfoArray();
+        scanInfo(fileInfo);
+        processFileInfo(fileInfo, br, link);
+        if (!StringUtils.isEmpty(fileInfo[0])) {
+            /* Correct- and set filename */
+            setFilename(fileInfo[0], link, br);
+        } else {
+            /* Fallback */
+            this.setWeakFilename(link, br);
+        }
+        /* Set filesize */
+        if (!StringUtils.isEmpty(fileInfo[1]) && !isFilesizeSet) {
+            link.setDownloadSize(SizeFormatter.getSize(fileInfo[1]));
         }
     }
 
@@ -1237,6 +1254,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
+        // this.checkErrors(br, url, link, account, false);
         final String[] fileInfo = internal_getFileInfoArray();
         scanInfo(fileInfo);
         processFileInfo(fileInfo, br, link);
@@ -1274,18 +1292,22 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, refererSaved);
         }
         getPage(br, url);
-        if (this.isRefererBlocked(br) && isDownload) {
-            // TODO: Test/improve referer handling
-            final String referer = getUserInput("Enter referer-URL?", link);
-            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
-            /* Reload page */
-            getPage(br.getURL());
-            if (!this.isRefererBlocked(br)) {
-                /* Success */
-                link.setDownloadPassword(referer);
+        if (this.isRefererBlocked(br)) {
+            if (isDownload) {
+                final String referer = getUserInput("Enter referer-URL?", link);
+                br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, referer);
+                /* Reload page */
+                getPage(br.getURL());
+                if (!this.isRefererBlocked(br)) {
+                    /* Success */
+                    link.setDownloadPassword(referer);
+                } else {
+                    /* Failure */
+                    link.setDownloadPassword(null);
+                }
             } else {
-                /* Failure */
-                link.setDownloadPassword(null);
+                /* Problem happened during availablecheck -> Do not ask user for password/referer. */
+                return;
             }
         }
         this.checkErrors(br, url, link, account, false);
@@ -1562,6 +1584,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             quotedFUID = Pattern.quote(urlFUID);
         }
         String filename = new Regex(html, "name=\"fname\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+        if (StringUtils.isEmpty(filename)) {
+            /* 2024-04-23: e.g. oceanoffile.com */
+            filename = new Regex(html, "class\\s*=\\s*\"dfilename\"[^>]*>\\s*(?:<div>)?\\s*([^<>\"]*?)</").getMatch(0);
+            if (StringUtils.isEmpty(filename)) {
+                filename = new Regex(html, "<div[^>]*id\\s*=\\s*\"dfilename\"[^>]*>\\s*(?:<div>)?\\s*([^<>\"]*?)</").getMatch(0);
+            }
+        }
         String filesizeBytesStr = null;
         String filesizeWithUnit = null;
         {
@@ -1624,21 +1653,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             // filename = filename.replaceFirst(Pattern.quote(filesizeWithUnit) + "$", "");
             // }
             // }
-            if (!supports_availablecheck_filesize_bytes_from_sharebox()) {
+            if (!supports_availablecheck_filesize_bytes_from_sharebox() && filesizeBytesStr != null) {
+                logger.info("Ignoring this possible filesize_bytes string: " + filesizeBytesStr);
                 filesizeBytesStr = null;
             }
         }
         /* Standard traits from base page */
         if (StringUtils.isEmpty(filename)) {
-            filename = new Regex(html, "name=\"fname\"[^>]*value=\"([^\"]+)\"").getMatch(0);
+            filename = new Regex(html, "(?i)You have requested.*?https?://(?:www\\.)?[^/]+/" + urlFUID + "/([^<>\"]+)<").getMatch(0);
             if (StringUtils.isEmpty(filename)) {
-                filename = new Regex(html, "(?i)You have requested.*?https?://(?:www\\.)?[^/]+/" + urlFUID + "/([^<>\"]+)<").getMatch(0);
+                filename = new Regex(html, "<h2>\\s*Download File\\s*(?:<(?:span|b)[^>]*>)?\\s*(.+?)\\s*(</(?:span|b|h2)>)").getMatch(0);
+                /* traits from download1 page below */
                 if (StringUtils.isEmpty(filename)) {
-                    filename = new Regex(html, "<h2>\\s*Download File\\s*(?:<(?:span|b)[^>]*>)?\\s*(.+?)\\s*(</(?:span|b|h2)>)").getMatch(0);
-                    /* traits from download1 page below */
-                    if (StringUtils.isEmpty(filename)) {
-                        filename = new Regex(html, "Filename:?\\s*(<[^>]+>\\s*)+?([^<>\"]+)").getMatch(1);
-                    }
+                    filename = new Regex(html, "Filename:?\\s*(<[^>]+>\\s*)+?([^<>\"]+)").getMatch(1);
                 }
             }
         }
@@ -1693,12 +1720,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     filename = new Regex(html, Pattern.compile("<title>\\s*(.*?\\.(png|jpe?g|gif))\\s*-\\s*(" + Pattern.quote(getHost()) + "|" + Pattern.quote(websiteName) + ")\\s*</title>", Pattern.CASE_INSENSITIVE)).getMatch(0);
                 }
             }
-            if (StringUtils.isEmpty(filename)) {
-                filename = new Regex(html, "class\\s*=\\s*\"dfilename\">\\s*(?:<div>)?\\s*([^<>\"]*?)</").getMatch(0);
-                if (StringUtils.isEmpty(filename)) {
-                    filename = new Regex(html, "<div[^>]*id\\s*=\\s*\"dfilename\">\\s*(?:<div>)?\\s*([^<>\"]*?)</").getMatch(0);
-                }
-            }
             if (internal_isVideohosterEmbed(this.br) && (StringUtils.isEmpty(filename) || StringUtils.equalsIgnoreCase("No title", filename))) {
                 /* 2019-10-15: E.g. vidoza.net */
                 final String curFileName = br.getRegex("var\\s*curFileName\\s*=\\s*\"(.*?)\"").getMatch(0);
@@ -1730,13 +1751,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 /* Starting from here - more unsafe attempts */
                 if (StringUtils.isEmpty(filesizeWithUnit)) {
                     filesizeWithUnit = new Regex(html, "\\((\\d+\\s*bytes)\\)").getMatch(0);
+                    /* Generic failover */
                     if (StringUtils.isEmpty(filesizeWithUnit)) {
-                        filesizeWithUnit = new Regex(html, "</font>[ ]+\\(([^<>\"'/]+)\\)(.*?)</font>").getMatch(0);
+                        filesizeWithUnit = scanGenericFileSize(html);
                     }
-                }
-                /* Generic failover */
-                if (StringUtils.isEmpty(filesizeWithUnit)) {
-                    filesizeWithUnit = scanGenericFileSize(html);
                 }
             }
         }
@@ -2709,7 +2727,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     /** Handles all kinds of captchas, also login-captcha - fills the given captchaForm. */
     public void handleCaptcha(final DownloadLink link, Browser br, final Form captchaForm) throws Exception {
         /* Captcha START */
-        if (new Regex(getCorrectBR(br), "(geetest_challenge|geetest_validate|geetest_seccode)").patternFind()) {
+        if (new Regex(getCorrectBR(br), Pattern.compile("(geetest_challenge|geetest_validate|geetest_seccode)", Pattern.CASE_INSENSITIVE)).patternFind()) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unsupported captcha type geetest", 3 * 60 * 60 * 1000l);
         } else if (new Regex(getCorrectBR(br), Pattern.compile("\\$\\.post\\(\\s*\"/ddl\"", Pattern.CASE_INSENSITIVE)).patternFind()) {
             /* 2019-06-06: Rare case */
@@ -3073,45 +3091,42 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    protected boolean verifyURLFormat(final String url) {
+        try {
+            if (StringUtils.startsWithCaseInsensitive(url, "http")) {
+                URLHelper.verifyURL(new URL(url));
+                return true;
+            }
+        } catch (MalformedURLException ignore) {
+        }
+        return false;
+    }
+
     /**
      * Returns referer to be used in availablecheck. </br>
      * This is e.g. useful for websites which restrict the embedding of videos to a specific source.
      */
     protected String getReferer(final DownloadLink link) {
-        final Class<? extends XFSConfig> cfg = this.getConfigInterface();
-        String custom_referer_from_settings = null;
-        if (cfg != null) {
-            custom_referer_from_settings = PluginJsonConfig.get(cfg).getCustomReferer();
+        final String downloadPassword = link.getDownloadPassword();
+        if (!StringUtils.isEmpty(downloadPassword) && !this.canHandle(downloadPassword) && verifyURLFormat(downloadPassword)) {
+            logger.info("Using download password as referer: " + downloadPassword);
+            return downloadPassword;
         }
-        final String refererForThisURL = null;
         final String containerURL = link.getContainerUrl();
-        if (!StringUtils.isEmpty(refererForThisURL) || !StringUtils.isEmpty(custom_referer_from_settings)) {
-            /* Use Referer from inside added URL if given. */
-            String chosenReferer = null;
-            if (!StringUtils.isEmpty(refererForThisURL)) {
-                logger.info("Using referer from URL: " + refererForThisURL);
-                chosenReferer = refererForThisURL;
-            } else {
-                logger.info("Using referer from config: " + custom_referer_from_settings);
-                chosenReferer = custom_referer_from_settings;
-            }
-            chosenReferer = Encoding.htmlOnlyDecode(chosenReferer);
-            if (!chosenReferer.startsWith("http")) {
-                logger.info("Applying protocol to chosen referer: Before: " + chosenReferer);
-                chosenReferer = "https://" + chosenReferer;
-                logger.info("After: " + chosenReferer);
-            }
-            return chosenReferer;
-        } else if (!StringUtils.isEmpty(containerURL) && !this.canHandle(containerURL)) {
-            /*
-             * Try to use source URL as Referer if it does not match any supported URL of this plugin.
-             */
-            logger.info("Using container URL as referer: " + containerURL);
+        if (!StringUtils.isEmpty(containerURL) && !this.canHandle(containerURL) && verifyURLFormat(containerURL)) {
+            logger.info("Using containerURL as referer: " + containerURL);
             return containerURL;
-        } else {
-            /* No Referer at all. */
-            return null;
         }
+        final Class<? extends XFSConfig> cfg = this.getConfigInterface();
+        if (cfg != null) {
+            final String custom_referer_from_settings = PluginJsonConfig.get(cfg).getCustomReferer();
+            if (!StringUtils.isEmpty(custom_referer_from_settings) && !this.canHandle(custom_referer_from_settings) && verifyURLFormat(custom_referer_from_settings)) {
+                logger.info("Using custom config as referer: " + custom_referer_from_settings);
+                return custom_referer_from_settings;
+            }
+        }
+        /* No Referer at all. */
+        return null;
     }
 
     @Override
@@ -4217,7 +4232,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 /* Devs only */
                 String accStatus;
-                if (ai.getStatus() != null) {
+                if (ai.getStatus() != null && !ai.getStatus().startsWith("[API] ")) {
                     accStatus = ai.getStatus();
                 } else {
                     accStatus = account.getType().toString();
@@ -4444,17 +4459,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      * apikey will usually be located here: "/?op=my_account"
      */
     protected String findAPIKey(final Browser brc) throws Exception {
-        /*
-         * 2019-07-11: apikey handling - prefer that instead of website. Even if an XFS website has the "API mod" enabled, we will only find
-         * a key here if the user at least once pressed the "Generate API Key" button or if the XFS 'api mod' used by the website admin is
-         * configured to display apikeys by default for all users.
-         */
         String apikey = regexAPIKey(brc);
         String generateApikeyUrl = this.regexGenerateAPIKeyURL(brc);
-        /*
-         * 2019-07-28: If no apikey has ever been generated by the user but generate_apikey_url != null we can generate the first apikey
-         * automatically.
-         */
         if (StringUtils.isEmpty(apikey) && generateApikeyUrl != null && allowToGenerateAPIKeyInWebsiteMode()) {
             generateApikeyUrl = Encoding.htmlOnlyDecode(generateApikeyUrl);
             logger.info("Failed to find apikey but host has api-mod enabled --> Trying to generate first apikey for this account via: " + generateApikeyUrl);
@@ -4482,7 +4488,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return apikey;
     }
 
-    /** Finds API host. Call this before attempting to use a previously found apikey in website mode! */
+    /**
+     * Finds API host and sets it as a plugin property. </br>
+     * Call this before attempting to use a previously found apikey in website mode! </br>
+     * This is needed because some websites are using a different domain or a subdomain for API requests.
+     */
     protected void findAPIHost(final Browser brc, final String apikey) {
         if (apikey == null) {
             return;
@@ -4520,7 +4530,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected String regexGenerateAPIKeyURL(final Browser br) {
-        return br.getRegex("\"([^\"]*?op=my_account[^\"]*?generate_api_key=1[^\"]*?token=[a-f0-9]{32}[^\"]*?)\"").getMatch(0);
+        return br.getRegex("\"([^\"]*?generate_api_key=1[^\"]*?token=[a-f0-9]{32}[^\"]*?)\"").getMatch(0);
     }
 
     protected void setAccountLimitsByType(final Account account, final AccountType type) {
@@ -5546,7 +5556,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* Devs only */
             String accStatus;
-            if (ai.getStatus() != null) {
+            if (ai.getStatus() != null && !ai.getStatus().startsWith("[API] ")) {
                 accStatus = ai.getStatus();
             } else {
                 accStatus = account.getType().toString();

@@ -18,20 +18,19 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48954 $", interfaceVersion = 3, names = {}, urls = {})
-public class VidozaNet extends XFileSharingProBasic {
-    public VidozaNet(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 48956 $", interfaceVersion = 3, names = {}, urls = {})
+public class WyslijNet extends XFileSharingProBasic {
+    public WyslijNet(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -40,9 +39,16 @@ public class VidozaNet extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null (official download has reCaptchaV2)<br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "wyslij.net" });
+        return ret;
+    }
+
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
     }
@@ -56,29 +62,13 @@ public class VidozaNet extends XFileSharingProBasic {
         return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
-    public static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidoza.net", "vidoza.org", "videzz.net" });
-        return ret;
-    }
-
-    @Override
-    public String[] scanInfo(final String[] fileInfo) {
-        super.scanInfo(fileInfo);
-        final String betterFilename = br.getRegex("var\\s*curFileName\\s*=\\s*\"(.*?)\"").getMatch(0);
-        if (StringUtils.isNotEmpty(betterFilename)) {
-            fileInfo[0] = betterFilename;
-        }
-        return fileInfo;
-    }
-
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return true;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
@@ -89,69 +79,72 @@ public class VidozaNet extends XFileSharingProBasic {
 
     @Override
     public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 1;
+            return -10;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return 5;
+        return 1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return 5;
+        return 1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return 5;
+        return -1;
     }
 
     @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            return true;
-        } else if (br.containsHTML(">\\s*Conversion stage\\s*:") && br.containsHTML("<title>\\s*Watch\\s*</title>")) {
-            /* 2024-04-23: Special offline - embed-only item which is actually offline e.g.: https://videzz.net/3ka8sbjnm59j */
-            return true;
-        } else if (br.containsHTML("/embed-\\.html\"|Reason for deletion:")) {
-            return true;
-        } else {
-            return super.isOffline(link, br);
-        }
+    protected boolean supportsAPIMassLinkcheck() {
+        return isAPIKey(this.getAPIKey());
     }
 
     @Override
-    public boolean supports_availablecheck_filename_abuse() {
-        /* 2019-07-04: Special */
+    protected boolean supportsAPISingleLinkcheck() {
+        return isAPIKey(this.getAPIKey());
+    }
+
+    @Override
+    protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
+        /* 2024-04-23: API can be used for linkcheck but not for downloading */
         return false;
     }
 
     @Override
-    protected boolean isVideohoster_enforce_video_filename() {
-        return true;
-    }
-
-    @Override
-    protected boolean isVideohosterEmbed() {
-        return true;
-    }
-
-    @Override
-    protected boolean trustAvailablecheckVideoEmbed() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+    protected boolean containsRecaptchaV2Class(String string) {
+        /* 2024-04-23 */
+        if (new Regex(string, "<input[^>]*name=\"g-recaptcha-response\"").patternFind()) {
             return true;
         } else {
-            return false;
+            return super.containsRecaptchaV2Class(string);
         }
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilesize = new Regex(html, ">\\s*Rozmiar pliku\\s*</span>\\s*</div>\\s*<div class=\"col-xl-8\">\\s*<p class=\"text-muted fs-14\">([^<]+)</p>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        return fileInfo;
+    }
+
+    @Override
+    protected String regexGenerateAPIKeyURL(final Browser br) {
+        return br.getRegex("\"([^\"]*?generate_api_key=1[^\"]*?token=[a-f0-9]{32}[^\"]*?)\"").getMatch(0);
     }
 }

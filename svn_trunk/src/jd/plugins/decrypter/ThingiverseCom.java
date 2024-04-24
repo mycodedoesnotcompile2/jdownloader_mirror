@@ -2,9 +2,9 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -26,7 +26,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
+@DecrypterPlugin(revision = "$Revision: 48957 $", interfaceVersion = 2, names = { "thingiverse.com" }, urls = { "https?://(www\\.)?thingiverse\\.com/(thing:\\d+|make:\\d+|[^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)" })
 public class ThingiverseCom extends antiDDoSForDecrypt {
     public ThingiverseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,44 +38,75 @@ public class ThingiverseCom extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         String fpName = null;
-        if (new Regex(param.getCryptedUrl(), "/([^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)").matches()) {
+        String description = null;
+        final String thingID = new Regex(param.getCryptedUrl(), "(?i)thing:(\\d+).*").getMatch(0);
+        if (new Regex(param.getCryptedUrl(), "/([^/]+/(about|designs|collections(/[^/]+)?|makes|likes|things)|groups/[^/]+(/(things|about))?)").patternFind()) {
             getPage(param.getCryptedUrl());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            String[] links = getAPISearchLinks(br);
+            final String[] links = getAPISearchLinks(br);
             if (links != null && links.length > 0) {
                 for (String link : links) {
-                    ret.add(createDownloadlink(br.getURL(link).toString()));
+                    ret.add(createDownloadlink(br.getURL(link).toExternalForm()));
                 }
             }
-        } else if (StringUtils.containsIgnoreCase(param.getCryptedUrl(), "/thing:")) {
-            // a thing
-            getPage(param.getCryptedUrl());
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            fpName = br.getRegex("<title>\\s*([^<]+?)\\s*-\\s*Thingiverse").getMatch(0);
-            final String thingID = new Regex(br.getURL(), "(?i)thing:(\\d+).*").getMatch(0);
-            if (thingID == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(String.format("https://www.thingiverse.com//thing:%s/zip", thingID)));
-            if (fpName != null) {
-                fpName = Encoding.htmlOnlyDecode(fpName);
-                link.setFinalFileName(fpName + ".zip");
-            }
-            ret.add(link);
-            // Images to see what we've downloaded (in case the label doesn't make much sense in hindsight).
-            final String[] imageLinks = br.getRegex("<div class=\"gallery-photo\"[^>]*data-full=\"([^\"]+)\"[^>]*>").getColumn(0);
-            if (imageLinks != null && imageLinks.length > 0) {
-                for (String imageLink : imageLinks) {
-                    imageLink = Encoding.htmlDecode(imageLink);
-                    final DownloadLink imageDL = createDownloadlink(imageLink);
-                    if (fpName != null) {
-                        imageDL.setFinalFileName(fpName + "_" + imageLink.hashCode() + ".jpg");
+        } else if (thingID != null) {
+            /* a thing */
+            /* 2024-04-23: Prefer WebAPI over website */
+            final boolean useWebAPI = true;
+            if (useWebAPI) {
+                /* API */
+                final String authtoken = this.getAuthToken(this.br);
+                if (authtoken == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                br.getHeaders().put("Authorization", "Bearer " + authtoken);
+                getPage(API_BASE + "/things/" + thingID);
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                fpName = entries.get("name").toString();
+                description = (String) entries.get("description");
+                final Map<String, Object> zip_data = (Map<String, Object>) entries.get("zip_data");
+                final String[] targetmapnames = new String[] { "files", "images" };
+                for (final String targetmapname : targetmapnames) {
+                    final List<Map<String, Object>> fileitems = (List<Map<String, Object>>) zip_data.get(targetmapname);
+                    if (fileitems == null || fileitems.isEmpty()) {
+                        continue;
                     }
-                    ret.add(imageDL);
+                    for (final Map<String, Object> fileitem : fileitems) {
+                        final DownloadLink file = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(fileitem.get("url").toString()));
+                        file.setName(fileitem.get("name").toString());
+                        file.setAvailable(true);
+                        ret.add(file);
+                    }
+                }
+            } else {
+                /* Website */
+                getPage(param.getCryptedUrl());
+                if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                fpName = br.getRegex("<title>\\s*([^<]+?)\\s*-\\s*Thingiverse").getMatch(0);
+                final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(String.format("https://www.thingiverse.com//thing:%s/zip", thingID)));
+                if (fpName != null) {
+                    fpName = Encoding.htmlOnlyDecode(fpName);
+                    link.setFinalFileName(fpName + ".zip");
+                }
+                ret.add(link);
+                // Images to see what we've downloaded (in case the label doesn't make much sense in hindsight).
+                final String[] imageLinks = br.getRegex("<div class=\"gallery-photo\"[^>]*data-full=\"([^\"]+)\"[^>]*>").getColumn(0);
+                if (imageLinks != null && imageLinks.length > 0) {
+                    for (String imageLink : imageLinks) {
+                        imageLink = Encoding.htmlOnlyDecode(imageLink);
+                        final DownloadLink imageDL = createDownloadlink(imageLink);
+                        if (fpName != null) {
+                            imageDL.setFinalFileName(fpName + "_" + imageLink.hashCode() + ".jpg");
+                        }
+                        ret.add(imageDL);
+                    }
                 }
             }
         } else if (StringUtils.containsIgnoreCase(param.getCryptedUrl(), "/make:")) {
@@ -94,7 +125,7 @@ public class ThingiverseCom extends antiDDoSForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String thingURL = JavaScriptEngineFactory.walkJson(entries, "thing/public_url").toString();
             if (StringUtils.isEmpty(thingURL)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -105,11 +136,14 @@ public class ThingiverseCom extends antiDDoSForDecrypt {
             /* Unsupported URL --> Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final FilePackage fp = FilePackage.getInstance();
         if (fpName != null) {
-            final FilePackage fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(fpName).trim());
-            fp.addLinks(ret);
         }
+        if (!StringUtils.isEmpty(description)) {
+            fp.setComment(description);
+        }
+        fp.addLinks(ret);
         return ret;
     }
 
@@ -132,7 +166,7 @@ public class ThingiverseCom extends antiDDoSForDecrypt {
                 searchValues.put("page", "1");
                 searchValues.put("per_page", "999999999");
                 Browser br2 = br.cloneBrowser();
-                String postURL = br2.getURL(searchValues.get("source")).toString();
+                String postURL = br2.getURL(searchValues.get("source")).toExternalForm();
                 PostRequest post = new PostRequest(postURL);
                 UrlQuery postQuery = new UrlQuery();
                 for (String key : searchValues.keySet()) {

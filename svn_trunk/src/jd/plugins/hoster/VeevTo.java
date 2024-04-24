@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48954 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +73,8 @@ public class VeevTo extends XFileSharingProBasic {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + getDefaultAnnotationPatternPartXFSNew());
+            // TODO: 2024-04-23: Use the line down below instead
+            // ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + getDefaultAnnotationPatternPart());
         }
         return ret.toArray(new String[0]);
     }

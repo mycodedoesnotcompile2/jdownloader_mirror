@@ -20,11 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
@@ -34,10 +29,16 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 48955 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FilemoonSxCrawler.class })
 public class FilemoonSxCrawler extends PluginForDecrypt {
     public FilemoonSxCrawler(PluginWrapper wrapper) {
@@ -84,10 +85,16 @@ public class FilemoonSxCrawler extends PluginForDecrypt {
             ret.add(link);
             return ret;
         }
-        distribute(link);
-        hosterPlugin.setDownloadLink(link);
-        final AvailableStatus status = hosterPlugin.requestFileInformation(link);
-        link.setAvailableStatus(status);
+        ret.add(link);
+        try {
+            hosterPlugin.setDownloadLink(link);
+            final AvailableStatus status = hosterPlugin.requestFileInformation(link);
+            link.setAvailableStatus(status);
+            distribute(link);
+        } catch (PluginException e) {
+            logger.log(e);
+            return ret;
+        }
         final String videoFilename = link.getName();
         final String packagename;
         if (videoFilename.contains(".")) {
