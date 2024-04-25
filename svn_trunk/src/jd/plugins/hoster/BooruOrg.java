@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48095 $", interfaceVersion = 3, names = { "booru.org" }, urls = { "https?://[a-z0-9]+\\.booru\\.org/index\\.php\\?page=post\\&s=view\\&id=(\\d+)" })
+@HostPlugin(revision = "$Revision: 48958 $", interfaceVersion = 3, names = { "booru.org" }, urls = { "https?://[a-z0-9]+\\.booru\\.org/index\\.php\\?page=post\\&s=view\\&id=(\\d+)" })
 public class BooruOrg extends PluginForHost {
     public BooruOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,6 +86,11 @@ public class BooruOrg extends PluginForHost {
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getRequest().getHtmlCode().length() <= 100) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!br.getURL().contains(fid)) {
+            /* E.g. redirect to mainpage */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("<title>([^<>\"]+)</title>").getMatch(0);
         if (filename != null) {
@@ -121,7 +126,11 @@ public class BooruOrg extends PluginForHost {
                 con = br2.openHeadConnection(this.dllink);
                 handleConnectionErrors(br2, con);
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
             } finally {
                 try {

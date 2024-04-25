@@ -181,8 +181,10 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 return container.resolveValue(container, expression, scope, false);
             } else {
                 try {
-                    for (final String g : container.listKeys(last)) {
-                        final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathElements(g));
+                    for (Iterator<KeyValue> it = container.iterator(last); it.hasNext();) {
+                        KeyValue next = it.next();
+                        final Scope newScope = scope.copy();
+                        newScope.add(next.value, next.key);
                         if (container.equalsDeep(container, expression, newScope.getLast(), newScope)) {
                             // {§any:1}
                             if (container._isDebug()) {
@@ -389,8 +391,10 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             } else {
                 try {
                     Condition filter = container.getOptions(Condition.class, "filter");
-                    for (final String g : container.listKeys(scope.getLast())) {
-                        final Scope newScope = container.resolveKeyPath(scope, JSPath.fromPathElements(g));
+                    for (Iterator<KeyValue> it = container.iterator(last); it.hasNext();) {
+                        KeyValue next = it.next();
+                        final Scope newScope = scope.copy();
+                        newScope.add(next.value, next.key);
                         if (filter != null) {
                             if (!filter.matchesWithoutExceptions(newScope.getLast())) {
                                 continue;
@@ -1548,6 +1552,104 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return typeHandlers;
     }
 
+    public static class KeyValue {
+        public final Object  key;
+        public final boolean validKey;
+
+        public KeyValue(Object key, Object value, boolean validKey) {
+            super();
+            this.key = key;
+            this.value = value;
+            this.validKey = validKey;
+        }
+
+        public final Object value;
+    }
+
+    /**
+     * @param last
+     * @return
+     */
+    public Iterator<KeyValue> iterator(final Object obj) {
+        ListAccessorInterface iterList;
+        MapAccessorInterface iterMap;
+        if (obj == null || Clazz.isPrimitive(obj.getClass()) || obj instanceof String) {
+            return null;
+        } else if (obj instanceof ConditionObjectValueView) {
+            final ConditionObjectValueView view = (ConditionObjectValueView) obj;
+            return view.iterator();
+        } else if ((iterMap = getMapWrapper(obj)) != null) {
+            ArrayList<String> ret = new ArrayList<String>();
+            for (java.util.Map.Entry<String, Object> es : iterMap) {
+                ret.add(es.getKey());
+            }
+            final Iterator<java.util.Map.Entry<String, Object>> keyValue = iterMap.iterator();
+            return new Iterator<KeyValue>() {
+                @Override
+                public boolean hasNext() {
+                    return keyValue.hasNext();
+                }
+
+                @Override
+                public KeyValue next() {
+                    java.util.Map.Entry<String, Object> nextKey = keyValue.next();
+                    return new KeyValue(nextKey.getKey(), nextKey.getValue(), true);
+                }
+            };
+        } else if ((iterList = getListWrapper(obj)) != null) {
+            final Iterator<Object> it = iterList.iterator();
+            return new Iterator<KeyValue>() {
+                int index = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return it.hasNext();
+                }
+
+                @Override
+                public KeyValue next() {
+                    try {
+                        Object value = it.next();
+                        return new KeyValue(index++, value, obj instanceof List);
+                    } finally {
+                        ;
+                    }
+                }
+            };
+        } else {
+            try {
+                final ClassCache cc = ClassCache.getClassCache(obj.getClass());
+                final Iterator<String> keys = cc.getKeys().iterator();
+                return new Iterator<KeyValue>() {
+                    @Override
+                    public boolean hasNext() {
+                        return keys.hasNext();
+                    }
+
+                    @Override
+                    public KeyValue next() {
+                        try {
+                            String nextKey = keys.next();
+                            return new KeyValue(nextKey, cc.getGetter(nextKey).getValue(obj), true);
+                        } catch (IllegalArgumentException e) {
+                            throw new WTFException(e);
+                        } catch (IllegalAccessException e) {
+                            throw new WTFException(e);
+                        } catch (InvocationTargetException e) {
+                            throw new WTFException(e);
+                        }
+                    }
+                };
+            } catch (IllegalArgumentException e) {
+                throw new WTFException(e);
+            } catch (SecurityException e) {
+                throw new WTFException(e);
+            } catch (NoSuchMethodException e) {
+                throw new WTFException(e);
+            }
+        }
+    }
+
     /**
      * @param last
      * @return
@@ -2630,9 +2732,13 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             return ret;
         } else if ((iterList = getListWrapper(obj)) != null) {
             final ArrayList<String> ret = new ArrayList<String>();
-            int i = 0;
-            for (Object e : iterList) {
-                ret.add(String.valueOf(i++));
+            if (iterList instanceof CollectionAccessor) {
+                return ret;
+            } else {
+                int i = 0;
+                for (Object e : iterList) {
+                    ret.add(String.valueOf(i++));
+                }
             }
             return ret;
         } else {

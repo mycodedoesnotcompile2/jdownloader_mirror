@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48184 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48966 $", interfaceVersion = 3, names = {}, urls = {})
 public class BiqleRuCrawler extends PluginForDecrypt {
     public BiqleRuCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,12 +62,9 @@ public class BiqleRuCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "biqle.ru", "biqle.com", "biqle.org" });
-        ret.add(new String[] { "daft.sex" });
+        // ret.add(new String[] { "biqle.ru", "biqle.com", "biqle.org" }); // 2024-04-24: RIP
         ret.add(new String[] { "ukdevilz.com" });
         ret.add(new String[] { "novids.com" });
-        /* 2022-12-22 */
-        ret.add(new String[] { "dsex.to" });
         /* 2022-12-27 */
         ret.add(new String[] { "mat6tube.com" });
         ret.add(new String[] { "noodlemagazine.com" });
@@ -334,7 +331,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
                     ret.add(best);
                 }
             } else {
-                /* Add ALL existant qualities */
+                /* Add ALL existent qualities */
                 for (final Entry<String, DownloadLink> entry : qualityMap.entrySet()) {
                     ret.add(entry.getValue());
                 }

@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48956 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48958 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3038,7 +3038,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    private final boolean attemptStoredDownloadurlDownload(final DownloadLink link, final Account account) throws Exception {
+    protected final boolean attemptStoredDownloadurlDownload(final DownloadLink link, final Account account) throws Exception {
         final String directurlproperty = getDownloadModeDirectlinkProperty(account);
         final String url = link.getStringProperty(directurlproperty);
         if (StringUtils.isEmpty(url)) {

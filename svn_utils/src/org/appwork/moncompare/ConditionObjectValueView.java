@@ -33,7 +33,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.moncompare;
 
+import java.util.Iterator;
 import java.util.List;
+
+import org.appwork.moncompare.Condition.KeyValue;
 
 /**
  * @author daniel
@@ -41,7 +44,6 @@ import java.util.List;
  *
  */
 public interface ConditionObjectValueView {
-
     public Object getConditionObjectValue(String key);
 
     public boolean containsConditionObjectKey(String key);
@@ -53,4 +55,8 @@ public interface ConditionObjectValueView {
      */
     public List<String> listConditionKeys();
 
+    /**
+     * @return
+     */
+    public Iterator<KeyValue> iterator();
 }

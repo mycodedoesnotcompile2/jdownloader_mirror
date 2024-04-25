@@ -64,7 +64,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 46265 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 48965 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -2245,7 +2245,7 @@ public class SaveTv extends PluginForHost {
     }
 
     /**
-     * @return: Returns a random number for the DownloadLink - uses saved random number if existant - if not, creates random number and
+     * @return: Returns a random number for the DownloadLink - uses saved random number if existent - if not, creates random number and
      *          saves it.
      */
     private static String getRandomNumber(final DownloadLink dl) {
