@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubewolfCom extends KernelVideoSharingComV2 {
     public TubewolfCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,7 @@ public class TubewolfCom extends KernelVideoSharingComV2 {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final String TYPE_CUSTOM = "https?://(?:www\\.)?[^/]+/movies/([a-z0-9\\-]+)/?";
+    private static final String TYPE_CUSTOM = "(?i)https?://(?:www\\.)?[^/]+/movies/([a-z0-9\\-]+)/?";
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();

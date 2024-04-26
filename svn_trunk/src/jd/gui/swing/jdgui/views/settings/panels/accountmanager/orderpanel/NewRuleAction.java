@@ -89,23 +89,13 @@ public class NewRuleAction extends AbstractAddAction {
             }
         }
         final Collection<LazyHostPlugin> plugins = HostPluginController.getInstance().list();
+        /* Collect all domains which the user is allowed to create usage rules for. */
         for (final LazyHostPlugin plugin : plugins) {
-            /**
-             * Collect domains of all plugins which: </br>
-             * - Support premium download/account </br>
-             * - and: Are not a multihoster </br>
-             * Some multihosters do support downloading their own selfhosted files in account mode but this is the exception. </br>
-             * Examples: high-way.me, premiumize.me
-             */
-            if (!plugin.isPremium()) {
-                continue;
-            } else if (multihosterDomains.contains(plugin.getHost())) {
-                continue;
-            } else {
+            if (allowAccountUsageRuleCreation(plugin)) {
                 domains.add(DomainInfo.getInstance(plugin.getHost()));
             }
         }
-        /* Sort our unsorted results. */
+        /* Sort results. */
         final ArrayList<DomainInfo> lst = new ArrayList<DomainInfo>(domains);
         Collections.sort(lst, new Comparator<DomainInfo>() {
             @Override
@@ -119,5 +109,29 @@ public class NewRuleAction extends AbstractAddAction {
     @Override
     public String getTooltipText() {
         return _GUI.T.NewRuleAction_getTooltipText_tt_();
+    }
+
+    /** Returns true if new rule creation is allowed according to some factors given inside given LazyHostPlugin instance. */
+    public static boolean allowAccountUsageRuleCreation(final LazyHostPlugin plg) {
+        if (!plg.isPremium()) {
+            return false;
+        } else if (plg.hasFeature(FEATURE.MULTIHOST)) {
+            /*
+             * Do not allow users to create account usage rules for multihosts as those usually don't host any files thus creating a rule
+             * doesn't make any sense.
+             */
+            return false;
+        } else if (plg.hasFeature(FEATURE.USENET)) {
+            /* Do not allow users to create account usage rules for Usenet services as Usenet can't be used without account anyways. */
+            return false;
+        } else if (plg.hasFeature(FEATURE.INTERNAL)) {
+            /* Do not allow users to create account usage rules for internal plugins. */
+            return false;
+        } else if (plg.isOfflinePlugin()) {
+            /* Do not allow users to create account usage rules for domains known to be permanently offline. */
+            return false;
+        } else {
+            return true;
+        }
     }
 }

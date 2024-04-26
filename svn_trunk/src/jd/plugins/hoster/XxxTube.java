@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47887 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class XxxTube extends KernelVideoSharingComV2 {
     public XxxTube(final PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class XxxTube extends KernelVideoSharingComV2 {
 
     @Override
     protected boolean isPrivateVideoWebsite(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*Buy premium to see full video")) {
+        if (br.containsHTML(">\\s*Buy premium to see full video")) {
             return true;
         } else {
             return super.isPrivateVideoWebsite(br);

@@ -20,10 +20,9 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47681 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class OkXxx extends KernelVideoSharingComV2 {
     public OkXxx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -48,16 +47,9 @@ public class OkXxx extends KernelVideoSharingComV2 {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:video/\\d+/|embed/\\d+)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:video/\\d+/|embed/\\d+)");
         }
         return ret.toArray(new String[0]);
-    }
-
-    @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        if (link.getPluginPatternMatcher().matches(pattern_embedded)) {
-            link.setPluginPatternMatcher(generateContentURL(this.getHost(), this.getFUID(link), null));
-        }
     }
 
     @Override
@@ -80,5 +72,16 @@ public class OkXxx extends KernelVideoSharingComV2 {
             /* Fallback to upper handling */
             return super.regexNormalTitleWebsite(br);
         }
+    }
+
+    @Override
+    protected boolean useEmbedWorkaround() {
+        return true;
+    }
+
+    @Override
+    protected boolean enableFastLinkcheck() {
+        /* 2024-04-25: They're using HLS streams and at this moment we are not calculating the filesize in upper handling. */
+        return true;
     }
 }

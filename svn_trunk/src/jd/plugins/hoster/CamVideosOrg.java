@@ -6,7 +6,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48108 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamVideosOrg extends KernelVideoSharingComV2 {
     public CamVideosOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -48,10 +48,6 @@ public class CamVideosOrg extends KernelVideoSharingComV2 {
          */
         return true;
     }
-    // @Override
-    // protected String regexNormalTitleWebsite(final Browser br) {
-    // return super.regexNormalTitleWebsite(br);
-    // }
 
     @Override
     protected boolean preferTitleHTML() {

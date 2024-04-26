@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeryfreepornCom extends KernelVideoSharingComV2 {
     public VeryfreepornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,25 +51,6 @@ public class VeryfreepornCom extends KernelVideoSharingComV2 {
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
-    // @Override
-    // protected String regexNormalTitleWebsite(final Browser br) {
-    // final String title = br.getRegex("property=\"og:title\" content=\"([^\"]+)\"").getMatch(0);
-    // if (title != null) {
-    // return title;
-    // } else {
-    // return super.regexNormalTitleWebsite(br);
-    // }
-    // }
-    //
-    // @Override
-    // protected String getFileTitle(final DownloadLink link) {
-    // final String titleWebsite = regexNormalTitleWebsite(br);
-    // if (titleWebsite != null) {
-    // return titleWebsite;
-    // } else {
-    // return getTitleURL(br, link);
-    // }
-    // }
 
     @Override
     protected boolean preferTitleHTML() {

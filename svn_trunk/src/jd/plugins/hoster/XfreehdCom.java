@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48835 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfreehdCom extends KernelVideoSharingComV2 {
     public XfreehdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -57,17 +57,17 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
     }
 
     @Override
+    protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
+        return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
+    }
+
+    @Override
     protected boolean isLoggedIN(final Browser br) {
         if (br.containsHTML("/logout")) {
             return true;
         } else {
             return false;
         }
-    }
-
-    @Override
-    protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
-        return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
 
     @Override

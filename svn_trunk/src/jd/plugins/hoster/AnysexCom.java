@@ -23,7 +23,7 @@ import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46959 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnysexCom extends KernelVideoSharingComV2 {
     public AnysexCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class AnysexCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    String generateContentURL(final String host, final String fuid, final String urlSlug) {
+    protected String generateContentURL(final String host, final String fuid, final String urlSlug) {
         return generateContentURLDefaultVideosPatternOnlyNumbers(host, fuid);
     }
 }

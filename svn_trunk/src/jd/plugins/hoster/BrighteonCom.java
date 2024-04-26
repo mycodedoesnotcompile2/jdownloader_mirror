@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47418 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class BrighteonCom extends antiDDoSForHost {
     public BrighteonCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,8 +43,6 @@ public class BrighteonCom extends antiDDoSForHost {
     /* DEV NOTES */
     // other: Only HLS + DASH
 
-    /* Connection stuff */
-    private static final int    free_maxdownloads    = -1;
     private String              hlsMaster            = null;
     private static final String PROPERTY_PREMIUMONLY = "premiumonly";
 
@@ -103,6 +101,9 @@ public class BrighteonCom extends antiDDoSForHost {
         br.setAllowedResponseCodes(500);
         getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*This page could not be found")) {
+            /* 404 page without response code 404 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getHttpConnection().getResponseCode() == 500) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -171,7 +172,7 @@ public class BrighteonCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

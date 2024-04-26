@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48649 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,8 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
 
     @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
-        final String embed = br.getRegex("(https?://www.cwtvembeds.com/embed/\\d+)").getMatch(0);
+        /* Special handling */
+        final String embed = br.getRegex("(https?://(?:www\\.)?(cwtvembeds\\.com|camwhores\\.lol)/embed/\\d+)").getMatch(0);
         if (embed != null && !StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath())) {
             br.setFollowRedirects(true);
             br.getPage(embed);

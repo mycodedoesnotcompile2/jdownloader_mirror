@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebcamsbabeCom extends KernelVideoSharingComV2 {
     public WebcamsbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class WebcamsbabeCom extends KernelVideoSharingComV2 {
         if (url == null) {
             return null;
         } else {
-            return new Regex(url, "/videos/\\d+-(.+)\\.html$").getMatch(0);
+            return new Regex(url, "(?i)/videos/\\d+-(.+)\\.html$").getMatch(0);
         }
     }
 

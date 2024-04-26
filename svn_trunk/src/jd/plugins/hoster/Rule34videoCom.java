@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48354 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,11 +61,6 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    public Class<? extends KVSConfig> getConfigInterface() {
-        return KVSConfigRule34videoCom.class;
-    }
-
-    @Override
     protected AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
         /* Collect some information for custom filenames */
@@ -82,5 +77,10 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
             link.setProperty(PROPERTY_FUID, fuid);
         }
         return status;
+    }
+
+    @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        return KVSConfigRule34videoCom.class;
     }
 }

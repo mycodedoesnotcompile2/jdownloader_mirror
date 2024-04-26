@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48544 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HclipsCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HclipsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -52,9 +52,4 @@ public class KernelVideoSharingComV2HclipsCom extends KernelVideoSharingComV2 {
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
-    // @Override
-    // protected boolean useEmbedWorkaround() {
-    // /* 2023-11-30 */
-    // return true;
-    // }
 }

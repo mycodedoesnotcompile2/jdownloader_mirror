@@ -1,5 +1,8 @@
 package jd.plugins.hoster;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
@@ -10,16 +13,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
 /**
  * This plugin only serves as a FallBack in case another plugin could not be initiated
  *
  * @author daniel
  *
  */
-@HostPlugin(revision = "$Revision: 46728 $", interfaceVersion = 3, names = { "UpdateRequired" }, urls = { "LXISAWESOME" })
+@HostPlugin(revision = "$Revision: 48970 $", interfaceVersion = 3, names = { "UpdateRequired" }, urls = { "LXISAWESOME" })
 public class UpdateRequiredHostPlugin extends PluginForHost {
     public UpdateRequiredHostPlugin(PluginWrapper wrapper) {
         super(wrapper);

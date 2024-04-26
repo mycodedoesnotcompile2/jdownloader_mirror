@@ -20,10 +20,9 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46959 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnypornCom extends KernelVideoSharingComV2 {
     public AnypornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,11 +50,6 @@ public class AnypornCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        link.setPluginPatternMatcher(link.getPluginPatternMatcher().replaceAll("/embed/", "/"));
-    }
-
-    @Override
     protected String regexNormalTitleWebsite(final Browser br) {
         String title = br.getRegex("class=\"videotitle\"><h1>([^<>\"]+)<").getMatch(0);
         if (title == null) {
@@ -72,5 +66,10 @@ public class AnypornCom extends KernelVideoSharingComV2 {
     @Override
     String generateContentURL(final String host, final String fuid, final String urlSlug) {
         return generateContentURLDefaultVideosPatternOnlyNumbers(host, fuid);
+    }
+
+    @Override
+    protected boolean useEmbedWorkaround() {
+        return false;
     }
 }

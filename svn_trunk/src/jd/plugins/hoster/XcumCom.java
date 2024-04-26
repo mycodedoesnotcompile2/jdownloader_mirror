@@ -23,7 +23,7 @@ import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47660 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
 public class XcumCom extends KernelVideoSharingComV2 {
     public XcumCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,17 +55,6 @@ public class XcumCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        if (link.getPluginPatternMatcher().matches(pattern_embedded)) {
-            /*
-             * 2020-10-30: Embedded content can only be viewed in 360p while using their main URLs, the same content may be available in up
-             * to 1080p!
-             */
-            link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("/embed/", "/v/"));
-        }
-    }
-
-    @Override
     public String getFUID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
@@ -76,5 +65,10 @@ public class XcumCom extends KernelVideoSharingComV2 {
             return null;
         }
         return this.getProtocol() + host + "/v/" + fuid + "/";
+    }
+
+    @Override
+    protected boolean useEmbedWorkaround() {
+        return true;
     }
 }
