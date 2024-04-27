@@ -50,7 +50,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -512,7 +512,7 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     protected boolean supportsAPIMassLinkcheck() {
-        if (isAPIKey(this.getAPIKey())) {
+        if (looksLikeValidAPIKey(this.getAPIKey())) {
             return true;
         } else {
             return false;
@@ -531,7 +531,7 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     protected boolean supportsAPISingleLinkcheck() {
-        return isAPIKey(this.getAPIKey());
+        return looksLikeValidAPIKey(this.getAPIKey());
     }
 
     @Override

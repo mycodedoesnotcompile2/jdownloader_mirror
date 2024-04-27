@@ -21,14 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48956 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
 public class WyslijNet extends XFileSharingProBasic {
     public WyslijNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -109,17 +108,20 @@ public class WyslijNet extends XFileSharingProBasic {
 
     @Override
     protected boolean supportsAPIMassLinkcheck() {
-        return isAPIKey(this.getAPIKey());
+        return looksLikeValidAPIKey(this.getAPIKey());
     }
 
     @Override
     protected boolean supportsAPISingleLinkcheck() {
-        return isAPIKey(this.getAPIKey());
+        return looksLikeValidAPIKey(this.getAPIKey());
     }
 
     @Override
     protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
-        /* 2024-04-23: API can be used for linkcheck but not for downloading */
+        /**
+         * 2024-04-23: API can be used for linkcheck but not for downloading. </br>
+         * During account-check it looks as if the API supports downloads but it does not.
+         */
         return false;
     }
 
@@ -141,10 +143,5 @@ public class WyslijNet extends XFileSharingProBasic {
             fileInfo[1] = betterFilesize;
         }
         return fileInfo;
-    }
-
-    @Override
-    protected String regexGenerateAPIKeyURL(final Browser br) {
-        return br.getRegex("\"([^\"]*?generate_api_key=1[^\"]*?token=[a-f0-9]{32}[^\"]*?)\"").getMatch(0);
     }
 }

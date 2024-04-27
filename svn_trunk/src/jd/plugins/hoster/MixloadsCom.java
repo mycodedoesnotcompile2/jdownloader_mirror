@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 44525 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
 public class MixloadsCom extends XFileSharingProBasic {
     public MixloadsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -147,12 +147,12 @@ public class MixloadsCom extends XFileSharingProBasic {
 
     @Override
     protected boolean supportsAPIMassLinkcheck() {
-        return isAPIKey(this.getAPIKey());
+        return looksLikeValidAPIKey(this.getAPIKey());
     }
 
     @Override
     protected boolean supportsAPISingleLinkcheck() {
-        return isAPIKey(this.getAPIKey());
+        return looksLikeValidAPIKey(this.getAPIKey());
     }
 
     @Override

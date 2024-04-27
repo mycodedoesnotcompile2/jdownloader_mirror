@@ -62,7 +62,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 48958 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48977 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -357,13 +357,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         final String dateFromHtml = TiktokCom.getAndSetDateFromWebsite(this, br, ret.get(0));
         String packagename = null;
         for (final DownloadLink result : ret) {
-            /**
-             * Set all non-video items always as online. For video items, obey user-setting. </br>
-             * Users may disable the "Fast linkcheck" setting e.g. to let the hoster-plugin find-and add the publish-date to the filename
-             * during extended linkcheck.
-             */
-            final boolean isVideo = StringUtils.equals(result.getStringProperty(TiktokCom.PROPERTY_TYPE), TiktokCom.TYPE_VIDEO);
-            if (cfg.isEnableFastLinkcheck() || !isVideo) {
+            if (cfg.isEnableFastLinkcheck()) {
                 result.setAvailable(true);
             }
             result.setProperty(TiktokCom.PROPERTY_ALLOW_HEAD_REQUEST, true);

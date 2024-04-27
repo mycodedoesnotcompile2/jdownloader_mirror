@@ -217,7 +217,7 @@ public class ExtFileSystemView extends FileSystemView {
     /**
      * @return
      */
-    public NetWorkFolder getNetworkFolder() {        
+    public NetWorkFolder getNetworkFolder() {
         return this.networkFolder;
     }
 
@@ -331,7 +331,12 @@ public class ExtFileSystemView extends FileSystemView {
         } else if (f instanceof VirtualRoot) {
             return f.getName();
         } else {
-            return this.org.getSystemDisplayName(f);
+            final File shellFolder = ShellFolderWrapper.getInstanceShellFolder(f);
+            if (shellFolder != null) {
+                return this.org.getSystemDisplayName(shellFolder);
+            } else {
+                return this.org.getSystemDisplayName(f);
+            }
         }
     }
 
@@ -341,7 +346,12 @@ public class ExtFileSystemView extends FileSystemView {
             if (f instanceof VirtualRoot) {
                 return ((VirtualRoot) f).getIcon(18);
             } else if (useFileIcons) {
-                return this.org.getSystemIcon(f);
+                final File shellFolder = ShellFolderWrapper.getInstanceShellFolder(f);
+                if (shellFolder != null) {
+                    return this.org.getSystemIcon(shellFolder);
+                } else {
+                    return this.org.getSystemIcon(f);
+                }
             } else {
                 if (f.isDirectory()) {
                     return ExtFileChooserDialogIcon.EXTFILESYSTEM_folder.get(18);

@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 48979 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
 public class NeodebridCom extends PluginForHost {
     /** Tags: cocoleech.com */
     private static final String          API_BASE                   = "https://neodebrid.com/api/v2";
@@ -348,7 +348,6 @@ public class NeodebridCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         this.prepBRAPI(br);
-        final AccountInfo ai = new AccountInfo();
         Map<String, Object> user = loginAPI(account, true);
         if (br.getURL() == null || !br.getURL().contains("/info?token")) {
             user = this.callAPI(account, null, br, "/info?token=" + this.getApiToken(account));
@@ -365,6 +364,7 @@ public class NeodebridCom extends PluginForHost {
         /**
          * 2021-01-03: Free (-Account) limits: 5 links per day (per IP and or account). 10 Minute waittime between generating direct-URLs.
          */
+        final AccountInfo ai = new AccountInfo();
         if (validuntil > System.currentTimeMillis()) {
             /* Premium account */
             /* Premium accounts have unlimited files per day */

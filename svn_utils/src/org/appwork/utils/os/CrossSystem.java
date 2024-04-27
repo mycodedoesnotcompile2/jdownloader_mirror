@@ -168,7 +168,7 @@ public class CrossSystem {
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -185,7 +185,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -197,9 +197,9 @@ public class CrossSystem {
         RASPBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -568,7 +568,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -757,7 +757,7 @@ public class CrossSystem {
                     // https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
                     // https://en.wikipedia.org/wiki/Windows_11_version_history
                     // https://ss64.com/nt/ver.html
-                    if (buildNumber >= 26052) {
+                    if (buildNumber >= 26052 || buildNumber >= 26080) {
                         // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
                         // TODO: update buildNumber
                         set(OperatingSystem.WINDOWS_11_24H2);

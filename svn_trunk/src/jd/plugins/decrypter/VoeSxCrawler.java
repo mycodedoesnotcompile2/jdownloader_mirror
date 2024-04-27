@@ -19,10 +19,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
@@ -34,7 +30,11 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48709 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 48982 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +44,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "voe.sx", "voe-unblock.com", "voe-unblock.net", "voeunblock.com", "voeunblk.com", "voeunblck.com", "voe-un-block.com", "un-block-voe.net", "voeunbl0ck.com", "voeunblock1.com", "voeunblock2.com", "voeunblock3.com", "voeunblock4.com", "voeunblock5.com", "voeunblock6.com", "voeun-block.net", "v-o-e-unblock.com", "audaciousdefaulthouse.com", "launchreliantcleaverriver.com", "reputationsheriffkennethsand.com", "fittingcentermondaysunday.com", "housecardsummerbutton.com", "fraudclatterflyingcar.com", "bigclatterhomesguideservice.com", "uptodatefinishconferenceroom.com", "realfinanceblogcenter.com", "tinycat-voe-fashion.com", "20demidistance9elongations.com", "telyn610zoanthropy.com", "toxitabellaeatrebates306.com", "greaseball6eventual20.com", "745mingiestblissfully.com", "19turanosephantasia.com", "30sensualizeexpression.com", "321naturelikefurfuroid.com",
                 "449unceremoniousnasoseptal.com", "cyamidpulverulence530.com", "boonlessbestselling244.com", "antecoxalbobbing1010.com", "matriculant401merited.com", "scatch176duplicities.com", "35volitantplimsoles5.com", "tummulerviolableness.com", "tubelessceliolymph.com", "availedsmallest.com", "counterclockwisejacky.com", "monorhinouscassaba.com", "tummulerviolableness.com", "urochsunloath.com", "simpulumlamerop.com", "wolfdyslectic.com", "metagnathtuggers.com", "gamoneinterrupted.com", "chromotypic.com", "crownmakermacaronicism.com", "generatesnitrosate.com", "yodelswartlike.com", "figeterpiazine.com", "cigarlessarefy.com", "valeronevijao.com", "apinchcaseation.com", "nectareousoverelate.com", "phenomenalityuniform.com", "nonesnanking.com", "troyyourlead.com", "stevenimaginelittle.com", "edwardarriveoften.com", "lukecomparetwo.com", "bradleyviewdoctor.com", "jamiesamewalk.com",
-                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com" });
+                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com" });
         return ret;
     }
 
@@ -73,6 +73,11 @@ public class VoeSxCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        return 1;
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final XFSConfigVideoVoeSx cfg = PluginJsonConfig.get(XFSConfigVideoVoeSx.class);
@@ -83,9 +88,18 @@ public class VoeSxCrawler extends PluginForDecrypt {
         }
         final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
         final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), param.getCryptedUrl(), true);
-        hosterPlugin.setDownloadLink(link);
-        final AvailableStatus status = hosterPlugin.requestFileInformation(link);
-        link.setAvailableStatus(status);
+        try {
+            hosterPlugin.setDownloadLink(link);
+            final AvailableStatus status = hosterPlugin.requestFileInformation(link);
+            ret.add(link);
+            link.setAvailableStatus(status);
+            distribute(link);
+        } catch (Exception e) {
+            // prefer fresh instance
+            ret.add(this.createDownloadlink(param.getCryptedUrl()));
+            logger.log(e);
+            return ret;
+        }
         final String videoFilename = link.getName();
         final String packagename;
         if (videoFilename.contains(".")) {
@@ -120,7 +134,9 @@ public class VoeSxCrawler extends PluginForDecrypt {
         } else {
             logger.info("This item does not have any subtitles");
         }
-        fp.addLinks(ret);
+        if (ret.size() > 0) {
+            fp.addLinks(ret);
+        }
         return ret;
     }
 }

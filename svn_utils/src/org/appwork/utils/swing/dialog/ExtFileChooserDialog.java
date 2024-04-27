@@ -85,14 +85,13 @@ import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
 import org.appwork.swing.components.searchcombo.SearchComboBox;
 import org.appwork.utils.Application;
 import org.appwork.utils.Files;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.locale._AWU;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
-
-import sun.swing.FilePane;
 
 public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     /**
@@ -511,20 +510,26 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                 return null;
             }
         }
-        f = fileSystemView.mapSpecialFolders(f);
-        String key = ExtFileChooserDialogIcon.FILECHOOSER_FOLDER.path();
-        if (f.getName().equals("Desktop")) {
-            key = ExtFileChooserDialogIcon.FILECHOOSER_DESKTOP.path();
-        } else if (f.getPath().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER_XP) || f.getPath().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER) || f.getPath().startsWith("\\") && f.getPath().indexOf("\\", 2) < 0) {
+        String key = null;
+        if (f instanceof NetWorkFolder) {
+            // NetworkFolder in Map->very very bad idea :)will trigger network calls
             key = ExtFileChooserDialogIcon.FILECHOOSER_NETWORK.path();
-        } else if (f.getPath().length() == 3 && f.getPath().charAt(1) == ':' && (f.getPath().charAt(0) + "").matches("[a-zA-Z]{1}")) {
-            key = ExtFileChooserDialogIcon.FILECHOOSER_HARDDRIVE.path();
-        } else if (f instanceof HomeFolder) {
-            key = ((HomeFolder) f).getIconKey();
-        } else if (f instanceof VirtualRoot) {
-            final Icon ret = ((VirtualRoot) f).getIcon(18);
-            if (ret != null) {
-                return ret;
+        } else {
+            f = fileSystemView.mapSpecialFolders(f);
+            key = ExtFileChooserDialogIcon.FILECHOOSER_FOLDER.path();
+            if (f.getName().equals("Desktop")) {
+                key = ExtFileChooserDialogIcon.FILECHOOSER_DESKTOP.path();
+            } else if (f.getPath().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER_XP) || f.getPath().equals(ExtFileSystemView.VIRTUAL_NETWORKFOLDER) || f.getPath().startsWith("\\") && f.getPath().indexOf("\\", 2) < 0) {
+                key = ExtFileChooserDialogIcon.FILECHOOSER_NETWORK.path();
+            } else if (f.getPath().length() == 3 && f.getPath().charAt(1) == ':' && (f.getPath().charAt(0) + "").matches("[a-zA-Z]{1}")) {
+                key = ExtFileChooserDialogIcon.FILECHOOSER_HARDDRIVE.path();
+            } else if (f instanceof HomeFolder) {
+                key = ((HomeFolder) f).getIconKey();
+            } else if (f instanceof VirtualRoot) {
+                final Icon ret = ((VirtualRoot) f).getIcon(18);
+                if (ret != null) {
+                    return ret;
+                }
             }
         }
         if (AWUTheme.I().hasIcon(key)) {
@@ -1085,7 +1090,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     protected JComponent getFileChooserContainer(JComponent fc) {
         for (int index = 0; index < fc.getComponentCount(); index++) {
             final Component c = fc.getComponent(index);
-            if (c instanceof FilePane && index == 2) {
+            if (ReflectionUtils.isInstanceOf("sun.swing.FilePane", c) && index == 2) {
                 // FilePane at 3rd position (Synthethica, FlatLAT, Metal...)
                 return fc;
             }
@@ -1174,11 +1179,11 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     /**
      * @param namePanel
      */
-    protected void modifiyNamePanel(final JPanel namePanel) {        
+    protected void modifiyNamePanel(final JPanel namePanel) {
     }
 
     @Override
-    protected void packed() {        
+    protected void packed() {
         super.packed();
         if (parentGlassPane != null) {
             parentGlassPane.setCursor(null);

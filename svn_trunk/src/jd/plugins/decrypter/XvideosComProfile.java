@@ -53,7 +53,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 48936 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48980 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,6 +93,7 @@ public class XvideosComProfile extends PluginForDecrypt {
             sb.append("(");
             sb.append("pornstar-channels/[A-Za-z0-9\\-_]+#_tabRed");
             sb.append("|(?:profiles|(?:pornstar-|amateur-|model-)?(?:channels|models|pornstars))/[A-Za-z0-9\\-_]+.*");
+            sb.append("|[A-Za-z0-9\\-_]+$");
             sb.append("|favorite/\\d+/[a-z0-9\\_]+");
             sb.append("|account/favorites/\\d+");
             sb.append(")");
@@ -176,7 +177,11 @@ public class XvideosComProfile extends PluginForDecrypt {
         } else if ((param.getCryptedUrl().matches(TYPE_USER) && premiumAccountActive) || param.getCryptedUrl().matches(TYPE_USER_PREMIUM)) {
             return crawlChannelPremium(param);
         } else {
-            return crawlChannel(contenturl);
+            if (!br.containsHTML("id\\s*=\\s*\"profile-title\"")) {
+                return new ArrayList<DownloadLink>();
+            } else {
+                return crawlChannel(contenturl);
+            }
         }
     }
 
@@ -284,7 +289,10 @@ public class XvideosComProfile extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlChannel(final String url) throws IOException, PluginException, DecrypterRetryException {
-        final String username = new Regex(url, TYPE_USER).getMatch(0);
+        String username = new Regex(url, TYPE_USER).getMatch(0);
+        if (username == null) {
+            username = new Regex(url, "/([A-Za-z0-9\\-_]+)$").getMatch(0);
+        }
         if (username == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -341,7 +349,7 @@ public class XvideosComProfile extends PluginForDecrypt {
                 dl.setName(nameTemp + ".mp4");
                 /* Packagizer properties */
                 if (correctVideoID != null) {
-                    dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID);
+                    dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
                 }
                 dl.setProperty(XvideosCore.PROPERTY_USERNAME, username);
                 dl._setFilePackage(fp);
@@ -412,7 +420,7 @@ public class XvideosComProfile extends PluginForDecrypt {
                 dl.setName(nameTemp + ".mp4");
                 /* Packagizer properties */
                 if (correctVideoID != null) {
-                    dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID);
+                    dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
                 }
                 dl.setProperty(XvideosCore.PROPERTY_USERNAME, username);
                 dl._setFilePackage(fp);

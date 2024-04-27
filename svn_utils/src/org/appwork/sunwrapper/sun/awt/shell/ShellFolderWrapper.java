@@ -53,9 +53,12 @@ import org.appwork.utils.images.IconIO;
  *
  */
 public class ShellFolderWrapper {
-
     private static final FileSystemView view                     = FileSystemView.getFileSystemView();
     private static boolean              shellFolderGetIconAccess = true;
+
+    public static interface ShellFolderSource {
+        public File getShellFolder();
+    }
 
     /**
      * @param file
@@ -168,16 +171,29 @@ public class ShellFolderWrapper {
 
     private static boolean shellFolderGetShellFolderAccess = true;
 
+    public static File getInstanceShellFolder(File file) {
+        if (file == null) {
+            return null;
+        } else if (isInstanceof(file)) {
+            return file;
+        } else if (file instanceof ShellFolderSource) {
+            final File source = ((ShellFolderSource) file).getShellFolder();
+            if (source != null) {
+                return getInstanceShellFolder(source);
+            }
+        }
+        return null;
+    }
+
     /**
      * @param file
      * @return @throws FileNotFoundException @throws
      */
     public static File getShellFolder(File file) throws FileNotFoundException {
         try {
-            if (file == null) {
-                return null;
-            } else if (isInstanceof(file)) {
-                return file;
+            final File shellFolder = getInstanceShellFolder(file);
+            if (shellFolder != null) {
+                return shellFolder;
             } else if (!file.exists()) {
                 throw new FileNotFoundException(file.getAbsolutePath());
             } else if (shellFolderGetShellFolderAccess) {

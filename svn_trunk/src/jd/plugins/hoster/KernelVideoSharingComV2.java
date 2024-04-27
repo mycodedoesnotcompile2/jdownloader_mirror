@@ -75,7 +75,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48972 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48975 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -2011,7 +2011,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         }
     }
 
-    /** Returns user selected stream quality. -1 = BEST/default */
+    /** Returns user selected stream quality (video height). -1 = BEST/default */
     protected final int getPreferredStreamQuality() {
         final Class<? extends KVSConfig> cfgO = this.getConfigInterface();
         if (cfgO != null) {

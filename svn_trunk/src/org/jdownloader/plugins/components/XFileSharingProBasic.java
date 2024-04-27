@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48958 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,12 +128,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     // }
     public static final String getDefaultAnnotationPatternPart() {
         return "/(d/[A-Za-z0-9]+|(d|e)/[a-z0-9]{12}|embed-[a-z0-9]{12}\\.html|[a-z0-9]{12}(/[^/]+(?:\\.html)?)?)";
-    }
-
-    @Deprecated
-    /** Deprecated since 2024-04-23, use getDefaultAnnotationPatternPart instead! */
-    public static final String getDefaultAnnotationPatternPartXFSNew() {
-        return "/(d|e)/[a-z0-9]{12}";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -5899,11 +5893,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         } else {
             return this.getAPIKeyFromConfig();
         }
-    }
-
-    protected boolean isAPIKey(final String str) {
-        // TODO: 2023-11-30: Remove this
-        return looksLikeValidAPIKey(str);
     }
 
     @Override

@@ -37,12 +37,16 @@ import java.io.File;
 
 import javax.swing.Icon;
 
+import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
+import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper.ShellFolderSource;
+
 /**
  * @author Thomas
  *
  */
-public class VirtualRoot extends File {
-    private String name;
+public class VirtualRoot extends File implements ShellFolderSource {
+    private String     name;
+    private final File f;
 
     /**
      * @param f
@@ -50,6 +54,7 @@ public class VirtualRoot extends File {
      */
     public VirtualRoot(final File f, final String name) {
         super(f.getAbsolutePath());
+        this.f = f;
         this.name = name;
     }
 
@@ -58,11 +63,21 @@ public class VirtualRoot extends File {
      */
     public VirtualRoot(String path) {
         super(path);
+        f = this;
         this.name = super.getName();
     }
 
     public String getName() {
         return name;
+    }
+
+    @Override
+    public File getShellFolder() {
+        if (ShellFolderWrapper.isInstanceof(f)) {
+            return f;
+        } else {
+            return null;
+        }
     }
 
     /**

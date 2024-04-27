@@ -29,20 +29,20 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 45806 $", interfaceVersion = 3, names = { "commons.wikimedia.org" }, urls = { "https?://commons\\.wikimedia\\.org/wiki/Category:Pictures_by_User:[A-Za-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 48975 $", interfaceVersion = 3, names = { "commons.wikimedia.org" }, urls = { "https?://commons\\.wikimedia\\.org/wiki/Category:Pictures_by_User:[A-Za-z0-9\\-_]+" })
 public class CommonsWikimediaOrg extends PluginForDecrypt {
     public CommonsWikimediaOrg(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String parameter = param.getCryptedUrl();
         final String username = new Regex(parameter, "Category:Pictures_by_User:(.+)").getMatch(0);
         br.getPage(parameter);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            ret.add(this.createOfflinelink(parameter));
+            return ret;
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
@@ -73,14 +73,14 @@ public class CommonsWikimediaOrg extends PluginForDecrypt {
                 dl.setDownloadSize(SizeFormatter.getSize(filesize));
                 dl.setAvailable(true);
                 dl._setFilePackage(fp);
-                decryptedLinks.add(dl);
+                ret.add(dl);
                 distribute(dl);
             }
-            logger.info("Crawled page " + page + " | Found items so far: " + decryptedLinks.size() + "/" + total_number_of_items);
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + total_number_of_items);
             if (this.isAbort()) {
                 logger.info("Stopping because: Crawler aborted by user");
                 break;
-            } else if (decryptedLinks.size() >= total_number_of_items) {
+            } else if (ret.size() >= total_number_of_items) {
                 logger.info("Stopping because: Found all items");
                 break;
             } else if (items_found < max_items_per_page) {
@@ -88,10 +88,10 @@ public class CommonsWikimediaOrg extends PluginForDecrypt {
                 break;
             }
         } while (true);
-        if (decryptedLinks.size() == 0) {
+        if (ret.size() == 0) {
             logger.warning("Decrypter broken for link: " + parameter);
             return null;
         }
-        return decryptedLinks;
+        return ret;
     }
 }

@@ -45,12 +45,14 @@ import java.util.HashMap;
 
 import javax.swing.filechooser.FileSystemView;
 
+import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
+import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper.ShellFolderSource;
+
 /**
  * @author Thomas
  *
  */
-public class NetWorkFolder extends File {
-
+public class NetWorkFolder extends File implements ShellFolderSource {
     private final File            networkFolder;
     private File[]                fileList;
     private HashMap<String, File> map;
@@ -61,7 +63,6 @@ public class NetWorkFolder extends File {
     public NetWorkFolder(final File networkFolder) {
         super(networkFolder, "");
         this.networkFolder = networkFolder;
-
     }
 
     @Override
@@ -336,4 +337,12 @@ public class NetWorkFolder extends File {
         return this.networkFolder.toURI().toURL();
     }
 
+    @Override
+    public File getShellFolder() {
+        if (ShellFolderWrapper.isInstanceof(networkFolder)) {
+            return networkFolder;
+        } else {
+            return null;
+        }
+    }
 }

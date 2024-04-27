@@ -15,7 +15,6 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,13 +25,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.DebugMode;
@@ -41,8 +35,6 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.config.OneFichierConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -51,7 +43,6 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.controlling.AccountController;
-import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.requests.GetRequest;
@@ -74,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48977 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -134,9 +125,14 @@ public class OneFichierCom extends PluginForHost {
         this.enablePremium("https://www.1fichier.com/en/register.pl");
     }
 
+    /* 2024-04-26: Removed this as user can switch between API-key and website login. E-Mail is not given in API-Key login */
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+        if (PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled()) {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.API_KEY_LOGIN };
+        } else {
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+        }
     }
 
     @Override
@@ -322,7 +318,7 @@ public class OneFichierCom extends PluginForHost {
         postData.put("url", link.getPluginPatternMatcher());
         postData.put("pass", link.getDownloadPassword());
         performAPIRequest(API_BASE + "/file/info.cgi", JSonStorage.serializeToJson(postData));
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String errorMsg = (String) entries.get("message");
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* E.g. message": "Resource not found #469" */
@@ -756,7 +752,7 @@ public class OneFichierCom extends PluginForHost {
             return ai;
         }
         handleErrorsAPI(account);
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String mail = (String) entries.get("email");
         if (!StringUtils.isEmpty(mail)) {
             /* don't store the complete username for security purposes. */
@@ -825,7 +821,7 @@ public class OneFichierCom extends PluginForHost {
     private void handleErrorsAPI(final Account account) throws PluginException {
         Map<String, Object> entries = null;
         try {
-            entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final Exception ignore) {
             throw new AccountUnavailableException("Invalid API response", 60 * 1000);
         }
@@ -897,24 +893,24 @@ public class OneFichierCom extends PluginForHost {
     }
 
     private static void errorInvalidAPIKey(final Account account) throws PluginException {
-        if (account != null) {
-            /* Assume APIKey is invalid or simply not valid anymore (e.g. user disabled or changed APIKey) */
-            final StringBuilder sb = new StringBuilder();
-            sb.append("Invalid API Key!");
-            sb.append("\r\nYou can find your API Key here: 1fichier.com/console/params.pl");
-            sb.append("\r\nIf you bought a 'premium key'/'Voucher'/'Activation key' from a reseller, you first need to create a 1fichier account and redeem that code here: 1fichier.com/console/vu.pl");
-            sb.append("\r\nPlease keep in mind that API Keys are only available for premium customers.");
-            sb.append("\r\nInformation for 1fichier.com FREE-account users:");
-            sb.append("\r\nIf you do not own a premium- but only a free account, Go to Settings -> Plugins -> 1fichier.com -> 'Use premium API' -> Disable this -> Now try to login again, this time with username & password.");
-            throw new AccountInvalidException(sb.toString());
-        } else {
+        if (account == null) {
+            /* This should never happen */
             throw new AccountRequiredException();
         }
+        /* Assume APIKey is invalid or simply not valid anymore (e.g. user disabled or changed APIKey) */
+        final StringBuilder sb = new StringBuilder();
+        sb.append("Invalid API Key!");
+        sb.append("\r\nYou can find your API Key here: 1fichier.com/console/params.pl");
+        sb.append("\r\nIf you bought a 'premium key'/'Voucher'/'Activation key' from a reseller, you first need to create a 1fichier account and redeem that code here: 1fichier.com/console/vu.pl");
+        sb.append("\r\nPlease keep in mind that API Keys are only available for premium customers.");
+        sb.append("\r\nInformation for 1fichier.com FREE-account users:");
+        sb.append("\r\nIf you do not own a premium- but only a free account, Go to Settings -> Plugins -> 1fichier.com -> 'Use premium API' -> Disable this -> Now try to login again, this time with username & password.");
+        throw new AccountInvalidException(sb.toString());
     }
 
     private String getAPIErrormessage(final Browser br) {
         try {
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             return (String) entries.get("message");
         } catch (final Throwable e) {
             /* E.g. no valid json in browser. */
@@ -1321,21 +1317,11 @@ public class OneFichierCom extends PluginForHost {
 
     /** Required to authenticate via API. Wrapper for setPremiumAPIHeaders(String). */
     public static void setPremiumAPIHeaders(final Browser br, final Account account) throws PluginException {
-        final String apiKey = getAPIKey(account);
-        if (apiKey == null) {
+        final String apiKey = account.getPass();
+        if (apiKey == null || !looksLikeValidAPIKeySTATIC(apiKey)) {
             errorInvalidAPIKey(account);
         } else {
             setPremiumAPIHeaders(br, apiKey);
-        }
-    }
-
-    public static String getAPIKey(final Account account) {
-        /* 2021-02-18: Remove linebreaks from the end RE forum: https://board.jdownloader.org/showthread.php?t=83954 */
-        final String apiKey = StringUtils.trim(account != null ? account.getPass() : null);
-        if (isApiKey(apiKey)) {
-            return apiKey;
-        } else {
-            return null;
         }
     }
 
@@ -1344,7 +1330,7 @@ public class OneFichierCom extends PluginForHost {
          * true = use premium API, false = use combination of website + OLD basic auth API - ONLY RELEVANT FOR PREMIUM USERS; IF ENABLED,
          * USER HAS TO ENTER API_KEY INSTEAD OF USERNAME:PASSWORD (or APIKEY:APIKEY)!!
          */
-        if (account != null && (account.getType() == AccountType.PREMIUM || account.getType() == AccountType.UNKNOWN) && getAPIKey(account) != null) {
+        if (account != null && (account.getType() == AccountType.PREMIUM || account.getType() == AccountType.UNKNOWN) && looksLikeValidAPIKeySTATIC(account.getPass())) {
             return PluginJsonConfig.get(OneFichierConfigInterface.class).isUsePremiumAPIEnabled();
         } else {
             return false;
@@ -1484,94 +1470,23 @@ public class OneFichierCom extends PluginForHost {
     }
 
     @Override
-    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        if (PluginJsonConfig.get(getLazyP(), OneFichierConfigInterface.class).isUsePremiumAPIEnabled()) {
-            return new OnefichierAccountFactory(callback);
+    protected String getAPILoginHelpURL() {
+        return "https://1fichier.com/console/params.pl";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return looksLikeValidAPIKeySTATIC(str);
+    }
+
+    public static boolean looksLikeValidAPIKeySTATIC(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("[A-Za-z0-9\\-_=]{32}")) {
+            return true;
         } else {
-            return super.getAccountFactory(callback);
+            return false;
         }
-    }
-
-    public static class OnefichierAccountFactory extends MigPanel implements AccountBuilderInterface {
-        private static final long serialVersionUID = 1L;
-        private final String      PINHELP          = "Enter your API Key";
-
-        private String getPassword() {
-            if (this.pass == null) {
-                return null;
-            } else {
-                final String pw = new String(this.pass.getPassword()).trim();
-                if (EMPTYPW.equals(pw)) {
-                    return null;
-                } else {
-                    return pw;
-                }
-            }
-        }
-
-        public boolean updateAccount(Account input, Account output) {
-            boolean changed = false;
-            if (!StringUtils.equals(input.getUser(), output.getUser())) {
-                output.setUser(input.getUser());
-                changed = true;
-            }
-            if (!StringUtils.equals(input.getPass(), output.getPass())) {
-                output.setPass(input.getPass());
-                changed = true;
-            }
-            return changed;
-        }
-
-        private final ExtPasswordField pass;
-        private static String          EMPTYPW = " ";
-        private final JLabel           idLabel;
-
-        public OnefichierAccountFactory(final InputChangedCallbackInterface callback) {
-            super("ins 0, wrap 2", "[][grow,fill]", "");
-            add(new JLabel("Click here to find your API Key (premium users only)"));
-            add(new JLink("https://1fichier.com/console/params.pl"));
-            this.add(this.idLabel = new JLabel("Enter your API Key:"));
-            add(this.pass = new ExtPasswordField() {
-                @Override
-                public void onChanged() {
-                    callback.onChangedInput(this);
-                }
-            }, "");
-            pass.setHelpText(PINHELP);
-        }
-
-        @Override
-        public JComponent getComponent() {
-            return this;
-        }
-
-        @Override
-        public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                // name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-            }
-        }
-
-        @Override
-        public boolean validateInputs() {
-            final String password = getPassword();
-            if (!isApiKey(password)) {
-                idLabel.setForeground(Color.RED);
-                return false;
-            }
-            idLabel.setForeground(Color.BLACK);
-            return getPassword() != null;
-        }
-
-        @Override
-        public Account getAccount() {
-            return new Account(null, getPassword());
-        }
-    }
-
-    private static boolean isApiKey(final String str) {
-        return str != null && str.matches("[A-Za-z0-9\\-_=]{32}");
     }
 
     @Override
