@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48974 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 48984 $", interfaceVersion = 3, names = {}, urls = {})
 public class SerienStreamTo extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public SerienStreamTo(final PluginWrapper wrapper) {
@@ -138,7 +138,7 @@ public class SerienStreamTo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String title = br.getRegex("<meta property=\"og:title\" content=\"(?:Episode \\d+\\s|Staffel \\d+\\s|von+\\s)+([^\"]+)\"/>").getMatch(0);
+        final String title = br.getRegex("<meta property=\"og:title\" content=\"(?:Episode\\s*\\d+\\s|Staffel\\s*\\d+\\s|Filme?\\s*\\d*\\s|von\\s)+([^\"]+)\"/>").getMatch(0);
         final String itemSlug = new Regex(br.getURL(), "https?://[^/]+/[^/]+/[^/]+/(.*)").getMatch(0);
         // If we're on a show site, add the seasons, if we're on a season page, add the episodes and so on ...
         final String[][] itemLinks = br.getRegex("href=\"([^\"]+" + Pattern.quote(itemSlug) + "/[^\"]+)\"").getMatches();

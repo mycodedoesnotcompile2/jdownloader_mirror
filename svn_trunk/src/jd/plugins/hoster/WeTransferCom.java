@@ -40,7 +40,6 @@ import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
@@ -67,7 +66,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 48875 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
+@HostPlugin(revision = "$Revision: 48984 $", interfaceVersion = 2, names = { "wetransfer.com" }, urls = { "https?://wetransferdecrypted/[a-f0-9]{46}/[a-f0-9]{4,12}/[a-f0-9]{46}" })
 public class WeTransferCom extends PluginForHost {
     public WeTransferCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -501,7 +500,6 @@ public class WeTransferCom extends PluginForHost {
         @AboutConfig
         @DefaultEnumValue("DEFAULT")
         @Order(10)
-        @DescriptionForConfigEntry("Single .zip download is recommended. Loose file download may lave you with corrupted files or wrongly named .zip files.")
         @DefaultOnNull
         CrawlMode getCrawlMode2();
 

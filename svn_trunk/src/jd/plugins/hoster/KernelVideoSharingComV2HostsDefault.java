@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48899 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48984 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -147,6 +147,7 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         /* 2023-07-31 */
         ret.add(new String[] { "gotgayporn.com", "bonertube.com" });
         ret.add(new String[] { "ah-me.com" });
+        ret.add(new String[] { "whoreshub.com" });
         return ret;
     }
 
