@@ -15,10 +15,25 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter.HighlightPainter;
+
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
@@ -38,7 +53,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48991 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDriveDirectoryIndex extends PluginForHost {
     public GoogleDriveDirectoryIndex(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,11 +108,14 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
      * https://gitlab.com/ParveenBhadooOfficial/Google-Drive-Index/-/blob/master/README.md </br>
      * Be sure to add all domains to crawler plugin GoogleDriveDirectoryIndex.java too!
      */
-    /* Connection stuff */
-    private final boolean FREE_RESUME            = true;
-    private final int     FREE_MAXCHUNKS         = 0;
-    private final boolean ACCOUNT_FREE_RESUME    = true;
-    private final int     ACCOUNT_FREE_MAXCHUNKS = 0;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 0;
+    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -114,7 +132,11 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
             con = br.openGetConnection(link.getPluginPatternMatcher());
             handleConnectionErrors(br, con, null);
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
             /* Usually final filename is already set by crawler plugin. */
             final String fname = Plugin.getFileNameFromDispositionHeader(con);
@@ -132,12 +154,12 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link, null, FREE_RESUME, FREE_MAXCHUNKS);
+        handleDownload(link, null);
     }
 
-    private void handleDownload(final DownloadLink link, final Account account, final boolean resumable, final int maxchunks) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link, account);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), resumable, maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
         handleConnectionErrors(br, dl.getConnection(), account);
         dl.startDownload();
     }
@@ -169,6 +191,11 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     public void login(final Account account) throws Exception {
         synchronized (account) {
+            String pw = account.getPass();
+            if (pw == null) {
+                /* Allow empty password! */
+                pw = "";
+            }
             br.getHeaders().put("Authorization", "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
         }
     }
@@ -184,7 +211,7 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        this.handleDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS);
+        this.handleDownload(link, account);
     }
 
     @Override
@@ -195,6 +222,133 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
     @Override
     public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
         return false;
+    }
+
+    @Override
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        return new EditAccountPanelWorkersDev(callback, this);
+    }
+
+    /** 2024-04-30: The sole purpose of this is to allow login without password slash login with blank password. */
+    public class EditAccountPanelWorkersDev extends MigPanel implements AccountBuilderInterface {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        protected String getPassword() {
+            if (this.pass == null) {
+                return null;
+            } else {
+                return new String(this.pass.getPassword());
+            }
+        }
+
+        protected String getUsername() {
+            if (name == null) {
+                return "";
+            } else {
+                if (_GUI.T.jd_gui_swing_components_AccountDialog_help_username().equals(this.name.getText())) {
+                    return null;
+                }
+                return this.name.getText();
+            }
+        }
+
+        private final ExtTextField                  name;
+        private final ExtPasswordField              pass;
+        private final InputChangedCallbackInterface callback;
+        private JLabel                              usernameLabel = null;
+        private final JLabel                        passwordLabel;
+        private final PluginForHost                 plg;
+
+        public boolean updateAccount(Account input, Account output) {
+            boolean changed = false;
+            if (!StringUtils.equals(input.getUser(), output.getUser())) {
+                output.setUser(input.getUser());
+                changed = true;
+            }
+            if (!StringUtils.equals(input.getPass(), output.getPass())) {
+                output.setPass(input.getPass());
+                changed = true;
+            }
+            return changed;
+        }
+
+        public EditAccountPanelWorkersDev(final InputChangedCallbackInterface callback, final PluginForHost plg) {
+            super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = plg;
+            this.callback = callback;
+            add(usernameLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_name()));
+            add(this.name = new ExtTextField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(name);
+                }
+
+                {
+                    final HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(Color.yellow);
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("^(\\s+)")));
+                    addTextHighlighter(new ExtTextHighlighter(painter, Pattern.compile("(\\s+)$")));
+                    refreshTextHighlighter();
+                }
+            });
+            name.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_help_username());
+            add(passwordLabel = new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_pass()));
+            add(this.pass = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(pass);
+                }
+            }, "");
+            /* Normal username & password login */
+            pass.setHelpText(_GUI.T.BuyAndAddPremiumAccount_layoutDialogContent_pass());
+        }
+
+        public InputChangedCallbackInterface getCallback() {
+            return callback;
+        }
+
+        public void setAccount(final Account defaultAccount) {
+            if (defaultAccount != null) {
+                name.setText(defaultAccount.getUser());
+                pass.setText(defaultAccount.getPass());
+            }
+        }
+
+        @Override
+        public boolean validateInputs() {
+            final boolean userok;
+            final boolean passok = true;
+            if (StringUtils.isEmpty(this.getUsername())) {
+                usernameLabel.setForeground(Color.RED);
+                userok = false;
+            } else {
+                usernameLabel.setForeground(Color.BLACK);
+                userok = true;
+            }
+            // final String pw = getPassword();
+            if (!passok) {
+                passwordLabel.setForeground(Color.RED);
+            } else {
+                passwordLabel.setForeground(Color.BLACK);
+            }
+            if (userok && passok) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public Account getAccount() {
+            return new Account(getUsername(), getPassword());
+        }
+
+        @Override
+        public JComponent getComponent() {
+            return this;
+        }
     }
 
     @Override

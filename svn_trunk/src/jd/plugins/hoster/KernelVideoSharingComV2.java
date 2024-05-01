@@ -75,7 +75,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48975 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 48989 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -646,10 +646,10 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             link.setFinalFileName(title + extDefault);
         }
         if (this.isPrivateVideoWebsite(this.br)) {
-            logger.info("Detected private video -> Ending linkcheck without looking for downloadurl");
             link.setProperty(PROPERTY_IS_PRIVATE_VIDEO, true);
             return AvailableStatus.TRUE;
         }
+        /* Not a private video or we're currently logged in [and friends with the uploader] so we can watch it. */
         link.removeProperty(PROPERTY_IS_PRIVATE_VIDEO);
         /* Only look for downloadurl if we need it! */
         if (isDownload || !this.enableFastLinkcheck()) {
@@ -1012,7 +1012,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             requestFileInformation(link, account, true);
             if (StringUtils.isEmpty(this.dllink)) {
                 if (this.isPrivateVideo(link)) {
-                    throw new AccountRequiredException("Private videos can only be watched by registered users and/or friends of the uploader");
+                    throw new AccountRequiredException("Private videos can only be watched by registered users or friends of the uploader");
                 } else {
                     /* Broken video or broken plugin. */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Broken video (?)");

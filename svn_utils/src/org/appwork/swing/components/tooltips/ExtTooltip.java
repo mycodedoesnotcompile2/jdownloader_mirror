@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.components.tooltips;
 
+import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -43,6 +44,7 @@ import java.awt.event.MouseListener;
 
 import javax.swing.JComponent;
 import javax.swing.JToolTip;
+import javax.swing.UIManager;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 
@@ -82,6 +84,11 @@ public abstract class ExtTooltip extends JToolTip implements AncestorListener {
             this.add(panel);
         }
         addAncestorListener(this);
+    }
+
+    @Deprecated
+    public static void setForgroundColor(final Color black) {
+        UIManager.put(ExtTooltip.APPWORK_TOOLTIP_FOREGROUND, black);
     }
 
     @Override
