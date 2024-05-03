@@ -2913,6 +2913,38 @@ public class Browser {
                 return null;
             }
         },
+        CLOUDFILT {
+            @Override
+            public String getLabel() {
+                return "CloudFilt";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                final HTTPConnection con;
+                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                    return null;
+                } else if (con.getResponseCode() == 200 && browser.getURL().contains("cloudfilt.com/stop-")) {
+                    return this;
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         NETWORK_SECURITY_WIREFILTER {
             @Override
             public String getLabel() {

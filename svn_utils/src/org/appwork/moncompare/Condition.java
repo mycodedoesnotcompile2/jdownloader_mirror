@@ -38,7 +38,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -644,7 +643,6 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     return (compareResult > 0);
                 }
             };
-
             protected abstract boolean opEval(int compareResult);
         }
 
@@ -1553,17 +1551,15 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     }
 
     public static class KeyValue {
+        public final Object  value;
         public final Object  key;
         public final boolean validKey;
 
         public KeyValue(Object key, Object value, boolean validKey) {
-            super();
             this.key = key;
             this.value = value;
             this.validKey = validKey;
         }
-
-        public final Object value;
     }
 
     /**
@@ -1571,35 +1567,16 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @return
      */
     public Iterator<KeyValue> iterator(final Object obj) {
-        ListAccessorInterface iterList;
-        MapAccessorInterface iterMap;
+        final ListAccessorInterface listWrapper;
+        final MapAccessorInterface mapWrapper;
         if (obj == null || Clazz.isPrimitive(obj.getClass()) || obj instanceof String) {
             return null;
         } else if (obj instanceof ConditionObjectValueView) {
             final ConditionObjectValueView view = (ConditionObjectValueView) obj;
             return view.iterator();
-        } else if ((iterMap = getMapWrapper(obj)) != null) {
-            ArrayList<String> ret = new ArrayList<String>();
-            for (java.util.Map.Entry<String, Object> es : iterMap) {
-                ret.add(es.getKey());
-            }
-            final Iterator<java.util.Map.Entry<String, Object>> keyValue = iterMap.iterator();
+        } else if ((mapWrapper = getMapWrapper(obj)) != null) {
             return new Iterator<KeyValue>() {
-                @Override
-                public boolean hasNext() {
-                    return keyValue.hasNext();
-                }
-
-                @Override
-                public KeyValue next() {
-                    java.util.Map.Entry<String, Object> nextKey = keyValue.next();
-                    return new KeyValue(nextKey.getKey(), nextKey.getValue(), true);
-                }
-            };
-        } else if ((iterList = getListWrapper(obj)) != null) {
-            final Iterator<Object> it = iterList.iterator();
-            return new Iterator<KeyValue>() {
-                int index = 0;
+                final Iterator<Map.Entry<String, Object>> it = mapWrapper.iterator();
 
                 @Override
                 public boolean hasNext() {
@@ -1608,28 +1585,42 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
 
                 @Override
                 public KeyValue next() {
-                    try {
-                        Object value = it.next();
-                        return new KeyValue(index++, value, obj instanceof List);
-                    } finally {
-                        ;
-                    }
+                    final Map.Entry<String, Object> nextKey = it.next();
+                    return new KeyValue(nextKey.getKey(), nextKey.getValue(), true);
+                }
+            };
+        } else if ((listWrapper = getListWrapper(obj)) != null) {
+            return new Iterator<KeyValue>() {
+                final boolean          validKeys = listWrapper instanceof ArrayAccessor || listWrapper instanceof ListAccessor;
+                final Iterator<Object> it        = listWrapper.iterator();
+                private int            index     = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return it.hasNext();
+                }
+
+                @Override
+                public KeyValue next() {
+                    final Object value = it.next();
+                    return new KeyValue(index++, value, validKeys);
                 }
             };
         } else {
             try {
                 final ClassCache cc = ClassCache.getClassCache(obj.getClass());
-                final Iterator<String> keys = cc.getKeys().iterator();
                 return new Iterator<KeyValue>() {
+                    final Iterator<String> it = cc.getKeys().iterator();
+
                     @Override
                     public boolean hasNext() {
-                        return keys.hasNext();
+                        return it.hasNext();
                     }
 
                     @Override
                     public KeyValue next() {
                         try {
-                            String nextKey = keys.next();
+                            final String nextKey = it.next();
                             return new KeyValue(nextKey, cc.getGetter(nextKey).getValue(obj), true);
                         } catch (IllegalArgumentException e) {
                             throw new WTFException(e);
@@ -1667,19 +1658,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
-    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    public static final ThreadLocal<List<TypeHandler>>         TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>                      GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
     static {
         GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
         GLOBAL_TYPE_HANDLERS.add(new DateHandler());
     }
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS        = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                };
+    private static final long                                  serialVersionUID     = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE                 = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                    };
     static {
         IGNORE.add($OPTIONS);
     }
@@ -1754,7 +1745,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     }
 
     public ListAccessorInterface getListWrapper(final Object expression) {
-        if (expression instanceof ListAccessorInterface) {
+        if (expression == null) {
+            return null;
+        } else if (expression instanceof ListAccessorInterface) {
             return (ListAccessorInterface) expression;
         }
         for (final TypeHandler e : getTypeHandlerIterable()) {
@@ -1763,23 +1756,21 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                 return ret;
             }
         }
-        if (expression == null) {
-            return null;
-        }
         if (expression.getClass().isArray()) {
             return new ArrayAccessor<MatcherType>(expression);
-        }
-        if (expression instanceof List) {
+        } else if (expression instanceof List) {
             return new ListAccessor((List<Object>) expression);
-        }
-        if (expression instanceof Collection) {
+        } else if (expression instanceof Collection) {
             return new CollectionAccessor(((Collection<Object>) expression));
+        } else {
+            return null;
         }
-        return null;
     }
 
     public MapAccessorInterface getMapWrapper(final Object expression) {
-        if (expression instanceof MapAccessorInterface) {
+        if (expression == null) {
+            return null;
+        } else if (expression instanceof MapAccessorInterface) {
             return (MapAccessorInterface) expression;
         }
         for (final TypeHandler e : getTypeHandlerIterable()) {
@@ -1790,8 +1781,9 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
         if (expression instanceof Map) {
             return new MapAccessor((Map<String, Object>) expression);
+        } else {
+            return null;
         }
-        return null;
     }
 
     /**
@@ -2714,33 +2706,29 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * @throws ConditionException
      */
     public List<String> listKeys(final Object obj) throws ConditionException {
-        Iterable<Object> iterList;
-        Iterable<java.util.Map.Entry<String, Object>> iterMap;
+        final ListAccessorInterface listWrapper;
+        final MapAccessorInterface mapWrapper;
         if (obj == null || Clazz.isPrimitive(obj.getClass()) || obj instanceof String) {
-            return Arrays.asList();
+            return new ArrayList<String>(0);
         } else if (obj instanceof ConditionObjectValueView) {
             final ConditionObjectValueView view = (ConditionObjectValueView) obj;
             return view.listConditionKeys();
         } else if (obj instanceof Map) {
             // faster than getMapIterable
             return new ArrayList<String>(((Map) obj).keySet());
-        } else if ((iterMap = getMapWrapper(obj)) != null) {
-            ArrayList<String> ret = new ArrayList<String>();
-            for (java.util.Map.Entry<String, Object> es : iterMap) {
-                ret.add(es.getKey());
-            }
-            return ret;
-        } else if ((iterList = getListWrapper(obj)) != null) {
-            final ArrayList<String> ret = new ArrayList<String>();
-            if (iterList instanceof CollectionAccessor) {
+        } else if ((mapWrapper = getMapWrapper(obj)) != null) {
+            return new ArrayList<String>(mapWrapper.keySet());
+        } else if ((listWrapper = getListWrapper(obj)) != null) {
+            if (listWrapper instanceof ArrayAccessor || listWrapper instanceof ListAccessor) {
+                final int size = listWrapper.size();
+                final ArrayList<String> ret = new ArrayList<String>(size);
+                for (int i = 0; i < size; i++) {
+                    ret.add(String.valueOf(i));
+                }
                 return ret;
             } else {
-                int i = 0;
-                for (Object e : iterList) {
-                    ret.add(String.valueOf(i++));
-                }
+                return new ArrayList<String>(0);
             }
-            return ret;
         } else {
             try {
                 return new ArrayList<String>(ClassCache.getClassCache(obj.getClass()).getKeys());

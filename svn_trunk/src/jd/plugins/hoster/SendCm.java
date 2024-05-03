@@ -50,7 +50,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49008 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -245,6 +245,7 @@ public class SendCm extends XFileSharingProBasic {
             } else {
                 dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
             }
+            // String twoFACode = this.getTwoFACode(account, "^\\d{6}$");
             String twoFACode = getUserInput("Enter verification code sent to your E-Mail", dl_dummy);
             if (twoFACode != null) {
                 twoFACode = twoFACode.trim();

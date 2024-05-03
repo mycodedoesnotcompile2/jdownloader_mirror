@@ -96,7 +96,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49002 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2038,10 +2038,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String filename_src = br.getRegex("(?i)<b>Filename\\s*:?\\s*<[^\n]+</td>").getMatch(-1);
         if (filename_src != null) {
             filename = new Regex(filename_src, ">([^>]+)</td>$").getMatch(0);
-        }
-        if (filename == null) {
-            /* 2020-12-07 e.g. sama-share.com, pandafiles.com */
-            filename = br.getRegex("name=\"file_name\"[^>]*value=\"([^<>\"]+)\"").getMatch(0);
         }
         if (filename == null) {
             /* 2021-05-12: New XFS style e.g. userupload.net */

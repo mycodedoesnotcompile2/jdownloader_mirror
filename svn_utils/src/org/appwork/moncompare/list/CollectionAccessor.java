@@ -44,7 +44,7 @@ import org.appwork.exceptions.NotSupportedException;
  *
  */
 public class CollectionAccessor extends ListAccessorInterface {
-    private Collection<Object> collection;
+    private final Collection<Object> collection;
 
     /**
      * @param collection
@@ -99,5 +99,10 @@ public class CollectionAccessor extends ListAccessorInterface {
     @Override
     public void add(Object value) {
         collection.add(value);
+    }
+
+    @Override
+    public Object getAccessedObject() {
+        return collection;
     }
 }
