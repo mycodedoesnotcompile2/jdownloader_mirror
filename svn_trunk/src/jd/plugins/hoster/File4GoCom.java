@@ -38,16 +38,23 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47664 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
+@HostPlugin(revision = "$Revision: 49019 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
 public class File4GoCom extends antiDDoSForHost {
     public File4GoCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(MAINPAGE);
+        this.enablePremium();
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return MAINPAGE;
+        return "http://www." + getHost();
     }
 
     @Override
@@ -64,21 +71,21 @@ public class File4GoCom extends antiDDoSForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    private static final String MAINPAGE = "http://www.file4go.net";
-
-    /** 2023-01-24: They're GEO-blocking all except brazil IPs via Cloudflare! */
+    /** 2023-01-24: They're GEO-blocking all except brazil/PT IPs via Cloudflare! */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
-        br.setCookie(MAINPAGE, "animesonline", "1");
-        br.setCookie(MAINPAGE, "musicasab", "1");
-        br.setCookie(MAINPAGE, "poup", "1");
-        br.setCookie(MAINPAGE, "noadvtday", "0");
-        br.setCookie(MAINPAGE, "hellpopab", "1");
+        br.setCookie(getHost(), "animesonline", "1");
+        br.setCookie(getHost(), "musicasab", "1");
+        br.setCookie(getHost(), "poup", "1");
+        br.setCookie(getHost(), "noadvtday", "0");
+        br.setCookie(getHost(), "hellpopab", "1");
         // do not follow redirects, as they can lead to 404 which is faked based on country of origin ?
         getPage(getContentURL(link));
         redirectControl(br);
-        if (br.containsHTML(">404 ARQUIVO N�O ENCOTRADO<|Arquivo Temporariamente Indisponivel|ARQUIVO DELATADO PELO USUARIO OU REMOVIDO POR <|ARQUIVO DELATADO POR <b>INATIVIDADE|O arquivo Não foi encotrado em nossos servidores")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*404 ARQUIVO N�O ENCOTRADO<|Arquivo Temporariamente Indisponivel|ARQUIVO DELATADO PELO USUARIO OU REMOVIDO POR <|ARQUIVO DELATADO POR <b>INATIVIDADE|O arquivo Não foi encotrado em nossos servidores")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex(">Nome:</b>\\s*(.*?)\\s*(?:</p>)?</span>").getMatch(0);
@@ -110,7 +117,8 @@ public class File4GoCom extends antiDDoSForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String directLink = checkDirectLink(link, "directlink");
+        final String directlinkproperty = "directlink";
+        String directLink = checkDirectLink(link, directlinkproperty);
         if (directLink == null) {
             Form form = br.getFormByRegex(".*CRIAR DOWNLOAD.*");
             if (form == null) {
@@ -139,7 +147,7 @@ public class File4GoCom extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty("directlink", directLink);
+        link.setProperty(directlinkproperty, directLink);
         dl.startDownload();
     }
 
@@ -149,7 +157,6 @@ public class File4GoCom extends antiDDoSForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     if (con.getCompleteContentLength() > 0) {
@@ -174,54 +181,50 @@ public class File4GoCom extends antiDDoSForHost {
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                // Load cookies
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    br.setCookies(cookies);
-                    if (!force) {
-                        /* Do not verify cookies */
-                        return;
-                    }
-                    if (isLoggedIN(br)) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        br.clearCookies(null);
-                    }
-                }
-                logger.info("Performing full login");
-                getPage(MAINPAGE);
-                redirectControl(br);
-                postPage("/login.html", "acao=logar&login=" + Encoding.urlEncode(account.getUser()) + "&senha=" + Encoding.urlEncode(account.getPass()));
-                redirectControl(br);
-                final String lang = System.getProperty("user.language");
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    if ("de".equalsIgnoreCase(lang)) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nServer Fehler 404 - Login momentan nicht möglich!", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nIServer error 404 - login not possible at the moment!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
+            // Load cookies
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                br.setCookies(cookies);
+                if (!force) {
+                    /* Do not verify cookies */
+                    return;
                 }
                 if (isLoggedIN(br)) {
-                    if ("de".equalsIgnoreCase(lang)) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                    account.clearCookies("");
                 }
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                account.clearCookies("");
-                throw e;
             }
+            logger.info("Performing full login");
+            getPage("http://www." + getHost());
+            redirectControl(br);
+            postPage("/login.html", "acao=logar&login=" + Encoding.urlEncode(account.getUser()) + "&senha=" + Encoding.urlEncode(account.getPass()));
+            redirectControl(br);
+            final String lang = System.getProperty("user.language");
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                if ("de".equalsIgnoreCase(lang)) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nServer Fehler 404 - Login momentan nicht möglich!", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nIServer error 404 - login not possible at the moment!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                }
+            }
+            if (isLoggedIN(br)) {
+                if ("de".equalsIgnoreCase(lang)) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                }
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
     private boolean isLoggedIN(final Browser br) {
-        if (br.getCookie(MAINPAGE, "FILE4GO", Cookies.NOTDELETEDPATTERN) != null) {
+        if (br.getCookie(br.getHost(), "FILE4GO", Cookies.NOTDELETEDPATTERN) != null) {
             return true;
         } else {
             return false;
@@ -293,7 +296,7 @@ public class File4GoCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

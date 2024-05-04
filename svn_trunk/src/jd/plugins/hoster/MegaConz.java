@@ -106,7 +106,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 48895 $", interfaceVersion = 2, names = { "mega.co.nz" }, urls = { "(https?://(www\\.)?mega\\.(co\\.)?nz/.*?(#!?N?|\\$)|chrome://mega/content/secure\\.html#)(!|%21|\\?)[a-zA-Z0-9]+(!|%21)[a-zA-Z0-9_,\\-%]{16,}((=###n=|!)[a-zA-Z0-9]+)?|mega:/*#(?:!|%21)[a-zA-Z0-9]+(?:!|%21)[a-zA-Z0-9_,\\-%]{16,}" })
+@HostPlugin(revision = "$Revision: 49017 $", interfaceVersion = 2, names = { "mega.co.nz" }, urls = { "(https?://(www\\.)?mega\\.(co\\.)?nz/.*?(#!?N?|\\$)|chrome://mega/content/secure\\.html#)(!|%21|\\?)[a-zA-Z0-9]+(!|%21)[a-zA-Z0-9_,\\-%]{16,}((=###n=|!)[a-zA-Z0-9]+)?|mega:/*#(?:!|%21)[a-zA-Z0-9]+(?:!|%21)[a-zA-Z0-9_,\\-%]{16,}" })
 public class MegaConz extends PluginForHost {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -832,10 +832,7 @@ public class MegaConz extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
             link.setDownloadSize(Long.parseLong(fileSize));
-            try {
-                link.setVerifiedFileSize(Long.parseLong(fileSize));
-            } catch (final Throwable e) {
-            }
+            link.setVerifiedFileSize(Long.parseLong(fileSize));
         }
         final String at = valueOf(response.get("at"));
         if (at == null) {
@@ -846,7 +843,7 @@ public class MegaConz extends PluginForHost {
             fileInfo = decrypt(at, keyString);
         } catch (final StringIndexOutOfBoundsException e) {
             /* key is incomplete */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, null, e);
         }
         final String fileName = valueOf(fileInfo.get("n"));
         if (fileName == null) {

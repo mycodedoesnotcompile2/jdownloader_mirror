@@ -26,16 +26,6 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.swing.components.ExtTextField;
-import org.appwork.swing.components.ExtTextHighlighter;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -53,7 +43,18 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48991 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.swing.components.ExtTextField;
+import org.appwork.swing.components.ExtTextHighlighter;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 49011 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDriveDirectoryIndex extends PluginForHost {
     public GoogleDriveDirectoryIndex(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,8 +106,8 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     /**
      * Host plugin that can handle instances of this project:
-     * https://gitlab.com/ParveenBhadooOfficial/Google-Drive-Index/-/blob/master/README.md </br>
-     * Be sure to add all domains to crawler plugin GoogleDriveDirectoryIndex.java too!
+     * https://gitlab.com/ParveenBhadooOfficial/Google-Drive-Index/-/blob/master/README.md </br> Be sure to add all domains to crawler
+     * plugin GoogleDriveDirectoryIndex.java too!
      */
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -119,18 +120,27 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null);
+        return requestFileInformation(link, null, false);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         this.setBrowserExclusive();
         if (account != null) {
             login(account);
         }
         URLConnectionAdapter con = null;
+        boolean success = false;
         try {
-            con = br.openGetConnection(link.getPluginPatternMatcher());
-            handleConnectionErrors(br, con, null);
+            /* 2024-05-03: Needed in some cases or error 401 will be returned even with correct authorization. */
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, link.getPluginPatternMatcher());
+            if (isDownload) {
+                dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
+                con = dl.getConnection();
+            } else {
+                con = br.openGetConnection(link.getPluginPatternMatcher());
+            }
+            handleConnectionErrors(br, con, account);
+            success = true;
             if (con.getCompleteContentLength() > 0) {
                 if (con.isContentDecoded()) {
                     link.setDownloadSize(con.getCompleteContentLength());
@@ -145,7 +155,9 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
             }
         } finally {
             try {
-                con.disconnect();
+                if (!success || !isDownload) {
+                    con.disconnect();
+                }
             } catch (final Throwable e) {
             }
         }
@@ -158,9 +170,11 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformation(link, account);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), this.isResumeable(link, account), this.getMaxChunks(link, account));
-        handleConnectionErrors(br, dl.getConnection(), account);
+        requestFileInformation(link, account, true);
+        if (dl == null) {
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         dl.startDownload();
     }
 
@@ -196,7 +210,7 @@ public class GoogleDriveDirectoryIndex extends PluginForHost {
                 /* Allow empty password! */
                 pw = "";
             }
-            br.getHeaders().put("Authorization", "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
         }
     }
 

@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48989 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49018 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,12 +200,13 @@ public abstract class YetiShareCore extends antiDDoSForHost {
         try {
             final URL url = new URL(originalURL);
             final String urlHost = getCorrectHost(link, url);
+            final String urlHostWithoutWww = urlHost.replaceFirst("(?i)www\\.", "");
             final List<String> deadDomains = this.getDeadDomains();
             final String protocol = getProtocol(originalURL);
-            if (deadDomains == null || !deadDomains.contains(urlHost)) {
-                /* Only correct domains if we know they're dead. */
+            if (deadDomains == null || (!deadDomains.contains(urlHost) && !deadDomains.contains(urlHostWithoutWww))) {
                 return protocol + url.getHost() + url.getPath();
             }
+            /* Correct domains if we know they're dead. */
             final String pluginHost = this.getHost();
             final String host;
             if (StringUtils.equalsIgnoreCase(urlHost, pluginHost)) {

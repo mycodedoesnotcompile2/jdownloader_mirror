@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49018 $", interfaceVersion = 3, names = {}, urls = {})
 public class IndiShareMe extends XFileSharingProBasic {
     public IndiShareMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -65,6 +65,20 @@ public class IndiShareMe extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "indishare.org", "indishare.cc", "indi-share.com", "indishare.co", "indishare.com", "indishare.me", "india-share.com", "news4town.com", "down-indi1.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("indishare.cc");
+        deadDomains.add("indi-share.com");
+        deadDomains.add("indishare.co");
+        deadDomains.add("indishare.com");
+        deadDomains.add("indishare.me");
+        deadDomains.add("india-share.com");
+        deadDomains.add("news4town.com");
+        deadDomains.add("down-indi1.com");
+        return deadDomains;
     }
 
     @Override

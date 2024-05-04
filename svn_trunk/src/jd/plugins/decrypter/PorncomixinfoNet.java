@@ -24,7 +24,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49018 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorncomixinfoNet extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
@@ -117,7 +117,7 @@ public class PorncomixinfoNet extends PluginForDecrypt {
                 if (StringUtils.endsWithCaseInsensitive(url, "cover.jpg") || StringUtils.endsWithCaseInsensitive(url, "cover.webp")) {
                     final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
                     ret.add(link);
-                } else if (url.endsWith(".webp")) {
+                } else if (StringUtils.endsWithCaseInsensitive(url, ".webp")) {
                     webpurls.add(url);
                 }
             }
