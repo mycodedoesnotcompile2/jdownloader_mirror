@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48977 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49021 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -612,7 +612,7 @@ public class OneFichierCom extends PluginForHost {
                 } else {
                     waitMilliseconds = defaultWaitMinutes * 60 * 1000l;
                 }
-                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait between downloads", waitMilliseconds);
+                throw new AccountUnavailableException("Wait between downloads", waitMilliseconds);
             } else {
                 final boolean preferReconnect = PluginJsonConfig.get(OneFichierConfigInterface.class).isPreferReconnectEnabled();
                 if (waittimeMinutesStr != null && preferReconnect) {
