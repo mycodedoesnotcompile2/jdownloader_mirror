@@ -52,7 +52,7 @@ import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 48809 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49024 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "restfile.ca", "restfilee.com", "storagely.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "uppit.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "userupload.net", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
@@ -169,10 +169,10 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         do {
             try {
                 getPage(param.getCryptedUrl());
-                if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)No such user exist|No such folder")) {
+                if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("No such user exist|No such folder")) {
                     logger.info("Incorrect URL, Invalid user or empty folder");
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (br.containsHTML("(?i)>\\s*?Guest access not possible")) {
+                } else if (br.containsHTML(">\\s*?Guest access not possible")) {
                     /* 2019-08-13: Rare special case E.g. easybytez.com */
                     if (loggedIN) {
                         logger.info("We are loggedIN but still cannot view this folder --> Wrong account or crawler plugin failure");
@@ -210,11 +210,9 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         final ArrayList<String> dupes = new ArrayList<String>();
         dupes.add(param.getCryptedUrl());
         /* prevents continuous loop. */
-        int lastArraySize = 0;
         int page = 1;
         do {
             logger.info("Crawling page: " + page);
-            lastArraySize = ret.size();
             final ArrayList<DownloadLink> newResults = parsePage(dupes, fp, param);
             if (newResults.isEmpty()) {
                 /* Fail-safe */
