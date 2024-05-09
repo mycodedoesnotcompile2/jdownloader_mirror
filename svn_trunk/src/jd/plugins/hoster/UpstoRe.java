@@ -54,7 +54,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49030 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -673,11 +673,11 @@ public class UpstoRe extends antiDDoSForHost {
                 final Entry<String, Long> ipentry = it.next();
                 final String ip = ipentry.getKey();
                 final long timestamp = ipentry.getValue();
-                if (System.currentTimeMillis() - timestamp >= FREE_RECONNECTWAIT) {
+                if (ip == null || System.currentTimeMillis() - timestamp >= FREE_RECONNECTWAIT) {
                     /* Remove old entries */
                     it.remove();
                 }
-                if (ip.equals(currentIP.get())) {
+                if (ip != null && ip.equals(currentIP.get())) {
                     lastdownload = timestamp;
                 }
             }
