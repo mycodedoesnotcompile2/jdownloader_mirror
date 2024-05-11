@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49038 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -200,13 +200,19 @@ public class JubaGetCom extends PluginForHost {
         final String[] htmls = hostsHTML.split("<img");
         final ArrayList<String> supportedHosts = new ArrayList<String>();
         for (final String html : htmls) {
-            final String hostWithoutTLD = new Regex(html, "data-original-title=\"([^\"]+)").getMatch(0);
+            String hostWithoutTLD = new Regex(html, "data-original-title=\"([^\" \\(]+)\"").getMatch(0);
+            if (hostWithoutTLD == null) {
+                // data-original-title="forum.com (hoster.com)">
+                hostWithoutTLD = new Regex(html, "data-original-title=\"[^\"]*\\(([^\"\\)]+)\\)").getMatch(0);
+            }
             if (hostWithoutTLD == null) {
                 /* Skip invalid items */
                 continue;
             }
             if (html.contains("servidor_online")) {
-                supportedHosts.add(hostWithoutTLD);
+                if (!supportedHosts.contains(hostWithoutTLD)) {
+                    supportedHosts.add(hostWithoutTLD);
+                }
             } else {
                 /* servidor_offline */
                 logger.info("Skipping offline host: " + hostWithoutTLD);

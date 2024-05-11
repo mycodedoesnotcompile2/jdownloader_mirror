@@ -35,7 +35,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
@@ -46,7 +45,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49031 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -237,7 +236,7 @@ public class OdyseeCom extends PluginForHost {
 
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection, final DownloadLink link) {
         /* First check if content-type matches the one we expect. */
-        if (StringUtils.equalsIgnoreCase(urlConnection.getContentType(), link.getStringProperty(PROPERTY_EXPECTED_CONTENT_TYPE))) {
+        if ((urlConnection.getResponseCode() == 200 || urlConnection.getResponseCode() == 206) && StringUtils.equalsIgnoreCase(urlConnection.getContentType(), link.getStringProperty(PROPERTY_EXPECTED_CONTENT_TYPE))) {
             return true;
         } else {
             return super.looksLikeDownloadableContent(urlConnection) && !LinkCrawlerDeepInspector.looksLikeMpegURL(urlConnection);

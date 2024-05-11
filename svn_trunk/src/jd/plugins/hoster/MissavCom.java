@@ -18,14 +18,10 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultEnumValue;
-import org.appwork.storage.config.annotations.DefaultOnNull;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.MissavComConfig;
+import org.jdownloader.plugins.components.config.MissavComConfig.VideoQuality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -42,9 +38,8 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.MissavComCrawler;
-import jd.plugins.hoster.MissavCom.MissavComConfig.VideoQuality;
 
-@HostPlugin(revision = "$Revision: 48824 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49038 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MissavComCrawler.class })
 public class MissavCom extends PluginForHost {
     public MissavCom(PluginWrapper wrapper) {
@@ -133,13 +128,16 @@ public class MissavCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
-        final String videoHash = br.getRegex("nineyu\\.com.?/([a-f0-9\\-]+)").getMatch(0);
+        final String videoHash = br.getRegex("(?:nineyu|sixyik)\\.com.?/([a-f0-9\\-]+)").getMatch(0);
         if (videoHash == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getHeaders().put("Origin", "https://" + br.getHost());
         br.getPage("https://surrit.com/" + videoHash + "/playlist.m3u8");
-        final VideoQuality qual = PluginJsonConfig.get(MissavComConfig.class).getVideoQuality();
+        VideoQuality qual = PluginJsonConfig.get(MissavComConfig.class).getVideoQuality();
+        if (VideoQuality.DEFAULT.equals(qual)) {
+            qual = MissavComConfig.DEFAULT_MODE;
+        }
         int targetHeight = 0;
         if (qual == VideoQuality.Q360P) {
             targetHeight = 360;
@@ -176,65 +174,6 @@ public class MissavCom extends PluginForHost {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return MissavComConfig.class;
-    }
-
-    public static interface MissavComConfig extends PluginConfigInterface {
-        public static final TRANSLATION  TRANSLATION  = new TRANSLATION();
-        public static final VideoQuality DEFAULT_MODE = VideoQuality.BEST;
-
-        public static class TRANSLATION {
-            public String getVideoQuality_label() {
-                return "Preferred video quality";
-            }
-        }
-
-        public static enum VideoQuality implements LabelInterface {
-            Q1080P {
-                @Override
-                public String getLabel() {
-                    return "1080p";
-                }
-            },
-            Q720P {
-                @Override
-                public String getLabel() {
-                    return "720p";
-                }
-            },
-            Q480P {
-                @Override
-                public String getLabel() {
-                    return "480p";
-                }
-            },
-            Q360P {
-                @Override
-                public String getLabel() {
-                    return "360p";
-                }
-            },
-            BEST {
-                @Override
-                public String getLabel() {
-                    return "Best";
-                }
-            },
-            DEFAULT {
-                @Override
-                public String getLabel() {
-                    return "Default: " + BEST.getLabel();
-                }
-            };
-        }
-
-        @AboutConfig
-        @DefaultEnumValue("DEFAULT")
-        @Order(10)
-        @DescriptionForConfigEntry("Select preferred video quality")
-        @DefaultOnNull
-        VideoQuality getVideoQuality();
-
-        void setVideoQuality(final VideoQuality mode);
     }
 
     @Override

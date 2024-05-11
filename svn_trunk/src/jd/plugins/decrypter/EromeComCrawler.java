@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48886 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49038 $", interfaceVersion = 3, names = {}, urls = {})
 public class EromeComCrawler extends PluginForDecrypt {
     public EromeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,6 +174,12 @@ public class EromeComCrawler extends PluginForDecrypt {
                 result._setFilePackage(fp);
             }
         } else if ((username = new Regex(br._getURL().getPath(), PATTERN_PROFILE).getMatch(0)) != null) {
+            if (!br.containsHTML("\\?t=posts\"")) {
+                // no profile url
+                return ret;
+            } else if (br.containsHTML("<p>No albums</p>")) {
+                return ret;
+            }
             /* Crawl all album-items of profile */
             final HashSet<String> dupes = new HashSet<String>();
             int page = 1;
