@@ -23,6 +23,7 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -41,7 +42,7 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
 import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
 
-@HostPlugin(revision = "$Revision: 49040 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49041 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +140,7 @@ public class FilemoonSx extends XFileSharingProBasic {
 
     @Override
     public String getFilenameFromURL(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/./[^/]+/(.+)").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/./[^/]+/(.*?)(?:\\.html|\\?|$)").getMatch(0);
     }
 
     @Override
@@ -228,6 +229,16 @@ public class FilemoonSx extends XFileSharingProBasic {
             }
         }
         return ret;
+    }
+
+    @Override
+    protected String getFileNameFromConnection(URLConnectionAdapter connection, DownloadLink link) {
+        final String ret = super.getFileNameFromConnection(connection, link);
+        if (ret != null) {
+            return ret.replaceFirst("\\s*mkv\\s*mp4$", "");
+        } else {
+            return null;
+        }
     }
 
     @Override
