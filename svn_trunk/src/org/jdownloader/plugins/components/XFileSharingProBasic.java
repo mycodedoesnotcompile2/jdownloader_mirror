@@ -96,7 +96,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49041 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49045 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1011,7 +1011,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 return false;
             }
         } finally {
-            con.disconnect();
+            if (con != null) {
+                con.disconnect();
+            }
             br.setFollowRedirects(followRedirectsOld);
         }
     }
