@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 43181 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]+)/?" })
+@DecrypterPlugin(revision = "$Revision: 49054 $", interfaceVersion = 3, names = { "hentai.animestigma.com" }, urls = { "https?://(?:www\\.)?hentai\\.animestigma\\.com/([a-z0-9\\-]+)/?" })
 public class HentaiAnimestigmaCom extends antiDDoSForDecrypt {
     public HentaiAnimestigmaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,8 +83,9 @@ public class HentaiAnimestigmaCom extends antiDDoSForDecrypt {
                 con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(downloadlink));
                 final String contentType = con.getContentType();
                 if (con.isOK() && StringUtils.containsIgnoreCase(contentType, "text/html")) {
+                    brc.followConnection();// follow/finish head request
                     brc.getPage(downloadlink);
-                    String realdownloadlink = brc.getRegex("<source src=\"([^\"]+)\" type='video/mp4'>").getMatch(0);
+                    String realdownloadlink = brc.getRegex("<source src=\"([^\"]+)\" type=\"video/mp4\">").getMatch(0);
                     downloadlink = realdownloadlink;
                 }
             } catch (Exception e) {

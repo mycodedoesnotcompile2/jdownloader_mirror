@@ -71,7 +71,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 48913 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://(?:www\\.|m\\.|new\\.)?(?:(?:vk\\.com|vkontakte\\.ru|vkontakte\\.com)/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+)" })
+@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://(?:www\\.|m\\.|new\\.)?(?:(?:vk\\.com|vkontakte\\.ru|vkontakte\\.com)/(?!doc[\\d\\-]+_[\\d\\-]+|picturelink|audiolink)[a-z0-9_/=\\.\\-\\?&%@:\\!]+)" })
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -1279,7 +1279,7 @@ public class VKontakteRu extends PluginForDecrypt {
         } else {
             internalSectionName = "all";
         }
-        String videoAlbumsJson = br.getRegex("let newCur\\s*=\\s*(\\{.*?\\});\\s+").getMatch(0);
+        String videoAlbumsJson = br.getRegex("(?:var|let) newCur\\s*=\\s*(\\{.*?\\});\\s+").getMatch(0);
         if (videoAlbumsJson == null) {
             /* Old regexes/fallback */
             videoAlbumsJson = br.getRegex("extend\\(cur, (\\{\"albumsPreload\".*?\\})\\);\\s+").getMatch(0);

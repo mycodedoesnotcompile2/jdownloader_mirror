@@ -28,7 +28,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48061 $", interfaceVersion = 2, names = { "heavy-r.com" }, urls = { "https?://(?:www\\.)?heavy\\-r\\.com/video/(\\d+)(?:/[^/]*/?)?" })
+@HostPlugin(revision = "$Revision: 49052 $", interfaceVersion = 2, names = { "heavy-r.com" }, urls = { "https?://(?:www\\.)?heavy\\-r\\.com/video/(\\d+)(?:/[^/]*/?)?" })
 public class HeavyRCom extends antiDDoSForHost {
     public HeavyRCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,10 +98,13 @@ public class HeavyRCom extends antiDDoSForHost {
         br2.setFollowRedirects(true);
         URLConnectionAdapter con = null;
         try {
-            br2.getHeaders().put(OPEN_RANGE_REQUEST);
-            con = br.openHeadConnection(dllink);
+            con = br2.openGetConnection(dllink);
             if (this.looksLikeDownloadableContent(con)) {
-                downloadLink.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    downloadLink.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    downloadLink.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             } else {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

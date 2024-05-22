@@ -537,9 +537,8 @@ public class IconIO {
             } else {
                 return new ScaledIcon(sIcon.getSource(), width, height, bicubic);
             }
-        } else {
-            return new ScaledIcon(icon, width, height, bicubic);
         }
+        return new ScaledIcon(icon, width, height, bicubic);
     }
 
     /**

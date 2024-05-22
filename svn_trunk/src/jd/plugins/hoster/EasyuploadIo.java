@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.EasyuploadIoFolder;
 
-@HostPlugin(revision = "$Revision: 48604 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49055 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadIo extends PluginForHost {
     public EasyuploadIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -154,6 +154,11 @@ public class EasyuploadIo extends PluginForHost {
             final UrlQuery query = new UrlQuery();
             query.add("type", "download-token");
             query.add("url", fid);
+            final String passwordMaxLength = br.getRegex("<input id=\"password\"[^>]*maxlength=\"(\\d+)\"[^>]*>").getMatch(0);
+            final int maxLength = passwordMaxLength != null ? Integer.parseInt(passwordMaxLength) : 20;
+            if (passCode != null && passCode.length() > maxLength) {
+                passCode = passCode.substring(0, maxLength);
+            }
             query.add("value", Encoding.urlEncode(passCode));
             query.add("method", "regular");
             final boolean captchaIsAlwaysNeeded = true; // 2023-05-30

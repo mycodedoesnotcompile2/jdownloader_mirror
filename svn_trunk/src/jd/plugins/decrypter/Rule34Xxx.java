@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
@@ -47,7 +48,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
  * @author raztoki
  *
  */
-@DecrypterPlugin(revision = "$Revision: 47938 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String prefixLinkID = getHost().replaceAll("[\\.\\-]+", "") + "://";
 
@@ -139,6 +140,7 @@ public class Rule34Xxx extends PluginForDecrypt {
             FilePackage fp = null;
             if (fpName != null) {
                 fp = FilePackage.getInstance();
+                fpName = URLEncode.decodeURIComponent(fpName).trim();
                 fp.setName(fpName);
             }
             final HashSet<String> dupes = new HashSet<String>();

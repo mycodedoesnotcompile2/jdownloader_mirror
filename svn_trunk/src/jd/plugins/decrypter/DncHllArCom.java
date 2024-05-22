@@ -19,7 +19,7 @@ import jd.plugins.PluginException;
 /**
  * category not designed to do spanning page support!
  */
-@DecrypterPlugin(revision = "$Revision: 48249 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 2, names = { "dancehallarena.com" }, urls = { "https?://(?:\\w*\\.)?dancehallarena\\.com/(?:[a-zA-Z0-9\\-/]+|category/(?:(?:dancehall|reggae)/(?:singles/|dancehall-albums/|instrumental-dancehall/)?|soca/|mixtapes/(?:dancehall-mixtapes/|reggae-mixtapes/|hiphoprb/)?|videos/(?:music-videos/|viral-videos/)?|efx/)(?:page/\\d+)?)" })
 public class DncHllArCom extends antiDDoSForDecrypt {
     public DncHllArCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -101,7 +101,7 @@ public class DncHllArCom extends antiDDoSForDecrypt {
         } else if (link.startsWith("//")) {
             link = protocol + ":" + link;
         }
-        if (new Regex(link, "facebook.com(/|%2F)plugins(/|%2F)|twitter.com(/|%2F)").matches()) {
+        if (new Regex(link, "facebook.com(/|%2F)plugins(/|%2F)|(x|twitter).com(/|%2F)").matches()) {
             return null;
         }
         return link;

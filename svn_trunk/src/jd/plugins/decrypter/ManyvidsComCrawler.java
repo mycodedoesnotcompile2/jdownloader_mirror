@@ -44,7 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 48654 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -224,7 +224,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             /* Find video metadata + screenshots */
             logger.info("Crawling metadata and images");
             final Browser brc = br.cloneBrowser();
-            brc.getPage("https://video-player-bff.estore.kiwi.manyvids.com/vercel/videos/" + contentID + "/public");
+            brc.getPage("https://video-player-bff.estore.kiwi.manyvids.com/vercel/videos/" + contentID);
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final int statusCode = ((Number) entries.get("statusCode")).intValue();
             if (statusCode != 200) {
