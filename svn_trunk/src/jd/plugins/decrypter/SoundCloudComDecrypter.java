@@ -51,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SoundcloudCom;
 
-@DecrypterPlugin(revision = "$Revision: 48951 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 49060 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https?://((?:www\\.|m\\.)?soundcloud\\.com/[^<>\"\\']+(?:\\?format=html\\&page=\\d+|\\?page=\\d+)?|api\\.soundcloud\\.com/tracks/\\d+(?:\\?secret_token=[A-Za-z0-9\\-_]+)?|api\\.soundcloud\\.com/playlists/\\d+(?:\\?|.*?\\&)secret_token=[A-Za-z0-9\\-_]+)" })
 public class SoundCloudComDecrypter extends PluginForDecrypt {
     public SoundCloudComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -499,7 +499,7 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
     protected ArrayList<DownloadLink> processTracklist(final List<Map<String, Object>> collection, final FilePackage fp) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (final Map<String, Object> item : collection) {
-            final Map<String, Object> trackmap = (Map<String, Object>) item.get("track");
+            Map<String, Object> trackmap = (Map<String, Object>) item.get("track");
             final Map<String, Object> playlist = (Map<String, Object>) item.get("playlist");
             String type = (String) item.get("type");
             if (StringUtils.isEmpty(type)) {
@@ -517,12 +517,18 @@ public class SoundCloudComDecrypter extends PluginForDecrypt {
                 final String permalinkURL = item.get("permalink_url").toString();
                 ret.add(createDownloadlink(permalinkURL));
             } else if (StringUtils.equalsIgnoreCase(type, "track")) {
+                if (trackmap == null && item.containsKey("permalink_url")) {
+                    trackmap = item;
+                }
                 if (trackmap == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 } else {
                     ret.addAll(this.crawlProcessSingleTrack(trackmap));
                 }
             } else {
+                if (trackmap == null && item.containsKey("permalink_url")) {
+                    trackmap = item;
+                }
                 /* Expect us to either have a single track item or have-found a single track item. */
                 if (trackmap == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

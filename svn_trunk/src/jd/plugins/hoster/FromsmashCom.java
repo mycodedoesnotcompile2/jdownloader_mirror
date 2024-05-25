@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FromsmashComFolder;
 
-@HostPlugin(revision = "$Revision: 48309 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49060 $", interfaceVersion = 3, names = {}, urls = {})
 public class FromsmashCom extends PluginForHost {
     public FromsmashCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,7 +129,7 @@ public class FromsmashCom extends PluginForHost {
         if (link.hasProperty(PROPERTY_STATIC_DOWNLOAD_PASSWORD)) {
             FromsmashComFolder.setPasswordHeader(brc, link.getStringProperty(PROPERTY_STATIC_DOWNLOAD_PASSWORD));
         }
-        FromsmashComFolder.prepBR(brc);
+        FromsmashComFolder.prepBR(new URL(link.getPluginPatternMatcher()), brc);
         final String region = getRegion(link);
         final PutRequest put = new PutRequest("https://" + region + "/transfer/" + getFolderID(link) + "/urls?version=07-2020");
         final String reqData = "{\"files\":[{\"id\":\"" + getFileID(link) + "\"}]}";

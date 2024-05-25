@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48771 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49060 $", interfaceVersion = 2, names = {}, urls = {})
 public class ShareplaceOrg extends YetiShareCore {
     public ShareplaceOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -133,6 +133,18 @@ public class ShareplaceOrg extends YetiShareCore {
             return requestFileInformationOLD(link);
         } else {
             return super.requestFileInformation(link);
+        }
+    }
+
+    @Override
+    public void checkErrors(Browser br, DownloadLink link, Account account) throws PluginException {
+        try {
+            super.checkErrors(br, link, account);
+        } catch (PluginException e) {
+            if (e.getLinkStatus() == LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE && StringUtils.containsIgnoreCase(e.getMessage(), "Could not open file for reading")) {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Server error 'Could not open file for reading'", 5 * 60 * 1000l, e);
+            }
+            throw e;
         }
     }
 
