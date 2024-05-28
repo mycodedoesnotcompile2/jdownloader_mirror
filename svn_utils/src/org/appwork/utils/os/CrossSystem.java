@@ -288,6 +288,7 @@ public class CrossSystem {
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -354,6 +355,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -752,7 +754,7 @@ public class CrossSystem {
                     final String line = reader.readLine();
                     process.destroy();
                     process = null;
-                    final String buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.([^\\.]+)").getMatch(0);
+                    final String buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.(\\d+)").getMatch(0);
                     final int buildNumber = Integer.parseInt(buildNumberString);
                     // https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
                     // https://en.wikipedia.org/wiki/Windows_11_version_history

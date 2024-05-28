@@ -52,7 +52,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 48894 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 49066 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -107,7 +107,8 @@ public class ZdfDeMediathek extends PluginForHost {
             /* This should never happen! */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(link.getStringProperty("directName"));
+        // Workaround to prevent finalFileName(set by Decrypter) to be lost on download for non HLS files
+        link.setFinalFileName(link.getStringProperty("directName", link.getName()));
         if (!isDownload) {
             if (StringUtils.containsIgnoreCase(dllink, "m3u8")) {
                 checkFFProbe(link, "Download a HLS Stream");

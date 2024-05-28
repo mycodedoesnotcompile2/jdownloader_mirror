@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 48965 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49063 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +84,6 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         ret.add(new String[] { "wrzucaj.pl" });
         ret.add(new String[] { "rapidshare.io" });
         ret.add(new String[] { "sharewith.click" });
-        ret.add(new String[] { "covyn.net" });
         ret.add(new String[] { "uploadcorner.com" });
         ret.add(new String[] { "bippupload.com" });
         ret.add(new String[] { "cyphershare.net" });
@@ -95,6 +94,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         ret.add(new String[] { "iceyfile.net", "iceyfile.com" });
         ret.add(new String[] { "anonzip.com" });
         ret.add(new String[] { "fileknot.io" });
+        ret.add(new String[] { "blazingshare.me" });
         return ret;
     }
 

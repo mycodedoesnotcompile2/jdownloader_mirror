@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2013  JD-Team support@jdownloader.org
+//Copyright (C) 2016  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -18,33 +18,33 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49063 $", interfaceVersion = 3, names = {}, urls = {})
-public class StreamvidNet extends XFileSharingProBasic {
-    public StreamvidNet(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 49063 $", interfaceVersion = 2, names = {}, urls = {})
+public class BlazingshareMe extends YetiShareCore {
+    public BlazingshareMe(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(super.getPurchasePremiumURL());
+        this.enablePremium(getPurchasePremiumURL());
     }
 
     /**
-     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
+     * DEV NOTES YetiShare<br />
+     ****************************
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2023-04-27: null <br />
-     * other:<br />
+     * captchatype-info: null solvemedia reCaptchaV2, hcaptcha<br />
+     * other: <br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamvid.net" });
+        ret.add(new String[] { "blazingshare.me" });
         return ret;
     }
 
@@ -58,31 +58,28 @@ public class StreamvidNet extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return YetiShareCore.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
+        if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
-            return true;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            return false;
+        } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return true;
+            return false;
         }
     }
 
-    @Override
     public int getMaxChunks(final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
+        if (account != null && account.getType() == AccountType.FREE) {
             /* Free Account */
             return 0;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+        } else if (account != null && account.getType() == AccountType.PREMIUM) {
             /* Premium account */
             return 0;
         } else {
@@ -92,47 +89,16 @@ public class StreamvidNet extends XFileSharingProBasic {
     }
 
     @Override
-    public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return -1;
+    public int getMaxSimultanFreeDownloadNum() {
+        return 1;
     }
 
-    @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+        return 1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected boolean supports_availablecheck_filename_abuse() {
-        /* 2023-04-27 */
-        return false;
-    }
-
-    @Override
-    protected boolean supports_availablecheck_alt() {
-        /* 2023-04-27 */
-        return false;
-    }
-
-    @Override
-    protected boolean isVideohoster_enforce_video_filename() {
-        /* 2023-04-27 */
-        return true;
-    }
-
-    @Override
-    protected boolean isOffline(final DownloadLink link, final Browser br) {
-        /* 2023-04-27 */
-        if (br.containsHTML("class=\"not-found-text\"")) {
-            return true;
-        } else if (br.getURL().endsWith("/404.html")) {
-            return true;
-        } else {
-            return super.isOffline(link, br);
-        }
     }
 }

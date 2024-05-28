@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 49056 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49063 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -155,6 +155,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "games-database.com", "gamesdatabase.net" });
         ret.add(new String[] { "global-files.net" });
         ret.add(new String[] { "free18.net" });
+        ret.add(new String[] { "restfilee.com", "restfile.ws", "restfile.ca", "restfile.co", "restfile.com", "restfile.bz", "restfile.cc", "restfile.net" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

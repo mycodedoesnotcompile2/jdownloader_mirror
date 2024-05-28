@@ -78,7 +78,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 49049 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49062 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -812,7 +812,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
         BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                return new BasicNotify("Twitter: " + title, msg, new AbstractIcon(IconKey.ICON_INFO, 32));
+                return new BasicNotify("TwitterX: " + title, msg, new AbstractIcon(IconKey.ICON_INFO, 32));
             }
         });
     }

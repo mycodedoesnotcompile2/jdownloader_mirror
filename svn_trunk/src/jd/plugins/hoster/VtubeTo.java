@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48899 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49064 $", interfaceVersion = 3, names = {}, urls = {})
 public class VtubeTo extends XFileSharingProBasic {
     public VtubeTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -162,5 +162,16 @@ public class VtubeTo extends XFileSharingProBasic {
             }
         }
         return status;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*File Not Found|The file expired")) {
+            return true;
+        } else if (br.containsHTML("/assets/bge2\\.jpg")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }

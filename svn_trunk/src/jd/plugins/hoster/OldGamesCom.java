@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48682 $", interfaceVersion = 2, names = { "old-games.com" }, urls = { "https?://(?:www\\.)?old\\-games\\.com/(?:getfile|getfree)/(\\d+)" })
+@HostPlugin(revision = "$Revision: 49063 $", interfaceVersion = 2, names = { "old-games.com" }, urls = { "https?://(?:www\\.)?old\\-games\\.com/(?:getfile|getfree)/(\\d+)" })
 public class OldGamesCom extends PluginForHost {
     public OldGamesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,6 +139,13 @@ public class OldGamesCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Download limit exceeded");
             }
             dllink = getFinalDownloadlink(br);
+            final String waitSecondsStr = br.getRegex("var count = (\\d+);").getMatch(0);
+            if (waitSecondsStr != null) {
+                logger.info("Found pre-download wait seconds: " + waitSecondsStr);
+                this.sleep(Long.parseLong(waitSecondsStr) * 1000l, link);
+            } else {
+                logger.info("Failed to find pre-download wait seconds");
+            }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
         if (!looksLikeDownloadableContent(dl.getConnection())) {
