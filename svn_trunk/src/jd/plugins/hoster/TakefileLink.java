@@ -16,9 +16,12 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -36,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49067 $", interfaceVersion = 3, names = {}, urls = {})
 public class TakefileLink extends XFileSharingProBasic {
     public TakefileLink(final PluginWrapper wrapper) {
         super(wrapper);
@@ -153,11 +156,21 @@ public class TakefileLink extends XFileSharingProBasic {
     public static List<String[]> getVirtualPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // virtual file hosting
-        for (final String virtualPluginDomain : new String[] { "vip", "erofullsets", "musiclibrary", "mega-rip", "webcam", "pwc", "scat", "rare", "files", "3dmodel", "4kuhd", "copro", "eros", "fetish", "goldenrain", "hentai", "hmu", "momroleplay", "monster", "pissing", "spy", "test", "voyeur", "gaybb", "hdmusic", "wandering-voyeur", "mh", "siteriplinks" }) {
+        final Set<String> dupes;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            dupes = new HashSet<String>();
+        } else {
+            dupes = null;
+        }
+        for (final String virtualPluginDomain : new String[] { "vip", "erofullsets", "musiclibrary", "mega-rip", "webcam", "pwc", "scat", "rare", "files", "3dmodel", "4kuhd", "copro", "eros", "fetish", "goldenrain", "hentai", "hmu", "momroleplay", "monster", "pissing", "spy", "test", "voyeur", "gaybb", "hdmusic", "wandering-voyeur", "mh", "siteriplinks", "88nsm", "allvoyeur", "asian", "avcens", "babes", "bestero", "camvip", "eliteporn", "erotelki", "extremesiterips", "goldhiphop", "kaprettiscat", "npkps", "payperview", "pornogayphy", "premiumbbwcontent", "seduction4life", "shitting", "siterip", "siteripz", "spanking", "spyerotic", "submales", "supervoyeur", "voyeurauthor", "voyeurzona", "watches" }) {
             if (virtualPluginDomain.contains(".")) {
                 ret.add(new String[] { virtualPluginDomain });
             } else {
                 ret.add(new String[] { virtualPluginDomain + ".takefile.link" });
+            }
+            if (dupes != null && !dupes.add(ret.get(ret.size() - 1)[0])) {
+                // domain duplicate detected
+                DebugMode.debugger();
             }
         }
         return ret;

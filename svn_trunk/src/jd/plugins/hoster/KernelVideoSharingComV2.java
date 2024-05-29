@@ -75,7 +75,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49070 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1537,7 +1537,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         }
         if (dllink != null && this.isHLS(dllink)) {
             /* 2016-12-02 - txxx.com */
-            /* Prefer httpp over hls */
+            /* Prefer http over hls */
             try {
                 /* First try to find highest quality */
                 final String fallback_player_json = br.getRegex("\\.on\\(\\'setupError\\',function\\(\\)\\{[^>]*?jwsettings\\.playlist\\[0\\]\\.sources=(\\[.*?\\])").getMatch(0);

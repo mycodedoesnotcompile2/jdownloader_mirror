@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 45808 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49069 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighstreamTv extends XFileSharingProBasic {
     public HighstreamTv(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,6 +49,13 @@ public class HighstreamTv extends XFileSharingProBasic {
         /* 2021-04-26: main domain has changed from clipwatching.com to highstream.tv */
         ret.add(new String[] { "highstream.tv", "clipwatching.com" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("clipwatching.com"); // 2024-05-28
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -122,6 +129,15 @@ public class HighstreamTv extends XFileSharingProBasic {
     protected boolean isVideohoster_enforce_video_filename() {
         /* 2019-08-13: Special */
         return true;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*File is no longer available")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 
     @Override
