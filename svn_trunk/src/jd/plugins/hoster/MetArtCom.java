@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48373 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,6 +64,7 @@ public class MetArtCom extends PluginForHost {
         ret.add(new String[] { "stunning18.com" });
         ret.add(new String[] { "thelifeerotic.com" });
         ret.add(new String[] { "vivthomas.com" });
+        ret.add(new String[] { "straplez.com" });
         return ret;
     }
 

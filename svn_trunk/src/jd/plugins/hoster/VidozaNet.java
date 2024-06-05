@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48954 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidozaNet extends XFileSharingProBasic {
     public VidozaNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class VidozaNet extends XFileSharingProBasic {
     @Override
     public String[] scanInfo(final String[] fileInfo) {
         super.scanInfo(fileInfo);
-        final String betterFilename = br.getRegex("var\\s*curFileName\\s*=\\s*\"(.*?)\"").getMatch(0);
+        final String betterFilename = br.getRegex("curFileName\\s*(?:=|:)\\s*\"([^\"]+)\"").getMatch(0);
         if (StringUtils.isNotEmpty(betterFilename)) {
             fileInfo[0] = betterFilename;
         }
@@ -148,7 +148,8 @@ public class VidozaNet extends XFileSharingProBasic {
 
     @Override
     protected boolean trustAvailablecheckVideoEmbed() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+        final boolean testThis = false;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && testThis) {
             return true;
         } else {
             return false;

@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -35,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49073 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -69,8 +68,8 @@ public class MetArtCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_GALLERY = "https://[^/]+/model/([^/]+)/gallery/(\\d+)/([^/]+)";
-    private static final String TYPE_MOVIE   = "https://[^/]+/model/([^/]+)/movie/(\\d+)/([^/]+)";
+    private static final String TYPE_GALLERY = "(?i)https://[^/]+/model/([^/]+)/gallery/(\\d+)/([^/]+)";
+    private static final String TYPE_MOVIE   = "(?i)https://[^/]+/model/([^/]+)/movie/(\\d+)/([^/]+)";
 
     @Override
     public int getMaxConcurrentProcessingInstances() {

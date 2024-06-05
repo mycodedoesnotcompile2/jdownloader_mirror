@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -35,10 +36,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47579 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgbbCo extends PluginForHost {
     public ImgbbCo(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
     @Override
@@ -71,9 +77,8 @@ public class ImgbbCo extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 1;
-    private static final int     FREE_MAXDOWNLOADS = -1;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 1;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -96,13 +101,14 @@ public class ImgbbCo extends PluginForHost {
             /* Fallback */
             link.setName(fid + ".jpg");
         }
+        if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
+            /* Only lowercase -> Invalid fid e.g. https://imgbb.com/tos -> "tos" */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.containsHTML(Pattern.quote(fid))) {
-            /* E.g. https://imgbb.com/login or https://imgbb.com/upload */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String filename = br.getRegex("download=\"([^\"]+)\"").getMatch(0);
@@ -118,6 +124,14 @@ public class ImgbbCo extends PluginForHost {
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        }
+        if (filename == null && filesize == null && !br.containsHTML(Pattern.quote(fid))) {
+            /* E.g. https://imgbb.com/login or https://imgbb.com/upload */
+            /*
+             * 2024-06-04: Important: The fileID inside the URL can change (looks like they got old and new IDs) so it is important to only
+             * check for a missing/changed fileID if no file information is found!
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }
@@ -182,7 +196,7 @@ public class ImgbbCo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
