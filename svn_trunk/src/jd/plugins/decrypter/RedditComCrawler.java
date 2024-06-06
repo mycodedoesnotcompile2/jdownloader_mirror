@@ -72,7 +72,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 48942 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49075 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -843,7 +843,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                 } catch (final Throwable e) {
                 }
             }
-        } while (!this.isAbort() && attempt <= 4);
+        } while (!this.isAbort() && attempt <= maxAttemptsNumber);
         if (rateLimitActive) {
             throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         }
