@@ -49,7 +49,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49066 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+@HostPlugin(revision = "$Revision: 49082 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -156,7 +156,7 @@ public class OkRu extends PluginForHost {
                 Map<String, Object> httpQualityInfo = null;
                 final Object httpQualitiesO = entries.get("videos");
                 if (httpQualitiesO != null) {
-                    final int preferredUserQuality = getUserPreferredqualityHeightInt();
+                    final int preferredUserQuality = getUserPreferredqualityHeightInt(link);
                     int maxQuality = 0;
                     final List<Object> httpQualities = (List<Object>) httpQualitiesO;
                     for (final Object httpQ : httpQualities) {
@@ -197,7 +197,7 @@ public class OkRu extends PluginForHost {
                     }
                 }
                 /* null = user wants BEST */
-                final String userPreferredQuality = getUserPreferredqualityStr();
+                final String userPreferredQuality = getUserPreferredqualityStr(link);
                 if (userPreferredQuality != null && collectedHTTPQualities.containsKey(userPreferredQuality)) {
                     logger.info("Using user preferred HTTP quality: " + userPreferredQuality);
                     this.dllink = collectedHTTPQualities.get(userPreferredQuality);
@@ -346,7 +346,7 @@ public class OkRu extends PluginForHost {
         if (dllink.contains(".m3u8")) {
             br.getPage(dllink);
             /* -1 = user wants BEST */
-            final int userPreferredQualityHeight = this.getUserPreferredqualityHeightInt();
+            final int userPreferredQualityHeight = this.getUserPreferredqualityHeightInt(link);
             HlsContainer chosenQuality = null;
             final List<HlsContainer> qualities = HlsContainer.getHlsQualities(br);
             for (final HlsContainer quality : qualities) {
@@ -471,7 +471,8 @@ public class OkRu extends PluginForHost {
         return -1;
     }
 
-    private String getUserPreferredqualityStr() {
+    private String getUserPreferredqualityStr(DownloadLink link) {
+        // TODO: return previous selected/used value from DownloadLink
         final Quality quality = PluginJsonConfig.get(OkRuConfig.class).getPreferredQuality();
         switch (quality) {
         /* 2021-05-27: Seems like mobile is lower than "lowest". */
@@ -493,7 +494,8 @@ public class OkRu extends PluginForHost {
         }
     }
 
-    private int getUserPreferredqualityHeightInt() {
+    private int getUserPreferredqualityHeightInt(DownloadLink link) {
+        // TODO: return previous selected/used value from DownloadLink
         final Quality quality = PluginJsonConfig.get(OkRuConfig.class).getPreferredQuality();
         switch (quality) {
         case Q144:

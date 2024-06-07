@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48109 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49078 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.UnknownPornScript1Crawler.class })
 public class UnknownPornScript1 extends PluginForHost {
     public UnknownPornScript1(PluginWrapper wrapper) {
@@ -180,6 +180,8 @@ public class UnknownPornScript1 extends PluginForHost {
             return true;
         } else if (br.containsHTML("(?i)>\\s*We're sorry, the content titled")) {
             /* 2017-02-18 xtwisted.com */
+            return true;
+        } else if (br.containsHTML("class=\"player\"[^>]*>\\s*Deleted\\s*</div>")) {
             return true;
         } else {
             return false;
