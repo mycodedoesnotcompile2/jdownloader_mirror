@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TiktokComCrawler;
 
-@HostPlugin(revision = "$Revision: 49079 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49084 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
 public class TiktokCom extends PluginForHost {
     public TiktokCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -168,6 +168,7 @@ public class TiktokCom extends PluginForHost {
     public static final String PROPERTY_TYPE                                  = "type";
     public static final String PROPERTY_INDEX                                 = "index";
     public static final String PROPERTY_INDEX_MAX                             = "index_max";
+    public static final String PROPERTY_COOKIES                               = "cookies";
     public static final String TYPE_AUDIO                                     = "audio";
     public static final String TYPE_VIDEO                                     = "video";
     public static final String TYPE_PICTURE                                   = "picture";
@@ -218,6 +219,11 @@ public class TiktokCom extends PluginForHost {
         }
         String dllink = null;
         dllink = getStoredDirecturl(link);
+        final String storedCookiesString = link.getStringProperty(TiktokCom.PROPERTY_COOKIES);
+        if (storedCookiesString != null) {
+            final Cookies cookies = Cookies.parseCookies(storedCookiesString, "." + this.getHost(), null);
+            br.setCookies(cookies);
+        }
         if (dllink == null || forceFetchNewDirecturl) {
             logger.info("Obtaining fresh directurl");
             final TiktokComCrawler crawler = (TiktokComCrawler) this.getNewPluginForDecryptInstance(this.getHost());
@@ -293,6 +299,8 @@ public class TiktokCom extends PluginForHost {
     private void prepareDownloadHeaders(final DownloadLink link, final Browser br) {
         br.getHeaders().put("Referer", "https://www." + this.getHost() + "/");
         br.getHeaders().put("Origin", "https://www." + this.getHost());
+        br.getHeaders().put("Sec-Fetch-Mode", "navigate");
+        br.getHeaders().put("Referer", "https://www.tiktok.com/@tristanvd/video/7286131089888808224");
     }
 
     private boolean allowsHeadRequest(final DownloadLink link) {
