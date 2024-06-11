@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.CamvaultXyz;
 
-@DecrypterPlugin(revision = "$Revision: 48530 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49086 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamvaultXyzCrawler extends PluginForDecrypt {
     public CamvaultXyzCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class CamvaultXyzCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "camvault.xyz" });
+        ret.add(new String[] { "camvault.xyz", "camvault.to" });
         return ret;
     }
 

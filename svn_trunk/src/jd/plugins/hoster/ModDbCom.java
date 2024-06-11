@@ -33,7 +33,7 @@ import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
 //Links come from a decrypter plugin
-@HostPlugin(revision = "$Revision: 49084 $", interfaceVersion = 2, names = { "moddb.com" }, urls = { "https?://(www\\.)?moddbdecrypted\\.com/(games|mods|engines|groups)/.*?/(addons|downloads)/[0-9a-z-]+" })
+@HostPlugin(revision = "$Revision: 49086 $", interfaceVersion = 2, names = { "moddb.com" }, urls = { "https?://(www\\.)?moddbdecrypted\\.com/(games|mods|engines|groups)/.*?/(addons|downloads)/[0-9a-z-]+" })
 public class ModDbCom extends PluginForHost {
     public void correctDownloadLink(DownloadLink link) {
         link.setUrlDownload(link.getDownloadURL().replace("moddbdecrypted.com/", "moddb.com/"));
@@ -55,6 +55,35 @@ public class ModDbCom extends PluginForHost {
     public ModDbCom(PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(DownloadLink link) throws IOException, PluginException {
+        this.setBrowserExclusive();
+        br.setFollowRedirects(true);
+        br.getPage(link.getDownloadURL());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("An error has occured") || br.containsHTML("The download requested could not be found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String filename = br.getRegex("<h5>Filename</h5>.*?<span class=\"summary\">(.*?)</span>").getMatch(0);
+        String filesize = br.getRegex("<h5>Size</h5>.*?<span class=\"summary\">.*?\\((.*?bytes)\\)</span>").getMatch(0);
+        if (filesize == null) {
+            filesize = br.getRegex("<h5>Size</h5>.*?<span class=\"summary\">(.*?)\\(").getMatch(0);
+        }
+        if (filename != null) {
+            filename = Encoding.htmlOnlyDecode(filename).trim();
+            link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
+        }
+        if (filesize != null) {
+            link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", "")));
+        } else {
+            logger.warning("Failed to find filesize");
+        }
+        return AvailableStatus.TRUE;
     }
 
     private String findLink(int configuredServer, String singlemirrorpage) throws IOException {
@@ -216,17 +245,8 @@ public class ModDbCom extends PluginForHost {
         int configuredServer = getConfiguredServer();
         // Get pages with the mirrors
         String singlemirrorpage = getSinglemirrorpage(br);
-        String dllink = findLink(configuredServer, singlemirrorpage);
+        final String dllink = findLink(configuredServer, singlemirrorpage);
         if (dllink == null) {
-            logger.info("no final downloadlink (dllink) has been found, the plugin must be defect!");
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dllink = "https://www.moddb.com" + dllink;
-        br.setFollowRedirects(false);
-        br.getPage(dllink);
-        dllink = br.getRedirectLocation();
-        if (dllink == null) {
-            logger.info("There is a problem with getting the dllink by br.getredirectlocation");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
@@ -258,35 +278,6 @@ public class ModDbCom extends PluginForHost {
             }
         }
         return singlemirrorpage;
-    }
-
-    @Override
-    public AvailableStatus requestFileInformation(DownloadLink link) throws IOException, PluginException {
-        this.setBrowserExclusive();
-        br.setFollowRedirects(false);
-        br.getPage(link.getDownloadURL());
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("An error has occured") || br.containsHTML("The download requested could not be found")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String filename = br.getRegex("<h5>Filename</h5>.*?<span class=\"summary\">(.*?)</span>").getMatch(0);
-        String filesize = br.getRegex("<h5>Size</h5>.*?<span class=\"summary\">.*?\\((.*?bytes)\\)</span>").getMatch(0);
-        if (filesize == null) {
-            filesize = br.getRegex("<h5>Size</h5>.*?<span class=\"summary\">(.*?)\\(").getMatch(0);
-        }
-        if (filename != null) {
-            filename = Encoding.htmlOnlyDecode(filename).trim();
-            link.setName(filename);
-        } else {
-            logger.warning("Failed to find filename");
-        }
-        if (filesize != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", "")));
-        } else {
-            logger.warning("Failed to find filesize");
-        }
-        return AvailableStatus.TRUE;
     }
 
     @Override

@@ -20,7 +20,6 @@ import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForHost;
@@ -40,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "8tracks.com" }, urls = { "https?://8tracksdecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 49085 $", interfaceVersion = 2, names = { "8tracks.com" }, urls = { "https?://8tracksdecrypted\\.com/\\d+" })
 public class EightTracksCom extends antiDDoSForHost {
     public EightTracksCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -468,7 +467,7 @@ public class EightTracksCom extends antiDDoSForHost {
             } catch (final Throwable e) {
             }
             final List<Object> ressourcelist = restoreFromString(br.toString(), TypeRef.LIST);
-            final String streamlink = jd.plugins.hoster.SoundcloudCom.getDirectlink(this, null, br2, (Map<String, Object>) ressourcelist.get(0));
+            final String streamlink = jd.plugins.hoster.SoundcloudCom.getDirectlink(this, null, null, br2, (Map<String, Object>) ressourcelist.get(0));
             return streamlink;
         } else {
             return dlink;

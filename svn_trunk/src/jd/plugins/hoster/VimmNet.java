@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VimmNetCrawler;
 
-@HostPlugin(revision = "$Revision: 49084 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49086 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VimmNetCrawler.class })
 public class VimmNet extends PluginForHost {
     public VimmNet(PluginWrapper wrapper) {
@@ -194,7 +194,7 @@ public class VimmNet extends PluginForHost {
                 if (downloadUnavailableReason != null) {
                     /* Item is not downloadable. */
                     downloadUnavailableReason = Encoding.htmlOnlyDecode(downloadUnavailableReason).trim();
-                    throw new PluginException(LinkStatus.ERROR_FATAL, downloadUnavailableReason);
+                    throw new PluginException(LinkStatus.ERROR_FATAL, downloadUnavailableReason, ple);
                 } else {
                     throw ple;
                 }
