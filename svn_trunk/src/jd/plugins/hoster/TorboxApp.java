@@ -21,22 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.notify.BasicNotify;
-import org.jdownloader.gui.notify.BubbleNotify;
-import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
-import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -54,7 +38,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49090 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49097 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -97,7 +91,11 @@ public class TorboxApp extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        return 0;
+        /**
+         * 2024-06-12: Max 16 total connections according to admin. </br> We'll be doing it this way right know, knowing that the user can
+         * easily try to exceed that limit with JDownloader.
+         */
+        return -16;
     }
 
     @Override
@@ -225,10 +223,14 @@ public class TorboxApp extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account, true);
         /**
-         * In GUI, used only needs to enter API key so we'll set the username for him here. </br>
-         * This is also important to be able to keep the user from adding the same account multiple times.
+         * In GUI, used only needs to enter API key so we'll set the username for him here. </br> This is also important to be able to keep
+         * the user from adding the same account multiple times.
          */
         account.setUser(user.get("email").toString());
+        final int planID = ((Number) user.get("plan")).intValue();
+        if (planID == 0) {
+            throw new AccountInvalidException("Unsupported account type (free account)");
+        }
         final String created_at = user.get("created_at").toString();
         final String premium_expires_at = (String) user.get("premium_expires_at");
         long premiumExpireTimestamp = -1;
@@ -265,6 +267,7 @@ public class TorboxApp extends PluginForHost {
         account.setConcurrentUsePossible(true);
         final boolean enableNotifications = true;
         if (enableNotifications) {
+            long highestNotificationTimestamp = 0;
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
@@ -272,14 +275,17 @@ public class TorboxApp extends PluginForHost {
                 int counterDisplayed = 0;
                 for (final Map<String, Object> notification : notifications) {
                     final long notification_created_at = TimeFormatter.getMilliSeconds(notification.get("created_at").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
-                    if (notification_created_at < timestampNotificationsDisplayed) {
+                    if (notification_created_at > highestNotificationTimestamp) {
+                        highestNotificationTimestamp = notification_created_at;
+                    }
+                    if (notification_created_at <= timestampNotificationsDisplayed) {
                         /* Assume that this notification has already been displayed in the past. */
                         continue;
                     }
                     logger.info("Displaying notification with ID: " + notification.get("id"));
-                    displayBubblenotifyMessage(notification.get("title").toString(), notification.get("message").toString());
+                    displayBubbleNotification(notification.get("title").toString(), notification.get("message").toString());
                     if (timestampNotificationsDisplayed == 0 && counterDisplayed >= 5) {
-                        logger.info("First time we are displaying notifications for this account. Let's not bombard the user with all past notifications he has.");
+                        logger.info("First time we are displaying notifications for this account. Let's not spam the user with all past notifications he has.");
                         break;
                     }
                 }
@@ -289,7 +295,7 @@ public class TorboxApp extends PluginForHost {
                 logger.warning("Exception happened in notification handling");
             } finally {
                 /* Save this timestamp so we are able to know to which time we've already displayed notifications. */
-                account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, System.currentTimeMillis());
+                account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, highestNotificationTimestamp);
             }
         }
         return ai;
@@ -388,15 +394,6 @@ public class TorboxApp extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    private void displayBubblenotifyMessage(final String title, final String msg) {
-        BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
-            @Override
-            public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                return new BasicNotify("TorBox: " + title, msg, new AbstractIcon(IconKey.ICON_INFO, 32));
-            }
-        });
     }
 
     @Override

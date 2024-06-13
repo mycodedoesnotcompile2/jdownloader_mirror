@@ -35,7 +35,6 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
@@ -49,7 +48,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49082 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?ok\\.ru/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)" })
 public class OkRu extends PluginForHost {
     public OkRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -264,7 +263,7 @@ public class OkRu extends PluginForHost {
                 } else {
                     link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
-                final String ext = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                final String ext = getExtensionFromMimeType(con);
                 if (ext != null) {
                     link.setFinalFileName(title + extDefault);
                 }

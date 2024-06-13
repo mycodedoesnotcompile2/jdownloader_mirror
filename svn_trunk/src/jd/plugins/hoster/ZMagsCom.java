@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47848 $", interfaceVersion = 2, names = { "zmags.com" }, urls = { "https?://(?:www\\.)?viewer\\.zmags\\.com/publication/([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 2, names = { "zmags.com" }, urls = { "https?://(?:www\\.)?viewer\\.zmags\\.com/publication/([a-z0-9]+)" })
 public class ZMagsCom extends PluginForHost {
     public ZMagsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,7 +115,7 @@ public class ZMagsCom extends PluginForHost {
         }
         /* Previously set name might not contain a file-extension --> Correct that if possible */
         final String title = link.getStringProperty(PROPERTY_TITLE);
-        final String ext = getExtensionFromMimeType(dl.getConnection().getContentType());
+        final String ext = getExtensionFromMimeType(dl.getConnection());
         if (title != null && ext != null) {
             link.setFinalFileName(applyFilenameExtension(title, "." + ext));
         }

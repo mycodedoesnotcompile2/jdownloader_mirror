@@ -23,24 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.notify.BasicNotify;
-import org.jdownloader.gui.notify.BubbleNotify;
-import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
-import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.components.config.TiktokConfig;
-import org.jdownloader.plugins.components.config.TiktokConfig.ImageFormat;
-import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
-import org.jdownloader.plugins.components.config.TiktokConfig.ProfileCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -63,7 +45,19 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 49084 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.TiktokConfig;
+import org.jdownloader.plugins.components.config.TiktokConfig.ImageFormat;
+import org.jdownloader.plugins.components.config.TiktokConfig.MediaCrawlMode;
+import org.jdownloader.plugins.components.config.TiktokConfig.ProfileCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 49097 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -197,8 +191,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
     private boolean websiteHandlingAsFallbackAndOfflineIfWebsiteHandlingFails = false;
 
     /**
-     * This can crawl single videos from website. </br>
-     * If this tiktok item also contains images or contains only images, this handling will fail!
+     * This can crawl single videos from website. </br> If this tiktok item also contains images or contains only images, this handling will
+     * fail!
      */
     public ArrayList<DownloadLink> crawlSingleMediaWebsite(final TiktokCom hostPlg, final String url, final Account account, final boolean forceGrabAll) throws Exception {
         websiteHandlingAsFallbackAndOfflineIfWebsiteHandlingFails = false;
@@ -412,7 +406,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Captcha-blocked");
         } else if (TiktokCom.isBotProtectionActive(br)) {
             final String blockedText = "Premature stop: Blocked by anti bot protection / captcha";
-            this.displayBubblenotifyMessage(blockedText, blockedText);
+            this.displayBubbleNotification(blockedText, blockedText);
             throw new DecrypterRetryException(RetryReason.CAPTCHA, blockedText, blockedText, null);
         }
     }
@@ -486,8 +480,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Use website to crawl all videos of a user. </br>
-     * Pagination hasn't been implemented so this will only find the first batch of items - usually around 30 items!
+     * Use website to crawl all videos of a user. </br> Pagination hasn't been implemented so this will only find the first batch of items -
+     * usually around 30 items!
      */
     public ArrayList<DownloadLink> crawlProfileWebsite(final CryptedLink param, final String contenturl) throws Exception {
         prepBRWebsite(br);
@@ -563,7 +557,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
             }
             if ((Boolean) userPost.get("hasMore") && cfg.isAddDummyURLProfileCrawlerWebsiteModeMissingPagination()) {
                 final String detailedErrorExplanation = "This crawler plugin cannot handle pagination in website mode thus it is currently impossible to crawl more than " + medias.size() + " items of this particular profile.\r\nCheck this forum thread for more info: https://board.jdownloader.org/showthread.php?t=79982";
-                this.displayBubblenotifyMessage("Premature stop", detailedErrorExplanation);
+                this.displayBubbleNotification("Premature stop", detailedErrorExplanation);
                 final DownloadLink dummy = createLinkCrawlerRetry(getCurrentLink(), new DecrypterRetryException(RetryReason.FILE_NOT_FOUND));
                 dummy.setFinalFileName("CANNOT_CRAWL_MORE_THAN_" + medias.size() + "_ITEMS_OF_PROFILE_" + usernameSlug + "_IN_WEBSITE_PROFILE_CRAWL_MODE");
                 dummy.setComment(detailedErrorExplanation);
@@ -589,7 +583,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
                 ret.add(dl);
                 if (ret.size() == cfg.getProfileCrawlerMaxItemsLimit()) {
                     logger.info("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
-                    this.displayBubblenotifyMessage("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit(), "Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
+                    this.displayBubbleNotification("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit(), "Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
                     return ret;
                 }
             }
@@ -807,7 +801,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
                 numberofProcessedItems++;
                 if (numberofProcessedItems == cfg.getProfileCrawlerMaxItemsLimit()) {
                     logger.info("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
-                    this.displayBubblenotifyMessage("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit(), "Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
+                    this.displayBubbleNotification("Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit(), "Stopping because: Reached user defined max items limit: " + cfg.getProfileCrawlerMaxItemsLimit());
                     return ret;
                 }
             }
@@ -949,6 +943,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         } while (true);
         return ret;
     }
+
     // private ArrayList<DownloadLink> processVideoList(final List<Map<String, Object>> videos, final FilePackage fp) throws PluginException
     // {
     // final TiktokCom hosterplugin = (TiktokCom) this.getNewPluginForHostInstance(this.getHost());
@@ -1067,9 +1062,9 @@ public class TiktokComCrawler extends PluginForDecrypt {
                  * https://github.com/yt-dlp/yt-dlp/issues/4138#issuecomment-1217380819
                  */
                 /**
-                 * This is also possible using "https://api-h2.tiktokv.com/aweme/v1/play/" </br>
-                 * This is also possible using modified URLs in e.g.: play_addr_bytevc1/uri_list/{last_item} --> Or also any item inside any
-                 * "uri_list" which contains the "video_id" parameter which also typically matches play_addr/uri
+                 * This is also possible using "https://api-h2.tiktokv.com/aweme/v1/play/" </br> This is also possible using modified URLs
+                 * in e.g.: play_addr_bytevc1/uri_list/{last_item} --> Or also any item inside any "uri_list" which contains the "video_id"
+                 * parameter which also typically matches play_addr/uri
                  */
                 video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, String.format("https://api.tiktokv.com/aweme/v1/play/?video_id=%s&line=0&watermark=0&source=AWEME_DETAIL&is_play_url=1&ratio=default&improve_bitrate=1", play_addr.get("uri").toString()));
                 /*
@@ -1094,8 +1089,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
                     video0.setProperty(TiktokCom.PROPERTY_DIRECTURL_API, directurl);
                     if (data_size != null) {
                         /**
-                         * Set filesize of download-version because streaming- and download-version are nearly identical. </br>
-                         * If a video is watermarked and downloads are prohibited both versions should be identical.
+                         * Set filesize of download-version because streaming- and download-version are nearly identical. </br> If a video
+                         * is watermarked and downloads are prohibited both versions should be identical.
                          */
                         video0.setDownloadSize(data_size.longValue());
                     }
@@ -1222,12 +1217,4 @@ public class TiktokComCrawler extends PluginForDecrypt {
         return TiktokCom.prepBRAPI(br);
     }
 
-    private void displayBubblenotifyMessage(final String title, final String msg) {
-        BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
-            @Override
-            public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                return new BasicNotify("Tiktok: " + title, msg, new AbstractIcon(IconKey.ICON_INFO, 32));
-            }
-        });
-    }
 }

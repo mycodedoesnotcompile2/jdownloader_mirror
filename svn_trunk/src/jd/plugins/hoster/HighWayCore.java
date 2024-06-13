@@ -24,30 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.notify.BasicNotify;
-import org.jdownloader.gui.notify.BubbleNotify;
-import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
-import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetFile;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -69,7 +45,27 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48979 $", interfaceVersion = 1, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetFile;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 49097 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -137,8 +133,7 @@ public abstract class HighWayCore extends UseNet {
     }
 
     /**
-     * API docs: https://high-way.me/threads/highway-api.201/ </br>
-     * According to admin we can 'hammer' the API every 60 seconds
+     * API docs: https://high-way.me/threads/highway-api.201/ </br> According to admin we can 'hammer' the API every 60 seconds
      */
     protected abstract String getAPIBase();
 
@@ -302,7 +297,7 @@ public abstract class HighWayCore extends UseNet {
                     link.setFinalFileName(serverFilename);
                 } else {
                     /* Fallback: This should not be needed. */
-                    final String realExtension = this.getExtensionFromMimeType(con.getContentType());
+                    final String realExtension = this.getExtensionFromMimeType(con);
                     if (realExtension != null) {
                         link.setFinalFileName(applyFilenameExtension(fallbackFilename, "." + realExtension));
                     } else {
@@ -310,7 +305,11 @@ public abstract class HighWayCore extends UseNet {
                     }
                 }
                 if (con.getCompleteContentLength() != -1) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
             } finally {
                 try {
@@ -388,8 +387,8 @@ public abstract class HighWayCore extends UseNet {
     @Override
     protected void handleMultiHost(DownloadLink downloadLink, Account account, UsenetFile usenetFile, String username, String password, UsenetServer server) throws Exception {
         /**
-         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br>
-         * This function should never get called with null/empty username and or password!
+         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br> This function should never get
+         * called with null/empty username and or password!
          */
         if (StringUtils.isEmpty(username)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -487,12 +486,7 @@ public abstract class HighWayCore extends UseNet {
                 final Object infoMsgO = entries.get("info");
                 if (infoMsgO instanceof String) {
                     /* Low traffic warning message: Usually something like "Less than 10% traffic remaining" */
-                    BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
-                        @Override
-                        public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                            return new BasicNotify((String) infoMsgO, (String) infoMsgO, new AbstractIcon(IconKey.ICON_INFO, 32));
-                        }
-                    });
+                    displayBubbleNotification((String) infoMsgO, (String) infoMsgO);
                 }
                 entries = this.cacheDLChecker(entries, this.br, link, account);
                 String dllink = (String) entries.get("download");
@@ -622,13 +616,9 @@ public abstract class HighWayCore extends UseNet {
         try {
             do {
                 /**
-                 * cacheStatus possible values and what they mean: </br>
-                 * d = download </br>
-                 * w = wait (retry) </br>
-                 * q = in queue </br>
-                 * qn = Download has been added to queue </br>
-                 * i = direct download without cache </br>
-                 * s = Cached download is ready for downloading
+                 * cacheStatus possible values and what they mean: </br> d = download </br> w = wait (retry) </br> q = in queue </br> qn =
+                 * Download has been added to queue </br> i = direct download without cache </br> s = Cached download is ready for
+                 * downloading
                  */
                 br.getPage(cachePollingURL);
                 entries = this.checkErrors(br, link, account);
@@ -641,8 +631,8 @@ public abstract class HighWayCore extends UseNet {
                 textForJD = (String) entries.get("for_jd");
                 if (!blockDownloadSlotsForCloudDownloads(account)) {
                     /**
-                     * Throw exception right away so other download candidates will be tried. </br>
-                     * This may speed up downloads significantly for some users.
+                     * Throw exception right away so other download candidates will be tried. </br> This may speed up downloads
+                     * significantly for some users.
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
                 }
@@ -796,8 +786,7 @@ public abstract class HighWayCore extends UseNet {
     /**
      * Login without errorhandling
      *
-     * @return true = cookies validated </br>
-     *         false = cookies set but not validated
+     * @return true = cookies validated </br> false = cookies set but not validated
      *
      * @throws PluginException
      * @throws InterruptedException
@@ -956,9 +945,9 @@ public abstract class HighWayCore extends UseNet {
                 getMultiHosterManagement().putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
             case 11:
                 /**
-                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br>
-                 * 2021-11-08: Admin asked us not to disable host right away when this error happens as it seems like this error is more
-                 * rleated to single files/fileservers -> Done accordingly.
+                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br> 2021-11-08: Admin asked
+                 * us not to disable host right away when this error happens as it seems like this error is more rleated to single
+                 * files/fileservers -> Done accordingly.
                  */
                 // mhm.putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);

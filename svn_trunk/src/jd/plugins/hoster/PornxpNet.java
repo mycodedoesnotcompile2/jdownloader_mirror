@@ -20,6 +20,20 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.hoster.PornxpNet.PornxpNetConfig.VideoQuality;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
@@ -31,22 +45,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.hoster.PornxpNet.PornxpNetConfig.VideoQuality;
-
-@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornxpNet extends PluginForHost {
     public PornxpNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -216,7 +215,7 @@ public class PornxpNet extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String ext = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                final String ext = getExtensionFromMimeType(con);
                 if (ext != null && title != null) {
                     link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + ext));
                 }

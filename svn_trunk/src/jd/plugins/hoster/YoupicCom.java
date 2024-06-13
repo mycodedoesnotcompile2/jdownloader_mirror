@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -32,11 +29,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48091 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
 public class YoupicCom extends PluginForHost {
     public YoupicCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,9 +146,13 @@ public class YoupicCom extends PluginForHost {
                 con = br.openGetConnection(this.dllink);
                 handleConnectionErrors(br, con);
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
-                final String ext = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                final String ext = getExtensionFromMimeType(con);
                 if (ext != null) {
                     link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + ext));
                 }

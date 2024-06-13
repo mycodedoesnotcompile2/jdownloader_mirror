@@ -66,7 +66,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49040 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/([\\w\\-]+/(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/([\\w\\-]+/(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML             = "(?i)class=\"text\">HTML download</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML           = "<div class=\"grf\\-indent\"";
@@ -542,7 +542,7 @@ public class DeviantArtCom extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String mimeTypeExtTmp = getExtensionFromMimeType(con.getRequest().getResponseHeader("Content-Type"));
+                final String mimeTypeExtTmp = getExtensionFromMimeType(con);
                 if (mimeTypeExtTmp != null) {
                     extByMimeType = "." + mimeTypeExtTmp;
                 }

@@ -52,7 +52,6 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
 import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
@@ -67,7 +66,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 2, names = {}, urls = {})
 public class FreeDiscPl extends PluginForHost {
     public FreeDiscPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -670,7 +669,7 @@ public class FreeDiscPl extends PluginForHost {
             if (link.hasProperty(PROPERTY_STREAMING_FILENAME)) {
                 newFilename = link.getStringProperty(PROPERTY_STREAMING_FILENAME);
             } else {
-                String realFileExtension = this.getExtensionFromMimeType(dl.getConnection().getContentType());
+                String realFileExtension = this.getExtensionFromMimeType(dl.getConnection());
                 /* Fallback if file-extension could not be determined by header. */
                 if (realFileExtension == null && this.hasAttemptedStreamDownload(link)) {
                     if (this.isAudioStreamAvailable(link)) {

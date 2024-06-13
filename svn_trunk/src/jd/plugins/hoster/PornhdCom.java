@@ -17,9 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -29,12 +26,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48101 $", interfaceVersion = 3, names = { "pornhd.com" }, urls = { "https?://(?:www\\.)?pornhd\\.com/(videos/\\d+/[a-z0-9\\-]+|video/embed/\\d+)" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "pornhd.com" }, urls = { "https?://(?:www\\.)?pornhd\\.com/(videos/\\d+/[a-z0-9\\-]+|video/embed/\\d+)" })
 public class PornhdCom extends PluginForHost {
     public PornhdCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,9 +152,13 @@ public class PornhdCom extends PluginForHost {
                 con = br.openHeadConnection(this.dllink);
                 handleConnectionErrors(br, con);
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
-                final String ext = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                final String ext = getExtensionFromMimeType(con);
                 if (ext != null) {
                     link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + ext));
                 }

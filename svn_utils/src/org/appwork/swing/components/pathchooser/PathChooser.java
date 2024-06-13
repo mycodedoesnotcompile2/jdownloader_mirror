@@ -35,6 +35,7 @@ package org.appwork.swing.components.pathchooser;
 
 import java.awt.KeyboardFocusManager;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
@@ -52,6 +53,8 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.filechooser.FileFilter;
 
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
@@ -65,8 +68,6 @@ import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.appwork.utils.swing.dialog.ExtFileChooserDialog;
 import org.appwork.utils.swing.dialog.FileChooserSelectionMode;
 import org.appwork.utils.swing.dialog.FileChooserType;
-
-import net.miginfocom.swing.MigLayout;
 
 public class PathChooser extends MigPanel {
     private class BrowseAction extends AbstractAction {
@@ -201,16 +202,19 @@ public class PathChooser extends MigPanel {
                 }
             };
             // this code makes enter leave the dialog.
-            this.destination.getTextField().getInputMap().put(KeyStroke.getKeyStroke("pressed TAB"), "auto");
+            this.destination.getTextField().getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, KeyEvent.SHIFT_DOWN_MASK, true), "auto");
+            this.destination.getTextField().getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0, true), "auto");
             this.destination.getTextField().setFocusTraversalKeysEnabled(false);
             this.destination.getTextField().getActionMap().put("auto", new AbstractAction() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
                     if (!PathChooser.this.auto(PathChooser.this.txt)) {
-                        //
-                        System.out.println("NExt Fpcus");
                         final KeyboardFocusManager manager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
-                        manager.focusNextComponent();
+                        if ((e.getModifiers() & ActionEvent.SHIFT_MASK) == ActionEvent.SHIFT_MASK) {
+                            manager.focusPreviousComponent();
+                        } else {
+                            manager.focusNextComponent();
+                        }
                     }
                 }
             });

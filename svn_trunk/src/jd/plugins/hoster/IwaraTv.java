@@ -23,20 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.IwaraTvConfig;
-import org.jdownloader.plugins.components.config.IwaraTvConfig.FilenameScheme;
-import org.jdownloader.plugins.components.config.IwaraTvConfig.FilenameSchemeType;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -58,7 +44,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 48834 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.IwaraTvConfig;
+import org.jdownloader.plugins.components.config.IwaraTvConfig.FilenameScheme;
+import org.jdownloader.plugins.components.config.IwaraTvConfig.FilenameSchemeType;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -421,7 +421,7 @@ public class IwaraTv extends PluginForHost {
         final IwaraTvConfig cfg = PluginJsonConfig.get(IwaraTvConfig.class);
         final FilenameSchemeType preferredFilenameSchemeType = cfg.getPreferredFilenameSchemeType();
         final String serverFilename = Plugin.getFileNameFromHeader(dl.getConnection());
-        final String mimeExt = getExtensionFromMimeType(dl.getConnection().getContentType());
+        final String mimeExt = getExtensionFromMimeType(dl.getConnection());
         if (preferredFilenameSchemeType == FilenameSchemeType.ORIGINAL_SERVER_FILENAMES) {
             if (StringUtils.endsWithCaseInsensitive(serverFilename, mimeExt)) {
                 link.setFinalFileName(Encoding.htmlDecode(serverFilename));

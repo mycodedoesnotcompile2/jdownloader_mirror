@@ -35,7 +35,7 @@ import jd.utils.locale.JDL;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?([a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?([a-z0-9]+)" })
 public class StaSh extends PluginForHost {
     public StaSh(PluginWrapper wrapper) {
         super(wrapper);
@@ -178,13 +178,17 @@ public class StaSh extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
                     }
                     if (isZip(link)) {
                         filename = getFileNameFromHeader(con);
                     }
                     if (ext == null) {
-                        ext = this.getExtensionFromMimeType(con.getContentType());
+                        ext = this.getExtensionFromMimeType(con);
                     }
                 }
             } finally {

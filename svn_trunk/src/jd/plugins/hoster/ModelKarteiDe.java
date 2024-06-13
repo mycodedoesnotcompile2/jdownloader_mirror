@@ -16,10 +16,14 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -32,21 +36,22 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.decrypter.CtDiskComFolder;
 
-@HostPlugin(revision = "$Revision: 49089 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49096 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
+        // this.enablePremium("https://www." + getHost() + "/vip/");
     }
 
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        for (final String[] domains : CtDiskComFolder.getPluginDomains()) {
+        for (final String[] domains : getPluginDomains()) {
             for (final String domain : domains) {
                 br.setCookie(domain, "mk4_language", "2"); // English
             }
@@ -62,8 +67,12 @@ public class ModelKarteiDe extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
-        /* 2024-06-04: Set to 1 as we are only downloading small files. */
-        return 1;
+        if (isVideo(link)) {
+            return -5;
+        } else {
+            /* 2024-06-04: Set to 1 as we are only downloading small files. */
+            return 1;
+        }
     }
 
     public static List<String[]> getPluginDomains() {
@@ -109,6 +118,14 @@ public class ModelKarteiDe extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
+    private boolean isVideo(final DownloadLink link) {
+        if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "/video/")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, false);
@@ -116,8 +133,9 @@ public class ModelKarteiDe extends PluginForHost {
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
-        String extDefault;
-        if (StringUtils.containsIgnoreCase(link.getPluginPatternMatcher(), "video")) {
+        final String extDefault;
+        if (isVideo(link)) {
+            /* Can be flv, webm, mp4 but mostly mp4 */
             extDefault = ".mp4";
         } else {
             extDefault = ".jpg";
@@ -128,8 +146,22 @@ public class ModelKarteiDe extends PluginForHost {
             link.setName(contentID + extDefault);
         }
         this.setBrowserExclusive();
-        br.getPage(link.getPluginPatternMatcher());
+        /* Ensure English language */
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, link.getPluginPatternMatcher());
+        /**
+         * Setting only the English language cookie wasn't enough so this should redirect us to our target-URL and enforce English language.
+         */
+        br.getPage("https://www." + getHost() + "/l.php?l=en");
+        /* Double-check: If we're not on our target-URL, navigate to it. */
+        if (!br.getURL().contains(contentID)) {
+            logger.warning("Expected redirect from language switcher to final URL did not happen");
+            br.getPage(link.getPluginPatternMatcher());
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*The video does not exist")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*The video is not active")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String title = br.getRegex("class=\"p-title\">\\s*<a href=\"[^\"]+\"[^<]*title=\"([^\"]+)\"").getMatch(0); // photo
@@ -154,33 +186,33 @@ public class ModelKarteiDe extends PluginForHost {
             dllink = br.getRegex("type=\"video/mp4\"[^>]*src=\"(https?://[^\"]+)").getMatch(0); // video MP4
             if (dllink == null) {
                 dllink = br.getRegex("type=\"video/webm\"[^>]*src=\"(https?://[^\"]+)").getMatch(0); // video WEBM
-                extDefault = ".webm";
+                if (dllink == null) {
+                    /* Super old flash player .flv videos */
+                    dllink = br.getRegex("\"(https?://[^/]+/[^\"]+\\.flv)\"").getMatch(0); // video FLV
+                }
             }
         }
-        if (dateFormatted != null && title != null) {
-            link.setFinalFileName(dateFormatted + "_" + contentID + "_" + title + extDefault);
-        } else if (title != null) {
-            link.setFinalFileName(contentID + "_" + title + extDefault);
-        } else {
-            link.setFinalFileName(contentID + extDefault);
-        }
-        if (isDownload) {
-            /* Download */
-            if (br.containsHTML("assets/images/no\\.jpg")) {
-                /* Account needed to view this image */
-                throw new AccountRequiredException("Account needed to download this image");
-            } else if (br.containsHTML(">\\s*(Your are not authorized to see the video|Deine Nutzerrechte reichen leider nicht aus um das Video zu sehen)")) {
-                /* Account needed to view this video */
-                throw new AccountRequiredException("Account needed to download this video");
+        String ext = extDefault;
+        if (dllink != null) {
+            final String extFromURL = Plugin.getFileNameExtensionFromURL(dllink);
+            if (extFromURL != null) {
+                ext = extFromURL;
             }
-        } else {
-            /* Linkcheck - find filesize if possible */
-            if (!StringUtils.isEmpty(dllink)) {
+        }
+        try {
+            if (!StringUtils.isEmpty(dllink) && (isDownload == false || dateFormatted == null)) {
                 /* Find filesize */
                 URLConnectionAdapter con = null;
                 try {
                     con = br.openHeadConnection(dllink);
                     handleConnectionErrors(br, con);
+                    /* Try to find date if we were unable to find it so far. */
+                    if (dateFormatted == null) {
+                        final Date lastModifiedDate = TimeFormatter.parseDateString(con.getHeaderField(HTTPConstants.HEADER_RESPONSE_LAST_MODFIED));
+                        if (lastModifiedDate != null) {
+                            dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
+                        }
+                    }
                     if (con.getCompleteContentLength() > 0) {
                         if (con.isContentDecoded()) {
                             link.setDownloadSize(con.getCompleteContentLength());
@@ -195,6 +227,17 @@ public class ModelKarteiDe extends PluginForHost {
                     }
                 }
             }
+        } finally {
+            /* Always set filename, even if exception has happened */
+            if (dateFormatted != null && title != null) {
+                link.setFinalFileName(dateFormatted + "_" + contentID + "_" + title + ext);
+            } else if (title != null) {
+                link.setFinalFileName(contentID + "_" + title + ext);
+            } else if (dateFormatted != null) {
+                link.setFinalFileName(dateFormatted + "_" + contentID + ext);
+            } else {
+                link.setFinalFileName(contentID + ext);
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -202,7 +245,13 @@ public class ModelKarteiDe extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
-        if (StringUtils.isEmpty(dllink)) {
+        if (br.containsHTML("assets/images/no\\.jpg")) {
+            /* Account needed to view this image */
+            throw new AccountRequiredException("Account needed to download this image");
+        } else if (br.containsHTML(">\\s*(Your are not authorized to see the video|Deine Nutzerrechte reichen leider nicht aus um das Video zu sehen)")) {
+            /* Account needed to view this video */
+            throw new AccountRequiredException("Account needed to download this video");
+        } else if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(this.br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));

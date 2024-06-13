@@ -51,7 +51,7 @@ import org.jdownloader.plugins.components.config.EpornerComConfig.PreferredVideo
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49040 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -416,7 +416,7 @@ public class EPornerCom extends PluginForHost {
                 throw e;
             }
         }
-        final String ext = Plugin.getExtensionFromMimeTypeStatic(dl.getConnection().getContentType());
+        final String ext = getExtensionFromMimeType(dl.getConnection());
         if (ext != null && link.getName() != null) {
             link.setFinalFileName(this.correctOrApplyFileNameExtension(link.getName(), "." + ext));
         }

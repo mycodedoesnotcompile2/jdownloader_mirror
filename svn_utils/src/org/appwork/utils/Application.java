@@ -54,9 +54,11 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
+import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -73,7 +75,6 @@ import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.CrossSystem;
 
@@ -84,20 +85,19 @@ import org.appwork.utils.os.CrossSystem;
  *
  */
 public class Application {
-    private static Boolean                 IS_JARED      = null;
-    private static String                  APP_FOLDER    = ".appwork";
-    private static String                  ROOT;
-    public final static long               JAVA16        = JVMVersion.JAVA16;
-    public final static long               JAVA17        = JVMVersion.JAVA17;
-    public final static long               JAVA18        = JVMVersion.JAVA18;
-    public final static long               JAVA19        = JVMVersion.JAVA19;
-    private static Boolean                 IS_SYNTHETICA = null;
-    private static Boolean                 JVM64BIT      = null;
-    private static boolean                 REDIRECTED    = false;
-    public static PauseableOutputStream    STD_OUT;
-    public static PauseableOutputStream    ERR_OUT;
-    private static boolean                 DID_INIT      = false;
-    private static HashMap<String, String> MANIFEST;
+    private static Boolean              IS_JARED      = null;
+    private static String               APP_FOLDER    = ".appwork";
+    private static String               ROOT;
+    public final static long            JAVA16        = JVMVersion.JAVA16;
+    public final static long            JAVA17        = JVMVersion.JAVA17;
+    public final static long            JAVA18        = JVMVersion.JAVA18;
+    public final static long            JAVA19        = JVMVersion.JAVA19;
+    private static Boolean              IS_SYNTHETICA = null;
+    private static Boolean              JVM64BIT      = null;
+    private static boolean              REDIRECTED    = false;
+    public static PauseableOutputStream STD_OUT;
+    public static PauseableOutputStream ERR_OUT;
+    private static boolean              DID_INIT      = false;
     static {
         // its important to do this AFTER the variables init. else statics like REDIRECTED will get overwritten
         if (System.getProperty("NO_SYSOUT_REDIRECT") == null) {
@@ -423,12 +423,7 @@ public class Application {
         return Application.ROOT;
     }
 
-    /**
-     * @param loc
-     * @param appRoot
-     * @return
-     * @throws URISyntaxException
-     */
+    @Deprecated
     public static java.io.File urlToFile(URL loc) throws URISyntaxException {
         if (loc == null) {
             throw new IllegalArgumentException("loc is null");
@@ -669,38 +664,31 @@ public class Application {
             }
         }
         try {
-            String jar = null;
-            try {
-                jar = Application.getJarName(Application.class);
-            } catch (IllegalStateException e) {
-                // ide workaround;
-                for (File f : Application.getResource("").listFiles()) {
-                    if (f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar")) {
-                        jar = f.getName();
-                    }
-                }
-            }
-            HashMap<String, String> mani = Application.getManifest();
+            Map<String, String> mani = Application.getManifest();
             if (mani != null && mani.size() > 0) {
-                logger.info(jar + " Manifest");
                 for (Entry<String, String> es : mani.entrySet()) {
                     logger.info(es.getKey() + ": " + es.getValue());
                 }
             }
-            if (jar != null) {
-                File jarFile = Application.getResource(jar);
-                if (jarFile.isFile()) {
-                    logger.info(jarFile + "- lastModified: " + DateMapper.formatJsonDefault(jarFile.lastModified()));
+            try {
+                final String jarName = Application.getJarName(Application.class);
+                if (jarName != null) {
+                    final File jarFile = Application.getResource(jarName);
+                    if (jarFile.isFile()) {
+                        logger.info(jarFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(jarFile.lastModified())));
+                    }
                 }
+            } catch (Exception ignore) {
+                // ide
             }
             final String moduleName = System.getProperty("exe4j.moduleName");
             if (StringUtils.isNotEmpty(moduleName)) {
-                File exe = new File(moduleName);
-                if (!exe.isAbsolute() || !exe.isFile() || exe.length() == 0) {
-                    exe = Application.getResource(moduleName);
+                File exe4jFile = new File(moduleName);
+                if (!exe4jFile.isAbsolute() || !exe4jFile.isFile() || exe4jFile.length() == 0) {
+                    exe4jFile = Application.getResource(moduleName);
                 }
-                if (exe.isFile()) {
-                    logger.info(exe + "- lastModified: " + DateMapper.formatJsonDefault(exe.lastModified()));
+                if (exe4jFile.isFile()) {
+                    logger.info(exe4jFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(exe4jFile.lastModified())));
                 }
             }
         } catch (final Throwable e1) {
@@ -721,7 +709,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(int)
          */
         @Override
@@ -744,7 +732,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
@@ -767,7 +755,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
@@ -790,7 +778,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#flush()
          */
         @Override
@@ -811,7 +799,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#close()
          */
         @Override
@@ -1110,9 +1098,12 @@ public class Application {
     /**
      * @return
      */
-    private static HashMap<String, String> getManifest() {
-        if (MANIFEST != null) {
-            return MANIFEST;
+    private static Map<String, String> MANIFEST;
+
+    private static Map<String, String> getManifest() {
+        Map<String, String> ret = MANIFEST;
+        if (ret != null) {
+            return ret;
         }
         final List<File> jars = new ArrayList<File>();
         try {
@@ -1126,7 +1117,7 @@ public class Application {
         if (jars.size() == 0) {
             // IDE workaround
             final File[] files = Application.getResource("").listFiles();
-            if (files != null) {
+            if (files != null && files.length > 0) {
                 for (final File file : files) {
                     if (file.isFile() && file.getName().endsWith(".jar")) {
                         jars.add(file);
@@ -1134,9 +1125,9 @@ public class Application {
                 }
             }
         }
-        final HashMap<String, String> manifestMap = readManifests(jars);
-        MANIFEST = manifestMap;
-        return manifestMap;
+        ret = readManifests(jars);
+        MANIFEST = ret;
+        return ret;
     }
 
     public static HashMap<String, String> readManifests(final List<File> jars) {

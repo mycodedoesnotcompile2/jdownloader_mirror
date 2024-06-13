@@ -23,6 +23,7 @@ import org.appwork.storage.TypeRef;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -34,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VimmNet;
 
-@DecrypterPlugin(revision = "$Revision: 49075 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49091 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimmNetCrawler extends PluginForDecrypt {
     public VimmNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,6 +76,10 @@ public class VimmNetCrawler extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String downloadUnavailableText = findDownloadUnavailableText(br);
+        if (downloadUnavailableText != null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, downloadUnavailableText);
         }
         final String jsonarrayStr = br.getRegex("var allMedia = (\\[.*?\\]);").getMatch(0);
         if (jsonarrayStr == null) {
@@ -141,5 +146,16 @@ public class VimmNetCrawler extends PluginForDecrypt {
         /* We want all results to go into this package. */
         fp.addLinks(ret);
         return ret;
+    }
+
+    /** Returns text-reason why item is unavailable if it has been abused. */
+    public static String findDownloadUnavailableText(final Browser br) {
+        String text = br.getRegex(">\\s*(Download[^<]*unavailable at the request of[^<]+)<").getMatch(0);
+        if (text != null) {
+            text = Encoding.htmlOnlyDecode(text).trim();
+            return text;
+        } else {
+            return null;
+        }
     }
 }

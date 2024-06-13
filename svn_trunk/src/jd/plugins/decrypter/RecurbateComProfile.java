@@ -39,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RecurbateCom;
 
-@DecrypterPlugin(revision = "$Revision: 48686 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49091 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RecurbateCom.class })
 public class RecurbateComProfile extends PluginForDecrypt {
     public RecurbateComProfile(PluginWrapper wrapper) {
@@ -117,7 +117,7 @@ public class RecurbateComProfile extends PluginForDecrypt {
                     RecurbateCom.setDate(dlvideo, dateStr);
                 }
                 dlvideo.setProperty(RecurbateCom.PROPERTY_USER, username);
-                hosterplugin.setFilename(dlvideo);
+                hosterplugin.setFilename(dlvideo, true);
                 dlvideo.setAvailable(true);
                 dlvideo._setFilePackage(fp);
                 ret.add(dlvideo);

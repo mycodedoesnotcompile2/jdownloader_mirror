@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -38,12 +35,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48973 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
 public class MvpdjCom extends PluginForHost {
     public MvpdjCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -183,7 +182,7 @@ public class MvpdjCom extends PluginForHost {
                 handleConnectionErrors(br2, con);
                 /* Especially for official account-downloads, server-filenames might be crippled! */
                 final String filename_header = getFileNameFromHeader(con);
-                String ext = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                String ext = getExtensionFromMimeType(con);
                 if (ext == null) {
                     /* Fallback */
                     ext = extDefault;

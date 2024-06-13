@@ -228,6 +228,7 @@ public class CrossSystem {
         UBUNTU_LUNAR(OSFamily.LINUX, "23\\.04"), // 23.04
         UBUNTU_MANTIC(OSFamily.LINUX, "23\\.10"), // 23.10
         UBUNTU_NOBLE(OSFamily.LINUX, "24\\.04"), // 24.04
+        UBUNTU_ORACULAR(OSFamily.LINUX, "24\\.10"), // 24.10
         /*
          * MAC: List must be sorted by release Date!!
          */
@@ -252,6 +253,7 @@ public class CrossSystem {
         MAC_MONTEREY(OSFamily.MAC), // 10.17/12.00
         MAC_VENTURA(OSFamily.MAC), // 10.18/13.00
         MAC_SONOMA(OSFamily.MAC), // 10.19/14.00
+        MAC_SEQUOIA(OSFamily.MAC), // 10.20/15.00
         /*
          * OS2
          */
@@ -288,7 +290,6 @@ public class CrossSystem {
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -355,7 +356,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -737,7 +737,7 @@ public class CrossSystem {
     private static OperatingSystem getWindowsReleaseCMD() {
         final Object initialValue = new Object();
         final AtomicReference<Object> reference = new AtomicReference<Object>(initialValue);
-        final Thread thread = new Thread("query: cmd -c ver") {
+        final Thread thread = new Thread("getWindowsReleaseCMD: cmd -c ver") {
             private void set(OperatingSystem operatingSystem) {
                 synchronized (reference) {
                     reference.compareAndSet(initialValue, operatingSystem);
@@ -963,7 +963,9 @@ public class CrossSystem {
                 }
                 final long version = Math.max(parseMacOSVersion(osVersion), parseMacOSVersion(sw_ver.get()));
                 // new version scheme
-                if (version >= 14000000) {
+                if (version >= 15000000) {
+                    return OperatingSystem.MAC_SEQUOIA;
+                } else if (version >= 14000000) {
                     return OperatingSystem.MAC_SONOMA;
                 } else if (version >= 13000000) {
                     return OperatingSystem.MAC_VENTURA;
@@ -973,7 +975,10 @@ public class CrossSystem {
                     return OperatingSystem.MAC_BIG_SUR;
                 } else {
                     // old version scheme
-                    if (version >= 10019000) {
+                    if (version >= 10020000) {
+                        // os.version=10.20
+                        return OperatingSystem.MAC_SEQUOIA;
+                    } else if (version >= 10019000) {
                         // os.version=10.19
                         return OperatingSystem.MAC_SONOMA;
                     } else if (version >= 10018000) {
