@@ -63,7 +63,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 49119 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -269,7 +269,7 @@ public class ArchiveOrg extends PluginForHost {
 
     /** Returns true if link leads to a compressed archive file. */
     private boolean isArchive(final DownloadLink link) {
-        if (link.getPluginPatternMatcher().matches("(?i).+\\.(zip|rar)/.+")) {
+        if (link.getPluginPatternMatcher().matches("(?i).+\\.(zip|rar|7z|gz)/.+")) {
             return true;
         } else {
             return false;

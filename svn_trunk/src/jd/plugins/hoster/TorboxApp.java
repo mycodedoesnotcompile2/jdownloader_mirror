@@ -42,18 +42,15 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49097 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49113 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
-    private final String                 PROPERTY_SERVERSIDE_FILE_ID                              = "file_id";
-    private final String                 PROPERTY_SERVERSIDE_HASH                                 = "hash";
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";
 
     @SuppressWarnings("deprecation")
@@ -122,71 +119,56 @@ public class TorboxApp extends PluginForHost {
         return this.getHost() + "_" + property;
     }
 
-    private String getMultihosterFileID(final DownloadLink link) {
-        return link.getStringProperty(getPropertyKey(PROPERTY_SERVERSIDE_FILE_ID));
-    }
-
-    private String getMultihosterHash(final DownloadLink link) {
-        return link.getStringProperty(getPropertyKey(PROPERTY_SERVERSIDE_HASH));
-    }
-
-    private void setMultihosterFileID(final DownloadLink link, final String file_id) {
-        link.setProperty(getPropertyKey(PROPERTY_SERVERSIDE_FILE_ID), file_id);
-    }
-
-    private void setMultihosterHash(final DownloadLink link, final String hash) {
-        link.setProperty(getPropertyKey(PROPERTY_SERVERSIDE_HASH), hash);
-    }
-
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         final String directlinkproperty = this.getPropertyKey("directlink");
-        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String dllink;
+        this.login(account, false);
         if (storedDirecturl != null) {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
             mhm.runCheck(account, link);
-            this.login(account, false);
-            final String stored_file_id = getMultihosterFileID(link);
-            String file_id = null;
-            String hash = getMultihosterHash(link);
-            /* TODO: Detect old fileIDs and/or only re-use them for X time or never re-use them. */
-            boolean isNewFileID = false;
-            final boolean allowReUseStoredFileID = true;
-            if (stored_file_id != null && allowReUseStoredFileID) {
-                logger.info("Re-using stored internal fileID: " + stored_file_id);
-                file_id = stored_file_id;
-            } else {
-                logger.info("Creating internal file_id");
-                final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", "link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
-                final Map<String, Object> entries = (Map<String, Object>) this.callAPI(req_createwebdownload, account, link);
-                // hash, auth_id
-                file_id = entries.get("webdownload_id").toString();
-                hash = entries.get("hash").toString();
-                /* Save this ID to re-use on next try. */
-                this.setMultihosterFileID(link, file_id);
-                this.setMultihosterHash(link, hash);
-                if (StringUtils.equals(file_id, stored_file_id)) {
-                    logger.info("createwebdownload has returned same internal fileID which we already know: " + stored_file_id);
-                } else {
-                    isNewFileID = true;
-                }
-            }
+            logger.info("Creating or finding internal file_id");
+            final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", "link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+            final Map<String, Object> entries = (Map<String, Object>) this.callAPI(req_createwebdownload, account, link);
+            /**
+             * These two strings can be used to identify the unique item/link we just added. </br> We could cache them but instead we will
+             * simply rely on the API to do this for us. </br> Once a download was started successfully we save- and re-use the direct-URL,
+             * that should be enough - we do not want to overcomplicate things.
+             */
+            final String file_id = entries.get("webdownload_id").toString();
+            final String hash = entries.get("hash").toString();
             /*
-             * 2024-06-11: Looks like this doesn't work or it needs some time until cached items get listed as cached so at this moment
-             * let's not do this and try downloading straight away.
+             * 2024-06-13: Disabled this handling.
              */
             final boolean doCachecheck = false;
             if (doCachecheck) {
+                /* Optional step */
+                /* Items need to be cached before they can be downloaded -> Check cache status */
                 logger.info("Checking downloadability of internal file_id: " + file_id + " | hash: " + hash);
                 final UrlQuery query_checkcached = new UrlQuery();
                 query_checkcached.add("hash", hash);
-                query_checkcached.add("format", "list");
+                query_checkcached.add("format", "object");
+                /* 2024-06-13: Use this for now to avoid problems with outdated response from this API call. */
+                query_checkcached.add("bypass_cache", "true");
                 final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/checkcached?" + query_checkcached.toString());
-                final Map<String, Object> resp_checkcached = (Map<String, Object>) this.callAPI(req_checkcached, account, link);
-                final Map<String, Object> cachemap = (Map<String, Object>) resp_checkcached.get(hash);
+                final Object resp_checkcached = this.callAPI(req_checkcached, account, link);
+                Map<String, Object> cachemap = null;
+                if (resp_checkcached instanceof Map) {
+                    cachemap = (Map<String, Object>) ((Map<String, Object>) resp_checkcached).get(hash);
+                } else {
+                    /* Assume we got a list -> Find cache-map */
+                    final List<Map<String, Object>> cacheitems = (List<Map<String, Object>>) resp_checkcached;
+                    for (final Map<String, Object> cacheitem : cacheitems) {
+                        final String thishash = cacheitem.get("hash").toString();
+                        if (thishash.equals(hash)) {
+                            cachemap = cacheitem;
+                            break;
+                        }
+                    }
+                }
                 if (cachemap == null) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverside download is not yet ready", 30 * 1000);
                 }
@@ -222,6 +204,8 @@ public class TorboxApp extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account, true);
+        /* Use shorter timeout than usually to make notification system work in a better way (see end of this function). */
+        account.setRefreshTimeout(5 * 60 * 1000l);
         /**
          * In GUI, used only needs to enter API key so we'll set the username for him here. </br> This is also important to be able to keep
          * the user from adding the same account multiple times.
@@ -265,12 +249,14 @@ public class TorboxApp extends PluginForHost {
         }
         ai.setMultiHostSupport(this, supportedHosts);
         account.setConcurrentUsePossible(true);
+        /* Handle notifications */
         final boolean enableNotifications = true;
         if (enableNotifications) {
             long highestNotificationTimestamp = 0;
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
+                /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
                 final List<Map<String, Object>> notifications = (List<Map<String, Object>>) this.callAPI(req_notifications, account, null);
                 int counterDisplayed = 0;
                 for (final Map<String, Object> notification : notifications) {
@@ -291,6 +277,10 @@ public class TorboxApp extends PluginForHost {
                 }
                 logger.info("Total number of notifications: " + notifications.size() + " | Displayed this run: " + counterDisplayed);
             } catch (final Exception e) {
+                /*
+                 * Ignore exception as the important part [the account-check] was successful and we don't care about a failure at this
+                 * point.
+                 */
                 logger.log(e);
                 logger.warning("Exception happened in notification handling");
             } finally {

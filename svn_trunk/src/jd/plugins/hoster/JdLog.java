@@ -22,6 +22,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.auth.AuthenticationInfo;
+import org.jdownloader.auth.AuthenticationInfo.Type;
+import org.jdownloader.auth.Login;
+import org.jdownloader.jdserv.JDServUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -32,6 +41,7 @@ import jd.http.Browser;
 import jd.http.CallbackAuthenticationFactory;
 import jd.http.DefaultAuthenticanFactory;
 import jd.http.Request;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -39,16 +49,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
 import jd.utils.locale.JDL;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.auth.AuthenticationInfo;
-import org.jdownloader.auth.AuthenticationInfo.Type;
-import org.jdownloader.auth.Login;
-import org.jdownloader.jdserv.JDServUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
 
 /**
  * Alternative AppWork log downloader
@@ -56,11 +59,11 @@ import org.jdownloader.plugins.controller.LazyPlugin;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 45814 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 49111 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
-        return "";
+        return "https://jdownloader.org/impressum";
     }
 
     public JdLog(PluginWrapper wrapper) {
@@ -68,8 +71,13 @@ public class JdLog extends PluginForHost {
     }
 
     @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL };
+    }
+
+    @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @SuppressWarnings("deprecation")
@@ -79,6 +87,26 @@ public class JdLog extends PluginForHost {
         final String uid = new Regex(link.getDownloadURL(), this.getSupportedLinks()).getMatch(0);
         link.setFinalFileName(uid + ".log");
         return AvailableStatus.TRUE;
+    }
+
+    /** Small hack to prevent file extension from being corrected from .log to .log.txt. */
+    @Override
+    public Downloadable newDownloadable(DownloadLink downloadLink, final Browser br) {
+        return new DownloadLinkDownloadable(downloadLink) {
+            @Override
+            public Browser getContextBrowser() {
+                if (br == null) {
+                    return super.getContextBrowser();
+                } else {
+                    return br.cloneBrowser();
+                }
+            }
+
+            @Override
+            protected String correctOrApplyFileNameExtension(String name, URLConnectionAdapter connection) {
+                return name;
+            }
+        };
     }
 
     @Override
@@ -224,11 +252,6 @@ public class JdLog extends PluginForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL };
     }
 
     @Override

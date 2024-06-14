@@ -36,6 +36,7 @@ import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
@@ -55,7 +56,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49099 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class VideoFCTwoCore extends PluginForHost {
     public VideoFCTwoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -223,7 +224,7 @@ public abstract class VideoFCTwoCore extends PluginForHost {
                     if (con.getCompleteContentLength() > 0) {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                } else if (con.getContentType().contains("application/vnd.apple.mpegurl")) {
+                } else if (LinkCrawlerDeepInspector.looksLikeMpegURL(con)) {
                     /* HLS download */
                     this.hlsDownloadurl = con.getURL().toString();
                     this.httpDownloadurl = null;

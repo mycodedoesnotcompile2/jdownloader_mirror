@@ -619,6 +619,7 @@ public class DownloadLinkDownloadable implements Downloadable {
         }
     }
 
+    /** Corrects or adds file-extension in given filename string based on mime-type of given URLConnection. */
     protected String correctOrApplyFileNameExtension(String name, URLConnectionAdapter connection) {
         final PluginForHost plugin = getPlugin();
         final String ext = getExtensionFromMimeType(connection);
@@ -637,32 +638,64 @@ public class DownloadLinkDownloadable implements Downloadable {
         return dl != null && dl.allowFilenameFromURL;
     }
 
+    protected boolean isFixWrongEncoding(URLConnectionAdapter connection, final String fileName) {
+        final DownloadInterface dl = getDownloadInterface();
+        return dl != null && dl.fixWrongContentDispositionHeader;
+    }
+
+    protected String fixWrongEncoding(URLConnectionAdapter connection, final String fileName) {
+        return decodeURIComponent(fileName, null);
+    }
+
     @Override
     public void updateFinalFileName() {
-        if (getFinalFileName() == null) {
-            final LogInterface logger = getLogger();
-            final DownloadInterface dl = getDownloadInterface();
-            final URLConnectionAdapter connection = getDownloadInterface().getConnection();
-            logger.info("FinalFileName is not set yet!");
-            final DispositionHeader dispositonHeader = parseDispositionHeader(connection);
-            String name = null;
-            if (dispositonHeader != null && StringUtils.isNotEmpty(name = dispositonHeader.getFilename())) {
-                if (dl.fixWrongContentDispositionHeader && dispositonHeader.getEncoding() == null) {
-                    name = decodeURIComponent(name, null);
+        final String existingFinalFilename = getFinalFileName();
+        final LogInterface logger = getLogger();
+        final DownloadInterface dl = getDownloadInterface();
+        final URLConnectionAdapter connection = dl.getConnection();
+        final DispositionHeader dispositonHeader = parseDispositionHeader(connection);
+        if (dispositonHeader != null && StringUtils.isNotEmpty(dispositonHeader.getFilename())) {
+            /* Get filename from content-disposition header */
+            if (existingFinalFilename == null) {
+                final String fileNameFromDispositionHeader = dispositonHeader.getFilename();
+                final String newFinalFilename;
+                if (dispositonHeader.getEncoding() == null && isFixWrongEncoding(connection, fileNameFromDispositionHeader)) {
+                    newFinalFilename = fixWrongEncoding(connection, fileNameFromDispositionHeader);
+                } else {
+                    newFinalFilename = fileNameFromDispositionHeader;
                 }
-                logger.info("FinalFileName: set to '" + name + "' from connection:" + dispositonHeader + "|Content-Type:" + connection.getContentType() + "|fix:" + dl.fixWrongContentDispositionHeader);
-                setFinalFileName(name);
-            } else if (isAllowFilenameFromURL(connection) && StringUtils.isNotEmpty(name = getFileNameFromURL(connection))) {
-                if (dl.fixWrongContentDispositionHeader) {
-                    name = decodeURIComponent(name, null);
+                logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from connection:" + dispositonHeader + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromDispositionHeader));
+                setFinalFileName(newFinalFilename);
+            }
+            /* never modify(correctOrApplyFileNameExtension) it in any way */
+            return;
+        }
+
+        if (existingFinalFilename == null && isAllowFilenameFromURL(connection) && StringUtils.isNotEmpty(getFileNameFromURL(connection))) {
+            /* Get filename from URL */
+            final String fileNameFromURL = getFileNameFromURL(connection);
+            final String newFinalFilename;
+            if (isFixWrongEncoding(connection, fileNameFromURL)) {
+                newFinalFilename = fixWrongEncoding(connection, fileNameFromURL);
+            } else {
+                newFinalFilename = fileNameFromURL;
+            }
+            logger.info("updateFinalFileName: set to '" + newFinalFilename + "' from url:" + connection.getURL().getPath() + "|Content-Type:" + connection.getContentType() + "|fixEncoding:" + !StringUtils.equals(newFinalFilename, fileNameFromURL));
+            setFinalFileName(newFinalFilename);
+        }
+
+        if (StringUtils.isNotEmpty(getName())) {
+            /* Use pre given filename and correct extension if needed. */
+            final String name = getName();
+            final String newFinalFilename = correctOrApplyFileNameExtension(name, connection);
+            if (StringUtils.equals(existingFinalFilename, newFinalFilename)) {
+                // no changes in filename
+                return;
+            } else {
+                if (!StringUtils.equals(name, newFinalFilename)) {
+                    logger.info("updateFinalFileName: correct from '" + name + "' to '" + newFinalFilename + "'|Content-Type:" + connection.getContentType());
                 }
-                name = correctOrApplyFileNameExtension(name, connection);
-                logger.info("FinalFileName: set to '" + name + "' from url:" + connection.getURL().toString() + "|Content-Type:" + connection.getContentType() + "|fix:" + dl.fixWrongContentDispositionHeader);
-                setFinalFileName(name);
-            } else if (StringUtils.isNotEmpty(name = getName())) {
-                name = correctOrApplyFileNameExtension(name, connection);
-                logger.info("FinalFileName: set to '" + name + "' from plugin");
-                setFinalFileName(name);
+                setFinalFileName(newFinalFilename);
             }
         }
     }
