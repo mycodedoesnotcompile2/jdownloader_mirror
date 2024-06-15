@@ -32,6 +32,7 @@ import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
 import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.net.BCSSLSocketStreamFactory;
@@ -54,7 +55,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49075 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49128 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamCom extends XFileSharingProBasic {
     public DoodstreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -203,23 +204,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
                     if (response.get("status").toString().equalsIgnoreCase("otp_sent")) {
                         /* {"status":"otp_sent","message":"OTP has been sent to your mail"} */
                         logger.info("2FA code required");
-                        final DownloadLink dl_dummy;
-                        if (this.getDownloadLink() != null) {
-                            dl_dummy = this.getDownloadLink();
-                        } else {
-                            dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                        }
-                        String twoFACode = getUserInput("Enter Google 2-Factor Authentication code: " + response.get("message").toString(), dl_dummy);
-                        if (twoFACode != null) {
-                            twoFACode = twoFACode.trim();
-                        }
-                        if (twoFACode == null || !twoFACode.matches("\\d{6}")) {
-                            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                                throw new AccountUnavailableException("\r\nUngültiges Format der 2-faktor-Authentifizierung!", 1 * 60 * 1000l);
-                            } else {
-                                throw new AccountUnavailableException("\r\nInvalid 2-factor-authentication code format!", 1 * 60 * 1000l);
-                            }
-                        }
+                        final String twoFACode = this.getTwoFACode(account, "\\d{6}");
                         logger.info("Submitting 2FA code");
                         query.addAndReplace("loginotp", twoFACode);
                         br.getPage("/?" + query.toString());
@@ -228,11 +213,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
                          * On success it will redirect us to a non-json page!
                          */
                         if (!this.isLoggedin(br)) {
-                            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                                throw new AccountUnavailableException("\r\nUngültiger 2-faktor-Authentifizierungscode!", 1 * 60 * 1000l);
-                            } else {
-                                throw new AccountUnavailableException("\r\nInvalid 2-factor-authentication code!", 1 * 60 * 1000l);
-                            }
+                            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
                         }
                     }
                 }
@@ -544,7 +525,7 @@ public class DoodstreamCom extends XFileSharingProBasic {
             if (dllink == null) {
                 String captchaContainer = br.getRegex("\\$\\.get\\(\"(/[^\"]+op=validate\\&gc_response=)").getMatch(0);
                 if (captchaContainer != null) {
-                    if (br.containsHTML("turnstile\\.render")) {
+                    if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
                         throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
                     } else {
                         final Browser brc = br.cloneBrowser();

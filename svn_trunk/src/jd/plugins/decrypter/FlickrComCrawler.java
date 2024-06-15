@@ -57,7 +57,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
 import jd.plugins.hoster.FlickrCom;
 
-@DecrypterPlugin(revision = "$Revision: 48316 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
+@DecrypterPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
 public class FlickrComCrawler extends PluginForDecrypt {
     public FlickrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -310,7 +310,7 @@ public class FlickrComCrawler extends PluginForDecrypt {
                 df = new DecimalFormat(String.valueOf(totalNumberofItems).replaceAll("\\d", "0"));
                 album.setTotalNumberofItems(totalNumberofItems);
                 fp = FilePackage.getInstance();
-                fp.setName(encodeUnicode(this.getFormattedPackagename(album)));
+                fp.setName(this.getFormattedPackagename(album));
                 if (!StringUtils.isEmpty(album.getDescription())) {
                     fp.setComment(album.getDescription());
                 }

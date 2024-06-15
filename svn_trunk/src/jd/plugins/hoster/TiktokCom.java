@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TiktokComCrawler;
 
-@HostPlugin(revision = "$Revision: 49084 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49130 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
 public class TiktokCom extends PluginForHost {
     public TiktokCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -300,7 +300,6 @@ public class TiktokCom extends PluginForHost {
         br.getHeaders().put("Referer", "https://www." + this.getHost() + "/");
         br.getHeaders().put("Origin", "https://www." + this.getHost());
         br.getHeaders().put("Sec-Fetch-Mode", "navigate");
-        br.getHeaders().put("Referer", "https://www.tiktok.com/@tristanvd/video/7286131089888808224");
     }
 
     private boolean allowsHeadRequest(final DownloadLink link) {

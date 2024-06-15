@@ -64,7 +64,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48965 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -2352,7 +2352,6 @@ public class SaveTv extends PluginForHost {
             formattedFilename = formattedFilename.replace("*serientitel*", site_title);
             formattedFilename = formattedFilename.replace("*episodenname*", episodename);
         }
-        formattedFilename = plugin.encodeUnicode(formattedFilename);
         formattedFilename = fixCharIssues(formattedFilename);
         return formattedFilename;
     }
@@ -2411,7 +2410,6 @@ public class SaveTv extends PluginForHost {
              */
             formattedFilename = convertNormalDataToServer(formattedFilename);
             formattedFilename += ext;
-            formattedFilename = plugin.encodeUnicode(formattedFilename);
         }
         formattedFilename = fixCharIssues(formattedFilename);
         return formattedFilename;

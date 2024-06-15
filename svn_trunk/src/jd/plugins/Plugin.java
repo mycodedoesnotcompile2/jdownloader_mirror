@@ -35,31 +35,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.Icon;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkCheckerThread;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.BrowserSettingsThread;
-import jd.http.ProxySelectorInterface;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.components.SiteType.SiteTemplate;
-import jd.utils.JDUtilities;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -109,6 +84,31 @@ import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.translate._JDT;
+
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkCheckerThread;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.BrowserSettingsThread;
+import jd.http.ProxySelectorInterface;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.components.SiteType.SiteTemplate;
+import jd.utils.JDUtilities;
 
 /**
  * Diese abstrakte Klasse steuert den Zugriff auf weitere Plugins. Alle Plugins müssen von dieser Klasse abgeleitet werden.
@@ -181,7 +181,7 @@ public abstract class Plugin implements ActionListener {
 
     public String getExtensionFromMimeType(final String contentType) {
         final List<CompiledFiletypeExtension> fileTypeExtensions = CompiledFiletypeFilter.getByMimeType(contentType);
-        if (fileTypeExtensions.size() > 0) {
+        if (fileTypeExtensions != null && fileTypeExtensions.size() > 0) {
             return fileTypeExtensions.get(0).getExtensionFromMimeType(contentType);
         } else {
             return null;
@@ -196,7 +196,7 @@ public abstract class Plugin implements ActionListener {
     @Deprecated
     public static String getExtensionFromMimeTypeStatic(final String contentType) {
         final List<CompiledFiletypeExtension> fileTypeExtensions = CompiledFiletypeFilter.getByMimeType(contentType);
-        if (fileTypeExtensions.size() > 0) {
+        if (fileTypeExtensions != null && fileTypeExtensions.size() > 0) {
             return fileTypeExtensions.get(0).getExtensionFromMimeType(contentType);
         } else {
             return null;
@@ -440,8 +440,9 @@ public abstract class Plugin implements ActionListener {
     }
 
     /**
-     * Corrects extension of given filename. Adds extension if it is missing. Returns null if given filename is null. </br> Pass
-     * fileExtension with dot(s) to this! </br> Only replaces extensions with one dot e.g. ".mp4", NOT e.g. ".tar.gz".
+     * Corrects extension of given filename. Adds extension if it is missing. Returns null if given filename is null. </br>
+     * Pass fileExtension with dot(s) to this! </br>
+     * Only replaces extensions with one dot e.g. ".mp4", NOT e.g. ".tar.gz".
      *
      * @param filenameOrg
      *            Original filename
@@ -458,13 +459,19 @@ public abstract class Plugin implements ActionListener {
             /* Filename doesn't contain an extension at all -> Add extension to filename. */
             return filenameOrg + newExtension;
         } else if (StringUtils.endsWithCaseInsensitive(filenameOrg, newExtension)) {
-            /* Filename already contains target-extension. */
+            /* Filename already ends with/contains target-extension. */
             return filenameOrg;
         } else {
             /* Replace existing extension with new extension. */
             final int lastIndex = filenameOrg.lastIndexOf(".");
-            final String fileExtension = lastIndex + 1 < filenameOrg.length() ? filenameOrg.substring(lastIndex + 1) : null;
-            if (CompiledFiletypeFilter.getExtensionsFilterInterface(fileExtension) != null) {
+            final String currentFileExtension = lastIndex + 1 < filenameOrg.length() ? filenameOrg.substring(lastIndex + 1) : null;
+            final CompiledFiletypeExtension newFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
+            final CompiledFiletypeExtension oldFileType = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
+            if (newFileType != null && currentFileExtension != null && newFileType.isValidExtension(currentFileExtension)) {
+                /* Filename already contains valid/alternative target-extension */
+                return filenameOrg;
+            }
+            if (oldFileType != null) {
                 final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
                 return filenameWithoutExtension + newExtension;
             } else {
@@ -759,26 +766,6 @@ public abstract class Plugin implements ActionListener {
         final File dest = JDUtilities.getResourceFile("captchas/" + this.getHost() + "_" + date + extension, true);
         cleanUpCaptchaFiles.addIfAbsent(dest);
         return dest;
-    }
-
-    /** TODO: Remove this once this is done: https://svn.jdownloader.org/issues/83699 */
-    @Deprecated
-    public String encodeUnicode(final String input) {
-        if (input != null) {
-            String output = input;
-            output = output.replace(":", ";");
-            output = output.replace("|", "¦");
-            output = output.replace("<", "[");
-            output = output.replace(">", "]");
-            output = output.replace("/", "⁄");
-            output = output.replace("\\", "∖");
-            output = output.replace("*", "#");
-            output = output.replace("?", "¿");
-            output = output.replace("!", "¡");
-            output = output.replace("\"", "'");
-            return output;
-        }
-        return null;
     }
 
     /**
@@ -1126,9 +1113,10 @@ public abstract class Plugin implements ActionListener {
     }
 
     /**
-     * Displays a BubbleNotification. </br> Plugins which are expected to use this function should return LazyPlugin.FEATURE of type
-     * BUBBLE_NOTIFICATION. </br> Any plugin can try to display a BubbleNotification but upper handling may decide not to display it
-     * depending on user settings. </br> Examples of Plugins using this functionality: RedditComCrawler, TwitterComCrawler, HighWayCore
+     * Displays a BubbleNotification. </br>
+     * Plugins which are expected to use this function should return LazyPlugin.FEATURE of type BUBBLE_NOTIFICATION. </br>
+     * Any plugin can try to display a BubbleNotification but upper handling may decide not to display it depending on user settings. </br>
+     * Examples of Plugins using this functionality: RedditComCrawler, TwitterComCrawler, HighWayCore
      */
     protected void displayBubbleNotification(final String title, final String text, final Icon icon) {
         BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {

@@ -6,12 +6,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import jd.plugins.LinkInfo;
-
 import org.appwork.utils.StringUtils;
 import org.jdownloader.controlling.filter.FiletypeFilter.TypeMatchType;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.plugins.LinkInfo;
 
 public class CompiledFiletypeFilter {
     private final Pattern[]                   list;
@@ -26,6 +26,8 @@ public class CompiledFiletypeFilter {
         public boolean matchesMimeType(final String mimeType);
 
         public String getExtensionFromMimeType(final String mimeType);
+
+        public boolean isValidExtension(String extension);
 
         public String name();
     }
@@ -102,6 +104,7 @@ public class CompiledFiletypeFilter {
         SHA512,
         PAR2("(vol\\d+\\.par2|vol\\d+\\+\\d+\\.par2|par2)"),
         PAR("(p\\d+|par)");
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -127,6 +130,10 @@ public class CompiledFiletypeFilter {
 
         public String getIconID() {
             return IconKey.ICON_HASHSUM;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         public Pattern compiledAllPattern() {
@@ -169,6 +176,7 @@ public class CompiledFiletypeFilter {
         RUN,
         PS1,
         CMD;
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -208,6 +216,10 @@ public class CompiledFiletypeFilter {
             return extension != null && extension instanceof ExecutableExtensions;
         }
 
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
+        }
+
         @Override
         public ExtensionsFilterInterface[] listSameGroup() {
             return values();
@@ -235,6 +247,7 @@ public class CompiledFiletypeFilter {
         SMI, // SAMI
         VTT, // WebVTT
         SUB;// VobSub
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -267,6 +280,10 @@ public class CompiledFiletypeFilter {
                 allPattern = compileAllPattern(SubtitleExtensions.values());
             }
             return allPattern;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         @Override
@@ -307,6 +324,7 @@ public class CompiledFiletypeFilter {
                 return pattern.matcher(mimeType).find();
             }
         },
+        LOG,
         HTML("(html?)") {
             private final Pattern pattern = Pattern.compile("(?i)text/html");
 
@@ -350,6 +368,10 @@ public class CompiledFiletypeFilter {
             public boolean matchesMimeType(String mimeType) {
                 return pattern.matcher(mimeType).find();
             }
+
+            public boolean isValidExtension(String extension) {
+                return super.isValidExtension(extension) || CompiledFiletypeFilter.isValidExtension(extension, DOC);
+            }
         },
         DOTX {
             private final Pattern pattern = Pattern.compile("(?i)application/vnd.openxmlformats-officedocument.wordprocessingml.template");
@@ -357,6 +379,10 @@ public class CompiledFiletypeFilter {
             @Override
             public boolean matchesMimeType(String mimeType) {
                 return pattern.matcher(mimeType).find();
+            }
+
+            public boolean isValidExtension(String extension) {
+                return super.isValidExtension(extension) || CompiledFiletypeFilter.isValidExtension(extension, DOC);
             }
         },
         DOCT {
@@ -392,6 +418,7 @@ public class CompiledFiletypeFilter {
         },
         NFO,
         USF;
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -417,6 +444,10 @@ public class CompiledFiletypeFilter {
 
         public String getIconID() {
             return IconKey.ICON_TEXT;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         public Pattern compiledAllPattern() {
@@ -449,6 +480,14 @@ public class CompiledFiletypeFilter {
 
     private static String getExtensionFromMimeType(String mimeType, CompiledFiletypeExtension fileTypeExtension) {
         return fileTypeExtension.matchesMimeType(mimeType) ? fileTypeExtension.name().toLowerCase(Locale.ENGLISH) : null;
+    }
+
+    private static Boolean isValidExtension(String extension, CompiledFiletypeExtension fileTypeExtension) {
+        if (extension != null) {
+            return fileTypeExtension.getPattern().matcher(extension).matches();
+        } else {
+            return null;
+        }
     }
 
     public static enum AudioExtensions implements CompiledFiletypeExtension {
@@ -489,6 +528,10 @@ public class CompiledFiletypeFilter {
             public boolean matchesMimeType(String mimeType) {
                 return pattern.matcher(mimeType).find();
             }
+
+            public boolean isValidExtension(String extension) {
+                return super.isValidExtension(extension) || CompiledFiletypeFilter.isValidExtension(extension, OGA);
+            }
         },
         OGA {
             // ogg audio media
@@ -497,6 +540,10 @@ public class CompiledFiletypeFilter {
             @Override
             public boolean matchesMimeType(String mimeType) {
                 return pattern.matcher(mimeType).find();
+            }
+
+            public boolean isValidExtension(String extension) {
+                return super.isValidExtension(extension) || CompiledFiletypeFilter.isValidExtension(extension, OGG);
             }
         },
         OPUS {
@@ -539,6 +586,7 @@ public class CompiledFiletypeFilter {
         SND,
         SPX, // Speex
         NSF;// NES Sound Format, https://wiki.nesdev.com/w/index.php/NSF
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -564,6 +612,10 @@ public class CompiledFiletypeFilter {
 
         public String getIconID() {
             return IconKey.ICON_AUDIO;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         public Pattern compiledAllPattern() {
@@ -646,6 +698,7 @@ public class CompiledFiletypeFilter {
                 return pattern.matcher(mimeType).find();
             }
         };
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -664,6 +717,10 @@ public class CompiledFiletypeFilter {
         @Override
         public boolean isSameExtensionGroup(ExtensionsFilterInterface extension) {
             return extension != null && extension instanceof VideoExtensions;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         private VideoExtensions(String id) {
@@ -730,12 +787,6 @@ public class CompiledFiletypeFilter {
                 return pattern.matcher(mimeType).find();
             }
         },
-        SevenZIP("7ZIP") {
-            @Override
-            public String getExtensionFromMimeType(String mimeType) {
-                return matchesMimeType(mimeType) ? "7zip" : null;
-            }
-        },
         R_NUM("[r-z]\\d{2}"),
         NUM("\\d{1,4}"),
         MultiZip("z\\d{1,4}"),
@@ -758,7 +809,7 @@ public class CompiledFiletypeFilter {
         BZ2,
         ARJ,
         CPIO,
-        SevenZ("7z") {
+        SevenZ("(7z|7zip)") {
             private final Pattern pattern = Pattern.compile("(?i)application/x-7z-compressed");
 
             @Override
@@ -787,6 +838,7 @@ public class CompiledFiletypeFilter {
         LZH,
         LHA,
         AA("[a-z]{2}");
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -804,6 +856,10 @@ public class CompiledFiletypeFilter {
 
         private ArchiveExtensions(String id) {
             this.pattern = Pattern.compile(id, Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         public String getDesc() {
@@ -843,7 +899,7 @@ public class CompiledFiletypeFilter {
     }
 
     public static enum ImageExtensions implements CompiledFiletypeExtension {
-        JPG {
+        JPG("(jpe|jpe?g|jfif)") {
             private final Pattern pattern = Pattern.compile("(?i)image/jpe?g");
 
             @Override
@@ -852,7 +908,6 @@ public class CompiledFiletypeFilter {
             }
         },
         JP2("(jp2|j2k|jpf|jpg2|jpx|jpm|mj2|mjp2)"),
-        JPEG("(jpe|jpeg|jfif)"),
         AVIF,
         GIF {
             private final Pattern pattern = Pattern.compile("(?i)image/gif");
@@ -873,9 +928,15 @@ public class CompiledFiletypeFilter {
                 return pattern.matcher(mimeType).find();
             }
         },
-        BMP,
-        TIF,
-        TIFF {
+        BMP {
+            private final Pattern pattern = Pattern.compile("(?i)image/(bmp|x-bmp)");
+
+            @Override
+            public boolean matchesMimeType(String mimeType) {
+                return pattern.matcher(mimeType).find();
+            }
+        },
+        TIFF("tiff?") {
             private final Pattern pattern = Pattern.compile("(?i)image/tiff");
 
             @Override
@@ -884,7 +945,14 @@ public class CompiledFiletypeFilter {
             }
         },
         RAW,
-        SVG,
+        SVG {
+            private final Pattern pattern = Pattern.compile("(?i)image/svg\\+xml");
+
+            @Override
+            public boolean matchesMimeType(String mimeType) {
+                return pattern.matcher(mimeType).find();
+            }
+        },
         ICO,
         CUR,
         WEBP {
@@ -896,6 +964,7 @@ public class CompiledFiletypeFilter {
             }
         },
         MVIEW;
+
         private final Pattern  pattern;
         private static Pattern allPattern;
 
@@ -917,6 +986,10 @@ public class CompiledFiletypeFilter {
 
         public ExtensionsFilterInterface getSource() {
             return this;
+        }
+
+        public boolean isValidExtension(String extension) {
+            return CompiledFiletypeFilter.isValidExtension(extension, this);
         }
 
         public Pattern compiledAllPattern() {

@@ -48,7 +48,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgurComHoster;
 
 /*Only accept single-imag URLs with an LID-length or either 5 OR 7 - everything else are invalid links or thumbnails*/
-@DecrypterPlugin(revision = "$Revision: 48642 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgurComGallery extends PluginForDecrypt {
     public ImgurComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -726,7 +726,6 @@ public class ImgurComGallery extends PluginForDecrypt {
             title = HTMLEntities.unhtmlAngleBrackets(title);
             title = HTMLEntities.unhtmlSingleQuotes(title);
             title = HTMLEntities.unhtmlDoubleQuotes(title);
-            title = encodeUnicode(title);
         }
         final String dateFormatted;
         if (!StringUtils.isEmpty(dateStr)) {

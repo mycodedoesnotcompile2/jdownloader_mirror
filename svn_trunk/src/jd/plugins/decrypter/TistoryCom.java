@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 47007 $", interfaceVersion = 3, names = { "tistory.com" }, urls = { "https?://[a-z0-9]+\\.tistory\\.com/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49137 $", interfaceVersion = 3, names = { "tistory.com" }, urls = { "https?://[a-z0-9]+\\.tistory\\.com/\\d+" })
 public class TistoryCom extends PluginForDecrypt {
     public TistoryCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,7 +53,7 @@ public class TistoryCom extends PluginForDecrypt {
         }
         for (final String singleLink : links) {
             final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(singleLink));
-            dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.JPEG);
+            dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.JPG);
             dl.setAvailable(true);
             ret.add(dl);
         }

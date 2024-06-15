@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49103 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49127 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2923,7 +2923,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     protected boolean containsPlainTextCaptcha(final String correctBR) {
-        return correctBR != null && StringUtils.containsIgnoreCase(correctBR, ";background:#ccc;text-align");
+        return StringUtils.containsIgnoreCase(correctBR, ";background:#ccc;text-align");
     }
 
     /** Tries to find 1st download Form for free(and Free-Account) download. */

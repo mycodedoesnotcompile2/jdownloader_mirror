@@ -82,7 +82,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.raf.HTTPDownloader;
 
-@HostPlugin(revision = "$Revision: 49096 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49136 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -838,7 +838,11 @@ public class GoogleDrive extends PluginForHost {
                 driveViewerURL = PluginJSonUtils.unescape(driveViewerURL);
                 /*
                  * 2024-06-11: Typically ends with "=s<number>" while in browser it ends with user's screen resolution e.g.: "=w1720-h1264".
+                 *
+                 * remove those as they may cause different image format/resolution
                  */
+                driveViewerURL = driveViewerURL.replaceFirst("=s\\d+[^&\\?]+$", "");
+                driveViewerURL = driveViewerURL.replaceFirst("=w\\d+-h\\d+[^&\\?]+$", "");
                 link.setProperty(PROPERTY_DIRECTURL_DRIVE_VIEWER, driveViewerURL);
             } else {
                 logger.warning("Failed to generate valid driveViewerURL");
@@ -1351,6 +1355,12 @@ public class GoogleDrive extends PluginForHost {
                 /*
                  * The file we are about to download might not be the original anymore -> Delete hash to prevent hashcheck from failing!
                  */
+                final long fileSize = link.getVerifiedFileSize();
+                if (fileSize != -1) {
+                    // filesize might be from original but download can be different file
+                    link.setVerifiedFileSize(-1);
+                    link.setDownloadSize(fileSize);
+                }
                 link.setHashInfo(null);
             }
             if (directurl == null) {

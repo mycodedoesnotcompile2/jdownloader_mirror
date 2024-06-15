@@ -20,6 +20,7 @@ import java.util.List;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
 import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
@@ -39,7 +40,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 48941 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49125 $", interfaceVersion = 2, names = {}, urls = {})
 public class MultiupOrgCrawler extends antiDDoSForDecrypt {
     // DEV NOTES:
     // DO NOT REMOVE COMPONENTS YOU DONT UNDERSTAND! When in doubt ask raztoki to fix.
@@ -124,7 +125,7 @@ public class MultiupOrgCrawler extends antiDDoSForDecrypt {
         } else if (br.containsHTML("The file does not exist any more\\.<|<h1>\\s*The server returned a \"404 Not Found\"\\.</h2>|<h1>\\s*Oops! An Error Occurred\\s*</h1>|>\\s*File not found|>\\s*No link currently available")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (br.containsHTML("cloudflare\\.com/turnstile/")) {
+        if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
             /* https://svn.jdownloader.org/issues/90281 */
             throw new DecrypterRetryException(RetryReason.BLOCKED_BY, "Cloudflare Turnstile captcha is not supported");
         } else if (AbstractHCaptcha.containsHCaptcha(br)) {
