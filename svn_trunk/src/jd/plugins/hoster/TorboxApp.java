@@ -25,6 +25,7 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -47,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49124 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49146 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -131,7 +132,12 @@ public class TorboxApp extends PluginForHost {
         } else {
             mhm.runCheck(account, link);
             logger.info("Creating or finding internal file_id");
-            final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", "link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+            final UrlQuery query = new UrlQuery();
+            query.add("link", Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+            if (!StringUtils.isEmpty(link.getDownloadPassword())) {
+                query.add("password", Encoding.urlEncode(link.getDownloadPassword()));
+            }
+            final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", query);
             final Map<String, Object> entries = (Map<String, Object>) this.callAPI(req_createwebdownload, account, link);
             /**
              * These two strings can be used to identify the unique item/link we just added. </br>
@@ -271,6 +277,7 @@ public class TorboxApp extends PluginForHost {
                     }
                     logger.info("Displaying notification with ID: " + notification.get("id"));
                     displayBubbleNotification(notification.get("title").toString(), notification.get("message").toString());
+                    counterDisplayed++;
                     if (timestampNotificationsDisplayed == 0 && counterDisplayed >= 5) {
                         logger.info("First time we are displaying notifications for this account. Let's not spam the user with all past notifications he has.");
                         break;
@@ -287,6 +294,15 @@ public class TorboxApp extends PluginForHost {
             } finally {
                 /* Save this timestamp so we are able to know to which time we've already displayed notifications. */
                 account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, highestNotificationTimestamp);
+                try {
+                    /* Clear all notifications ("mark as read") */
+                    final Request req_clear_all_notifications = br.createGetRequest(API_BASE + "/notifications/clear");
+                    this.callAPI(req_clear_all_notifications, account, null);
+                    // final Object req_clear_allnotofications_answer = this.callAPI(req_clear_all_notifications, account, null);
+                } catch (final Exception e) {
+                    logger.log(e);
+                    logger.info("Clearing notifications API request failed");
+                }
             }
         }
         return ai;

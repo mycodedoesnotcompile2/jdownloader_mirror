@@ -37,6 +37,7 @@ public abstract class AbstractLinkStorable extends AbstractNodeStorable implemen
 
     private String   host        = null;
     private long     packageUUID = -1;
+    private long jobUUID=-1;
 
     private String url = null;
 
@@ -63,5 +64,13 @@ public abstract class AbstractLinkStorable extends AbstractNodeStorable implemen
     public void setUrl(final String url) {
         this.url = url;
     }
+
+	public long getJobUUID() {
+		return jobUUID;
+	}
+
+	public void setJobUUID(long jobUUID) {
+		this.jobUUID = jobUUID;
+	}
 
 }

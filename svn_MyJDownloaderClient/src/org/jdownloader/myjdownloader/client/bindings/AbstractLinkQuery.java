@@ -38,8 +38,18 @@ public abstract class AbstractLinkQuery extends AbstractQuery {
     private boolean password = false;
     
     private boolean host     = false;
+    
+    private boolean  isJobUUID=false;
 
-    private long[]  jobUUIDs;
+    public boolean isJobUUID() {
+		return isJobUUID;
+	}
+
+	public void setJobUUID(boolean isJobUUID) {
+		this.isJobUUID = isJobUUID;
+	}
+
+	private long[]  jobUUIDs;
     
     public long[] getJobUUIDs() {
         return this.jobUUIDs;

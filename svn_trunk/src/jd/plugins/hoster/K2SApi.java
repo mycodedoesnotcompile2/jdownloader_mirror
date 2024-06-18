@@ -66,7 +66,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 48859 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49143 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -227,7 +227,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 48859 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 49143 $"));
     }
 
     /**
@@ -536,6 +536,14 @@ public abstract class K2SApi extends PluginForHost {
             // premium = restricted to premium
             // private = owner only..
             link.setProperty(PROPERTY_ACCESS, access);
+        }
+        /* Set additional properties for packagizer usage */
+        final Map<String, Object> video_info = (Map<String, Object>) fileInfo.get("video_info");
+        if (video_info != null) {
+            link.setProperty("video_duration", video_info.get("duration"));
+            link.setProperty("video_width", video_info.get("width"));
+            link.setProperty("video_height", video_info.get("height"));
+            link.setProperty("video_format", video_info.get("format"));
         }
     }
 
@@ -1760,8 +1768,9 @@ public abstract class K2SApi extends PluginForHost {
         final String fileID = getFUID(link);
         this.setWeakFilename(link);
         postdataGetfilestatus.put("id", getFUID(link));
-        postdataGetfilestatus.put("limit", 1);
-        postdataGetfilestatus.put("offset", 0);
+        /* 2024-06-17: Do not send any other parameters otherwise the field "video_info" might be missing. */
+        // postdataGetfilestatus.put("limit", 1);
+        // postdataGetfilestatus.put("offset", 0);
         try {
             final Map<String, Object> response = this.postPageRaw(br, "/getfilestatus", postdataGetfilestatus, null);
             K2SApi.parseFileInfo(link, response, fileID);

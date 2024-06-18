@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.jdownloader.myjdownloader.client.bindings.downloadlist;
 
+import java.util.Map;
+
 import org.jdownloader.myjdownloader.client.bindings.AbstractLinkStorable;
 
 public class DownloadLinkStorable extends AbstractLinkStorable {
@@ -66,8 +68,17 @@ public class DownloadLinkStorable extends AbstractLinkStorable {
     private boolean finished         = false;
     private boolean running          = false;
     private String  status           = null;
+    private Map<String,Object> advancedStatus=null;
 
-    public String getStatus() {
+    public Map<String, Object> getAdvancedStatus() {
+		return advancedStatus;
+	}
+
+	public void setAdvancedStatus(Map<String, Object> advancedStatus) {
+		this.advancedStatus = advancedStatus;
+	}
+
+	public String getStatus() {
         return this.status;
     }
 

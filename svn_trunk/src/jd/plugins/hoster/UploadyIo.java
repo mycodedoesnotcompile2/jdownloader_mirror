@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48958 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49141 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -171,7 +171,8 @@ public class UploadyIo extends XFileSharingProBasic {
             this.checkErrorsLastResort(br, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final boolean handleCaptchaDuringWait = true;
+        /* 2024-06-17: Disabled for now as the captcha is now happening after the wait time (also hCaptcha instead of reCaptchaV2). */
+        final boolean handleCaptchaDuringWait = false;
         final Browser br3 = br.cloneBrowser();
         /* Wait time is counting serverside now */
         getPage(br3, br._getURL().getPath() + "?start_countdown=1");
