@@ -66,7 +66,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 49143 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49159 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -227,7 +227,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 49143 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 49159 $"));
     }
 
     /**
@@ -423,7 +423,7 @@ public abstract class K2SApi extends PluginForHost {
                     try {
                         final HashMap<String, Object> postdata = new HashMap<String, Object>();
                         postdata.put("ids", fileIDs);
-                        // postdata.put("extended_info", true);
+                        postdata.put("extended_info", true);
                         /* Docs to used API call: https://keep2share.github.io/api/#resources:/getFilesInfo:post */
                         final Map<String, Object> entries = postPageRaw(br, "/getfilesinfo", postdata, null);
                         final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
@@ -537,8 +537,14 @@ public abstract class K2SApi extends PluginForHost {
             // private = owner only..
             link.setProperty(PROPERTY_ACCESS, access);
         }
-        /* Set additional properties for packagizer usage */
-        final Map<String, Object> video_info = (Map<String, Object>) fileInfo.get("video_info");
+        /* Set additional properties for Packagizer usage */
+        final Map<String, Object> video_info;
+        final Map<String, Object> extended_info = (Map<String, Object>) fileInfo.get("extended_info");
+        if (extended_info != null) {
+            video_info = (Map<String, Object>) extended_info.get("video_info");
+        } else {
+            video_info = (Map<String, Object>) fileInfo.get("video_info");
+        }
         if (video_info != null) {
             link.setProperty("video_duration", video_info.get("duration"));
             link.setProperty("video_width", video_info.get("width"));
@@ -1784,6 +1790,11 @@ public abstract class K2SApi extends PluginForHost {
         } catch (final PluginException e) {
             if (br.getHttpConnection().getResponseCode() == 400) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid fileID");
+            } else if (br.getHttpConnection().getResponseCode() == 403) {
+                /* Private file - we know that it is online but we can't obtain any file information. */
+                /* {"message":"You are not authorized for this action","status":"error","code":403,"errorCode":10} */
+                link.setProperty(PROPERTY_ACCESS, "private");
+                return AvailableStatus.TRUE;
             } else {
                 throw e;
             }

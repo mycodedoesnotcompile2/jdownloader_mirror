@@ -30,7 +30,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46961 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49151 $", interfaceVersion = 3, names = {}, urls = {})
 public class TheyarehugeCom extends KernelVideoSharingComV2 {
     public TheyarehugeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -99,7 +99,7 @@ public class TheyarehugeCom extends KernelVideoSharingComV2 {
                 this.getDownloadLink().setComment("SelectedQuality: 720p");
             }
             if (Encoding.isHtmlEntityCoded(officialDownloadurl)) {
-                officialDownloadurl = Encoding.htmlDecode(officialDownloadurl);
+                officialDownloadurl = Encoding.htmlOnlyDecode(officialDownloadurl);
             }
             return officialDownloadurl;
         } else {

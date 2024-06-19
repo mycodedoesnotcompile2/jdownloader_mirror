@@ -1,0 +1,27 @@
+{
+  "artefact":"org.brotli/dec",
+  "dependencies":null,
+  "filter":null,
+  "installed":{
+    "date":"2024-06-18T18:25:59.516+02:00",
+    "dependencies":[{
+      "groupId":"junit",
+      "artifactId":"junit",
+      "version":"4.12",
+      "scope":"test"
+    }],
+    "description":"Brotli is a generic-purpose lossless compression algorithm that compresses data using a combination of a modern variant of the LZ77 algorithm, Huffman coding and 2nd order context modeling, with a compression ratio comparable to the best currently available general-purpose compression methods. It is similar in speed with deflate but offers more dense compression.",
+    "hashes":{"brotli.jar":"615c0c3efef990d77831104475fba6a1f7971388691d4bad1471ad84101f6d52"},
+    "licenses":null,
+    "minJRE":"JVM_1_5",
+    "name":"${project.groupId}:${project.artifactId}",
+    "version":"0.1.2"
+  },
+  "minJRE":"1.6",
+  "provider":"maven",
+  "renames":{"dec.jar":"brotli.jar"},
+  "requiredBy":[],
+  "version":"/\\d+(\\.\\d+)?(\\.\\d+)?/",
+  "autoRenameEnabled":true,
+  "confirm":true
+}

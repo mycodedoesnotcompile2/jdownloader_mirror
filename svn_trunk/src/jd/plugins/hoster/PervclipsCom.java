@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46515 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49151 $", interfaceVersion = 3, names = {}, urls = {})
 public class PervclipsCom extends KernelVideoSharingComV2 {
     public PervclipsCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -79,7 +79,7 @@ public class PervclipsCom extends KernelVideoSharingComV2 {
         String officialDownloadurl = br.getRegex("\"(https?://[^\"]+\\.mp4\\?download=1[^\"]*)\"").getMatch(0);
         if (officialDownloadurl != null) {
             if (Encoding.isHtmlEntityCoded(officialDownloadurl)) {
-                officialDownloadurl = Encoding.htmlDecode(officialDownloadurl);
+                officialDownloadurl = Encoding.htmlOnlyDecode(officialDownloadurl);
             }
             return officialDownloadurl;
         } else {

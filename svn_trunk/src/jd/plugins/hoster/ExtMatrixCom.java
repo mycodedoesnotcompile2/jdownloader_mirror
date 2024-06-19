@@ -28,7 +28,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49084 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49149 $", interfaceVersion = 3, names = {}, urls = {})
 public class ExtMatrixCom extends FlexShareCore {
     public ExtMatrixCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,7 +114,7 @@ public class ExtMatrixCom extends FlexShareCore {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

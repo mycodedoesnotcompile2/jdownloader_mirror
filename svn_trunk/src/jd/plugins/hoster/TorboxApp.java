@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49146 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49148 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -306,6 +306,12 @@ public class TorboxApp extends PluginForHost {
             }
         }
         return ai;
+    }
+
+    @Override
+    protected void displayBubbleNotification(final String title, final String text) {
+        final DownloadLink link = getDownloadLink();
+        super.displayBubbleNotification("TorBox | " + title, text, link != null ? link.getDomainInfo().getIcon(32) : null);
     }
 
     private Map<String, Object> login(final Account account, final boolean validateLogins) throws IOException, PluginException, InterruptedException {

@@ -39,6 +39,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DropBoxComCrawler;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
@@ -55,10 +56,11 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.config.DropBoxConfig;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49161 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +69,7 @@ public class DropboxCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     public void correctDownloadLink(DownloadLink link) {
@@ -82,6 +84,13 @@ public class DropboxCom extends PluginForHost {
     public static Browser prepBrWebsite(final Browser br) {
         br.setCookie("dropbox.com", "locale", "en");
         br.setAllowedResponseCodes(new int[] { 429, 460, 509 });
+        final String customUserAgent = PluginJsonConfig.get(DropBoxConfig.class).getUserAgent();
+        if (!StringUtils.equalsIgnoreCase(customUserAgent, "JDDEFAULT")) {
+            /*
+             * 2024-06-18: For login to work, User-Agent must match User-Agent used in users' browser otherwise login-cookies can't be used.
+             */
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, customUserAgent);
+        }
         return br;
     }
 
@@ -197,7 +206,11 @@ public class DropboxCom extends PluginForHost {
                     link.setProperty(PROPERTY_DIRECTLINK, dllink);
                     link.setProperty(PROPERTY_IS_OFFICIALLY_DOWNLOADABLE, true);
                     if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
                     }
                     String filenameFromHeader = getFileNameFromHeader(con);
                     if (!StringUtils.isEmpty(filenameFromHeader)) {
@@ -340,17 +353,9 @@ public class DropboxCom extends PluginForHost {
     }
 
     public AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
-        if (!account.getUser().matches(".+@.+\\..+")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlease enter your e-mail address in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
-        br.setDebug(true);
         loginWebsite(account, true);
-        /* 2019-09-19: Treat all accounts as FREE accounts */
+        final AccountInfo ai = new AccountInfo();
+        /* 2019-09-19: Treat all accounts as FREE accounts / currently we don't have extra detection for premium accounts. */
         account.setType(AccountType.FREE);
         ai.setUnlimitedTraffic();
         return ai;
@@ -821,57 +826,46 @@ public class DropboxCom extends PluginForHost {
         synchronized (account) {
             setBrowserExclusive();
             br.setFollowRedirects(true);
+            prepBrWebsite(br);
             final Cookies userCookies = account.loadUserCookies();
             if (userCookies == null || userCookies.isEmpty()) {
                 showCookieLoginInfo();
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
-            if (userCookies != null) {
-                br.setCookies(userCookies);
-                if (!validateCookies) {
-                    /* Do not validate cookies. */
-                    return;
-                }
-                /* 2020-09-30: This will redirect to login page if cookies are invalid! */
-                br.getPage("https://www." + this.getHost() + "/account");
-                if (br.getURL().contains(br.getHost() + "/account")) {
-                    logger.info("User cookie login successful");
-                    return;
+            br.setCookies(userCookies);
+            final String propertyLastUsedUserAgent = "lastUsedUserAgent";
+            final String lastUsedUserAgent = account.getStringProperty(propertyLastUsedUserAgent);
+            String useragent = null;
+            if (userCookies.getUserAgent() != null) {
+                useragent = userCookies.getUserAgent();
+            } else if (lastUsedUserAgent != null) {
+                useragent = lastUsedUserAgent;
+            }
+            /* If user-agent value is null here, user-agent from config is used; we do not want to store this! */
+            if (useragent != null) {
+                /* Special User-Agent value present: Set it and save it on account for later usage. */
+                br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, useragent);
+                account.setProperty(propertyLastUsedUserAgent, useragent);
+            } else {
+                account.removeProperty(propertyLastUsedUserAgent);
+            }
+            if (!validateCookies) {
+                /* Do not validate cookies. */
+                return;
+            }
+            /* 2020-09-30: This will redirect to login page if cookies are invalid! */
+            br.getPage("https://www." + this.getHost() + "/account");
+            if (br.getURL().contains(br.getHost() + "/account")) {
+                logger.info("User cookie login successful");
+                return;
+            } else {
+                logger.info("User cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    logger.info("User cookie login failed");
-                    if (account.hasEverBeenValid()) {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                    } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
-            if (!true) {
-                // Old code
-                logger.info("Full login required");
-                br.getPage("https://www.dropbox.com/login");
-                String t = br.getRegex("type=\"hidden\" name=\"t\" value=\"([^<>\"]*?)\"").getMatch(0);
-                if (t == null) {
-                    t = this.br.getCookie("dropbox.com", "t");
-                }
-                if (t == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-                br.getHeaders().put("Accept", "text/plain, */*; q=0.01");
-                br.getHeaders().put("Accept-Language", "en-US;q=0.7,en;q=0.3");
-                br.postPage("/needs_captcha", "is_xhr=true&t=" + t + "&email=" + Encoding.urlEncode(account.getUser()));
-                br.postPage("/sso_state", "is_xhr=true&t=" + t + "&email=" + Encoding.urlEncode(account.getUser()));
-                String postdata = "is_xhr=true&t=" + t + "&cont=%2F&require_role=&signup_data=&third_party_auth_experiment=CONTROL&signup_tag=&login_email=" + Encoding.urlEncode(account.getUser()) + "&login_password=" + Encoding.urlEncode(account.getPass()) + "&remember_me=True";
-                postdata += "&login_sd=";
-                postdata += "";
-                br.postPage("/ajax_login", postdata);
-                if (!isLoggedInViaCookies(br) || !"OK".equals(PluginJSonUtils.getJsonValue(br, "status"))) {
-                    throw new AccountInvalidException();
-                }
-            }
-            /* This code should never be reached! */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
     }
 

@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46961 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49153 $", interfaceVersion = 3, names = {}, urls = {})
 public class VjavCom extends KernelVideoSharingComV2 {
     public VjavCom(final PluginWrapper wrapper) {
         super(wrapper);

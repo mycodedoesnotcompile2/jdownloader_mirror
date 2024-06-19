@@ -75,7 +75,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49070 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49153 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -641,6 +641,11 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 logger.info("Failed to find fuid in html");
             }
         }
+        if (br.containsHTML("\"iab_extended\"") && br.containsHTML("app\\.js")) {
+            /* 2024-06-18: New e.g. vjav.com, txxx.com, upornia.com, mrgay.com and many more */
+            logger.info("Auto detected the need to use API for linkcheck");
+            return this.requestFileInformationAPI(link, account, isDownload);
+        }
         final String title = getFileTitle(link);
         if (!StringUtils.isEmpty(title)) {
             link.setFinalFileName(title + extDefault);
@@ -656,6 +661,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             try {
                 dllink = getDllink(link, this.br);
             } catch (final PluginException e) {
+                // TODO: Check if this check is still required - the "video is private" status should be known before here already.
                 if (this.isPrivateVideo(link) && e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
                     logger.log(e);
                     logger.info("ERROR_FILE_NOT_FOUND in getDllink but we have a private video so it is not offline ...");
@@ -675,7 +681,6 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 // brc.getHeaders().put("Accept-Encoding", "identity");
                 con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(dllink));
                 if (this.looksLikeHLS(con)) {
-                    // TODO: Maybe add filesize estimation for HLS streams
                     logger.info("Got HLS stream instead of progressive video");
                     return AvailableStatus.TRUE;
                 }
@@ -1276,19 +1281,6 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
 
     /** Finds direct download link to [video stream] file. */
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
-        /*
-         * Newer KVS versions also support html5 --> RegEx for that as this is a reliable source for our final downloadurl.They can contain
-         * the old "video_url" as well but it will lead to 404 --> Prefer this way.
-         *
-         * E.g. wankoz.com, pervclips.com, pornicom.com
-         */
-        // final String pc3_vars = br.getRegex("pC3\\s*:\\s*'([^<>\"\\']+)'").getMatch(0);
-        // final String videoID = br.getRegex("video_id\\s*:\\s*(?:')?(\\d+)\\s*(?:')?").getMatch(0);
-        // if (pc3_vars != null && videoID != null) {
-        // /* 2019-11-26: TODO: Add support for this: Used by a lot of these hosts to hide their directurls */
-        // br.postPage("/sn4diyux.php", "param=" + videoID + "," + pc3_vars);
-        // String crypted_url = getDllinkCrypted(br);
-        // }
         String dllink = null;
         final String json_playlist_source = br.getRegex("sources\\s*?:\\s*?(\\[.*?\\])").getMatch(0);
         String httpurl_temp = null;
@@ -1346,10 +1338,6 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 foundQualities++;
             }
             logger.info("Found " + foundQualities + " crypted qualities 1");
-            /**
-             * TODO: Check if it is a good idea to only go into the wider attempt if no URLs with quality information have been found. </br>
-             * In this case, uncryptedUrlWithoutQualityIndicator is always null!
-             */
             if (qualityMap.isEmpty()) {
                 /* Wider attempt */
                 foundQualities = 0;
@@ -1514,12 +1502,8 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 /* Rare case */
                 logger.info("Failed to find any quality in stage 3");
             }
-            /*
-             * TODO: Find/Implement/prefer download of "official" downloadlinks e.g. xcafe.com - in this case, "get_file" URLs won't contain
-             * a quality identifier (??) at least not in the format "720p" and they will contain either "download=true" or "download=1".
-             */
         }
-        /* For most of all website, we should have found a result by now! */
+        /* For most of all websites, we should have found a result by now! */
         if (StringUtils.isEmpty(dllink)) {
             /* 2020-10-30: Older fallbacks */
             if (StringUtils.isEmpty(dllink)) {
@@ -1599,17 +1583,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                     }
                 }
             }
-            if (!br.containsHTML("license_code:") && !br.containsHTML("kt_player_[0-9\\.]+\\.swfx?")) {
-                /* No licence key present in html and/or no player --> No video --> Offline */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        // dllink = Encoding.htmlDecode(dllink); - Why?
-        dllink = Encoding.urlDecode(dllink, true);
-        if (dllink.contains("&amp;")) {
-            dllink = Encoding.htmlOnlyDecode(dllink);
-        }
+        dllink = Encoding.htmlOnlyDecode(dllink);
         return dllink;
     }
 
@@ -1647,7 +1623,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                  * offline-indicator.
                  */
                 if (decryptedVideoURL.startsWith("/")) {
-                    /* Add dummy-host because relative URLs would throw exception. */
+                    /* Add dummy-host because relative URLs would lead to Exception. */
                     new URL("https://example.com" + decryptedVideoURL);
                 } else {
                     new URL(decryptedVideoURL);
