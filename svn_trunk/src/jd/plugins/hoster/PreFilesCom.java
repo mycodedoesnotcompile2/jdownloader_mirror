@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@HostPlugin(revision = "$Revision: 46020 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49164 $", interfaceVersion = 3, names = {}, urls = {})
 public class PreFilesCom extends XFileSharingProBasic {
     public PreFilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -178,6 +178,18 @@ public class PreFilesCom extends XFileSharingProBasic {
                     throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, null, waittime);
                 }
             }
+        }
+    }
+
+    @Override
+    public boolean isPremiumOnly(final Browser br) {
+        if (br == null) {
+            return false;
+        }
+        if (br.containsHTML(">\\s*The file owner does not allow FREE")) {
+            return true;
+        } else {
+            return super.isPremiumOnly(br);
         }
     }
 

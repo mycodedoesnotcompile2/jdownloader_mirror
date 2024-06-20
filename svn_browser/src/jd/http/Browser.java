@@ -640,7 +640,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     * 
+     *
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -1157,10 +1157,19 @@ public class Browser {
             }
             return request.getHTMLSource();
         } else {
-            if (ignoreResponseCode) {
-                request.getHttpConnection().setAllResponseCodesAllowed(true);
+            final URLConnectionAdapter httpConnection = request.getHttpConnection();
+            if (httpConnection == null || !httpConnection.isConnected()) {
+                final LogInterface logger = this.getLogger();
+                if (logger != null) {
+                    logger.warning("Request has already been read");
+                }
+                return request.toString();
+            } else {
+                if (ignoreResponseCode) {
+                    httpConnection.setAllResponseCodesAllowed(true);
+                }
+                return this.loadConnection(httpConnection).getHTMLSource();
             }
-            return this.loadConnection(request.getHttpConnection()).getHTMLSource();
         }
     }
 
@@ -3091,8 +3100,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                             */
+                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                 */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {

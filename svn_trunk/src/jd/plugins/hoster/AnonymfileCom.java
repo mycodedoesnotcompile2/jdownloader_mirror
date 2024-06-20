@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47712 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49164 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonymfileCom extends PluginForHost {
     public AnonymfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -163,7 +163,7 @@ public class AnonymfileCom extends PluginForHost {
                 }
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }

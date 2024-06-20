@@ -1015,20 +1015,20 @@ public abstract class Request {
         if (!this.isRequested()) {
             return "Request not sent yet";
         }
-        final StringBuilder sb = new StringBuilder();
         try {
             final URLConnectionAdapter lhttpConnection = this.getHttpConnection();
             if (lhttpConnection != null) {
+                final StringBuilder sb = new StringBuilder();
                 sb.append(lhttpConnection.toString());
                 sb.append("\r\n");
                 this.getHtmlCode();
                 sb.append(this.getHTMLSource());
+                return sb.toString();
             } else {
                 return this.getHTMLSource();
             }
         } catch (final Exception e) {
             return "NOTEXT: " + e.getMessage();
         }
-        return sb.toString();
     }
 }

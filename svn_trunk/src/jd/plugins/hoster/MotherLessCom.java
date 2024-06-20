@@ -21,6 +21,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -44,13 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.MotherLessComCrawler;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49164 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MotherLessComCrawler.class })
 public class MotherLessCom extends PluginForHost {
     public static final String  text_subscribeFailed        = "Failed to subscribe to the owner of the video";
@@ -580,7 +579,6 @@ public class MotherLessCom extends PluginForHost {
             }
             prepHeadersDownload(link, br);
             if (!attemptStoredDownloadurlDownload(link, account)) {
-                br.followConnection(true);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken file(?)");
             }
             if (link.getFinalFileName() == null) {

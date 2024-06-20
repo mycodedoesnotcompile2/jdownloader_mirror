@@ -184,6 +184,9 @@ public abstract class ExtTextAreaColumn<E> extends ExtColumn<E> implements Actio
             // under substance, setting setText(null) somehow sets the label
             // opaque.
             str = "";
+        } else {
+            // JLabel doesn't render
+            str = str.replaceAll("\t", "    ");
         }
         this.renderer.setText(str);
         this.renderer.setIcon(this.getIcon(value));
@@ -201,7 +204,7 @@ public abstract class ExtTextAreaColumn<E> extends ExtColumn<E> implements Actio
         if (!e.isTemporary() || e.getOppositeComponent() == null) {
             /*
              * we check for temporary , because a rightclick menu will cause focus lost but editing should not stop
-             *
+             * 
              * we also check for oppositeComponent to stopEditing when we click outside the window
              */
             setNoSet(true);
@@ -228,7 +231,7 @@ public abstract class ExtTextAreaColumn<E> extends ExtColumn<E> implements Actio
 
     /*
      * @param value
-     *
+     * 
      * @return
      */
     protected Icon getIcon(final E value) {
