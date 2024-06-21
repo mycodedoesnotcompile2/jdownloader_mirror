@@ -22,13 +22,14 @@ import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigRule34videoCom;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49171 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +78,15 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
             link.setProperty(PROPERTY_FUID, fuid);
         }
         return status;
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 
     @Override

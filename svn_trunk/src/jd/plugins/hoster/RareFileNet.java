@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49171 $", interfaceVersion = 3, names = {}, urls = {})
 public class RareFileNet extends XFileSharingProBasic {
     public RareFileNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -138,7 +138,9 @@ public class RareFileNet extends XFileSharingProBasic {
 
     @Override
     protected boolean isOffline(final DownloadLink link, final Browser br) {
-        if (br.containsHTML(">\\s*This server has crashed but we are still working for this server|>\\s*No such file with this filename")) {
+        if (br.containsHTML(">\\s*This server has crashed but we are still working for this server")) {
+            return true;
+        } else if (br.containsHTML(">\\s*No such file with this filename")) {
             return true;
         } else {
             return super.isOffline(link, br);
