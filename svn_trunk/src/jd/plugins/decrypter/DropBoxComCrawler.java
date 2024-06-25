@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 48918 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 49175 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -323,7 +323,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             if (StringUtils.isEmpty(rlkey)) {
                 rlkey = UrlQuery.parse(param.getCryptedUrl()).get("rlkey");
             }
-            final Regex urlinfoTypeC = new Regex(contentURL, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/]+)");
+            final Regex urlinfoTypeC = new Regex(contentURL, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/\\?]+).*");
             if (urlinfoTypeC.patternFind()) {
                 if (StringUtils.isEmpty(link_type)) {
                     link_type = "c";
@@ -337,7 +337,7 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             } else {
                 /* Typically dropbox.com/sh/bla/bla(?params...)? */
                 link_type = "s";
-                final Regex urlinfo = new Regex(contentURL, "https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
+                final Regex urlinfo = new Regex(contentURL, "(?i)https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
                 if (StringUtils.isEmpty(link_key)) {
                     link_key = urlinfo.getMatch(1);
                 }
@@ -436,6 +436,13 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                     /* Do some one time checks/assignments. */
                     if (currentRootFolderName == null) {
                         currentRootFolderName = (String) JavaScriptEngineFactory.walkJson(response, "folder/filename");
+                        if (currentRootFolderName == null) {
+                            /* 2024-06-24 */
+                            try {
+                                currentRootFolderName = JavaScriptEngineFactory.walkJson(response, "shared_link_infos/{0}/displayName").toString();
+                            } catch (final Throwable e) {
+                            }
+                        }
                     }
                     if (StringUtils.isEmpty(subFolderPath) && !StringUtils.isEmpty(currentRootFolderName)) {
                         subFolderPath = currentRootFolderName;

@@ -49,7 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49144 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49176 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -259,6 +259,18 @@ public class SendCm extends XFileSharingProBasic {
             fileInfo[1] = betterFilesize;
         }
         return fileInfo;
+    }
+
+    @Override
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account, checkAll);
+        if (br.containsHTML(">\\s*Not allowed")) {
+            /*
+             * 2024-06-24: Not sure what this means. Possibly this happens for premium-only files. In this case, website does not provide
+             * any information on filename/size.
+             */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Website error 'Not allowed'");
+        }
     }
 
     @Override

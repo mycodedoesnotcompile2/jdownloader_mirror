@@ -60,7 +60,7 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
 
     public ExtFileSizeColumn(final String name, final ExtTableModel<E> table) {
         super(name, table);
-        this.formatter = new DecimalFormat("0.00") {
+        this.formatter = new DecimalFormat() {
             /**
                     *
                     */
@@ -89,11 +89,11 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
 
     @Override
     public void configureEditorComponent(final E value, final boolean isSelected, final int row, final int column) {
-	}
+    }
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.swing.exttable.columns.ExtTextColumn#getStringValue(java.lang.Object)
      */
     @Override
@@ -173,7 +173,7 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
     // final - not implemented
     @Override
     public final void resetEditor() {
-	}
+    }
 
     @Override
     public void resetRenderer() {

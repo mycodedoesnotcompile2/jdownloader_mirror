@@ -58,7 +58,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 49165 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49175 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -639,7 +639,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         final Map<String, Object> imagePost = (Map<String, Object>) media.get("imagePost");
         final Map<String, Object> music = (Map<String, Object>) media.get("music");
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String username = authormap.get("nickname").toString();
+        final String username = authormap.get("uniqueId").toString();
         final String videoID = (String) media.get("id");
         final String createTimeStr = (String) media.get("createTime");
         final String description = (String) media.get("desc");
