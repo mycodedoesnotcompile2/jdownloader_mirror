@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2016  JD-Team support@jdownloader.org
+//Copyright (C) 2013  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -18,33 +18,33 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.YetiShareCore;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49186 $", interfaceVersion = 2, names = {}, urls = {})
-public class IwaraZip extends YetiShareCore {
-    public IwaraZip(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 49193 $", interfaceVersion = 3, names = {}, urls = {})
+public class TengbVn extends XFileSharingProBasic {
+    public TengbVn(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(getPurchasePremiumURL());
+        this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
-     * DEV NOTES YetiShare<br />
-     ****************************
+     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null solvemedia reCaptchaV2, hcaptcha<br />
-     * other: <br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
+     * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "iwara.zip" });
+        ret.add(new String[] { "10gb.vn" });
         return ret;
     }
 
@@ -58,41 +58,45 @@ public class IwaraZip extends YetiShareCore {
     }
 
     public static String[] getAnnotationUrls() {
-        return YetiShareCore.buildAnnotationUrls(getPluginDomains());
+        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return true;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
             return true;
-        }
-    }
-
-    public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
-            /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
-            /* Premium account */
-            return 0;
-        } else {
-            /* Free(anonymous) and unknown account type */
-            return 1;
         }
     }
 
     @Override
-    public int getMaxSimultanFreeDownloadNum() {
+    public int getMaxChunks(final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return 0;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return 0;
+        }
+    }
+
+    @Override
+    public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
     }
 
+    @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
         return -1;
     }
@@ -100,5 +104,15 @@ public class IwaraZip extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilesize = new Regex(html, "class=\"text-danger\"[^>]*>https?://[^<]*</span>\\s*\\((\\d+[^<]+)\\)</font>").getMatch(0);
+        if (betterFilesize != null) {
+            fileInfo[1] = betterFilesize;
+        }
+        return fileInfo;
     }
 }

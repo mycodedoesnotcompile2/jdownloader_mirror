@@ -26,10 +26,11 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -48,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49176 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49186 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -241,7 +242,8 @@ public class TorboxApp extends PluginForHost {
         } else {
             subscribedStr = "No";
         }
-        ai.setStatus(account.getType().getLabel() + " | Subscribed: " + subscribedStr + " | Dl so far: " + SizeFormatter.formatBytes(((Number) user.get("total_bytes_downloaded")).longValue()));
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        ai.setStatus(account.getType().getLabel() + " | Subscribed: " + subscribedStr + " | Dl so far: " + SIZEUNIT.formatValue(maxSizeUnit, ((Number) user.get("total_bytes_downloaded")).longValue()));
         /* Obtain list of supported hosts */
         final Request req_hosters = br.createGetRequest(API_BASE + "/webdl/hosters");
         final List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) this.callAPI(req_hosters, account, null);

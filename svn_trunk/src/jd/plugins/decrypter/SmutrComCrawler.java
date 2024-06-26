@@ -27,7 +27,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 48013 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49186 $", interfaceVersion = 2, names = {}, urls = {})
 public class SmutrComCrawler extends PornEmbedParser {
     public SmutrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,6 +84,8 @@ public class SmutrComCrawler extends PornEmbedParser {
     protected boolean isOffline(final Browser br) {
         final String offlineTrait = "/404.php";
         if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML(">\\s*This video has been removed")) {
             return true;
         } else if (br.getURL().contains(offlineTrait) || br.getRedirectLocation() != null && br.getRedirectLocation().contains(offlineTrait)) {
             return true;

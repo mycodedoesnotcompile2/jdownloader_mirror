@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.simplejson.JSonUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.gui.translate._GUI;
@@ -60,7 +59,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48526 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49190 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -228,7 +227,7 @@ public class OffCloudCom extends UseNet {
                     dllink = "https://offcloud.com/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
                 } else {
                     link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
-                    this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + JSonUtils.escape(this.currDownloadLink.getDownloadURL()));
+                    this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + Encoding.urlEncode(this.currDownloadLink.getDownloadURL()));
                     requestID = PluginJSonUtils.getJsonValue(br, "requestId");
                     if (requestID == null) {
                         /* Should never happen */
