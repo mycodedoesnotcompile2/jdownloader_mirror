@@ -31,26 +31,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Files;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
-import org.jdownloader.auth.AuthenticationController;
-import org.jdownloader.auth.AuthenticationInfo;
-import org.jdownloader.auth.AuthenticationInfo.Type;
-import org.jdownloader.auth.Login;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.PluginClassLoader;
-import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -92,10 +72,30 @@ import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.HTTPDownloader;
 import jd.utils.locale.JDL;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Files;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
+import org.jdownloader.auth.AuthenticationController;
+import org.jdownloader.auth.AuthenticationInfo;
+import org.jdownloader.auth.AuthenticationInfo.Type;
+import org.jdownloader.auth.Login;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.PluginClassLoader;
+import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
 /**
  * TODO: remove after next big update of core to use the public static methods!
  */
-@HostPlugin(revision = "$Revision: 49189 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
+@HostPlugin(revision = "$Revision: 49197 $", interfaceVersion = 2, names = { "DirectHTTP", "http links" }, urls = { "directhttp://.+",
         "https?(viajd)?://[^/]+/.*\\.((jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|bin|ape|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nsf|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}$)(\\.\\d{1,4})?(?=\\?|$|#|\"|\r|\n|;))" })
 public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVerifier {
     public static final String  ENDINGS                                      = "\\.(jdeatme|3gp|7zip|7z|abr|ac3|ace|aiff|aifc|aif|ai|au|avi|avif|appimage|apk|azw3|azw|adf|asc|ape|bin|ass|bmp|bat|bz2|cbr|csv|cab|cbz|ccf|chm|cr2|cso|cue|cpio|cvd|c\\d{2,4}|chd|dta|deb|diz|divx|djvu|dlc|dmg|dms|doc|docx|dot|dx2|eps|epub|exe|ff|flv|flac|f4v|gsd|gif|gpg|gz|hqx|iwd|idx|iso|ipa|ipsw|java|jar|jpe?g|jp2|load|lha|lzh|m2ts|m4v|m4a|md5|midi?|mkv|mp2|mo3|mp3|mp4|mobi|mov|movie|mpeg|mpe|mpg|mpq|msi|msu|msp|mv|mws|nfo|npk|nfs|oga|ogg|ogm|ogv|otrkey|par2|pak|pkg|png|pdf|pptx?|ppsx?|ppz|pdb|pot|psd|ps|qt|rmvb|rm|rar|ra|rev|rnd|rpm|run|rsdf|reg|rtf|shnf|sh(?!tml)|ssa|smi|sig|sub|srt|snd|sfv|sfx|swf|swc|sid|sit|tar\\.(gz|bz2|xz)|tar|tgz|tiff?|ts|txt|viv|vivo|vob|vtt|webm|webp|wav|wad|wmv|wma|wpt|xla|xls|xpi|xtm|zeno|zip|[r-z]\\d{2}|_?[_a-z]{2}|\\d{1,4}(?=\\?|$|#|\"|\r|\n|;))";
@@ -376,6 +376,16 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
                     return new HashResult(HashInfo.parse(ret.getFileHash()), ret.getFileHash());
                 }
             }
+
+            @Override
+            public Browser getContextBrowser() {
+                if (br != null) {
+                    return br.cloneBrowser();
+                } else {
+                    return super.getContextBrowser();
+                }
+            }
+
         };
     }
 
@@ -759,7 +769,7 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
         case 200:
             /*
              * for example HTTP/1.1 200 OK, Content-Disposition: inline; filename=error.html
-             *
+             * 
              * we retry without HEAD in order to get full html response
              */
             return RequestMethod.HEAD.equals(con.getRequest().getRequestMethod()) && Boolean.FALSE.equals(verifyDownloadableContent(null, con));
@@ -1169,14 +1179,18 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
                 }
             }
             /* if final filename already set, do not change */
-            if (downloadLink.getFinalFileName() == null) {
+            if (downloadLink.getFinalFileName() != null && Plugin.parseDispositionHeader(urlConnection) == null) {
+                final String oldFinalFilename = downloadLink.getFinalFileName();
+                final String newFinalFilename = correctOrApplyFileNameExtension(oldFinalFilename, urlConnection);
+                if (!StringUtils.equals(oldFinalFilename, newFinalFilename)) {
+                    logger.info("Updated finalFilenames' file extension | Old: " + oldFinalFilename + " | New: " + newFinalFilename);
+                    downloadLink.setFinalFileName(newFinalFilename);
+                }
+            } else if (downloadLink.getFinalFileName() == null) {
                 /* Restore filename from property */
                 boolean allowFileExtensionCorrection = true;
                 String fileName = downloadLink.getStringProperty(FIXNAME, null);
-                if (StringUtils.isNotEmpty(fileName)) {
-                    // trust given filename extension from FIXNAME
-                    allowFileExtensionCorrection = false;
-                } else {
+                if (StringUtils.isEmpty(fileName)) {
                     final DispositionHeader dispositionHeader = Plugin.parseDispositionHeader(urlConnection);
                     if (dispositionHeader != null && StringUtils.isNotEmpty(dispositionHeader.getFilename())) {
                         // trust given filename extension via Content-Disposition header
@@ -1195,6 +1209,7 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
                     if (StringUtils.isEmpty(fileName)) {
                         fileName = Plugin.extractFileNameFromURL(urlConnection.getRequest().getUrl());
                         if (StringUtils.isNotEmpty(fileName)) {
+                            // TODO: Check if this is still needed
                             if (StringUtils.equalsIgnoreCase("php", Files.getExtension(fileName)) || fileName.matches(IP.IP_PATTERN)) {
                                 fileName = null;
                             }
@@ -1205,16 +1220,12 @@ public class DirectHTTP extends antiDDoSForHost implements DownloadConnectionVer
                     }
                 }
                 if (StringUtils.isEmpty(fileName)) {
+                    /* Get any cached name */
                     fileName = downloadLink.getName();
                 }
                 if (fileName != null) {
-                    final String ext = getExtensionFromMimeType(urlConnection);
-                    if (ext != null) {
-                        if (fileName.indexOf(".") < 0) {
-                            fileName = fileName + "." + ext;
-                        } else if (allowFileExtensionCorrection) {
-                            fileName = correctOrApplyFileNameExtension(fileName, "." + ext);
-                        }
+                    if (allowFileExtensionCorrection) {
+                        fileName = correctOrApplyFileNameExtension(fileName, urlConnection);
                     }
                     downloadLink.setFinalFileName(fileName);
                     /* save filename in property so we can restore in reset case */
