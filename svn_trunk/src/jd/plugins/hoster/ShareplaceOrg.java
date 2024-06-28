@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 49060 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 public class ShareplaceOrg extends YetiShareCore {
     public ShareplaceOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -247,7 +247,7 @@ public class ShareplaceOrg extends YetiShareCore {
             }
         }
         /* Workaround für fehlerhaften Filename Header */
-        final String name = Plugin.getFileNameFromHeader(dl.getConnection());
+        final String name = Plugin.getFileNameFromConnection(dl.getConnection());
         if (name != null) {
             link.setFinalFileName(Encoding.deepHtmlDecode(name));
         }

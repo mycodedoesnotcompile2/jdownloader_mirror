@@ -23,6 +23,10 @@ import java.util.Locale;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -38,11 +42,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49027 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49202 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -299,7 +299,7 @@ public class SubyShareCom extends XFileSharingProBasic {
                 checkErrors(br, correctedBR, link, account, false);
                 /* Okay we finally have no idea what happened ... */
                 logger.warning("Failed to find download2 Form");
-                checkErrorsLastResort(br, account);
+                checkErrorsLastResort(br, link, account);
             }
             logger.info("Found download2 Form");
             /*
@@ -360,7 +360,7 @@ public class SubyShareCom extends XFileSharingProBasic {
                         logger.info("Throwing exceptionBeforeDownload2Submit");
                         throw exceptionBeforeDownload2Submit;
                     }
-                    checkErrorsLastResort(br, account);
+                    checkErrorsLastResort(br, link, account);
                 } else if (StringUtils.isEmpty(dllink) && download2 != null) {
                     invalidateLastChallengeResponse();
                     continue;

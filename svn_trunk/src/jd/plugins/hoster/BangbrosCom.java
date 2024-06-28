@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangbrosComCrawler;
 
-@HostPlugin(revision = "$Revision: 48229 $", interfaceVersion = 2, names = { "bangbrosold.com", "mygf.com" }, urls = { "bangbrosdecrypted://.+", "mygfdecrypted://.+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "bangbrosold.com", "mygf.com" }, urls = { "bangbrosdecrypted://.+", "mygfdecrypted://.+" })
 public class BangbrosCom extends PluginForHost {
     public BangbrosCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -176,7 +176,7 @@ public class BangbrosCom extends PluginForHost {
                 }
                 link.setVerifiedFileSize(con.getCompleteContentLength());
                 if (final_filename == null) {
-                    final String filenameFromHeader = getFileNameFromHeader(con);
+                    final String filenameFromHeader = getFileNameFromConnection(con);
                     if (filenameFromHeader != null) {
                         final_filename = Encoding.htmlDecode(filenameFromHeader);
                     }

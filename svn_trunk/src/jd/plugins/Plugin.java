@@ -413,18 +413,33 @@ public abstract class Plugin implements ActionListener {
     }
 
     /**
-     * Holt den Dateinamen aus einem Content-Disposition header. wird dieser nicht gefunden, wird der dateiname aus der url ermittelt
+     * Obtains filename from Content-Disposition header. If none is there, filename will be obtained from URL.
      *
      * @param urlConnection
-     * @return Filename aus dem header (content disposition) extrahiert
+     * @return Extracted filename.
      */
-    public static String getFileNameFromHeader(final URLConnectionAdapter urlConnection) {
-        final String fileName = getFileNameFromDispositionHeader(urlConnection);
-        if (StringUtils.isEmpty(fileName)) {
-            return Plugin.getFileNameFromURL(urlConnection.getURL());
-        } else {
-            return fileName;
+    public static String getFileNameFromConnection(final URLConnectionAdapter urlConnection) {
+        final String filenameFromDispositionHeader = getFileNameFromDispositionHeader(urlConnection);
+        if (!StringUtils.isEmpty(filenameFromDispositionHeader)) {
+            return filenameFromDispositionHeader;
         }
+        String filenameFromURL = Plugin.getFileNameFromURL(urlConnection.getURL());
+        if (filenameFromURL != null) {
+            /* Add file extension if none is there. Allow empty strings so in the worst case, this may only return something like ".jpg". */
+            if (!filenameFromURL.contains(".") && urlConnection.getContentType() != null) {
+                String extByMimetype = null;
+                // TODO: Obtain file extension via one-liner from another function
+                final List<CompiledFiletypeExtension> fileTypeExtensions = CompiledFiletypeFilter.getByMimeType(urlConnection.getContentType());
+                if (fileTypeExtensions != null && fileTypeExtensions.size() > 0) {
+                    extByMimetype = fileTypeExtensions.get(0).getExtensionFromMimeType(urlConnection.getContentType());
+                }
+                if (extByMimetype != null) {
+                    filenameFromURL = filenameFromURL + "." + extByMimetype;
+                }
+            }
+            return filenameFromURL;
+        }
+        return null;
     }
 
     public static String getFileNameFromURL(final URL url) {
@@ -444,6 +459,10 @@ public abstract class Plugin implements ActionListener {
         return getCorrectOrApplyFileNameExtension(name, extNew);
     }
 
+    public static String getCorrectOrApplyFileNameExtension(final String filenameOrg, String newExtension) {
+        return correctOrApplyFileNameExtension(filenameOrg, newExtension, false);
+    }
+
     /**
      * Corrects extension of given filename. Adds extension if it is missing. Returns null if given filename is null. </br>
      * Pass fileExtension with dot(s) to this! </br>
@@ -457,7 +476,7 @@ public abstract class Plugin implements ActionListener {
      *
      * @return Filename with new extension
      */
-    public static String getCorrectOrApplyFileNameExtension(final String filenameOrg, String newExtension) {
+    public static String correctOrApplyFileNameExtension(final String filenameOrg, String newExtension, final boolean force) {
         if (StringUtils.isEmpty(filenameOrg) || StringUtils.isEmpty(newExtension)) {
             return filenameOrg;
         }
@@ -485,6 +504,11 @@ public abstract class Plugin implements ActionListener {
         if (StringUtils.isEmpty(currentFileExtension)) {
             return filenameOrg;
         }
+        if (force) {
+            /* Replace extension without any further checks. */
+            final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
+            return filenameWithoutExtension + newExtension;
+        }
         final CompiledFiletypeExtension filetypeOld = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
         if (filetypeOld == null) {
             /* Unknown current/old filetype -> Do not touch given filename */
@@ -494,7 +518,7 @@ public abstract class Plugin implements ActionListener {
             /* Filename already contains valid/alternative target-extension e.g. webm/mp4 */
             return filenameOrg;
         }
-        if ((CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(filetypeOld)) && filetypeNew != null && filetypeNew.isSameExtensionGroup(filetypeOld)) {
+        if ((CompiledFiletypeFilter.VideoExtensions.MP4.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.ImageExtensions.JPG.isSameExtensionGroup(filetypeOld) || CompiledFiletypeFilter.AudioExtensions.MP3.isSameExtensionGroup(filetypeOld)) && filetypeNew.isSameExtensionGroup(filetypeOld)) {
             final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
             return filenameWithoutExtension + newExtension;
         }
@@ -502,16 +526,37 @@ public abstract class Plugin implements ActionListener {
     }
 
     /** Adds extension to given filename if given filename does not already end with new extension. */
-    public String applyFilenameExtension(final String filenameOrg, final String fileExtension) {
+    public String applyFilenameExtension(final String filenameOrg, String newExtension) {
         if (filenameOrg == null) {
             return null;
-        } else if (StringUtils.isEmpty(fileExtension) || !fileExtension.startsWith(".")) {
+        } else if (StringUtils.isEmpty(newExtension)) {
             return filenameOrg;
-        } else if (StringUtils.endsWithCaseInsensitive(filenameOrg, fileExtension)) {
+        }
+        if (!newExtension.startsWith(".")) {
+            newExtension = "." + newExtension;
+        }
+        if (StringUtils.endsWithCaseInsensitive(filenameOrg, newExtension)) {
             /* Filename already contains target-extension. */
             return filenameOrg;
+        } else if (!filenameOrg.contains(".")) {
+            /* Filename has no extension at all -> Apply extension */
+            return filenameOrg + newExtension;
+        }
+        final int lastIndex = filenameOrg.lastIndexOf(".");
+        final String currentFileExtension = lastIndex < filenameOrg.length() ? filenameOrg.substring(lastIndex) : null;
+        final CompiledFiletypeExtension filetypeOld = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
+        if (filetypeOld == null) {
+            /* We don't know the type of the current/old file extension -> No "smart handling" possible -> Apply new extension */
+            return filenameOrg + newExtension;
+        }
+        final CompiledFiletypeExtension filetypeNew = CompiledFiletypeFilter.getExtensionsFilterInterface(newExtension);
+        if (filetypeNew != null && filetypeNew.isSameExtensionGroup(filetypeOld)) {
+            /* Same filetype (e.g. old is image, new is image) -> Replace old extension with new extension e.g. .png to .jpg */
+            final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
+            return filenameWithoutExtension + newExtension;
         } else {
-            return filenameOrg + fileExtension;
+            /* Apply new extension */
+            return filenameOrg + newExtension;
         }
     }
 
@@ -1139,11 +1184,12 @@ public abstract class Plugin implements ActionListener {
      * Any plugin can try to display a BubbleNotification but upper handling may decide not to display it depending on user settings. </br>
      * Examples of Plugins using this functionality: RedditComCrawler, TwitterComCrawler, HighWayCore
      */
-    protected void displayBubbleNotification(final String title, final String text, final Icon icon) {
+    protected void displayBubbleNotification(String title, final String text, final Icon icon) {
+        final String finaltitle = title = getHost() + ": " + title;
         BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
-                return new BasicNotify(title, text, icon == null ? new AbstractIcon(IconKey.ICON_INFO, 32) : icon);
+                return new BasicNotify(finaltitle, text, icon == null ? new AbstractIcon(IconKey.ICON_INFO, 32) : icon);
             }
         });
     }

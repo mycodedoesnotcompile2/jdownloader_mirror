@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48354 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "hulkshare.com" }, urls = { "https?://(www\\.)?(hulksharedecrypted\\.com/playlistsong/\\d+|(((hulkshare\\.com|hu\\.lk)/dl/|hulksharedecrypted\\.com/)|old\\.hulkshare\\.com/dl/)[a-z0-9]{12})" })
 public class HulkShareCom extends PluginForHost {
     private String              BRBEFORE            = "";
     private static final String PASSWORDTEXT        = "(<br><b>Password:</b> <input|<br><b>Passwort:</b> <input)";
@@ -109,8 +109,12 @@ public class HulkShareCom extends PluginForHost {
         try {
             con = br.openGetConnection(link.getPluginPatternMatcher());
             if (this.looksLikeDownloadableContent(con)) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
-                link.setFinalFileName(getFileNameFromHeader(con));
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+                link.setFinalFileName(getFileNameFromConnection(con));
                 link.setProperty("freelink", con.getURL().toString());
                 return AvailableStatus.TRUE;
             } else {

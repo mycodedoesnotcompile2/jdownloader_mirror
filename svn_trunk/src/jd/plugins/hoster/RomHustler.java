@@ -41,7 +41,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.RomHustlerCrawler;
 
-@HostPlugin(revision = "$Revision: 48752 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { RomHustlerCrawler.class })
 public class RomHustler extends PluginForHost {
     public RomHustler(PluginWrapper wrapper) {
@@ -248,7 +248,7 @@ public class RomHustler extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        final String filename = getFileNameFromHeader(dl.getConnection());
+        final String filename = getFileNameFromConnection(dl.getConnection());
         if (filename != null) {
             link.setFinalFileName(Encoding.htmlDecode(filename).trim());
         }

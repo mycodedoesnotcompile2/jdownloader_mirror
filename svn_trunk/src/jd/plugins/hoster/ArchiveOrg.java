@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 49132 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,7 +164,7 @@ public class ArchiveOrg extends PluginForHost {
                 prepDownloadHeaders(br, link);
                 con = br.openGetConnection(getDirectURL(link, account));
                 connectionErrorhandling(con, link, account, null);
-                String filenameFromHeader = getFileNameFromHeader(con);
+                String filenameFromHeader = getFileNameFromConnection(con);
                 if (filenameFromHeader != null) {
                     filenameFromHeader = Encoding.htmlDecode(filenameFromHeader);
                     setFinalFilename(link, filenameFromHeader);

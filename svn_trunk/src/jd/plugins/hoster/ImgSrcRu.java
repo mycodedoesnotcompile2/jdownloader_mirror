@@ -41,7 +41,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.ImgSrcRuCrawler;
 
-@HostPlugin(revision = "$Revision: 48796 $", interfaceVersion = 2, names = { "imgsrc.ru" }, urls = { "https?://decryptedimgsrc\\.ru/[^/]+/\\d+\\.html(\\?pwd=[a-z0-9]{32})?" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "imgsrc.ru" }, urls = { "https?://decryptedimgsrc\\.ru/[^/]+/\\d+\\.html(\\?pwd=[a-z0-9]{32})?" })
 public class ImgSrcRu extends PluginForHost {
     private String                         dllink    = null;
     private static AtomicReference<String> userAgent = new AtomicReference<String>(null);
@@ -242,16 +242,16 @@ public class ImgSrcRu extends PluginForHost {
     }
 
     private void filenameHandling(final DownloadLink link, final URLConnectionAdapter con) {
-        String filenameFromHeader = getFileNameFromHeader(con);
-        if (filenameFromHeader == null) {
+        String filenameFromConnection = getFileNameFromConnection(con);
+        if (filenameFromConnection == null) {
             return;
         }
         final String fileid = this.getFID(link);
-        if (filenameFromHeader.contains(".")) {
+        if (filenameFromConnection.contains(".")) {
             /* Remove domain from header-filename. */
-            filenameFromHeader = filenameFromHeader.substring(filenameFromHeader.lastIndexOf("."));
+            filenameFromConnection = filenameFromConnection.substring(filenameFromConnection.lastIndexOf("."));
         }
-        link.setFinalFileName(fileid + filenameFromHeader);
+        link.setFinalFileName(fileid + filenameFromConnection);
     }
 
     public static boolean isPasswordProtected(final Browser br) {

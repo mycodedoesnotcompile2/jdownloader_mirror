@@ -26,7 +26,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.NZBSAXHandler;
 
-@DecrypterPlugin(revision = "$Revision: 48689 $", interfaceVersion = 3, names = { "nzb" }, urls = { "https?://.+/.*\\.nzb($|(\\?|&)[^\\s<>\"']*)" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "nzb" }, urls = { "https?://.+/.*\\.nzb($|(\\?|&)[^\\s<>\"']*)" })
 public class GenericNZBDecrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -76,7 +76,7 @@ public class GenericNZBDecrypter extends PluginForDecrypt {
             final String contentType = con.getContentType();
             if (StringUtils.containsIgnoreCase(contentType, "nzb") && con.isOK()) {
                 ret.addAll(NZBSAXHandler.parseNZB(con.getInputStream()));
-                final String nzbPassword = new Regex(Plugin.getFileNameFromHeader(con), NZB.PATTERN_COMMON_FILENAME_SCHEME).getMatch(1);
+                final String nzbPassword = new Regex(Plugin.getFileNameFromConnection(con), NZB.PATTERN_COMMON_FILENAME_SCHEME).getMatch(1);
                 if (nzbPassword != null) {
                     if (StringUtils.isNotEmpty(nzbPassword)) {
                         archiveInfo = new ArchiveInfo();
@@ -87,7 +87,7 @@ public class GenericNZBDecrypter extends PluginForDecrypt {
                 final String response = br.followConnection();
                 if (response.startsWith("<?xml")) {
                     ret.addAll(NZBSAXHandler.parseNZB(response));
-                    final String nzbPassword = new Regex(Plugin.getFileNameFromHeader(con), NZB.PATTERN_COMMON_FILENAME_SCHEME).getMatch(1);
+                    final String nzbPassword = new Regex(Plugin.getFileNameFromConnection(con), NZB.PATTERN_COMMON_FILENAME_SCHEME).getMatch(1);
                     if (nzbPassword != null) {
                         if (StringUtils.isNotEmpty(nzbPassword)) {
                             archiveInfo = new ArchiveInfo();

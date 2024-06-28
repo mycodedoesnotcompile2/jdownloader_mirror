@@ -68,7 +68,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49188 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -120,9 +120,9 @@ public abstract class HighWayCore extends UseNet {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         if (this.useApikeyLogin()) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.API_KEY_LOGIN };
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.API_KEY_LOGIN };
         } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USENET };
+            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION, LazyPlugin.FEATURE.USENET };
         }
     }
 
@@ -254,12 +254,14 @@ public abstract class HighWayCore extends UseNet {
                     con = br.openHeadConnection(Encoding.urlDecode(link.getPluginPatternMatcher(), true));
                     if (!this.looksLikeDownloadableContent(con) || con.getCompleteContentLength() <= 0) {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    }
+                    final String filename = getFileNameFromConnection(con);
+                    if (filename != null) {
+                        link.setFinalFileName(filename);
+                    }
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
                     } else {
-                        final String filename = getFileNameFromHeader(con);
-                        if (filename != null) {
-                            link.setFinalFileName(filename);
-                        }
-                        ;
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 } finally {
@@ -296,17 +298,12 @@ public abstract class HighWayCore extends UseNet {
                 if (!this.looksLikeDownloadableContent(con)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                final String serverFilename = getFileNameFromHeader(con);
+                final String serverFilename = getFileNameFromConnection(con);
                 if (!StringUtils.isEmpty(serverFilename)) {
                     link.setFinalFileName(serverFilename);
                 } else {
                     /* Fallback: This should not be needed. */
-                    final String realExtension = this.getExtensionFromMimeType(con);
-                    if (realExtension != null) {
-                        link.setFinalFileName(applyFilenameExtension(fallbackFilename, "." + realExtension));
-                    } else {
-                        link.setFinalFileName(fallbackFilename);
-                    }
+                    link.setFinalFileName(correctOrApplyFileNameExtension(fallbackFilename, con));
                 }
                 if (con.getCompleteContentLength() != -1) {
                     if (con.isContentDecoded()) {

@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NaughtyamericaComCrawler;
 
-@HostPlugin(revision = "$Revision: 48603 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
 public class NaughtyamericaCom extends PluginForHost {
     public NaughtyamericaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,9 +171,9 @@ public class NaughtyamericaCom extends PluginForHost {
             if (con.getCompleteContentLength() > 0) {
                 link.setVerifiedFileSize(con.getCompleteContentLength());
             }
-            final String filenameFromHeader = getFileNameFromHeader(con);
-            if (link.getFinalFileName() == null && filenameFromHeader != null) {
-                link.setFinalFileName(Encoding.htmlDecode(filenameFromHeader).trim());
+            final String filenameFromConnection = getFileNameFromConnection(con);
+            if (link.getFinalFileName() == null && filenameFromConnection != null) {
+                link.setFinalFileName(Encoding.htmlDecode(filenameFromConnection).trim());
             }
         } finally {
             try {

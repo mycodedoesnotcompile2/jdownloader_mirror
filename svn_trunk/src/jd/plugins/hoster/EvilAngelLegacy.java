@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48374 $", interfaceVersion = 2, names = { "evilangel.legacy" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "evilangel.legacy" }, urls = { "" })
 @Deprecated
 // 2021-09-01: TODO: Rewrite all plugins which still make use of this to to use EvilangelCore!
 public class EvilAngelLegacy extends antiDDoSForHost {
@@ -188,11 +188,15 @@ public class EvilAngelLegacy extends antiDDoSForHost {
                     con = brc.openHeadConnection(dllink);
                     if (this.looksLikeDownloadableContent(con)) {
                         if (con.getCompleteContentLength() > 0) {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                            if (con.isContentDecoded()) {
+                                link.setDownloadSize(con.getCompleteContentLength());
+                            } else {
+                                link.setVerifiedFileSize(con.getCompleteContentLength());
+                            }
                         }
                         if (StringUtils.isEmpty(filename)) {
                             /* Fallback if everything else fails */
-                            filename = Encoding.htmlDecode(getFileNameFromHeader(con));
+                            filename = Encoding.htmlDecode(getFileNameFromConnection(con));
                         }
                         link.setFinalFileName(filename);
                     } else {
@@ -263,7 +267,7 @@ public class EvilAngelLegacy extends antiDDoSForHost {
                     if (con.getCompleteContentLength() > 0) {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                    link.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(con)));
+                    link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
                 } else {
                     server_issues = true;
                 }

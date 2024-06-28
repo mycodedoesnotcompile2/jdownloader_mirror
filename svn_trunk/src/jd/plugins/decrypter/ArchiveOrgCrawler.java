@@ -42,6 +42,7 @@ import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCr
 import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -67,10 +68,15 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49158 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     @Override
@@ -1032,7 +1038,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                                     link.setVerifiedFileSize(con.getCompleteContentLength());
                                 }
                             }
-                            link.setFinalFileName(getFileNameFromHeader(con));
+                            link.setFinalFileName(getFileNameFromConnection(con));
                             link.setAvailable(true);
                         } else {
                             /* 2021-02-05: Either offline or account-only. Assume offline for now. */
@@ -1164,7 +1170,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                             link.setVerifiedFileSize(con.getCompleteContentLength());
                         }
                     }
-                    final String filenameFromHeader = getFileNameFromHeader(con);
+                    final String filenameFromHeader = getFileNameFromConnection(con);
                     if (filenameFromHeader != null) {
                         link.setFinalFileName(Encoding.htmlDecode(filenameFromHeader).trim());
                     }

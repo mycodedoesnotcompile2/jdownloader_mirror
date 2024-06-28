@@ -60,7 +60,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49161 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -212,7 +212,7 @@ public class DropboxCom extends PluginForHost {
                             link.setVerifiedFileSize(con.getCompleteContentLength());
                         }
                     }
-                    String filenameFromHeader = getFileNameFromHeader(con);
+                    String filenameFromHeader = getFileNameFromConnection(con);
                     if (!StringUtils.isEmpty(filenameFromHeader)) {
                         if (Encoding.isHtmlEntityCoded(filenameFromHeader)) {
                             filenameFromHeader = Encoding.htmlDecode(filenameFromHeader).trim();

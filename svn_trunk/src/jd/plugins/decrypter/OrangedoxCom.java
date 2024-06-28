@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48392 $", interfaceVersion = 3, names = { "orangedox.com" }, urls = { "https?://(?:www\\.)?dl\\.orangedox\\.com/([A-Za-z0-9]+)(/([^\\?#]+))?" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "orangedox.com" }, urls = { "https?://(?:www\\.)?dl\\.orangedox\\.com/([A-Za-z0-9]+)(/([^\\?#]+))?" })
 public class OrangedoxCom extends PluginForDecrypt {
     public OrangedoxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,7 +89,7 @@ public class OrangedoxCom extends PluginForDecrypt {
                 direct.setVerifiedFileSize(con.getCompleteContentLength());
             }
             if (con.isContentDisposition()) {
-                direct.setFinalFileName(Plugin.getFileNameFromHeader(con));
+                direct.setFinalFileName(Plugin.getFileNameFromConnection(con));
             }
             direct.setAvailable(true);
             ret.add(direct);

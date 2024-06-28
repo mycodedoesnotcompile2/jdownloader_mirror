@@ -24,7 +24,7 @@ import jd.plugins.components.NZBSAXHandler;
 
 import org.jdownloader.container.NZB;
 
-@DecrypterPlugin(revision = "$Revision: 47483 $", interfaceVersion = 3, names = { "nzbking.com" }, urls = { "https?://(?:www\\.)?nzbking\\.com/details(?::|%3a)[a-f0-9]{24}" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "nzbking.com" }, urls = { "https?://(?:www\\.)?nzbking\\.com/details(?::|%3a)[a-f0-9]{24}" })
 public class NzbKingCom extends PluginForDecrypt {
     public NzbKingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class NzbKingCom extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             ret.addAll(NZBSAXHandler.parseNZB(con.getInputStream()));
-            final String nzbFilename = Plugin.getFileNameFromHeader(con);
+            final String nzbFilename = Plugin.getFileNameFromConnection(con);
             final Regex nzbCommonFilenameScheme = new Regex(nzbFilename, NZB.PATTERN_COMMON_FILENAME_SCHEME);
             if (nzbFilename != null && nzbCommonFilenameScheme.matches()) {
                 if (nzbCommonFilenameScheme.matches()) {

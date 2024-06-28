@@ -34,7 +34,7 @@ import jd.plugins.FilePackage;
 /**
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 46365 $", interfaceVersion = 2, names = { "anilinkz.com" }, urls = { "https?://(?:www\\.)?(?:anilinkz|aniwatcher)\\.(?:com|tv|io|to)/[^<>\"/]+(/[^<>\"/]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "anilinkz.com" }, urls = { "https?://(?:www\\.)?(?:anilinkz|aniwatcher)\\.(?:com|tv|io|to)/[^<>\"/]+(/[^<>\"/]+)?" })
 @SuppressWarnings("deprecation")
 public class AniLinkzCom extends antiDDoSForDecrypt {
     private final String            invalid_links  = "https?://(?:www\\.)?(?:anilinkz|aniwatcher)\\.(?:com|tv|io|to)/(search|affiliates|get|img|dsa|forums|files|category|\\?page=|faqs|.*?-list|.*?-info|\\?random).*?";
@@ -265,7 +265,7 @@ public class AniLinkzCom extends antiDDoSForDecrypt {
                         con = br2.openGetConnection(aLink);
                         // only way to check for made up links... or offline is here
                         if (!con.getContentType().contains("html")) {
-                            downloadLink.setName(fpName + getFileNameFromHeader(con).substring(getFileNameFromHeader(con).lastIndexOf(".")));
+                            downloadLink.setName(fpName + getFileNameFromConnection(con).substring(getFileNameFromConnection(con).lastIndexOf(".")));
                             downloadLink.setDownloadSize(con.getLongContentLength());
                             downloadLink.setAvailable(true);
                         } else {

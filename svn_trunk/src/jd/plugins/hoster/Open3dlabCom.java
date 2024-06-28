@@ -38,7 +38,7 @@ import org.jdownloader.plugins.components.config.Open3dlabComConfig;
 import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,7 +141,7 @@ public class Open3dlabCom extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String serverFilename = Plugin.getFileNameFromHeader(con);
+                final String serverFilename = Plugin.getFileNameFromConnection(con);
                 if (serverFilename != null) {
                     link.setFinalFileName(serverFilename);
                 }

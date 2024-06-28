@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
 public class SeedrCc extends PluginForHost {
     public SeedrCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,9 +103,9 @@ public class SeedrCc extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String filenameFromHeader = getFileNameFromHeader(con);
-                if (filenameFromHeader != null && link.getFinalFileName() == null) {
-                    link.setFinalFileName(filenameFromHeader);
+                final String filenameFromConnection = getFileNameFromConnection(con);
+                if (filenameFromConnection != null && link.getFinalFileName() == null) {
+                    link.setFinalFileName(filenameFromConnection);
                 }
                 return AvailableStatus.TRUE;
             } finally {
@@ -151,7 +151,7 @@ public class SeedrCc extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String filenameFromHeader = getFileNameFromHeader(con);
+                final String filenameFromHeader = getFileNameFromConnection(con);
                 if (filenameFromHeader != null) {
                     link.setFinalFileName(filenameFromHeader);
                 }

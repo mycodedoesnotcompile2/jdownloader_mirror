@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 46792 $", interfaceVersion = 2, names = { "adrive.com" }, urls = { "https?://(?:www(?:\\d+)?\\.)?adrive\\.com/public/([0-9a-zA-Z]+)(\\?path=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "adrive.com" }, urls = { "https?://(?:www(?:\\d+)?\\.)?adrive\\.com/public/([0-9a-zA-Z]+)(\\?path=[^\\&]+)?" })
 public class AdriveComDecrypter extends PluginForDecrypt {
     public AdriveComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,7 +86,7 @@ public class AdriveComDecrypter extends PluginForDecrypt {
                     if (con.getContentType().contains("html")) {
                         br.followConnection();
                     } else {
-                        String filename = getFileNameFromHeader(con);
+                        String filename = getFileNameFromConnection(con);
                         long filesize = con.getCompleteContentLength();
                         if (filename != null && filesize > 0) {
                             final DownloadLink dl = new DownloadLink(hostPlg, this.getHost(), this.getHost(), br.getURL(), true);

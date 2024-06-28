@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48136 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlfafileNet extends PluginForHost {
     public AlfafileNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,7 +157,7 @@ public class AlfafileNet extends PluginForHost {
                 if (this.looksLikeDownloadableContent(con)) {
                     logger.info("This url is a directurl");
                     link.setVerifiedFileSize(con.getCompleteContentLength());
-                    link.setFinalFileName(getFileNameFromHeader(con));
+                    link.setFinalFileName(getFileNameFromConnection(con));
                     isDirecturl = true;
                     return AvailableStatus.TRUE;
                 } else {

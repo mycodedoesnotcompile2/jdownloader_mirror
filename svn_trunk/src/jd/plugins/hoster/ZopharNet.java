@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 45258 $", interfaceVersion = 2, names = { "zophar.net" }, urls = { "https?://(?:www\\.)zophar\\.net/download_file/([0-9]{1,})" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "zophar.net" }, urls = { "https?://(?:www\\.)zophar\\.net/download_file/([0-9]{1,})" })
 public class ZopharNet extends PluginForHost {
     public ZopharNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,9 +65,13 @@ public class ZopharNet extends PluginForHost {
         try {
             con = br.openHeadConnection(link.getPluginPatternMatcher());
             if (this.looksLikeDownloadableContent(con)) {
-                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(con)));
+                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
             } else {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -89,7 +93,6 @@ public class ZopharNet extends PluginForHost {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        link.setFinalFileName(getFileNameFromHeader(dl.getConnection()));
         dl.startDownload();
     }
 

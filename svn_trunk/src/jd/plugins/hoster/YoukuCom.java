@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 46972 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
 public class YoukuCom extends antiDDoSForHost {
     public YoukuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,9 +112,13 @@ public class YoukuCom extends antiDDoSForHost {
                 }
                 if (this.looksLikeDownloadableContent(con)) {
                     if (link.getFinalFileName() == null) {
-                        link.setFinalFileName(getFileNameFromHeader(con));
+                        link.setFinalFileName(getFileNameFromConnection(con));
                     }
-                    link.setDownloadSize(con.getLongContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 } else {
                     this.server_issues = true;
                 }

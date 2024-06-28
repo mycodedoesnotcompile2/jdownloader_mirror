@@ -32,7 +32,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49158 $", interfaceVersion = 2, names = { "pornhost.com" }, urls = { "https?://(?:www\\.)?pornhost\\.com/([0-9]+/([0-9]+\\.html)?|[0-9]+|embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "pornhost.com" }, urls = { "https?://(?:www\\.)?pornhost\\.com/([0-9]+/([0-9]+\\.html)?|[0-9]+|embed/\\d+)" })
 public class PornHostCom extends PluginForHost {
     private String ending = null;
     private String dllink = null;
@@ -132,7 +132,7 @@ public class PornHostCom extends PluginForHost {
         }
         try {
             dl.setAllowFilenameFromURL(false);
-            String name = Plugin.getFileNameFromHeader(dl.getConnection());
+            String name = Plugin.getFileNameFromConnection(dl.getConnection());
             if (ending != null && ending.length() <= 1) {
                 String name2 = link.getName();
                 name = new Regex(name, ".+?(\\..{1,4})").getMatch(0);

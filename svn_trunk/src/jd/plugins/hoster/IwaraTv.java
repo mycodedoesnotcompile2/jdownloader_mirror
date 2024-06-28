@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -419,7 +419,7 @@ public class IwaraTv extends PluginForHost {
         }
         final IwaraTvConfig cfg = PluginJsonConfig.get(IwaraTvConfig.class);
         final FilenameSchemeType preferredFilenameSchemeType = cfg.getPreferredFilenameSchemeType();
-        final String serverFilename = Plugin.getFileNameFromHeader(dl.getConnection());
+        final String serverFilename = Plugin.getFileNameFromDispositionHeader(dl.getConnection());
         final String mimeExt = getExtensionFromMimeType(dl.getConnection());
         if (preferredFilenameSchemeType == FilenameSchemeType.ORIGINAL_SERVER_FILENAMES) {
             if (StringUtils.endsWithCaseInsensitive(serverFilename, mimeExt)) {

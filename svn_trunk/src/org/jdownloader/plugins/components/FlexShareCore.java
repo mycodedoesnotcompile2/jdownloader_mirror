@@ -30,7 +30,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48718 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class FlexShareCore extends antiDDoSForHost {
     public FlexShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -186,9 +186,13 @@ public abstract class FlexShareCore extends antiDDoSForHost {
         final URLConnectionAdapter con = br.openGetConnection(this.getContentURL(link));
         if (this.looksLikeDownloadableContent(con)) {
             /* Directurl or we're logged in a premium account with direct downloads enabled. */
-            link.setFinalFileName(Plugin.getFileNameFromHeader(con));
+            link.setFinalFileName(Plugin.getFileNameFromConnection(con));
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
         } else {
             br.followConnection();

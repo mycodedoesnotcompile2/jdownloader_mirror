@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48090 $", interfaceVersion = 2, names = { "8muses.com" }, urls = { "https?://(?:www\\.|comics\\.)?8muses\\.com/(?:(comics/)?picture/([^/]+/){1,}\\d+|forum/(?:data/)?attachments/.+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "8muses.com" }, urls = { "https?://(?:www\\.|comics\\.)?8muses\\.com/(?:(comics/)?picture/([^/]+/){1,}\\d+|forum/(?:data/)?attachments/.+)" })
 public class EightMusesCom extends antiDDoSForHost {
     public EightMusesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,7 +174,7 @@ public class EightMusesCom extends antiDDoSForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                     if (filename == null) {
-                        link.setFinalFileName(Plugin.getFileNameFromHeader(con));
+                        link.setFinalFileName(Plugin.getFileNameFromConnection(con));
                     }
                 } else if (con.getResponseCode() == 403) {
                     /* Account required to download */

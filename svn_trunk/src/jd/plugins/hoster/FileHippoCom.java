@@ -30,7 +30,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
-@HostPlugin(revision = "$Revision: 47477 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?filehippo\\.com(?:/(?:es|en|pl|jp|de))?/download_[^<>/\"]+(?:(?:/tech)?/\\d+/)?" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?filehippo\\.com(?:/(?:es|en|pl|jp|de))?/download_[^<>/\"]+(?:(?:/tech)?/\\d+/)?" })
 public class FileHippoCom extends PluginForHost {
     private static final String FILENOTFOUND = "(<h1>404 Error</h1>|<b>Sorry the page you requested could not be found|Sorry an error occurred processing your request)";
     public static final String  MAINPAGE     = "https://www.filehippo.com";
@@ -144,7 +144,7 @@ public class FileHippoCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FATAL, "Download impossible - download-url points to external site");
                 }
             }
-            link.setFinalFileName(getFileNameFromHeader(dl.getConnection()));
+            link.setFinalFileName(getFileNameFromConnection(dl.getConnection()));
             dl.startDownload();
             return;
         }
@@ -187,7 +187,7 @@ public class FileHippoCom extends PluginForHost {
                     continue;
                 }
             }
-            link.setFinalFileName(getFileNameFromHeader(dl.getConnection()));
+            link.setFinalFileName(getFileNameFromConnection(dl.getConnection()));
             dl.startDownload();
             return;
         }

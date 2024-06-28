@@ -48,7 +48,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49041 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
 public class DebridItaliaCom extends antiDDoSForHost {
     public DebridItaliaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -268,7 +268,7 @@ public class DebridItaliaCom extends antiDDoSForHost {
     }
 
     public static String getFileNameFromHeader(final URLConnectionAdapter urlConnection) {
-        final String ret = Plugin.getFileNameFromHeader(urlConnection);
+        final String ret = Plugin.getFileNameFromConnection(urlConnection);
         if (!isValidFileNameFromHeader(ret)) {
             return null;
         } else {

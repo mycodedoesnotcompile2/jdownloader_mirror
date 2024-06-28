@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.RedditCom;
 
-@DecrypterPlugin(revision = "$Revision: 49180 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49208 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { RedditCom.class })
 public class RedditComCrawler extends PluginForDecrypt {
     public RedditComCrawler(PluginWrapper wrapper) {
@@ -82,7 +82,7 @@ public class RedditComCrawler extends PluginForDecrypt {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     @Override
@@ -480,7 +480,7 @@ public class RedditComCrawler extends PluginForDecrypt {
                                  *
                                  * -> Correct that but keep .gif to signal source of the mp4
                                  */
-                                direct.setFinalFileName(this.correctOrApplyFileNameExtension(filenameFromURL, ".gif.mp4"));
+                                direct.setFinalFileName(this.applyFilenameExtension(filenameFromURL, ".gif.mp4"));
                                 direct.setProperty(RedditCom.PROPERTY_VIDEO_SOURCE, "gif");
                             }
                             direct.setProperty(RedditCom.PROPERTY_TYPE, RedditCom.PROPERTY_TYPE_video);

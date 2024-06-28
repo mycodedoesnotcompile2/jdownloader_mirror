@@ -65,7 +65,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -374,7 +374,7 @@ public class SoundcloudCom extends PluginForHost {
              * E.g. official download: All filenames are set with .mp3 extension in crawler but official downloads can also e.g. be .wav
              * files.
              */
-            final String serverFilename = Encoding.htmlDecode(getFileNameFromHeader(dl.getConnection()));
+            final String serverFilename = Encoding.htmlDecode(getFileNameFromConnection(dl.getConnection()));
             if (link.getFinalFileName() != null && serverFilename != null) {
                 final String newExtension = Plugin.getFileNameExtensionFromString(serverFilename);
                 if (newExtension != null) {

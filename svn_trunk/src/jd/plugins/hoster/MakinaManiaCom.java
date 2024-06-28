@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48146 $", interfaceVersion = 2, names = { "makinamania.net" }, urls = { "https?://(?:www\\.)?makinamania\\.(?:com|net)/((download/|descargar\\-).+|index\\.php\\?action=dlattach;topic=\\d+(?:\\.0)?;attach=\\d+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "makinamania.net" }, urls = { "https?://(?:www\\.)?makinamania\\.(?:com|net)/((download/|descargar\\-).+|index\\.php\\?action=dlattach;topic=\\d+(?:\\.0)?;attach=\\d+)" })
 public class MakinaManiaCom extends PluginForHost {
     public MakinaManiaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,9 +61,13 @@ public class MakinaManiaCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
-                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(con)));
+                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
             } finally {
                 try {
                     con.disconnect();
@@ -160,7 +164,7 @@ public class MakinaManiaCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, Encoding.htmlDecode(dllink), true, 0);
-        String filenameFromHeader = getFileNameFromHeader(dl.getConnection());
+        String filenameFromHeader = getFileNameFromConnection(dl.getConnection());
         if (filenameFromHeader != null) {
             filenameFromHeader = Encoding.htmlDecode(filenameFromHeader).trim();
             link.setFinalFileName(filenameFromHeader);
@@ -208,7 +212,7 @@ public class MakinaManiaCom extends PluginForHost {
         }
         br.setFollowRedirects(true);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, Encoding.htmlDecode(dllink), true, 0);
-        String filenameHeader = getFileNameFromHeader(dl.getConnection());
+        String filenameHeader = getFileNameFromConnection(dl.getConnection());
         if (filenameHeader != null) {
             filenameHeader = Encoding.htmlDecode(filenameHeader).trim();
             filenameHeader = filenameHeader.replace("_(MAKINAMANIA.COM)", "");

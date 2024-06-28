@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "doci.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "doci.pl" }, urls = { "" })
 public class DociPl extends PluginForHost {
     public DociPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -262,7 +262,7 @@ public class DociPl extends PluginForHost {
                 throw e;
             }
         }
-        final String final_server_filename = getFileNameFromHeader(dl.getConnection());
+        final String final_server_filename = getFileNameFromConnection(dl.getConnection());
         if (final_server_filename != null) {
             link.setFinalFileName(Encoding.htmlDecode(final_server_filename).trim());
         }

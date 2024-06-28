@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48878 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "http://suicidegirlsdecrypted/\\d+|https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "http://suicidegirlsdecrypted/\\d+|https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
 public class SuicidegirlsCom extends PluginForHost {
     public SuicidegirlsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +150,7 @@ public class SuicidegirlsCom extends PluginForHost {
                     }
                 }
                 if (filename == null) {
-                    filename = getFileNameFromHeader(con);
+                    filename = getFileNameFromConnection(con);
                 }
                 link.setProperty(PROPERTY_DIRECTURL, dllink);
             } finally {

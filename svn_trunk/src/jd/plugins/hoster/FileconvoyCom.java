@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.FileconvoyComFolder;
 
-@HostPlugin(revision = "$Revision: 48424 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { FileconvoyComFolder.class })
 public class FileconvoyCom extends PluginForHost {
     public FileconvoyCom(PluginWrapper wrapper) {
@@ -157,7 +157,7 @@ public class FileconvoyCom extends PluginForHost {
             if (con.getCompleteContentLength() > 0) {
                 link.setVerifiedFileSize(con.getCompleteContentLength());
             }
-            final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
+            final String filenameFromHeader = Plugin.getFileNameFromConnection(con);
             if (!StringUtils.isEmpty(filenameFromHeader)) {
                 link.setFinalFileName(filenameFromHeader);
             }

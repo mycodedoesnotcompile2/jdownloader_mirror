@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -241,7 +241,7 @@ public class Bunkr extends PluginForHost {
                     con = br.openGetConnection(lastCachedDirecturl);
                 }
                 handleConnectionErrors(link, br, con);
-                final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
+                final String filenameFromHeader = Plugin.getFileNameFromDispositionHeader(con);
                 final String filenameFromDirecturl = Plugin.getFileNameFromURL(lastCachedDirecturl);
                 if (filenameFromHeader != null) {
                     setFilename(link, filenameFromHeader, true, true);
@@ -339,7 +339,7 @@ public class Bunkr extends PluginForHost {
             if (con.getCompleteContentLength() > 0) {
                 link.setVerifiedFileSize(con.getCompleteContentLength());
             }
-            final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
+            final String filenameFromHeader = Plugin.getFileNameFromConnection(con);
             if (!StringUtils.isEmpty(filenameFromHeader)) {
                 setFilename(link, filenameFromHeader, true, true);
             }

@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48756 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
 public class ScribdCom extends PluginForHost {
     private final String        formats       = "formats";
     /** The list of server values displayed to the user */
@@ -429,7 +429,7 @@ public class ScribdCom extends PluginForHost {
             /* Assume that our current account type = free and the file is not downloadable */
             throw new AccountRequiredException();
         }
-        parameter.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(dl.getConnection())));
+        parameter.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(dl.getConnection())));
         dl.startDownload();
     }
 

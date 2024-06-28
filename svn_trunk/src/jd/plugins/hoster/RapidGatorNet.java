@@ -74,7 +74,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49128 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -320,9 +320,9 @@ public class RapidGatorNet extends PluginForHost {
                     }
                 }
                 if (link.getFinalFileName() == null) {
-                    final String filenameFromHeader = Plugin.getFileNameFromHeader(con);
-                    if (filenameFromHeader != null) {
-                        link.setFinalFileName(filenameFromHeader);
+                    final String filenameFromConnection = Plugin.getFileNameFromConnection(con);
+                    if (filenameFromConnection != null) {
+                        link.setFinalFileName(filenameFromConnection);
                     }
                 }
                 link.setProperty(PROPERTY_HOTLINK, true);

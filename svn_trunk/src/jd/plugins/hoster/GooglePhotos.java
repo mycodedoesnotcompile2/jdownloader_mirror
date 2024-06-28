@@ -31,7 +31,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 42768 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+/photo/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "photos.google.com" }, urls = { "https?://photos\\.google\\.com/share/[A-Za-z0-9\\-_]+/photo/[A-Za-z0-9\\-_]+\\?key=[A-Za-z0-9\\-_]+" })
 public class GooglePhotos extends PluginForHost {
     public GooglePhotos(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,7 +102,7 @@ public class GooglePhotos extends PluginForHost {
                     }
                     if (dllink != null) {
                         con = br.openHeadConnection(dllink);
-                        filename = getFileNameFromHeader(con);
+                        filename = getFileNameFromConnection(con);
                         if (isVideoStreamDwnload) {
                             filename = this.removeDoubleExtensions(filename, "mp4");
                             /* =m22?cpn=blablabla&c=WEB&cver=1.20160414 */
@@ -146,7 +146,7 @@ public class GooglePhotos extends PluginForHost {
                 if (!con.getContentType().contains("html")) {
                     filesize = con.getLongContentLength();
                     if (filename == null) {
-                        filename = getFileNameFromHeader(con);
+                        filename = getFileNameFromConnection(con);
                     }
                     if (filename == null) {
                         filename = url_title;

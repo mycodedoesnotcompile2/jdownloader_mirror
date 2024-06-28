@@ -30,10 +30,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49099 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
 public class FilesFm extends PluginForHost {
     public FilesFm(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,7 +103,7 @@ public class FilesFm extends PluginForHost {
                 // https://files.fm/thumb_show.php?i=wfslpuh&n=20140908_073035.jpg&refresh1
                 /* Maybe we have a picture without official "Download" button ... */
                 logger.info("Checking for picture content without official download button");
-                dllink = "https://files.fm/thumb_show.php" + linkpart + "&refresh1";
+                dllink = "/thumb_show.php" + linkpart + "&refresh1";
                 con = brc.openHeadConnection(dllink);
             }
             if (!this.looksLikeDownloadableContent(con)) {
@@ -150,7 +151,7 @@ public class FilesFm extends PluginForHost {
                 link.setFinalFileName(torrentFilename);
                 // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                filename_header = Encoding.htmlDecode(getFileNameFromHeader(con));
+                filename_header = Encoding.htmlDecode(Plugin.getFileNameFromDispositionHeader(con));
                 if (filename_url == null && filename_header != null) {
                     link.setFinalFileName(filename_header);
                 } else if (filename_url != null && filename_header.length() > filename_url.length()) {

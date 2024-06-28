@@ -32,7 +32,7 @@ import jd.plugins.PluginForDecrypt;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 45875 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
 public class FreeLoopsCom extends PluginForDecrypt {
     public FreeLoopsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class FreeLoopsCom extends PluginForDecrypt {
                 brc.setFollowRedirects(true);
                 brc.getPage(parameter);
                 final String fileName = brc.getRegex("File:\\s*(.*?)\\s*<br/>").getMatch(0);
-                final String serverFileName = Plugin.getFileNameFromHeader(con);
+                final String serverFileName = Plugin.getFileNameFromConnection(con);
                 if (fileName != null) {
                     l.setFinalFileName(fileName + getFileNameExtensionFromString(serverFileName, ".wav"));
                 } else {

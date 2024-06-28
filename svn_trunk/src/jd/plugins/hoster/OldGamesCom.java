@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49063 $", interfaceVersion = 2, names = { "old-games.com" }, urls = { "https?://(?:www\\.)?old\\-games\\.com/(?:getfile|getfree)/(\\d+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "old-games.com" }, urls = { "https?://(?:www\\.)?old\\-games\\.com/(?:getfile|getfree)/(\\d+)" })
 public class OldGamesCom extends PluginForHost {
     public OldGamesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,7 +161,7 @@ public class OldGamesCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setFinalFileName(getFileNameFromHeader(dl.getConnection()));
+        link.setFinalFileName(getFileNameFromConnection(dl.getConnection()));
         link.setProperty(directlinkproperty, dllink);
         dl.startDownload();
     }
@@ -275,7 +275,7 @@ public class OldGamesCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setFinalFileName(getFileNameFromHeader(dl.getConnection()));
+        link.setFinalFileName(getFileNameFromConnection(dl.getConnection()));
         link.setProperty("premium_directlink", dllink);
         dl.startDownload();
     }

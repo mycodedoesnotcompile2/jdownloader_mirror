@@ -26,7 +26,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48678 $", interfaceVersion = 3, names = { "microsoft.com" }, urls = { "https?://(?:download\\.microsoft\\.com/download/|download\\.windowsupdate\\.com)[^<>\"]+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "microsoft.com" }, urls = { "https?://(?:download\\.microsoft\\.com/download/|download\\.windowsupdate\\.com)[^<>\"]+" })
 public class MicrosoftCom extends PluginForHost {
     public MicrosoftCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,12 +52,16 @@ public class MicrosoftCom extends PluginForHost {
             if (!this.looksLikeDownloadableContent(con)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final String filenameFromHeader = getFileNameFromHeader(con);
+            final String filenameFromHeader = getFileNameFromConnection(con);
             if (filenameFromHeader != null) {
                 link.setFinalFileName(Encoding.htmlDecode(filenameFromHeader).trim());
             }
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
         } finally {
             try {

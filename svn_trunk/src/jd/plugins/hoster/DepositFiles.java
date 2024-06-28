@@ -64,7 +64,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 
-@HostPlugin(revision = "$Revision: 48936 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepositFiles extends antiDDoSForHost {
     public static AtomicReference<String>          MAINPAGE = new AtomicReference<String>();
     /* don't touch the following! */
@@ -529,7 +529,7 @@ public class DepositFiles extends antiDDoSForHost {
 
     private void handlePreDownloadStuff(final URLConnectionAdapter connection, final DownloadLink link, final Account account, String finalLink) {
         final String finalLinkProperty = this.getDirectlinkproperty(account);
-        final String name = Plugin.getFileNameFromHeader(connection);
+        final String name = Plugin.getFileNameFromConnection(connection);
         if (name != null && name.contains("?") && link.getFinalFileName() == null) {
             /* fix invalid filenames */
             final String fixedName = new Regex(name, "(.+)\\?").getMatch(0);

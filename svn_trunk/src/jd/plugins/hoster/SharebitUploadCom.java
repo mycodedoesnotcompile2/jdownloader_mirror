@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 44527 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49203 $", interfaceVersion = 3, names = {}, urls = {})
 public class SharebitUploadCom extends XFileSharingProBasic {
     public SharebitUploadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -115,5 +116,14 @@ public class SharebitUploadCom extends XFileSharingProBasic {
     protected boolean supports_availablecheck_filesize_html() {
         /* 2020-05-19: Special */
         return false;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*Downloading this file, you break DMCA")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }

@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47665 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
+@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 2, names = { "shutterstock.com" }, urls = { "http://(www\\.)?shutterstock\\.com/pic\\-\\d+/[a-z0-9\\-]+\\.html" })
 public class ShutterStockCom extends PluginForHost {
     public ShutterStockCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,21 +91,7 @@ public class ShutterStockCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        fixFilename(downloadLink);
         dl.startDownload();
-    }
-
-    private void fixFilename(final DownloadLink downloadLink) {
-        final String serverFilename = Encoding.htmlDecode(getFileNameFromHeader(dl.getConnection()));
-        final String newExtension = serverFilename.substring(serverFilename.lastIndexOf("."));
-        if (newExtension != null && !downloadLink.getName().endsWith(newExtension)) {
-            final String oldExtension = downloadLink.getName().substring(downloadLink.getName().lastIndexOf("."));
-            if (oldExtension != null) {
-                downloadLink.setFinalFileName(downloadLink.getName().replace(oldExtension, newExtension));
-            } else {
-                downloadLink.setFinalFileName(downloadLink.getName() + newExtension);
-            }
-        }
     }
 
     @SuppressWarnings("unchecked")
@@ -296,7 +282,6 @@ public class ShutterStockCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        fixFilename(link);
         link.setProperty("premlink", dllink);
         dl.startDownload();
     }
@@ -322,7 +307,7 @@ public class ShutterStockCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -331,7 +316,7 @@ public class ShutterStockCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

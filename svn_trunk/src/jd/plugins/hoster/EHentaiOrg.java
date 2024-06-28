@@ -57,7 +57,7 @@ import org.jdownloader.plugins.components.config.EhentaiConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(?:s/[a-f0-9]{10}/\\d+-\\d+|mpv/\\d+/[a-f0-9]{10}/#page\\d+)|ehentaiarchive://\\d+/[a-z0-9]+" })
 public class EHentaiOrg extends PluginForHost {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
@@ -609,7 +609,7 @@ public class EHentaiOrg extends PluginForHost {
             }
         }
         /* Correct filename if necessary */
-        final String headerFilename = Plugin.getFileNameFromHeader(dl.getConnection());
+        final String headerFilename = Plugin.getFileNameFromConnection(dl.getConnection());
         final String finalFilename = link.getFinalFileName();
         final String extByMimeType = getExtensionFromMimeType(dl.getConnection());
         if (finalFilename != null && headerFilename != null) {

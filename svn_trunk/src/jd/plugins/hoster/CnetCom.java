@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 2, names = { "cnet.com" }, urls = { "https?://(?:www\\.)?download\\.cnet\\.com/([A-Za-z0-9\\-_]+)/([A-Za-z0-9\\-_]+)-(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "cnet.com" }, urls = { "https?://(?:www\\.)?download\\.cnet\\.com/([A-Za-z0-9\\-_]+)/([A-Za-z0-9\\-_]+)-(\\d+)\\.html" })
 public class CnetCom extends PluginForHost {
     public CnetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,7 +129,7 @@ public class CnetCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        final String serverFilename = getFileNameFromHeader(dl.getConnection());
+        final String serverFilename = getFileNameFromConnection(dl.getConnection());
         if (!StringUtils.isEmpty(serverFilename)) {
             link.setFinalFileName(serverFilename);
         }

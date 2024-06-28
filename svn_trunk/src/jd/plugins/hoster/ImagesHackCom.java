@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ImagesHackComCrawler;
 
-@HostPlugin(revision = "$Revision: 48359 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ImagesHackComCrawler.class })
 public class ImagesHackCom extends PluginForHost {
     private static final boolean enable_api_image = true;
@@ -184,12 +184,16 @@ public class ImagesHackCom extends PluginForHost {
             try {
                 con = br.openHeadConnection(dllink);
                 handleConnectionErrors(br, con);
-                final String filenameFromHeader = getFileNameFromHeader(con);
+                final String filenameFromHeader = getFileNameFromConnection(con);
                 if (filenameFromHeader != null) {
                     link.setName(filenameFromHeader);
                 }
                 if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
                 }
             } finally {
                 try {

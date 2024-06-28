@@ -39,7 +39,7 @@ import jd.plugins.PluginForHost;
 
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
-@HostPlugin(revision = "$Revision: 47482 $", interfaceVersion = 2, names = { "datpiff.com" }, urls = { "https?://(?:www\\.)?datpiff\\.com/([^<>\"% ]*?\\-download(\\-track)?\\.php\\?id=[a-z0-9]+|mixtapes\\-detail\\.php\\?id=\\d+|.*?\\-mixtape\\.\\d+\\.html)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "datpiff.com" }, urls = { "https?://(?:www\\.)?datpiff\\.com/([^<>\"% ]*?\\-download(\\-track)?\\.php\\?id=[a-z0-9]+|mixtapes\\-detail\\.php\\?id=\\d+|.*?\\-mixtape\\.\\d+\\.html)" })
 public class DatPiffCom extends PluginForHost {
     private static final String PATTERN_PREMIUMONLY               = "(?i)>\\s*you must be logged in to download mixtapes<";
     private static final String ONLYREGISTEREDUSERTEXT            = "Only downloadable for registered users";
@@ -262,7 +262,7 @@ public class DatPiffCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String headerFilename = getFileNameFromHeader(dl.getConnection());
+        final String headerFilename = getFileNameFromConnection(dl.getConnection());
         if (headerFilename != null) {
             link.setFinalFileName(headerFilename);
         }

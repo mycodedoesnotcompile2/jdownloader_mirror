@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48459 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(\\w+\\.)?sendspace\\.com/(file|pro/dl)/[0-9a-zA-Z]+" })
 public class SendspaceCom extends PluginForHost {
     public SendspaceCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,12 +157,16 @@ public class SendspaceCom extends PluginForHost {
                         if (!this.looksLikeDownloadableContent(con)) {
                             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                         }
-                        final String filenameFromHeader = getFileNameFromHeader(con);
-                        if (filenameFromHeader != null) {
-                            link.setName(Encoding.htmlDecode(filenameFromHeader));
+                        final String filenameFromConnection = getFileNameFromConnection(con);
+                        if (filenameFromConnection != null) {
+                            link.setName(Encoding.htmlDecode(filenameFromConnection));
                         }
                         if (con.getCompleteContentLength() > 0) {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                            if (con.isContentDecoded()) {
+                                link.setDownloadSize(con.getCompleteContentLength());
+                            } else {
+                                link.setVerifiedFileSize(con.getCompleteContentLength());
+                            }
                         }
                         return AvailableStatus.TRUE;
                     } finally {

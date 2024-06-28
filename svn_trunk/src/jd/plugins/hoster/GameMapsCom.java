@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47543 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 public class GameMapsCom extends PluginForHost {
     private String         dllink            = null;
     private final String   cacheLinkProperty = "cacheLink";
@@ -144,7 +144,7 @@ public class GameMapsCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String filenameFromHeader = getFileNameFromHeader(dl.getConnection());
+        final String filenameFromHeader = getFileNameFromConnection(dl.getConnection());
         if (filenameFromHeader != null) {
             link.setFinalFileName(Encoding.htmlDecode(filenameFromHeader));
         }

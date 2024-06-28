@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -334,7 +334,7 @@ public class MetArtCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Directurl expired or media content is broken");
             }
         }
-        final String headerFilename = getFileNameFromHeader(dl.getConnection());
+        final String headerFilename = getFileNameFromConnection(dl.getConnection());
         if (!link.isNameSet() && !StringUtils.isEmpty(headerFilename)) {
             link.setFinalFileName(Encoding.htmlDecode(headerFilename));
         }

@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48077 $", interfaceVersion = 3, names = { "icloud.com" }, urls = { "http://iclouddecrypted\\.com/[A-Z0-9\\-]+_[a-f0-9]{42}" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "icloud.com" }, urls = { "http://iclouddecrypted\\.com/[A-Z0-9\\-]+_[a-f0-9]{42}" })
 public class IcloudCom extends PluginForHost {
     public IcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,10 +120,14 @@ public class IcloudCom extends PluginForHost {
                 con = br2.openGetConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
                     }
                     if (filename == null) {
-                        filename = getFileNameFromHeader(con);
+                        filename = getFileNameFromConnection(con);
                         link.setFinalFileName(filename);
                     }
                     /* Save directlink to save http requests in the future. */

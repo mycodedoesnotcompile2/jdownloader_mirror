@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48766 $", interfaceVersion = 4, names = { "debrid-link.fr" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 4, names = { "debrid-link.fr" }, urls = { "" })
 public class DebridLinkFr2 extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.fr");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -642,7 +642,7 @@ public class DebridLinkFr2 extends PluginForHost {
          */
         String final_filename = null;
         final String previous_filename = link.getName();
-        final String this_filename = getFileNameFromHeader(dl.getConnection());
+        final String this_filename = getFileNameFromConnection(dl.getConnection());
         if (previous_filename != null && this_filename != null && (this_filename.length() < previous_filename.length() || link.getHost().contains("vidoza"))) {
             final_filename = previous_filename;
         } else {

@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47476 $", interfaceVersion = 2, names = { "youjizz.com" }, urls = { "https?://(?:www\\.)?youjizz\\.com/videos/(embed/\\d+|.*?\\-\\d+\\.html)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "youjizz.com" }, urls = { "https?://(?:www\\.)?youjizz\\.com/videos/(embed/\\d+|.*?\\-\\d+\\.html)" })
 public class YouJizzCom extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -184,9 +184,13 @@ public class YouJizzCom extends PluginForHost {
         try {
             con = br2.openGetConnection(dllink);
             if (this.looksLikeDownloadableContent(con)) {
-                String ext = getFileNameFromHeader(con).substring(getFileNameFromHeader(con).lastIndexOf("."));
+                String ext = getFileNameFromConnection(con).substring(getFileNameFromConnection(con).lastIndexOf("."));
                 link.setFinalFileName(Encoding.htmlDecode(filename) + ext);
-                link.setDownloadSize(con.getLongContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             } else {
                 br2.followConnection(true);
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

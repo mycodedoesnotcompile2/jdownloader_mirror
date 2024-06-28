@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 40530 $", interfaceVersion = 3, names = { "filehorse.com" }, urls = { "https?://(www\\.)?(mac\\.)?filehorse\\.com/download\\-([a-z0-9\\-]+)/(\\d+/)?" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "filehorse.com" }, urls = { "https?://(www\\.)?(mac\\.)?filehorse\\.com/download\\-([a-z0-9\\-]+)/(\\d+/)?" })
 public class FileHorseCom extends PluginForHost {
     public FileHorseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +119,7 @@ public class FileHorseCom extends PluginForHost {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        downloadLink.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(dl.getConnection())));
+        downloadLink.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(dl.getConnection())));
         dl.startDownload();
     }
 

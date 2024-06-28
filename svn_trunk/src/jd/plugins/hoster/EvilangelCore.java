@@ -61,7 +61,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49069 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,7 +200,7 @@ public abstract class EvilangelCore extends PluginForHost {
                         }
                         if (StringUtils.isEmpty(filename)) {
                             /* Fallback if everything else fails */
-                            filename = Encoding.htmlDecode(getFileNameFromHeader(con));
+                            filename = Encoding.htmlDecode(getFileNameFromConnection(con));
                         }
                         link.setFinalFileName(filename);
                     } else {
@@ -514,11 +514,19 @@ public abstract class EvilangelCore extends PluginForHost {
                     con = brc.openHeadConnection(dllink);
                     if (this.looksLikeDownloadableContent(con)) {
                         if (con.getCompleteContentLength() > 0) {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                            if (con.isContentDecoded()) {
+                                link.setDownloadSize(con.getCompleteContentLength());
+                            } else {
+                                link.setVerifiedFileSize(con.getCompleteContentLength());
+                            }
                         }
-                        final String serverFilename = getFileNameFromHeader(con);
-                        if (serverFilename != null && link.getFinalFileName() == null) {
-                            link.setFinalFileName(serverFilename);
+                        final String serverFilename = getFileNameFromConnection(con);
+                        if (serverFilename != null) {
+                            if (link.getFinalFileName() == null) {
+                                link.setFinalFileName(serverFilename);
+                            }
+                        } else if (filename != null) {
+                            link.setFinalFileName(this.correctOrApplyFileNameExtension(filename, con));
                         }
                     } else {
                         brc.followConnection(true);

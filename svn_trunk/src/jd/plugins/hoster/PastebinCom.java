@@ -29,7 +29,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.AbstractPastebinCrawler;
 import jd.plugins.decrypter.PastebinComCrawler;
 
-@HostPlugin(revision = "$Revision: 48201 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PastebinComCrawler.class })
 public class PastebinCom extends AbstractPastebinHoster {
     public PastebinCom(PluginWrapper wrapper) {
@@ -63,9 +63,13 @@ public class PastebinCom extends AbstractPastebinHoster {
         URLConnectionAdapter con = null;
         try {
             con = br.openHeadConnection(getDirectDownloadURL(link));
-            link.setFinalFileName(Plugin.getFileNameFromHeader(con));
+            link.setFinalFileName(Plugin.getFileNameFromConnection(con));
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
         } finally {
             try {

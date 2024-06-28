@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 42242 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "sugarsync.com" }, urls = { "https?://(?:www\\.)?sugarsync\\.com/pf/(D[\\d\\_]+)" })
 public class SugarSyncCom extends PluginForHost {
     public SugarSyncCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,8 +79,12 @@ public class SugarSyncCom extends PluginForHost {
             } else {
                 /* We have a directlink */
                 dllink = link.getPluginPatternMatcher();
-                link.setDownloadSize(con.getLongContentLength());
-                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromHeader(con)));
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+                link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
                 return AvailableStatus.TRUE;
             }
         } finally {

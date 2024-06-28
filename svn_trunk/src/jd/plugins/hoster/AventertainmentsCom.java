@@ -40,7 +40,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "imgs.aventertainments.com", "aventertainments.com" }, urls = { "https?://imgs\\d+\\.aventertainments\\.com/.+", "https?://www\\.aventertainments\\.com/newdlsample\\.aspx.+\\.mp4|https?://ppvclips\\d+\\.aventertainments\\.com/.+\\.m3u9|https?://(?:www\\.)?aventertainments\\.com/ppv/new_detail\\.aspx\\?ProID=\\d+.*|https?://(?:www\\.)?aventertainments\\.com/ppv/Download\\.aspx\\?.+" })
+@HostPlugin(revision = "$Revision: 49208 $", interfaceVersion = 3, names = { "imgs.aventertainments.com", "aventertainments.com" }, urls = { "https?://imgs\\d+\\.aventertainments\\.com/.+", "https?://www\\.aventertainments\\.com/newdlsample\\.aspx.+\\.mp4|https?://ppvclips\\d+\\.aventertainments\\.com/.+\\.m3u9|https?://(?:www\\.)?aventertainments\\.com/ppv/new_detail\\.aspx\\?ProID=\\d+.*|https?://(?:www\\.)?aventertainments\\.com/ppv/Download\\.aspx\\?.+" })
 public class AventertainmentsCom extends PluginForHost {
     public AventertainmentsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,21 +169,25 @@ public class AventertainmentsCom extends PluginForHost {
             try {
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                    final String serverFilename = Plugin.getFileNameFromDispositionHeader(con);
+                    /* Assume directurl is offline */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                if (con.getCompleteContentLength() > 0) {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+                final String serverFilename = Plugin.getFileNameFromDispositionHeader(con);
+                if (serverFilename != null) {
                     if (finalFilename == null && serverFilename != null) {
                         link.setFinalFileName(finalFilename);
                     }
+                } else {
                     /* 2022-01-04: Filename is not (always) given via header... */
-                    final String videoFallbackFilename = new Regex(con.getURL().toString(), "/([^/]+\\.mp4)").getMatch(0);
+                    final String videoFallbackFilename = new Regex(con.getURL().toExternalForm(), "(?i)/([^/]+\\.mp4)").getMatch(0);
                     if (finalFilename == null && link.getPluginPatternMatcher().matches(TYPE_VIDEO_DIRECT) && videoFallbackFilename != null) {
                         link.setFinalFileName(videoFallbackFilename);
+                    } else if (link.getName() != null) {
+                        link.setFinalFileName(this.correctOrApplyFileNameExtension(link.getName(), con));
                     }
-                } else {
-                    /* Assume directurl is offline */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } finally {
                 try {

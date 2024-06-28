@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-\\.]+\\.artstation\\.com/p/assets/.+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "artstation.com" }, urls = { "https?://[a-z0-9\\-\\.]+\\.artstation\\.com/p/assets/.+" })
 public class ArtstationCom extends PluginForHost {
     public ArtstationCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,7 +104,7 @@ public class ArtstationCom extends PluginForHost {
                     link.setDownloadSize(con.getCompleteContentLength());
                 }
                 if (filename == null) {
-                    filename = getFileNameFromHeader(con);
+                    filename = getFileNameFromConnection(con);
                     link.setFinalFileName(filename);
                 }
                 link.setProperty("directlink", dllink);

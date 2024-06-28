@@ -49,7 +49,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48733 $", interfaceVersion = 3, names = { "kink.com" }, urls = { "https?://(?:www\\.)?kink.com/shoot/(\\d+)" })
+@HostPlugin(revision = "$Revision: 49208 $", interfaceVersion = 3, names = { "kink.com" }, urls = { "https?://(?:www\\.)?kink.com/shoot/(\\d+)" })
 public class KinkCom extends PluginForHost {
     public KinkCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -180,6 +180,7 @@ public class KinkCom extends PluginForHost {
                     } else {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
+                    link.setFinalFileName(this.correctOrApplyFileNameExtension(filetitle, con));
                 } finally {
                     try {
                         con.disconnect();

@@ -81,8 +81,9 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
+import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49176 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -518,6 +519,21 @@ public class GoogleDrive extends PluginForHost {
             link.setSha1Hash(sha1Checksum);
         } else if (!StringUtils.isEmpty(checksumMd5)) {
             link.setMD5Hash(checksumMd5);
+        }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final List<HashInfo> hashList = new ArrayList<HashInfo>();
+            if (!StringUtils.isEmpty(checksumSha256)) {
+                hashList.add(HashInfo.newInstanceSafe(checksumSha256, HashInfo.TYPE.SHA256));
+            }
+            if (!StringUtils.isEmpty(sha1Checksum)) {
+                hashList.add(HashInfo.newInstanceSafe(sha1Checksum, HashInfo.TYPE.SHA1));
+            }
+            if (!StringUtils.isEmpty(checksumMd5)) {
+                hashList.add(HashInfo.newInstanceSafe(checksumMd5, HashInfo.TYPE.MD5));
+            }
+            if (hashList.size() > 0) {
+                link.setHashInfos(hashList);
+            }
         }
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
@@ -1480,10 +1496,10 @@ public class GoogleDrive extends PluginForHost {
             this.removeQuotaReachedFlags(link, null, streamDownloadlink != null);
         }
         /** Set final filename here in case previous handling failed to find a good final filename. */
-        final String headerFilename = getFileNameFromHeader(dl.getConnection());
-        if (link.getFinalFileName() == null && !StringUtils.isEmpty(headerFilename)) {
-            link.setFinalFileName(headerFilename);
-            link.setProperty(PROPERTY_CACHED_FILENAME, headerFilename);
+        final String connectionFilename = getFileNameFromConnection(dl.getConnection());
+        if (link.getFinalFileName() == null && !StringUtils.isEmpty(connectionFilename)) {
+            link.setFinalFileName(connectionFilename);
+            link.setProperty(PROPERTY_CACHED_FILENAME, connectionFilename);
         }
         dl.startDownload();
     }

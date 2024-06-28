@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48355 $", interfaceVersion = 3, names = { "superdown.com.br" }, urls = { "https?://[\\w]+\\.superdown\\.com\\.br/(?:superdown/)?\\w+/[a-zA-Z0-9]+/\\d+/\\S+" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "superdown.com.br" }, urls = { "https?://[\\w]+\\.superdown\\.com\\.br/(?:superdown/)?\\w+/[a-zA-Z0-9]+/\\d+/\\S+" })
 public class SuperdownComBr extends antiDDoSForHost {
     /* Tags: conexaomega.com.br, megarapido.net, superdown.com.br */
     private static MultiHosterManagement mhm           = new MultiHosterManagement("superdown.com.br");
@@ -140,16 +140,20 @@ public class SuperdownComBr extends antiDDoSForHost {
             final Browser checkbr = br.cloneBrowser();
             checkbr.setFollowRedirects(true);
             checkbr.setAllowedResponseCodes(new int[] { 500 });
-            for (DownloadLink dl : urls) {
+            for (DownloadLink link : urls) {
                 URLConnectionAdapter con = null;
                 try {
-                    con = openAntiDDoSRequestConnection(checkbr, checkbr.createGetRequest(dl.getDownloadURL()));
+                    con = openAntiDDoSRequestConnection(checkbr, checkbr.createGetRequest(link.getDownloadURL()));
                     if (con.isContentDisposition()) {
-                        dl.setFinalFileName(getFileNameFromHeader(con));
-                        dl.setDownloadSize(con.getLongContentLength());
-                        dl.setAvailable(true);
+                        link.setFinalFileName(getFileNameFromConnection(con));
+                        if (con.isContentDecoded()) {
+                            link.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            link.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
+                        link.setAvailable(true);
                     } else {
-                        dl.setAvailable(false);
+                        link.setAvailable(false);
                     }
                 } finally {
                     try {

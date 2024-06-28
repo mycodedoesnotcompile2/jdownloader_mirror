@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48699 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
 public class OpenDriveCom extends PluginForHost {
     public OpenDriveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -231,7 +231,7 @@ public class OpenDriveCom extends PluginForHost {
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (StringUtils.equalsIgnoreCase(getFileNameFromHeader(dl.getConnection()), "limit_exceeded.jpg")) {
+        if (StringUtils.equalsIgnoreCase(getFileNameFromConnection(dl.getConnection()), "limit_exceeded.jpg")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Limit exeeded");
         }
         link.setProperty("directurl", dl.getConnection().getURL().toString());

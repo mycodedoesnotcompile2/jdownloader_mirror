@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.MotherLessComCrawler;
 
-@HostPlugin(revision = "$Revision: 49164 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MotherLessComCrawler.class })
 public class MotherLessCom extends PluginForHost {
     public static final String  text_subscribeFailed        = "Failed to subscribe to the owner of the video";
@@ -583,7 +583,7 @@ public class MotherLessCom extends PluginForHost {
             }
             if (link.getFinalFileName() == null) {
                 final String plugin_filename = link.getName();
-                String server_filename = getFileNameFromHeader(dl.getConnection());
+                String server_filename = getFileNameFromConnection(dl.getConnection());
                 if (server_filename != null) {
                     server_filename = Encoding.htmlDecode(server_filename).trim();
                 }

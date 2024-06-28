@@ -15,6 +15,9 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -26,11 +29,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 //Links come from a decrypter
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 2, names = { "soundsnap.com" }, urls = { "https?://(?:www\\.)?soundsnap\\.com/node/(\\d+)" })
+@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "soundsnap.com" }, urls = { "https?://(?:www\\.)?soundsnap\\.com/node/(\\d+)" })
 public class SoundSnapCom extends PluginForHost {
     public SoundSnapCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -90,12 +90,16 @@ public class SoundSnapCom extends PluginForHost {
             }
         } else {
             con.disconnect();
-            final String filename = getFileNameFromHeader(con);
+            final String filename = getFileNameFromConnection(con);
             if (filename != null) {
                 link.setFinalFileName(Encoding.htmlDecode(filename).trim());
             }
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
             return AvailableStatus.TRUE;
         }
