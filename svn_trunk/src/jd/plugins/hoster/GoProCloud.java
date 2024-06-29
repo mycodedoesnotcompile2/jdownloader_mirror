@@ -71,7 +71,7 @@ import jd.plugins.components.gopro.Media;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.decrypter.GoProCloudDecrypter;
 
-@HostPlugin(revision = "$Revision: 48670 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
 public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler */ {
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
@@ -384,7 +384,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
             fileExtension = "mp4";
         }
         if (StringUtils.isNotEmpty(fileExtension)) {
-            name = plugin.correctOrApplyFileNameExtension(name, "." + fileExtension);
+            name = plugin.applyFilenameExtension(name, "." + fileExtension);
         }
         if (config.isUseOriginalGoProFileNames()) {
             link.setFinalFileName(name);

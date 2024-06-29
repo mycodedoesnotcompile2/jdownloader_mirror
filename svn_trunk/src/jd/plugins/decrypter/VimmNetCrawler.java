@@ -35,10 +35,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VimmNet;
 
-@DecrypterPlugin(revision = "$Revision: 49100 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49224 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimmNetCrawler extends PluginForDecrypt {
     public VimmNetCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -70,7 +77,6 @@ public class VimmNetCrawler extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.setFollowRedirects(true);
         final String contentid = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final String contenturl = "https://" + this.getHost() + "/vault/" + contentid;
         br.getPage(contenturl);
@@ -103,14 +109,18 @@ public class VimmNetCrawler extends PluginForDecrypt {
             final String filesizeZippedStr = resource.get("Zipped").toString();
             final Object filesizeAltZippedStr = resource.get("AltZipped");
             if (filesizeZippedStr != null && filesizeZippedStr.matches("\\d+")) {
-                link.setDownloadSize(Long.parseLong(filesizeZippedStr) * 1024);
+                final long filesizeZipped = Long.parseLong(filesizeZippedStr) * 1024;
+                /* Value 0 means that the size is unknown. */
+                if (filesizeZipped > 0) {
+                    link.setDownloadSize(Long.parseLong(filesizeZippedStr) * 1024);
+                }
             }
             /**
              * There are file-hashes available but it looks like those are for the files inside the .zip archives so we can't make use of
              * them. </br>
              * See fields GoodHash, GoodMd5, GoodSha1
              */
-            if (filesizeAltZippedStr != null && resourcelist.size() == 1 && downloadformatsOptions != null && downloadformatsOptions.length >= 2) {
+            if (filesizeAltZippedStr != null && filesizeAltZippedStr.toString().matches("\\d+") && resourcelist.size() == 1 && downloadformatsOptions != null && downloadformatsOptions.length >= 2) {
                 /* Alternative version is available */
                 /* Add format properties to first format */
                 link.setProperty(VimmNet.PROPERTY_FORMAT_ID, downloadformatsOptions[0][0]);
@@ -121,7 +131,11 @@ public class VimmNetCrawler extends PluginForDecrypt {
                 link2.setProperty(VimmNet.PROPERTY_PRE_GIVEN_FILENAME, goodTitle);
                 link2.setProperty(VimmNet.PROPERTY_FORMAT_ID, downloadformatsOptions[1][0]);
                 link2.setProperty(VimmNet.PROPERTY_FORMAT, Encoding.htmlDecode(downloadformatsOptions[1][1]).trim());
-                link2.setDownloadSize(Long.parseLong(filesizeAltZippedStr.toString()) * 1024);
+                /* Value 0 means that the size is unknown. */
+                final long filesizeAltZipped = Long.parseLong(filesizeAltZippedStr.toString()) * 1024;
+                if (filesizeAltZipped > 0) {
+                    link2.setDownloadSize(filesizeAltZipped);
+                }
                 ret.add(link2);
             }
             ret.add(link);
@@ -149,7 +163,7 @@ public class VimmNetCrawler extends PluginForDecrypt {
         /* Set some additional properties which we want to have on all of our results. */
         for (final DownloadLink result : ret) {
             result.setAvailable(true);
-            VimmNet.setFilename(result, false);
+            VimmNet.setFilename(this, result, false);
             if (fp != null) {
                 result._setFilePackage(fp);
             }

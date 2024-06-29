@@ -42,7 +42,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.LibGenInfo;
 
-@DecrypterPlugin(revision = "$Revision: 49208 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 2, names = {}, urls = {})
 public class LibGenCrawler extends PluginForDecrypt {
     public LibGenCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -286,7 +286,7 @@ public class LibGenCrawler extends PluginForDecrypt {
                     if (title != null) {
                         final String ext = getFileNameExtensionFromString(cover_art_url, ".jpg");
                         if (ext != null) {
-                            String filename_cover = correctOrApplyFileNameExtension(title, ext);
+                            String filename_cover = applyFilenameExtension(title, ext);
                             cover.setFinalFileName(filename_cover);
                         }
                     }

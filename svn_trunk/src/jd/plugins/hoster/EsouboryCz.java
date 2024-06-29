@@ -47,7 +47,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
 public class EsouboryCz extends PluginForHost {
     public EsouboryCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,7 +171,7 @@ public class EsouboryCz extends PluginForHost {
                 filename = Encoding.htmlDecode(filename).trim();
                 if (fileextension != null) {
                     fileextension = fileextension.trim();
-                    filename = this.correctOrApplyFileNameExtension(filename, fileextension);
+                    filename = this.applyFilenameExtension(filename, fileextension);
                 }
                 /* Do not set the final filename here as we'll have the API when downloading via account anyways! */
                 link.setName(filename);

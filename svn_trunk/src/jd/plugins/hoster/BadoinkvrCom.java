@@ -21,6 +21,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -41,12 +46,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class BadoinkvrCom extends PluginForHost {
     public BadoinkvrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,14 +91,15 @@ public class BadoinkvrCom extends PluginForHost {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
             /**
-             * 2023-11-14: </br> vrpornvideo: badoinkvr.com, babevr.com, 18vr.com </br> cosplaypornvideo: vrcosplayx.com </br>
+             * 2023-11-14: </br>
+             * vrpornvideo: badoinkvr.com, babevr.com, 18vr.com </br>
+             * cosplaypornvideo: vrcosplayx.com </br>
              * bdsm-vr-video: kinkvr.com
              */
             ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:members/)?[\\w\\-]+/([a-z0-9\\-_]+)\\-(\\d+)/?");
         }
         return ret.toArray(new String[0]);
     }
-
     /* DEV NOTES */
     // Tags: Porn plugin
     // protocol: no https
@@ -244,7 +245,7 @@ public class BadoinkvrCom extends PluginForHost {
             title = videoid + "_" + title;
             title = Encoding.htmlDecode(title);
             title = title.trim();
-            link.setName(this.correctOrApplyFileNameExtension(title, extDefault));
+            link.setName(this.applyFilenameExtension(title, extDefault));
         }
         if (filesize > 0) {
             /* Successfully found 'MOCH-filesize' --> Display assumed filesize for MOCH download. */
@@ -262,10 +263,7 @@ public class BadoinkvrCom extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String extReal = getExtensionFromMimeType(con);
-                if (extReal != null) {
-                    link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + extReal));
-                }
+                link.setFinalFileName(this.correctOrApplyFileNameExtension(title, con));
             } finally {
                 try {
                     con.disconnect();
@@ -396,7 +394,6 @@ public class BadoinkvrCom extends PluginForHost {
     public int getMaxSimultanFreeDownloadNum() {
         return free_maxdownloads;
     }
-
     // @Override
     // public Class<? extends PluginConfigInterface> getConfigInterface() {
     // return HereSphereConfig.class;

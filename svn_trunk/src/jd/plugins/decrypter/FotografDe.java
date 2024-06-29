@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 47857 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class FotografDe extends PluginForDecrypt {
     public FotografDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -173,7 +173,7 @@ public class FotografDe extends PluginForDecrypt {
                     /* Fallback */
                     ext = ".jpg";
                 }
-                final String finalFilename = this.correctOrApplyFileNameExtension(title, ext);
+                final String finalFilename = this.applyFilenameExtension(title, ext);
                 photo.setFinalFileName(finalFilename);
                 /* Make sure that this filename will never change even if the user resets that item. */
                 photo.setProperty(DirectHTTP.FIXNAME, finalFilename);

@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -207,10 +207,10 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                     ext = Plugin.getFileNameExtensionFromURL(urlThumbnail);
                 }
                 if (ext != null) {
-                    link.setFinalFileName(this.correctOrApplyFileNameExtension(Encoding.htmlDecode(title).trim(), ext));
+                    link.setFinalFileName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ext));
                 } else {
                     /* Fallback */
-                    link.setName(this.correctOrApplyFileNameExtension(Encoding.htmlDecode(title).trim(), ".jpg"));
+                    link.setName(this.applyFilenameExtension(Encoding.htmlDecode(title).trim(), ".jpg"));
                 }
                 link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
                 link.setAvailable(true);

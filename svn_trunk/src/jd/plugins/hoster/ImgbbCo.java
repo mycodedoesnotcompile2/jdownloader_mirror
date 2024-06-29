@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImgbbCo extends PluginForHost {
     public ImgbbCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +118,7 @@ public class ImgbbCo extends PluginForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             if (ext != null) {
-                filename = this.correctOrApplyFileNameExtension(filename, "." + ext.toLowerCase(Locale.ENGLISH));
+                filename = this.applyFilenameExtension(filename, "." + ext.toLowerCase(Locale.ENGLISH));
             }
             link.setFinalFileName(filename);
         }

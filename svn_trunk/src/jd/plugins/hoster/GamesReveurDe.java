@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47544 $", interfaceVersion = 2, names = { "games.reveur.de" }, urls = { "https?://(?:www\\.)?games\\.reveur\\.de/(?:en|de)/[A-Za-z0-9\\-_/]+\\.html" })
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 2, names = { "games.reveur.de" }, urls = { "https?://(?:www\\.)?games\\.reveur\\.de/(?:en|de)/[A-Za-z0-9\\-_/]+\\.html" })
 public class GamesReveurDe extends PluginForHost {
     public GamesReveurDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class GamesReveurDe extends PluginForHost {
         }
         final String assumedFileExtension = ".rar";
         if (!link.isNameSet()) {
-            final String urlpart = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/(.+)\\.html").getMatch(0);
+            final String urlpart = new Regex(link.getPluginPatternMatcher(), "(?i)https?://[^/]+/(.+)\\.html").getMatch(0);
             link.setName(urlpart + assumedFileExtension);
         }
         this.setBrowserExclusive();
@@ -78,7 +78,7 @@ public class GamesReveurDe extends PluginForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             filename += "_" + dlid;
-            filename = this.correctOrApplyFileNameExtension(filename, assumedFileExtension);
+            filename = this.applyFilenameExtension(filename, assumedFileExtension);
             link.setName(Encoding.htmlDecode(filename).trim());
         }
         if (filesize != null) {

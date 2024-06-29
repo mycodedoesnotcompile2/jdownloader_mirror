@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -35,11 +36,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VimmNetCrawler;
 
-@HostPlugin(revision = "$Revision: 49100 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49224 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VimmNetCrawler.class })
 public class VimmNet extends PluginForHost {
     public VimmNet(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -107,7 +115,6 @@ public class VimmNet extends PluginForHost {
             link.setName(this.getLinkID(link) + EXT_DEFAULT);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -115,30 +122,45 @@ public class VimmNet extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    public static void setFilename(final DownloadLink link, final boolean isFinalName) {
+    public static void setFilename(final Plugin plg, final DownloadLink link, final boolean setAsFinalFileName) {
         String preGivenFilename = link.getStringProperty(PROPERTY_PRE_GIVEN_FILENAME);
         if (StringUtils.isEmpty(preGivenFilename)) {
             /* This should never happen but can happen for older items which do not have this property. */
             return;
+        }
+        final String formatFileExtension = link.getStringProperty(PROPERTY_FORMAT);
+        String filename;
+        if (formatFileExtension != null && preGivenFilename.contains(".")) {
+            /**
+             * Item is available in multiple different formats. </br>
+             */
+            final String originalFileExtension = preGivenFilename.substring(preGivenFilename.lastIndexOf("."));
+            final String newFileEnding;
+            if (formatFileExtension.equalsIgnoreCase(originalFileExtension)) {
+                /* New extension == current extension */
+                newFileEnding = originalFileExtension;
+            } else {
+                if (formatFileExtension.endsWith(originalFileExtension)) {
+                    newFileEnding = formatFileExtension;
+                } else {
+                    newFileEnding = formatFileExtension + originalFileExtension;
+                }
+            }
+            if (!preGivenFilename.endsWith(newFileEnding)) {
+                filename = preGivenFilename.replaceFirst(Pattern.quote(originalFileExtension) + "$", newFileEnding);
+            } else {
+                filename = preGivenFilename;
+            }
+        } else {
+            filename = preGivenFilename;
         }
         /**
          * We know that this website is always providing .7z files. </br>
          * Filename is the same serverside regardless of the user selected file format. </br>
          * In JDownloader however, we want to have different filenames for each format.
          */
-        preGivenFilename = Plugin.getCorrectOrApplyFileNameExtension(preGivenFilename, EXT_DEFAULT);
-        final String formatFileExtension = link.getStringProperty(PROPERTY_FORMAT);
-        final String filename;
-        if (formatFileExtension != null) {
-            /**
-             * Item is available in multiple different formats. </br>
-             */
-            final String originalFileExtension = preGivenFilename.substring(preGivenFilename.lastIndexOf("."));
-            filename = Plugin.getCorrectOrApplyFileNameExtension(preGivenFilename, formatFileExtension + originalFileExtension);
-        } else {
-            filename = preGivenFilename;
-        }
-        if (isFinalName) {
+        filename = plg.applyFilenameExtension(filename, ".7z");
+        if (setAsFinalFileName) {
             link.setFinalFileName(filename);
         } else {
             link.setName(filename);

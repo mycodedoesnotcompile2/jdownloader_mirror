@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 49205 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49223 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -534,7 +534,7 @@ public class TwitterComCrawler extends PluginForDecrypt {
                 filename = originalFilename;
             } else {
                 /* E.g. .txt file filename which is supposed to look like filename of related media file(s). */
-                filename = Plugin.getCorrectOrApplyFileNameExtension(relatedOriginalFilename, ext);
+                filename = Plugin.correctOrApplyFileNameExtension(relatedOriginalFilename, ext);
             }
         } else if (scheme == FilenameScheme.ORIGINAL_WITH_TWEET_ID) {
             filename = tweetID;

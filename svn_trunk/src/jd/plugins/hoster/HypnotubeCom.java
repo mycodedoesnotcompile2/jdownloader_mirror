@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -33,10 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,10 +174,7 @@ public class HypnotubeCom extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String ext = getExtensionFromMimeType(con);
-                if (ext != null && title != null) {
-                    link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + ext));
-                }
+                link.setFinalFileName(this.correctOrApplyFileNameExtension(title, con));
             } finally {
                 try {
                     con.disconnect();

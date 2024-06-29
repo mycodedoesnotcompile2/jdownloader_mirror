@@ -33,12 +33,11 @@ import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
-import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HighWayCore;
 import jd.plugins.hoster.HighWayMe2;
 
-@DecrypterPlugin(revision = "$Revision: 49205 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder2 extends PluginForDecrypt {
     public HighWayMeFolder2(PluginWrapper wrapper) {
         super(wrapper);
@@ -167,7 +166,7 @@ public class HighWayMeFolder2 extends PluginForDecrypt {
                 final boolean isSingleFile = StringUtils.equals(zip, "1");
                 if (isSingleFile && trustZipAsSingleFile) {
                     /* We know we got only one file and it is downloadable. */
-                    link.setName(Plugin.getCorrectOrApplyFileNameExtension(name, ".zip"));
+                    link.setName(this.applyFilenameExtension(name, ".zip"));
                     final String filesizeBytesStr = (String) item.get("Size");
                     if (filesizeBytesStr != null) {
                         link.setDownloadSize(Long.parseLong(filesizeBytesStr));

@@ -30,11 +30,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "biguz.net" }, urls = { "https?://(?:www\\.)?biguz\\.net/(?:watch\\.php\\?id=\\d+|video/\\?id=\\d+\\&name=[a-z0-9\\-]+)" })
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "biguz.net" }, urls = { "https?://(?:www\\.)?biguz\\.net/(?:watch\\.php\\?id=\\d+|video/\\?id=\\d+\\&name=[a-z0-9\\-]+)" })
 public class BiguzNet extends PluginForHost {
     public BiguzNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,10 +131,7 @@ public class BiguzNet extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String ext = getExtensionFromMimeType(con);
-                if (ext != null) {
-                    link.setFinalFileName(this.correctOrApplyFileNameExtension(title, "." + ext));
-                }
+                link.setFinalFileName(this.correctOrApplyFileNameExtension(title, con));
             } finally {
                 try {
                     con.disconnect();

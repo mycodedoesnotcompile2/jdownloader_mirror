@@ -15,7 +15,7 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "e-hentai.org", type = Type.HOSTER)
 public interface EhentaiConfig extends PluginConfigInterface {
     public static final TRANSLATION TRANSLATION                                = new TRANSLATION();
-    final String                    text_AccountDownloadsPreferOriginalQuality = "Account downloads: Prefer original quality (better quality, counts towards image points limit)?";
+    final String                    text_AccountDownloadsPreferOriginalQuality = "Account downloads: Single images: Prefer original quality (better quality, counts towards image points limit)?";
     final String                    text_PreferOriginalFilename                = "Prefer original file name?";
     final String                    text_GalleryCrawlMode                      = "Gallery crawl mode";
 
@@ -55,7 +55,7 @@ public interface EhentaiConfig extends PluginConfigInterface {
         ZIP_AND_IMAGES {
             @Override
             public String getLabel() {
-                return "Crawl zip archive and images";
+                return "Crawl original zip archive and images";
             }
         },
         ZIP_ONLY {
@@ -67,7 +67,7 @@ public interface EhentaiConfig extends PluginConfigInterface {
         ZIP_DISABLED {
             @Override
             public String getLabel() {
-                return "Do not crawl zip archive: Crawl images only";
+                return "Do not crawl original zip archive: Crawl images only";
             }
         };
     }

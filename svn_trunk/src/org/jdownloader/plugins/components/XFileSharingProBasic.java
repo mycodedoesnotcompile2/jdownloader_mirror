@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49208 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49217 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -6002,16 +6002,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /** @return apikey but only if it is considered valid! */
     protected final String getAPIKeyFromConfig() {
-        final Class<? extends XFSConfigVideo> cfgO = getVideoConfigInterface();
+        final Class<? extends XFSConfig> cfgO = getConfigInterface();
         if (cfgO == null) {
             return null;
+        }
+        final String apikey = PluginJsonConfig.get(cfgO).getApikey();
+        if (looksLikeValidAPIKey(apikey)) {
+            return apikey;
         } else {
-            final String apikey = PluginJsonConfig.get(cfgO).getApikey();
-            if (looksLikeValidAPIKey(apikey)) {
-                return apikey;
-            } else {
-                return null;
-            }
+            return null;
         }
     }
 

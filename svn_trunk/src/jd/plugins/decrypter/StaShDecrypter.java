@@ -29,7 +29,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 44878 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 49222 $", interfaceVersion = 2, names = { "sta.sh" }, urls = { "https?://(?:www\\.)?sta\\.sh/(zip/)?[a-z0-9]+" })
 public class StaShDecrypter extends PluginForDecrypt {
     public StaShDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,14 +93,8 @@ public class StaShDecrypter extends PluginForDecrypt {
                     dl.setName(name + ".html");
                     dl.setAvailable(true);
                 } else {
-                    /* No ext found --> Don't set available, let host plugin perform a full check to find the correct name */
-                    final String ext = jd.plugins.hoster.StaSh.getFileExt(this.br);
-                    if (ext != null) {
-                        dl.setName(name + "." + ext);
-                        dl.setAvailable(true);
-                    } else {
-                        dl.setName(name);
-                    }
+                    dl.setName(name);
+                    dl.setAvailable(true);
                 }
                 decryptedLinks.add(dl);
             }

@@ -36,7 +36,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DociPl;
 
-@DecrypterPlugin(revision = "$Revision: 48824 $", interfaceVersion = 3, names = { "doci.pl" }, urls = { "https?://(?:www\\.)?doci\\.pl/[^\\?\\&]+" })
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "doci.pl" }, urls = { "https?://(?:www\\.)?doci\\.pl/[^\\?\\&]+" })
 public class DociPlCrawler extends PluginForDecrypt {
     public DociPlCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class DociPlCrawler extends PluginForDecrypt {
             }
             for (final String singleLink[] : files) {
                 String filename = singleLink[1];
-                filename = this.correctOrApplyFileNameExtension(filename, ".pdf");
+                filename = this.applyFilenameExtension(filename, ".pdf");
                 final String url = br.getURL(singleLink[0]).toExternalForm();
                 final DownloadLink link = createDownloadlink(url);
                 link.setDefaultPlugin(plg);

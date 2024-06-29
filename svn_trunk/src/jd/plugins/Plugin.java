@@ -261,8 +261,8 @@ public abstract class Plugin implements ActionListener {
      *
      * @return Datename des Downloads.
      */
-    public static String extractFileNameFromURL(final String iFilename) {
-        String ret = iFilename;
+    public static String extractFileNameFromURL(final String filename) {
+        String ret = filename;
         if (StringUtils.isEmpty(ret)) {
             return null;
         }
@@ -450,17 +450,9 @@ public abstract class Plugin implements ActionListener {
         return getFileNameFromURL(new URL(url));
     }
 
-    public String correctOrApplyFileNameExtension(final String filenameOrg, final String newExtension) {
-        return getCorrectOrApplyFileNameExtension(filenameOrg, newExtension);
-    }
-
-    public String correctOrApplyFileNameExtension(String name, URLConnectionAdapter connection) {
+    public String correctOrApplyFileNameExtension(final String filenameOrg, final URLConnectionAdapter connection) {
         final String extNew = getExtensionFromMimeType(connection);
-        return getCorrectOrApplyFileNameExtension(name, extNew);
-    }
-
-    public static String getCorrectOrApplyFileNameExtension(final String filenameOrg, String newExtension) {
-        return correctOrApplyFileNameExtension(filenameOrg, newExtension, false);
+        return correctOrApplyFileNameExtension(filenameOrg, extNew);
     }
 
     /**
@@ -476,7 +468,7 @@ public abstract class Plugin implements ActionListener {
      *
      * @return Filename with new extension
      */
-    public static String correctOrApplyFileNameExtension(final String filenameOrg, String newExtension, final boolean force) {
+    public static String correctOrApplyFileNameExtension(final String filenameOrg, String newExtension) {
         if (StringUtils.isEmpty(filenameOrg) || StringUtils.isEmpty(newExtension)) {
             return filenameOrg;
         }
@@ -504,11 +496,6 @@ public abstract class Plugin implements ActionListener {
         if (StringUtils.isEmpty(currentFileExtension)) {
             return filenameOrg;
         }
-        if (force) {
-            /* Replace extension without any further checks. */
-            final String filenameWithoutExtension = filenameOrg.substring(0, lastIndex);
-            return filenameWithoutExtension + newExtension;
-        }
         final CompiledFiletypeExtension filetypeOld = CompiledFiletypeFilter.getExtensionsFilterInterface(currentFileExtension);
         if (filetypeOld == null) {
             /* Unknown current/old filetype -> Do not touch given filename */
@@ -525,7 +512,11 @@ public abstract class Plugin implements ActionListener {
         return filenameOrg;
     }
 
-    /** Adds extension to given filename if given filename does not already end with new extension. */
+    /**
+     * Adds extension to given filename if given filename does not already end with new extension. </br>
+     * Do not use this to replace a file extension with another one if you clearly know what to replace with what because this will auto
+     * decide whether to replace or append the new extension!
+     */
     public String applyFilenameExtension(final String filenameOrg, String newExtension) {
         if (filenameOrg == null) {
             return null;

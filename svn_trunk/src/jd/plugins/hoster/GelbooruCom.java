@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48846 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
 public class GelbooruCom extends PluginForHost {
     public GelbooruCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,15 +157,17 @@ public class GelbooruCom extends PluginForHost {
                 dllink = br.getRegex("<\\s*source\\s+[^>]*src\\s*=\\s*(\"|'|)(.*?)\\1").getMatch(1);
             }
         }
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+        }
         final GelbooruComConfig cfg = PluginJsonConfig.get(GelbooruComConfig.class);
         final FilenameScheme scheme = cfg.getPreferredFilenameScheme();
         final String originalFilename = dllink != null ? Plugin.getFileNameFromURL(dllink) : null;
         if (scheme == FilenameScheme.SERVER_FILENAME && originalFilename != null) {
             link.setFinalFileName(originalFilename);
         } else if (title != null) {
-            title = Encoding.htmlDecode(title).trim();
             final String extFromURL = getFileNameExtensionFromString(dllink, extDefault);
-            link.setFinalFileName(this.correctOrApplyFileNameExtension(title, extFromURL));
+            link.setFinalFileName(this.applyFilenameExtension(title, extFromURL));
         }
         if (!StringUtils.isEmpty(dllink) && !isDownload) {
             dllink = Encoding.htmlOnlyDecode(dllink);
@@ -182,6 +184,11 @@ public class GelbooruCom extends PluginForHost {
                         } else {
                             link.setVerifiedFileSize(con.getCompleteContentLength());
                         }
+                    }
+                    if (scheme == FilenameScheme.SERVER_FILENAME && originalFilename != null) {
+                        link.setFinalFileName(this.correctOrApplyFileNameExtension(originalFilename, con));
+                    } else if (title != null) {
+                        link.setFinalFileName(this.correctOrApplyFileNameExtension(title, con));
                     }
                 } finally {
                     try {

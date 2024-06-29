@@ -41,7 +41,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48727 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String PRESET_NAME_PROPERTY               = "preSetName";
     public static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -261,7 +261,7 @@ public class GenericM3u8 extends PluginForHost {
         if (bandwidth > 0 && ((videoq == null && audioq == null) || PluginJsonConfig.get(GenericM3u8DecrypterConfig.class).isAddBandwidthValueToFilenames())) {
             name += "_bw_" + bandwidth;
         }
-        name = plugin.correctOrApplyFileNameExtension(name, "." + assumedFileExtension);
+        name = plugin.applyFilenameExtension(name, "." + assumedFileExtension);
         if (setFinalFilename) {
             link.setFinalFileName(name);
         } else {

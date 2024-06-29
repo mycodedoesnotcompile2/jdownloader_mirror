@@ -26,7 +26,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48351 $", interfaceVersion = 3, names = { "lezlezlez.com" }, urls = { "https?://(?:www\\.)?lezlezlez\\.com/mediaswf\\.php\\?type=vid\\&name=[^<>\"/]+\\.flv" })
+@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "lezlezlez.com" }, urls = { "https?://(?:www\\.)?lezlezlez\\.com/mediaswf\\.php\\?type=vid\\&name=[^<>\"/]+\\.flv" })
 public class LezlezlezCom extends PluginForDecrypt {
     public LezlezlezCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -36,7 +36,7 @@ public class LezlezlezCom extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String name = UrlQuery.parse(param.getCryptedUrl()).get("name");
         final String finallink = "https://www.lezlezlez.com/vidz/" + name.replace(".flv", ".mp4");
-        final String finalfilename = this.correctOrApplyFileNameExtension(name, ".mp4");
+        final String finalfilename = this.applyFilenameExtension(name, ".mp4");
         final DownloadLink dl = createDownloadlink(finallink);
         dl.setFinalFileName(finalfilename);
         ret.add(dl);
