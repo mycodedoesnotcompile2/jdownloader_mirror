@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 49195 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49226 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -450,7 +450,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                         dl = jd.plugins.BrowserAdapter.openDownload(br, link, contenturl, this.isResumeable(link, account), this.getMaxChunks(account));
                         con = dl.getConnection();
                     } else {
-                        br.openGetConnection(contenturl);
+                        con = br.openGetConnection(contenturl);
                     }
                     if (this.looksLikeDownloadableContent(con)) {
                         logger.info("Direct download");
@@ -469,6 +469,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                     }
                     /* No direct download */
                     br.followConnection(true);
+                    this.runPostRequestTask(br);
                     dl = null;
                     /* Try again if we are unsure whether or not we are logged in. */
                     if (account == null || hasGoneThroughVerifiedLoginOnce) {
