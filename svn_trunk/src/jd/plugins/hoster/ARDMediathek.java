@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49221 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 49228 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String             dllink                           = null;
     public static final String PROPERTY_CRAWLER_FORCED_FILENAME = "crawler_forced_filename";
@@ -186,9 +186,7 @@ public class ARDMediathek extends PluginForHost {
                     connectionErrorhandling(con);
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
+                setFileInfo(link, con);
             } finally {
                 try {
                     con.disconnect();
@@ -197,6 +195,26 @@ public class ARDMediathek extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    private void setFileInfo(final DownloadLink link, final URLConnectionAdapter con) {
+        if (con.getCompleteContentLength() > 0) {
+            if (con.isContentDecoded()) {
+                link.setDownloadSize(con.getCompleteContentLength());
+            } else {
+                link.setVerifiedFileSize(con.getCompleteContentLength());
+            }
+        }
+        final String etag = con.getRequest().getResponseHeader("etag");
+        if (etag != null) {
+            try {
+                final String md5 = etag.replace("\"", "").split(":")[0];
+                if (md5.matches("[A-Fa-f0-9]{32}")) {
+                    link.setMD5Hash(md5);
+                }
+            } catch (final Throwable ignore) {
+            }
+        }
     }
 
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter con, final DownloadLink link) {
@@ -251,6 +269,7 @@ public class ARDMediathek extends PluginForHost {
                 this.connectionErrorhandling(dl.getConnection());
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
             }
+            setFileInfo(link, dl.getConnection());
             if (this.dl.startDownload()) {
                 this.postprocess(link);
             }

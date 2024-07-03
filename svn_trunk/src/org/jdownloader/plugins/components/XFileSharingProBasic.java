@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49217 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49234 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -291,7 +291,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     /** Returns property to store generated directurl -> Depends on current download mode and account account type. */
@@ -869,6 +869,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (ret) {
             /* Double-check in cleaned HTML */
             ret = new Regex(correctBR(br), pattern).patternFind();
+            if (!ret) {
+                logger.warning("File is password protected according to html but is not password protected according to cleaned HTML!");
+            }
         }
         return ret;
     }
@@ -938,7 +941,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
         final String apiKey = this.getAPIKey();
-        if ((this.looksLikeValidAPIKey(apiKey) && this.supportsAPIMassLinkcheck()) || enableAccountApiOnlyMode()) {
+        if (enableAccountApiOnlyMode() || (this.looksLikeValidAPIKey(apiKey) && this.supportsAPIMassLinkcheck())) {
             return massLinkcheckerAPI(urls, apiKey);
         } else if (supportsMassLinkcheckOverWebsite()) {
             return this.massLinkcheckerWebsite(urls);
@@ -3173,7 +3176,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     }
 
     @Override
-    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
         if (isPremium(acc)) {
             /* Premium accounts don't have captchas */
             return false;
