@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -36,7 +34,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VimmNetCrawler;
 
-@HostPlugin(revision = "$Revision: 49224 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VimmNetCrawler.class })
 public class VimmNet extends PluginForHost {
     public VimmNet(PluginWrapper wrapper) {
@@ -155,11 +155,10 @@ public class VimmNet extends PluginForHost {
             filename = preGivenFilename;
         }
         /**
-         * We know that this website is always providing .7z files. </br>
-         * Filename is the same serverside regardless of the user selected file format. </br>
-         * In JDownloader however, we want to have different filenames for each format.
+         * We know that this website is always providing .7z files. </br> Filename is the same serverside regardless of the user selected
+         * file format. </br> In JDownloader however, we want to have different filenames for each format.
          */
-        filename = plg.applyFilenameExtension(filename, ".7z");
+        filename = plg.applyFilenameExtension(filename, EXT_DEFAULT);
         if (setAsFinalFileName) {
             link.setFinalFileName(filename);
         } else {

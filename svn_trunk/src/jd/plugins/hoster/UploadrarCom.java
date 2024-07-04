@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49244 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadrarCom extends XFileSharingProBasic {
     public UploadrarCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -47,6 +47,13 @@ public class UploadrarCom extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "uploadrar.com", "uploadrar.net" });
         return ret;
+    }
+
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("uploadrar.net"); // 2024-07-03
+        return deadDomains;
     }
 
     @Override

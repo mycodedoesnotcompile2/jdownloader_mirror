@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49200 $", interfaceVersion = 3, names = { "sextvx.com" }, urls = { "https?://(?:www\\.)?sextvx\\.com/(?:(?:[a-z]{2}/)?video/\\d+/[a-z0-9\\-]+|embed/\\d+)" })
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "sextvx.com" }, urls = { "https?://(?:www\\.)?sextvx\\.com/(?:(?:[a-z]{2}/)?video/\\d+/[a-z0-9\\-]+|embed/\\d+)" })
 public class SextvxCom extends PluginForHost {
     public SextvxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -185,19 +185,6 @@ public class SextvxCom extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
-    }
-
-    private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(con)) {
-            br.followConnection(true);
-            if (con.getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
-            }
-        }
     }
 
     @Override

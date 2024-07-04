@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49128 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49248 $", interfaceVersion = 3, names = {}, urls = {})
 public class OneFichierCom extends PluginForHost {
     private final String         PROPERTY_FREELINK                 = "freeLink";
     private final String         PROPERTY_HOTLINK                  = "hotlink";
@@ -841,7 +841,7 @@ public class OneFichierCom extends PluginForHost {
                 final AccountInfo ai = new AccountInfo();
                 ai.setExpired(true);
                 account.setAccountInfo(ai);
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Premium expired: Only premium users can use the 1fichier API)", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Premium expired: Only premium users can use the 1fichier API", PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else if (isAPIErrorPassword(message)) {
                 /* 2021-02-10: This will usually be handled outside of this errorhandling! */
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password");

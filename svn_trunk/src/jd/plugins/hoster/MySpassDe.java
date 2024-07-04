@@ -21,8 +21,6 @@ import java.text.DecimalFormat;
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -32,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48377 $", interfaceVersion = 3, names = { "myspass.de", "tvtotal.prosieben.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$", "https?://tvtotal\\.prosieben\\.de/(videos/.*?/\\d+/|videoplayer/\\?id=\\d+)" })
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "myspass.de", "tvtotal.prosieben.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$", "https?://tvtotal\\.prosieben\\.de/(videos/.*?/\\d+/|videoplayer/\\?id=\\d+)" })
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,23 +138,11 @@ public class MySpassDe extends PluginForHost {
                 logger.warning("Failed to fix final downloadurl --> Download might not be possible!");
             }
             if (!isDownload) {
-                link.setFinalFileName(filename + ext);
-                URLConnectionAdapter con = null;
-                try {
-                    con = br.openHeadConnection(dllink);
-                    handleConnectionErrors(br, con);
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (Throwable e) {
-                    }
-                }
+                link.setFinalFileName(applyFilenameExtension(filename, ext));
+                basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), ext);
             }
         } else {
-            link.setName(filename + ext);
+            link.setName(applyFilenameExtension(filename, ext));
         }
         return AvailableStatus.TRUE;
     }
@@ -175,19 +161,6 @@ public class MySpassDe extends PluginForHost {
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
-    }
-
-    private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(con)) {
-            br.followConnection(true);
-            if (con.getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
-            }
-        }
     }
 
     private String getXML(final String parameter) {

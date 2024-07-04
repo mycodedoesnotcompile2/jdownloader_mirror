@@ -52,7 +52,6 @@ import org.appwork.utils.StringUtils;
  *
  */
 public class ContainerRuntime {
-
     public static enum TYPE {
         DOCKER,
         KUBERNETES,
@@ -158,7 +157,7 @@ public class ContainerRuntime {
 
     private static Object[] detectContainerByProc() {
         if (CrossSystem.isUnix()) {
-            for (final String procFileString : new String[] { "/proc/1/cgroup", "/proc/self/cgroup", "/proc/version_signature" }) {
+            for (final String procFileString : new String[] { "/proc/1/cgroup", "/proc/self/cgroup", "/proc/version_signature", "/proc/version" }) {
                 final File procFile = new File(procFileString);
                 if (procFile.isFile()) {
                     FileInputStream fis = null;
@@ -168,8 +167,8 @@ public class ContainerRuntime {
                         try {
                             String line = null;
                             while ((line = is.readLine()) != null) {
-                                if (procFileString.endsWith("/version_signature")) {
-                                    if (line.matches("(?i).*Microsoft.*")) {
+                                if (procFileString.startsWith("/proc/version")) {
+                                    if (line.matches("(?i).*-WSL2?\\s+.*") && line.matches("(?i).*Microsoft.*")) {
                                         return new Object[] { TYPE.WSL, System.getenv("WSL_DISTRO_NAME") };
                                     }
                                 } else if (procFileString.endsWith("/cgroup")) {

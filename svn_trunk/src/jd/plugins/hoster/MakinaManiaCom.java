@@ -17,8 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -36,7 +34,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "makinamania.net" }, urls = { "https?://(?:www\\.)?makinamania\\.(?:com|net)/((download/|descargar\\-).+|index\\.php\\?action=dlattach;topic=\\d+(?:\\.0)?;attach=\\d+)" })
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "makinamania.net" }, urls = { "https?://(?:www\\.)?makinamania\\.(?:com|net)/((download/|descargar\\-).+|index\\.php\\?action=dlattach;topic=\\d+(?:\\.0)?;attach=\\d+)" })
 public class MakinaManiaCom extends PluginForHost {
     public MakinaManiaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -222,13 +222,16 @@ public class MakinaManiaCom extends PluginForHost {
         dl.startDownload();
     }
 
-    private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (!this.looksLikeDownloadableContent(con)) {
             logger.warning("The final dllink seems not to be a file!");
             br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         } else if (dl.getConnection().getLongContentLength() == 0) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error: File is empty", 10 * 60 * 1000l);
+        } else {
+            super.handleConnectionErrors(br, con);
         }
     }
 

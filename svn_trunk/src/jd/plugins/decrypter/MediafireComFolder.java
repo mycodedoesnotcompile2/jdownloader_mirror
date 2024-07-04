@@ -16,12 +16,10 @@
 package jd.plugins.decrypter;
 
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -41,7 +39,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-@DecrypterPlugin(revision = "$Revision: 48110 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,7 +112,7 @@ public class MediafireComFolder extends PluginForDecrypt {
             return ret;
         } else if (fid != null) {
             /* Single file */
-            final String filenameFromURL = Plugin.getFileNameFromURL(param.getCryptedUrl());
+            final String filenameFromURL = Plugin.getFileNameFromURL(new URL(param.getCryptedUrl()));
             final DownloadLink file = createSingleFileDownloadlink(fid, filenameFromURL);
             ret.add(file);
             if (directurl != null) {

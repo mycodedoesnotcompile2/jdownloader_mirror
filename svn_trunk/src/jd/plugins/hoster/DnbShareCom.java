@@ -15,9 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
+import java.net.URL;
 
 import jd.PluginWrapper;
 import jd.parser.Regex;
@@ -32,11 +30,15 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 /**
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 48990 $", interfaceVersion = 2, names = { "dnbshare.com" }, urls = { "^https?://[\\w\\.]*?dnbshare\\.com/download/[^<>\"/]*?(?:\\.mp3|\\.html)$" })
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "dnbshare.com" }, urls = { "^https?://[\\w\\.]*?dnbshare\\.com/download/[^<>\"/]*?(?:\\.mp3|\\.html)$" })
 public class DnbShareCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public DnbShareCom(PluginWrapper wrapper) {
@@ -65,7 +67,7 @@ public class DnbShareCom extends PluginForHost {
         br.setFollowRedirects(true);
         if (!link.isNameSet()) {
             /* Set weak-filename */
-            String nameFromURL = Plugin.getFileNameFromURL(link.getPluginPatternMatcher());
+            String nameFromURL = Plugin.getFileNameFromURL(new URL(link.getPluginPatternMatcher()));
             if (nameFromURL != null) {
                 nameFromURL = nameFromURL.replaceFirst("\\.html$", "");
                 link.setName(nameFromURL);

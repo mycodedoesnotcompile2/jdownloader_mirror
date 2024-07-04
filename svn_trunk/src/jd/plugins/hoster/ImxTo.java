@@ -17,9 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -34,7 +31,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
 public class ImxTo extends PluginForHost {
     private static final String PROPERTY_DIRECTURL = "directurl";
     private static final String TYPE_THUMBNAIL     = "(?i)https?://[^/]+/(?:u/)?t/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+";
@@ -210,9 +210,9 @@ public class ImxTo extends PluginForHost {
                     }
                     if (link.getFinalFileName() == null) {
                         String name = link.getName();
-                        final String existingExt = getFileNameExtensionFromString(name);
+                        final String existingExt = getFileNameExtensionFromString(name, null);
                         if (existingExt == null || ".html".equals(existingExt)) {
-                            name += ".jpg";
+                            name = applyFilenameExtension(name, ".jpg");
                         }
                         link.setFinalFileName(name);
                     }

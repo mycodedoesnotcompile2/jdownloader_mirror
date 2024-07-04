@@ -2,6 +2,10 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -14,11 +18,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-
-@DecrypterPlugin(revision = "$Revision: 49093 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(\\?filename=.+|/.+)?", "ipfs://[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(/.+)?" })
+@DecrypterPlugin(revision = "$Revision: 49244 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(\\?filename=.+|/.+)?", "ipfs://[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(/.+)?" })
 public class IPFS extends PluginForDecrypt {
     // https://developers.cloudflare.com/distributed-web/ipfs-gateway
     // https://docs.ipfs.io/concepts/ipfs-gateway/
@@ -59,8 +59,8 @@ public class IPFS extends PluginForDecrypt {
                     name = getFileNameFromURL(br._getURL());
                 }
                 if (name == null) {
-                    final String extension = getExtensionFromMimeType(con);
-                    name = cid + (extension != null ? ("." + extension) : "");
+                    final String extension = getExtensionFromConnection(con);
+                    name = this.applyFilenameExtension(cid, extension);
                 }
             }
             if (name != null) {

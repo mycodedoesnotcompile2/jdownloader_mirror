@@ -18,11 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -31,12 +26,16 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 48286 $", interfaceVersion = 3, names = { "ero-video.net" }, urls = { "https?://(?:[a-z0-9]+\\.)?ero\\-video\\.net/movie/\\?mcd=[A-Za-z0-9]+" })
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = { "ero-video.net" }, urls = { "https?://(?:[a-z0-9]+\\.)?ero\\-video\\.net/movie/\\?mcd=[A-Za-z0-9]+" })
 public class EroVideoNet extends PornEmbedParser {
     private static AtomicReference<String> DELIMITER = new AtomicReference<String>(null);
 
@@ -104,7 +103,7 @@ public class EroVideoNet extends PornEmbedParser {
                             for (final String movieURL[] : movieURLs) {
                                 final DownloadLink link = createDownloadlink("directhttp://" + movieURL[2]);
                                 link.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
-                                link.setFinalFileName(title + "_" + movieURL[0] + Plugin.getFileNameExtensionFromURL(movieURL[2]));
+                                link.setFinalFileName(title + "_" + movieURL[0] + getFileNameExtensionFromURL(movieURL[2]));
                                 link.setContentUrl(param.getCryptedUrl());
                                 ret.add(link);
                             }

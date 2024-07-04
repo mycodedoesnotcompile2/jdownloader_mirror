@@ -25,9 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.text.TextDownloader;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -43,7 +40,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.text.TextDownloader;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -238,21 +238,6 @@ public class KemonoParty extends PluginForHost {
             return true;
         } else {
             return super.looksLikeDownloadableContent(urlConnection);
-        }
-    }
-
-    private void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
-        if (!this.looksLikeDownloadableContent(con)) {
-            br.followConnection(true);
-            if (con.getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (con.getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            } else if (con.getResponseCode() == 429) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "429 Too Many Requests", 1 * 60 * 1000l);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File broken?");
-            }
         }
     }
 

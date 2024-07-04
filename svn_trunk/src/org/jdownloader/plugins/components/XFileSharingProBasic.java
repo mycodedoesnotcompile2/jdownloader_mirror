@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49234 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49247 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2507,12 +2507,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          */
         dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
-            /*
-             * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
-             */
-            dllink = br.getRegex("<a href=\"(https?[^\"]+)\"[^>]*>Direct Download Link\\s*</a>").getMatch(0);
-        }
-        if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
             return null;
         } else {
@@ -2636,16 +2630,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final Form download1 = br.getFormByInputFieldKeyValue("op", "download_orig");
         if (download1 != null) {
             handleCaptcha(link, br, download1);
+            logger.info("Waiting extra wait seconds: " + getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds());
+            this.sleep(getDllinkViaOfficialVideoDownloadExtraWaittimeSeconds() * 1000l, link);
             submitForm(br, download1);
             checkErrors(br, br.getRequest().getHtmlCode(), link, account, false);
         }
         String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-        if (StringUtils.isEmpty(dllink)) {
-            /*
-             * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
-             */
-            dllink = br.getRegex("<a href\\s*=\\s*\"(https?[^\"]+)\"[^>]*>\\s*Direct Download Link\\s*</a>").getMatch(0);
-        }
         if (StringUtils.isEmpty(dllink)) {
             logger.warning("Failed to find dllink via official video download");
             return null;
@@ -3327,8 +3317,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Used for imagehosts */
             dllink = getDllinkImagehost(link, account, br, src);
         }
-        if (dllink != null && Encoding.isHtmlEntityCoded(dllink)) {
-            /* 2020-02-10: E.g. files.im */
+        if (dllink != null) {
             dllink = Encoding.htmlOnlyDecode(dllink);
         }
         return dllink;
@@ -3521,6 +3510,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 // jwplayer("flvplayer").onError(function()...
                 dllink = check;
             }
+        }
+        if (StringUtils.isEmpty(dllink)) {
+            /* Official video download */
+            /*
+             * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
+             */
+            dllink = br.getRegex("<a[^>]*href=\"(https?[^\"]+)\"[^>]*>\\s*Direct Download Link\\s*</a>").getMatch(0);
         }
         return dllink;
     }
@@ -3915,7 +3911,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         String filenameURL = this.getFilenameFromURL(link);
         if (filenameURL != null) {
             filenameURL = URLEncode.decodeURIComponent(filenameURL);
-            if (getFileNameExtensionFromString(filenameURL) == null) {
+            if (getFileNameExtensionFromString(filenameURL, null) == null) {
                 if (this.internal_isVideohoster_enforce_video_filename(link, br)) {
                     return filenameURL + ".mp4";
                 } else if (isImagehoster()) {

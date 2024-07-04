@@ -57,7 +57,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.TwitterComCrawler;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterCom extends PluginForHost {
     public TwitterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -506,7 +506,7 @@ public class TwitterCom extends PluginForHost {
         final String tweetID = link.getStringProperty(TwitterComCrawler.PROPERTY_TWEET_ID);
         if (tweetID != null) {
             /* Item from crawler which shall contain all information needed to set custom filenames. */
-            TwitterComCrawler.setFormattedFilename(link);
+            TwitterComCrawler.setFormattedFilename(this, link);
         } else if (filenameFromConnection != null) {
             link.setFinalFileName(filenameFromConnection);
         }

@@ -19,11 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -33,7 +29,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
 public class GiphyCom extends PluginForHost {
     public GiphyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -140,28 +139,11 @@ public class GiphyCom extends PluginForHost {
         }
         if (!StringUtils.isEmpty(dllink)) {
             dllink = Encoding.htmlDecode(dllink);
-            URLConnectionAdapter con = null;
             try {
-                con = br.openHeadConnection(this.dllink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    server_issues = true;
-                } else {
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    if (title != null) {
-                        link.setFinalFileName(this.correctOrApplyFileNameExtension(title, con));
-                    }
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
+                basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, title, ".gif");
+            } catch (Exception e) {
+                logger.log(e);
+                server_issues = true;
             }
         }
         return AvailableStatus.TRUE;

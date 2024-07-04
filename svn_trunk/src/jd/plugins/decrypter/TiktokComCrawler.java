@@ -59,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 49205 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49246 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -427,7 +427,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         if (aweme_detail == null || aweme_detail.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return this.crawlProcessWebsiteMediaMapSingleTiktokItem(hostPlg, aweme_detail, null, true);
+        return this.crawlProcessWebsiteMediaMapSingleTiktokItem(hostPlg, aweme_detail, null, forceGrabAll);
     }
 
     private void checkErrorsWebsite(final Browser br) throws PluginException, DecrypterRetryException {
@@ -1127,10 +1127,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
             final Boolean has_watermark = Boolean.TRUE.equals(video.get("has_watermark"));
             Map<String, Object> downloadInfo = (Map<String, Object>) video.get("download_addr");
             if (downloadInfo == null) {
-                /* Fallback/old way */
-                final String downloadJson = video.get("misc_download_addrs").toString();
-                final Map<String, Object> misc_download_addrs = restoreFromString(downloadJson, TypeRef.MAP);
-                downloadInfo = (Map<String, Object>) misc_download_addrs.get("suffix_scene");
+                /* Look for official download json */
+                final String downloadJson = (String) video.get("misc_download_addrs");
+                if (downloadJson != null) {
+                    final Map<String, Object> misc_download_addrs = restoreFromString(downloadJson, TypeRef.MAP);
+                    downloadInfo = (Map<String, Object>) misc_download_addrs.get("suffix_scene");
+                }
             }
             final Map<String, Object> play_addr = (Map<String, Object>) video.get("play_addr");
             /* Get non-HD directurl */

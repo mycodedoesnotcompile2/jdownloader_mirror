@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 49130 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49248 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1730,7 +1730,7 @@ public class PornHubCom extends PluginForHost {
              */
             return true;
         } else {
-            if ("debrid-link.fr".equals(plugin.getHost())) {
+            if ("debrid-link.fr".equals(plugin.getHost()) || "debrid-link.com".equals(plugin.getHost())) {
                 // only supports 360p
                 return false;
             } else {

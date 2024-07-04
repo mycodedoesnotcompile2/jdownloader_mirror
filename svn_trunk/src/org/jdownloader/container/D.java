@@ -27,24 +27,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.appwork.utils.Files;
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.XML;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.updatev2.UpdateController;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-
 import jd.config.SubConfiguration;
-import jd.controlling.linkcollector.LinknameCleaner;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.linkcrawler.PackageInfo;
@@ -63,13 +46,29 @@ import jd.utils.JDHexUtils;
 import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
+import org.appwork.utils.Files;
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.XML;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.updatev2.UpdateController;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
 public class D extends PluginsC {
     private byte[]                  b3;
     private byte[]                  d;
     private HashMap<String, String> header;
 
     public D() {
-        super("DLC", "file:/.+\\.dlc$", "$Revision: 48725 $");
+        super("DLC", "file:/.+\\.dlc$", "$Revision: 49240 $");
         b3 = new byte[] { 77, 69, 84, 65, 45, 73, 78, 70, 47, 74, 68, 79, 87, 78, 76, 79, 65, 46, 68, 83, 65 };
         d = new byte[] { -44, 47, 74, 116, 56, -46, 20, 9, 17, -53, 0, 8, -47, 121, 1, 75 };
         // kk = (byte[]) SubConfiguration.getConfig(new String(new byte[] { 97,
@@ -650,10 +649,9 @@ public class D extends PluginsC {
             String oos = ps.item(pgs).getAttributes().getNamedItem("passwords") == null ? null : Encoding.Base64Decode(ps.item(pgs).getAttributes().getNamedItem("passwords").getNodeValue());
             String cs2 = ps.item(pgs).getAttributes().getNamedItem("comment") == null ? null : Encoding.Base64Decode(ps.item(pgs).getAttributes().getNamedItem("comment").getNodeValue());
             String ca3 = ps.item(pgs).getAttributes().getNamedItem("category") == null ? null : Encoding.Base64Decode(ps.item(pgs).getAttributes().getNamedItem("category").getNodeValue());
-            // TODO: 2023-11-23: Why is this check for "n.A." here?
-            if (packagename != null && !"n.A.".equals(packagename)) {
-                // n.A. is no good default packageName
-                dpi.setName(LinknameCleaner.cleanPackagename(packagename, false));
+            if (StringUtils.isNotEmpty(packagename) && !"n.A.".equals(packagename)) {
+                // n.A. (not Available, set by some libs/tools) is no good default packageName
+                dpi.setName(packagename);
             }
             if (ca3 != null && ca3.trim().length() > 0) {
                 // dpi.setComment("[" + ca3 + "] " + cs2);

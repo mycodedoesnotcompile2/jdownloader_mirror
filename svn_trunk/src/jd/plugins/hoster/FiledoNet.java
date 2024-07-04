@@ -4,13 +4,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -23,20 +21,11 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -46,11 +35,23 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49231 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -59,9 +60,12 @@ public class FiledoNet extends PluginForHost {
 
     @Override
     public Browser createNewBrowserInstance() {
-        final Browser br = super.createNewBrowserInstance();
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
-        br.setFollowRedirects(true);
+        final Browser br = new PluginBrowser<FiledoNet>(this) {
+            {
+                getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
+                setFollowRedirects(true);
+            }
+        };
         return br;
     }
 
@@ -108,7 +112,7 @@ public class FiledoNet extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    public static final String API_BASE = "https://api.filedo.net";
+    private final String API_BASE = "https://api.filedo.net";
 
     @Override
     public String getAGBLink() {
@@ -149,7 +153,7 @@ public class FiledoNet extends PluginForHost {
         }
         final String counterFileName = query.get("counterFileName");
         final GetRequest req = br.createGetRequest(API_BASE + "/file?fileId=" + fileId);
-        final Map<String, Object> resp = (Map<String, Object>) this.callAPI(req, null, link);
+        final Map<String, Object> resp = this.callAPI(req, null, link);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -161,8 +165,8 @@ public class FiledoNet extends PluginForHost {
         if (fileSize != null) {
             link.setVerifiedFileSize(Long.parseLong(fileSize) * 1024);
         }
-        final byte[] decodedFileNameIv = Base64.getDecoder().decode(URLDecoder.decode(counterFileName, "UTF-8"));
-        final byte[] decoded = Base64.getDecoder().decode(URLDecoder.decode(key, "UTF-8"));
+        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
+        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
         /* Set final filename here because Content-Disposition header contains crypted filename. */
         final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
         link.setFinalFileName(decryptedFileName);
@@ -203,13 +207,13 @@ public class FiledoNet extends PluginForHost {
         handleDownload(link, null, dlUrl);
     }
 
-    private String decryptFileName(String encryptedFileName, byte[] keyData, byte[] iv) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, NoSuchPaddingException {
+    private String decryptFileName(String encryptedFileName, byte[] keyData, byte[] iv) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, NoSuchPaddingException, UnsupportedEncodingException {
         SecretKeySpec secretKeySpec = new SecretKeySpec(keyData, "AES");
         IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
         Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
-        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedFileName));
-        return new String(decryptedBytes, StandardCharsets.UTF_8);
+        byte[] decryptedBytes = cipher.doFinal(Base64.decode(encryptedFileName));
+        return new String(decryptedBytes, "UTF-8");
     }
 
     private void decryptFile(String encryptedFilePath, String decryptedFilePath, byte[] keyData, ArrayList<byte[]> iv, String decryptedFileName) throws Exception {
@@ -245,7 +249,7 @@ public class FiledoNet extends PluginForHost {
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dlUrl, this.isResumeable(link, null), this.getMaxChunks(link, null));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection();
+            br.followConnection(true);
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Got unexpected non-file content");
         }
         if (dl.startDownload()) {
@@ -261,9 +265,9 @@ public class FiledoNet extends PluginForHost {
             String[] test = countersString.split(",");
             ArrayList<byte[]> decodedIvs = new ArrayList<byte[]>();
             for (int i = 0; i < test.length; i++) {
-                decodedIvs.add(Base64.getDecoder().decode(test[i]));
+                decodedIvs.add(Base64.decode(test[i]));
             }
-            byte[] decoded = Base64.getDecoder().decode(URLDecoder.decode(key, "UTF-8"));
+            byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
             decryptFile(downloadPath, destinationPath, decoded, decodedIvs, link.getStringProperty("decryptedFileName"));
             final File tempFile = new File(downloadPath);
             tempFile.delete();
@@ -281,9 +285,8 @@ public class FiledoNet extends PluginForHost {
                 return null;
             } else {
                 logger.info("Performing full login");
-                br.setHeader("authorization", apikey);
                 br.getPage(API_BASE + "/user");
-                return (Map<String, Object>) this.callAPI(br.createGetRequest(API_BASE + "/user"), account, null);
+                return this.callAPI(br.createGetRequest(API_BASE + "/user"), account, null);
             }
         }
     }
@@ -295,18 +298,15 @@ public class FiledoNet extends PluginForHost {
         final String premiumUntilStr = PluginJSonUtils.getJson(br, "premiumUntil");
         long premiumUntil = -1;
         if (premiumUntilStr != null) {
-            premiumUntil = TimeFormatter.getMilliSeconds(premiumUntilStr, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+            premiumUntil = TimeFormatter.getMilliSeconds(premiumUntilStr, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
         }
         if (premiumUntil == -1 || premiumUntil < System.currentTimeMillis()) {
             ai.setExpired(true);
             return ai;
         }
-        final String trafficleftStr = (String) resp.get("dailyDownloadLimit");
-        final String trafficleftMaxStr = (String) resp.get("maxDailyDownloadLimit");
-        ai.setTrafficLeft(Long.parseLong(trafficleftStr) * 1024);
-        ai.setTrafficMax(Long.parseLong(trafficleftMaxStr) * 1024);
+        ai.setTrafficLeft(((Number) resp.get("dailyDownloadLimit")).longValue() * 1024);
+        ai.setTrafficMax(((Number) resp.get("maxDailyDownloadLimit")).longValue() * 1024);
         account.setType(AccountType.PREMIUM);
-        account.setMaxSimultanDownloads(6);
         ai.setValidUntil(premiumUntil, br);
         final String user = (String) resp.get("secret");
         if (!StringUtils.isEmpty(user)) {
@@ -318,34 +318,29 @@ public class FiledoNet extends PluginForHost {
     }
 
     /* API docs: TODO: add link to API docs */
-    private Object callAPI(final Request req, final Account account, final DownloadLink link) throws IOException, PluginException, InterruptedException {
+    private Map<String, Object> callAPI(final Request req, final Account account, final DownloadLink link) throws IOException, PluginException, InterruptedException {
         if (account != null) {
             req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, getApikey(account));
         }
         br.getPage(req);
         if (br.getHttpConnection().getResponseCode() == 401) {
-            throw new AccountInvalidException("Falsche Filedo-ID");
+            throw new AccountInvalidException();
+        } else {
+            return checkErrors(br, account, link);
         }
-        return checkErrors(account, link);
     }
 
-    private Object checkErrors(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
+    private Map<String, Object> checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         try {
-            final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            if (jsonO == null || !(jsonO instanceof Map)) {
-                return jsonO;
+            final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (resp == null) {
+                return resp;
             }
-            // TODO: Implement errorhandling
-            if (!(jsonO instanceof Map)) {
-                return jsonO;
-            }
-            final Map<String, Object> resp = (Map<String, Object>) jsonO;
             final String errormsg = (String) resp.get("message");
             if (errormsg == null) {
                 /* No error */
                 return resp;
-            }
-            if (link != null) {
+            } else if (link != null) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg);
             } else {
                 throw new AccountUnavailableException(errormsg, 1 * 60 * 1000l);
@@ -353,23 +348,15 @@ public class FiledoNet extends PluginForHost {
         } catch (final JSonMapperException jme) {
             final String errortext = "Bad API response";
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errortext, jme);
             } else {
-                throw new AccountUnavailableException(errortext, 1 * 60 * 1000l);
+                throw new AccountUnavailableException(jme, errortext, 1 * 60 * 1000l);
             }
         }
     }
 
     private String getApikey(final Account account) {
-        return correctPassword(account.getPass());
-    }
-
-    private static String correctPassword(final String pw) {
-        if (pw != null) {
-            return pw.trim();
-        } else {
-            return null;
-        }
+        return account.getPass();
     }
 
     @Override
@@ -381,7 +368,7 @@ public class FiledoNet extends PluginForHost {
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (str.matches(".+")) {
+        } else if (str.replace("-", "").trim().matches("[a-f0-9]{32}")) {
             // TODO: Add proper validation
             return true;
         } else {
@@ -396,7 +383,7 @@ public class FiledoNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return Integer.MAX_VALUE;
+        return 6;
     }
 
     @Override

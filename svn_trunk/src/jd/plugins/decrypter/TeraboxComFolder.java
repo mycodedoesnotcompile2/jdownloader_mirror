@@ -22,12 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -47,7 +41,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 49225 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "terabox.com", "teraboxapp.com", "dubox.com", "4funbox.com", "mirrobox.com", "1024tera.com", "1024terabox.com" });
+        ret.add(new String[] { "terabox.com", "teraboxapp.com", "dubox.com", "4funbox.com", "mirrobox.com", "1024tera.com", "1024terabox.com", "terabox.app" });
         return ret;
     }
 
