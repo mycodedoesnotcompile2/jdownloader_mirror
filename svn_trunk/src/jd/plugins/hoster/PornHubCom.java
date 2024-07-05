@@ -37,23 +37,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.ReflectionUtils;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
-import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.net.BCSSLSocketStreamFactory;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -86,7 +69,24 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 49248 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptions;
+import org.appwork.utils.net.httpconnection.SSLSocketStreamOptionsModifier;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.net.BCSSLSocketStreamFactory;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 49269 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -109,15 +109,15 @@ public class PornHubCom extends PluginForHost {
     /* Note: Video bitrates and resolutions are not exact, they can vary. */
     /* Quality, { videoCodec, videoBitrate, videoResolution, audioCodec, audioBitrate } */
     public static LinkedHashMap<String, String[]> formats                                 = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
-                                                                                              {
-                                                                                                  put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
-                                                                                                  put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
-                                                                                                  put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
-                                                                                                  put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
-                                                                                                  put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
-                                                                                                  put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
-                                                                                              }
-                                                                                          });
+        {
+            put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
+            put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
+            put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
+            put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
+            put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
+            put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
+        }
+    });
     public static final String                    BEST_ONLY                               = "BEST_ONLY";
     public static final String                    BEST_SELECTION_ONLY                     = "BEST_SELECTION_ONLY";
     public static final String                    CRAWL_VIDEO_HLS                         = "CRAWL_VIDEO_HLS";
@@ -339,7 +339,8 @@ public class PornHubCom extends PluginForHost {
                     if (RNKEY == null) {
                         return br.getRequest();
                     } else if (--maxLoops > 0) {
-                        br.setCookie(br.getHost(), "RNKEY", RNKEY);
+                        // br.setCookie(br.getHost(), "RNKEY", RNKEY);
+                        br.setCookie(br.getHost(), "KEY", RNKEY);
                         Thread.sleep(1000 + ((8 - maxLoops) * 500));
                         br.getPage(request.cloneRequest());
                         RNKEY = evalRNKEY(br);
@@ -641,7 +642,7 @@ public class PornHubCom extends PluginForHost {
                 final Browser hlsCheck = br.cloneBrowser();
                 hlsCheck.setFollowRedirects(true);
                 hlsCheck.setAllowedResponseCodes(new int[] { -1 });
-                hlsCheck.getPage(url);
+                getPage(hlsCheck, url);
                 if (hlsCheck.getHttpConnection().getResponseCode() != 200) {
                     /* Directurl needs to be refreshed */
                     return false;
@@ -800,7 +801,7 @@ public class PornHubCom extends PluginForHost {
                         brc.setFollowRedirects(true);
                         // no keep alive for this request
                         brc.getHeaders().put("Connection", "close");
-                        brc.getPage(videoUrl);
+                        getPage(brc, videoUrl);
                         final List<Map<String, Object>> mp4Medias = (List<Map<String, Object>>) plugin.restoreFromString(brc.toString(), TypeRef.OBJECT);
                         if (mp4Medias.isEmpty()) {
                             plugin.getLogger().info("No MP4 media available for this item");
@@ -831,7 +832,7 @@ public class PornHubCom extends PluginForHost {
                         }
                         final Browser brc = br.cloneBrowser();
                         brc.setFollowRedirects(true);
-                        brc.getPage(videoUrl);
+                        getPage(brc, videoUrl);
                         final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(brc);
                         if (hlsQualities.size() == 1) {
                             Map<String, String> formatMap = qualities.get(qualityVideoHeight);
@@ -860,7 +861,7 @@ public class PornHubCom extends PluginForHost {
                             final String m3u8 = videoUrl.replaceFirst("(\\d+/,)(.*?)(,_\\d+\\.mp4)", "$1" + replacement + "$3");
                             final Browser brc = br.cloneBrowser();
                             brc.setFollowRedirects(true);
-                            brc.getPage(m3u8);
+                            getPage(brc, m3u8);
                             final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(brc);
                             if (hlsQualities.size() == 1) {
                                 Map<String, String> formatMap = qualities.get(quality.toString());
@@ -1234,8 +1235,8 @@ public class PornHubCom extends PluginForHost {
                 if (premiumExpired && isPremiumDomain(br.getHost())) {
                     /**
                      * Expired pornhub premium --> It should still be a valid free account --> We might need to access a special url which
-                     * redirects us to the pornhub free mainpage and sets the cookies. </br>
-                     * 2022-06-27: Old code but let's leave it in for now as we can't know if it is still needed.
+                     * redirects us to the pornhub free mainpage and sets the cookies. </br> 2022-06-27: Old code but let's leave it in for
+                     * now as we can't know if it is still needed.
                      */
                     logger.info("Expired premium --> Free account --> Trying to ensure that free login works");
                     final String pornhubMainpageCookieRedirectUrl = br.getRegex("\\'pornhubLink\\'\\s*?:\\s*?(?:\"|\\')(https?://(?:www\\.)?pornhub\\.(?:com|org)/[^<>\"\\']+)(?:\"|\\')").getMatch(0);
@@ -1294,8 +1295,7 @@ public class PornHubCom extends PluginForHost {
     }
 
     /**
-     * Checks login and sets account-type. </br>
-     * Expects browser instance to be logged in already (cookies need to be there).
+     * Checks login and sets account-type. </br> Expects browser instance to be logged in already (cookies need to be there).
      *
      * @throws Exception
      */
@@ -1752,8 +1752,9 @@ public class PornHubCom extends PluginForHost {
     }
 
     /* Similar in: PornHubCom, PornportalCom */
-    public final static String evalRNKEY(Browser br) throws ScriptException {
-        if (br.containsHTML("document.cookie=\"RNKEY") && br.containsHTML("leastFactor")) {
+    public final static String evalRNKEY(final Browser br) throws ScriptException {
+        final String jscookievarname = br.getRegex("document\\.cookie=\"(RNKEY|KEY)=").getMatch(0);
+        if (jscookievarname != null && br.containsHTML("leastFactor")) {
             ScriptEngineManager mgr = JavaScriptEngineFactory.getScriptEngineManager(null);
             ScriptEngine engine = mgr.getEngineByName("JavaScript");
             String js = br.getRequest().getHtmlCode();
@@ -1762,7 +1763,9 @@ public class PornHubCom extends PluginForHost {
             js = js.replaceAll("(/\\*.*?\\*/)", "");
             engine.eval(js + " var ret=go();");
             final String answer = engine.get("ret").toString();
-            return new Regex(answer, "RNKEY=(.+)").getMatch(0);
+            final String realAnswer = new Regex(answer, Pattern.quote(jscookievarname) + "=(.+)").getMatch(0);
+            /* Split this cookie-string, only return first value (cookie-value). */
+            return realAnswer.split(";")[0];
         } else {
             return null;
         }
@@ -1779,6 +1782,8 @@ public class PornHubCom extends PluginForHost {
     public static final String   SETTING_URL_CRAWL_LANGUAGE_HANDLING         = "url_crawl_language_handling";
     public static final int      default_SETTING_URL_CRAWL_LANGUAGE_HANDLING = 0;
     public static final String[] SETTING_URL_CRAWL_LANGUAGE_HANDLING_OPTIONS = new String[] { "Replace subdomain in url with 'www.' -> Title language English", "Do not touch subdomain -> Title language can vary depending on URL" };
+    public static final String   SETTING_CHANNEL_CRAWLER_LIMIT               = "channel_crawler_limit";
+    public static final int      default_SETTING_CHANNEL_CRAWLER_LIMIT       = -1;
 
     /** Returns user configured domain based on domain given in URL we want to access. */
     public static String getConfiguredDomainURL(final String pluginDomain, final String domainFromURL) {
@@ -1883,6 +1888,7 @@ public class PornHubCom extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), GIFS_WEBM, "Prefer webm over old gif format?").setDefaultValue(true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SELECTED_DOMAIN, DOMAINS, "Select preferred domain").setDefaultValue(default_SELECTED_DOMAIN));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_URL_CRAWL_LANGUAGE_HANDLING, SETTING_URL_CRAWL_LANGUAGE_HANDLING_OPTIONS, "URL crawl handling").setDefaultValue(default_SETTING_URL_CRAWL_LANGUAGE_HANDLING));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_CHANNEL_CRAWLER_LIMIT, "Channel/Profile crawler: Limit max results [-1 = no limit, 0 = disable crawler]", default_SETTING_CHANNEL_CRAWLER_LIMIT, 10000, 1).setDefaultValue(-1));
     }
 
     @Override

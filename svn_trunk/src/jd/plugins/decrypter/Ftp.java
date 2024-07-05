@@ -46,7 +46,7 @@ import org.jdownloader.auth.AuthenticationInfo.Type;
 import org.jdownloader.auth.Login;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 45502 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
+@DecrypterPlugin(revision = "$Revision: 49261 $", interfaceVersion = 2, names = { "ftp" }, urls = { "ftp://.*?\\.[\\p{L}\\p{Nd}a-zA-Z0-9]{1,}(:\\d+)?/([^\\?&\"\r\n ]+|$)" })
 public class Ftp extends PluginForDecrypt {
     private static Map<String, Integer>     LIMITS = new HashMap<String, Integer>();
     private static Map<String, Set<Thread>> LOCKS  = new HashMap<String, Set<Thread>>();
@@ -339,9 +339,7 @@ public class Ftp extends PluginForDecrypt {
                 fp.addLinks(ret);
             }
         } catch (UnknownHostException e) {
-            logger.log(e);
-            ret.add(createOfflinelink(cLink.getCryptedUrl()));
-            return ret;
+            throw new DecrypterRetryException(RetryReason.HOST, null, null, e);
         } catch (HTTPProxyException e) {
             ProxyController.getInstance().reportHTTPProxyException(proxy, url, e);
             throw e;
@@ -367,11 +365,10 @@ public class Ftp extends PluginForDecrypt {
 
     private DownloadLink checkLinkFile(final SimpleFTP ftp, final SimpleFTPListEntry entry) throws IOException {
         if (entry != null && ftp.bin()) {
-            final String path = entry.getURL().getPath();
-            final long size = ftp.getSize(path);
+            final long size = ftp.getSize(entry.getURL().getPath());
             if (size >= 0) {
-                final String url = entry.getURL().toString();
-                final DownloadLink ret = createDownloadlink(url.replace("ftp://", "ftpviajd://"));
+                final String url = entry.getURL().toExternalForm();
+                final DownloadLink ret = createDownloadlink(url);
                 ret.setAvailable(true);
                 ret.setVerifiedFileSize(size);
                 ret.setFinalFileName(SimpleFTP.BestEncodingGuessingURLDecode(entry.getName()));
@@ -381,12 +378,17 @@ public class Ftp extends PluginForDecrypt {
         return null;
     }
 
+    protected DownloadLink createDownloadlink(String link, boolean urlDecode) {
+        // do not URLDecode but keep original name
+        return new DownloadLink(null, null, getHost(), link.replace("ftp://", "ftpviajd://"), true);
+    }
+
     private DownloadLink createDirectFile(SimpleFTPListEntry entry) throws IOException {
-        final String url = entry.getURL().toString();
-        final DownloadLink ret = createDownloadlink(url.replace("ftp://", "ftpviajd://"));
+        final DownloadLink ret = createDownloadlink(entry.getURL().toExternalForm());
         ret.setAvailable(true);
-        if (entry.getSize() >= 0) {
-            ret.setVerifiedFileSize(entry.getSize());
+        final long size = entry.getSize();
+        if (size >= 0) {
+            ret.setVerifiedFileSize(size);
         }
         ret.setFinalFileName(SimpleFTP.BestEncodingGuessingURLDecode(entry.getName()));
         return ret;
@@ -411,8 +413,9 @@ public class Ftp extends PluginForDecrypt {
         }
         if (list == null || list.size() == 0) {
             throw new NoGateWayException(selector, "No Gateway or Proxy Found: " + url);
+        } else {
+            return list;
         }
-        return list;
     }
 
     @Override

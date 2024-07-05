@@ -60,6 +60,7 @@ public class ContainerRuntime {
         PODMAN,
         GARDEN,
         WSL,
+        WSL2,
         FREEBSD_JAIL
     }
 
@@ -155,6 +156,40 @@ public class ContainerRuntime {
         return null;
     }
 
+    private static boolean hasWSLInterop() {
+        if (CrossSystem.isUnix()) {
+            final File procFile = new File("/proc/sys/fs/binfmt_misc/WSLInterop");
+            if (procFile.isFile()) {
+                FileInputStream fis = null;
+                try {
+                    fis = new FileInputStream(procFile);
+                    final BufferedReader is = new BufferedReader(new InputStreamReader(fis, "UTF-8"));
+                    try {
+                        String line = null;
+                        while ((line = is.readLine()) != null) {
+                            if (line.startsWith("magic 4d5a")) {
+                                return true;
+                            }
+                        }
+                    } finally {
+                        is.close();
+                        fis = null;
+                    }
+                } catch (final Throwable ignore) {
+                    ignore.printStackTrace();
+                } finally {
+                    if (fis != null) {
+                        try {
+                            fis.close();
+                        } catch (final Throwable ignore) {
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private static Object[] detectContainerByProc() {
         if (CrossSystem.isUnix()) {
             for (final String procFileString : new String[] { "/proc/1/cgroup", "/proc/self/cgroup", "/proc/version_signature", "/proc/version" }) {
@@ -168,8 +203,12 @@ public class ContainerRuntime {
                             String line = null;
                             while ((line = is.readLine()) != null) {
                                 if (procFileString.startsWith("/proc/version")) {
-                                    if (line.matches("(?i).*-WSL2?\\s+.*") && line.matches("(?i).*Microsoft.*")) {
-                                        return new Object[] { TYPE.WSL, System.getenv("WSL_DISTRO_NAME") };
+                                    if (line.matches("(?i).*-WSL(1|2)?\\s+.*") && line.matches("(?i).*Microsoft.*")) {
+                                        if (line.matches("(?i).*-WSL2\\s+.*")) {
+                                            return new Object[] { TYPE.WSL2, System.getenv("WSL_DISTRO_NAME") };
+                                        } else {
+                                            return new Object[] { TYPE.WSL, System.getenv("WSL_DISTRO_NAME") };
+                                        }
                                     }
                                 } else if (procFileString.endsWith("/cgroup")) {
                                     // 5:net_cls:/system.slice/docker-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.scope
@@ -212,6 +251,13 @@ public class ContainerRuntime {
                             }
                         }
                     }
+                }
+            }
+            if (hasWSLInterop()) {
+                if (new File("/run/WSL").isDirectory()) {
+                    return new Object[] { TYPE.WSL2, System.getenv("WSL_DISTRO_NAME") };
+                } else {
+                    return new Object[] { TYPE.WSL, System.getenv("WSL_DISTRO_NAME") };
                 }
             }
         }
