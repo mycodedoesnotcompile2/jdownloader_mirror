@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48558 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49273 $", interfaceVersion = 3, names = {}, urls = {})
 public class UupbomCom extends XFileSharingProBasic {
     public UupbomCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,8 +43,14 @@ public class UupbomCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "uupbom.com" });
+        ret.add(new String[] { "uupbom.com", "upbaam.com", "upbam.org", "uppom.live" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* 2024-07-05: Domains from deleted plugin "UppomLive" have been moved into this one: upbaam.com, upbam.org, uppom.live */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {

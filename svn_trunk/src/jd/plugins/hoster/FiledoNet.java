@@ -51,7 +51,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49275 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,7 +120,7 @@ public class FiledoNet extends PluginForHost {
     }
 
     public String getPurchasePremiumURL() {
-        return "https://" + getHost() + "/premium";
+        return "https://" + getHost() + "/pricing";
     }
 
     @Override

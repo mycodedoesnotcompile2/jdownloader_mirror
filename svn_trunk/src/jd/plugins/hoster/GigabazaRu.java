@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47548 $", interfaceVersion = 2, names = { "gigabaza.ru" }, urls = { "https?://(?:www\\.)?gigabaza\\.ru/download/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 2, names = { "gigabaza.ru" }, urls = { "https?://(?:www\\.)?gigabaza\\.ru/download/(\\d+)\\.html" })
 public class GigabazaRu extends PluginForHost {
     public GigabazaRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,7 +102,6 @@ public class GigabazaRu extends PluginForHost {
             }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 

@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49244 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49272 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadrarCom extends XFileSharingProBasic {
     public UploadrarCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -141,5 +141,17 @@ public class UploadrarCom extends XFileSharingProBasic {
     @Override
     public String[] siteSupportedNames() {
         return buildSupportedNames(getPluginDomains());
+    }
+
+    @Override
+    protected boolean supports_availablecheck_alt() {
+        // 2024-07-04
+        return false;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filename_abuse() {
+        // 2024-07-04
+        return false;
     }
 }

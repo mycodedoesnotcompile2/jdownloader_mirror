@@ -19,11 +19,6 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.YetiShareCore;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -37,7 +32,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48767 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.YetiShareCore;
+
+@HostPlugin(revision = "$Revision: 49275 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -297,7 +297,6 @@ public class SharingWtf extends YetiShareCore {
                 checkErrors(br, link, account);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
             }
-            dl.setFilenameFix(isContentDispositionFixRequired(dl, con, link));
             dl.startDownload();
         } else {
             super.handlePremium(link, account);

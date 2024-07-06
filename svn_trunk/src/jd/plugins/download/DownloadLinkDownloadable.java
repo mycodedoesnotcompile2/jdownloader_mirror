@@ -603,7 +603,12 @@ public class DownloadLinkDownloadable implements Downloadable {
     }
 
     protected DispositionHeader parseDispositionHeader(URLConnectionAdapter connection) {
-        return Plugin.parseDispositionHeader(connection);
+        final PluginForHost plugin = getPlugin();
+        if (plugin != null) {
+            return plugin.getDispositionHeader(connection);
+        } else {
+            return Plugin.parseDispositionHeader(connection);
+        }
     }
 
     protected String getFileNameFromURL(URLConnectionAdapter connection) {
@@ -640,7 +645,12 @@ public class DownloadLinkDownloadable implements Downloadable {
     }
 
     protected String fixWrongEncoding(URLConnectionAdapter connection, final String fileName) {
-        return decodeURIComponent(fileName, null);
+        final List<String[]> results = Plugin.decodeURIComponentFindBestEncoding(fileName);
+        if (results != null && results.size() > 0) {
+            return results.get(0)[1];
+        } else {
+            return fileName;
+        }
     }
 
     @Override

@@ -23,12 +23,13 @@ import org.jdownloader.plugins.components.config.XFSConfigVideo;
 import org.jdownloader.plugins.components.config.XFSConfigVideoUpstreamTo;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49273 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstreamTo extends XFileSharingProBasic {
     public UpstreamTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -124,6 +125,15 @@ public class UpstreamTo extends XFileSharingProBasic {
     @Override
     protected boolean supportsAPISingleLinkcheck() {
         return looksLikeValidAPIKey(this.getAPIKey());
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("/image-404\\.png\"")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 
     @Override

@@ -37,7 +37,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
+@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = { "fex.net" }, urls = { "https?://(?:www\\.)?fex\\.net/folder/([a-z0-9]+)/file/(\\d+)" })
 public class FexNet extends PluginForHost {
     public FexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,7 +171,6 @@ public class FexNet extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
-        dl.setFilenameFix(true);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {

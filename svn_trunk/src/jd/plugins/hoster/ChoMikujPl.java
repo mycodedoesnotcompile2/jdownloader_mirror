@@ -54,7 +54,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     private String               dllink                                                = null;
     private static final String  PREMIUMONLY                                           = "(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)";
@@ -192,8 +192,9 @@ public class ChoMikujPl extends antiDDoSForHost {
                     }
                     /* Only set final filename if it wasn't set before as video and */
                     /* audio streams can have bad filenames */
-                    if (link.getFinalFileName() == null) {
-                        link.setFinalFileName(Encoding.htmlDecode(getFileNameFromConnection(con)));
+                    final String fname = getFileNameFromConnection(con);
+                    if (link.getFinalFileName() == null && fname != null) {
+                        link.setFinalFileName(Encoding.htmlDecode(fname));
                     }
                 } else {
                     /* Just because we get html here that doesn't mean that the file is offline ... */
@@ -607,8 +608,6 @@ public class ChoMikujPl extends antiDDoSForHost {
             maxChunks = 1;
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
-        dl.setFilenameFix(true);
-        final URLConnectionAdapter con = dl.getConnection();
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             logger.warning("The final dllink seems not to be a file!");

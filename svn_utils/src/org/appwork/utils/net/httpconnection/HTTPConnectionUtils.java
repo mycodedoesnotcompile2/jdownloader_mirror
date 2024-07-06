@@ -513,7 +513,7 @@ public class HTTPConnectionUtils {
         private final String  filename;
         private final Charset encoding;
 
-        private DispositionHeader(final String header, final String raw, final String filename, final Charset encoding) {
+        protected DispositionHeader(final String header, final String raw, final String filename, final Charset encoding) {
             this.raw = raw;
             this.filename = filename;
             this.encoding = encoding;

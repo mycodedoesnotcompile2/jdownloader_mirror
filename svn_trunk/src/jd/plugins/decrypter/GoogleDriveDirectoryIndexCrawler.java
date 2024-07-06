@@ -16,7 +16,6 @@
 package jd.plugins.decrypter;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,7 +42,6 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
@@ -61,7 +59,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.FunctionObject;
 
-@DecrypterPlugin(revision = "$Revision: 49011 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49277 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.hoster.GoogleDriveDirectoryIndex.class })
 public class GoogleDriveDirectoryIndexCrawler extends PluginForDecrypt {
     private static final String PROPERTY_FOLDER_USE_OLD_POST_REQUEST = "folder_use_old_post_request";
@@ -152,17 +150,10 @@ public class GoogleDriveDirectoryIndexCrawler extends PluginForDecrypt {
         if (con != null && looksLikeDownloadableContent(con)) {
             con.disconnect();
             final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(con.getURL().toExternalForm()));
-            final DispositionHeader dispositionHeader = Plugin.parseDispositionHeader(con);
+            final DispositionHeader dispositionHeader = parseDispositionHeader(con);
             String dispositionHeaderFilename = null;
             if (dispositionHeader != null && StringUtils.isNotEmpty(dispositionHeaderFilename = dispositionHeader.getFilename())) {
                 direct.setFinalFileName(dispositionHeaderFilename);
-                if (dispositionHeader.getEncoding() == null) {
-                    try {
-                        direct.setFinalFileName(URLEncode.decodeURIComponent(dispositionHeaderFilename, "UTF-8", true));
-                    } catch (final IllegalArgumentException ignore) {
-                    } catch (final UnsupportedEncodingException ignore) {
-                    }
-                }
             }
             if (con.getCompleteContentLength() > 0) {
                 if (con.isContentDecoded()) {

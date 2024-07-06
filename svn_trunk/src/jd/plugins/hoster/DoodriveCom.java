@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -34,11 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-
-@HostPlugin(revision = "$Revision: 47584 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodriveCom extends PluginForHost {
     public DoodriveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -249,7 +249,6 @@ public class DoodriveCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            dl.setFilenameFix(true);
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
         }
         dl.startDownload();
