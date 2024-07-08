@@ -40,6 +40,7 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
+import java.text.NumberFormat;
 import java.util.EventObject;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -131,6 +132,24 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     @Override
     public String toString() {
         return getClass().getSimpleName() + ":" + getModel().getModelID() + "." + getName();
+    }
+
+    protected NumberFormat getDefaultNumberFormat() {
+        return NumberFormat.getInstance();
+    }
+
+    protected NumberFormat getNumberFormat() {
+        final ExtTableModel<E> model = getModel();
+        final NumberFormat ret = model != null ? model.getNumberFormat(this) : null;
+        if (ret == null) {
+            return getDefaultNumberFormat();
+        } else {
+            return ret;
+        }
+    }
+
+    protected NumberFormat updateNumberFormat() {
+        return getNumberFormat();
     }
 
     /**
@@ -743,6 +762,7 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
     public void setModel(final ExtTableModel<E> model) {
         this.model = model;
         this.generateID();
+        updateNumberFormat();
     }
 
     public void setResizable(boolean resizeAllowed) {

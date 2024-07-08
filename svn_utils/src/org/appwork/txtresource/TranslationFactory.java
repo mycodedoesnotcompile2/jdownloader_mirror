@@ -59,7 +59,7 @@ public class TranslationFactory {
     private static String                                    LANGUAGE = "en";
     static {
         try {
-            String l = Locale.getDefault().getLanguage();
+            String l = System.getProperty("user.language");
             if (StringUtils.isEmpty(l)) {
                 l = Locale.getDefault().getLanguage();
                 if (StringUtils.isEmpty(l)) {
@@ -291,10 +291,6 @@ public class TranslationFactory {
         return sb.toString();
     }
 
-    public static void main(String[] args) {
-        System.out.println(getVariantsOf("he_IL"));
-    }
-
     public static boolean setDesiredLanguage(final String loc) {
         if (TranslationFactory.getDesiredLanguage().equals(loc)) {
             return false;
@@ -316,23 +312,36 @@ public class TranslationFactory {
     }
 
     public static Locale stringToLocale(final String lng) {
-        // try {
-        // if (Application.getJavaVersion() >= Application.JAVA17) {
-        // //
-        // Locale ret = Locale.forLanguageTag(lng.replace("_", "-"));
-        // return ret;
-        // }
-        // } catch (final Throwable e) {
-        // }
         final String[] split = lng.split("[\\-\\_]");
+        final Locale def = Locale.getDefault();
+        final Locale ret;
         switch (split.length) {
         case 1:
-            return new Locale(split[0]);
+            if (split[0].equals(def.getLanguage())) {
+                // HostLocaleProviderAdapterImpl only supports matching OS Locale
+                ret = def;
+            } else {
+                ret = new Locale(split[0]);
+            }
+            break;
         case 2:
-            return new Locale(split[0], split[1]);
+            if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry())) {
+                // avoid new Locale instance
+                ret = def;
+            } else {
+                ret = new Locale(split[0], split[1]);
+            }
+            break;
         default:
-            return new Locale(split[0], split[1], split[2]);
+            if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry()) && split[2].equals(def.getVariant())) {
+                // avoid new Locale instance
+                ret = def;
+            } else {
+                ret = new Locale(split[0], split[1], split[2]);
+            }
+            break;
         }
+        return ret;
     }
 
     public static List<String> getVariantsOf(String lng) {

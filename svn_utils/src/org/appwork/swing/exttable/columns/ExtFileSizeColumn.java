@@ -33,7 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable.columns;
 
-import java.text.DecimalFormat;
+import java.text.NumberFormat;
 
 import javax.swing.JComponent;
 import javax.swing.SwingConstants;
@@ -47,9 +47,9 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
     /**
      *
      */
-    private static final long     serialVersionUID = -5812486934156037376L;
-    protected final String        ltZero           = "~";
-    protected final DecimalFormat formatter;
+    private static final long serialVersionUID = -5812486934156037376L;
+    protected final String    ltZero           = "~";
+    protected NumberFormat    formatter        = null;
 
     /**
      * @param createtablemodel_column_size
@@ -60,12 +60,7 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
 
     public ExtFileSizeColumn(final String name, final ExtTableModel<E> table) {
         super(name, table);
-        this.formatter = new DecimalFormat() {
-            /**
-                    *
-                    */
-            private static final long serialVersionUID = 1L;
-        };
+        formatter = updateNumberFormat();
         rendererField.setHorizontalAlignment(SwingConstants.RIGHT);
         setRowSorter(new ExtDefaultRowSorter<E>() {
             /**
@@ -85,6 +80,11 @@ public abstract class ExtFileSizeColumn<E> extends ExtTextColumn<E> {
                 }
             }
         });
+    }
+
+    @Override
+    protected NumberFormat updateNumberFormat() {
+        return formatter = super.updateNumberFormat();
     }
 
     @Override

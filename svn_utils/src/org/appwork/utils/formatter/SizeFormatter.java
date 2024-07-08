@@ -34,6 +34,7 @@
 package org.appwork.utils.formatter;
 
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
@@ -52,6 +53,10 @@ public class SizeFormatter {
      * @return
      */
     public static String formatBytes(final DecimalFormat c, final long fileSize) {
+        return formatBytes((NumberFormat) c, fileSize);
+    }
+
+    public static String formatBytes(final NumberFormat c, final long fileSize) {
         final long abs = Math.abs(fileSize);
         if (abs >= Unit.TB.getBytes1024()) {
             return _AWU.T.literally_tebibyte(c.format(fileSize / (double) Unit.TB.getBytes1024()));
@@ -66,8 +71,9 @@ public class SizeFormatter {
         }
     }
 
+    @Deprecated
     public static String formatBytes(long fileSize) {
-        return formatBytes(new DecimalFormat("0.00"), fileSize);
+        return formatBytes(NumberFormat.getInstance(), fileSize);
     }
 
     public static enum Unit {
@@ -76,6 +82,7 @@ public class SizeFormatter {
         MB(1024l * 1024l, 1000l * 1000l),
         KB(1024l, 1000l),
         B(1l, 1l);
+
         private final long bytes;
         private final long kibytes;
 

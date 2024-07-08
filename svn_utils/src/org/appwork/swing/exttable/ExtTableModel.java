@@ -38,6 +38,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -639,6 +640,10 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
         return null;
     }
 
+    public NumberFormat getNumberFormat(ExtColumn<E> column) {
+        return column.getDefaultNumberFormat();
+    }
+
     /**
      * @param i
      * @return
@@ -693,14 +698,14 @@ public abstract class ExtTableModel<E> extends AbstractTableModel {
     /**
      * @return a list of all ExtComponentRowHighlighters
      */
-    public java.util.List<ExtComponentRowHighlighter<E>> getExtComponentRowHighlighters() {        
+    public java.util.List<ExtComponentRowHighlighter<E>> getExtComponentRowHighlighters() {
         return this.extComponentRowHighlighters;
     }
 
     /**
      * @return
      */
-    public int getExtViewColumnCount() {        
+    public int getExtViewColumnCount() {
         return this.getTable().getColumnCount();
     }
 
