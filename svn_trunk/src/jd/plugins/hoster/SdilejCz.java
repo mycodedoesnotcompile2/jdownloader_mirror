@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 47665 $", interfaceVersion = 3, names = { "sdilej.cz" }, urls = { "https?://(?:www\\.)?sdilej\\.cz/(\\d+)/([a-z0-9-\\.]+)" })
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = { "sdilej.cz" }, urls = { "https?://(?:www\\.)?sdilej\\.cz/(\\d+)/([a-z0-9-\\.]+)" })
 public class SdilejCz extends PluginForHost {
     /** Former czshare.com */
     private static AtomicInteger SIMULTANEOUS_PREMIUM = new AtomicInteger(-1);
@@ -203,7 +203,6 @@ public class SdilejCz extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 
@@ -250,7 +249,6 @@ public class SdilejCz extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 

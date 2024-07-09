@@ -19,9 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49283 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeryfreepornCom extends KernelVideoSharingComV2 {
     public VeryfreepornCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -55,5 +56,15 @@ public class VeryfreepornCom extends KernelVideoSharingComV2 {
     @Override
     protected boolean preferTitleHTML() {
         return true;
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.containsHTML("location\\.href\\s*= ./404\\.php")) {
+            /* 2024-07-08: js redirect to 404 error-page. */
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 }

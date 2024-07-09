@@ -59,7 +59,7 @@ import jd.plugins.decrypter.PluralsightComDecrypter;
  * @author Neokyuubi
  *
  */
-@HostPlugin(revision = "$Revision: 48648 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
 public class PluralsightCom extends antiDDoSForHost {
     private static final boolean                    cookieLoginOnly                          = true;
     private static WeakHashMap<Account, List<Long>> map100PerHour                            = new WeakHashMap<Account, List<Long>>();
@@ -514,11 +514,6 @@ public class PluralsightCom extends antiDDoSForHost {
         } else if (plugin instanceof PluralsightComDecrypter) {
             ((PluralsightComDecrypter) plugin).sendRequest(br, request);
         }
-    }
-
-    @Override
-    public void sendRequest(Browser ibr, Request request) throws Exception {
-        super.sendRequest(ibr, request);
     }
 
     @Deprecated

@@ -56,7 +56,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -360,7 +360,6 @@ public class MediafireCom extends PluginForHost {
                 throw e;
             }
         }
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 
@@ -659,7 +658,7 @@ public class MediafireCom extends PluginForHost {
                         /* Set weak filename. */
                         final String filenameFromURL = this.getFilenameFromURL(link);
                         if (filenameFromURL != null) {
-                            link.setName(filenameFromURL);
+                            link.setName(Encoding.htmlDecode(filenameFromURL).trim());
                         }
                     }
                     if (addDelimiter) {

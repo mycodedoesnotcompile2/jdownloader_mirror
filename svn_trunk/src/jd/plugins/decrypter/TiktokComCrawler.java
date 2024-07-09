@@ -59,7 +59,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 49246 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49284 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -992,7 +992,12 @@ public class TiktokComCrawler extends PluginForDecrypt {
         final TiktokCom hosterplugin = (TiktokCom) this.getNewPluginForHostInstance(this.getHost());
         do {
             TiktokCom.accessAPI(br, apiPath, query);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            Map<String, Object> entries = null;
+            try {
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            } catch (final JSonMapperException e) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
             final List<Map<String, Object>> videos = (List<Map<String, Object>>) entries.get("aweme_list");
             if (videos.isEmpty()) {
                 if (ret.isEmpty()) {

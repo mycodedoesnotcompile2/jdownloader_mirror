@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.EasyuploadIoFolder;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasyuploadIo extends PluginForHost {
     public EasyuploadIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -213,7 +213,6 @@ public class EasyuploadIo extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        // dl.setFilenameFix(true);
         link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
         dl.startDownload();
     }

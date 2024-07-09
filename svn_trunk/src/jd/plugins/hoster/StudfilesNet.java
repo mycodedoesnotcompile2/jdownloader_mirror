@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 47770 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = {}, urls = {})
 public class StudfilesNet extends PluginForHost {
     public StudfilesNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -153,7 +153,6 @@ public class StudfilesNet extends PluginForHost {
             }
         }
         link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 

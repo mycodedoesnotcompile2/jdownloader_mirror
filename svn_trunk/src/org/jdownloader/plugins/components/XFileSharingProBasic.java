@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49272 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -1641,13 +1641,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* Look for textarea with special copy-able URLs which will sometimes contain information about filename/size. */
             final String[] textareas = new Regex(html, "(?i)<textarea[^>]*>(.*?)</textarea>").getColumn(0);
             /* E.g. brupload.net, apkadmin.com, send.cm */
-            final Pattern pattern_shareboxWithFilenameAndFilesizeBytes = quotedFUID != null ? Pattern.compile(quotedFUID + "(?:/[^\\]]+)?\\]([^\"]+) - \\s*(\\d+)\\[/URL\\]") : null;
+            final Pattern pattern_shareboxWithFilenameAndFilesizeBytes = quotedFUID != null ? Pattern.compile(quotedFUID + "(?:\\.html)?(?:/[^\\]]+)?\\]([^\"]+) - \\s*(\\d+)\\[/URL\\]") : null;
             if (textareas != null && textareas.length > 0) {
                 for (final String textarea : textareas) {
                     if (filename == null) {
                         /* Filename from URL */
-                        if (urlFUID != null) {
-                            final Regex targetUrlWithFilename = new Regex(textarea, "(?i)^https?://[^/]+/" + quotedFUID + "/" + "([^/#?]+)(\\.html)?$");
+                        if (quotedFUID != null) {
+                            final Regex targetUrlWithFilename = new Regex(textarea, "(?i)^https?://[^/]+/" + quotedFUID + "(?:\\.html)?/" + "([^/#?]+)(\\.html)?$");
                             if (targetUrlWithFilename.patternFind()) {
                                 filename = targetUrlWithFilename.getMatch(0);
                             }
@@ -1677,6 +1677,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         filesizeWithUnit = new Regex(textarea, "(?i)([\\d\\.]+ (?:B|KB|MB|GB))(\\[/URL\\]|</a>)").getMatch(0);
                     }
                     if (filename != null && filesizeWithUnit != null) {
+                        /* We found all needed info -> No need to continue. */
                         break;
                     }
                 }
@@ -3188,6 +3189,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     @Override
     public void clean() {
         try {
+            correctBrowserMap.set(null);
             super.clean();
         } finally {
             synchronized (correctedBrowserRequestMap) {
@@ -3381,7 +3383,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         String jssource = new Regex(src, "\"?sources\"?\\s*:\\s*(\\[[^\\]]+\\])").getMatch(0);
         if (StringUtils.isEmpty(jssource)) {
             /* 2019-07-04: Wider attempt - find sources via pattern of their video-URLs. */
-            jssource = new Regex(src, "[A-Za-z0-9]+\\s*:\\s*(\\[[^\\]]+[a-z0-9]{60}/v\\.mp4[^\\]]+\\])").getMatch(0);
+            final String[] jssources = new Regex(src, ":\\s*(\\[[^\\]]+\\])").getColumn(0);
+            if (jssources != null && jssources.length > 0) {
+                for (final String thisjssource : jssources) {
+                    if (new Regex(thisjssource, "[a-z0-9]{60}/v\\.mp4").patternFind()) {
+                        jssource = thisjssource;
+                        break;
+                    }
+                }
+            }
         }
         if (!StringUtils.isEmpty(jssource)) {
             logger.info("Found video json source");
@@ -3516,7 +3526,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /*
              * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
              */
-            dllink = br.getRegex("<a[^>]*href=\"(https?[^\"]+)\"[^>]*>\\s*Direct Download Link\\s*</a>").getMatch(0);
+            dllink = br.getRegex("href\\s*=\\s*\"(https?://[^\"]+)\"[^>]*>\\s*Direct Download Link").getMatch(0);
         }
         return dllink;
     }
@@ -3692,45 +3702,47 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    @Override
-    protected void getPage(String page) throws Exception {
-        getPage(br, page, true);
+    protected void getPage(final Browser br, String page, final boolean correctBr) throws Exception {
+        setCorrectBrowserFlag(br, correctBr);
+        getPage(br, page);
     }
 
-    protected void getPage(final Browser br, String page, final boolean correctBr) throws Exception {
-        getPage(br, page);
-        if (correctBr) {
+    private final ThreadLocal<WeakHashMap<Browser, Boolean>> correctBrowserMap = new ThreadLocal<WeakHashMap<Browser, Boolean>>();
+
+    @Override
+    protected void sendRequest(Browser br, Request request) throws Exception {
+        super.sendRequest(br, request);
+        if (wasCorrectBrowserFlagSet(br)) {
             correctBR(br);
         }
     }
 
-    @Override
-    protected void postPage(String page, final String postdata) throws Exception {
-        postPage(br, page, postdata, true);
+    protected void setCorrectBrowserFlag(final Browser br, boolean flag) {
+        WeakHashMap<Browser, Boolean> map = correctBrowserMap.get();
+        if (flag && map != null) {
+            map.remove(br);
+        } else if (!flag) {
+            if (map == null) {
+                map = new WeakHashMap<Browser, Boolean>();
+                correctBrowserMap.set(map);
+            }
+            map.put(br, Boolean.FALSE);
+        }
+    }
+
+    protected boolean wasCorrectBrowserFlagSet(final Browser br) {
+        final WeakHashMap<Browser, Boolean> map = correctBrowserMap.get();
+        return map == null || Boolean.TRUE.equals(map.remove(br));
     }
 
     protected void postPage(final Browser br, String page, final String postdata, final boolean correctBr) throws Exception {
+        setCorrectBrowserFlag(br, correctBr);
         postPage(br, page, postdata);
-        if (correctBr) {
-            correctBR(br);
-        }
-    }
-
-    @Override
-    protected void submitForm(final Form form) throws Exception {
-        submitForm(br, form, true);
-    }
-
-    @Override
-    protected void submitForm(Browser br, Form form) throws Exception {
-        submitForm(br, form, true);
     }
 
     protected void submitForm(final Browser br, final Form form, final boolean correctBr) throws Exception {
-        super.submitForm(br, form);
-        if (correctBr) {
-            correctBR(br);
-        }
+        setCorrectBrowserFlag(br, correctBr);
+        submitForm(br, form);
     }
 
     /**
@@ -5244,7 +5256,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             /* API failed/not supported? Try website! */
             String officialVideoDownloadURL = null;
-            final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
             if (StringUtils.isEmpty(dllink)) {
                 /* TODO: Maybe skip this, check for offline later */
                 requestFileInformationWebsite(link, account, true);
@@ -5261,29 +5272,35 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                  */
                 officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
                 dllink = getDllink(link, account, br, getCorrectBR(br));
-                if (StringUtils.isEmpty(dllink) && (mode == DownloadMode.STREAM || StringUtils.isEmpty(officialVideoDownloadURL))) {
+                if (StringUtils.isEmpty(dllink) || StringUtils.isEmpty(officialVideoDownloadURL)) {
                     final Form dlForm = findFormDownload2Premium(link, account, this.br);
-                    if (dlForm == null) {
+                    if (dlForm != null) {
+                        handlePassword(dlForm, link);
+                        final URLConnectionAdapter formCon = openAntiDDoSRequestConnection(br, br.createFormRequest(dlForm));
+                        if (looksLikeDownloadableContent(formCon)) {
+                            /* Sending the form already gives us the file -> Very rare case - e.g. tiny-files.com */
+                            handleDownload(link, account, null, dllink, formCon.getRequest());
+                            return;
+                        } else {
+                            br.followConnection(true);
+                            runPostRequestTask(br);
+                            this.correctBR(br);
+                        }
                         checkErrors(br, getCorrectBR(br), link, account, true);
-                        logger.warning("Failed to find Form download2");
-                        checkServerErrors(br, link, account);
-                        checkErrorsLastResort(br, link, account);
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                        if (StringUtils.isEmpty(officialVideoDownloadURL)) {
+                            officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
+                        }
+                        if (dllink == null) {
+                            dllink = getDllink(link, account, br, getCorrectBR(br));
+                        }
                     }
-                    handlePassword(dlForm, link);
-                    final URLConnectionAdapter formCon = openAntiDDoSRequestConnection(br, br.createFormRequest(dlForm));
-                    if (looksLikeDownloadableContent(formCon)) {
-                        /* Sending the form already gives us the file -> Very rare case - e.g. tiny-files.com */
-                        handleDownload(link, account, null, dllink, formCon.getRequest());
-                        return;
-                    } else {
-                        br.followConnection(true);
-                        runPostRequestTask(br);
-                        this.correctBR(br);
-                    }
+                }
+                if (StringUtils.isEmpty(dllink) && StringUtils.isEmpty(officialVideoDownloadURL)) {
                     checkErrors(br, getCorrectBR(br), link, account, true);
-                    officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
-                    dllink = getDllink(link, account, br, getCorrectBR(br));
+                    logger.warning("Failed to find Form download2");
+                    checkServerErrors(br, link, account);
+                    checkErrorsLastResort(br, link, account);
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
             handleDownload(link, account, officialVideoDownloadURL, dllink, null);

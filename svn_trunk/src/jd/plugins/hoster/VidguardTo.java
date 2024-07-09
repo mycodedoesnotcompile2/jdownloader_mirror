@@ -51,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49208 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49283 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidguardTo extends PluginForHost {
     public VidguardTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class VidguardTo extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net", "bembed.net" });
+        ret.add(new String[] { "vidguard.to", "vid-guard.com", "vgfplay.com", "vgembed.com", "v6embed.xyz", "vembed.net", "bembed.net", "listeamed.net" });
         return ret;
     }
 
@@ -327,7 +327,6 @@ public class VidguardTo extends PluginForHost {
             }
         }
         link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 

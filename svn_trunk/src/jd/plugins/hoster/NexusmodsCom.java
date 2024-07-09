@@ -57,7 +57,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48517 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
 public class NexusmodsCom extends antiDDoSForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -321,17 +321,6 @@ public class NexusmodsCom extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "URL expired?");
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
-            }
-        }
-        if (link.getFinalFileName() == null) {
-            /* Workaround for rare case if e.g. account was not available when a (nxm://) URL has been added initially. */
-            if (dl.getConnection().isContentDisposition()) {
-                dl.setFilenameFix(true);
-            } else {
-                final String filename = new Regex(dl.getConnection().getURL().toString(), "/([^/]+)\\?").getMatch(0);
-                if (filename != null) {
-                    link.setFinalFileName(Encoding.htmlDecode(filename).trim());
-                }
             }
         }
         dl.startDownload();

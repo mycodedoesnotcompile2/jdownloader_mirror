@@ -59,7 +59,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 48631 $", interfaceVersion = 3, names = { "disk.yandex.net" }, urls = { "http://yandexdecrypted\\.net/\\d+" })
+@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = { "disk.yandex.net" }, urls = { "http://yandexdecrypted\\.net/\\d+" })
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -464,7 +464,6 @@ public class DiskYandexNet extends PluginForHost {
             if (freshDirecturlHasJustBeenGenerated) {
                 link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
             }
-            dl.setFilenameFix(true);
         }
         dl.startDownload();
     }

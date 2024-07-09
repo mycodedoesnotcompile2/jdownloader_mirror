@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49283 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -122,7 +122,9 @@ public class VeevTo extends XFileSharingProBasic {
         }
         final Form dlform = br.getFormbyActionRegex(".*/dl");
         if (dlform == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* 2024-07-08 */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
         }
         final Form preForm = new Form();
         preForm.setMethod(MethodType.POST);
@@ -165,5 +167,15 @@ public class VeevTo extends XFileSharingProBasic {
             fileInfo[0] = betterFilename;
         }
         return fileInfo;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML("<title>Watch video - Veev\\.to</title>")) {
+            /* 2024-07-08: Offline embed item without further error message. */
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }
