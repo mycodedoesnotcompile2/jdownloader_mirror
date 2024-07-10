@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48615 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 2, names = { "workupload.com" }, urls = { "https?://(?:www\\.|en\\.)?workupload\\.com/(?:file|start|report)/([A-Za-z0-9]+)" })
 public class WorkuploadCom extends PluginForHost {
     public WorkuploadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -225,7 +225,6 @@ public class WorkuploadCom extends PluginForHost {
                 throw e;
             }
         }
-        dl.setFilenameFix(true);
         link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }

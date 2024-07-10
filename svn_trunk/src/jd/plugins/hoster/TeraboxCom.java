@@ -52,7 +52,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -387,11 +387,6 @@ public class TeraboxCom extends PluginForHost {
                 throw e;
             }
         }
-        /*
-         * htmldecode final filename just in case we're using in from Content-Disposition and not the one that was set during the crawl
-         * process.
-         */
-        dl.setFilenameFix(true);
         dl.startDownload();
     }
 

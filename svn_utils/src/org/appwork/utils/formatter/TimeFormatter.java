@@ -51,7 +51,6 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.locale._AWU;
 
 public class TimeFormatter {
-
     private static final java.util.List<SimpleDateFormat> dateformats  = new ArrayList<SimpleDateFormat>();
     static {
         try {
@@ -92,7 +91,6 @@ public class TimeFormatter {
             e.printStackTrace();
         }
     }
-
     public static final int                               HIDE_SECONDS = 1 << 1;
     public static final int                               HIDE_MARKER  = 1 << 2;
     public static final int                               CLOCK        = 1 << 3;
@@ -205,6 +203,7 @@ public class TimeFormatter {
         if (dateString != null) {
             final SimpleDateFormat dateFormat = l != null ? new SimpleDateFormat(timeformat, l) : new SimpleDateFormat(timeformat, Locale.ENGLISH);
             try {
+                dateFormat.setLenient(false);
                 if (timeformat.contains("'Z'")) {
                     dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
                 }

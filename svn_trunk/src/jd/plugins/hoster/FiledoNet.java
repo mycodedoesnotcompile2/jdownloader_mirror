@@ -11,6 +11,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -27,7 +28,6 @@ import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49285 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49305 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,88 +142,88 @@ public class FiledoNet extends PluginForHost {
         return 0;
     }
 
-    /** Using API: https://api.filedo.net/doc/index.html#/File/post_File_Multiple */
     @Override
     public boolean checkLinks(final DownloadLink[] urls) {
+        return checkLinks(urls, null);
+    }
+
+    /** Using API: https://api.filedo.net/doc/index.html#/File/post_File_Multiple */
+    private boolean checkLinks(final DownloadLink[] urls, final Account account) {
         if (urls == null || urls.length == 0) {
             return false;
         }
         try {
             br.setCookiesExclusive(true);
             final StringBuilder sb = new StringBuilder();
-            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            final Map<String, DownloadLink> links = new HashMap<String, DownloadLink>();
             int index = 0;
-            while (true) {
+            while (index < urls.length) {
                 links.clear();
                 while (true) {
                     if (index == urls.length || links.size() == 50) {
                         break;
                     } else {
-                        links.add(urls[index]);
-                        index++;
+                        final DownloadLink link = urls[index++];
+                        final String fileID = getFID(link);
+                        if (!link.isNameSet()) {
+                            link.setName(fileID);
+                        }
+                        links.put(fileID, link);
                     }
                 }
                 sb.delete(0, sb.capacity());
-                final List<String> fileIDs = new ArrayList<String>();
-                for (final DownloadLink link : links) {
-                    if (!this.isValidFileURL(link.getPluginPatternMatcher())) {
-                        continue;
-                    } else {
-                        fileIDs.add(this.getFID(link));
-                    }
-                }
-                final PostRequest req = br.createJSonPostRequest(API_BASE + "/file/multiple", JSonStorage.serializeToJson(fileIDs));
-                final List<Map<String, Object>> responselist = (List<Map<String, Object>>) this.callAPI(req, null, links.get(0));
-                for (final DownloadLink link : links) {
-                    final String fid = this.getFID(link);
-                    if (!link.isNameSet()) {
-                        link.setName(fid);
-                    }
-                    if (!this.isValidFileURL(link.getPluginPatternMatcher())) {
-                        link.setAvailable(false);
+                final PostRequest req = br.createJSonPostRequest(API_BASE + "/file/multiple", JSonStorage.serializeToJson(links.keySet()));
+                final List<Map<String, Object>> responselist = (List<Map<String, Object>>) this.callAPI(req, account, links.get(0));
+                for (final Map<String, Object> resp : responselist) {
+                    final String fileID = resp.get("fileId").toString();
+                    final DownloadLink link = links.remove(fileID);
+                    if (link == null) {
+                        logger.info("No response for: " + fileID);
                         continue;
                     }
-                    Map<String, Object> resp = null;
-                    for (final Map<String, Object> responseitem : responselist) {
-                        if (responseitem.get("fileId").toString().equals(fid)) {
-                            resp = responseitem;
-                            break;
+                    try {
+                        final int fileStatus = ((Number) resp.get("fileStatus")).intValue();
+                        if (fileStatus != 1) {
+                            link.setAvailable(false);
+                            continue;
                         }
+                        final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
+                        final String key = query.get("key");
+                        final String counterFileName = query.get("counterFileName");
+                        final String fileName = resp.get("fileName").toString();
+                        final Number fileSize = (Number) resp.get("fileSize");
+                        final String fileHash = resp.get("fileHash").toString();
+                        final String downloadUrl = resp.get("downloadUrl").toString();
+                        final Boolean hasCaptcha = (Boolean) resp.get("hasCaptcha");
+                        if (fileSize != null) {
+                            link.setVerifiedFileSize(fileSize.longValue());
+                        }
+                        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
+                        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
+                        /* Set final filename here because Content-Disposition header contains crypted filename. */
+                        final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
+                        link.setFinalFileName(decryptedFileName);
+                        link.setMD5Hash(fileHash);
+                        link.setProperty("dl3", downloadUrl);
+                        // link.setProperty("hashedFileName", fileName);
+                        link.setProperty("decryptedFileName", decryptedFileName);
+                        if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
+                            link.setProperty("hasCatpcha", hasCaptcha);
+                        } else {
+                            link.removeProperty("hasCatpcha");
+                        }
+                        if (!this.isValidFileURL(link.getPluginPatternMatcher())) {
+                            link.setAvailable(false);
+                        } else {
+                            link.setAvailable(true);
+                        }
+                    } catch (final Exception e) {
+                        logger.log(e);
                     }
-                    if (resp == null) {
-                        /* This should never happen! */
-                        link.setAvailable(false);
-                        continue;
-                    }
-                    final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-                    final String key = query.get("key");
-                    final String counterFileName = query.get("counterFileName");
-                    final String fileName = resp.get("fileName").toString();
-                    final Number fileSize = (Number) resp.get("fileSize");
-                    final String fileHash = resp.get("fileHash").toString();
-                    final String downloadUrl = resp.get("downloadUrl").toString();
-                    final Boolean hasCaptcha = (Boolean) resp.get("hasCaptcha");
-                    if (fileSize != null) {
-                        link.setVerifiedFileSize(fileSize.longValue());
-                    }
-                    final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
-                    final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
-                    /* Set final filename here because Content-Disposition header contains crypted filename. */
-                    final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
-                    link.setFinalFileName(decryptedFileName);
-                    link.setMD5Hash(fileHash);
-                    link.setProperty("dl3", downloadUrl);
-                    // link.setProperty("hashedFileName", fileName);
-                    link.setProperty("decryptedFileName", decryptedFileName);
-                    if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
-                        link.setProperty("hasCatpcha", hasCaptcha);
-                    } else {
-                        link.removeProperty("hasCatpcha");
-                    }
-                    link.setAvailable(true);
                 }
-                if (index == urls.length) {
-                    break;
+                /** All items which were not included in the API response shall be offline. */
+                for (final DownloadLink link : links.values()) {
+                    link.setAvailable(false);
                 }
             }
         } catch (final Exception e) {
@@ -244,48 +244,51 @@ public class FiledoNet extends PluginForHost {
             /* Set weak-filename */
             link.setName(fileId);
         }
-        final boolean useMassLinkchecker = false;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && useMassLinkchecker) {
-            return requestFileInformationSingleViaMassLinkcheck(link);
+        final boolean useMassLinkchecker = true;
+        if (useMassLinkchecker) {
+            return requestFileInformationSingleViaMassLinkcheck(link, account);
         } else {
-            if (!isValidFileID(fileId)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            if (isValidFileURL(link.getPluginPatternMatcher())) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-            final String key = query.get("key");
-            final String counterFileName = query.get("counterFileName");
-            final GetRequest req = br.createGetRequest(API_BASE + "/file?fileId=" + fileId);
-            final Map<String, Object> resp = (Map<String, Object>) this.callAPI(req, null, link);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final String fileName = resp.get("fileName").toString();
-            final String fileSize = PluginJSonUtils.getJson(br, "fileSize");
-            final String fileHash = resp.get("fileHash").toString();
-            final String downloadUrl = resp.get("downloadUrl").toString();
-            final boolean hasCaptcha = PluginJSonUtils.parseBoolean(PluginJSonUtils.getJson(br, "hasCaptcha"));
-            if (fileSize != null) {
-                link.setVerifiedFileSize(Long.parseLong(fileSize) * 1024);
-            }
-            final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
-            final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
-            /* Set final filename here because Content-Disposition header contains crypted filename. */
-            final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
-            link.setFinalFileName(decryptedFileName);
-            link.setMD5Hash(fileHash);
-            link.setProperty("dl3", downloadUrl);
-            // link.setProperty("hashedFileName", fileName);
-            link.setProperty("decryptedFileName", decryptedFileName);
-            if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
-                link.setProperty("hasCatpcha", hasCaptcha);
-            } else {
-                link.removeProperty("hasCatpcha");
-            }
-            return AvailableStatus.TRUE;
+            return requestFileInformationAPISingle(link, account);
         }
+    }
+
+    @Deprecated
+    private AvailableStatus requestFileInformationAPISingle(final DownloadLink link, final Account account) throws Exception {
+        if (isValidFileURL(link.getPluginPatternMatcher())) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String fileId = this.getFID(link);
+        final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
+        final String key = query.get("key");
+        final String counterFileName = query.get("counterFileName");
+        final GetRequest req = br.createGetRequest(API_BASE + "/file?fileId=" + fileId);
+        final Map<String, Object> resp = (Map<String, Object>) this.callAPI(req, null, link);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String fileName = resp.get("fileName").toString();
+        final String fileSize = PluginJSonUtils.getJson(br, "fileSize");
+        final String fileHash = resp.get("fileHash").toString();
+        final String downloadUrl = resp.get("downloadUrl").toString();
+        final boolean hasCaptcha = PluginJSonUtils.parseBoolean(PluginJSonUtils.getJson(br, "hasCaptcha"));
+        if (fileSize != null) {
+            link.setVerifiedFileSize(Long.parseLong(fileSize) * 1024);
+        }
+        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
+        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
+        /* Set final filename here because Content-Disposition header contains crypted filename. */
+        final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
+        link.setFinalFileName(decryptedFileName);
+        link.setMD5Hash(fileHash);
+        link.setProperty("dl3", downloadUrl);
+        // link.setProperty("hashedFileName", fileName);
+        link.setProperty("decryptedFileName", decryptedFileName);
+        if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
+            link.setProperty("hasCatpcha", hasCaptcha);
+        } else {
+            link.removeProperty("hasCatpcha");
+        }
+        return AvailableStatus.TRUE;
     }
 
     private boolean isValidFileURL(final String url) throws MalformedURLException {
@@ -303,7 +306,7 @@ public class FiledoNet extends PluginForHost {
         }
     }
 
-    private AvailableStatus requestFileInformationSingleViaMassLinkcheck(final DownloadLink link) throws Exception {
+    private AvailableStatus requestFileInformationSingleViaMassLinkcheck(final DownloadLink link, final Account account) throws Exception {
         checkLinks(new DownloadLink[] { link });
         if (!link.isAvailabilityStatusChecked()) {
             return AvailableStatus.UNCHECKED;
@@ -333,7 +336,7 @@ public class FiledoNet extends PluginForHost {
     @Override
     public void handleFree(DownloadLink link) throws Exception {
         if (checkShowFreeDialog(getHost())) {
-            showFreeDialog(getHost());
+            showFreeDialog();
         }
         requestFileInformation(link);
         final String dlUrl = link.getStringProperty("dl3");

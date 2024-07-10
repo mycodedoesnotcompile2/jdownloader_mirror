@@ -908,8 +908,8 @@ public abstract class KeyHandler<RawClass> {
         getterName = getterName.replaceAll("(\\d+)(\\D)", "$1 $2");
         getterName = getterName.replaceAll("(\\S)([A-Z][a-z])", "$1 $2");
         getterName = getterName.replaceAll("I P", "IP");// special case for IP
-        getterName = getterName.replaceAll("(2160|1080|720|480|570|540|360|270|240|170) ?(p|P)", "$1$2");// special case for 1080p
-        getterName = getterName.replaceAll("(^| )(2|4|8) ?(k|K)($| )", "$1$2$3$4");// special case for 2k,4k,8k
+        getterName = getterName.replaceAll("(\\d{3,4}) ?(p|P)", "$1$2");// special case for 1080p
+        getterName = getterName.replaceAll("(^| )(2|4|5|8) ?(k|K)($| )", "$1$2$3$4");// special case for 2k,4k,8k
         getterName = getterName.replaceAll("(?i)(MP) ?(3|4)", "$1$2");// special case for MP3/MP4
         if (getterName.endsWith(" Enabled")) {
             getterName = getterName.substring(0, getterName.length() - 8);

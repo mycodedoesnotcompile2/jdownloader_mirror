@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 47857 $", interfaceVersion = 3, names = { "yimuhe.com" }, urls = { "https?://(?:www\\.)?yimuhe\\.com/(?:file|down)\\-(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 3, names = { "yimuhe.com" }, urls = { "https?://(?:www\\.)?yimuhe\\.com/(?:file|down)\\-(\\d+)\\.html" })
 public class YimuheCom extends PluginForHost {
     public YimuheCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,9 +45,8 @@ public class YimuheCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private final boolean FREE_RESUME       = false;
-    private final int     FREE_MAXCHUNKS    = 1;
-    private final int     FREE_MAXDOWNLOADS = 1;
+    private final boolean FREE_RESUME    = false;
+    private final int     FREE_MAXCHUNKS = 1;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -171,8 +170,7 @@ public class YimuheCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        dl.setFilenameFix(true);
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -206,7 +204,7 @@ public class YimuheCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     @Override

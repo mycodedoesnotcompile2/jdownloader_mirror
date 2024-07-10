@@ -70,7 +70,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 49290 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -532,7 +532,6 @@ public class LinkSnappyCom extends PluginForHost {
             }
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
-        dl.setFilenameFix(true);
         if (this.dl.startDownload()) {
             /**
              * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br>

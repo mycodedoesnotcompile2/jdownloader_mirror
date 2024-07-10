@@ -141,6 +141,7 @@ import jd.plugins.DownloadLinkDatabindingInterface;
 import jd.plugins.FilePackage;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
@@ -152,7 +153,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 49278 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 49309 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -248,6 +249,15 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             }
         }
         super.setBrowser(brr);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        return new PluginBrowser<YoutubeDashV2>(this) {
+            {
+                setDebug(true);
+            }
+        };
     }
 
     @Override
@@ -2265,7 +2275,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         case IMAGE:
             this.setBrowserExclusive();
             this.requestFileInformation(downloadLink, true);
-            this.br.setDebug(true);
             this.dl = jd.plugins.BrowserAdapter.openDownload(this.br, downloadLink, getAndUpdateVariantInfo(downloadLink, true).getDataStreams().get(0).getUrl(), resume, 1);
             if (!this.dl.getConnection().isContentDisposition() && !this.dl.getConnection().getContentType().startsWith("image/")) {
                 try {
@@ -2292,7 +2301,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         case SUBTITLES:
             this.setBrowserExclusive();
             this.requestFileInformation(downloadLink, true);
-            this.br.setDebug(true);
             this.dl = jd.plugins.BrowserAdapter.openDownload(this.br, downloadLink, getAndUpdateVariantInfo(downloadLink, true).getDataStreams().get(0).getUrl(), resume, 1);
             if (!this.dl.getConnection().isContentDisposition() && !this.dl.getConnection().getContentType().startsWith("text/xml")) {
                 try {
@@ -2323,7 +2331,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             this.setBrowserExclusive();
             //
             this.requestFileInformation(downloadLink, true);
-            this.br.setDebug(true);
             // downloadLink.setInternalTmpFilenameAppend(fileName);
             final YoutubeFinalLinkResource sd = getYoutubeFinalLinkResource(downloadLink, YoutubeHelper.YT_STREAM_DATA_VIDEO);
             br.getHeaders().put(new HTTPHeader("Connection", "close", false));

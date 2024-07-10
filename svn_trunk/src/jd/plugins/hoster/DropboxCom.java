@@ -60,7 +60,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DropBoxComCrawler;
 
-@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49290 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -550,7 +550,6 @@ public class DropboxCom extends PluginForHost {
         /* Important: URL needs to contain "www."! */
         dllink = dllink.replaceFirst("(?i)/dropbox.com/", "/www.dropbox.com/");
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resume, 1);
-        dl.setFilenameFix(true);
         final String filename = link.getName();
         if (LinkCrawlerDeepInspector.looksLikeMpegURL(dl.getConnection())) {
             /* HLS download (usually only needed as fallback if official download is disabled) */
@@ -685,7 +684,6 @@ public class DropboxCom extends PluginForHost {
         br.getHeaders().put("Dropbox-API-Arg", jsonHeader);
         br.getHeaders().put("Content-Type", "text/plain;charset=UTF-8");
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, API_BASE_CONTENT + "/sharing/get_shared_link_file", "", true, 1);
-        dl.setFilenameFix(true);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             final String error_summary = getErrorSummaryField(this.br);

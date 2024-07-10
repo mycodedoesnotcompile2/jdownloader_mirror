@@ -74,7 +74,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -337,7 +337,6 @@ public class RapidGatorNet extends PluginForHost {
                 }
                 final String filesize = br.getRegex("File size:\\s*<strong>([^<>\"]+)</strong>").getMatch(0);
                 if (StringUtils.isNotEmpty(filename)) {
-                    /* Prevent encoding issues when using Content-disposition filenames. */
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setFinalFileName(filename);
                 }
@@ -1484,7 +1483,6 @@ public class RapidGatorNet extends PluginForHost {
             directurl = directurl.replaceFirst("(?i)^http://", "https://");
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, isResumeable(link, account), getMaxChunks(link, account));
-        dl.setFilenameFix(true);
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             logger.warning("The final dllink seems not to be a file!");
             br.followConnection(true);
