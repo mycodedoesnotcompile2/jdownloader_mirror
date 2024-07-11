@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47192 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49310 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidbmCom extends XFileSharingProBasic {
     public VidbmCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -43,7 +43,7 @@ public class VidbmCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vedbam.xyz", "vidbam.org", "vidbm.com", "vidbom.com", "vidbem.com" });
+        ret.add(new String[] { "vedbam.xyz", "vidbam.org", "vidbm.com", "vidbom.com", "vidbem.com", "vadbam.net" });
         return ret;
     }
 

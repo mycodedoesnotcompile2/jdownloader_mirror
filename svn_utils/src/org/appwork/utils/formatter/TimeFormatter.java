@@ -37,7 +37,9 @@ import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Pattern;
 
@@ -199,17 +201,26 @@ public class TimeFormatter {
         return Math.round(res);
     }
 
-    public static long getMilliSeconds(final String dateString, final String timeformat, final Locale l) {
+    public static long getMilliSeconds(final String dateString, final String dateFormatString, final Locale l) {
         if (dateString != null) {
-            final SimpleDateFormat dateFormat = l != null ? new SimpleDateFormat(timeformat, l) : new SimpleDateFormat(timeformat, Locale.ENGLISH);
-            try {
-                dateFormat.setLenient(false);
-                if (timeformat.contains("'Z'")) {
-                    dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            final Set<String> dateFormatVariants = new LinkedHashSet<String>();
+            dateFormatVariants.add(dateFormatString);
+            dateFormatVariants.add(dateFormatString.replaceAll("H+", "kk"));// Hour in day (0-23) to Hour in day (1-24)
+            dateFormatVariants.add(dateFormatString.replaceAll("k+", "HH"));// Hour in day (1-24) to Hour in day (0-23)
+            dateFormatVariants.add(dateFormatString.replaceAll("h+", "KK")); // Hour in am/pm (1-12) to Hour in am/pm (0-11)
+            dateFormatVariants.add(dateFormatString.replaceAll("h+", "kk")); // Hour in am/pm (1-12) to Hour in day (1-24)
+            dateFormatVariants.add(dateFormatString.replaceAll("h+", "HH")); // Hour in am/pm (1-12) to Hour in day (0-23)
+            for (final String dateFormatVariant : dateFormatVariants) {
+                final SimpleDateFormat dateFormat = l != null ? new SimpleDateFormat(dateFormatVariant, l) : new SimpleDateFormat(dateFormatVariant, Locale.ENGLISH);
+                try {
+                    dateFormat.setLenient(false);
+                    if (dateFormatVariant.contains("'Z'")) {
+                        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                    }
+                    return dateFormat.parse(dateString).getTime();
+                } catch (final Exception e) {
+                    e.printStackTrace();
                 }
-                return dateFormat.parse(dateString).getTime();
-            } catch (final Exception e) {
-                e.printStackTrace();
             }
         }
         return -1;

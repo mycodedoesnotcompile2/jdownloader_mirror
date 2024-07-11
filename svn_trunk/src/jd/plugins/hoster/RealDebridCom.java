@@ -24,6 +24,33 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -62,34 +89,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 49314 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -626,7 +626,15 @@ public class RealDebridCom extends PluginForHost {
                     }
 
                     private final boolean is2FARequired(String html) {
+                        return is2FAEmailRequired(html) || is2FAAppRequired(html);
+                    }
+
+                    private final boolean is2FAEmailRequired(String html) {
                         return StringUtils.contains(html, "A temporary code has been sent to your email address and is required");
+                    }
+
+                    private final boolean is2FAAppRequired(String html) {
+                        return StringUtils.contains(html, "A temporary code from Two-Factor app is required");
                     }
 
                     private final Boolean check(SolverJob<Boolean> job, Browser br) throws Exception {
@@ -667,10 +675,17 @@ public class RealDebridCom extends PluginForHost {
                         loginForm.getInputField("p").setValue(Encoding.urlEncode(getAccount().getPass()));
                         loginForm.getInputField("u").setValue(Encoding.urlEncode(getAccount().getUser()));
                         if (is2FARequired(loginForm.getHtmlCode())) {
+                            logger.info("2fa required");
                             if (Application.isHeadless() || !BrowserSolverService.getInstance().isOpenBrowserSupported()) {
-                                String text = loginForm.getRegex("(A temporary.*?)\\s*</").getMatch(0);
+                                String text = loginForm.getRegex(">\\s*(A temporary.*?)\\s*</").getMatch(0);
                                 if (StringUtils.isEmpty(text)) {
-                                    text = "A temporary code has been sent to your email address and is required to complete the login:";
+                                    if (is2FAEmailRequired(loginForm.getHtmlCode())) {
+                                        text = "A temporary code has been sent to your email address and is required to complete the login:";
+                                    } else if (is2FAAppRequired(loginForm.getHtmlCode())) {
+                                        text = "A temporary code from Two-Factor app is required to complete the login:";
+                                    } else {
+                                        text = "Please enter 2FA code to complete the login:";
+                                    }
                                 }
                                 final InputDialog mfaDialog = new InputDialog(UIOManager.LOGIC_COUNTDOWN, "Account is 2fa protected!", text, null, null, _GUI.T.lit_continue(), null);
                                 mfaDialog.setTimeout(5 * 60 * 1000);

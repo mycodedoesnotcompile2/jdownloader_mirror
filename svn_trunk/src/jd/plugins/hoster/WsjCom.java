@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48043 $", interfaceVersion = 3, names = { "wsj.com" }, urls = { "https?://(?:www\\.)?((?:wsj|barrons)\\.com/video/[^/]+/[A-F0-9]{8}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{12}\\.html|allthingsd\\.com/video/\\?video_id=[A-F0-9]{8}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{12})" })
+@HostPlugin(revision = "$Revision: 49312 $", interfaceVersion = 3, names = { "wsj.com" }, urls = { "https?://(?:www\\.)?((?:wsj|barrons)\\.com/video/[^/]+/[A-F0-9]{8}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{12}\\.html|allthingsd\\.com/video/\\?video_id=[A-F0-9]{8}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{4}\\-[A-F0-9]{12})" })
 public class WsjCom extends PluginForHost {
     public WsjCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,10 +61,9 @@ public class WsjCom extends PluginForHost {
      * master. m3u8
      */
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
@@ -172,7 +171,7 @@ public class WsjCom extends PluginForHost {
     }
 
     private String formatDate(final String input) {
-        final long date = TimeFormatter.getMilliSeconds(input, "MM/dd/yyyy hh:mm:ss aa", Locale.US);
+        final long date = TimeFormatter.getMilliSeconds(input, "MM/dd/yyyy HH:mm:ss aa", Locale.US);
         String formattedDate = null;
         final String targetFormat = "yyyy-MM-dd";
         Date theDate = new Date(date);
@@ -188,7 +187,7 @@ public class WsjCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override
