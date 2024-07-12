@@ -33,8 +33,6 @@
  * ==================================================================================================================================================== */
 package org.jdownloader.myjdownloader.client.bindings.downloadlist;
 
-import java.util.Map;
-
 import org.jdownloader.myjdownloader.client.bindings.AbstractLinkStorable;
 
 public class DownloadLinkStorable extends AbstractLinkStorable {
@@ -42,16 +40,6 @@ public class DownloadLinkStorable extends AbstractLinkStorable {
     private long bytesLoaded = -1;
 
     private long eta         = -1;
-    
-    private long addedDate   = -1;
-    
-    public long getAddedDate() {
-        return this.addedDate;
-    }
-    
-    public void setAddedDate(long addedDate) {
-        this.addedDate = addedDate;
-    }
     
     public long getFinishedDate() {
         return this.finishedDate;
@@ -68,17 +56,8 @@ public class DownloadLinkStorable extends AbstractLinkStorable {
     private boolean finished         = false;
     private boolean running          = false;
     private String  status           = null;
-    private Map<String,Object> advancedStatus=null;
 
-    public Map<String, Object> getAdvancedStatus() {
-		return advancedStatus;
-	}
-
-	public void setAdvancedStatus(Map<String, Object> advancedStatus) {
-		this.advancedStatus = advancedStatus;
-	}
-
-	public String getStatus() {
+    public String getStatus() {
         return this.status;
     }
 

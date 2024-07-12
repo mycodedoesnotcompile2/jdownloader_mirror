@@ -97,17 +97,8 @@ public class DownloadLinkQuery extends AbstractLinkQuery {
     private boolean eta          = false;
     private boolean finished     = false;
     private boolean status       = false;
-    private boolean advancedStatus=false;
 
-    public boolean isAdvancedStatus() {
-		return advancedStatus;
-	}
-
-	public void setAdvancedStatus(boolean advancedStatus) {
-		this.advancedStatus = advancedStatus;
-	}
-
-	private boolean finishedDate = false;
+    private boolean finishedDate = false;
     
     public boolean isFinishedDate() {
         return this.finishedDate;
@@ -116,16 +107,6 @@ public class DownloadLinkQuery extends AbstractLinkQuery {
     public void setFinishedDate(boolean finishedDate) {
         this.finishedDate = finishedDate;
     }
-    
-    public boolean isAddedDate() {
-        return this.addedDate;
-    }
-    
-    public void setAddedDate(boolean addedDate) {
-        this.addedDate = addedDate;
-    }
-    
-    private boolean addedDate = false;
     
     @Override
     public boolean isStatus() {

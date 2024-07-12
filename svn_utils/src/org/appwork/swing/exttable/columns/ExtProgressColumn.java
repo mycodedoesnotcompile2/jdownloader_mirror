@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.swing.exttable.columns;
 
+import java.awt.Color;
 import java.awt.Rectangle;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -48,6 +49,7 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.renderercomponents.RendererProgressBar;
+import org.appwork.utils.ColorUtils;
 import org.appwork.utils.swing.renderer.RendererMigPanel;
 
 abstract public class ExtProgressColumn<E> extends ExtColumn<E> {
@@ -211,7 +213,7 @@ abstract public class ExtProgressColumn<E> extends ExtColumn<E> {
      *
      */
     protected void preInit() {
-	}
+    }
 
     protected IndeterminatedRenderer<E> initIndeterminatedRenderer() {
         return new IndeterminatedRenderer<E>(this);
@@ -219,6 +221,11 @@ abstract public class ExtProgressColumn<E> extends ExtColumn<E> {
 
     protected RendererProgressBar initDeterminatedRenderer() {
         return new RendererProgressBar();
+    }
+
+    @Override
+    protected Color getDefaultForeground() {
+        return ColorUtils.getContrastBWColor(getDefaultBackground());
     }
 
     /**

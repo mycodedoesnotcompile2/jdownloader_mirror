@@ -73,11 +73,9 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public class ClassCache {
-    public static final String                             ORG_APPWORK_STORAGE_FLEXIJSON_MAPPER_FLEXI_KEY_LOOKUP = "org.appwork.storage.flexijson.mapper.FlexiKeyLookup";
-    public static final String                             ORG_APPWORK_STORAGE_CONFIG_ANNOTATIONS_LOOK_UP_KEYS   = "org.appwork.storage.config.annotations.LookUpKeys";
-    private static final WeakHashMap<Class<?>, ClassCache> CACHE                                                 = new WeakHashMap<Class<?>, ClassCache>();
-    private static final Object[]                          EMPTY_OBJECT                                          = new Object[] {};
-    private static final Class<?>[]                        EMPTY_TYPES                                           = new Class[] {};
+    private static final WeakHashMap<Class<?>, ClassCache> CACHE        = new WeakHashMap<Class<?>, ClassCache>();
+    private static final Object[]                          EMPTY_OBJECT = new Object[] {};
+    private static final Class<?>[]                        EMPTY_TYPES  = new Class[] {};
 
     protected static ClassCache create(final Class<? extends Object> clazz) throws SecurityException, NoSuchMethodException {
         return create(clazz, null);
@@ -204,8 +202,6 @@ public class ClassCache {
      */
     public static ClassCache create(final Class<? extends Object> clazz, Rules rules) throws SecurityException, NoSuchMethodException {
         final ClassCache cc = new ClassCache(clazz);
-        Getter g;
-        Setter s;
         final HashSet<String> ignores = new HashSet<String>();
         typeHierarchy: for (Type t : cc.getTypeHierarchy()) {
             if (t == Object.class) {
@@ -273,45 +269,45 @@ public class ClassCache {
                 }
             });
             for (final Method m : methods) {
+                final int mods = m.getModifiers();
+                if (Modifier.isPrivate(mods) && m.getAnnotation(StorableAllowPrivateAccessModifier.class) == null) {
+                    continue;
+                } else if (!Modifier.isPrivate(mods) && !Modifier.isPublic(mods) && m.getAnnotation(StorableAllowProtectedAccessModifier.class) == null) {
+                    continue;
+                }
                 final ArrayList<String> alternativeKeys = new ArrayList<String>();
+                final Boolean setOrGet;
                 String key = null;
                 if ((key = getGetterKey(m)) != null) {
-                    int mods = m.getModifiers();
-                    if (Modifier.isPrivate(mods) && m.getAnnotation(StorableAllowPrivateAccessModifier.class) == null) {
-                        continue;
-                    }
-                    if (!Modifier.isPrivate(mods) && !Modifier.isPublic(mods) && m.getAnnotation(StorableAllowProtectedAccessModifier.class) == null) {
-                        continue;
-                    }
+                    setOrGet = Boolean.TRUE;
+                } else if ((key = getSetterKey(m)) != null) {
+                    setOrGet = Boolean.FALSE;
+                } else {
+                    setOrGet = null;
+                }
+                if (setOrGet != null) {
                     for (Annotation a : m.getAnnotations()) {
                         addAlternativeKeyFromAnnotation(alternativeKeys, a, key);
                     }
                     final Field field = addAlternativeKeyFromField(ct.raw, m, alternativeKeys, key);
-                    cc.allGetter.add(g = new Getter(cc, key, alternativeKeys, m, field));
-                    if (putMethod(cc.getterMap, g.getKey(), g)) {
-                        cc.getter.add(g);
-                    }
-                    for (String aKey : alternativeKeys) {
-                        putMethod(cc.getterMap, aKey, g);
-                    }
-                } else if ((key = getSetterKey(m)) != null) {
-                    int mods = m.getModifiers();
-                    if (Modifier.isPrivate(mods) && m.getAnnotation(StorableAllowPrivateAccessModifier.class) == null) {
-                        continue;
-                    }
-                    if (!Modifier.isPrivate(mods) && !Modifier.isPublic(mods) && m.getAnnotation(StorableAllowProtectedAccessModifier.class) == null) {
-                        continue;
-                    }
-                    for (Annotation a : m.getAnnotations()) {
-                        addAlternativeKeyFromAnnotation(alternativeKeys, a, key);
-                    }
-                    Field field = addAlternativeKeyFromField(ct.raw, m, alternativeKeys, key);
-                    cc.allSetter.add(s = new Setter(cc, key, alternativeKeys, m, field));
-                    if (putMethod(cc.setterMap, s.getKey(), s)) {
-                        cc.setter.add(s);
-                    }
-                    for (String aKey : alternativeKeys) {
-                        putMethod(cc.setterMap, aKey, s);
+                    if (Boolean.TRUE.equals(setOrGet)) {
+                        final Getter g = new Getter(cc, key, alternativeKeys, m, field);
+                        cc.allGetter.add(g);
+                        if (putMethod(cc.getterMap, g.getKey(), g)) {
+                            cc.getter.add(g);
+                        }
+                        for (String aKey : alternativeKeys) {
+                            putMethod(cc.getterMap, aKey, g);
+                        }
+                    } else {
+                        final Setter s = new Setter(cc, key, alternativeKeys, m, field);
+                        cc.allSetter.add(s);
+                        if (putMethod(cc.setterMap, s.getKey(), s)) {
+                            cc.setter.add(s);
+                        }
+                        for (String aKey : alternativeKeys) {
+                            putMethod(cc.setterMap, aKey, s);
+                        }
                     }
                 }
             }
@@ -427,14 +423,6 @@ public class ClassCache {
                 add(alternativeKeys, key, value);
             } else if ("com.fasterxml.jackson.annotation.JsonProperty".equals(type.getName())) {
                 // Support for Jackson Annotation
-                final Method valueMethod = ((Class) type).getMethod("value", new Class[] {});
-                final Object value = valueMethod.invoke(a, new Object[] {});
-                add(alternativeKeys, key, value);
-            } else if (ORG_APPWORK_STORAGE_FLEXIJSON_MAPPER_FLEXI_KEY_LOOKUP.equals(type.getName())) {
-                final Method valueMethod = ((Class) type).getMethod("value", new Class[] {});
-                final Object value = valueMethod.invoke(a, new Object[] {});
-                add(alternativeKeys, key, value);
-            } else if (ORG_APPWORK_STORAGE_CONFIG_ANNOTATIONS_LOOK_UP_KEYS.equals(type.getName())) {
                 final Method valueMethod = ((Class) type).getMethod("value", new Class[] {});
                 final Object value = valueMethod.invoke(a, new Object[] {});
                 add(alternativeKeys, key, value);

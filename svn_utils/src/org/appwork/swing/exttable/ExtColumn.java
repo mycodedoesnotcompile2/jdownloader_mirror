@@ -73,10 +73,6 @@ import org.appwork.utils.swing.SwingUtils;
  * @author $Author: unknown$
  */
 public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCellEditor, TableCellRenderer {
-    protected static Color           background             = null;
-    protected static Color           backgroundselected     = null;
-    protected static Color           foreground             = null;
-    protected static Color           foregroundselected     = null;
     private static final long        serialVersionUID       = -2662459732650363059L;
     protected static final Border    DEFAULT_BORDER         = BorderFactory.createEmptyBorder(0, 5, 0, 5);
     /**
@@ -199,11 +195,10 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
             if (hs.size() == 0) {
                 return;
             }
-            ExtTable<E> table = getModel().getTable();
             // set background back
             SwingUtils.setOpaque(comp, false);
-            comp.setBackground(table.getBackground());
-            comp.setForeground(table.getForeground());
+            comp.setBackground(getDefaultBackground());
+            comp.setForeground(getDefaultForeground());
             for (final ExtComponentRowHighlighter<E> rh : hs) {
                 if (rh.highlight(this, comp, value, isSelected, hasFocus, row)) {
                     // no break. we may have mixing highlighters
@@ -212,6 +207,22 @@ public abstract class ExtColumn<E> extends AbstractCellEditor implements TableCe
         } catch (final Throwable e) {
             org.appwork.loggingv3.LogV3.log(e);
         }
+    }
+
+    /**
+     * @return
+     */
+    protected Color getDefaultForeground() {
+        final ExtTable<E> table = getModel().getTable();
+        return table.getForeground();
+    }
+
+    /**
+     * @return
+     */
+    protected Color getDefaultBackground() {
+        final ExtTable<E> table = getModel().getTable();
+        return table.getBackground();
     }
 
     /**

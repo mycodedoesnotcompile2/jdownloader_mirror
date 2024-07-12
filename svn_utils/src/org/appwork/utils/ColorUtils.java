@@ -61,4 +61,14 @@ public class ColorUtils {
         final int a = (int) (255 * (transbg * transfg));
         return new Color(r, g, b, (255 - a));
     }
+
+    public static Color getContrastBWColor(final Color color) {
+        if (color == null) {
+            return null;
+        } else {
+            // https://www.w3.org/TR/AERT/#color-contrast
+            final int luminance = (299 * color.getRed() + 587 * color.getGreen() + 114 * color.getBlue()) / 1000;
+            return luminance < 128 ? Color.white : Color.black;
+        }
+    }
 }

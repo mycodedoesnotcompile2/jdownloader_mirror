@@ -3,9 +3,10 @@ package org.appwork.utils;
 import org.appwork.utils.JVMVersion.JavaVersionInterface;
 
 public enum JavaVersion implements JavaVersionInterface {
+    // https://en.wikipedia.org/wiki/Java_version_history
     // UNKNOWN IS ALWAYS FIRST!
     UNKNOWN(-1, "Unknown"),
-    // ORDERR IS IMPORTANT! ALWAYS ORDER ENUMS ACCORDING TO THEIR VERSION!
+    // ORDER IS IMPORTANT! ALWAYS ORDER ENUMS ACCORDING TO THEIR VERSION!
     JVM_1_0(45, "1.0"),
     JVM_1_1(45, "1.1"),
     JVM_1_2(46, "1.2"),
@@ -31,7 +32,7 @@ public enum JavaVersion implements JavaVersionInterface {
     JVM_22_0(66, "22"),
     JVM_23_0(67, "23"),
     JVM_24_0(68, "24"),
-    JVM_25_0(69, "25") {
+    JVM_25_0(69, "25", true/* planned */) {
         private final long next;
         {
             this.next = JVMVersion.parseJavaVersionString("26");

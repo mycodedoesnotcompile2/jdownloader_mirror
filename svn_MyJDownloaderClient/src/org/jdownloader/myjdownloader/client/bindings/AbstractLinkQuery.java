@@ -34,55 +34,75 @@
 package org.jdownloader.myjdownloader.client.bindings;
 
 public abstract class AbstractLinkQuery extends AbstractQuery {
-    
-    private boolean password = false;
-    
-    private boolean host     = false;
-    
-    private boolean  isJobUUID=false;
 
+    private boolean password       = false;
+
+    private boolean host           = false;
+
+    private boolean jobUUID        = false;
+    
+    private boolean advancedStatus = false;
+    
+    public boolean isAddedDate() {
+        return this.addedDate;
+    }
+    
+    public void setAddedDate(boolean addedDate) {
+        this.addedDate = addedDate;
+    }
+    
+    private boolean addedDate = false;
+    
     public boolean isJobUUID() {
-		return isJobUUID;
-	}
-
-	public void setJobUUID(boolean isJobUUID) {
-		this.isJobUUID = isJobUUID;
-	}
-
-	private long[]  jobUUIDs;
+        return this.jobUUID;
+    }
     
+    public void setJobUUID(boolean isJobUUID) {
+        this.jobUUID = isJobUUID;
+    }
+    
+    private long[] jobUUIDs;
+
     public long[] getJobUUIDs() {
         return this.jobUUIDs;
     }
-    
+
     public void setJobUUIDs(long[] jobUUIDs) {
         this.jobUUIDs = jobUUIDs;
     }
-    
+
     public boolean isHost() {
         return this.host;
     }
-    
+
     public void setHost(final boolean host) {
         this.host = host;
     }
     
+    public boolean isAdvancedStatus() {
+        return this.advancedStatus;
+    }
+
+    public void setAdvancedStatus(boolean advancedStatus) {
+        this.advancedStatus = advancedStatus;
+    }
+
     public boolean isUrl() {
         return this.url;
     }
-    
+
     public void setUrl(final boolean url) {
         this.url = url;
     }
-    
+
     public boolean isPassword() {
         return this.password;
     }
-    
+
     public void setPassword(boolean password) {
         this.password = password;
     }
-    
+
     private boolean url = false;
-    
+
 }

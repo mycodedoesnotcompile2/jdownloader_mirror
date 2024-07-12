@@ -69,13 +69,11 @@ public class ClassCacheTest extends AWTest {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {
-        assertEquals(Class.forName("org.appwork.storage.config.annotations.LookUpKeys"), Class.forName(ClassCache.ORG_APPWORK_STORAGE_CONFIG_ANNOTATIONS_LOOK_UP_KEYS));
-        assertEquals(Class.forName("org.appwork.storage.flexijson.mapper.FlexiKeyLookup"), Class.forName(ClassCache.ORG_APPWORK_STORAGE_FLEXIJSON_MAPPER_FLEXI_KEY_LOOKUP));
         final FlexiConfigBuilder<TestConfigInterface> builder = new FlexiConfigBuilder<TestConfigInterface>(TestConfigInterface.class, Application.getResource("test.json")).setAutoWriteEnabled(false);
         TestConfigInterface storage = builder.getStorage();
         assertTrue(Proxy.isProxyClass(storage.getClass()));
