@@ -29,6 +29,49 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.Property;
+import jd.config.SubConfiguration;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractNodeNotifier;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.HeadRequest;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.BrowserAdapter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.DownloadLinkDatabindingInterface;
+import jd.plugins.FilePackage;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.decrypter.TbCmV2;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashResult;
+import jd.plugins.download.raf.ChunkRange;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
@@ -110,50 +153,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.Property;
-import jd.config.SubConfiguration;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractNodeNotifier;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.HeadRequest;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.BrowserAdapter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.DownloadLinkDatabindingInterface;
-import jd.plugins.FilePackage;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginBrowser;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.decrypter.TbCmV2;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashResult;
-import jd.plugins.download.raf.ChunkRange;
-
-@HostPlugin(revision = "$Revision: 49309 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 49344 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -392,12 +392,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 final Browser br2 = br.cloneBrowser();
                 br2.getHeaders().remove("Accept-Encoding");
                 URLConnectionAdapter con = null;
+                IOException ioe = null;
                 try {
-                    try {
-                        con = br2.openGetConnection(urls.getDataStreams().get(0).getUrl());
-                    } catch (final IOException e) {
-                        logger.log(e);
-                    }
+                    con = br2.openGetConnection(urls.getDataStreams().get(0).getUrl());
+                } catch (final IOException e) {
+                    ioe = e;
+                    logger.log(e);
                 } finally {
                     if (con != null) {
                         con.disconnect();
@@ -407,6 +407,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                     if (i == 0) {
                         resetStreamUrls(downloadLink);
                         continue;
+                    } else if (ioe != null) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, null, ioe);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
@@ -426,12 +428,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 URLConnectionAdapter con = null;
+                IOException ioe = null;
                 try {
-                    try {
-                        con = br.openGetConnection(urls.getDataStreams().get(0).getUrl());
-                    } catch (final IOException e) {
-                        logger.log(e);
-                    }
+                    con = br.openGetConnection(urls.getDataStreams().get(0).getUrl());
+                } catch (final IOException e) {
+                    ioe = e;
+                    logger.log(e);
                 } finally {
                     if (con != null) {
                         con.disconnect();
@@ -441,6 +443,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                     if (i == 0) {
                         resetStreamUrls(downloadLink);
                         continue;
+                    } else if (ioe != null) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, null, ioe);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
@@ -459,7 +463,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 int maxAlternativesChecks = CFG_YOUTUBE.CFG.getAutoAlternativeSearchDepths();
                 final boolean hasCache = ClipDataCache.hasCache(helper, downloadLink);
                 boolean triedToResetTheCache = !hasCache;
-                test: while (maxAlternativesChecks-- >= 0) {
+                test: while (maxAlternativesChecks-- >= 0 || triedToResetTheCache) {
                     final AbstractVariant currentVariant = getVariant(downloadLink);
                     checkedAlternatives.add(currentVariant);
                     YoutubeFinalLinkResource cache = null;
@@ -510,10 +514,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                     // if (false && vv.getQualityRating() > VideoResolution.P_360.getRating()) {
                                     // url = url.replace("signature=", "signature=BAD");
                                     // }
+                                    IOException ioe = null;
                                     try {
                                         lastCon = null;
                                         lastCon = br.openRequestConnection(new HeadRequest(url));
                                     } catch (IOException e) {
+                                        ioe = e;
                                         logger.log(e);
                                     } finally {
                                         if (lastCon != null) {
@@ -538,11 +544,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                         if (si.getSrc() != null) {
                                             logger.info("Failed for Stream Source: " + si.getSrc());
                                         }
-                                        // if (i == 0) {
-                                        // resetStreamUrls(downloadLink);
-                                        // continue;
-                                        // }
-                                        if (firstException == null) {
+                                        if (lastCon != null && lastCon.getResponseCode() == 403) {
+                                            firstException = new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE);
+                                        } else if (ioe != null) {
+                                            firstException = new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, null, ioe);
+                                        } else if (firstException == null) {
                                             firstException = new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                                         }
                                         continue;
@@ -594,10 +600,12 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                     break;
                                 } else {
                                     final String url = cache.getBaseUrl();
+                                    IOException ioe = null;
                                     try {
                                         lastCon = null;
                                         lastCon = br.openRequestConnection(new HeadRequest(url));
                                     } catch (IOException e) {
+                                        ioe = e;
                                         logger.log(e);
                                     } finally {
                                         if (lastCon != null) {
@@ -618,11 +626,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                         ok |= true;
                                         break;
                                     } else {
-                                        // if (i == 0) {
-                                        // resetStreamUrls(downloadLink);
-                                        // continue;
-                                        // }
-                                        if (firstException == null) {
+                                        if (lastCon != null && lastCon.getResponseCode() == 403) {
+                                            firstException = new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE);
+                                        } else if (ioe != null) {
+                                            firstException = new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, null, ioe);
+                                        } else if (firstException == null) {
                                             firstException = new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                                         }
                                         continue;
@@ -677,6 +685,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                             final YoutubeClipData clipData = ClipDataCache.hasCache(helper, downloadLink) ? ClipDataCache.get(helper, downloadLink) : null;
                             if (clipData != null && clipData.ageCheck) {
                                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+                            } else if (cache != null && cache.getThrottle() == 0) {
+                                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                             }
                         }
                         LinkVariant alternative = getAlternatives(helper, downloadLink, orgVariant, checkedAlternatives);
@@ -718,27 +728,33 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         // helper.login(false, false);
         // // we should cache this information:
         downloadLink.setFinalFileName(helper.createFilename(downloadLink));
-        String oldLinkName = downloadLink.getStringProperty("name", null);
+        final String oldLinkName = downloadLink.getStringProperty("name", null);
         if (StringUtils.isNotEmpty(oldLinkName)) {
             // old link?
             downloadLink.setFinalFileName(oldLinkName);
         }
         downloadLink.setInternalTmpFilenameAppend(null);
-        AbstractVariant v = getVariant(downloadLink);
+        final AbstractVariant v = getVariant(downloadLink);
         if (v.hasConverter(downloadLink)) {
             downloadLink.setInternalTmpFilenameAppend(".tmp");
         }
-        if (verifiedSize && totalSize > 0) {
-            downloadLink.setVerifiedFileSize(totalSize);
-        } else if (!verifiedSize && totalSize > 0) {
-            downloadLink.setDownloadSize(totalSize);
+        if (totalSize > 0) {
+            if (verifiedSize) {
+                downloadLink.setVerifiedFileSize(totalSize);
+            } else {
+                downloadLink.setDownloadSize(totalSize);
+            }
         }
         return AvailableStatus.TRUE;
     }
 
     private LinkVariant getAlternatives(YoutubeHelper helper, final DownloadLink downloadLink, final AbstractVariant variant, final HashSet<LinkVariant> blacklisted) throws Exception {
+        if (CFG_YOUTUBE.CFG.getAutoAlternativeSearchDepths() <= 0) {
+            // auto alternative search is disabled
+            return null;
+        }
         if (helper == null) {
-            helper = new YoutubeHelper(new Browser(), LoggerFactory.getDefaultLogger());
+            helper = new YoutubeHelper(createNewBrowserInstance(), LoggerFactory.getDefaultLogger());
         }
         final YoutubeClipData clipData = ClipDataCache.get(helper, downloadLink);
         switch (variant.getGroup()) {

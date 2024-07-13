@@ -19,16 +19,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.Stream;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
-import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -41,7 +31,17 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.Stream;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
+import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 49336 $", interfaceVersion = 3, names = { "M3u8" }, urls = { "m3u8s?://.+" })
 public class GenericM3u8 extends PluginForHost {
     public static final String PRESET_NAME_PROPERTY               = "preSetName";
     public static final String DEPRECATED_NAME_PROPERTY           = "deprecatedName";
@@ -189,9 +189,8 @@ public class GenericM3u8 extends PluginForHost {
     public static void setFilename(Plugin plugin, final DownloadLink link, final boolean setFinalFilename) throws MalformedURLException {
         if (link.getFinalFileName() != null) {
             /**
-             * No not modify filename once final name has been set. </br>
-             * This e.g. allows other plugins/crawlers to set desired filenames telling this plugin not to use the default filenames down
-             * below.
+             * No not modify filename once final name has been set. </br> This e.g. allows other plugins/crawlers to set desired filenames
+             * telling this plugin not to use the default filenames down below.
              */
             return;
         }
@@ -282,7 +281,7 @@ public class GenericM3u8 extends PluginForHost {
 
     /** Converts given URL into an URL which this plugin can handle. */
     public static String createURLForThisPlugin(final String url) {
-        return url == null ? null : url.replaceFirst("^http(s?://)", "m3u8$1");
+        return url == null ? null : url.replaceFirst("^(?i)http(s?://)", "m3u8$1");
     }
 
     @Override

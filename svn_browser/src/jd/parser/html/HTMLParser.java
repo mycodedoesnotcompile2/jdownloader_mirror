@@ -29,14 +29,14 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jd.nutils.encoding.Encoding;
+
 import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Hex;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
-
-import jd.nutils.encoding.Encoding;
 
 public class HTMLParser {
     private static class ConcatCharSequence implements CharSequence {
@@ -474,7 +474,7 @@ public class HTMLParser {
                         matcher.appendReplacement(sb, replacement);
                     } while (matcher.find());
                     matcher.appendTail(sb);
-                    if (this.equals((CharSequence) sb)) {
+                    if (this.equals(sb)) {
                         return this;
                     } else {
                         return new HtmlParserCharSequence(sb);
@@ -497,7 +497,7 @@ public class HTMLParser {
                     final StringBuffer sb = new StringBuffer();
                     matcher.appendReplacement(sb, replacement);
                     matcher.appendTail(sb);
-                    if (this.equals((CharSequence) sb)) {
+                    if (this.equals(sb)) {
                         return this;
                     } else {
                         return new HtmlParserCharSequence(sb);
@@ -652,7 +652,7 @@ public class HTMLParser {
         }
 
         private void setBaseURL(final HtmlParserCharSequence baseURL) {
-            if (baseURL != null && !baseURL.equals((CharSequence) "about:blank")) {
+            if (baseURL != null && !baseURL.equals("about:blank")) {
                 this.baseURL = baseURL;
             }
         }
@@ -721,7 +721,7 @@ public class HTMLParser {
 
     final private static Httppattern[] linkAndFormPattern     = new Httppattern[] { new Httppattern(Pattern.compile("src\\s*=\\s*('|\\\\\"|\")(.*?)(\\1)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2), new Httppattern(Pattern.compile("(<\\s*a[^>]*href\\s*=\\s*|<\\s*form[^>]*action\\s*=\\s*)('|\\\\\"|\")(.*?)(\\2)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 3), new Httppattern(Pattern.compile("(<\\s*a[^>]*href\\s*=\\s*|<\\s*form[^>]*action\\s*=\\s*)([^'\"][^\\s]*)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2), new Httppattern(Pattern.compile("\\[(link|url)\\](.*?)\\[/(link|url)\\]", Pattern.CASE_INSENSITIVE | Pattern.DOTALL), 2) };
     public final static String         protocolFile           = "file:/";
-    final private static String        protocolPrefixes       = "((?:chrome|directhttp://https?|usenet|flashget|https?viajd|https?|ccf|dlc|ftp|ftpviajd|jd|rsdf|jdlist|ipfs|nxm|youtubev2" + (!Application.isJared(null) ? "|jdlog" : "") + ")(?:(:|\\\\x3A|\\\\u003A)(/|\\\\x2F|\\\\u002F)(/|\\\\x2F|\\\\u002F))|" + HTMLParser.protocolFile + "|magnet:|mega:)";
+    final private static String        protocolPrefixes       = "((?:chrome|directhttp://https?|usenet|flashget|https?viajd|m3u8://https?|https?|ccf|dlc|ftp|ftpviajd|jd|rsdf|jdlist|ipfs|nxm|youtubev2" + (!Application.isJared(null) ? "|jdlog" : "") + ")(?:(:|\\\\x3A|\\\\u003A)(/|\\\\x2F|\\\\u002F)(/|\\\\x2F|\\\\u002F))|" + HTMLParser.protocolFile + "|magnet:|mega:)";
     final private static Pattern[]     basePattern            = new Pattern[] { Pattern.compile("<[^>]*base[^>]*href\\s*=\\s*('|\")(.*?)\\1", Pattern.CASE_INSENSITIVE), Pattern.compile("<[^>]*base[^>]*(href)\\s*=\\s*([^'\"][^\\s]*)", Pattern.CASE_INSENSITIVE) };
     final private static Pattern[]     hrefPattern            = new Pattern[] { Pattern.compile("data-\\w+\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE), Pattern.compile("href\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE), Pattern.compile("src\\s*=\\s*('|\")\\s*(.*?)\\s*(\\1)", Pattern.CASE_INSENSITIVE) };
     final private static Pattern       pat1                   = Pattern.compile("(" + HTMLParser.protocolPrefixes + "|(?<!://)www\\.)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -964,7 +964,7 @@ public class HTMLParser {
                 }
             }
         }
-        if (checkForUnicode(options, data)) {
+        if (HTMLParser.checkForUnicode(options, data)) {
             /* no changes in results size, and data contains unicode */
             final HtmlParserCharSequence next = HTMLParser.unicodeDecode(urlDecoded);
             final boolean historyContains = path.contains(next);
@@ -1025,7 +1025,7 @@ public class HTMLParser {
     }
 
     private static boolean skip(final HtmlParserCharSequence link) {
-        return link == null || link.equals((CharSequence) "about:blank") || link.equals((CharSequence) "/") || link.startsWith("#");
+        return link == null || link.equals("about:blank") || link.equals("/") || link.startsWith("#");
     }
 
     protected static class HexHtmlParserCharSequence extends HtmlParserCharSequence {
@@ -1095,11 +1095,11 @@ public class HTMLParser {
                             return HTMLParser._getHttpLinksFinder(HTMLParser.next(path, location), results, options);
                         }
                         final HtmlParserCharSequence host = data.group(1, HTMLParser.maybeHostPattern);
-                        if (host != null && host.equals((CharSequence) PublicSuffixList.getInstance().getDomain(host.toString()))) {
+                        if (host != null && host.equals(PublicSuffixList.getInstance().getDomain(host.toString()))) {
                             final HtmlParserCharSequence missingProtocol = new HtmlParserCharSequence(new ConcatCharSequence("http://", data));
                             return HTMLParser._getHttpLinksFinder(HTMLParser.next(path, missingProtocol), results, options);
                         }
-                        /* no href inside */}
+                    /* no href inside */}
                     return results.stop();
                 }
             } else if (c == 1 && data.length() < 256) {
@@ -1455,7 +1455,7 @@ public class HTMLParser {
                     return new HtmlParserCharSequence(ret);
                 }
             }
-            if (input.equals((CharSequence) url.toString())) {
+            if (input.equals(url.toString())) {
                 return input;
             } else {
                 return new HtmlParserCharSequence(url.toString());
@@ -1530,8 +1530,8 @@ public class HTMLParser {
     /**
      * Diese Methode sucht die vordefinierten input type="hidden" und formatiert sie zu einem poststring z.b. wÃ¼rde bei:
      *
-     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" />
-     * <input type="hidden" name="b" value="9" />
+     * <input type="hidden" name="f" value="f50b0f" /> <input type="hidden" name="h" value="390b4be0182b85b0" /> <input type="hidden"
+     * name="b" value="9" />
      *
      * f=f50b0f&h=390b4be0182b85b0&b=9 ausgegeben werden
      *
@@ -1595,7 +1595,7 @@ public class HTMLParser {
 
     /*
      * return tmplinks.toArray(new String[tmplinks.size()]); }
-     * 
+     *
      * /* parses data for available links and returns a string array which does not contain any duplicates
      */
     public static Collection<String> getHttpLinksIntern(final String content, final String baseURLString, final HtmlParserResultSet results) {
