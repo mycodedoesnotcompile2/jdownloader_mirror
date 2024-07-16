@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Regex;
@@ -70,7 +71,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49289 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49350 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +111,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             return this.crawlSearchQueryURL(br, param);
         } else if ((identifier = getIdentifierFromURL(contenturl)) != null) {
             return this.crawlMetadataJsonV2(identifier, contenturl);
-        } else if (isArchiveURL(contenturl)) {
+        } else if (isCompressedArchiveURL(contenturl)) {
             return this.crawlArchiveContentV2(contenturl, null, null);
         } else {
             /* Unsupported link -> Developer mistake */
@@ -137,7 +138,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         if (StringUtils.isEmpty(collectionIdentifier)) {
             throw new IllegalArgumentException();
         }
-        return crawlViaScrapeAPI(br, "collection:" + collectionIdentifier, -1);
+        return crawlViaScrapeAPI(br, "collection:" + collectionIdentifier, null, -1);
     }
 
     private ArrayList<DownloadLink> crawlSearchQueryURL(final Browser br, final CryptedLink param) throws Exception {
@@ -157,7 +158,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* User supplied invalid URL. */
             throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, "INVALID_SEARCH_QUERY");
         }
-        final ArrayList<DownloadLink> searchResults = crawlViaScrapeAPI(br, searchQuery, maxResults);
+        final ArrayList<DownloadLink> searchResults = crawlViaScrapeAPI(br, searchQuery, parseFilterMap(param.getCryptedUrl()), maxResults);
         if (searchResults.isEmpty()) {
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + searchQuery);
         }
@@ -168,7 +169,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
      * Uses search APIv1 </br>
      * API: Docs: https://archive.org/help/aboutsearch.htm
      */
-    private ArrayList<DownloadLink> crawlViaScrapeAPI(final Browser br, final String searchTerm, final int maxResultsLimit) throws Exception {
+    private ArrayList<DownloadLink> crawlViaScrapeAPI(final Browser br, final String searchTerm, Map<String, Object> filter_map, final int maxResultsLimit) throws Exception {
         if (StringUtils.isEmpty(searchTerm)) {
             /* Developer mistake */
             throw new IllegalArgumentException();
@@ -182,7 +183,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final int minNumberofItemsPerPage = 100;
         final UrlQuery query = new UrlQuery();
         query.add("fields", "identifier");
-        query.add("q", Encoding.urlEncode(searchTerm));
+        query.add("q", URLEncode.encodeURIComponent(searchTerm));
+        if (!filter_map.isEmpty()) {
+            final String json = new SimpleMapper().setPrettyPrintEnabled(false).objectToString(filter_map);
+            query.add("filter_map", URLEncode.encodeURIComponent(json));
+        }
         final int maxNumberofItemsPerPageForThisRun;
         if (maxResultsLimit == -1) {
             /* -1 means unlimited -> Use internal hardcoded limit. */
@@ -302,7 +307,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (!isArchiveURL(br.getURL())) {
+            } else if (!isCompressedArchiveURL(br.getURL())) {
                 /* Redirect to some unsupported URL. */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -412,7 +417,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             loanedSecondsLeft += secondsLeftOnLoan;
         }
         final Map<String, Object> brOptions = (Map<String, Object>) data.get("brOptions");
-        final boolean isLendingRequired = (Boolean) lendingInfo.get("isLendingRequired") == Boolean.TRUE;
+        final Boolean isLendingRequired = (Boolean) lendingInfo.get("isLendingRequired");
+        final Boolean isPrintDisabledOnly = (Boolean) lendingInfo.get("isPrintDisabledOnly");
         String contentURLFormat = generateBookContentURL(identifier);
         final String bookId = brOptions.get("bookId").toString();
         String title = ((String) brOptions.get("bookTitle")).trim();
@@ -469,7 +475,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 if (isMultiVolumeBook) {
                     link.setProperty(ArchiveOrg.PROPERTY_BOOK_SUB_PREFIX, subPrefix);
                 }
-                if (Boolean.TRUE.equals(isLendingRequired)) {
+                if (Boolean.TRUE.equals(isLendingRequired) || Boolean.TRUE.equals(isPrintDisabledOnly)) {
                     link.setProperty(ArchiveOrg.PROPERTY_IS_LENDING_REQUIRED, true);
                 }
                 if (loanedSecondsLeft > 0) {
@@ -889,7 +895,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     query.add("subPrefix", subPrefix);
                     query.add("requestUri", "/details/" + identifier);
                     final String url = "https://" + server + "/BookReader/BookReaderJSIA.php?" + query.toString();
-                    final ArrayList<DownloadLink> thisBookResults = this.crawlBook(br, url, null);
+                    final ArrayList<DownloadLink> thisBookResults = this.crawlBook(br, url, account);
                     /* Make resulting items appear in linkgrabber now already. */
                     distribute(thisBookResults);
                     if (this.isAbort()) {
@@ -1005,6 +1011,61 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         }
     }
 
+    private Map<String, Object> parseFilterMap(String url) {
+        final Map<String, Object> filter_map = new HashMap<String, Object>();
+        final String[] andValueStrings = new Regex(url, "and%5B%5D=([^&]+)").getColumn(0);
+        if (andValueStrings != null && andValueStrings.length > 0) {
+            /* Filter parameters selected by the user. On the website you can find them on the left side as checkboxes. */
+            for (String andValueString : andValueStrings) {
+                andValueString = URLEncode.decodeURIComponent(andValueString);
+                if (!andValueString.contains(":")) {
+                    /* Skip invalid items */
+                    continue;
+                }
+                final String keyValue[] = new Regex(andValueString, "(.*?)\\s*:\\s*\"(.*?)\"").getRow(0);
+                if (keyValue != null) {
+                    Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(keyValue[0]);
+                    if (valueMap == null) {
+                        valueMap = new HashMap<String, Object>();
+                        filter_map.put(keyValue[0], valueMap);
+                    }
+                    valueMap.put(keyValue[1], "inc");
+                    continue;
+                }
+                final String range[] = new Regex(andValueString, "(.*?)\\s*:\\s*\\[\\s*(\\d+)(?:\\+\\s*)?TO\\s*(?:\\+\\s*)?(\\d+)\\s*\\]").getRow(0);
+                if (range != null) {
+                    Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(range[0]);
+                    if (valueMap == null) {
+                        valueMap = new HashMap<String, Object>();
+                        filter_map.put(range[0], valueMap);
+                    }
+                    valueMap.put(range[1], "gte");
+                    valueMap.put(range[2], "lte");
+                    continue;
+                }
+            }
+        }
+        final String[] notValueStrings = new Regex(url, "not%5B%5D=([^&]+)").getColumn(0);
+        if (notValueStrings != null && notValueStrings.length > 0) {
+            /* Filter parameters selected by the user. On the website you can find them on the left side as checkboxes. */
+            for (String notValueString : notValueStrings) {
+                notValueString = URLEncode.decodeURIComponent(notValueString);
+                if (!notValueString.contains(":")) {
+                    /* Skip invalid items */
+                    continue;
+                }
+                String keyValue[] = new Regex(notValueString, "(.*?)\\s*:\\s*\"(.*?)\"").getRow(0);
+                Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(keyValue[0]);
+                if (valueMap == null) {
+                    valueMap = new HashMap<String, Object>();
+                    filter_map.put(keyValue[0], valueMap);
+                }
+                valueMap.put(keyValue[1], "exc");
+            }
+        }
+        return filter_map;
+    }
+
     /** Returns all uploads of a profile. */
     private ArrayList<DownloadLink> crawlProfile(String username, final String sourceurl) throws Exception {
         if (StringUtils.isEmpty(username)) {
@@ -1031,14 +1092,19 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final UrlQuery query = new UrlQuery();
         query.add("user_query", "");
         query.add("page_type", "account_details");
-        query.add("page_target", Encoding.urlEncode(username));
+        query.add("page_target", URLEncode.encodeURIComponent(username));
         query.add("page_elements", "%5B%22uploads%22%5D");
         query.add("hits_per_page", Integer.toString(maxItemsPerPage));
+        final Map<String, Object> filter_map = parseFilterMap(sourceurl);
+        if (!filter_map.isEmpty()) {
+            final String json = new SimpleMapper().setPrettyPrintEnabled(false).objectToString(filter_map);
+            query.add("filter_map", URLEncode.encodeURIComponent(json));
+        }
         query.add("sort", "publicdate%3Adesc");
         query.add("aggregations", "false");
         if (sourceurl != null) {
             /* Not important */
-            query.add("client_url", Encoding.urlEncode(sourceurl));
+            query.add("client_url", URLEncode.encodeURIComponent(sourceurl));
         }
         final Browser brc = br.cloneBrowser();
         brc.setAllowedResponseCodes(400);
@@ -1102,6 +1168,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 page++;
             }
         } while (!this.isAbort());
+        if (ret.isEmpty() && !filter_map.isEmpty()) {
+            logger.info("Got zero results which might be the case because the user has supplied filters which are too restrictive: " + filter_map);
+        }
         return ret;
     }
 
@@ -1143,7 +1212,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /** Returns true if given URL leads to content inside an archive. */
-    private static boolean isArchiveURL(final String url) throws MalformedURLException {
+    private static boolean isCompressedArchiveURL(final String url) throws MalformedURLException {
         return url.toLowerCase(Locale.ENGLISH).contains("view_archive.php");
     }
 
@@ -1166,7 +1235,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 hostPlugin.login(account, false);
             }
             URLConnectionAdapter con = null;
-            boolean isArchiveContentURL = isArchiveURL(contenturl);
+            boolean isArchiveContentURL = isCompressedArchiveURL(contenturl);
             if (isArchiveContentURL) {
                 br.getPage(contenturl);
             } else {
@@ -1174,7 +1243,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     /* Check if we have a direct URL --> Host plugin */
                     con = br.openGetConnection(contenturl);
                     /* Check again as URL could've changed. */
-                    isArchiveContentURL = isArchiveURL(con.getURL().toExternalForm());
+                    isArchiveContentURL = isCompressedArchiveURL(con.getURL().toExternalForm());
                     /*
                      * 2020-03-04: E.g. directurls will redirect to subdomain e.g. ia800503.us.archive.org --> Sometimes the only way to
                      * differ between a file or expected html.

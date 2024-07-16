@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48667 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49345 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingHdzogCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,5 +58,10 @@ public class KernelVideoSharingHdzogCom extends KernelVideoSharingComV2 {
     protected int getMaxChunks(final Account account) {
         /* 2024-02-14 */
         return 1;
+    }
+
+    @Override
+    protected boolean useAPI() {
+        return true;
     }
 }

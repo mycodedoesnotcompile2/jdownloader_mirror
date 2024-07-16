@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49345 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfreehdCom extends KernelVideoSharingComV2 {
     public XfreehdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -83,6 +83,15 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
         } else {
             /* Fallback */
             return super.getDllink(link, br);
+        }
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.containsHTML(">\\s*This Video Is No Longer Available")) {
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
         }
     }
 

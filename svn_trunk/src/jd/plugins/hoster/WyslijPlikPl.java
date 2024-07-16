@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47855 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49345 $", interfaceVersion = 3, names = {}, urls = {})
 public class WyslijPlikPl extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -134,6 +134,10 @@ public class WyslijPlikPl extends PluginForHost {
             filename = br.getRegex("<h2>([^<>\"]+)</h2>").getMatch(0);
         }
         String filesize = br.getRegex("(?i)>\\s*(?:Rozmiar pliku|File size)\\s*:\\s*</div><div class=\"right\">([^<>\"]+)<").getMatch(0);
+        if (filesize == null) {
+            /* 2024-07-15 */
+            filesize = br.getRegex("(?:Rozmiar pliku|File size):\\s*</td>\\s*<td>([^<]+)</td>").getMatch(0);
+        }
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);

@@ -24,7 +24,7 @@ import org.jdownloader.plugins.components.config.KVSConfigGoodpornTo;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47564 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49346 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoodpornTo extends KernelVideoSharingComV2 {
     public GoodpornTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -34,8 +34,22 @@ public class GoodpornTo extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "goodporn.to" });
+        ret.add(new String[] { "sincity.is", "goodporn.to", "goodporn.se" });
         return ret;
+    }
+
+    @Override
+    protected ArrayList<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("goodporn.to"); // 2024-07-15
+        /* 2024-07-15: Still working but soon not anymore, see: https://gpstatus.org/ */
+        deadDomains.add("goodporn.se");
+        return deadDomains;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
