@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49352 $", interfaceVersion = 3, names = {}, urls = {})
 public class XbabeCom extends KernelVideoSharingComV2 {
     public XbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,25 @@ public class XbabeCom extends KernelVideoSharingComV2 {
         } else {
             /* Fallback to upper handling */
             return super.getDllink(link, br);
+        }
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        final boolean isOffline = super.isOfflineWebsite(br);
+        if (isOffline) {
+            return true;
+        }
+        /* Not offline -> Check if we really have a link to a video */
+        String videoid = br.getRegex("/embed/(\\d+)").getMatch(0);
+        if (videoid == null) {
+            videoid = br.getRegex("\\['video_id'\\] = (\\d+)").getMatch(0);
+        }
+        if (videoid == null) {
+            /* Assume that we don't have a valid video-url e.g.: https://xbabe.com/videos/most-viewed/ */
+            return true;
+        } else {
+            return false;
         }
     }
 }
