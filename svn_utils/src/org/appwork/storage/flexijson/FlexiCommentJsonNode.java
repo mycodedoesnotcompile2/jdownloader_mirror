@@ -40,17 +40,22 @@ package org.appwork.storage.flexijson;
  */
 public interface FlexiCommentJsonNode extends FlexiJSonNode {
     public static enum AttachLocation {
-        AFTER_KEY,
-        BEFORE_KEY,
-        BEFORE_VALUE,
-        AFTER_VALUE,
-        INSIDE_OBJECT,
-        BEFORE_OBJECT,
-        AFTER_OBJECT,
-        AFTER_ARRAY,
-        BEFORE_ARRAY,
-        INSIDE_ARRAY
+        AFTER_KEY("AK"),
+        BEFORE_KEY("BK"),
+        BEFORE_VALUE("B"),
+        AFTER_VALUE("A"),
+        INSIDE_OBJECT("I"),
+        BEFORE_OBJECT("B"),
+        AFTER_OBJECT("A"),
+        AFTER_ARRAY("A"),
+        BEFORE_ARRAY("B"),
+        INSIDE_ARRAY("I");
 
+        public final String prefix;
+
+        AttachLocation(String pathPrefix) {
+            this.prefix = pathPrefix;
+        }
     }
 
     /**
@@ -59,5 +64,4 @@ public interface FlexiCommentJsonNode extends FlexiJSonNode {
     public void setLocation(AttachLocation afterKey);
 
     public AttachLocation getLocation();
-
 }

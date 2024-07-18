@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49349 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49357 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftuploadsCom extends PluginForHost {
     public SwiftuploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,6 +48,9 @@ public class SwiftuploadsCom extends PluginForHost {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        // br.setCookie(getHost(), "adb", "0");
+        br.setCookie(getHost(), "adb", "1");
+        br.setCookie(getHost(), "gdpr_cookie", "1");
         return br;
     }
 
@@ -147,6 +150,12 @@ public class SwiftuploadsCom extends PluginForHost {
             if (continueform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            // br.getHeaders().put("Origin", "https://www." + br.getHost());
+            // br.getHeaders().put("Priority", "u=0, i");
+            // br.getHeaders().put("Upgrade-Insecure-Requests", "1");
+            // br.getHeaders().put("", "");
+            // br.getHeaders().put("", "");
+            // br.getHeaders().put("", "");
             br.submitForm(continueform);
             Form dlform2 = br.getFormbyProperty("id", "down_2Form");
             if (dlform2 == null) {

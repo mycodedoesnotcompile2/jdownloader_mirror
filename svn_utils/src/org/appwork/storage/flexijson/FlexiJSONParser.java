@@ -135,35 +135,35 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
+    private static final char SQUARE_BRACKET_CLOSE = ']';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_CLOSE               = '}';
+    private static final char CURLY_BRACKET_CLOSE  = '}';
     /**
      *
      */
-    private static final char                 COLON                             = ':';
+    private static final char COLON                = ':';
     /**
      *
      */
-    private static final char                 ASTERISK                          = '*';
+    private static final char ASTERISK             = '*';
     /**
      *
      */
-    private static final char                 SLASH                             = '/';
+    private static final char SLASH                = '/';
     /**
      *
      */
-    private static final char                 SQUARE_BRACKET_OPEN               = '[';
+    private static final char SQUARE_BRACKET_OPEN  = '[';
     /**
      *
      */
-    private static final char                 CURLY_BRACKET_OPEN                = '{';
+    private static final char CURLY_BRACKET_OPEN   = '{';
     /**
      *
      */
-    private static final char                 COMMA                             = ',';
+    private static final char COMMA                = ',';
 
     public class NumberParser {
         /**
@@ -1398,8 +1398,7 @@ public class FlexiJSONParser {
             }
         }
         newPath = extendPath(newPath, key);
-        KeyValueElement element = new KeyValueElement(newPath);
-        element.setKey(mapKey(key));
+        KeyValueElement element = new KeyValueElement(ret, newPath, mapKey(key), null);
         element.addCommentsBeforeKey(commentsBeforeKey, true);
         skipWhitespace(newPath, ParsingError.EXPECTED_ANY_CHARACTER, Token.WS_AFTER_KEY);
         FlexiJSonComments commentsAfterKey = readComment(newPath, container, Token.WS_AFTER_KEY);
@@ -1418,6 +1417,15 @@ public class FlexiJSONParser {
         FlexiJSonComments commentsBeforeValue2 = readComment(newPath, container, Token.WS_BEFORE_VALUE);
         setToken(newPath, Token.VALUE);
         FlexiJSonNode newValue = parseValue(newPath);
+        FlexiJSonComments aks = element.getCommentsAfterKey();
+        FlexiJSonComments bks = element.getCommentsBeforeKey();
+        // now that we have the value, set it as parent to the before and after key comments
+        if (aks != null) {
+            aks.setParent(newValue);
+        }
+        if (bks != null) {
+            bks.setParent(newValue);
+        }
         newValue.addCommentsBefore(commentsBeforeValue1);
         newValue.addCommentsBefore(commentsBeforeValue2);
         newValue.addCommentsAfter(readComment(newPath, container, Token.WS_AFTER_VALUE));
@@ -1617,9 +1625,9 @@ public class FlexiJSONParser {
             if (lookahead(path) == SLASH && isParseLineCommentEnabled()) {
                 // comment until end of line
                 throwParserExceptionInternal(ParsingError.ERROR_LINE_COMMENT, path, null, container, null);
+                setToken(path, Token.COMMENT_LINE);
                 // since we did a lookahead, this cannot result in end of stream
                 nextChar(path, ParsingError.EXPECTED_ANY_CHARACTER);
-                setToken(path, Token.COMMENT_LINE);
                 sb.setLength(0);
                 while (true) {
                     nextAtEndOfToken(path, container);
@@ -1654,11 +1662,12 @@ public class FlexiJSONParser {
                 }
             } else if (lookahead(path) == ASTERISK && isParseInlineCommentEnabled()) {
                 // comment until */
+                //
                 start = index - 1;
                 // since we did a lookahead, this cannot result in end of stream
                 throwParserExceptionInternal(ParsingError.ERROR_INLINE_COMMENT, path, null, container, null);
-                nextChar(path, ParsingError.EXPECTED_ANY_CHARACTER);
                 setToken(path, Token.COMMENT_INLINE);
+                nextChar(path, ParsingError.EXPECTED_ANY_CHARACTER);
                 sb.setLength(0);
                 while (true) {
                     nextAtEndOfToken(path, container);
@@ -2217,7 +2226,8 @@ public class FlexiJSONParser {
         } else {
             String json = "";
             if (debug != null) {
-                json = "[...]" + debug.toString().substring(Math.max(0, debug.length() - 100)) + " ";
+                json = "\r\n[...]" + debug.subSequence(Math.max(0, index - 100), Math.min(debug.length(), index + 20)) + " ";
+                json += "\r\n" + StringUtils.fillPost("", " ", Math.min(index, 100) + 4) + "^\r\n";
             }
             json += error.name() + ": " + error.description + " at index " + index;
             throw new FlexiParserException(error, index, path, json, cause);

@@ -200,7 +200,7 @@ public class FlexiJSonValue implements FlexiJSonNode {
     @Override
     public String toString() {
         try {
-            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonStringBuilder().toJSONString(this);
+            return FlexiUtils.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonStringBuilder().toJSONString(this);
         } catch (InvalidPathException e) {
             return "ERROR:" + e.getMessage() + ": " + new FlexiJSonStringBuilder().toJSONString(this);
         }

@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -41,10 +44,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KhinsiderCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49355 $", interfaceVersion = 3, names = {}, urls = {})
 public class KhinsiderComCrawler extends PluginForDecrypt {
     public KhinsiderComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,9 +70,9 @@ public class KhinsiderComCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final String PATTERN_ALBUM_DOWNLOAD            = "https?://downloads\\.%s/cp/add_album_TODO_FIXME_/(\\d+)$";
-    private static final String PATTERN_ALBUM_STREAM              = "https?://downloads\\.%s/([^/]+)/album/([\\w\\-]+)$";
-    private static final String PATTERN_ALBUM_SINGLE_TRACK_STREAM = "https?://downloads\\.%s/([^/]+)/album/([\\w\\-]+)/([^/#\\?]+)";
+    private static final String PATTERN_ALBUM_DOWNLOAD            = "(?i)https?://downloads\\.%s/cp/add_album_TODO_FIXME_/(\\d+)$";
+    private static final String PATTERN_ALBUM_STREAM              = "(?i)https?://downloads\\.%s/([^/]+)/album/([^/#\\?]+)$";
+    private static final String PATTERN_ALBUM_SINGLE_TRACK_STREAM = "(?i)https?://downloads\\.%s/([^/]+)/album/([^/#\\?]+)/([^/#\\?]+)";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();

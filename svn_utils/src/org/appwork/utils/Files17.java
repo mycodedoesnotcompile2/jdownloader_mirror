@@ -52,7 +52,6 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.os.CrossSystem;
 
 public class Files17 {
-
     private final static HashMap<String, List<FileStore>> FILESTORECACHE = new HashMap<String, List<FileStore>>();
 
     public static Iterable<FileStore> getFileStores() {
@@ -185,5 +184,4 @@ public class Files17 {
         }
         return null;
     }
-
 }

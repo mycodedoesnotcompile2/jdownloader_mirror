@@ -172,9 +172,9 @@ public class ExtTextField extends JTextField implements CaretListener, FocusList
         }
         if (super.getText().equals(this.helpText)) {
             if (this.isClearHelpTextOnFocus()) {
-                this.setText("");
+                super.setText("");
             } else {
-                this.selectAll();
+                selectAll();
             }
         }
         this.setForeground(this.defaultColor);

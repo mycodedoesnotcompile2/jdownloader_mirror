@@ -41,6 +41,8 @@ import java.util.Set;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
+import org.appwork.utils.CompareUtils;
+import org.appwork.utils.StringUtils;
 
 /**
  * @author thomas
@@ -114,6 +116,41 @@ public class FlexiComment implements FlexiCommentJsonNode {
         if (tag != null) {
             tag(tag);
         }
+    }
+
+    /**
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (!(obj instanceof FlexiComment)) {
+            return false;
+        }
+        FlexiComment other = (FlexiComment) obj;
+        if (other.getType() != getType()) {
+            return false;
+        }
+        if (other.getLocation() != getLocation()) {
+            return false;
+        }
+        if (!CompareUtils.equals(other.getTags(), getTags())) {
+            return false;
+        }
+        if (!StringUtils.equals(getText(), other.getText())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        return (getText() + getType() + getLocation() + getTags()).hashCode();
     }
 
     private FlexiComment(String string, Type inline) {

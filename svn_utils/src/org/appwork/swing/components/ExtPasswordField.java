@@ -41,6 +41,7 @@ import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -179,6 +180,26 @@ public class ExtPasswordField extends MigPanel implements FocusListener, Documen
                 applyTextHighlighter(e);
             }
         });
+    }
+
+    /**
+     * @see java.awt.Component#addMouseMotionListener(java.awt.event.MouseMotionListener)
+     */
+    @Override
+    public synchronized void addMouseMotionListener(MouseMotionListener l) {
+        super.addMouseMotionListener(l);
+        editor.addMouseMotionListener(l);
+        renderer.addMouseMotionListener(l);
+    }
+
+    /**
+     * @see java.awt.Component#removeMouseMotionListener(java.awt.event.MouseMotionListener)
+     */
+    @Override
+    public synchronized void removeMouseMotionListener(MouseMotionListener l) {
+        super.removeMouseMotionListener(l);
+        editor.removeMouseMotionListener(l);
+        renderer.removeMouseMotionListener(l);
     }
 
     @Override

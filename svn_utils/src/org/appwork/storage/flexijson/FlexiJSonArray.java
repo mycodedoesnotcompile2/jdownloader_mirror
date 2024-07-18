@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
@@ -55,9 +56,10 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     /**
      *
      */
-    private static final long serialVersionUID = 1L;
+    private static final long                         serialVersionUID = 1L;
+    public static final SimpleTypeRef<FlexiJSonArray> TYPE             = new SimpleTypeRef<FlexiJSonArray>(FlexiJSonArray.class);
 
-    public FlexiJSonArray(int size) {
+    public FlexiJSonArray(final int size) {
         super(size);
     }
 
@@ -68,18 +70,18 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     private HashSet<FlexiMapperTags> tags;
 
     @Override
-    public void tag(FlexiMapperTags tag) {
-        if (tags == null) {
-            tags = new HashSet<FlexiMapperTags>();
+    public void tag(final FlexiMapperTags tag) {
+        if (this.tags == null) {
+            this.tags = new HashSet<FlexiMapperTags>();
         }
         if (tag != null) {
-            tags.add(tag);
+            this.tags.add(tag);
         }
     }
 
     @Override
     public Set<FlexiMapperTags> getTags() {
-        return tags;
+        return this.tags;
     }
 
     @Override
@@ -88,19 +90,19 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
         }
         if (obj == null || !(obj instanceof FlexiJSonArray)) {
             return false;
         }
-        FlexiJSonArray other = (FlexiJSonArray) obj;
+        final FlexiJSonArray other = (FlexiJSonArray) obj;
         if (other.size() != this.size()) {
             return false;
         }
-        FlexiJSonStringBuilder stringify = new FlexiJSonStringBuilder();
-        for (int i = 0; i < size(); i++) {
+        final FlexiJSonStringBuilder stringify = new FlexiJSonStringBuilder();
+        for (int i = 0; i < this.size(); i++) {
             if (!stringify.toJSONString(other.get(i)).equals(stringify.toJSONString(this.get(i)))) {
                 return false;
             }
@@ -114,8 +116,8 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     @Override
     public String toString() {
         try {
-            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonPrettyStringify().toJSONString(this);
-        } catch (InvalidPathException e) {
+            return FlexiUtils.fromFlexiNode(this).toPathString(false) + ": " + new FlexiJSonPrettyStringify().toJSONString(this);
+        } catch (final InvalidPathException e) {
             return "ERROR:" + e.getMessage() + ": " + new FlexiJSonPrettyStringify().toJSONString(this);
         }
     }
@@ -125,13 +127,13 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     }
 
     @Override
-    public boolean add(FlexiJSonNode e) {
+    public boolean add(final FlexiJSonNode e) {
         e.setParent(this);
         return super.add(e);
     }
 
     @Override
-    public void add(int index, FlexiJSonNode e) {
+    public void add(final int index, final FlexiJSonNode e) {
         e.setParent(this);
         super.add(index, e);
     }
@@ -142,8 +144,8 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see java.util.ArrayList#set(int, java.lang.Object)
      */
     @Override
-    public FlexiJSonNode set(int index, FlexiJSonNode e) {
-        e.setParent(this);     
+    public FlexiJSonNode set(final int index, final FlexiJSonNode e) {
+        e.setParent(this);
         return super.set(index, e);
     }
 
@@ -153,7 +155,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see java.util.ArrayList#addAll(java.util.Collection)
      */
     @Override
-    public boolean addAll(Collection<? extends FlexiJSonNode> c) {
+    public boolean addAll(final Collection<? extends FlexiJSonNode> c) {
         throw new WTFException("Not supported");
     }
 
@@ -163,7 +165,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see java.util.ArrayList#addAll(int, java.util.Collection)
      */
     @Override
-    public boolean addAll(int index, Collection<? extends FlexiJSonNode> c) {
+    public boolean addAll(final int index, final Collection<? extends FlexiJSonNode> c) {
         throw new WTFException("Not supported");
     }
 
@@ -173,7 +175,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see java.util.ArrayList#replaceAll(java.util.function.UnaryOperator)
      */
     @Override
-    public void replaceAll(UnaryOperator<FlexiJSonNode> operator) {
+    public void replaceAll(final UnaryOperator<FlexiJSonNode> operator) {
         throw new WTFException("Not supported");
     }
 
@@ -183,18 +185,18 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see org.appwork.storage.flexijson.FlexiJSonNode#addCommentsBefore(org.appwork.storage.flexijson.FlexiJSonComments)
      */
     @Override
-    public void addCommentsBefore(FlexiJSonComments comments) {
+    public void addCommentsBefore(final FlexiJSonComments comments) {
         if (comments == null) {
             return;
         }
         comments.setParent(this);
-        for (FlexiCommentJsonNode comment : comments) {
+        for (final FlexiCommentJsonNode comment : comments) {
             comment.setLocation(FlexiCommentJsonNode.AttachLocation.BEFORE_ARRAY);
         }
-        if (commentsBefore == null) {
-            commentsBefore = comments;
+        if (this.commentsBefore == null) {
+            this.commentsBefore = comments;
         } else {
-            commentsBefore.addAll(comments);
+            this.commentsBefore.addAll(comments);
         }
     }
 
@@ -204,56 +206,57 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @see org.appwork.storage.flexijson.FlexiJSonNode#addCommentsAfter(org.appwork.storage.flexijson.FlexiJSonComments)
      */
     @Override
-    public void addCommentsAfter(FlexiJSonComments comments) {
+    public void addCommentsAfter(final FlexiJSonComments comments) {
         if (comments == null) {
             return;
         }
         comments.setParent(this);
-        for (FlexiCommentJsonNode comment : comments) {
+        for (final FlexiCommentJsonNode comment : comments) {
             comment.setLocation(FlexiCommentJsonNode.AttachLocation.AFTER_ARRAY);
         }
-        if (commentsAfter == null) {
-            commentsAfter = comments;
+        if (this.commentsAfter == null) {
+            this.commentsAfter = comments;
         } else {
-            commentsAfter.addAll(comments);
+            this.commentsAfter.addAll(comments);
         }
     }
 
-    public void addCommentsInside(FlexiJSonComments comments) {
+    public void addCommentsInside(final FlexiJSonComments comments) {
         if (comments == null) {
             return;
         }
         comments.setParent(this);
-        for (FlexiCommentJsonNode comment : comments) {
+        for (final FlexiCommentJsonNode comment : comments) {
             comment.setLocation(FlexiCommentJsonNode.AttachLocation.INSIDE_ARRAY);
         }
-        if (commentsInside == null) {
-            commentsInside = comments;
+        if (this.commentsInside == null) {
+            this.commentsInside = comments;
         } else {
-            commentsInside.addAll(comments);
+            this.commentsInside.addAll(comments);
         }
     }
 
     public FlexiJSonComments getCommentsInside() {
-        return commentsInside;
+        return this.commentsInside;
     }
 
-    public void setCommentsInside(FlexiJSonComments commentsInside) {
+    public void setCommentsInside(final FlexiJSonComments commentsInside) {
         if (commentsInside != null) {
             commentsInside.setParent(this);
-            for (FlexiCommentJsonNode comment : commentsInside) {
+            for (final FlexiCommentJsonNode comment : commentsInside) {
                 comment.setLocation(FlexiCommentJsonNode.AttachLocation.INSIDE_ARRAY);
             }
         }
         this.commentsInside = commentsInside;
     }
 
+    @Override
     public boolean hasComments() {
-        if (getCommentsInside() != null && getCommentsInside().size() > 0) {
+        if (this.getCommentsInside() != null && this.getCommentsInside().size() > 0) {
             return true;
-        } else if (getCommentsAfter() != null && getCommentsAfter().size() > 0) {
+        } else if (this.getCommentsAfter() != null && this.getCommentsAfter().size() > 0) {
             return true;
-        } else if (getCommentsBefore() != null && getCommentsBefore().size() > 0) {
+        } else if (this.getCommentsBefore() != null && this.getCommentsBefore().size() > 0) {
             return true;
         } else {
             return false;
@@ -262,14 +265,14 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
 
     @Override
     public FlexiJSonComments getCommentsBefore() {
-        return commentsBefore;
+        return this.commentsBefore;
     }
 
     @Override
-    public void setCommentsBefore(FlexiJSonComments commentsBefore) {
+    public void setCommentsBefore(final FlexiJSonComments commentsBefore) {
         if (commentsBefore != null) {
             commentsBefore.setParent(this);
-            for (FlexiCommentJsonNode comment : commentsBefore) {
+            for (final FlexiCommentJsonNode comment : commentsBefore) {
                 comment.setLocation(FlexiCommentJsonNode.AttachLocation.BEFORE_ARRAY);
             }
         }
@@ -278,14 +281,14 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
 
     @Override
     public FlexiJSonComments getCommentsAfter() {
-        return commentsAfter;
+        return this.commentsAfter;
     }
 
     @Override
-    public void setCommentsAfter(FlexiJSonComments commentsAfter) {
+    public void setCommentsAfter(final FlexiJSonComments commentsAfter) {
         if (commentsAfter != null) {
             commentsAfter.setParent(this);
-            for (FlexiCommentJsonNode comment : commentsAfter) {
+            for (final FlexiCommentJsonNode comment : commentsAfter) {
                 comment.setLocation(FlexiCommentJsonNode.AttachLocation.AFTER_ARRAY);
             }
         }
@@ -301,7 +304,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * java.io.OutputStream)
      */
     @Override
-    public void writeToStream(FlexiJSonStringBuilder stringifier, JSONBuilderOutputStream out, int layer, LinkedList<String> path) throws IOException {
+    public void writeToStream(final FlexiJSonStringBuilder stringifier, final JSONBuilderOutputStream out, final int layer, final LinkedList<String> path) throws IOException {
         stringifier.appendArray(this, out, layer, path);
     }
 
@@ -313,7 +316,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
     private FlexiJSonNode parent;
 
     @Override
-    public void setParent(FlexiJSonNode parent) {
+    public void setParent(final FlexiJSonNode parent) {
         this.parent = parent;
     }
 
@@ -324,7 +327,7 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      */
     @Override
     public FlexiJSonNode getParent() {
-        return parent;
+        return this.parent;
     }
 
     /**
@@ -334,27 +337,28 @@ public class FlexiJSonArray extends ArrayList<FlexiJSonNode> implements FlexiJSo
      * @return
      * @throws InvalidPathException
      */
-    public FlexiJSonNode resolvePath(String path) throws InvalidPathException {
-        return resolvePath(JSPath.fromPathString(path));
+    public FlexiJSonNode resolvePath(final String path) throws InvalidPathException {
+        return this.resolvePath(JSPath.fromPathString(path));
     }
 
     /**
      * @param splitPath
      * @return
      */
-    public FlexiJSonNode resolvePath(JSPath splitPath) {
+    @Override
+    public FlexiJSonNode resolvePath(final JSPath splitPath) {
         return FlexiJSonObject.resolvePath(splitPath, this);
     }
 
     @Override
-    public boolean remove(FlexiJSonNode node) {
+    public boolean remove(final FlexiJSonNode node) {
         org.appwork.storage.flexijson.FlexiJSonValue.removeCommentsFromNode(node, this);
         if (node instanceof FlexiJSonComments) {
-            if (node == getCommentsInside()) {
-                setCommentsInside(null);
+            if (node == this.getCommentsInside()) {
+                this.setCommentsInside(null);
                 return true;
             }
         }
-        return remove((Object) node);
+        return this.remove((Object) node);
     }
 }

@@ -657,4 +657,32 @@ public class Files {
         }, path);
         return size.get();
     }
+
+    /**
+     * Creates a child file and ensures that the result stays in base, and does not leave by using path traversals
+     *
+     * @param sourceSettingsFolder
+     * @param name
+     * @return
+     * @throws IOException
+     */
+    public static File createChildSecure(File base, String rel) throws IOException {
+        if (new File(rel).isAbsolute()) {
+            throw new IOException("The relative part must not be absolute!");
+        }
+        // Get the canonical path of the base directory
+        File baseDirCanonical = base.getCanonicalFile();
+        // Resolve the destination file against the base directory
+        File destFile = new File(baseDirCanonical, rel).getCanonicalFile();
+        // Compare the canonical paths to ensure that the destFile remains within the base directory
+        String baseDirPath = baseDirCanonical.getPath();
+        String destFilePath = destFile.getPath();
+        if (destFilePath.equals(baseDirPath)) {
+            return destFile;
+        }
+        if (!destFilePath.startsWith(baseDirPath + File.separator)) {
+            throw new IOException("Path traversal attempt detected: " + destFilePath);
+        }
+        return destFile;
+    }
 }

@@ -35,14 +35,23 @@ package org.appwork.utils.swing.locationstore;
 
 import org.appwork.storage.Storable;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.swing.windowmanager.WindowManager.WindowExtendedState;
 
 /**
  * @author Thomas
  *
  */
 public class LocationStorage implements Storable {
+    private int                 x;
+    private WindowExtendedState extendedState = null;
 
-    private int  x;
+    public WindowExtendedState getExtendedState() {
+        return extendedState;
+    }
+
+    public void setExtendedState(WindowExtendedState extendedState) {
+        this.extendedState = extendedState;
+    }
 
     private int  y;
     private long lastAccess = System.currentTimeMillis();
@@ -56,7 +65,6 @@ public class LocationStorage implements Storable {
     }
 
     private boolean valid;
-
     private String  type;
 
     /**
@@ -120,5 +128,4 @@ public class LocationStorage implements Storable {
             return true;
         }
     }
-
 }

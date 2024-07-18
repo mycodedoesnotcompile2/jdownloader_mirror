@@ -1,8 +1,9 @@
 package org.appwork.storage;
 
 import java.util.Date;
-
 //if null checks are done for each field seperatly
+
+@StorableDoc("The targetBuilds property in your configuration files specifies the version details of the application for which the configuration is intended. This property is critical for ensuring that all configurations match the required target versions of the application. When the configuration file is used, the system checks this property against the actual application versions. If any discrepancies are found, warnings are generated to alert the customer about potential incompatibilities. These warnings indicate which properties may not be supported by all or some of the targeted application versions.")
 @StorableValidateCondition(value = "{$or:[{minimumBuildDate:null},{maximumBuildDate:null},{maximumBuildDate:{$gte:§PARENT.minimumBuildDate}}]}", description = "minimumBuildDate must not be bigger than maximumBuildDate!")
 public class BuildsInfo implements Storable {
     public static final String                                  KEY_MINIMUM_BUILD_DATE = "minimumBuildDate";

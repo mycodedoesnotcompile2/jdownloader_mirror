@@ -74,12 +74,7 @@ public class LogV3 {
      * @return
      */
     private static LogV3Factory createInstance() {
-        String load = LogV3FactoryImpl.class.getName();
-        try {
-            Class.forName(load = LogV3.class.getPackage().getName() + ".simple.SimpleLoggerFactory");
-        } catch (final Throwable e) {
-            load = LogV3FactoryImpl.class.getName();
-        }
+        String load = PreInitLoggerFactory.class.getName();
         try {
             final String clazz = System.getProperty("org.appwork.LoggerFactory", load);
             final LogV3Factory ret = (LogV3Factory) Class.forName(clazz).newInstance();

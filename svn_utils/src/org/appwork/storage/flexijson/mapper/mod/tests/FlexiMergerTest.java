@@ -73,8 +73,8 @@ public class FlexiMergerTest extends AWTest {
             JsonModification<FlexiJSonObject, Boolean> mods = new JsonModification<FlexiJSonObject, Boolean>();
             FlexiJSonObject set = new FlexiJSonObject();
             set.put("a.b.c", 1);
-            set.put("a.array.1", 1);
-            set.put("a.array.3", 3);
+            set.put("a.array[1]", 1);
+            set.put("a.array[3]", 3);
             set.put("bool", true);
             mods.setSet(set);
             Condition.putThreadOPHandler("§set", new SetHandler());

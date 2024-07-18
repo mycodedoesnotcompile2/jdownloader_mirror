@@ -43,7 +43,6 @@ import org.appwork.storage.BuildsInfo;
 import org.appwork.storage.FailLevel;
 import org.appwork.storage.MapperType;
 import org.appwork.storage.Storable;
-import org.appwork.storage.StorableAvailableSince;
 import org.appwork.storage.StorableDoc;
 import org.appwork.storage.StorableSupportedMappers;
 import org.appwork.storage.StorableValidateNotNull;
@@ -140,8 +139,7 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
 
     private BuildsInfo targetBuilds;
 
-    @StorableAvailableSince(value = "2023-07-5T00:00+0200", level = FailLevel.INFO)
-    @StorableDoc("Information about the target Clients this configuration should be used with. This information is used to create warnings or to avoid that unsupported or deprectaed features are used.")
+    @StorableDoc("Information about the target Clients this configuration should be used with. This information is used to create warnings or to avoid that unsupported or deprecated features are used.")
     @StorableValidateNotNull(description = "It is recommended to set up a proper targetClients property.", level = FailLevel.WARNING)
     public BuildsInfo getTargetBuilds() {
         return this.targetBuilds;

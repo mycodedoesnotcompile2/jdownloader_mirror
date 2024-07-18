@@ -68,7 +68,7 @@ import jd.plugins.components.gopro.SearchResponse;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.hoster.GoProCloud;
 
-@DecrypterPlugin(revision = "$Revision: 47873 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://plus.gopro.com/media-library/[a-zA-Z0-9]+|https?://plus\\.gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
+@DecrypterPlugin(revision = "$Revision: 49356 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://plus.gopro.com/media-library/[a-zA-Z0-9]+|https?://plus\\.gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
 @PluginDependencies(dependencies = { GoProCloud.class })
 public class GoProCloudDecrypter extends antiDDoSForDecrypt {
     private GoProConfig hostConfig;
@@ -310,7 +310,7 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
                         Collections.sort(download.getEmbedded().getVariations(), new Comparator<Variation>() {
                             @Override
                             public int compare(Variation o1, Variation o2) {
-                                return CompareUtils.compare(o2.getHeight(), o1.getHeight());
+                                return CompareUtils.compareInt(o2.getHeight(), o1.getHeight());
                             }
                         });
                         for (Variation v : download.getEmbedded().getVariations()) {

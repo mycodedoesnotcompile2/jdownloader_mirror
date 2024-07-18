@@ -18,8 +18,7 @@ package jd.gui.swing.jdgui.views.settings;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -37,14 +36,14 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 
+import org.jdownloader.logging.LogController;
+
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.config.GuiConfigListener;
 import jd.gui.swing.components.JDLabelContainer;
 import jd.gui.swing.components.JDTextArea;
 import jd.gui.swing.components.JDTextField;
-
-import org.jdownloader.logging.LogController;
 
 /**
  * Diese Klasse fasst ein label / input Paar zusammen und macht das lesen und schreiben einheitlich. Es lassen sich so Dialogelemente
@@ -148,40 +147,6 @@ public class GUIConfigEntry implements GuiConfigListener, ActionListener, Change
             boolean state = configEntry.isConditionalEnabled(null, null);
             enableComponent(input, configEntry.isEnabled() && state);
             enableComponent(decoration, configEntry.isEnabled() && state);
-            if (decoration instanceof JLabel) {
-                final JLabel lbl = (JLabel) decoration;
-                final MouseListener listener = new MouseListener() {
-
-                    @Override
-                    public void mouseReleased(MouseEvent e) {
-                    }
-
-                    @Override
-                    public void mousePressed(MouseEvent e) {
-                    }
-
-                    @Override
-                    public void mouseExited(MouseEvent e) {
-                        String text = lbl.getText();
-                        text = text.replaceFirst("^<html><U>", "<html>");
-                        text = text.replaceFirst("</U></html>$", "</html>");
-                        lbl.setText(text);
-                    }
-
-                    @Override
-                    public void mouseEntered(MouseEvent e) {
-                        String text = lbl.getText();
-                        text = text.replaceFirst("^<html>", "<html><U>");
-                        text = text.replaceFirst("</html>$", "</U></html>");
-                        lbl.setText(text);
-                    }
-
-                    @Override
-                    public void mouseClicked(MouseEvent e) {
-                    }
-                };
-                input.addMouseListener(listener);
-            }
         }
     }
 
@@ -363,6 +328,37 @@ public class GUIConfigEntry implements GuiConfigListener, ActionListener, Change
             configEntry.getPropertyInstance().setProperty(configEntry.getPropertyName(), getText());
         } else if (configEntry.getListController() != null) {
             configEntry.getListController().setList(getText() + "");
+        }
+    }
+
+    public int getYMin() {
+        if (input == null) {
+            return -1;
+        }
+        int min = input.getY();
+        if (decoration != null) {
+            min = Math.min(min, decoration.getY());
+        }
+        return min;
+    }
+
+    public int getYMax() {
+        if (input == null) {
+            return -1;
+        }
+        int max = input.getY() + input.getHeight();
+        if (decoration != null) {
+            max = Math.max(max, decoration.getY() + decoration.getHeight());
+        }
+        return max;
+    }
+
+    public void addMouseMotionListener(MouseMotionListener ml) {
+        if (decoration != null) {
+            decoration.addMouseMotionListener(ml);
+        }
+        if (input != null) {
+            input.addMouseMotionListener(ml);
         }
     }
 }

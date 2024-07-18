@@ -65,4 +65,11 @@ public class LoggerToSink extends AbstractLogger {
     public void exception(String msg, Throwable e) {
         sinkProvider.publish(new LogRecord2(this, msg + "\r\n" + getStackTrace(e), getThrownAt()).level(LogV3Level.EXCEPTION));
     }
+
+    /**
+     * @param newRecord
+     */
+    public void publish(LogRecord2 newRecord) {
+        sinkProvider.publish(newRecord);
+    }
 }

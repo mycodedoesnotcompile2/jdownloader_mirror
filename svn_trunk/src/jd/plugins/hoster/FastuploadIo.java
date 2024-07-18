@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49164 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49355 $", interfaceVersion = 2, names = {}, urls = {})
 public class FastuploadIo extends YetiShareCore {
     public FastuploadIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class FastuploadIo extends YetiShareCore {
     public String[] scanInfo(final DownloadLink link, final String[] fileInfo) {
         super.scanInfo(link, fileInfo);
         // 2024-06-19
-        final String betterfilesize = br.getRegex("Filesize</p>\\s*<h5[^>]*>([^<]+)</h5>").getMatch(0);
+        final String betterfilesize = br.getRegex("Filesize\\s*</p>\\s*<h5[^>]*>([^<]+)</h5>").getMatch(0);
         if (betterfilesize != null) {
             fileInfo[1] = betterfilesize;
         }

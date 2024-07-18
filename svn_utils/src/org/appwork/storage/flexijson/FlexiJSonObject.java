@@ -47,6 +47,7 @@ import java.util.Set;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.JSPath.MetaElement;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
@@ -89,7 +90,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
 
     private int                                                size = 0;
     private final LinkedHashMap<String, List<KeyValueElement>> keys;
-    private FlexiJSonComments                                  commentsBefore;
+    private FlexiJSonComments                     commentsBefore;
     private FlexiJSonComments                                  commentsInside;
 
     public FlexiJSonComments getCommentsInside() {
@@ -176,13 +177,14 @@ public class FlexiJSonObject implements FlexiJSonNode {
         }
         element.getValue().setParent(this);
         // forward correct parent to comments
+        // before and after key ocmments are related to the key/value element and use the value as parent
         FlexiJSonComments comment = element.getCommentsAfterKey();
         if (comment != null) {
-            comment.setParent(this);
+            comment.setParent(element.getValue());
         }
         comment = element.getCommentsBeforeKey();
         if (comment != null) {
-            comment.setParent(this);
+            comment.setParent(element.getValue());
         }
         if (addAt < 0) {
             this.elements.add(element);
@@ -264,7 +266,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
     public String toString() {
         String pretty = new FlexiJSonPrettyStringify().toJSONString(this);
         try {
-            return JSPath.fromFlexiNode(this).toPathString(false) + ": " + (pretty.contains("\r") ? "\r\n" : "") + pretty;
+            return FlexiUtils.fromFlexiNode(this).toPathString(false) + ": " + (pretty.contains("\r") ? "\r\n" : "") + pretty;
         } catch (InvalidPathException e) {
             return "ERROR:" + e.getMessage() + ": " + (pretty.contains("\r") ? "\r\n" : "") + pretty;
         }
@@ -394,6 +396,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
 
     public static FlexiJSonNode resolvePath(final JSPath path, FlexiJSonNode obj) {
         int depths = 0;
+        KeyValueElement el = null;
         for (Object key : path.getElements()) {
             if (obj == null) {
                 return null;
@@ -402,23 +405,45 @@ public class FlexiJSonObject implements FlexiJSonNode {
                 depths++;
                 continue;
             }
-            if (obj instanceof FlexiJSonObject) {
-                final KeyValueElement el = ((FlexiJSonObject) obj).getElement(String.valueOf(key));
+            if (key instanceof MetaElement) {
+                String commentTag = ((MetaElement) key).getString().substring(1);
+                if (commentTag.equals(FlexiCommentJsonNode.AttachLocation.BEFORE_KEY.prefix)) {
+                    obj = el.getCommentsBeforeKey();
+                    depths++;
+                } else if (commentTag.equals(FlexiCommentJsonNode.AttachLocation.AFTER_KEY.prefix)) {
+                    obj = el.getCommentsAfterKey();
+                    depths++;
+                } else if (commentTag.equals(FlexiCommentJsonNode.AttachLocation.BEFORE_VALUE.prefix)) {
+                    obj = obj.getCommentsBefore();
+                    depths++;
+                } else if (commentTag.equals(FlexiCommentJsonNode.AttachLocation.AFTER_VALUE.prefix)) {
+                    obj = obj.getCommentsAfter();
+                    depths++;
+                } else if (commentTag.equals(FlexiCommentJsonNode.AttachLocation.INSIDE_OBJECT.prefix)) {
+                    if (obj instanceof FlexiJSonArray) {
+                        obj = ((FlexiJSonArray) obj).getCommentsInside();
+                    } else if (obj instanceof FlexiJSonObject) {
+                        obj = ((FlexiJSonObject) obj).getCommentsInside();
+                    } else {
+                        throw new WTFException("Not supported");
+                    }
+                    depths++;
+                } else {
+                    throw new WTFException("Not supported");
+                }
+            } else if (obj instanceof FlexiJSonComments) {
+                obj = ((FlexiJSonComments) obj).get(JSPath.toArrayIndex(key));
+                depths++;
+            } else if (obj instanceof FlexiJSonObject) {
+                el = ((FlexiJSonObject) obj).getElement(String.valueOf(key));
                 if (el == null) {
                     return null;
                 }
                 obj = el.getValue();
                 depths++;
             } else if (obj instanceof FlexiJSonArray) {
-                try {
-                    if (!(key instanceof Number)) {
-                        key = Integer.parseInt(String.valueOf(key));
-                    }
-                    obj = ((FlexiJSonArray) obj).get(((Number) key).intValue());
-                    depths++;
-                } catch (final NumberFormatException e) {
-                    return null;
-                }
+                obj = ((FlexiJSonArray) obj).get(JSPath.toArrayIndex(key));
+                depths++;
             } else {
                 if (depths == path.size() - 1) {
                     // hä?

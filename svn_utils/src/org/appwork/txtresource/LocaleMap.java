@@ -97,7 +97,9 @@ public class LocaleMap extends LinkedHashMap<String, String> implements Storable
      * @param message
      */
     public LocaleMap(Map<String, String> message) {
-        putAll(message);
+        if (message != null) {
+            putAll(message);
+        }
     }
 
     public static String getBestMatch(Map<String, String> message) {

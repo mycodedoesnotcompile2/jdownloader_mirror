@@ -46,6 +46,7 @@ import java.util.LinkedList;
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.JSPath.MetaElement;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
@@ -56,6 +57,7 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.PropertyJSonPrettyStringify;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.ReflectionUtils;
@@ -169,7 +171,7 @@ public class FlexiUtils {
      * @throws InvalidPathException
      */
     public static String getPathString(final FlexiJSonNode json) throws InvalidPathException {
-        return JSPath.fromFlexiNode(json).toPathString(true);
+        return FlexiUtils.fromFlexiNode(json).toPathString(true);
     }
 
     /**
@@ -450,8 +452,8 @@ public class FlexiUtils {
         if (node instanceof FlexiJSonObject) {
             final FlexiJSonObject obj = (FlexiJSonObject) node;
             flexiVisitor.openObject(obj, path);
-            int comments = walkComments(obj.getCommentsBefore(), 0, flexiVisitor, path);
-            comments = walkComments(obj.getCommentsInside(), comments, flexiVisitor, path);
+            walkComments(obj.getCommentsBefore(), flexiVisitor, path);
+            walkComments(obj.getCommentsInside(), flexiVisitor, path);
             // new List to be Concurrent modification save. the loop might fail if we modify elements in the walk method
             for (final KeyValueElement e : new LinkedList<KeyValueElement>(obj.getElements())) {
                 final JSPath newPath = path.derive(e.getKey());
@@ -459,49 +461,60 @@ public class FlexiUtils {
                 walk(e.getValue(), flexiVisitor, newPath);
                 walk(e.getCommentsAfterKey(), flexiVisitor, newPath);
             }
-            comments = walkComments(obj.getCommentsAfter(), comments, flexiVisitor, path);
+            walkComments(obj.getCommentsAfter(), flexiVisitor, path);
             flexiVisitor.closeObject(obj, path);
         } else if (node instanceof FlexiJSonArray) {
             final FlexiJSonArray array = (FlexiJSonArray) node;
             flexiVisitor.openArray(array, path);
-            int comments = walkComments(array.getCommentsBefore(), 0, flexiVisitor, path);
-            comments = walkComments(array.getCommentsInside(), comments, flexiVisitor, path);
+            walkComments(array.getCommentsBefore(), flexiVisitor, path);
+            walkComments(array.getCommentsInside(), flexiVisitor, path);
             // new List to be Concurrent modification save. the loop might fail if we modify elements in the walk method
             int i = 0;
             for (final FlexiJSonNode e : new LinkedList<FlexiJSonNode>(array)) {
                 walk(e, flexiVisitor, path.derive(i++));
             }
-            comments = walkComments(array.getCommentsAfter(), comments, flexiVisitor, path);
+            walkComments(array.getCommentsAfter(), flexiVisitor, path);
             flexiVisitor.closeArray(array, path);
         } else if (node instanceof FlexiJSonComments) {
-            walkComments((FlexiJSonComments) node, 0, flexiVisitor, path);
+            walkComments((FlexiJSonComments) node, flexiVisitor, path);
         } else if (node instanceof FlexiCommentJsonNode) {
             flexiVisitor.onComment((FlexiCommentJsonNode) node, path);
         } else {
             final FlexiJSonValue value = (FlexiJSonValue) node;
-            int comments = walkComments(value.getCommentsBefore(), 0, flexiVisitor, path);
+            walkComments(value.getCommentsBefore(), flexiVisitor, path);
             flexiVisitor.onValue(value, path);
-            comments = walkComments(value.getCommentsAfter(), comments, flexiVisitor, path);
+            walkComments(value.getCommentsAfter(), flexiVisitor, path);
         }
     }
 
     /**
-     * @param commentsBefore
-     * @param i
      * @param flexiVisitor
      * @param path
-     * @return
+     * @param commentsBefore
      */
-    private static int walkComments(final FlexiJSonComments comments, int i, final FlexiVisitor flexiVisitor, final JSPath path) {
+    private static void walkComments(final FlexiJSonComments comments, final FlexiVisitor flexiVisitor, final JSPath path) {
         if (comments == null || comments.size() == 0) {
-            return i;
+            return;
         }
+        int i = 0;
         // new List to be Concurrent modification save. the loop might fail if we modify elements in the walk method
         for (final FlexiCommentJsonNode c : new LinkedList<FlexiCommentJsonNode>(comments)) {
-            walk(c, flexiVisitor, path.derive(JSPath.COMMENT_PATH_PREFIX + i));
+            // ensure that this is consistent to
+            JSPath derivedPath = path.derive(new MetaElement(JSPath.META_PREFIX + c.getLocation().prefix));
+            derivedPath = derivedPath.add(i);
+            if (System.getProperty("AWTEST.CLASS") != null) {
+                try {
+                    JSPath flxi = FlexiUtils.fromFlexiNode(c);
+                    if (!flxi.equals(derivedPath)) {
+                        throw new WTFException("AWTest:Path mismatch!");
+                    }
+                } catch (InvalidPathException e) {
+                    throw new WTFException("AWTest:Path issue", e);
+                }
+            }
+            walk(c, flexiVisitor, derivedPath);
             i++;
         }
-        return i;
     }
 
     public static void walk(final FlexiJSonNode node, final FlexiVisitor flexiVisitor) {
@@ -657,5 +670,163 @@ public class FlexiUtils {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    /**
+     * @param json
+     * @return
+     * @throws InvalidPathException
+     */
+    public static JSPath fromFlexiNode(FlexiJSonNode org) throws InvalidPathException {
+        if (org == null) {
+            throw new IllegalArgumentException("Node is null");
+        }
+        FlexiJSonNode json = org;
+        JSPath path = new JSPath();
+        next: while (json != null) {
+            FlexiJSonNode parent = json.getParent();
+            if (parent == json) {
+                throw new InvalidPathException("Bad Path");
+            }
+            if (parent == null) {
+                break;
+            }
+            if (json instanceof FlexiComment) {
+                if (parent instanceof FlexiJSonComments) {
+                    parent = parent.getParent();
+                }
+                if (FlexiUtils.handleComments(json, path, parent.getCommentsBefore())) {
+                    json = parent;
+                    continue next;
+                }
+                if (FlexiUtils.handleComments(json, path, parent.getCommentsAfter())) {
+                    json = parent;
+                    continue next;
+                }
+                if (parent instanceof FlexiJSonObject) {
+                    if (FlexiUtils.handleComments(json, path, ((FlexiJSonObject) parent).getCommentsInside())) {
+                        json = parent;
+                        continue next;
+                    }
+                    for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
+                        if (FlexiUtils.handleComments(json, path, e.getCommentsBeforeKey())) {
+                            DebugMode.debugger();
+                            json = parent;
+                            continue next;
+                        }
+                        if (FlexiUtils.handleComments(json, path, e.getCommentsAfterKey())) {
+                            DebugMode.debugger();
+                            json = parent;
+                            continue next;
+                        }
+                    }
+                } else if (parent instanceof FlexiJSonArray) {
+                    if (FlexiUtils.handleComments(json, path, ((FlexiJSonArray) parent).getCommentsInside())) {
+                        json = parent;
+                        continue next;
+                    }
+                }
+                // before or after key. The parent is the value, thus we have to search for the element
+                FlexiJSonNode elementRoot = parent.getParent();
+                if (elementRoot instanceof FlexiJSonObject) {
+                    for (KeyValueElement e : ((FlexiJSonObject) elementRoot).getElements()) {
+                        if (e.getValue() == parent) {
+                            if (FlexiUtils.handleComments(json, path, e.getCommentsBeforeKey())) {
+                                json = parent;
+                                continue next;
+                            }
+                            if (FlexiUtils.handleComments(json, path, e.getCommentsAfterKey())) {
+                                json = parent;
+                                continue next;
+                            }
+                        }
+                    }
+                }
+                // parent = parent.getParent();
+                // if (parent instanceof FlexiJSonObject) {
+                // ArrayList<FlexiJSonComments> collect = new ArrayList<FlexiJSonComments>();
+                // collect.add(((FlexiJSonObject) parent).getCommentsBefore());
+                // collect.add(((FlexiJSonObject) parent).getCommentsInside());
+                // for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
+                // if (e.getCommentsBeforeKey() != null) {
+                // collect.add(e.getCommentsBeforeKey());
+                // }
+                // if (e.getCommentsAfterKey() != null) {
+                // collect.add(e.getCommentsAfterKey());
+                // }
+                // }
+                // collect.add(((FlexiJSonObject) parent).getCommentsAfter());
+                // int index = 0;
+                // for (FlexiCommentJsonNode c : new ConcatIterator<FlexiCommentJsonNode>(collect.toArray(new FlexiJSonComments[] {}))) {
+                // if (c == json) {
+                // path.add(0, COMMENT_PATH_PREFIX + index);
+                // json = parent;
+                // continue next;
+                // }
+                // index++;
+                // }
+                // } else if (parent instanceof FlexiJSonArray) {
+                // int index = 0;
+                // for (FlexiCommentJsonNode c : new ConcatIterator<FlexiCommentJsonNode>(((FlexiJSonArray) parent).getCommentsBefore(),
+                // ((FlexiJSonArray) parent).getCommentsInside(), ((FlexiJSonArray) parent).getCommentsAfter())) {
+                // if (c == json) {
+                // path.add(0, COMMENT_PATH_PREFIX + index);
+                // json = parent;
+                // continue next;
+                // }
+                // index++;
+                // }
+                // }
+                throw new InvalidPathException("Bad Path");
+            }
+            if (parent instanceof FlexiJSonObject) {
+                for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
+                    if (e.getValue() == json) {
+                        json = parent;
+                        path.add(0, e.getKey());
+                        continue next;
+                    }
+                }
+                throw new InvalidPathException("Bad Path: Element is not a child of its own parent");
+            } else if (parent instanceof FlexiJSonArray) {
+                for (int i = 0; i < ((FlexiJSonArray) parent).size(); i++) {
+                    if (((FlexiJSonArray) parent).get(i) == json) {
+                        path.add(0, i);
+                        json = parent;
+                        continue next;
+                    }
+                }
+                throw new InvalidPathException("Bad Path");
+            } else if (parent instanceof FlexiJSonValue) {
+                throw new InvalidPathException("Bad Path");
+            } else {
+                throw new InvalidPathException("Unknown entry");
+            }
+        }
+        // if (org instanceof FlexiJSonComments || org instanceof FlexiCommentJsonNode) {
+        // path.add("//");
+        // }
+        return path;
+    }
+
+    /**
+     * @param json
+     * @param path
+     * @param commentsBefore
+     * @return
+     */
+    static boolean handleComments(FlexiJSonNode json, JSPath path, FlexiJSonComments comments) {
+        if (comments != null) {
+            int index = 0;
+            for (FlexiCommentJsonNode c : comments) {
+                if (c == json) {
+                    path.add(0, new JSPath.MetaElement(JSPath.META_PREFIX + c.getLocation().prefix));
+                    path.add(1, index);
+                    return true;
+                }
+                index++;
+            }
+        }
+        return false;
     }
 }

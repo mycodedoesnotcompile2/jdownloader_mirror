@@ -1023,6 +1023,10 @@ public class CompiledType {
             return classCache;
         } else {
             try {
+                if (raw == null) {
+                    // e.g. Type '?' - unresolved generic
+                    return null;
+                }
                 classCache = ClassCache.getClassCache(raw);
             } catch (SecurityException e) {
                 throw new IllegalStateException(e);
@@ -1178,6 +1182,8 @@ public class CompiledType {
                 } else {
                     throw new CannotResolvePathException();
                 }
+            } else {
+                throw new CannotResolvePathException();
             }
         }
         return ret;

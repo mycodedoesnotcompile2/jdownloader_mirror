@@ -1449,7 +1449,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     @Override
     protected void processMouseEvent(final MouseEvent e) {
         if (e.getID() == MouseEvent.MOUSE_RELEASED) {
-            if (CrossSystem.isContextMenuTrigger(e)) {
+            if (isContextMenuTrigger(e)) {
                 final int row = this.rowAtPoint(e.getPoint());
                 final E obj = this.getModel().getObjectbyRow(row);
                 final ExtColumn<E> col = this.getExtColumnAtPoint(e.getPoint());
@@ -1472,9 +1472,12 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                     }
                     final List<E> selected = this.getModel().getSelectedObjects();
                     final JPopupMenu popup = this.onContextMenu(new JPopupMenu(), obj, selected, col, e);
-                    if (popup != null && popup.getComponentCount() > 0) {
-                        showPopup(popup, e.getPoint());
-                        return;
+                    if (popup != null) {
+                        this.eventSender.fireEvent(new ExtTableEvent<JPopupMenu>(this, ExtTableEvent.Types.CONTEXTMENU, popup));
+                        if (popup.getComponentCount() > 0) {
+                            showPopup(popup, e.getPoint());
+                            return;
+                        }
                     }
                 }
             }
@@ -1599,6 +1602,10 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
          * moved this at the end of this function so it does not pre-interfere with customized click handling (eg changing selection)
          */
         super.processMouseEvent(e);
+    }
+
+    protected boolean isContextMenuTrigger(final MouseEvent e) {
+        return CrossSystem.isContextMenuTrigger(e);
     }
 
     /**

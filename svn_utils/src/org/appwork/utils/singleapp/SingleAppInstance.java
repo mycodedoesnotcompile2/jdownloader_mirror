@@ -231,7 +231,10 @@ public class SingleAppInstance {
                 return daemon;
             }
         } finally {
-            ShutdownController.getInstance().removeShutdownEvent(shutdownEvent);
+            if (!ShutdownController.getInstance().isAlive()) {
+                // do not remove if we are already in shutdown
+                ShutdownController.getInstance().removeShutdownEvent(shutdownEvent);
+            }
         }
     }
 

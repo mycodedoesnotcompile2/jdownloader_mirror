@@ -70,6 +70,10 @@ public class ModifyLock {
         return lock.isWriteLocked();
     }
 
+    public final boolean isWriteLockedByCurrentThread() {
+        return lock.isWriteLockedByCurrentThread();
+    }
+
     public final boolean isReadLocked() {
         return lock.getReadLockCount() > 0;
     }

@@ -187,6 +187,7 @@ public class FlexiJSonStringBuilder {
     protected byte[]             collonString;
     protected byte[]             zeroString;
     protected byte[]             escapedEscaped;
+    protected byte[]             escapedSolidus;
     protected byte[]             escapedEscapedUString;
     protected byte[]             escapedEscapedNString;
     protected byte[]             escapedEscapedRString;
@@ -233,6 +234,7 @@ public class FlexiJSonStringBuilder {
         collonString = ":".getBytes(charset);
         zeroString = "0".getBytes(charset);
         escapedEscaped = "\\\\".getBytes(charset);
+        escapedSolidus = "\\/".getBytes(charset);
         escapedEscapedUString = "\\u".getBytes(charset);
         escapedEscapedNString = "\\n".getBytes(charset);
         escapedEscapedRString = "\\r".getBytes(charset);
@@ -428,6 +430,11 @@ public class FlexiJSonStringBuilder {
                 // We support only " in the stringifier
                 // bytesToStream(out, "\\'".getBytes(charset));
                 // continue;
+                // to discuss. escaping solidus would make comments look very strange.
+                // case '/':
+                // finalizeAppendString(out);
+                // bytesToStream(out, escapedSolidus);
+                // continue;
                 case '\\':
                     finalizeAppendString(out);
                     bytesToStream(out, escapedEscaped);
@@ -454,11 +461,13 @@ public class FlexiJSonStringBuilder {
                     continue;
                 }
                 // '\u0000' && ch <= '\u001F' are controll characters )(
-                // http://www.ietf.org/rfc/rfc4627.txt 5.2 Strings)
+                // https://www.ietf.org/rfc/rfc8259.txt 7. Strings)
                 // the text says U+0000 >>> to U+001F but the syntax diagram just
                 // says control character, which in >>> Unicode 6.3 also includes
                 // U+007F to U+009F
                 // http://www.unicode.org/charts/PDF/U2000.pdf
+                // todo. implement \u1D11E and other chars that require more \ u sequences
+                // newer RFC: https://www.ietf.org/rfc/rfc8259.txt
                 if (ch >= '\u0000' && ch <= '\u001F' || ch >= '\u007F' && ch <= '\u009F' || ch >= '\u2000' && ch <= '\u20FF') {
                     finalizeAppendString(out);
                     final String ss = Integer.toHexString(ch);

@@ -235,12 +235,12 @@ public class ConditionTest extends AWTest {
         eval(false, FlexiCondition.parse("{§§THIS:{}}").matches(regex));
         eval(false, FlexiCondition.parse("{§§THIS:{$eq:{}}}").matches(regex));
         eval(true, FlexiCondition.parse("{$ne:{}}").matches(regex));
-        eval(true, FlexiCondition.parse("{§§NOW:{§gt:1}}").matches(regex));
+        eval(true, FlexiCondition.parse("{§NOW:{§gt:1}}").matches(regex));
         eval(true, FlexiCondition.parse("{set.§size:2}").matches(regex));
         eval(true, FlexiCondition.parse("{set[1]:\"643dfbg\"}").matches(regex));
         eval(true, "a".equals(JSPath.fromPathString("a.§key").resolve(regex)));
         eval(true, FlexiCondition.parse("{\"§§THIS\":1M!365}").matches(TimeSpan.parse("1M!365")));
-        eval(true, FlexiCondition.parse("{\"§§THIS\":2021-10-07T00:00CET}").matches(DateMapper.parseJsonDefault("2021-10-07T00:00CET")));
+        eval(true, FlexiCondition.parse("{\"§§THIS\":2021-10-07T00:00CET}").matches(DateMapper.parse("2021-10-07T00:00CET")));
         eval(true, FlexiCondition.parse("{\"§§THIS\":{§gt:2021-10-07T00:00CET}}").matches(new Date()));
         eval(true, FlexiCondition.parse("{\"§§THIS\":{§gte:2021-10-07T00:00CET}}").matches(new Date()));
         eval(false, FlexiCondition.parse("{\"§§THIS\":{§gt:2121-10-07T00:00CET}}").matches(new Date()));
@@ -257,7 +257,7 @@ public class ConditionTest extends AWTest {
         eval(true, FlexiCondition.parse("{\"§§THIS\":{§gt:1M}}").matches(TimeSpan.parse("1Y!365d")));
         eval(true, FlexiCondition.parse("{\"§§THIS[{§project:{§key:{§regex:^valid.*}}}].§size\":2}").matches(regex));
         eval(true, FlexiCondition.parse("{\"listWithNull[{§project:{§or:[{§§THIS:string},{§key:0}]}}].§size\":2}").matches(regex));
-        eval(true, FlexiCondition.parse("{\"listWithNull[{§concat:[§0,§1]}]\":\"true1\"}").matches(regex));
+        eval(true, FlexiCondition.parse("{\"listWithNull[{§concat:[\\\"§[0]\\\",\\\"§[1]\\\"]}]\":\"true1\"}").matches(regex));
         eval(true, FlexiCondition.parse("{\"listWithNull\":{§options:{filter:{§§THIS:string}},§each:{§§THIS:string}}}").matches(regex));
         eval(true, FlexiCondition.parse("{\"listWithNull[{§project:{§§THIS:string}}]\":{§each:{§§THIS:string}}}").matches(regex));
         eval(true, FlexiCondition.parse("{§options:{aggregate:true},§eq:[abc.def_(.,{§concat:[§valid,_,§a]}]}").matches(regex));
@@ -333,11 +333,11 @@ public class ConditionTest extends AWTest {
         eval(false, FlexiCondition.parse("{§ne:[c,null],d:{§exists:true,$ne:null}}").matches(test2));
         // better
         eval(true, FlexiCondition.parse("{§gt:[{§sum:[§c,1]},0]}").matches(test2));
-        eval(false, FlexiCondition.parse("{§§THIS.0.§size:{§gt:0}}").matches(new String[] { "" }));
-        eval(true, FlexiCondition.parse("{§§THIS.0.§size:{§gt:0}}").matches(new String[] { "abc" }));
-        eval(true, FlexiCondition.parse("{0.§size:{§gt:0}}").matches(new String[] { "abc" }));
-        eval(true, FlexiCondition.parse("{§gt:[§0.§size,0]}").matches(new String[] { "abc" }));
-        eval(false, new Condition("§§THIS.0.§size", new Condition(Condition.$GT, 0)).matches(new String[] { "" }));
+        eval(false, FlexiCondition.parse("{§§THIS[0].§size:{§gt:0}}").matches(new String[] { "" }));
+        eval(true, FlexiCondition.parse("{§§THIS[0].§size:{§gt:0}}").matches(new String[] { "abc" }));
+        eval(true, FlexiCondition.parse("{[0].§size:{§gt:0}}").matches(new String[] { "abc" }));
+        eval(true, FlexiCondition.parse("{§gt:[\"§[0].§size\",0]}").matches(new String[] { "abc" }));
+        eval(false, new Condition("§§THIS[0].§size", new Condition(Condition.$GT, 0)).matches(new String[] { "" }));
         eval(true, new Condition("c", new Condition($EXISTS, new Condition($SUM, new Object[] { "§PARENT.a", "§PARENT.leer", 0, -2, "§§THIS" }))).append($LT, new Object[] { new Condition($SUM, new Object[] { "§test2.sum" }), 10 }).matches(test));
         eval(true, new Condition("a", new Condition($EQ, new Condition($SUM, Arrays.asList(new Object[] { 1, "§§ROOT.leer" })))).matches(test));
         eval(true, new Condition("boo", new Condition($EQ, Arrays.asList(new Object[] { 1, "§§ROOT.a" })).append($OPTIONS, new Condition(Condition.OPTIONS_AGGREGATE, true))).matches(test));
@@ -368,7 +368,7 @@ public class ConditionTest extends AWTest {
         eval(false, new Condition("c", new Condition($EXISTS, 0)).matches(test));
         // eq tests from the mongo docu https://docs.mongodb.com/manual/reference/operator/query/eq/
         eval(true, new Condition("sa", list(new Condition($REGEX, "a.?"), new Condition($REGEX, ".?b"))).matches(test3));
-        eval(true, new Condition($OR, list(new Condition($REGEX, list("a.?", "§sa.0")), new Condition($REGEX, list("b.?", "§sa.1")))).matches(test3));
+        eval(true, new Condition($OR, list(new Condition($REGEX, list("a.?", "§sa[0]")), new Condition($REGEX, list("b.?", "§sa[1]")))).matches(test3));
         eval(true, new Condition("sa", new Condition($REGEX, "(a|b)")).matches(test3));
         eval(false, new Condition("sa", new Condition($REGEX, "\\d")).matches(test3));
         eval(true, new Condition("list", new Condition($EQ, 1)).matches(test3));
@@ -437,12 +437,12 @@ public class ConditionTest extends AWTest {
             }
         }
         if (true) {
-            eval(true, new Condition("§§THIS.0", new Condition(Condition.$EXISTS, true)).matches(new String[] { "" }));
-            eval(false, new Condition("§§THIS.0", new Condition(Condition.$REGEX, "^https?://.+$")).matches(new String[] { "" }));
-            System.out.println(JSonStorage.serializeToJson(JSonStorage.serializeToJson(new Condition("§§THIS.0", new Condition(Condition.$REGEX, "^https?://.+$")))));
-            eval(true, new Condition("§§THIS.0", new Condition(Condition.$REGEX, "^https?://.+$")).matches(new String[] { "http://www.google.de" }));
-            eval(false, new Condition("§§THIS.0.§size", new Condition(Condition.$GT, 0)).matches(new String[] { "" }));
-            eval(true, new Condition("§§THIS.0.§size", new Condition(Condition.$GT, 0)).matches(new String[] { "1" }));
+            eval(true, new Condition("§§THIS[0]", new Condition(Condition.$EXISTS, true)).matches(new String[] { "" }));
+            eval(false, new Condition("§§THIS[0]", new Condition(Condition.$REGEX, "^https?://.+$")).matches(new String[] { "" }));
+            System.out.println(JSonStorage.serializeToJson(JSonStorage.serializeToJson(new Condition("§§THIS[0]", new Condition(Condition.$REGEX, "^https?://.+$")))));
+            eval(true, new Condition("§§THIS[0]", new Condition(Condition.$REGEX, "^https?://.+$")).matches(new String[] { "http://www.google.de" }));
+            eval(false, new Condition("§§THIS[0].§size", new Condition(Condition.$GT, 0)).matches(new String[] { "" }));
+            eval(true, new Condition("§§THIS[0].§size", new Condition(Condition.$GT, 0)).matches(new String[] { "1" }));
             eval(true, new Condition(Condition.$$THIS + "." + Condition.$SIZE, new Condition($GT, 0)).matches(new String[] { "" }));
             eval(false, new Condition(Condition.$$THIS + "." + Condition.$SIZE, new Condition($GT, 0)).matches(new String[] {}));
         }
@@ -466,7 +466,7 @@ public class ConditionTest extends AWTest {
         eval(true, new Condition($AND, new Condition[] { new Condition("a", 1), new Condition("a", new Condition($NE, 2)).append("c", new Condition($NE, 1)) }).matches(test3));
         eval(true, new Condition("a", new Condition($EQ, 1)).matches(test3));
         eval(true, new Condition("a", new Condition($GTE, 1).append($LT, 2)).matches(test3));
-        eval(true, new Condition("sa.0", "a").matches(test3));
+        eval(true, new Condition("sa[0]", "a").matches(test3));
         eval(true, new Condition("sa", new Condition($IN, new String[] { "h", "b" })).matches(test3));
         eval(true, new Condition("sa", new Condition($NIN, new String[] { "c", "d" })).matches(test3));
         String json = JSonStorage.serializeToJson(new Condition("sa", new Condition($IN, new String[] { "h", "b" })));

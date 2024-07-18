@@ -60,11 +60,19 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
         super(1);
     }
 
+    public FlexiJSonComments(Collection<FlexiCommentJsonNode> comments) {
+        // do not put comments in the costructor - this would not set the parents
+        super();
+        addAll(comments);
+    }
+
     /**
      * @param flexiComment
      */
     public FlexiJSonComments(FlexiCommentJsonNode... comments) {
-        super(Arrays.asList(comments));
+        // do not put comments in the costructor - this would not set the parents
+        super();
+        addAll(Arrays.asList(comments));
     }
 
     /*
@@ -85,7 +93,7 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
      */
     @Override
     public void add(int index, FlexiCommentJsonNode element) {
-        element.setParent(this);        
+        element.setParent(this);
         super.add(index, element);
     }
 

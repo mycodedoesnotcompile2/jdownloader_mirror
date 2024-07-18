@@ -34,6 +34,7 @@
 package org.appwork.utils.swing.locationstore;
 
 import java.awt.Dimension;
+import java.awt.Frame;
 import java.awt.Point;
 import java.awt.Window;
 import java.io.File;
@@ -51,6 +52,8 @@ import org.appwork.utils.IO;
 import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
+import org.appwork.utils.swing.windowmanager.WindowManager;
+import org.appwork.utils.swing.windowmanager.WindowManager.WindowExtendedState;
 
 /**
  * This class is meant to be used in EDT and thus os NOT Threadsafe in any way
@@ -155,7 +158,6 @@ public class LocationStorageManager extends ShutdownEvent {
                 return;
             } else {
                 final byte[] json = new EDTHelper<byte[]>() {
-
                     @Override
                     public byte[] edtRun() {
                         try {
@@ -181,7 +183,6 @@ public class LocationStorageManager extends ShutdownEvent {
     public void onUpdate(final Window window, final Point locationOnScreen, final Dimension windowSize, final LocationStorage cfg, final String type) {
         if (cfg != null) {
             new EDTRunner(false) {
-
                 @Override
                 protected void runInEDT() {
                     boolean write = false;
@@ -192,12 +193,19 @@ public class LocationStorageManager extends ShutdownEvent {
                     } else if (window != null) {
                         write |= cfg.update(true, type, window.getWidth(), window.getHeight());
                     }
+                    if (window != null && window instanceof Frame) {
+                        WindowExtendedState newState = WindowManager.getInstance().getExtendedState(((Frame) window));
+                        WindowExtendedState is = cfg.getExtendedState();
+                        if (newState != is) {
+                            cfg.setExtendedState(newState);
+                            write = true;
+                        }
+                    }
                     if (write && saver != null) {
                         saver.resetAndStart();
                     }
                 }
             };
-
         }
     }
 
@@ -217,5 +225,4 @@ public class LocationStorageManager extends ShutdownEvent {
     public void onShutdown(ShutdownRequest shutdownRequest) {
         save(true);
     }
-
 }

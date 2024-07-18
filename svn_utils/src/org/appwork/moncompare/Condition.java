@@ -187,7 +187,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         if (container.equalsDeep(container, expression, newScope.getLast(), newScope)) {
                             // {§any:1}
                             if (container._isDebug()) {
-                                container.log(newScope.getPath(), this.getClass().getSimpleName() + ": " + container.resolveValue(container, expression, newScope, false) + ".matches(" + expression + ")");
+                                container.log(newScope.getPath(), this.getClass().getSimpleName() + ": " + container.resolveValue(container, expression, newScope, false) + ".matches(" + debugToString(expression) + ")");
                             }
                             return true;
                         }
@@ -1497,7 +1497,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      * Returns the current datetime value, which is same across all members of the deployment and remains constant throughout the
      * aggregation pipeline.
      */
-    public static final String                              $NOW               = "§§NOW";
+    public static final String                              $NOW               = "§NOW";
     /**
      * Regex options https://docs.mongodb.com/manual/reference/operator/expression/regex/#op._S_options
      */
@@ -1544,10 +1544,14 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     @ApiDoc("Set this option to true to force all operators in the same layer to work in aggregation mode.")
     @ApiDocExample("{§eq:['§a',1],§options:{'aggregate':true}}")
     public static final String                              OPTIONS_AGGREGATE  = "aggregate";
-    protected ArrayList<TypeHandler>                        typeHandlers       = new ArrayList<TypeHandler>();
+    protected List<TypeHandler>                             typeHandlers       = new ArrayList<TypeHandler>();
 
-    protected ArrayList<TypeHandler> getTypehandlers() {
+    protected List<TypeHandler> getTypeHandler() {
         return typeHandlers;
+    }
+
+    public void setTypeHandler(List<TypeHandler> typeHandlers) {
+        this.typeHandlers = typeHandlers;
     }
 
     public static class KeyValue {
@@ -1987,7 +1991,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
         Object resolvedExpression = this.resolveValue(container, expression, scope, false);
         if (resolvedExpression == matcherValue) {
-            DebugMode.debugger();
+            // DebugMode.debugger();
             return true;
         }
         if (resolvedExpression instanceof AggregationResult && ((AggregationResult) resolvedExpression) == matcherValue) {
@@ -2106,7 +2110,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             }
             boolean couldHandleAllKeys = true;
             for (final java.util.Map.Entry<String, Object> es : this.entrySet()) {
-                final String key = es.getKey();
+                String key = es.getKey();
                 if (IGNORE.contains(key)) {
                     // for internal use only.
                     continue;
@@ -2341,6 +2345,10 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
             MapAccessorInterface map;
             ListAccessorInterface list;
             Scope ret = scope.copy();
+            if (keyPath.getFirst() instanceof String && ((String) keyPath.getFirst()).equals("§")) {
+                // §[0] -->ference to 0. element
+                keyPath.remove(0);
+            }
             NEXT_PATH_ELEMENT: for (final Object keyOrg : keyPath.getElements()) {
                 try {
                     if (keyOrg instanceof Condition) {
@@ -2348,13 +2356,13 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         ret.add(convert(filter).evaluateInternal(ret), keyOrg);
                         continue NEXT_PATH_ELEMENT;
                     }
-                    String key = StringUtils.valueOfOrNull(keyOrg);
+                    String keyAsString = StringUtils.valueOfOrNull(keyOrg);
                     {
                         // custom Pathhandlers
                         final ConcatIterator<java.util.Map.Entry<String, PathHandler>> it = this.getPathHandlerIterator();
                         if (it != null) {
                             for (final java.util.Map.Entry<String, PathHandler> es : it) {
-                                if (es.getKey() == null || es.getKey().equalsIgnoreCase(key)) {
+                                if (es.getKey() == null || es.getKey().equalsIgnoreCase(keyAsString)) {
                                     final Scope r = es.getValue().resolve(scope, ret, keyOrg);
                                     if (r != null) {
                                         ret = r;
@@ -2364,36 +2372,36 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                             }
                         }
                     }
-                    if ($$ROOT.equalsIgnoreCase(key)) {
-                        if (key != keyPath.getFirst()) {
+                    if ($$ROOT.equalsIgnoreCase(keyAsString)) {
+                        if (keyAsString != keyPath.getFirst()) {
                             throw new ConditionException("PathLink §§... must always be the first key element");
                         }
                         ret = new Scope(scope.getFirst());
                         continue;
-                    } else if ($$THIS.equalsIgnoreCase(key) || $$CURRENT.equalsIgnoreCase(key)) {
-                        if (key != keyPath.getFirst()) {
+                    } else if ($$THIS.equalsIgnoreCase(keyAsString) || $$CURRENT.equalsIgnoreCase(keyAsString)) {
+                        if (keyAsString != keyPath.getFirst()) {
                             throw new ConditionException("PathLink §§... must always be the first key element");
                         }
                         ret.add(scope.getLast(), keyOrg);
                         continue;
-                    } else if ("§this".equalsIgnoreCase(key) || "§current".equalsIgnoreCase(key)) {
-                        throw new WTFException(key + " is not allowed. Use §§this and §§current");
-                    } else if ($PARENT.equalsIgnoreCase(key)) {
+                    } else if ("§this".equalsIgnoreCase(keyAsString) || "§current".equalsIgnoreCase(keyAsString)) {
+                        throw new WTFException(keyAsString + " is not allowed. Use §§this and §§current");
+                    } else if ($PARENT.equalsIgnoreCase(keyAsString)) {
                         ret = ret.getParent();
                         if (ret == null) {
                             ret = new Scope(KEY_DOES_NOT_EXIST);
                         }
                         continue;
-                    } else if ($NOW.equalsIgnoreCase(key)) {
+                    } else if ($NOW.equalsIgnoreCase(keyAsString)) {
                         ret = new Scope(now.get());
                         continue;
-                    } else if ($TYPE.equalsIgnoreCase(key)) {
-                        ret.add(ret.getLast().getClass().getName(), key);
+                    } else if ($TYPE.equalsIgnoreCase(keyAsString)) {
+                        ret.add(ret.getLast().getClass().getName(), keyAsString);
                         continue;
-                    } else if ($KEYS.equalsIgnoreCase(key)) {
+                    } else if ($KEYS.equalsIgnoreCase(keyAsString)) {
                         ret.add(this.listKeys(ret.getLast()), keyOrg);
                         continue;
-                    } else if ($KEY.equalsIgnoreCase(key)) {
+                    } else if ($KEY.equalsIgnoreCase(keyAsString)) {
                         final List<Object> loop = ret.getPath().getElements();
                         int backlog = 0;
                         while (backlog < loop.size()) {
@@ -2408,7 +2416,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                             }
                         }
                         continue;
-                    } else if ($FIRST.equalsIgnoreCase(key)) {
+                    } else if ($FIRST.equalsIgnoreCase(keyAsString)) {
                         if ((list = getListWrapper(ret.getLast())) != null) {
                             if (list.size() == 0) {
                                 ret.add(KEY_DOES_NOT_EXIST, keyOrg);
@@ -2425,7 +2433,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                             ret.add((ret.getLast()), keyOrg);
                         }
                         continue;
-                    } else if ($SIZE.equalsIgnoreCase(key)) {
+                    } else if ($SIZE.equalsIgnoreCase(keyAsString)) {
                         if ((list = getListWrapper(ret.getLast())) != null) {
                             ret.add(list.size(), keyOrg);
                         } else if ((map = getMapWrapper(ret.getLast())) != null) {
@@ -2446,14 +2454,14 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         ret.add(KEY_DOES_NOT_EXIST, keyOrg);
                         continue;
                     }
-                    if (key != null && key.startsWith("§")) {
-                        key = key.substring(1);
+                    if (keyAsString != null && keyAsString.startsWith("§")) {
+                        keyAsString = keyAsString.substring(1);
                     }
                     if (ret.getLast() instanceof ConditionObjectValueView) {
                         final ConditionObjectValueView view = (ConditionObjectValueView) ret.getLast();
-                        final Object newValue = view.getConditionObjectValue(key);
+                        final Object newValue = view.getConditionObjectValue(keyAsString);
                         if (newValue == null) {
-                            if (view.containsConditionObjectKey(key)) {
+                            if (view.containsConditionObjectKey(keyAsString)) {
                                 ret.add(null, keyOrg);
                                 continue;
                             } else if (!view.isConditionObjectVisible()) {
@@ -2467,14 +2475,14 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     } else if ((map = getMapWrapper(ret.getLast())) != null) {
                         // do not use isMap here - this is for actual Map elements - not for TypeHandlers
                         try {
-                            ret.add(map.get(key), keyOrg);
+                            ret.add(map.get(keyAsString), keyOrg);
                         } catch (Exception e) {
                             throw new CannotGetValueException(e);
                         }
                         continue;
                     } else if ((list = getListWrapper(ret.getLast())) != null) {
                         try {
-                            ret.add(list.get(JSPath.toArrayIndex(key)), keyOrg);
+                            ret.add(list.get(((Number) keyOrg).intValue()), keyOrg);
                         } catch (Exception e) {
                             throw new CannotGetValueException(e);
                         }
@@ -2485,7 +2493,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     Method method = null;
                     try {
                         final ClassCache cc = ClassCache.getClassCache(cls);
-                        final Getter getter = cc.getGetter(key);
+                        final Getter getter = cc.getGetter(keyAsString);
                         if (getter != null) {
                             if (!this.isForbiddenMethod(getter.method)) {
                                 method = getter.method;
@@ -2749,13 +2757,13 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         if (thread != null && thread.size() > 0) {
             it.add(thread.iterator());
         }
-        ArrayList<TypeHandler> local = getTypehandlers();
+        List<TypeHandler> local = getTypeHandler();
         if (local != null && local.size() > 0) {
             it.add(local.iterator());
         }
         final Condition root = ROOT_CONDITION.get();
         if (root != null && root != this) {
-            ArrayList<TypeHandler> rootLocal = root.getTypehandlers();
+            List<TypeHandler> rootLocal = root.getTypeHandler();
             if (rootLocal != null && rootLocal.size() > 0) {
                 it.add(rootLocal.iterator());
             }
@@ -2770,7 +2778,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      */
     public boolean matches(final MatcherType obj) throws ConditionException {
         if (this._isDebug()) {
-            this.log(new JSPath(), "Run " + this + ".matches(" + obj + ")");
+            this.log(new JSPath(), "Run " + this + ".matches(" + debugToString(obj) + ")");
         }
         final Object result = this.evaluateInternal(new Scope(obj));
         return this.isTrue(result);
@@ -2955,7 +2963,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         }
         if (expression instanceof String && ((String) expression).startsWith("§")) {
             try {
-                expression = this.resolveKeyPath(scope, JSPath.fromPathString((String) expression)).getLast();
+                expression = this.resolveKeyPath(scope, JSPath.fromPathString(((String) expression))).getLast();
             } catch (final InvalidPathException e) {
                 throw new ConditionException(e);
             }
@@ -2990,7 +2998,26 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
     @Override
     public String toString() {
         // do not use Jsonstorage here - bad coupling
-        return "Condition: " + super.toString();
+        return debugToString(this);
+    }
+
+    /**
+     * @param condition
+     * @return
+     * @throws Exception
+     */
+    private static String debugToString(Object obj) {
+        try {
+            Class<?> deser = Class.forName("org.appwork.serializer.Deser");
+            Class<?> serializerInterface = Class.forName("org.appwork.storage.commonInterface.SerializerInterface");
+            Method method = deser.getMethod("get", new Class[] {});
+            method.setAccessible(true);
+            Object serializer = method.invoke(method, new Object[] {});
+            Method toString = serializerInterface.getMethod("toString", new Class[] { Object.class, Object[].class });
+            return (String) toString.invoke(serializer, obj, new Object[] {});
+        } catch (Exception e) {
+            return String.valueOf(obj);
+        }
     }
 
     /**

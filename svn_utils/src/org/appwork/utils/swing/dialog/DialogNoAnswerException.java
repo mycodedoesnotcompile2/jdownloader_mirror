@@ -52,6 +52,11 @@ public class DialogNoAnswerException extends Exception implements ExceptionDefau
     private final boolean     causedByESC;
     private final boolean     causedByClosed;
     private final boolean     causedByInterrupt;
+    private final boolean     causedByInitException;
+
+    public boolean isCausedByInitException() {
+        return causedByInitException;
+    }
 
     public boolean isCausedByInterrupt() {
         return causedByInterrupt;
@@ -68,12 +73,13 @@ public class DialogNoAnswerException extends Exception implements ExceptionDefau
         this.causedByESC = BinaryLogic.containsSome(mask, Dialog.RETURN_ESC);
         this.causedByClosed = BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED);
         this.causedByInterrupt = BinaryLogic.containsSome(mask, Dialog.RETURN_INTERRUPT);
+        this.causedByInitException = BinaryLogic.containsSome(mask, Dialog.RETURN_EXCEPTION);
         if (cause == null) {
             this.setStackTrace(new StackTraceElement[] {});
         }
     }
 
-    public Level getDefaultLogLevel() {        
+    public Level getDefaultLogLevel() {
         return Level.WARNING;
     }
 

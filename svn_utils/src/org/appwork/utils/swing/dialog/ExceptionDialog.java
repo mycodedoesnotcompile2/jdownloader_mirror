@@ -121,7 +121,7 @@ public class ExceptionDialog extends AbstractDialog<Integer> implements Exceptio
     }
 
     @Override
-    protected Integer createReturnValue() {        
+    protected Integer createReturnValue() {
         return this.getReturnmask();
     }
 

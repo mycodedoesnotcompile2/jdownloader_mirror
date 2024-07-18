@@ -52,6 +52,7 @@ import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.moncompare.Condition;
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.storage.InvalidTypeException;
 import org.appwork.storage.JSonStorage;
@@ -150,6 +151,9 @@ public class StorableValidatorTest extends AWTest {
     protected boolean skipValidation(Class<?> cls) throws Exception {
         if (cls == null) {
             return false;
+        }
+        if (CompiledType.create(cls).isInstanceOf(Condition.class)) {
+            return true;
         }
         try {
             List<IgnoreInAWTest> ignore = ClassCache.getClassCache(cls).getAnnotations(null, IgnoreInAWTest.class);
@@ -359,7 +363,7 @@ public class StorableValidatorTest extends AWTest {
                     canStore(classCache, cls, g.getMethod(), g.getMethod().getGenericReturnType());
                 } catch (InvalidTypeException e) {
                     LogV3.log(e);
-                    throw new Exception("getter (" + g.getMethod().getDeclaringClass().getSimpleName() + ".java:1)" + "." + g.key + " returns a non-storable object " + (g.getMethod().getGenericReturnType()));
+                    throw new Exception(g.getMethod().getDeclaringClass() + " getter (" + g.getMethod().getDeclaringClass().getSimpleName() + ".java:1)" + "." + g.key + " returns a non-storable object " + (g.getMethod().getGenericReturnType()));
                 }
             }
             if (s != null) {

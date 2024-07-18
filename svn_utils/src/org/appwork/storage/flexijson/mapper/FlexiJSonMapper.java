@@ -42,6 +42,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -58,9 +59,16 @@ import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.moncompare.BadFormatException;
+import org.appwork.moncompare.ConditionException;
+import org.appwork.moncompare.fromjson.FlexiCondition;
+import org.appwork.moncompare.typehandler.FlexiTypeHandler;
 import org.appwork.remoteapi.annotations.ApiDoc;
 import org.appwork.remoteapi.annotations.ApiDocExample;
 import org.appwork.storage.StorableAvailableSince;
+import org.appwork.storage.StorableConditionalType;
+import org.appwork.storage.StorableConditionalType2;
+import org.appwork.storage.StorableConditionalType3;
 import org.appwork.storage.StorableDateFormat;
 import org.appwork.storage.StorableDeprecatedSince;
 import org.appwork.storage.StorableDoc;
@@ -100,6 +108,8 @@ import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;
+import org.appwork.utils.reflection.TypeBuilder;
+import org.appwork.utils.reflection.TypeParserException;
 
 /**
  * @author thomas
@@ -301,7 +311,7 @@ public class FlexiJSonMapper {
                 }
                 try {
                     context.add(type, next.getKey());
-                    ret.add(this.createKeyValueElement(ret, next.getKey().toString(), this.objectToJsonNode(reference, next.getValue(), context)));
+                    putObjectPropertyForMap(ret, this.createKeyValueElement(ret, next.getKey().toString(), this.objectToJsonNode(reference, next.getValue(), context)), type, context, obj, next.getValue());
                 } finally {
                     context.removeLast();
                 }
@@ -456,7 +466,7 @@ public class FlexiJSonMapper {
                             }
                             orderMap.put(element, orders.get(0).value());
                         }
-                        ret.add(element);
+                        putObjectPropertyForStorableOrInterface(ret, element, cc, t, g, context, obj, value);
                     } catch (final IllegalArgumentException e) {
                         this.returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
                     } catch (final IllegalAccessException e) {
@@ -476,7 +486,7 @@ public class FlexiJSonMapper {
                             emptyKeyValueElement.addCommentsBeforeKey(el.getCommentsBeforeKey(), true);
                             this.cleanUpComments(emptyKeyValueElement.getCommentsBeforeKey());
                             this.cleanUpComments(emptyKeyValueElement.getCommentsAfterKey());
-                            ret.add(emptyKeyValueElement);
+                            putObjectPropertyForInterfaceBackend(ret, emptyKeyValueElement, cc, context, obj);
                             continue;
                         }
                         if (!cc.getGetterMap().containsKey(el.getKey())) {
@@ -485,7 +495,7 @@ public class FlexiJSonMapper {
                             element.addCommentsBeforeKey(el.getCommentsBeforeKey(), true);
                             this.cleanUpComments(element.getCommentsBeforeKey());
                             this.cleanUpComments(element.getCommentsAfterKey());
-                            ret.add(element);
+                            putObjectPropertyForInterfaceBackend(ret, element, cc, context, obj);
                         }
                     }
                 }
@@ -518,6 +528,33 @@ public class FlexiJSonMapper {
             }
             return ret;
         }
+    }
+
+    /**
+     * Keep in mind, that cc, type, getter,parent may be null - depending on the object we try to create
+     *
+     * @param ret
+     * @param element
+     * @param cc
+     * @param context
+     *            TODO
+     * @param parent
+     *            TODO
+     * @param value
+     *            TODO
+     * @param t
+     * @param g
+     */
+    protected void putObjectPropertyForMap(final FlexiJSonObject ret, KeyValueElement element, CompiledType type, DefaultObjectToJsonContext context, Object parent, Object value) {
+        ret.add(element);
+    }
+
+    protected void putObjectPropertyForInterfaceBackend(final FlexiJSonObject ret, KeyValueElement element, ClassCache cc, DefaultObjectToJsonContext context, Object parent) {
+        ret.add(element);
+    }
+
+    protected void putObjectPropertyForStorableOrInterface(final FlexiJSonObject ret, KeyValueElement element, ClassCache cc, CompiledType type, Getter getter, DefaultObjectToJsonContext context, Object parent, Object value) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException, FlexiMapperException {
+        ret.add(element);
     }
 
     /**
@@ -894,6 +931,10 @@ public class FlexiJSonMapper {
         while (cType != null && cType.raw == null) {
             cType = cType.superType;
         }
+        if (cType == null) {
+            // MyType<?> where ? is an enum
+            return comments;
+        }
         if (cType.isEnum(false) && this.isEnumOptionsCommentsEnabled(cType)) {
             try {
                 final Object[] options = ReflectionUtils.getEnumValues((Class<? extends Enum>) cType.raw);
@@ -1221,12 +1262,14 @@ public class FlexiJSonMapper {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public Object jsonToObject(final FlexiJSonNode json, CompiledType cType, final Setter setter) throws FlexiMapperException {
         try {
-            cType = this.guessTypeForObject(json, cType);
+            cType = this.guessTypeForObject(json, cType, setter);
             if (cType.isInstanceOf(FlexiJSonObject.class) && json instanceof FlexiJSonObject) {
                 return json;
             } else if (cType.isInstanceOf(FlexiJSonArray.class) && json instanceof FlexiJSonArray) {
                 return json;
             } else if (cType.isInstanceOf(FlexiJSonValue.class) && json instanceof FlexiJSonValue) {
+                return json;
+            } else if (cType.isInstanceOf(FlexiJSonNode.class) && json instanceof FlexiJSonNode) {
                 return json;
             }
             final Object mapped = this.handleMapperJsonNodeToObject(json, cType, setter);
@@ -1319,27 +1362,33 @@ public class FlexiJSonMapper {
                     }
                 }
             } else {
-                if (cType.isInterface()) {
-                    try {
-                        return this.initProxy(cType, (FlexiJSonObject) json);
-                    } catch (final Exception e1) {
-                        return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e1));
+                try {
+                    if (cType.isInterface()) {
+                        try {
+                            return this.initProxy(cType, (FlexiJSonObject) json);
+                        } catch (final Exception e1) {
+                            return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e1));
+                        }
+                    } else {
+                        Object inst = null;
+                        try {
+                            inst = this.getInstance(cType);
+                        } catch (final Exception e1) {
+                            return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e1));
+                        }
+                        this.writeNodeToObject(cType, (FlexiJSonObject) json, inst);
+                        return inst;
                     }
-                } else {
-                    Object inst = null;
-                    try {
-                        inst = this.getInstance(cType);
-                    } catch (final Exception e1) {
-                        return this.returnFallbackOrThrowException(new FailedToCreateInstanceFlexiMapperException(json, cType, e1));
-                    }
-                    this.writeNodeToObject(cType, (FlexiJSonObject) json, inst);
-                    return inst;
+                } catch (ClassCastException e) {
+                    // try to map a primitive to an object
+                    return this.returnFallbackOrThrowException(new ClassCastFlexiMapperException(json, cType, "Cannot map " + json.getClass().getSimpleName() + " to type " + cType, e, null));
                 }
             }
         } catch (final FlexiMapperException e) {
             // returnFallbackOrThrowException should be handled earlier.
             throw e;
         } catch (final RuntimeException e) {
+            e.printStackTrace();
             return this.returnFallbackOrThrowException(new FlexiMapperException(json, cType, e));
         } finally {
         }
@@ -1354,7 +1403,7 @@ public class FlexiJSonMapper {
         return componentType;
     }
 
-    public CompiledType guessTypeForObject(final FlexiJSonNode json, CompiledType cType) {
+    public CompiledType guessTypeForObject(final FlexiJSonNode json, CompiledType cType, Setter setter) {
         if (cType.isObject() || cType.raw == null) {
             if (json instanceof FlexiJSonArray) {
                 cType = this.autoMapFlexiJSonArrayclass;
@@ -1528,7 +1577,7 @@ public class FlexiJSonMapper {
         } catch (final java.lang.IllegalArgumentException e) {
             // invalid enum check annotations to see if we have fallback values
             for (final Field f : type.raw.getDeclaredFields()) {
-                final FlexiKeyLookup fallback = f.getAnnotation(FlexiKeyLookup.class);
+                final FlexiEnumFallback fallback = f.getAnnotation(FlexiEnumFallback.class);
                 if (fallback != null) {
                     for (final String fb : fallback.value()) {
                         if (fb.equals(string)) {
@@ -1594,8 +1643,14 @@ public class FlexiJSonMapper {
             }
             value = es.getValue();
             //
-            final CompiledType fieldType = CompiledType.create(s.getType(), cType.type);
-            if (!fieldType.isGenericsResolved()) {
+            CompiledType fieldType = CompiledType.create(s.getType(), cType.type);
+            CompiledType newType = handleConditionalTypeAnnotations(cType, obj, key);
+            if (newType != null) {
+                fieldType = newType;
+            }
+            // do not use isGenericsResolved because this method looks deeper in the type and retruns true if any generics are unresolved.
+            // we need to throw only an exception if the type here is actually directly unresolved.
+            if (fieldType.raw == null/* &&!fieldType.isGenericsResolved() */) {
                 this.returnFallbackOrThrowException(new FlexiMapperException(value, cType, "Cannot resolve Type " + fieldType + " " + es.getKey() + "=" + value + " to actual type ", null));
             }
             try {
@@ -1626,6 +1681,69 @@ public class FlexiJSonMapper {
                 this.returnFallbackOrThrowException(new ClassCastFlexiMapperException(value, fieldType, null, e, v));
             }
         }
+    }
+
+    protected CompiledType handleConditionalTypeAnnotations(final CompiledType cType, final FlexiJSonObject obj, final String key) throws FlexiMapperException {
+        try {
+            ClassCache cc = cType.getClassCache();
+            if (cc != null) {
+                {
+                    List<StorableConditionalType> annos = cc.getAnnotations(key, StorableConditionalType.class);
+                    if (annos != null && annos.size() > 0) {
+                        for (StorableConditionalType a : annos) {
+                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                            condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
+                            if (condition.matches(obj)) {
+                                if (StringUtils.isNotEmpty(a.type())) {
+                                    return CompiledType.create(new TypeBuilder().parse(a.type()), cType.type);
+                                } else {
+                                    return CompiledType.create(a.cls(), cType.type);
+                                }
+                            }
+                        }
+                    }
+                }
+                {
+                    List<StorableConditionalType2> annos = cc.getAnnotations(key, StorableConditionalType2.class);
+                    if (annos != null && annos.size() > 0) {
+                        for (StorableConditionalType2 a : annos) {
+                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                            condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
+                            if (condition.matches(obj)) {
+                                if (StringUtils.isNotEmpty(a.type())) {
+                                    return CompiledType.create(new TypeBuilder().parse(a.type()), cType.type);
+                                } else {
+                                    return CompiledType.create(a.cls(), cType.type);
+                                }
+                            }
+                        }
+                    }
+                }
+                {
+                    List<StorableConditionalType3> annos = cc.getAnnotations(key, StorableConditionalType3.class);
+                    if (annos != null && annos.size() > 0) {
+                        for (StorableConditionalType3 a : annos) {
+                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                            condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
+                            if (condition.matches(obj)) {
+                                if (StringUtils.isNotEmpty(a.type())) {
+                                    return CompiledType.create(new TypeBuilder().parse(a.type()), cType.type);
+                                } else {
+                                    return CompiledType.create(a.cls(), cType.type);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (BadFormatException e) {
+            throw new FlexiMapperException(obj, cType, e);
+        } catch (ConditionException e) {
+            throw new FlexiMapperException(obj, cType, e);
+        } catch (TypeParserException e) {
+            throw new FlexiMapperException(obj, cType, e);
+        }
+        return null;
     }
 
     protected void setValueToObject(final FlexiJSonNode node, final Object inst, final CompiledType instType, final Object value, final Setter setter) throws IllegalAccessException, InvocationTargetException, FlexiMapperException {

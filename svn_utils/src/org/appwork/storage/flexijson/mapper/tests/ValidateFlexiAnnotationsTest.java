@@ -51,7 +51,7 @@ import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.storage.flexijson.ParsingError;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.FlexiKeyLookup;
+import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
@@ -88,7 +88,7 @@ public class ValidateFlexiAnnotationsTest extends AWTest {
         extracted(cc, StorableDeprecatedSince.class);
         extracted(cc, StorableAvailableSince.class);
         extracted(cc, Deprecated.class);
-        extracted(cc, FlexiKeyLookup.class);
+        extracted(cc, FlexiEnumFallback.class);
     }
 
     public <TT extends Annotation> void extracted(ClassCache cc, Class<TT> an) throws Exception {

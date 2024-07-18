@@ -163,7 +163,7 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
                     activeComponent = null;
                 }
             }
-        }
+        } 
     }
 
     public boolean isTooltipActive() {
@@ -501,6 +501,10 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
         }
     }
 
+    public JComponent getActiveComponent() {
+        return activeComponent;
+    }
+
     /**
      * @param iconedProcessIndicator
      */
@@ -560,7 +564,6 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void windowGainedFocus(final WindowEvent e) {
-        
     }
 
     /*
@@ -580,7 +583,6 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void mousePressed(final MouseEvent e) {
-        
     }
 
     /*
@@ -590,6 +592,5 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
      */
     @Override
     public void mouseReleased(final MouseEvent e) {
-        
     }
 }

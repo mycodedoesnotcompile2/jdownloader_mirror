@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.flexijson;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -47,7 +46,7 @@ import org.appwork.moncompare.Scope;
 import org.appwork.moncompare.fromjson.FlexiConditionMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.utils.CompareUtils;
-import org.appwork.utils.ConcatIterator;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
 
@@ -90,19 +89,9 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof JSPath) {
-            JSPath other = (JSPath) obj;
-            if (elements.equals(other.elements)) {
-                return true;
+            if (size() == ((JSPath) obj).size()) {
+                return this.startsWith(((JSPath) obj));
             }
-            if (elements.size() != other.elements.size()) {
-                return false;
-            }
-            for (int i = 0; i < elements.size(); i++) {
-                if (!StringUtils.equals(StringUtils.valueOfOrNull(elements.get(i)), StringUtils.valueOfOrNull(other.elements.get(i)))) {
-                    return false;
-                }
-            }
-            return true;
         }
         return false;
     }
@@ -141,6 +130,7 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                     parser.setIgnoreIssues(FlexiJSONParser.IGNORE_LIST_JS);
                     FlexiJSonNode parsed = ((FlexiJSonArray) parser.parse()).get(0);
                     if (parsed instanceof FlexiJSonValue) {
+                        // escaped primitive value
                         FlexiJSonValue token = (FlexiJSonValue) parsed;
                         ret.add(token.getValue());
                         if (parser.isEndOfStreamReached()) {
@@ -177,7 +167,12 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                 int pointIndex = path.indexOf(".");
                 int parenthesisIndexIndex = path.indexOf("[");
                 if (pointIndex < 0 && parenthesisIndexIndex < 0) {
-                    ret.add(path);
+                    if (path.startsWith(META_PREFIX)) {
+                        // e.g. comments
+                        ret.add(new MetaElement(path));
+                    } else {
+                        ret.add(path);
+                    }
                     return ret;
                 } else if (parenthesisIndexIndex > 0 && (parenthesisIndexIndex < pointIndex || pointIndex < 0)) {
                     key = path.substring(0, parenthesisIndexIndex);
@@ -194,106 +189,49 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
         }
     }
 
-    public static final String COMMENT_PATH_PREFIX = "//#";
+    public static final String META_PREFIX = "#";
 
-    /**
-     * @param json
-     * @return
-     * @throws InvalidPathException
-     */
-    public static JSPath fromFlexiNode(FlexiJSonNode org) throws InvalidPathException {
-        if (org == null) {
-            throw new IllegalArgumentException("Node is null");
+    public static class MetaElement implements CustomElement {
+        private final String string;
+
+        /**
+         * @param string
+         */
+        public MetaElement(String string) {
+            this.string = string;
         }
-        FlexiJSonNode json = org;
-        JSPath path = new JSPath();
-        next: while (json != null) {
-            FlexiJSonNode parent = json.getParent();
-            if (parent == json) {
-                throw new InvalidPathException("Bad Path");
-            }
-            if (parent == null) {
-                break;
-            }
-            if (json instanceof FlexiComment) {
-                if (parent instanceof FlexiJSonComments) {
-                    parent = parent.getParent();
-                }
-                if (parent instanceof FlexiJSonValue) {
-                    int index = 0;
-                    for (FlexiCommentJsonNode c : new ConcatIterator<FlexiCommentJsonNode>(parent.getCommentsBefore(), parent.getCommentsAfter())) {
-                        if (c == json) {
-                            path.add(0, COMMENT_PATH_PREFIX + index);
-                            json = parent;
-                            continue next;
-                        }
-                        index++;
-                    }
-                    parent = parent.getParent();
-                }
-                if (parent instanceof FlexiJSonObject) {
-                    ArrayList<FlexiJSonComments> collect = new ArrayList<FlexiJSonComments>();
-                    collect.add(((FlexiJSonObject) parent).getCommentsBefore());
-                    collect.add(((FlexiJSonObject) parent).getCommentsInside());
-                    for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
-                        if (e.getCommentsBeforeKey() != null) {
-                            collect.add(e.getCommentsBeforeKey());
-                        }
-                        if (e.getCommentsAfterKey() != null) {
-                            collect.add(e.getCommentsAfterKey());
-                        }
-                    }
-                    collect.add(((FlexiJSonObject) parent).getCommentsAfter());
-                    int index = 0;
-                    for (FlexiCommentJsonNode c : new ConcatIterator<FlexiCommentJsonNode>(collect.toArray(new FlexiJSonComments[] {}))) {
-                        if (c == json) {
-                            path.add(0, COMMENT_PATH_PREFIX + index);
-                            json = parent;
-                            continue next;
-                        }
-                        index++;
-                    }
-                } else if (parent instanceof FlexiJSonArray) {
-                    int index = 0;
-                    for (FlexiCommentJsonNode c : new ConcatIterator<FlexiCommentJsonNode>(((FlexiJSonArray) parent).getCommentsBefore(), ((FlexiJSonArray) parent).getCommentsInside(), ((FlexiJSonArray) parent).getCommentsAfter())) {
-                        if (c == json) {
-                            path.add(0, COMMENT_PATH_PREFIX + index);
-                            json = parent;
-                            continue next;
-                        }
-                        index++;
-                    }
-                }
-                throw new InvalidPathException("Bad Path");
-            }
-            if (parent instanceof FlexiJSonObject) {
-                for (KeyValueElement e : ((FlexiJSonObject) parent).getElements()) {
-                    if (e.getValue() == json) {
-                        json = parent;
-                        path.add(0, e.getKey());
-                        continue next;
-                    }
-                }
-                throw new InvalidPathException("Bad Path: Element is not a child of its own parent");
-            } else if (parent instanceof FlexiJSonArray) {
-                for (int i = 0; i < ((FlexiJSonArray) parent).size(); i++) {
-                    if (((FlexiJSonArray) parent).get(i) == json) {
-                        path.add(0, i);
-                        json = parent;
-                        continue next;
-                    }
-                }
-                throw new InvalidPathException("Bad Path");
-            } else if (parent instanceof FlexiJSonValue) {
-                throw new InvalidPathException("Bad Path");
-            } else {
-                throw new InvalidPathException("Unknown entry");
-            }
+
+        public String getString() {
+            return string;
         }
-        // if (org instanceof FlexiJSonComments || org instanceof FlexiCommentJsonNode) {
-        // path.add("//");
-        // }
-        return path;
+
+        /**
+         * @see org.appwork.storage.flexijson.JSPath.CustomElement#append(java.lang.StringBuilder)
+         */
+        @Override
+        public void append(StringBuilder sb) {
+            sb.append(".");
+            sb.append(string);
+        }
+
+        /**
+         * @see java.lang.Object#equals(java.lang.Object)
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof MetaElement) {
+                return StringUtils.equals(((MetaElement) obj).string, string);
+            }
+            return false;
+        }
+
+        /**
+         * @see java.lang.Object#hashCode()
+         */
+        @Override
+        public int hashCode() {
+            return string.hashCode();
+        }
     }
 
     /**
@@ -311,32 +249,39 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
         return toPathString(true);
     }
 
+    public static interface CustomElement {
+        /**
+         * @param sb
+         */
+        void append(StringBuilder sb);
+    }
+
     public String toPathString(boolean leadingPoint) {
         StringBuilder sb = new StringBuilder();
         for (Object o : this.elements) {
-            if (isArrayKey(o)) {
+            if (JSPath.isArrayKey(o)) {
                 sb.append("[" + o + "]");
+            } else if (o instanceof CustomElement) {
+                ((CustomElement) o).append(sb);
             } else if (o instanceof String) {
-                if (((String) o).matches("//\\#\\d+") && o == this.getLast()) {
+                if (!String.valueOf(o).matches("^[a-zA-Z_$][a-zA-Z_$0-9]*$")) {
+                    try {
+                        sb.append("[" + FlexiUtils.serializeMinimized(o) + "]");
+                    } catch (FlexiMapperException e) {
+                        throw new WTFException(e);
+                    }
+                } else {
                     sb.append(".");
                     sb.append(o);
-                } else {
-                    if (!String.valueOf(o).matches("^[a-zA-Z_$][a-zA-Z_$0-9]*$")) {
-                        try {
-                            sb.append("[" + FlexiUtils.serializeMinimized(o) + "]");
-                        } catch (FlexiMapperException e) {
-                            throw new WTFException(e);
-                        }
-                    } else {
-                        sb.append(".");
-                        sb.append(o);
-                    }
                 }
             } else if (o instanceof Condition) {
                 sb.append("[" + FlexiUtils.serializeMinimizedWithWTF(o) + "]");
             } else {
                 throw new WTFException("Unsupported Path entry");
             }
+        }
+        if (sb.length() == 0 && leadingPoint) {
+            sb.append(".");
         }
         String ret = sb.toString();
         if (!leadingPoint && ret.startsWith(".")) {
@@ -457,15 +402,22 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
      * @return
      */
     public boolean startsWith(JSPath path) {
-        if (path.size() > size()) {
-            return false;
-        }
-        for (int i = 0; i < path.size(); i++) {
-            if (!String.valueOf(elements.get(i)).equals(String.valueOf(path.elements.get(i)))) {
+        try {
+            if (path.size() > size()) {
                 return false;
             }
+            for (int i = 0; i < path.size(); i++) {
+                Object me = elements.get(i);
+                Object other = path.elements.get(i);
+                if (!CompareUtils.equals(me, other)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (RuntimeException e) {
+            DebugMode.debugger();
+            throw e;
         }
-        return true;
     }
 
     /**
@@ -492,10 +444,10 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
         return new JSPath(elements);
     }
 
-    /**
-     * @param nextPathElement
-     * @return
-     */
+    // /**
+    // * @param nextPathElement
+    // * @return
+    // */
     public static boolean isArrayKey(Object e) {
         if (e == null) {
             return false;
@@ -503,18 +455,19 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
         if (Clazz.isFixedPointNumber(e.getClass())) {
             return true;
         }
-        if (String.valueOf(e).matches("^[0-9]+$")) {
-            return true;
-        }
         return false;
     }
 
-    /**
-     * @param pathElement
-     * @return
-     */
+    //
+    // /**
+    // * @param pathElement
+    // * @return
+    // */
     public static int toArrayIndex(Object e) throws NumberFormatException {
-        return e instanceof Number ? ((Number) e).intValue() : Integer.parseInt(String.valueOf(e));
+        if (e instanceof Number) {
+            return ((Number) e).intValue();
+        }
+        throw new NumberFormatException("No Array index: " + e + "(" + e.getClass() + ")");
     }
 
     /**
@@ -577,11 +530,32 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                 me = String.valueOf(me);
                 other = String.valueOf(other);
             }
-            ret = CompareUtils.compareComparable((Comparable) me, (Comparable) other);
+            if (me instanceof Comparable && other instanceof Comparable) {
+                ret = CompareUtils.compareComparable((Comparable) me, (Comparable) other);
+            } else {
+                if (me instanceof Comparable && other instanceof Comparable) {
+                    ret = CompareUtils.compareComparable(StringUtils.valueOfOrNull(me), StringUtils.valueOfOrNull(other));
+                }
+            }
             if (ret != 0) {
                 return ret;
             }
         }
         return 0;
+    }
+
+    /**
+     * @param i
+     * @param substring
+     */
+    public void set(int i, Object element) {
+        elements.set(i, element);
+    }
+
+    /**
+     * @param i
+     */
+    public void remove(int i) {
+        elements.remove(0);
     }
 }

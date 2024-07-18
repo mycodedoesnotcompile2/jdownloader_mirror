@@ -88,6 +88,7 @@ import org.appwork.uio.UIOManager;
 import org.appwork.uio.UserIODefinition;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -343,6 +344,11 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
     // if there are several window stacks, the dialog blocks only it's own
     // windowstack.
     private ModalityType                                   modalityType  = ModalityType.DOCUMENT_MODAL;
+    private volatile RuntimeException                      layoutException;
+
+    protected RuntimeException getLayoutException() {
+        return layoutException;
+    }
 
     public void setModalityType(ModalityType modalityType) {
         this.modalityType = modalityType;
@@ -361,21 +367,21 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      * this function will init and show the dialog
      */
     protected void _init() {
-        this.layoutDialog();
-        if (BinaryLogic.containsAll(this.flagMask, UIOManager.LOGIC_COUNTDOWN)) {
-            this.timerLbl.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(final MouseEvent e) {
-                    AbstractDialog.this.cancel();
-                    AbstractDialog.this.timerLbl.removeMouseListener(this);
-                }
-            });
-            this.timerLbl.setToolTipText(_AWU.T.TIMERDIALOG_TOOLTIP_TIMERLABEL());
-            this.timerLbl.setIcon(DialogIcon.DIALOG_CANCEL.get(16));
-        }
         WindowStack windowStack = null;
         InternDialog<T> dialog = null;
         try {
+            this.layoutDialog();
+            if (BinaryLogic.containsAll(this.flagMask, UIOManager.LOGIC_COUNTDOWN)) {
+                this.timerLbl.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(final MouseEvent e) {
+                        AbstractDialog.this.cancel();
+                        AbstractDialog.this.timerLbl.removeMouseListener(this);
+                    }
+                });
+                this.timerLbl.setToolTipText(_AWU.T.TIMERDIALOG_TOOLTIP_TIMERLABEL());
+                this.timerLbl.setIcon(DialogIcon.DIALOG_CANCEL.get(16));
+            }
             this.setTitle(this.title);
             if (this.evaluateDontShowAgainFlag()) {
                 return;
@@ -679,6 +685,9 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             //
             // this.dispose();
             // }
+        } catch (RuntimeException e) {
+            this.layoutException = e;
+            throw e;
         } finally {
             if (this.getDialog().getModalityType() != ModalityType.MODELESS) {
                 this.dispose();
@@ -816,6 +825,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
         if (!this.initialized) {
             throw new IllegalStateException("Dialog has not been initialized yet. call displayDialog()");
         }
+        DebugMode.breakIf(getReturnmask() == 0, "YOu should set a returnmask first");
         AbstractDialog.this.stopTimer();
         new EDTRunner() {
             @Override

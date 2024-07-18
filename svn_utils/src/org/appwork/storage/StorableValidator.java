@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
@@ -71,7 +72,7 @@ import org.appwork.storage.flexijson.KeyValueElement;
 import org.appwork.storage.flexijson.NodeFilter;
 import org.appwork.storage.flexijson.mapper.ClassCastFlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.FlexiKeyLookup;
+import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
@@ -910,6 +911,15 @@ public class StorableValidator<T> {
     private ArrayList<StorableValidator<T>.ValidatetoDoss> toDos;
     private ArrayList<ValidatorException>                  exceptions;
     private String                                         targetBuildsProperty = "targetBuilds";
+    private Object                                         context;
+
+    public Object getContext() {
+        return context;
+    }
+
+    public void setContext(Object context) {
+        this.context = context;
+    }
 
     public String getTargetBuildsProperty() {
         return targetBuildsProperty;
@@ -1019,43 +1029,46 @@ public class StorableValidator<T> {
             this.path = path;
             this.value = value;
             this.type = type;
+            DebugMode.breakIf(type == null);
             ClassCache cc = type.getClassCache();
-            if (value != null) {
-                // this adds annotations for the type - no reason to evaluate them if the value is null.
-                add(cc.getAnnotations(null, StorableClassValidator1.class));
-                add(cc.getAnnotations(null, StorableClassValidator2.class));
-                add(cc.getAnnotations(null, StorableClassValidator3.class));
-                add(cc.getAnnotations(null, StorableValidateNotNull.class));
-                add(cc.getAnnotations(null, StorableValidateMandatoryInJson.class));
-                add(cc.getAnnotations(null, StorableValidateCondition.class));
-                add(cc.getAnnotations(null, StorableValidateCondition2.class));
-                add(cc.getAnnotations(null, StorableValidateCondition3.class));
-                add(cc.getAnnotations(null, StorableValidateRegex.class));
-                add(cc.getAnnotations(null, StorableDeprecatedSince.class));
-                add(cc.getAnnotations(null, StorableAvailableSince.class));
-                add(cc.getAnnotations(null, StorableUnique.class));
-                add(cc.getAnnotations(null, StorableValidateTimestamp.class));
-                add(cc.getAnnotations(null, StorableValidateTimestampRelative.class));
-                add(cc.getAnnotations(null, StorableValidateTimeSpan.class));
-            }
-            if (context != null) {
-                cc = context.getter.classCache;
-                add(cc.getAnnotations(context.key, FlexiKeyLookup.class));
-                add(cc.getAnnotations(context.key, StorableClassValidator1.class));
-                add(cc.getAnnotations(context.key, StorableClassValidator2.class));
-                add(cc.getAnnotations(context.key, StorableClassValidator3.class));
-                add(cc.getAnnotations(context.key, StorableValidateNotNull.class));
-                add(cc.getAnnotations(context.key, StorableValidateMandatoryInJson.class));
-                add(cc.getAnnotations(context.key, StorableValidateCondition.class));
-                add(cc.getAnnotations(context.key, StorableValidateCondition2.class));
-                add(cc.getAnnotations(context.key, StorableValidateCondition3.class));
-                add(cc.getAnnotations(context.key, StorableValidateRegex.class));
-                add(cc.getAnnotations(context.key, StorableDeprecatedSince.class));
-                add(cc.getAnnotations(context.key, StorableUnique.class));
-                add(cc.getAnnotations(context.key, StorableAvailableSince.class));
-                add(cc.getAnnotations(context.key, StorableValidateTimestamp.class));
-                add(cc.getAnnotations(context.key, StorableValidateTimestampRelative.class));
-                add(cc.getAnnotations(context.key, StorableValidateTimeSpan.class));
+            if (cc != null) {
+                if (value != null) {
+                    // this adds annotations for the type - no reason to evaluate them if the value is null.
+                    add(cc.getAnnotations(null, StorableClassValidator1.class));
+                    add(cc.getAnnotations(null, StorableClassValidator2.class));
+                    add(cc.getAnnotations(null, StorableClassValidator3.class));
+                    add(cc.getAnnotations(null, StorableValidateNotNull.class));
+                    add(cc.getAnnotations(null, StorableValidateMandatoryInJson.class));
+                    add(cc.getAnnotations(null, StorableValidateCondition.class));
+                    add(cc.getAnnotations(null, StorableValidateCondition2.class));
+                    add(cc.getAnnotations(null, StorableValidateCondition3.class));
+                    add(cc.getAnnotations(null, StorableValidateRegex.class));
+                    add(cc.getAnnotations(null, StorableDeprecatedSince.class));
+                    add(cc.getAnnotations(null, StorableAvailableSince.class));
+                    add(cc.getAnnotations(null, StorableUnique.class));
+                    add(cc.getAnnotations(null, StorableValidateTimestamp.class));
+                    add(cc.getAnnotations(null, StorableValidateTimestampRelative.class));
+                    add(cc.getAnnotations(null, StorableValidateTimeSpan.class));
+                }
+                if (context != null) {
+                    cc = context.getter.classCache;
+                    add(cc.getAnnotations(context.key, FlexiEnumFallback.class));
+                    add(cc.getAnnotations(context.key, StorableClassValidator1.class));
+                    add(cc.getAnnotations(context.key, StorableClassValidator2.class));
+                    add(cc.getAnnotations(context.key, StorableClassValidator3.class));
+                    add(cc.getAnnotations(context.key, StorableValidateNotNull.class));
+                    add(cc.getAnnotations(context.key, StorableValidateMandatoryInJson.class));
+                    add(cc.getAnnotations(context.key, StorableValidateCondition.class));
+                    add(cc.getAnnotations(context.key, StorableValidateCondition2.class));
+                    add(cc.getAnnotations(context.key, StorableValidateCondition3.class));
+                    add(cc.getAnnotations(context.key, StorableValidateRegex.class));
+                    add(cc.getAnnotations(context.key, StorableDeprecatedSince.class));
+                    add(cc.getAnnotations(context.key, StorableUnique.class));
+                    add(cc.getAnnotations(context.key, StorableAvailableSince.class));
+                    add(cc.getAnnotations(context.key, StorableValidateTimestamp.class));
+                    add(cc.getAnnotations(context.key, StorableValidateTimestampRelative.class));
+                    add(cc.getAnnotations(context.key, StorableValidateTimeSpan.class));
+                }
             }
         }
     }
@@ -1126,6 +1139,12 @@ public class StorableValidator<T> {
                     throw new WTFException("Path not supported");
                 }
             });
+            customPathhandlers.put("§§context", new PathHandler() {
+                public Scope resolve(Scope oldScope, Scope scope, Object key) {
+                    scope.add(getContext(), key);
+                    return scope;
+                }
+            });
             customPathhandlers.put(null, new PathHandler() {
                 public Scope resolve(Scope oldScope, Scope scope, Object key) {
                     if (key instanceof String && "§type".equalsIgnoreCase((String) key)) {
@@ -1178,7 +1197,7 @@ public class StorableValidator<T> {
      */
     private static JSPath fromFlexiNode(FlexiJSonNode node) {
         try {
-            return JSPath.fromFlexiNode(node);
+            return FlexiUtils.fromFlexiNode(node);
         } catch (InvalidPathException e) {
             throw new WTFException(e);
         }
@@ -1195,6 +1214,11 @@ public class StorableValidator<T> {
      * @throws IllegalArgumentException
      */
     private void run(Object object, FlexiJSonNode node, CompiledType type, JSPath path, Property context) throws InterruptedException {
+        if (type.raw == null) {
+            // unresolvable generics
+            type = CompiledType.OBJECT;
+            DebugMode.debugger();
+        }
         StorableValidator<T>.ValidatetoDoss todo = new ValidatetoDoss(node, object, type, context, path);
         if (type.hasAnnotation(StorableHidden.class)) {
             return;
@@ -1269,6 +1293,14 @@ public class StorableValidator<T> {
                     FlexiJSonNode newNode = ((FlexiJSonObject) node).getNode(key);
                     CompiledType newType = null;
                     newType = type.resolve(JSPath.fromPathString(key));
+                    if (newType.raw == null && newObject != null) {
+                        // unresolvable generics
+                        newType = CompiledType.create(newObject.getClass(), type);
+                    }
+                    if (newType.raw == null) {
+                        // unresolvable generics
+                        newType = CompiledType.OBJECT;
+                    }
                     run(newObject, newNode, newType, newPath, property);
                 } catch (IllegalArgumentException e) {
                     throw new WTFException(e);
@@ -1687,7 +1719,30 @@ public class StorableValidator<T> {
             options.put(Condition.FILTER_ROOT, true);
             condition.put(Condition.$OPTIONS, options);
             final Condition c = new Condition(toDo.path.withPrefix(Condition.$$THIS).toPathString(true), condition);
+            c._setDebug(true);
+            c._setLogger(LogV3.defaultLogger());
             boolean result = c.matches(this.result);
+            Matcher matcher = Pattern.compile("[^\\\\](§[\\w\\.\\[\\]\\d\\§]+)").matcher(desc);
+            while (matcher.find()) {
+                String g = matcher.group(1);
+                // ;
+                // JSPath.fromPathString(g).resolve(options)
+                final Condition c2 = new Condition();
+                JSPath abs = toDo.path.withPrefix(Condition.$$THIS);
+                for (Object e : JSPath.fromPathString(g).getElements()) {
+                    if (e instanceof String && StringUtils.equalsIgnoreCase(Condition.$$THIS, (String) e)) {
+                        // ignore §§this. this would result in an exception
+                    } else {
+                        abs.add(e);
+                    }
+                }
+                final Scope ret = c2.resolveKeyPath(new Scope(this.result), abs);
+                Object replacement = ret.getLast();
+                if (replacement != null && replacement != Condition.KEY_DOES_NOT_EXIST) {
+                    desc = desc.replace(g, String.valueOf(replacement));
+                }
+            }
+            desc = desc.replace("\\§", "§");
             if ((!result && logic == StorableValidationLogic.OK_ON_MATCH) || (result && logic == StorableValidationLogic.FAIL_ON_MATCH)) {
                 add(new ConditionException(StorableValidator.this, c, toDo.path, toDo.node, toDo.type, desc, level));
             }

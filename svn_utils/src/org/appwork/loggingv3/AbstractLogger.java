@@ -49,7 +49,15 @@ public abstract class AbstractLogger implements LogInterface {
 
     protected StackTraceElement getThrownAt() {
         final Exception e = new Exception();
+        StackTraceElement last = filterThrownAt(e);
+        return last;
+    }
+
+    public StackTraceElement filterThrownAt(final Throwable e) {
         StackTraceElement last = null;
+        if (e == null) {
+            return null;
+        }
         for (StackTraceElement es : e.getStackTrace()) {
             last = es;
             if (filterThrownAtEntries(es)) {

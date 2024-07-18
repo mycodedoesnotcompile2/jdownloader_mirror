@@ -3,9 +3,15 @@
   "dependencies":null,
   "filter":null,
   "installed":{
-    "date":"2023-09-04T11:08:31 CEST",
+    "date":"2023-09-04T11:08:31+02:00",
     "dependencies":null,
     "description":"https://github.com/blackears/svgSalamander/tree/ecd1092927971a9e02a9062fdd1a95dd610d7309, compiled by AppWork for java 1.6 compatibility\r\nSVG Salamander - tools and components for SVG rendering, manipulation and animation",
+    "files":[
+      "",
+      "meta.json",
+      "svgSalamander.jar",
+      "svgSalamander.jar.info"
+    ],
     "hashes":{
       "svgSalamander.jar.info":"37a3e6543de81642ca5e5f2a4ac52b01e504bd6ceda1a52a47ec594350b505eb",
       "svgSalamander.jar":"dc14687ea181125aef73737fd2d8fa5ab3bc09c43254a2ae57128391b44e94f9"

@@ -34,13 +34,13 @@
 package org.appwork.storage.flexijson;
 
 public class KeyValueElement {
-    private String          key;
+    private String               key;
     /**
      * Path is optional and may get set by the parser. By default, the path is NOT set due to performance reasons. override the extendPath
      * Method in the parser
      */
-    public final Object     path;
-    private FlexiJSonObject parent;
+    public final Object          path;
+    public final FlexiJSonObject parent;
 
     public String getKey() {
         return key;
@@ -60,7 +60,7 @@ public class KeyValueElement {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
@@ -80,14 +80,6 @@ public class KeyValueElement {
         sb.append("=");
         sb.append(value);
         return sb.toString();
-    }
-
-    /**
-     * @param path
-     *
-     */
-    public KeyValueElement(Object path) {
-        this.path = path;
     }
 
     protected void setKey(String key) {
@@ -112,6 +104,7 @@ public class KeyValueElement {
     public void setCommentsBeforeKey(FlexiJSonComments commentsBeforeKey) {
         this.commentsBeforeKey = commentsBeforeKey;
         if (commentsBeforeKey != null) {
+            // we probably do not have the value yet and will set the parent later
             commentsBeforeKey.setParent(value);
             for (FlexiCommentJsonNode c : commentsBeforeKey) {
                 c.setLocation(FlexiCommentJsonNode.AttachLocation.BEFORE_KEY);
@@ -126,6 +119,7 @@ public class KeyValueElement {
     public void setCommentsAfterKey(FlexiJSonComments commentsAfterKey) {
         this.commentsAfterKey = commentsAfterKey;
         if (commentsAfterKey != null) {
+            // we probably do not have the value yet and will set the parent later
             commentsAfterKey.setParent(value);
             for (FlexiCommentJsonNode c : commentsAfterKey) {
                 c.setLocation(FlexiCommentJsonNode.AttachLocation.AFTER_KEY);
@@ -149,6 +143,7 @@ public class KeyValueElement {
         if (commentsBeforeKey2 == null) {
             return;
         }
+        // we probably do not have the value yet and will set the parent later
         commentsBeforeKey2.setParent(value);
         for (FlexiCommentJsonNode c : commentsBeforeKey2) {
             c.setLocation(FlexiCommentJsonNode.AttachLocation.BEFORE_KEY);
@@ -168,6 +163,7 @@ public class KeyValueElement {
         if (c == null) {
             return;
         }
+        // we probably do not have the value yet and will set the parent later
         c.setParent(value);
         for (FlexiCommentJsonNode comment : c) {
             comment.setLocation(FlexiCommentJsonNode.AttachLocation.AFTER_KEY);

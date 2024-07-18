@@ -35,13 +35,19 @@ package org.appwork.storage.flexijson.mapper.tests;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TimeZone;
 
 import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.testframework.AWTest;
+import org.appwork.utils.DebugMode;
 
 /**
  * @author thomas
@@ -60,7 +66,62 @@ public class DateMapperTest extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
-        // ""yyyy-MM-dd'T'HH:mm:ss'Z'""
+        // Get the current timezone offset in ISO 8601 format
+        TimeZone timeZone = TimeZone.getDefault();
+        Calendar calendar = Calendar.getInstance(timeZone);
+        int offsetInMillis = timeZone.getOffset(calendar.getTimeInMillis());
+        int offsetHours = offsetInMillis / (1000 * 60 * 60);
+        int offsetMinutes = Math.abs((offsetInMillis / (1000 * 60)) % 60);
+        final String currentTimezoneOffset = String.format("%+03d:%02d", offsetHours, offsetMinutes);
+        TimeZone restore = TimeZone.getDefault();
+        TimeZone p2 = TimeZone.getTimeZone("GMT+02:00");
+        try {
+            TimeZone.setDefault(p2);
+            Map<String, String> testDates = new LinkedHashMap<String, String>() {
+                {
+                    put("03:00 PM", "1970-01-01T15:00+02:00");
+                    put("01.04.2024+02:00", "2024-04-01" + currentTimezoneOffset);
+                    put("2024-04-01T15:01:02Z", "2024-04-01T17:01:02+02:00");
+                    put("2024-04-01T15:01:02.123Z", "2024-04-01T17:01:02.123+02:00");
+                    put("04/01/2024", "2024-04-01" + currentTimezoneOffset);
+                    put("2024-04-01T15:00:00+02:00", "2024-04-01T15:00+02:00");
+                    put("2024-04-01T15:00:00.000+02:00", "2024-04-01T15:00+02:00");
+                    put("2024-04-01 15:00:00", "2024-04-01T15:00" + currentTimezoneOffset);
+                    put("2024/04/01 15:00:00", "2024-04-01T15:00" + currentTimezoneOffset);
+                    put("2024-04-01", "2024-04-01" + currentTimezoneOffset);
+                    put("2024/04/01", "2024-04-01" + currentTimezoneOffset);
+                    put("01.04.2024", "2024-04-01" + currentTimezoneOffset);
+                    put("01.04.2024 00:00", "2024-04-01" + currentTimezoneOffset);
+                    put("01-04-2024", "2024-04-01" + currentTimezoneOffset);
+                    put("2024-04-01CEST", "2024-04-01" + currentTimezoneOffset);
+                    put("2024/04/01+02:00", "2024-04-01" + currentTimezoneOffset);
+                    put("2024-04-01 15:00:00+0200", "2024-04-01T15:00+02:00");
+                    put("2024-04-01 15:00:00+02:00", "2024-04-01T15:00+02:00");
+                    put("2024/04/01 15:00:00+0200", "2024-04-01T15:00+02:00");
+                    put("2024/04/01 15:00:00+02:00", "2024-04-01T15:00+02:00");
+                    put("2024-04-01 15:00:00 +0200", "2024-04-01T15:00+02:00");
+                    put("2024-04-01 15:00:00 +02:00", "2024-04-01T15:00+02:00");
+                    put("2024/04/01 15:00:00 +0200", "2024-04-01T15:00+02:00");
+                    put("2024/04/01 15:00:00 +02:00", "2024-04-01T15:00+02:00");
+                    put("15:00:00", "1970-01-01T15:00+02:00");
+                    put("15:00", "1970-01-01T15:00+02:00");
+                    put("15:00 +03:00", "1970-01-01T14:00+02:00");
+                    put("03:00:00 PM", "1970-01-01T15:00+02:00");
+                }
+            };
+            String date2 = DateMapper.formatJsonDefault(1717592073325l);
+            // incl. ms
+            assertEquals("2024-06-05T14:54:33.325+02:00", date2);
+            for (Entry<String, String> str : testDates.entrySet()) {
+                Date date = DateMapper.parse(str.getKey());
+                String normalized = DateMapper.formatJsonDefault(date);
+                System.out.println("Input  " + str.getKey() + "\r\n" + "Expect " + str.getValue() + "\r\nresult " + normalized);
+                DebugMode.breakIf(!str.getValue().equals(normalized));
+                assertEquals(str.getValue(), normalized);
+            }
+        } finally {
+            TimeZone.setDefault(restore);
+        }
         String source = "2022-01-01T00:00:00Z";
         Instant instant = Instant.parse(source);
         java.util.Date fromInstant = java.util.Date.from(instant);
@@ -72,34 +133,63 @@ public class DateMapperTest extends AWTest {
             assertNotNull(date);
         }
         {
-            Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00 -08:00\"", new SimpleTypeRef<Date>(Date.class));
-            assertEquals(date.toInstant().toString(), "2022-01-01T08:00:00Z");
-            String json = FlexiUtils.serializeMinimized(date);
-            assertEquals(json, "\"2022-01-01T09:00:00 CET\"");
+            TimeZone.setDefault(TimeZone.getTimeZone("CET"));
+            try {
+                // without timezone - we expect the local time - so this test works only - this is ISO 8601
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01+01:00\"");
+            } finally {
+                TimeZone.setDefault(restore);
+            }
         }
         {
-            Date date = FlexiUtils.jsonToObject("\"2022-01-01 00:00:00 -08:00\"", new SimpleTypeRef<Date>(Date.class));
-            assertEquals(date.toInstant().toString(), "2022-01-01T08:00:00Z");
-            String json = FlexiUtils.serializeMinimized(date);
-            assertEquals(json, "\"2022-01-01T09:00:00 CET\"");
+            TimeZone.setDefault(TimeZone.getTimeZone("CET"));
+            try {
+                // without timezone - we expect the local time - so this test works only - this is ISO 8601
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01+01:00\"");
+            } finally {
+                TimeZone.setDefault(restore);
+            }
         }
-        {
-            Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00Z\"", new SimpleTypeRef<Date>(Date.class));
-            assertEquals(date.toInstant().toString(), "2022-01-01T00:00:00Z");
-            String json = FlexiUtils.serializeMinimized(date);
-            assertEquals(json, "\"2022-01-01T01:00:00 CET\"");
-        }
-        {
-            Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00 CET\"", new SimpleTypeRef<Date>(Date.class));
-            assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
-            String json = FlexiUtils.serializeMinimized(date);
-            assertEquals(json, "\"2022-01-01T00:00:00 CET\"");
-        }
-        {
-            Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00+0100\"", new SimpleTypeRef<Date>(Date.class));
-            assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
-            String json = FlexiUtils.serializeMinimized(date);
-            assertEquals(json, "\"2022-01-01T00:00:00 CET\"");
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"));
+        try {
+            {
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00 -08:00\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2022-01-01T08:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01T09:00+01:00\"");
+            }
+            {
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01 00:00:00 -08:00\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2022-01-01T08:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01T09:00+01:00\"");
+            }
+            {
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00Z\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2022-01-01T00:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01T01:00+01:00\"");
+            }
+            {
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00 CET\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01+01:00\"");
+            }
+            {
+                Date date = FlexiUtils.jsonToObject("\"2022-01-01T00:00:00+0100\"", new SimpleTypeRef<Date>(Date.class));
+                assertEquals(date.toInstant().toString(), "2021-12-31T23:00:00Z");
+                String json = FlexiUtils.serializeMinimized(date);
+                assertEquals(json, "\"2022-01-01+01:00\"");
+            }
+        } finally {
+            TimeZone.setDefault(restore);
         }
     }
 }

@@ -92,7 +92,7 @@ public class DateHandler extends SimpleTypeHandler {
         }
         if (a instanceof String) {
             try {
-                return DateMapper.parseJsonDefault((String) a).getTime();
+                return DateMapper.parse((String) a).getTime();
             } catch (FlexiMapperException e) {
             }
         }

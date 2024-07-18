@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.appwork.storage.flexijson.JSPath;
+import org.appwork.storage.flexijson.JSPath.MetaElement;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.CompareUtils;
 
@@ -60,6 +61,9 @@ public class JSPathTest extends AWTest {
     @Override
     public void runTest() throws Exception {
         ObjectContainsAll o = new ObjectContainsAll();
+        JSPath withComment = JSPath.fromPathString("hashMap.#A");
+        assertTrue(JSPath.fromPathString("hashMap.#A").getElements().get(1) instanceof MetaElement);
+        assertTrue(JSPath.fromPathString("hashMap[#A]").getElements().get(1) instanceof String);
         assertEquals(JSPath.fromPathString("hashMap.eins").resolve(o), 1);
         assertEquals(JSPath.fromPathString("map[{\"§concat\":[\"§eins\",\" & \",\"§zwei\"]}]").resolve(o), "1 & 2");
         assertEqualsDeep(org.appwork.storage.flexijson.JSPath.fromPathString("objArray[1].intArray.0"), new JSPath(Arrays.asList("objArray", 1, "intArray", "0")));

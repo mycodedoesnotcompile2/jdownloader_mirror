@@ -40,9 +40,9 @@ import java.awt.event.ComponentEvent;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.swing.locationstore.LocationStorage;
 import org.appwork.utils.swing.locationstore.LocationStorageManager;
+import org.appwork.utils.swing.windowmanager.WindowManager.WindowExtendedState;
 
 public class RememberAbsoluteLocator extends AbstractLocator {
-
     public static final String TYPE = "absolute";
 
     public RememberAbsoluteLocator(final String id) {
@@ -75,5 +75,22 @@ public class RememberAbsoluteLocator extends AbstractLocator {
             LogV3.logger(this).exception("Swallowed", e);
             // nothing.... frame.getParent or parent might be invisible
         }
+    }
+
+    /**
+     * @param jsonEditor
+     * @return
+     */
+    public WindowExtendedState getExtendedState(final Window window) {
+        try {
+            final LocationStorage cfg = LocationStorageManager.INSTANCE.get(window, getStorageID(window));
+            if (cfg.isValid() && RememberAbsoluteLocator.TYPE.equalsIgnoreCase(cfg.getType())) {
+                // Do a "is on screen check" here
+                return cfg.getExtendedState();
+            }
+        } catch (final Throwable e) {
+            LogV3.logger(this).exception("Swallowed", e);
+        }
+        return null;
     }
 }

@@ -38,6 +38,7 @@ import java.awt.HeadlessException;
 import java.awt.Image;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -47,9 +48,11 @@ import javax.swing.SwingUtilities;
 import org.appwork.resources.AWUTheme;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.BinaryLogic;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.interfaces.ValueConverter;
 import org.appwork.utils.locale._AWU;
+import org.appwork.utils.swing.EDT;
 import org.appwork.utils.swing.EDTRunner;
 
 /**
@@ -107,6 +110,7 @@ public class Dialog {
      */
     public static final int     RETURN_CLOSED                       = 1 << 6;
     public static final int     RETURN_INTERRUPT                    = 1 << 8;
+    public static final int     RETURN_EXCEPTION                    = 1 << 9;
     /**
      * this return flag can be set in two situations:<br>
      * a) The user selected the {@link #STYLE_SHOW_DO_NOT_DISPLAY_AGAIN} Option<br>
@@ -503,15 +507,19 @@ public class Dialog {
             throw new HeadlessException("No Dialogs in Headless Mode!");
         } else {
             dialog.setCallerIsEDT(true);
-            dialog.displayDialog();
-            final T ret = dialog.getReturnValue();
-            final int mask = dialog.getReturnmask();
-            if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
-                throw new DialogClosedException(mask);
-            } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
-                throw new DialogCanceledException(mask);
-            } else {
-                return ret;
+            try {
+                dialog.displayDialog();
+                final T ret = dialog.getReturnValue();
+                final int mask = dialog.getReturnmask();
+                if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
+                    throw new DialogClosedException(mask);
+                } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
+                    throw new DialogCanceledException(mask);
+                } else {
+                    return ret;
+                }
+            } catch (RuntimeException e) {
+                throw new DialogClosedException(dialog.getReturnmask() | Dialog.RETURN_EXCEPTION, e);
             }
         }
     }
@@ -536,21 +544,33 @@ public class Dialog {
             throw new HeadlessException("No Dialogs in Headless Mode!");
         } else {
             final AtomicBoolean waitingLock = new AtomicBoolean(false);
-            new EDTRunner() {
+            final AtomicReference<Throwable> exception = new AtomicReference<Throwable>();
+            EDT<Void, RuntimeException> edt = new EDT<Void, RuntimeException>() {
                 @Override
-                protected void runInEDT() {
-                    dialog.setDisposedCallback(new DisposeCallBack() {
-                        @Override
-                        public void dialogDisposed(final AbstractDialog<?> dialog) {
-                            synchronized (waitingLock) {
-                                waitingLock.set(true);
-                                waitingLock.notifyAll();
+                protected Void runInEDT() throws RuntimeException {
+                    try {
+                        dialog.setDisposedCallback(new DisposeCallBack() {
+                            @Override
+                            public void dialogDisposed(final AbstractDialog<?> dialog) {
+                                exception.set(dialog.getLayoutException());
+                                synchronized (waitingLock) {
+                                    waitingLock.set(true);
+                                    waitingLock.notifyAll();
+                                }
                             }
+                        });
+                        dialog.displayDialog();
+                    } catch (Throwable e) {
+                        exception.set(e);
+                        synchronized (waitingLock) {
+                            waitingLock.set(true);
+                            waitingLock.notifyAll();
                         }
-                    });
-                    dialog.displayDialog();
+                    }
+                    return null;
                 }
             };
+            edt.start();
             try {
                 if (Thread.interrupted()) {
                     throw new InterruptedException();
@@ -588,12 +608,17 @@ public class Dialog {
             }
             final T ret = dialog.getReturnValue();
             final int mask = dialog.getReturnmask();
-            if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
-                throw new DialogClosedException(mask);
-            } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
-                throw new DialogCanceledException(mask);
+            if (exception.get() != null) {
+                throw new DialogClosedException(mask | Dialog.RETURN_EXCEPTION, exception.get());
             } else {
-                return ret;
+                if (BinaryLogic.containsSome(mask, Dialog.RETURN_CLOSED)) {
+                    throw new DialogClosedException(mask);
+                } else if (BinaryLogic.containsSome(mask, Dialog.RETURN_CANCEL)) {
+                    throw new DialogCanceledException(mask);
+                } else {
+                    DebugMode.breakIf(mask == 0, "Bad Dialog? Mask should never be 0");
+                    return ret;
+                }
             }
         }
     }
@@ -885,7 +910,7 @@ public class Dialog {
              * @see org.appwork.utils.swing.dialog.AbstractDialog#getModalityType()
              */
             @Override
-            public ModalityType getModalityType() {                
+            public ModalityType getModalityType() {
                 return ModalityType.MODELESS;
             }
         };

@@ -37,7 +37,7 @@ import java.text.ParseException;
 
 import org.appwork.storage.flexijson.FlexiParserException;
 import org.appwork.storage.flexijson.FlexiUtils;
-import org.appwork.storage.flexijson.mapper.FlexiKeyLookup;
+import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.reflection.CompiledType;
@@ -53,7 +53,7 @@ public class FlexiIllegalEnumValueFallbackTest extends AWTest {
     }
 
     public static enum MyEnum {
-        @FlexiKeyLookup({ "TEST2" })
+        @FlexiEnumFallback({ "TEST2" })
         TEST3
     }
 

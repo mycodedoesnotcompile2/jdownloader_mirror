@@ -149,25 +149,11 @@ public abstract class AbstractLocator implements Locator {
     public static Point validate(Point point, final Window dialog) {
         point = AbstractLocator.correct(point, dialog);
         final GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        final GraphicsDevice[] screens = ge.getScreenDevices();
-        // for (final GraphicsDevice screen : screens) {
+        final GraphicsDevice[] screens = ge.getScreenDevices();       
         for (final GraphicsDevice screen : screens) {
             final Rectangle bounds = screen.getDefaultConfiguration().getBounds();
             if (bounds.contains(point)) {
-                return point;
-                // if (point.x >= bounds.x && point.x < bounds.x + bounds.width) {
-                // if (point.y >= bounds.y && point.y < bounds.y + bounds.height) {
-                // // found point on screen
-                // if (point.x + dimension.width <= bounds.x + bounds.width) {
-                //
-                // if (point.y + dimension.height <= bounds.y + bounds.height) {
-                // // dialog is completly visible on this screen
-                // return point;
-                // }
-                // }
-                //
-                // }
-                // }
+                return point;     
             }
         }
         return new CenterOfScreenLocator().getLocationOnScreen(dialog);

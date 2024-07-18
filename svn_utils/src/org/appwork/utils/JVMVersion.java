@@ -86,7 +86,7 @@ public class JVMVersion {
     @Deprecated
     public final static long                  JAVA17   = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long                  JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
+    public final static long                  JAVA_1_8 = JavaVersion.JVM_1_8.longID;  // LTS Dec 2030
     @Deprecated
     public final static long                  JAVA18   = JavaVersion.JVM_1_8.longID;
     @Deprecated
@@ -132,6 +132,10 @@ public class JVMVersion {
     }
 
     @Deprecated
+    /**
+     *
+     * @deprecated Use JVMVersion.getVersion()
+     */
     public static final long get() {
         return getVersion().getLongID();
     }
@@ -141,6 +145,10 @@ public class JVMVersion {
     }
 
     @Deprecated
+    /**
+     *
+     * @deprecated Use JVMVersion.getVersion().isMinimum()
+     */
     public static final boolean isMinimum(final long version) {
         return getVersion().getLongID() >= version;
     }
@@ -325,6 +333,10 @@ public class JVMVersion {
      * @return
      */
     @Deprecated
+    /**
+     *
+     * @deprecated Use JVMVersion.getVersion().is()
+     */
     public static boolean is(JavaVersion version) {
         return version != null && version.is(get());
     }
@@ -334,6 +346,10 @@ public class JVMVersion {
      * @return
      */
     @Deprecated
+    /**
+     *
+     * @deprecated Use JVMVersion.getVersion().isMinimum()
+     */
     public static boolean isAtLeast(JavaVersion version) {
         return version != null && get() > version.getLongID();
     }

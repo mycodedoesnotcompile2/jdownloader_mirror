@@ -85,7 +85,7 @@ public abstract class KeyHandler<RawClass> {
     private static final String                   PACKAGE_NAME            = PlainStorage.class.getPackage().getName();
     private final String                          key;
     protected Method                              getMethod               = null;
-    protected Method                              setMethod               = null;                                                                                                                                                                                                                                                                                                                                                                                                         ;
+    protected Method                              setMethod               = null;
     protected final StorageHandler<?>             storageHandler;
     protected RawClass                            defaultValue;
     protected boolean                             factoryDefaultValueSet  = false;

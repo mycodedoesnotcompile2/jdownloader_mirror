@@ -73,8 +73,8 @@ public class FlexiMapperTest extends AWTest {
         FlexiJSonValue intValue = (FlexiJSonValue) mapper.objectToJsonNode(1);
         assertEquals(intValue.getValue(), 1);
         FlexiJSonNode node = mapper.objectToJsonNode(obj);
-        assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("objArray.[1].intArray.0")).getValue(), 1);
-        assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("objArray.[1][\"intArray\"].0")).getValue(), 1);
+        assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("objArray.[1].intArray[0]")).getValue(), 1);
+        assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("objArray.[1][\"intArray\"][0]")).getValue(), 1);
         assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("genericClass.key")).getValue(), "mykey");
         assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath(".genericClass...key")).getValue(), "mykey");
         assertEquals(((FlexiJSonValue) ((FlexiJSonObject) node).resolvePath("genericClass[\"key\"]")).getValue(), "mykey");
