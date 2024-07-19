@@ -208,7 +208,7 @@ public class JSonParser {
     /**
      * @return
      */
-    protected boolean isDebugEnabled() {        
+    protected boolean isDebugEnabled() {
         return DEBUG;
     }
 
@@ -278,7 +278,7 @@ public class JSonParser {
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString() {        
+    public String toString() {
         return global + ". " + str.charAt(global);
     }
 
@@ -333,12 +333,18 @@ public class JSonParser {
     }
 
     protected Number parseFixedNumber(final CharSequence charSequence) {
-        String string = charSequence.toString();
-        try {
-            return Integer.valueOf(string);
-        } catch (NumberFormatException e2) {
-            return Long.valueOf(string);
+        final String string = charSequence.toString();
+        final Long ret = Long.valueOf(string);
+        if (ret.longValue() <= Integer.MAX_VALUE && ret.longValue() >= Integer.MIN_VALUE) {
+            if (ret.longValue() <= Short.MAX_VALUE && ret.longValue() >= Short.MIN_VALUE) {
+                if (ret.longValue() <= Byte.MAX_VALUE && ret.longValue() >= Byte.MIN_VALUE) {
+                    return Byte.valueOf(ret.byteValue());
+                }
+                return Short.valueOf(ret.shortValue());
+            }
+            return Integer.valueOf(ret.intValue());
         }
+        return ret;
     }
 
     protected Object createJSonValue(Number number) {

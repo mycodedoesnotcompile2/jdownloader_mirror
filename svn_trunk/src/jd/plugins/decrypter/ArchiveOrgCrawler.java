@@ -29,25 +29,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.SimpleMapper;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -71,7 +52,26 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49362 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+import org.appwork.storage.SimpleMapper;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.BookCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistCrawlMode;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.SingleFilePathNotFoundMode;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 49371 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,7 +108,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         final String identifier;
         if (new Regex(contenturl, PATTERN_SEARCH).patternFind()) {
-            return this.crawlBetaSearchAPI(null, contenturl);
+            return this.crawlSearchQueryURL(param);
         } else if ((identifier = getIdentifierFromURL(contenturl)) != null) {
             return this.crawlMetadataJsonV2(identifier, contenturl);
         } else if (isCompressedArchiveURL(contenturl)) {
@@ -126,55 +126,59 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Returns identifier from given URL. </br>
-     * The definition of how an identifier is supposed to look is vague so in this case we're also including username strings a la
-     * "@<username>" as possible return values.
+     * Returns identifier from given URL. </br> The definition of how an identifier is supposed to look is vague so in this case we're also
+     * including username strings a la "@<username>" as possible return values.
      */
     public static String getIdentifierFromURL(final String url) {
         return new Regex(url, "/(?:details|embed|download|metadata|stream)/(@?[A-Za-z0-9\\-_\\.]{2,})").getMatch(0);
     }
 
-    private ArrayList<DownloadLink> crawlCollection(final String collectionIdentifier) throws Exception {
+    private ArrayList<DownloadLink> crawlCollection(final String sourceurl, final String collectionIdentifier) throws Exception {
         if (StringUtils.isEmpty(collectionIdentifier)) {
             throw new IllegalArgumentException();
         }
-        return crawlViaScrapeAPI(br, "collection:" + collectionIdentifier, -1);
+        final boolean useBetaAPI = true;
+        if (useBetaAPI) {
+            return crawlBetaSearchAPI(sourceurl, collectionIdentifier, "collection");
+        } else {
+            return crawlViaScrapeAPI("collection:" + collectionIdentifier, -1);
+        }
     }
 
-    private ArrayList<DownloadLink> crawlSearchQueryURL(final Browser br, final CryptedLink param) throws Exception {
-        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
-        final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
-        if (maxResults == 0) {
-            logger.info("User disabled search term crawler -> Returning empty array");
-            return new ArrayList<DownloadLink>();
+    private ArrayList<DownloadLink> crawlSearchQueryURL(final CryptedLink param) throws Exception {
+        final boolean useBetaAPI = true;
+        if (useBetaAPI) {
+            return this.crawlBetaSearchAPI(param.getCryptedUrl(), null, null);
+        } else {
+            /* Old handling */
+            final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+            final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
+            if (maxResults == 0) {
+                logger.info("User disabled search term crawler -> Returning empty array");
+                return new ArrayList<DownloadLink>();
+            }
+            final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
+            String searchQuery = query.get("query");
+            if (searchQuery != null) {
+                /* Gets encoded later -> Needs to be decoded here. */
+                searchQuery = URLEncode.decodeURIComponent(searchQuery).trim();
+            }
+            if (StringUtils.isEmpty(searchQuery)) {
+                /* User supplied invalid URL. */
+                throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, "INVALID_SEARCH_QUERY");
+            }
+            return crawlViaScrapeAPI(searchQuery, maxResults);
         }
-        final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
-        String searchQuery = query.get("query");
-        if (searchQuery != null) {
-            /* Gets encoded later -> Needs to be decoded here. */
-            searchQuery = Encoding.htmlDecode(searchQuery).trim();
-        }
-        if (StringUtils.isEmpty(searchQuery)) {
-            /* User supplied invalid URL. */
-            throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, "INVALID_SEARCH_QUERY");
-        }
-        final ArrayList<DownloadLink> searchResults = crawlViaScrapeAPI(br, searchQuery, maxResults);
-        if (searchResults.isEmpty()) {
-            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + searchQuery);
-        }
-        return searchResults;
     }
 
     /**
-     * Uses search APIv1 </br>
-     * API: Docs: https://archive.org/help/aboutsearch.htm </br>
-     * 2024-07-17: This API is limited in functionality which is why we are moving away from it and use
-     * {@link #crawlBetaSearchAPI(String, String)}. </br>
-     * Example of things which are NOT possible via this API: </br>
-     * - Find all uploads of a user </br>
-     * - New style search queries such as: query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
+     * Uses search APIv1 </br> API: Docs: https://archive.org/help/aboutsearch.htm </br> 2024-07-17: This API is limited in functionality
+     * which is why we are moving away from it and use {@link #crawlBetaSearchAPI(String, String)}. </br> Example of things which are NOT
+     * possible via this API: </br> - Find all uploads of a user </br> - New style search queries such as:
+     * query=test&and%5B%5D=lending%3A"is_readable"&and%5B%5D=year%3A%5B1765+TO+1780%5D
      */
-    private ArrayList<DownloadLink> crawlViaScrapeAPI(final Browser br, final String searchTerm, final int maxResultsLimit) throws Exception {
+    @Deprecated
+    private ArrayList<DownloadLink> crawlViaScrapeAPI(final String searchTerm, final int maxResultsLimit) throws Exception {
         if (StringUtils.isEmpty(searchTerm)) {
             /* Developer mistake */
             throw new IllegalArgumentException();
@@ -203,12 +207,21 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         query.add("count", Integer.toString(maxNumberofItemsPerPageForThisRun));
         String cursor = null;
         int page = 1;
+        boolean displayedSearchNotification = false;
         do {
             br.getPage("https://" + this.getHost() + "/services/search/v1/scrape?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final int maxItems = ((Number) entries.get("total")).intValue();
-            if (maxItems == 0) {
+            final int totalNumberofItems = ((Number) entries.get("total")).intValue();
+            if (totalNumberofItems == 0) {
                 throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, searchTerm);
+            }
+            if (!displayedSearchNotification) {
+                String message = "This item leads to " + totalNumberofItems + " results.";
+                if (maxResultsLimit != -1 && maxResultsLimit < totalNumberofItems) {
+                    message += "\r\nImportant: Due to your currently defined limits in the plugin settings, only " + maxResultsLimit + " of these items will be crawled.";
+                }
+                displayBubbleNotification("Search " + searchTerm + " | Crawling", message);
+                displayedSearchNotification = true;
             }
             final List<Map<String, Object>> items = (List<Map<String, Object>>) entries.get("items");
             boolean stopDueToCrawlLimitReached = false;
@@ -227,7 +240,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             final String lastCursor = cursor;
             cursor = (String) entries.get("cursor");
-            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + maxItems + " | maxResultsLimit: " + maxResultsLimit + " | Cursor: " + lastCursor + " | Next cursor: " + cursor);
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + totalNumberofItems + " | maxResultsLimit: " + maxResultsLimit + " | Cursor: " + lastCursor + " | Next cursor: " + cursor);
             if (stopDueToCrawlLimitReached) {
                 logger.info("Stopping because: Reached max allowed results: " + maxResultsLimit);
                 break;
@@ -237,9 +250,9 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             } else if (StringUtils.isEmpty(cursor)) {
                 logger.info("Stopping because: Reached last page: " + lastCursor);
                 break;
-            } else if (ret.size() >= maxItems) {
+            } else if (ret.size() >= totalNumberofItems) {
                 /* Additional fail-safe */
-                logger.info("Stopping because: Found all items: " + maxItems);
+                logger.info("Stopping because: Found all items: " + totalNumberofItems);
                 break;
             } else if (items.size() < maxNumberofItemsPerPageForThisRun) {
                 /* Additional fail-safe */
@@ -251,6 +264,187 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 page++;
             }
         } while (true);
+        if (ret.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + searchTerm);
+        }
+        return ret;
+    }
+
+    /**
+     * Crawls items using the archive.org "BETA Search API" which, funnily enough, they are also using in production on their website. </br>
+     * Successor of {@link #crawlViaScrapeAPI(String, int)}
+     */
+    private ArrayList<DownloadLink> crawlBetaSearchAPI(final String sourceurl, String identifier, final String type) throws Exception {
+        if (StringUtils.isEmpty(sourceurl)) {
+            throw new IllegalArgumentException();
+        }
+        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
+        final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
+        if (maxResults == 0) {
+            logger.info("User disabled search term crawler -> Returning empty array");
+            return new ArrayList<DownloadLink>();
+        }
+        final int defaultMaxNumberofItemsPerPage = 100;
+        final int maxNumberofItemsPerPageForThisRun;
+        if (maxResults == -1) {
+            /* -1 means unlimited -> Use internal hardcoded limit. */
+            maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
+        } else if (maxResults < defaultMaxNumberofItemsPerPage) {
+            maxNumberofItemsPerPageForThisRun = maxResults;
+        } else {
+            maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
+        }
+        if (identifier == null) {
+            identifier = getIdentifierFromURL(sourceurl);
+        }
+        final UrlQuery sourceurlquery = UrlQuery.parse(sourceurl);
+        String userSearchQuery = sourceurlquery.get("query");
+        if (userSearchQuery == null) {
+            userSearchQuery = "";
+        }
+        final String titleHumanReadable;
+        final boolean isUserProfile = identifier != null && identifier.startsWith("@");
+        final boolean isCollection = StringUtils.equalsIgnoreCase(type, "collection");
+        if (isUserProfile) {
+            titleHumanReadable = "Profile " + identifier;
+        } else if (isCollection) {
+            titleHumanReadable = "Collection " + identifier;
+        } else if (!StringUtils.isEmpty(userSearchQuery)) {
+            titleHumanReadable = "Search " + userSearchQuery;
+        } else {
+            titleHumanReadable = "Search URL " + new URL(sourceurl).getPath();
+        }
+        final String startPageStr = sourceurlquery.get("page");
+        /* Allow user to define custom start-page in given URL. */
+        final int startPage;
+        if (startPageStr != null && startPageStr.matches("\\d+")) {
+            logger.info("Starting from user defined page: " + startPageStr);
+            startPage = Integer.parseInt(startPageStr);
+        } else {
+            logger.info("Starting from page 1");
+            startPage = 1;
+        }
+        logger.info("Starting from page " + startPage);
+        final UrlQuery query = new UrlQuery();
+        query.add("user_query", userSearchQuery);
+        if (isUserProfile) {
+            query.add("page_type", "account_details");
+            query.add("page_target", URLEncode.encodeURIComponent(identifier));
+            query.add("page_elements", "%5B%22uploads%22%5D");
+        } else if (isCollection) {
+            query.add("page_type", "collection_details");
+            query.add("page_target", URLEncode.encodeURIComponent(identifier));
+        }
+        query.add("hits_per_page", Integer.toString(maxNumberofItemsPerPageForThisRun));
+        final Map<String, Map<String, String>> filter_map = parseFilterMap(sourceurl);
+        if (!filter_map.isEmpty()) {
+            final String json = new SimpleMapper().setPrettyPrintEnabled(false).objectToString(filter_map);
+            query.add("filter_map", URLEncode.encodeURIComponent(json));
+        }
+        /* Not needed. If not given, server-side decides how results are sorted. */
+        // query.add("sort", "publicdate%3Adesc");
+        query.add("aggregations", "false");
+        /* Not important */
+        // query.add("uid", "NOT_NEEDED");
+        query.add("client_url", URLEncode.encodeURIComponent(sourceurl));
+        // query.add("client_url", sourceurl);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Browser brc = br.cloneBrowser();
+        brc.setAllowedResponseCodes(400);
+        int page = startPage;
+        final HashSet<String> dupes = new HashSet<String>();
+        int totalNumberofItems = -1;
+        boolean displayedSearchNotification = false;
+        do {
+            query.addAndReplace("page", Integer.toString(page));
+            /* This looks to be an internally used version of public crawl/search API v2 beta, see: https://archive.org/services/swagger/ */
+            brc.getPage("https://archive.org/services/search/beta/page_production/?" + query.toString());
+            if (brc.getHttpConnection().getResponseCode() == 400) {
+                if (ret.size() > 0) {
+                    logger.info("Stopping because: Surprisingly got http response 400 | Possibly missing items: " + (totalNumberofItems - ret.size()));
+                    if (ret.size() < totalNumberofItems) {
+                        displayBubbleNotification(titleHumanReadable + " | Search crawler stopped early", "Found items: " + ret.size() + "/" + totalNumberofItems);
+                    }
+                    break;
+                } else {
+                    /* This happened on the first page -> Assume that this profile is invalid/offline */
+                    throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, "INVALID_SEARCH_QUERY");
+                }
+            }
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> hitsmap;
+            if (isUserProfile) {
+                hitsmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "response/body/page_elements/uploads/hits");
+            } else {
+                hitsmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "response/body/hits");
+            }
+            totalNumberofItems = ((Number) hitsmap.get("total")).intValue();
+            if (!displayedSearchNotification) {
+                String message = "This item leads to " + totalNumberofItems + " results.";
+                if (maxResults != -1 && maxResults < totalNumberofItems) {
+                    message += "\r\nImportant: Due to your currently defined limits in the plugin settings, only " + maxResults + " of these items will be crawled.";
+                }
+                if (startPage > 1) {
+                    message += "\r\nImportant: According to the parameters in your added URL, this crawl process will not start from the first page but from page " + startPage + " so this will not find any items of previous pages.";
+                }
+                displayBubbleNotification(titleHumanReadable + " | Crawling", message);
+                displayedSearchNotification = true;
+            }
+            final List<Map<String, Object>> hits = (List<Map<String, Object>>) hitsmap.get("hits");
+            int numberofNewItemsThisPage = 0;
+            boolean stopDueToCrawlLimitReached = false;
+            for (final Map<String, Object> hit : hits) {
+                final Map<String, Object> fields = (Map<String, Object>) hit.get("fields");
+                final String this_identifier = fields.get("identifier").toString();
+                if (!dupes.add(this_identifier)) {
+                    continue;
+                }
+                numberofNewItemsThisPage++;
+                final DownloadLink result = this.createDownloadlink("https://" + this.getHost() + "/download/" + this_identifier);
+                ret.add(result);
+                /* Distribute results live as pagination can run for a very very long time. */
+                /* The following statement makes debugging easier. */
+                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    distribute(result);
+                }
+                if (dupes.size() == maxResults) {
+                    stopDueToCrawlLimitReached = true;
+                    break;
+                }
+            }
+            logger.info("Crawled page " + page + " | Crawled new items this page: " + numberofNewItemsThisPage + " | Crawled items so far: " + ret.size() + "/" + totalNumberofItems + " | Max result limit: " + maxResults);
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                break;
+            } else if (totalNumberofItems == 0) {
+                if (isUserProfile) {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "EMPTY_PROFILE_" + identifier);
+                } else {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + userSearchQuery);
+                }
+            } else if (stopDueToCrawlLimitReached) {
+                logger.info("Stopping because: Reached user defined limit: " + maxResults);
+                break;
+            } else if (hits.size() < maxNumberofItemsPerPageForThisRun) {
+                /* Main stop condition */
+                logger.info("Stopping because: Current page contains less items than " + maxNumberofItemsPerPageForThisRun + " --> Reached end");
+                break;
+            } else if (ret.size() >= totalNumberofItems) {
+                /* Fail-safe 1 */
+                logger.info("Stopping because: Found all items: " + totalNumberofItems);
+                break;
+            } else if (numberofNewItemsThisPage == 0) {
+                /* Fail-safe 2 */
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break;
+            } else {
+                /* Continue to next page */
+                page++;
+            }
+        } while (!this.isAbort());
+        if (ret.isEmpty() && !filter_map.isEmpty()) {
+            logger.info("Got zero results which might be the case because the user has supplied filters which are too restrictive: " + filter_map);
+        }
         return ret;
     }
 
@@ -452,8 +646,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         int internalPageIndex = 0;
         for (final Object imageO : imagesO) {
             /**
-             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br>
-             * Exception = First page --> Cover
+             * Most of all objects will contain an array with 2 items --> Books always have two viewable pages. </br> Exception = First page
+             * --> Cover
              */
             final List<Object> pagesO = (List<Object>) imageO;
             for (final Object pageO : pagesO) {
@@ -483,8 +677,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     link.setProperty(ArchiveOrg.PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, System.currentTimeMillis() + loanedSecondsLeft * 1000);
                 }
                 /**
-                 * Mark pages that are not viewable in browser as offline. </br>
-                 * If we have borrowed this book, this field will not exist at all.
+                 * Mark pages that are not viewable in browser as offline. </br> If we have borrowed this book, this field will not exist at
+                 * all.
                  */
                 final Object viewable = bookpage.get("viewable");
                 if (Boolean.FALSE.equals(viewable)) {
@@ -553,20 +747,21 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /** Work in progress, see https://archive.org/metadata/<identifier> */
-    private ArrayList<DownloadLink> crawlMetadataJsonV2(final String identifier, String sourceurl) throws Exception {
+    private ArrayList<DownloadLink> crawlMetadataJsonV2(final String identifier, final String sourceurl) throws Exception {
         if (StringUtils.isEmpty(identifier)) {
             throw new IllegalArgumentException();
         }
+        String sourceurlForThisHandling = sourceurl;
         if (identifier.startsWith("@")) {
             /* ideantifier looks to be a user profile. */
             return this.crawlProfile(identifier, sourceurl);
         }
-        if (sourceurl != null) {
+        if (sourceurlForThisHandling != null) {
             /* Correct source-URL */
             /* Remove params so that URL-paths will be correct down below. */
-            sourceurl = URLHelper.getUrlWithoutParams(sourceurl);
+            sourceurlForThisHandling = URLHelper.getUrlWithoutParams(sourceurlForThisHandling);
             /* Prevent handling down below from picking up specific parts of the URL as used desired file-path. */
-            sourceurl = sourceurl.replaceAll("(?i)/start/\\d+/end/\\d+$", "");
+            sourceurlForThisHandling = sourceurlForThisHandling.replaceAll("(?i)/start/\\d+/end/\\d+$", "");
         }
         /* The following request will return an empty map if the given identifier is invalid. */
         final Browser brc = br.cloneBrowser();
@@ -585,11 +780,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final String mediatype = root_metadata.get("mediatype").toString();
         if (StringUtils.equalsIgnoreCase(mediatype, "collection")) {
             /* Crawl item with collection crawler */
-            return this.crawlCollection(identifier);
+            return this.crawlCollection(sourceurl, identifier);
         }
         final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
-        final boolean isDownloadPage = sourceurl.matches("(?i)https?://[^/]+/download/.+");
-        final String desiredSubpath = new Regex(sourceurl, ".*/(" + Pattern.quote(identifier) + "/.+)").getMatch(0);
+        final boolean isDownloadPage = sourceurlForThisHandling.matches("(?i)https?://[^/]+/download/.+");
+        final String desiredSubpath = new Regex(sourceurlForThisHandling, ".*/(" + Pattern.quote(identifier) + "/.+)").getMatch(0);
         boolean allowCrawlArchiveContents = false;
         String desiredSubpathDecoded = null;
         String desiredSubpathDecoded2 = null;
@@ -806,7 +1001,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 if (allowCrawlArchiveContents && desiredFileArchiveFileCount != null && Integer.parseInt(desiredFileArchiveFileCount.toString()) > 1) {
                     /* Single archive file which user wants but user wants to have the content of that archive (rare case). */
                     logger.info("Looks like user does not want to download single found file but instead wants to download all " + desiredFileArchiveFileCount + " files inside archive file: " + desiredSubpathDecoded);
-                    return this.crawlArchiveContentV2(sourceurl, null, ret);
+                    return this.crawlArchiveContentV2(sourceurlForThisHandling, null, ret);
                 } else {
                     /* Single file which user wants */
                     ret.clear(); // Clear list of previously collected results
@@ -816,7 +1011,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             } else if (desiredSubpathDecoded2 != null && singleDesiredFile2 != null && desiredFileArchiveFileCount != null) {
                 /* User wants file which is part of an archive. */
                 logger.info("Looks like user wants to download single file inside archive " + desiredSubpathDecoded2 + " which contains " + desiredFileArchiveFileCount + " files");
-                return this.crawlArchiveContentV2(sourceurl, desiredSubpathDecoded, singleDesiredFile2);
+                return this.crawlArchiveContentV2(sourceurlForThisHandling, desiredSubpathDecoded, singleDesiredFile2);
             } else if (desiredSubpathItems.size() > 0) {
                 /* User desired item(s) are available -> Return only them */
                 return desiredSubpathItems;
@@ -852,7 +1047,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 /* Crawl book */
                 /* Books can be split into multiple "parts" -> Collect them here */
                 final HashSet<String> subPrefixes = new HashSet<String>();
-                final String subPrefixInSourceURL = new Regex(sourceurl, "(?i)/details/[^/]+/([^/#\\?\\&]+)").getMatch(0);
+                final String subPrefixInSourceURL = new Regex(sourceurlForThisHandling, "(?i)/details/[^/]+/([^/#\\?\\&]+)").getMatch(0);
                 for (final String str : originalFilenamesDupeCollection) {
                     final Regex chapterregex = new Regex(str, "(.+)_(djvu\\.xml|page_numbers\\.json)");
                     if (chapterregex.patternFind()) {
@@ -1012,8 +1207,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         }
     }
 
-    private Map<String, Object> parseFilterMap(final String url) {
-        final Map<String, Object> filter_map = new HashMap<String, Object>();
+    private Map<String, Map<String, String>> parseFilterMap(final String url) {
+        final Map<String, Map<String, String>> filter_map = new HashMap<String, Map<String, String>>();
         /* Some keys need to be renamed. */
         final Map<String, String> replacements = new HashMap<String, String>();
         replacements.put("lending", "lending___status");
@@ -1028,11 +1223,13 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 }
                 final String keyValue[] = new Regex(andValueString, "(.*?)\\s*:\\s*\"(.*?)\"").getRow(0);
                 if (keyValue != null) {
-                    String key = keyValue[0];
-                    key = replacements.getOrDefault(key, key);
-                    Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(key);
+                    String key = replacements.get(keyValue[0]);
+                    if (key == null) {
+                        key = keyValue[0];
+                    }
+                    Map<String, String> valueMap = filter_map.get(key);
                     if (valueMap == null) {
-                        valueMap = new HashMap<String, Object>();
+                        valueMap = new HashMap<String, String>();
                         filter_map.put(key, valueMap);
                     }
                     valueMap.put(keyValue[1], "inc");
@@ -1040,11 +1237,13 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 }
                 final String range[] = new Regex(andValueString, "(.*?)\\s*:\\s*\\[\\s*(\\d+)(?:\\+\\s*)?TO\\s*(?:\\+\\s*)?(\\d+)\\s*\\]").getRow(0);
                 if (range != null) {
-                    String key = range[0];
-                    key = replacements.getOrDefault(key, key);
-                    Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(key);
+                    String key = replacements.get(range[0]);
+                    if (key == null) {
+                        key = range[0];
+                    }
+                    Map<String, String> valueMap = filter_map.get(key);
                     if (valueMap == null) {
-                        valueMap = new HashMap<String, Object>();
+                        valueMap = new HashMap<String, String>();
                         filter_map.put(key, valueMap);
                     }
                     valueMap.put(range[1], "gte");
@@ -1062,15 +1261,19 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                     /* Skip invalid items */
                     continue;
                 }
-                String keyValue[] = new Regex(notValueString, "(.*?)\\s*:\\s*\"(.*?)\"").getRow(0);
-                String key = keyValue[0];
-                key = replacements.getOrDefault(key, key);
-                Map<String, Object> valueMap = (Map<String, Object>) filter_map.get(key);
-                if (valueMap == null) {
-                    valueMap = new HashMap<String, Object>();
-                    filter_map.put(key, valueMap);
+                final String keyValue[] = new Regex(notValueString, "(.*?)\\s*:\\s*\"(.*?)\"").getRow(0);
+                if (keyValue != null) {
+                    String key = replacements.get(keyValue[0]);
+                    if (key == null) {
+                        key = keyValue[0];
+                    }
+                    Map<String, String> valueMap = filter_map.get(key);
+                    if (valueMap == null) {
+                        valueMap = new HashMap<String, String>();
+                        filter_map.put(key, valueMap);
+                    }
+                    valueMap.put(keyValue[1], "exc");
                 }
-                valueMap.put(keyValue[1], "exc");
             }
         }
         return filter_map;
@@ -1085,153 +1288,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* Curate given parameter. */
             username += "@";
         }
-        return crawlBetaSearchAPI(username, sourceurl);
-    }
-
-    /** Crawls items using the archive.org "BETA Search API" which, funnily enough, they are also using in production on their website. */
-    private ArrayList<DownloadLink> crawlBetaSearchAPI(final String identifier, final String sourceurl) throws Exception {
-        if (StringUtils.isEmpty(sourceurl)) {
-            throw new IllegalArgumentException();
-        }
-        final ArchiveOrgConfig cfg = PluginJsonConfig.get(ArchiveOrgConfig.class);
-        final int maxResults = cfg.getSearchTermCrawlerMaxResultsLimit();
-        if (maxResults == 0) {
-            logger.info("User disabled search term crawler -> Returning empty array");
-            return new ArrayList<DownloadLink>();
-        }
-        final int defaultMaxNumberofItemsPerPage = 100;
-        final int maxNumberofItemsPerPageForThisRun;
-        if (maxResults == -1) {
-            /* -1 means unlimited -> Use internal hardcoded limit. */
-            maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
-        } else if (maxResults < defaultMaxNumberofItemsPerPage) {
-            maxNumberofItemsPerPageForThisRun = maxResults;
-        } else {
-            maxNumberofItemsPerPageForThisRun = defaultMaxNumberofItemsPerPage;
-        }
-        final boolean isUserProfile = identifier != null && identifier.startsWith("@");
-        final UrlQuery sourceurlquery = UrlQuery.parse(sourceurl);
-        String userSearchQuery = sourceurlquery.get("query");
-        if (userSearchQuery == null) {
-            userSearchQuery = "";
-        }
-        final String startPageStr = sourceurlquery.get("page");
-        /* Allow user to define custom start-page in given URL. */
-        final int startPage;
-        if (startPageStr != null && startPageStr.matches("\\d+")) {
-            logger.info("Starting from user defined page: " + startPageStr);
-            startPage = Integer.parseInt(startPageStr);
-        } else {
-            logger.info("Starting from page 1");
-            startPage = 1;
-        }
-        logger.info("Starting from page " + startPage);
-        final UrlQuery query = new UrlQuery();
-        query.add("user_query", userSearchQuery);
-        if (isUserProfile) {
-            query.add("page_type", "account_details");
-            query.add("page_target", URLEncode.encodeURIComponent(identifier));
-            query.add("page_elements", "%5B%22uploads%22%5D");
-        }
-        query.add("hits_per_page", Integer.toString(maxNumberofItemsPerPageForThisRun));
-        final Map<String, Object> filter_map = parseFilterMap(sourceurl);
-        if (!filter_map.isEmpty()) {
-            final String json = new SimpleMapper().setPrettyPrintEnabled(false).objectToString(filter_map);
-            query.add("filter_map", URLEncode.encodeURIComponent(json));
-        }
-        /* Not needed. If not given, server-side decides how results are sorted. */
-        // query.add("sort", "publicdate%3Adesc");
-        query.add("aggregations", "false");
-        /* Not important */
-        // query.add("uid", "NOT_NEEDED");
-        query.add("client_url", URLEncode.encodeURIComponent(sourceurl));
-        // query.add("client_url", sourceurl);
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final Browser brc = br.cloneBrowser();
-        brc.setAllowedResponseCodes(400);
-        int page = startPage;
-        final HashSet<String> dupes = new HashSet<String>();
-        int totalNumberofItems = -1;
-        do {
-            query.addAndReplace("page", Integer.toString(page));
-            /* This looks to be an internally used version of public crawl/search API v2 beta, see: https://archive.org/services/swagger/ */
-            brc.getPage("https://archive.org/services/search/beta/page_production/?" + query.toString());
-            if (brc.getHttpConnection().getResponseCode() == 400) {
-                if (ret.size() > 0) {
-                    logger.info("Stopping because: Surprisingly got http response 400 | Possibly missing items: " + (totalNumberofItems - ret.size()));
-                    if (ret.size() < totalNumberofItems) {
-                        displayBubbleNotification(identifier + "| Search crawler stopped early", "Found items: " + ret.size() + "/" + totalNumberofItems);
-                    }
-                    break;
-                } else {
-                    /* This happened on the first page -> Assume that this profile is invalid/offline */
-                    throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, "INVALID_SEARCH_QUERY");
-                }
-            }
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final Map<String, Object> hitsmap;
-            if (isUserProfile) {
-                hitsmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "response/body/page_elements/uploads/hits");
-            } else {
-                hitsmap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "response/body/hits");
-            }
-            totalNumberofItems = ((Number) hitsmap.get("total")).intValue();
-            final List<Map<String, Object>> hits = (List<Map<String, Object>>) hitsmap.get("hits");
-            int numberofNewItemsThisPage = 0;
-            boolean stopDueToCrawlLimitReached = false;
-            for (final Map<String, Object> hit : hits) {
-                final Map<String, Object> fields = (Map<String, Object>) hit.get("fields");
-                final String this_identifier = fields.get("identifier").toString();
-                if (!dupes.add(this_identifier)) {
-                    continue;
-                }
-                numberofNewItemsThisPage++;
-                final DownloadLink result = this.createDownloadlink("https://" + this.getHost() + "/download/" + this_identifier);
-                ret.add(result);
-                /* Distribute results live as pagination can run for a very very long time. */
-                /* The following statement makes debugging easier. */
-                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    distribute(result);
-                }
-                if (dupes.size() == maxResults) {
-                    stopDueToCrawlLimitReached = true;
-                    break;
-                }
-            }
-            logger.info("Crawled page " + page + " | Crawled new items this page: " + numberofNewItemsThisPage + " | Crawled items so far: " + ret.size() + "/" + totalNumberofItems + " | Max result limit: " + maxResults);
-            if (this.isAbort()) {
-                logger.info("Stopping because: Aborted by user");
-                break;
-            } else if (totalNumberofItems == 0) {
-                if (isUserProfile) {
-                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE, "EMPTY_PROFILE_" + identifier);
-                } else {
-                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "NO_SEARCH_RESULTS_FOR_QUERY_" + userSearchQuery);
-                }
-            } else if (stopDueToCrawlLimitReached) {
-                logger.info("Stopping because: Reached user defined limit: " + maxResults);
-                break;
-            } else if (hits.size() < maxNumberofItemsPerPageForThisRun) {
-                /* Main stop condition */
-                logger.info("Stopping because: Current page contains less items than " + maxNumberofItemsPerPageForThisRun + " --> Reached end");
-                break;
-            } else if (ret.size() >= totalNumberofItems) {
-                /* Fail-safe 1 */
-                logger.info("Stopping because: Found all items: " + totalNumberofItems);
-                break;
-            } else if (numberofNewItemsThisPage == 0) {
-                /* Fail-safe 2 */
-                logger.info("Stopping because: Failed to find any new items on current page");
-                break;
-            } else {
-                /* Continue to next page */
-                page++;
-            }
-        } while (!this.isAbort());
-        if (ret.isEmpty() && !filter_map.isEmpty()) {
-            logger.info("Got zero results which might be the case because the user has supplied filters which are too restrictive: " + filter_map);
-        }
-        return ret;
+        return crawlBetaSearchAPI(sourceurl, username, null);
     }
 
     /** Crawls desired book. Given browser instance needs to access URL to book in beforehand! */
@@ -1283,7 +1340,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         if (new Regex(contenturl, PATTERN_DOWNLOAD).patternFind()) {
             return crawlPatternSlashDownloadWebsite(contenturl);
         } else if (new Regex(contenturl, PATTERN_SEARCH).patternFind()) {
-            return this.crawlSearchQueryURL(br, param);
+            return this.crawlSearchQueryURL(param);
         } else {
             /*
              * 2020-08-26: Login might sometimes be required for book downloads.
@@ -1434,8 +1491,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         if (path.contains("/") && allowCheckForDirecturl) {
             /**
              * 2023-05-30: Especially important when user adds a like to a file inside a .zip file as that will not be contained in the XML
-             * which we are crawling below. </br>
-             * Reference: https://board.jdownloader.org/showthread.php?t=89368
+             * which we are crawling below. </br> Reference: https://board.jdownloader.org/showthread.php?t=89368
              */
             logger.info("Path contains subpath -> Checking for single directurl");
             URLConnectionAdapter con = null;
@@ -1575,9 +1631,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             final ArrayList<DownloadLink> audioPlaylistItemsDetailed = new ArrayList<DownloadLink>();
             if (metadataJson != null) {
                 /**
-                 * Try to find more metadata to the results we already have and combine them with the track-position-data we know. </br>
-                 * In the end we should get the best of both worlds: All tracks with track numbers, metadata and file hashes for CRC
-                 * checking.
+                 * Try to find more metadata to the results we already have and combine them with the track-position-data we know. </br> In
+                 * the end we should get the best of both worlds: All tracks with track numbers, metadata and file hashes for CRC checking.
                  */
                 logger.info("Looking for more detailed audio metadata");
                 audioPlaylistItemsDetailed.addAll(this.crawlMetadataJson(metadataJson, filepathToPlaylistItemMapping));
@@ -1623,7 +1678,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 return this.crawlProfile(identifier, br.getURL());
             } else {
                 logger.info("Crawling collection...");
-                final ArrayList<DownloadLink> collectionResults = crawlCollection(identifier);
+                final ArrayList<DownloadLink> collectionResults = crawlCollection(br.getURL(), identifier);
                 if (collectionResults.isEmpty()) {
                     throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_COLLECTION_" + identifier);
                 }
@@ -1842,9 +1897,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
     }
 
     /**
-     * Crawls json which can sometimes be found in html of such URLs: "/details/<identifier>" </br>
-     * If a filename/path to track position mapping is given, this handling tries to find the playlist position of crawled items based on
-     * the mapping.
+     * Crawls json which can sometimes be found in html of such URLs: "/details/<identifier>" </br> If a filename/path to track position
+     * mapping is given, this handling tries to find the playlist position of crawled items based on the mapping.
      */
     @Deprecated
     private ArrayList<DownloadLink> crawlMetadataJson(final String json, final Map<String, DownloadLink> filepathToPlaylistItemMapping) throws Exception {
@@ -1912,8 +1966,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             final DownloadLink file = new DownloadLink(hostPlugin, null, "archive.org", directurl, true);
             if (audioTrackPosition != -1) {
                 /**
-                 * Size of playlist must not be pre-given </br>
-                 * Size of playlist = Highest track-number.
+                 * Size of playlist must not be pre-given </br> Size of playlist = Highest track-number.
                  */
                 if (audioTrackPosition > playlistSize) {
                     /* Determine size of playlist as it must not be pre-given. */

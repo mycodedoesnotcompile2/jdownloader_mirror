@@ -51,33 +51,36 @@ public class PathTraversalProtection extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
-        File result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../c");
-        assertEquals(result, new File("c:/a/b/c"));
-        result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c");
-        assertEquals(result, new File("c:/a/b/c"));
-        result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "/allowed1/../allowed2");
-        assertEquals(result, new File("c:/a/b/c/allowed2"));
-        result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c/allowed.txt");
-        assertEquals(result, new File("c:/a/b/c/allowed.txt"));
-        try {
-            org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c/allowed.txt../../../");
-            throw new Exception("This should throw an exception");
-        } catch (IOException e) {
-            // expected
+        File result = null;
+        if (CrossSystem.isWindows()) {
+            result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../c");
+            assertEquals(result, new File("c:/a/b/c"));
+            result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c");
+            assertEquals(result, new File("c:/a/b/c"));
+            result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "/allowed1/../allowed2");
+            assertEquals(result, new File("c:/a/b/c/allowed2"));
+            result = org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c/allowed.txt");
+            assertEquals(result, new File("c:/a/b/c/allowed.txt"));
+            try {
+                org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b/c/allowed.txt../../../");
+                throw new Exception("This should throw an exception");
+            } catch (IOException e) {
+                // expected
+            }
+            try {
+                org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b");
+                throw new Exception("This should throw an exception");
+            } catch (IOException e) {
+                // expected
+            }
+            try {
+                org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../forbidden");
+                throw new Exception("This should throw an exception");
+            } catch (IOException e) {
+                // expected
+            }
         }
-        try {
-            org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../../b");
-            throw new Exception("This should throw an exception");
-        } catch (IOException e) {
-            // expected
-        }
-        try {
-            org.appwork.utils.Files.createChildSecure(new File("c:/a/b/c"), "../forbidden");
-            throw new Exception("This should throw an exception");
-        } catch (IOException e) {
-            // expected
-        }
-        {
+        if (CrossSystem.isUnix()) {
             // Assuming the base directory is a Linux-style path:
             File baseDir = new File("/path/to/source/folder");
             // Attempt to traverse outside the base directory
@@ -95,13 +98,11 @@ public class PathTraversalProtection extends AWTest {
                 System.out.println("Caught expected IOException: " + e.getMessage());
             }
             // Attempt to use an absolute path directly
-            if (CrossSystem.isUnix()) {
-                try {
-                    result = Files.createChildSecure(baseDir, "/etc/passwd");
-                    throw new Exception("This should throw an exception");
-                } catch (IOException e) {
-                    System.out.println("Caught expected IOException: " + e.getMessage());
-                }
+            try {
+                result = Files.createChildSecure(baseDir, "/etc/passwd");
+                throw new Exception("This should throw an exception");
+            } catch (IOException e) {
+                System.out.println("Caught expected IOException: " + e.getMessage());
             }
             // Complex path traversal using multiple directory steps
             try {
@@ -119,7 +120,7 @@ public class PathTraversalProtection extends AWTest {
             // System.out.println("Caught expected IOException: " + e.getMessage());
             // }
         }
-        {
+        if (CrossSystem.isWindows()) {
             File baseDir = new File("C:\\path\\to\\source\\folder");
             // Attempt to traverse outside the base directory
             try {

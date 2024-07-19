@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49350 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49364 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +139,7 @@ public class CivitaiCom extends PluginForHost {
         final String mimeType = (String) imagemap.get("mimeType");
         final String ext = getExtensionFromMimeType(mimeType);
         if (ext != null) {
-            link.setName(this.applyFilenameExtension(filename, "." + ext));
+            link.setFinalFileName(this.applyFilenameExtension(filename, "." + ext));
         } else {
             link.setName(filename);
         }

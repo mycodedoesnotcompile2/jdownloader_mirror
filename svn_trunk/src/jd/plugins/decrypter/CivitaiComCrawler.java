@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49357 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49365 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -82,7 +82,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
-        final Regex urlregex = new Regex(param.getCryptedUrl(), "(?i)/(posts|models|user)/(.+)");
+        final Regex urlregex = new Regex(param.getCryptedUrl(), "(?i)/(posts|models|user)/([^/]+)");
         final UrlQuery query = UrlQuery.parse(contenturl);
         final String modelVersionId = query.get("modelVersionId");
         final String itemType = urlregex.getMatch(0);
@@ -144,8 +144,13 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             /* Handles such links: https://civitai.com/user/test */
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images */
             /* 2024-07-17: use small limit/pagination size to avoid timeout issues */
+            /**
+             * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be rerturned but that
+             * is wrong --> Wrong API docs or bug in API. </br>
+             * Only with the nsfw parameter set to "X", all items will be returned.
+             */
             final int maxItemsPerPage = 10;
-            String nextPage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage;
+            String nextPage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage + "&nsfw=X";
             int page = 0;
             pagination: while (nextPage != null && !isAbort()) {
                 page++;

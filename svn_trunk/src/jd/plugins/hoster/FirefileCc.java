@@ -73,7 +73,7 @@ import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48620 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
+@HostPlugin(revision = "$Revision: 49371 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
 public class FirefileCc extends PluginForHost {
     private static Object         DECRYPTLOCK                = new Object();
     /** Settings stuff */
@@ -322,7 +322,7 @@ public class FirefileCc extends PluginForHost {
     }
 
     private String decryptString(String data, String plainKey) throws Exception {
-        byte[] dataArr = MegaConz.b64decode(data);
+        byte[] dataArr = MegaNz.b64decode(data);
         byte[] decrypted = this.decryptBytes(dataArr, plainKey);
         final String decryptedStr = new String(decrypted, "UTF-8").trim();
         return decryptedStr;

@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48903 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49370 $", interfaceVersion = 3, names = {}, urls = {})
 public class AkwamCc extends PluginForHost {
     public AkwamCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,7 +108,7 @@ public class AkwamCc extends PluginForHost {
         String filename = br.getRegex("class=\"sub_title sub_download_title\"><h1>([^<>\"]+)<").getMatch(0);
         if (filename == null) {
             /* 2021-11-09 */
-            filename = br.getRegex("download class=\"[^\"]+\"[^>]*>([^<>\"]+)<").getMatch(0);
+            filename = br.getRegex("download class=\"[^\"]+\"[^>]*>([^<\"]+)<").getMatch(0);
         }
         if (!StringUtils.isEmpty(filename)) {
             filename = Encoding.htmlDecode(filename).trim();
@@ -134,7 +134,12 @@ public class AkwamCc extends PluginForHost {
                 dllink = PluginJSonUtils.getJson(br, "direct_link");
                 if (StringUtils.isEmpty(dllink)) {
                     logger.warning("Failed to find final downloadurl");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    if (br.containsHTML("text-danger")) {
+                        /* Very rudimentary error handling */
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File temporarily unavailable");
+                    } else {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                 }
             }
         }

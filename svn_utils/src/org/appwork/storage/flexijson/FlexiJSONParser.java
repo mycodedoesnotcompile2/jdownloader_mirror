@@ -135,35 +135,35 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char SQUARE_BRACKET_CLOSE = ']';
+    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
     /**
      *
      */
-    private static final char CURLY_BRACKET_CLOSE  = '}';
+    private static final char                 CURLY_BRACKET_CLOSE               = '}';
     /**
      *
      */
-    private static final char COLON                = ':';
+    private static final char                 COLON                             = ':';
     /**
      *
      */
-    private static final char ASTERISK             = '*';
+    private static final char                 ASTERISK                          = '*';
     /**
      *
      */
-    private static final char SLASH                = '/';
+    private static final char                 SLASH                             = '/';
     /**
      *
      */
-    private static final char SQUARE_BRACKET_OPEN  = '[';
+    private static final char                 SQUARE_BRACKET_OPEN               = '[';
     /**
      *
      */
-    private static final char CURLY_BRACKET_OPEN   = '{';
+    private static final char                 CURLY_BRACKET_OPEN                = '{';
     /**
      *
      */
-    private static final char COMMA                = ',';
+    private static final char                 COMMA                             = ',';
 
     public class NumberParser {
         /**
@@ -308,25 +308,34 @@ public class FlexiJSONParser {
             return false;
         }
 
-        protected Number parseSmallestFixedNumberType(String string, final int radix, final boolean leadingMinus) {
-            if (leadingMinus) {
-                string = "-" + string;
-            }
-            try {
-                final short num = Short.parseShort(string, radix);
-                return Short.valueOf(num);
-            } catch (NumberFormatException e) {
-                try {
-                    final int num = Integer.parseInt(string, radix);
-                    return Integer.valueOf(num);
-                } catch (NumberFormatException e2) {
-                    final long num = Long.parseLong(string, radix);
-                    return Long.valueOf(num);
+        protected Number parseFixedNumber(final CharSequence charSequence, final int radix) {
+            final String string = charSequence.toString();
+            // TODO: Add Java9 Long.valueOf(CharSequence)
+            final Long ret = Long.valueOf(string, radix);
+            if (ret.longValue() <= Integer.MAX_VALUE && ret.longValue() >= Integer.MIN_VALUE) {
+                if (ret.longValue() <= Short.MAX_VALUE && ret.longValue() >= Short.MIN_VALUE) {
+                    if (ret.longValue() <= Byte.MAX_VALUE && ret.longValue() >= Byte.MIN_VALUE) {
+                        return Byte.valueOf(ret.byteValue());
+                    } else {
+                        return Short.valueOf(ret.shortValue());
+                    }
+                } else {
+                    return Integer.valueOf(ret.intValue());
                 }
+            }
+            return ret;
+        }
+
+        protected Number parseSmallestFixedNumberType(CharSequence value, final int radix, final boolean leadingMinus) {
+            if (leadingMinus) {
+                return parseFixedNumber("-" + value, radix);
+            } else {
+                return parseFixedNumber(value, radix);
             }
         }
 
-        protected Number parseSmalltestFloatNumberType(String string, final boolean leadingMinus) {
+        protected Number parseSmalltestFloatNumberType(CharSequence value, final boolean leadingMinus) {
+            final String string = value.toString();
             double num = Double.parseDouble(string);
             if (leadingMinus) {
                 num = -num;

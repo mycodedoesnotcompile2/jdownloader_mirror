@@ -30,7 +30,7 @@ import org.appwork.utils.StringUtils;
 
 public class InternetShortcut extends PluginsC {
     public InternetShortcut() {
-        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 49093 $");
+        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 49372 $");
     }
 
     public InternetShortcut newPluginInstance() {
@@ -57,7 +57,8 @@ public class InternetShortcut extends PluginsC {
                         cls = retLinks;
                     }
                 } else {
-                    throw new IOException("No InternetShortcut:" + lc);
+                    // can also be user generated .url files and no [InternetShortcut]
+                    // throw new IOException("No InternetShortcut:" + lc);
                 }
             } finally {
                 fis.close();
