@@ -3095,8 +3095,7 @@ public class Browser {
 
             @Override
             public BlockedTypeInterface isBlocked(Browser browser, Request request) {
-                final HTTPConnection con;
-                if (request == null || !request.isLoaded() || (con = request.getHttpConnection()) == null) {
+                if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
                     return null;
                 }
                 if (true) { /*
