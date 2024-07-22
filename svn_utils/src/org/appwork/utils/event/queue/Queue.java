@@ -36,6 +36,8 @@ package org.appwork.utils.event.queue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -64,7 +66,7 @@ public abstract class Queue {
     protected final java.util.List<QueueAction<?, ? extends Throwable>> queueThreadHistory  = new ArrayList<QueueAction<?, ? extends Throwable>>(20);
     protected final AtomicReference<QueueThread>                        thread              = new AtomicReference<QueueThread>(null);
     private volatile QueueAction<?, ? extends Throwable>                sourceItem          = null;
-    private volatile QueueAction<?, ?>                                  currentJob;
+    protected final LinkedBlockingDeque<QueueAction<?, ?>>              currentJobs         = new LinkedBlockingDeque<QueueAction<?, ?>>();
     protected final AtomicLong                                          addStats            = new AtomicLong(0);
     protected final AtomicLong                                          addWaitStats        = new AtomicLong(0);
     protected final AtomicLong                                          addRunStats         = new AtomicLong(0);
@@ -202,8 +204,8 @@ public abstract class Queue {
         internalAdd(action);
     }
 
-    protected QueueAction<?, ?> getCurrentJob() {
-        return currentJob;
+    protected BlockingDeque<QueueAction<?, ?>> getCurrentJobs() {
+        return currentJobs;
     }
 
     protected final Object getLock() {
@@ -213,9 +215,10 @@ public abstract class Queue {
     public List<QueueAction<?, ?>> getEntries() {
         final List<QueueAction<?, ?>> ret = new ArrayList<QueueAction<?, ?>>();
         synchronized (getLock()) {
-            final QueueAction<?, ?> lcurrentJob = currentJob;
-            if (lcurrentJob != null) {
-                ret.add(currentJob);
+            final QueueAction<?, ?> pendingItem = this.pendingItem.get();
+            ret.addAll(currentJobs);
+            if (pendingItem != null && !ret.contains(pendingItem)) {
+                ret.add(pendingItem);
             }
             for (int i = 0; i < queues.length; i++) {
                 final ArrayDeque<?> queue = queues[i];
@@ -256,7 +259,7 @@ public abstract class Queue {
     /**
      * Overwrite this to hook before a action execution
      */
-    protected void handlePreRun() {        
+    protected void handlePreRun() {
     }
 
     protected void internalAdd(final QueueAction<?, ?> action) {
@@ -368,7 +371,7 @@ public abstract class Queue {
     /**
      * @param item
      */
-    protected void onItemHandled(final QueueAction<?, ? extends Throwable> item) {        
+    protected void onItemHandled(final QueueAction<?, ? extends Throwable> item) {
     }
 
     public boolean remove(final QueueAction<?, ?> action) {
@@ -406,13 +409,15 @@ public abstract class Queue {
         return null;
     }
 
+    private final AtomicReference<QueueAction<?, ? extends Throwable>> pendingItem = new AtomicReference<QueueAction<?, ? extends Throwable>>();
+
     protected void runQueue() {
+        final Object lock = getLock();
         try {
             QueueAction<?, ? extends Throwable> item = null;
             while (true) {
                 try {
                     handlePreRun();
-                    final Object lock = getLock();
                     synchronized (lock) {
                         item = poll();
                         if (item == null) {
@@ -426,6 +431,7 @@ public abstract class Queue {
                                 return;
                             }
                         }
+                        pendingItem.set(item);
                     }
                     if (!handleItem(item)) {
                         continue;
@@ -441,10 +447,12 @@ public abstract class Queue {
                 } catch (final Throwable e) {
                     org.appwork.loggingv3.LogV3.info("Queue rescued!");
                     org.appwork.loggingv3.LogV3.log(e);
+                } finally {
+                    pendingItem.compareAndSet(item, null);
                 }
             }
         } finally {
-            synchronized (getLock()) {
+            synchronized (lock) {
                 final Thread lThread = Thread.currentThread();
                 if (lThread instanceof QueueThread) {
                     thread.compareAndSet((QueueThread) lThread, null);
@@ -493,7 +501,8 @@ public abstract class Queue {
     @SuppressWarnings("unchecked")
     protected <T extends Throwable> void startItem(final QueueAction<?, T> item, final boolean callExceptionhandler) throws T {
         try {
-            currentJob = item;
+            currentJobs.addLast(item);
+            pendingItem.compareAndExchange(item, null);
             if (getQueueThread() != item.getCallerThread()) {
                 synchronized (queueThreadHistory) {
                     queueThreadHistory.add(item);
@@ -518,7 +527,9 @@ public abstract class Queue {
                 }
             }
             item.setFinished(true);
-            currentJob = null;
+            if (currentJobs.removeLast() != item) {
+                DebugMode.debugger();
+            }
         }
     }
 

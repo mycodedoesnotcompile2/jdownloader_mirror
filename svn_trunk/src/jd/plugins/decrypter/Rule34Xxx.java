@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 49354 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 49389 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String prefixLinkID = getHost().replaceAll("[\\.\\-]+", "") + "://";
 
@@ -104,7 +104,7 @@ public class Rule34Xxx extends PluginForDecrypt {
             br.getPage(api_base + "?" + apiquery.toString());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (!br.getRequest().getHtmlCode().startsWith("{")) {
+            } else if (!br.getRequest().getHtmlCode().startsWith("[")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final List<Map<String, Object>> results = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
@@ -188,7 +188,10 @@ public class Rule34Xxx extends PluginForDecrypt {
         } else {
             image.setFinalFileName("rule34xxx-" + id + extension);
         }
-        image.setMD5Hash(result.get("hash").toString());
+        if (!originalFilename.matches("(?i).+\\.(mp4)$")) {
+            // for videos the md5 doesn't match
+            image.setMD5Hash(result.get("hash").toString());
+        }
         return image;
     }
 

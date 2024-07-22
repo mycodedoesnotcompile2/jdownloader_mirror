@@ -28,15 +28,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 48946 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49387 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class abstractGenericHTTPDirectoryIndexCrawler extends PluginForDecrypt {
     protected abstractGenericHTTPDirectoryIndexCrawler(PluginWrapper wrapper) {
         super(wrapper);
-    }
-
-    public enum DirectoryListingMode {
-        NGINX,
-        APACHE
     }
 
     public abstract ArrayList<DownloadLink> parseHTTPDirectory(final CryptedLink param, final Browser br) throws IOException, PluginException, DecrypterRetryException;
