@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
@@ -35,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49379 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49390 $", interfaceVersion = 3, names = {}, urls = {})
 public class AnonymfileCom extends PluginForHost {
     public AnonymfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -156,6 +157,10 @@ public class AnonymfileCom extends PluginForHost {
             } else {
                 link.setName(fid);
             }
+        }
+        if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
+            /* Example: https://anonymfile.com/about */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invlid fileID");
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);

@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47386 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49390 $", interfaceVersion = 3, names = {}, urls = {})
 public class FappicCom extends XFileSharingProBasic {
     public FappicCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -134,5 +134,11 @@ public class FappicCom extends XFileSharingProBasic {
         } else {
             return super.getFUID(url, type);
         }
+    }
+
+    @Override
+    public String getLoginURL() {
+        // 2024-07-22
+        return getMainPage() + "/?op=login";
     }
 }

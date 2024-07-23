@@ -502,7 +502,7 @@ public abstract class Queue {
     protected <T extends Throwable> void startItem(final QueueAction<?, T> item, final boolean callExceptionhandler) throws T {
         try {
             currentJobs.addLast(item);
-            pendingItem.compareAndExchange(item, null);
+            pendingItem.compareAndSet(item, null);
             if (getQueueThread() != item.getCallerThread()) {
                 synchronized (queueThreadHistory) {
                     queueThreadHistory.add(item);

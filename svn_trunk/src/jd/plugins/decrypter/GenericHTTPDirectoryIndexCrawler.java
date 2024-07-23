@@ -21,11 +21,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.abstractGenericHTTPDirectoryIndexCrawler;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -41,7 +36,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49387 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
+import org.appwork.utils.Regex;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.abstractGenericHTTPDirectoryIndexCrawler;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 49399 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
 public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirectoryIndexCrawler {
     private enum DirectoryListingMode {
         NGINX,
@@ -225,6 +225,7 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
             ret = parseCaddy(param, br);
         }
         if (ret == null) {
+            // this plugin should not fail
             ret = new ArrayList<DownloadLink>();
         }
         return ret;
