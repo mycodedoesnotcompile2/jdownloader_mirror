@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 45219 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
 public class DasanCo extends YetiShareCore {
     public DasanCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +38,7 @@ public class DasanCo extends YetiShareCore {
      ****************************
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null solvemedia reCaptchaV2, hcaptcha<br />
+     * captchatype-info: null reCaptchaV2, hcaptcha<br />
      * other: Special YetiShare Multihoster see: https://board.jdownloader.org/showthread.php?t=88877 <br />
      */
     public static List<String[]> getPluginDomains() {

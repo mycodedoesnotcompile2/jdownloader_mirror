@@ -19,9 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountUnavailableException;
@@ -30,10 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49414 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilespaceCom extends XFileSharingProBasic {
     public FilespaceCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +45,7 @@ public class FilespaceCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2019-04-29: solvemedia<br />
+     * captchatype-info: 2024-07-23: hCaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
@@ -121,7 +122,7 @@ public class FilespaceCom extends XFileSharingProBasic {
             }
         }
         super.checkErrors(br, correctedBR, link, account, checkAll);
-        if (new Regex(correctedBR, "(?i)>\\s*You, or someone with the same IP address, are downloading the").matches()) {
+        if (new Regex(correctedBR, "(?i)>\\s*You, or someone with the same IP address, are downloading the").patternFind()) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You're using all download slots for current IP", 10 * 60 * 1001l);
         } else if (br.containsHTML(">\\s*Bandwidth overload detected")) {
             /* 2023-04-19: Temp account ban because of accountsharing or user used VPN / server IP. */
@@ -133,7 +134,7 @@ public class FilespaceCom extends XFileSharingProBasic {
             }
         }
         if (checkAll) {
-            if (new Regex(correctedBR, "(?i)>[^<]*Wrong captcha[^<]*<").matches()) {
+            if (new Regex(correctedBR, "(?i)>[^<]*Wrong captcha[^<]*<").patternFind()) {
                 logger.warning("Wrong captcha (or wrong password as well)!");
                 /*
                  * TODO: Find a way to avoid using a property for this or add the property in very plugin which overrides handleCaptcha e.g.
@@ -169,8 +170,35 @@ public class FilespaceCom extends XFileSharingProBasic {
         /* 2019-04-29: Special */
         String wait = super.regexWaittime(br);
         if (wait == null) {
-            wait = new Regex(br.getRequest().getHtmlCode(), "Please wait <span id=\"[a-z0-9]+\">(\\d+)</span>").getMatch(0);
+            wait = new Regex(br.getRequest().getHtmlCode(), "Please wait <span id=\"[a-z0-9]+\"[^>]*>(\\d+)</span>").getMatch(0);
         }
         return wait;
+    }
+
+    @Override
+    public Form findFormDownload1Free(final Browser br) throws Exception {
+        final Form ret = br.getFormbyProperty("id", "frm_free");
+        if (ret == null) {
+            return super.findFormDownload1Free(br);
+        }
+        return ret;
+    }
+
+    @Override
+    protected Form findFormDownload2Free(final Browser br) {
+        Form ret = super.findFormDownload2Free(br);
+        if (ret == null) {
+            return null;
+        }
+        final String actionStr = "accounttype=free";
+        if (br.containsHTML(actionStr) && !StringUtils.isEmpty(ret.getAction())) {
+            ret.setAction(ret.getAction() + "?" + actionStr);
+            // if (!StringUtils.isEmpty(ret.getAction())) {
+            // ret.setAction(ret.getAction() + "?" + actionStr);
+            // } else {
+            // ret.setAction("/fd/xxxxxxyyyyyy?accounttype=free");
+            // }
+        }
+        return ret;
     }
 }

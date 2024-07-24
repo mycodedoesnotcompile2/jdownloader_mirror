@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 44527 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
 public class DownloadAniMe extends XFileSharingProBasic {
     public DownloadAniMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -37,7 +37,7 @@ public class DownloadAniMe extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2020-06-11: solvemedia<br />
+     * captchatype-info: 2024-07-23: hCaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {

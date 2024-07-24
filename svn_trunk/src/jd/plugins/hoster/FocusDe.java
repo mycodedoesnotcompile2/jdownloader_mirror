@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48085 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
+@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 3, names = { "focus.de" }, urls = { "https?://(?:www\\.)?focus\\.de/.+" })
 public class FocusDe extends PluginForHost {
     public FocusDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -159,11 +159,9 @@ public class FocusDe extends PluginForHost {
             }
         }
         if (dllink == null) {
-            logger.info("Looks like no video content -> Display as offline");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Looks like no video content");
         } else if (dllink.startsWith("rtmp")) {
-            logger.info("Livestreams are not supported");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Livestreams are not supported");
         }
         if (title != null) {
             title = Encoding.htmlDecode(title);

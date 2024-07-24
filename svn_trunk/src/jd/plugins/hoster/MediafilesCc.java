@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48653 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafilesCc extends YetiShareCore {
     public MediafilesCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class MediafilesCc extends YetiShareCore {
      ****************************
      * mods: See overridden functions<br />
      * limit-info: 2020-06-12: No limits at all <br />
-     * captchatype-info: 2023-09-04: Solvemedia <br />
+     * captchatype-info: 2024-07-23: hCaptcha<br />
      * other: <br />
      */
     public static List<String[]> getPluginDomains() {

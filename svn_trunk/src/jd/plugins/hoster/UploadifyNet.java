@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 41485 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
 public class UploadifyNet extends YetiShareCore {
     public UploadifyNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +38,7 @@ public class UploadifyNet extends YetiShareCore {
      ****************************
      * mods: See overridden functions<br />
      * limit-info: 2019-10-28: premium untested, set FREE account limits <br />
-     * captchatype-info: null solvemedia reCaptchaV2<br />
+     * captchatype-info: null reCaptchaV2<br />
      * other: <br />
      */
     public static List<String[]> getPluginDomains() {

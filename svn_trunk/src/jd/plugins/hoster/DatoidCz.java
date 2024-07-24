@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48564 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49408 $", interfaceVersion = 2, names = {}, urls = {})
 public class DatoidCz extends PluginForHost {
     public DatoidCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,7 +75,7 @@ public class DatoidCz extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "datoid.cz", "datoid.sk" });
+        ret.add(new String[] { "datoid.cz", "datoid.sk", "datoid.com" });
         ret.add(new String[] { "pornoid.cz", "pornoid.sk" });
         return ret;
     }

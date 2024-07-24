@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49064 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
 public class IceyfileCom extends YetiShareCore {
     public IceyfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -38,7 +38,7 @@ public class IceyfileCom extends YetiShareCore {
      ****************************
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null solvemedia reCaptchaV2, hcaptcha<br />
+     * captchatype-info: null reCaptchaV2, hcaptcha<br />
      * other: <br />
      */
     public static List<String[]> getPluginDomains() {

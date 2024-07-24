@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hds.HDSDownloader;
@@ -37,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "tf1.fr" }, urls = { "https?://(?:www\\.)?(wat\\.tv/video/.*?|tf1\\.fr/.+/videos/[A-Za-z0-9\\-_]+)\\.html" })
+@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 2, names = { "tf1.fr" }, urls = { "https?://(?:www\\.)?(wat\\.tv/video/.*?|tf1\\.fr/.+/videos/[A-Za-z0-9\\-_]+)\\.html" })
 public class Tf1Fr extends PluginForHost {
     public Tf1Fr(final PluginWrapper wrapper) {
         super(wrapper);
@@ -129,8 +128,6 @@ public class Tf1Fr extends PluginForHost {
              * New endpoint: https://mediainfo.tf1.fr/mediainfocombo/<video_id>
              */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming type MPD with split video audio");
-        } else if (finallink.startsWith("rtmp")) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming protocol");
         } else if (finallink.contains(".f4m?")) {
             // HDS
             br.getPage(finallink);
