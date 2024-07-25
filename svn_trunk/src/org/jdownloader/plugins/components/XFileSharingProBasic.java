@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49420 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2259,6 +2259,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     break download1;
                 }
                 logger.info("Found download1 Form");
+                /* Wait before sending download1 form is not so common. Example where it is needed: fastream.to */
+                waitTime(link, Time.systemIndependentCurrentJVMTimeMillis());
                 submitForm(download1);
                 checkErrors(br, getCorrectBR(br), link, account, false);
                 download1counter++;

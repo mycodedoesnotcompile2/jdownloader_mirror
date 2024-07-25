@@ -96,6 +96,8 @@ public class CrossSystem {
          * openSUSE: List must be sorted by release Date!!
          */
         OPENSUSE(OSFamily.LINUX),
+        OPENSUSE_LEAP(OSFamily.LINUX, "opensuse-leap"),
+        OPENSUSE_TUMBLEWEED(OSFamily.LINUX, "opensuse-tumbleweed"),
         /*
          * Slackware: List must be sorted by release Date!!
          */
@@ -290,6 +292,7 @@ public class CrossSystem {
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -356,6 +359,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -1069,7 +1073,7 @@ public class CrossSystem {
     public static OperatingSystem getLinuxRelease(final String osName) {
         OperatingSystem ret = null;
         if (osName != null && osName.toLowerCase(Locale.ENGLISH).contains("linux")) {
-            final String[] sources = new String[] { "/etc/os-release", "/etc/issue" };
+            final String[] sources = new String[] { "/etc/os-release", "/etc/issue", "/usr/lib/os-release" };
             for (final String source : sources) {
                 final File issue = new File(source);
                 if (issue.isFile()) {
@@ -1133,7 +1137,11 @@ public class CrossSystem {
                                         } else if (line.contains("slackware")) {
                                             return OperatingSystem.SLACKWARE;
                                         } else if (line.contains("opensuse")) {
-                                            return OperatingSystem.OPENSUSE;
+                                            ret = OperatingSystem.OPENSUSE;
+                                            final OperatingSystem release = getLinuxRelease(ret, line);
+                                            if (release != null) {
+                                                return release;
+                                            }
                                         } else if (line.contains("centos")) {
                                             if (line.contains("centos stream")) {
                                                 return OperatingSystem.CENTOS_STREAM;
