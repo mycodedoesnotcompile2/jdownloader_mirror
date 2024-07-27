@@ -63,7 +63,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 49432 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 49444 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,9 +118,7 @@ public class ArchiveOrg extends PluginForHost {
     public static final String                            PROPERTY_IS_LENDING_REQUIRED                    = "is_lending_required";
     public static final String                            PROPERTY_IS_FREE_DOWNLOADABLE_BOOK_PREVIEW_PAGE = "is_free_downloadable_book_preview_page";
     public static final String                            PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP            = "is_borrowed_until_timestamp";
-    @Deprecated
-    public static final String                            PROPERTY_PLAYLIST_POSITION_OLD                  = "position";
-    public static final String                            PROPERTY_PLAYLIST_POSITION_NEW                  = "position_new";
+    public static final String                            PROPERTY_PLAYLIST_POSITION                      = "position";
     public static final String                            PROPERTY_PLAYLIST_SIZE                          = "playlist_size";
     public static final String                            PROPERTY_TITLE                                  = "title";
     public static final String                            PROPERTY_ARTIST                                 = "artist";
@@ -205,13 +203,7 @@ public class ArchiveOrg extends PluginForHost {
         if (StringUtils.isEmpty(originalFilename)) {
             return;
         }
-        int playlistPosition[] = null;
-        final int positionOld = link.getIntegerProperty(PROPERTY_PLAYLIST_POSITION_OLD, -1);
-        if (positionOld != -1) {
-            playlistPosition = new int[] { positionOld };
-        } else {
-            playlistPosition = link.getObjectProperty(PROPERTY_PLAYLIST_POSITION_NEW, TypeRef.INT_ARRAY);
-        }
+        final int position = link.getIntegerProperty(PROPERTY_PLAYLIST_POSITION, -1);
         String fileExtension = Plugin.getFileNameExtensionFromString(originalFilename);
         if (fileExtension != null && fileExtension.startsWith(".")) {
             fileExtension = fileExtension.substring(1);
@@ -225,17 +217,14 @@ public class ArchiveOrg extends PluginForHost {
         } else if (StringUtils.equals(filetype, FILETYPE_VIDEO)) {
             isVideo = true;
         }
-        if (playlistPosition != null && (isAudio || isVideo) && link.getRelativeDownloadFolderPath() == null) {
+        if (position != -1 && (isAudio || isVideo) && link.getRelativeDownloadFolderPath() == null) {
             final int playlistSize = link.getIntegerProperty(PROPERTY_PLAYLIST_SIZE, -1);
-            String positionFormatted;
+            final String positionFormatted;
             if (playlistSize != -1) {
                 final int padLength = StringUtils.getPadLength(playlistSize);
-                positionFormatted = StringUtils.formatByPadLength(padLength, playlistPosition[0]);
+                positionFormatted = StringUtils.formatByPadLength(padLength, position);
             } else {
-                positionFormatted = Integer.toString(playlistPosition[0]);
-            }
-            if (playlistPosition.length == 2) {
-                positionFormatted += playlistPosition[1] + "-" + positionFormatted;
+                positionFormatted = Integer.toString(position);
             }
             if (isAudio) {
                 /* File is part of audio playlist. Format: <positionFormatted>.<rawFilename> */

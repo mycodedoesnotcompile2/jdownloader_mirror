@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo;
+import org.jdownloader.plugins.components.config.XFSConfigVideoFastreamTo;
 
 import jd.PluginWrapper;
 import jd.plugins.Account;
@@ -26,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49420 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49441 $", interfaceVersion = 3, names = {}, urls = {})
 public class FastreamTo extends XFileSharingProBasic {
     public FastreamTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +105,15 @@ public class FastreamTo extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        return Boolean.FALSE;
+    }
+
+    @Override
+    public Class<? extends XFSConfigVideo> getConfigInterface() {
+        return XFSConfigVideoFastreamTo.class;
     }
 }

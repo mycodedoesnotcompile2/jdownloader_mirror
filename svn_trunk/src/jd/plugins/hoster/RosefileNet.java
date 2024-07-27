@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49171 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49440 $", interfaceVersion = 3, names = {}, urls = {})
 public class RosefileNet extends PluginForHost {
     public RosefileNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -203,7 +203,11 @@ public class RosefileNet extends PluginForHost {
             ajax.getHeaders().put("Origin", "https://" + br.getHost());
             final boolean looksLikePremiumADownloadWithoutWait = br.containsHTML("load_down");
             if (account != null && looksLikePremiumADownloadWithoutWait) {
-                final String hash = br.getRegex("let hash = \"([^\"]+)\"").getMatch(0);
+                String hash = br.getRegex("let hash = \"([a-f0-9]{32})").getMatch(0);
+                if (hash == null) {
+                    /* 2024-07-26 */
+                    hash = br.getRegex("([a-f0-9]{32})'").getMatch(0);
+                }
                 final UrlQuery query = new UrlQuery();
                 query.add("action", "check_recaptcha");
                 query.add("file_id", internalFileID);

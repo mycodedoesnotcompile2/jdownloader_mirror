@@ -21,11 +21,11 @@ import java.lang.ref.SoftReference;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49432 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49444 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -738,6 +738,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         return null;
     }
 
+    @Deprecated
+    /** This function can parse the "track" field of json items from "/metadata/<identifier> */
     private int[] parseAudioTrackPosition(final Object audioTrackPositionO) throws PluginException {
         if (audioTrackPositionO == null) {
             return null;
@@ -833,10 +835,10 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final String server = root.get("server").toString();
         final String dir = root.get("dir").toString();
         /* Crawl files */
-        final Map<Integer, List<Integer>> usedTrackPositions = new HashMap<Integer, List<Integer>>();
-        final Map<DownloadLink, List<Integer>> highestTrackPositions = new HashMap<DownloadLink, List<Integer>>();
         final ArrayList<DownloadLink> originalItems = new ArrayList<DownloadLink>();
-        final ArrayList<DownloadLink> audioPlaylistItems = new ArrayList<DownloadLink>();
+        final Map<String, DownloadLink> itemMapping = new HashMap<String, DownloadLink>();
+        final Map<String, String> originalMapping = new HashMap<String, String>();
+        final ArrayList<String> audioPlaylistItems = new ArrayList<String>();
         final ArrayList<DownloadLink> desiredSubpathItems = new ArrayList<DownloadLink>();
         DownloadLink singleDesiredFile = null;
         DownloadLink singleDesiredFile2 = null;
@@ -869,7 +871,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final boolean isAccessRestricted = StringUtils.equalsIgnoreCase((String) root_metadata.get("access-restricted-item"), "true");
         /* If this gets set to true, we expect 60 second video streams to be available. */
         boolean identifierDotMp4Exists = false;
-        int audioTrackPositionCounterInternal = 1;
         for (final Map<String, Object> filemap : root_files) {
             final String source = filemap.get("source").toString(); // "original", "derivative" or "metadata"
             final String format = (String) filemap.get("format");
@@ -879,10 +880,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             final boolean isMetadata = StringUtils.equalsIgnoreCase(format, "metadata");
             final boolean isThumbnail = StringUtils.equalsIgnoreCase(format, "Thumbnail");
             // final boolean isArchiveViewSupported = false; // TODO: Check this
-            // final Object originalO = filemap.get("original");
+            final Object originalO = filemap.get("original");
             /* Boolean as string */
             final boolean isAccountRequiredForDownload = StringUtils.equalsIgnoreCase((String) filemap.get("private"), "true");
-            String pathWithFilename = filemap.get("name").toString();
+            final String name = filemap.get("name").toString();
+            String pathWithFilename = name;
             if (Encoding.isHtmlEntityCoded(pathWithFilename)) {
                 /* Will sometimes contain "&amp;" */
                 pathWithFilename = Encoding.htmlOnlyDecode(pathWithFilename);
@@ -923,7 +925,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 filename = pathWithFilename;
             }
             final Object fileSizeO = filemap.get("size");
-            final Object audioTrackPositionO = filemap.get("track");
             String url = "https://archive.org/download/" + identifier;
             if (pathWithFilename.startsWith("/")) {
                 url += URLEncode.encodeURIComponent(pathWithFilename);
@@ -932,6 +933,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             // final String directurl = "https://" + server + dir + "/" + URLEncode.encodeURIComponent(pathWithFilename);
             final DownloadLink file = this.createDownloadlink(url);
+            itemMapping.put(name, file);
+            if (isOriginal) {
+                originalMapping.put(name, null);
+            } else if ("derivative".equals(source) && originalO instanceof String) {
+                originalMapping.put(name, originalO.toString());
+            }
             file.setProperty(ArchiveOrg.PROPERTY_ARTIST, filemap.get("artist")); // Optional field
             file.setProperty(ArchiveOrg.PROPERTY_TITLE, filemap.get("title")); // Optional field
             file.setProperty(ArchiveOrg.PROPERTY_ARTIST, filemap.get("artist")); // optional field
@@ -959,48 +966,14 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             if (isAccountRequiredForDownload) {
                 file.setProperty(ArchiveOrg.PROPERTY_IS_ACCOUNT_REQUIRED, true);
             }
-            if (audioTrackPositionO != null) {
-                /* Track position given -> Item must be part of a playlist. */
-                final DownloadLink audioPlaylistItem = this.createDownloadlink(url);
-                final int[] audioTrackPosition = parseAudioTrackPosition(audioTrackPositionO);
-                findHighest: if (audioTrackPosition != null) {
-                    file.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, audioTrackPosition);
-                    /**
-                     * Size of playlist must not be pre-given </br>
-                     * Size of playlist = Highest track-number.
-                     */
-                    final Integer medium;
-                    final Integer pos;
-                    if (audioTrackPosition.length == 1) {
-                        medium = null;
-                        pos = audioTrackPosition[0];
-                    } else if (audioTrackPosition.length == 2) {
-                        medium = audioTrackPosition[1];
-                        pos = audioTrackPosition[0];
-                    } else {
-                        break findHighest;
-                    }
-                    List<Integer> list = usedTrackPositions.get(medium);
-                    if (list == null) {
-                        list = new ArrayList<Integer>();
-                        usedTrackPositions.put(medium, list);
-                    }
-                    if (!list.contains(pos)) {
-                        list.add(pos);
-                    }
-                    highestTrackPositions.put(file, list);
-                    highestTrackPositions.put(audioPlaylistItem, list);
-                }
-                audioPlaylistItem.setProperties(file.getProperties());
-                /* Add item to list of playlist results. */
-                audioPlaylistItems.add(audioPlaylistItem);
-                // file.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_OLD, audioTrackPositionCounterInternal);
-                audioTrackPositionCounterInternal++;
+            if (StringUtils.containsIgnoreCase(format, "MP3")) {
+                /* Item looks to be part of a playlist. */
+                audioPlaylistItems.add(name);
             }
             file.setAvailable(true);
+            file.setRelativeDownloadFolderPath(pathToCurrentFolder);
             /* Set filename */
             ArchiveOrg.setFinalFilename(file, filename);
-            file.setRelativeDownloadFolderPath(pathToCurrentFolder);
             FilePackage fp = packagemap.get(pathToCurrentFolder);
             if (fp == null) {
                 fp = FilePackage.getInstance();
@@ -1042,16 +1015,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             } else {
                 ret.add(file);
             }
-            final Object original = filemap.get("original");
-            if (original instanceof String) {
-                originalFilenamesDupeCollection.add(original.toString());
-            }
-        }
-        // assign PROPERTY_PLAYLIST_SIZE
-        for (final DownloadLink file : highestTrackPositions.keySet()) {
-            final List<Integer> list = highestTrackPositions.get(file);
-            if (list != null) {
-                file.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, Collections.max(list));
+            if (originalO instanceof String) {
+                originalFilenamesDupeCollection.add(originalO.toString());
             }
         }
         /* Log skipped results */
@@ -1204,7 +1169,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 final String directurl = "https://archive.org/download/" + identifier + "/" + identifier + ".mp4?t=" + offsetSeconds + "/" + (offsetSeconds + secondsPerSegment) + "&ignore=x.mp4";
                 final DownloadLink video = this.createDownloadlink(directurl);
                 video.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_VIDEO);
-                video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, parseAudioTrackPosition(position));
+                video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION, position);
                 video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, numberofVideoSegments);
                 ArchiveOrg.setFinalFilename(video, identifier + ".mp4");
                 video.setAvailable(true);
@@ -1234,25 +1199,55 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* Audio playlist handling */
             // final boolean isAudioPlaylist = mediatype.equalsIgnoreCase("audio");
             final int playlistSize = audioPlaylistItems.size();
-            /* Add some additional properties for special playlist items. */
-            for (final DownloadLink audioPlaylistItem : audioPlaylistItems) {
-                if (!audioPlaylistItem.hasProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE)) {
-                    /* Playlist size can only be determined after first loop -> Set that property here. */
-                    audioPlaylistItem.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, playlistSize);
+            final ArrayList<DownloadLink> audioPlaylistFinalResults = new ArrayList<DownloadLink>();
+            final ListIterator<String> li = audioPlaylistItems.listIterator();
+            while (li.hasNext()) {
+                final int itemPosition = li.nextIndex() + 1;
+                final String itemName = li.next();
+                final String mappingName = originalMapping.get(itemName);
+                final String originalName;
+                final String derivativeName;
+                if (mappingName == null) {
+                    originalName = itemName;
+                    derivativeName = null;
+                } else {
+                    originalName = mappingName;
+                    if (crawlOriginalFilesOnly) {
+                        derivativeName = null;
+                    } else {
+                        derivativeName = itemName;
+                    }
                 }
-                audioPlaylistItem.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_AUDIO);
-                audioPlaylistItem.setAvailable(true);
-                audioPlaylistItem._setFilePackage(playlistpackage);
-                ArchiveOrg.setFinalFilename(audioPlaylistItem, audioPlaylistItem.getName());
+                for (final String entryName : new String[] { originalName, derivativeName }) {
+                    if (entryName == null) {
+                        continue;
+                    }
+                    final DownloadLink item = itemMapping.get(entryName);
+                    final DownloadLink audioPlaylistLink = this.createDownloadlink(item.getPluginPatternMatcher());
+                    audioPlaylistLink.setProperties(item.getProperties());
+                    /* Remove relative folder path set on original item otherwise playlist results will go into different packages! */
+                    audioPlaylistLink.setRelativeDownloadFolderPath(null);
+                    /*
+                     * Add playlist specific properties so hosterplugin "knows" that this item is part of a playlist and cand set filenames
+                     * accordingly.
+                     */
+                    audioPlaylistLink.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION, itemPosition);
+                    audioPlaylistLink.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, playlistSize);
+                    audioPlaylistLink.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_AUDIO);
+                    audioPlaylistLink.setAvailable(true);
+                    audioPlaylistLink._setFilePackage(playlistpackage);
+                    ArchiveOrg.setFinalFilename(audioPlaylistLink, item.getName());
+                    audioPlaylistFinalResults.add(audioPlaylistLink);
+                }
             }
             if (playlistCrawlMode == PlaylistCrawlMode.PLAYLIST_ONLY) {
                 /* Return playlist items only */
-                return audioPlaylistItems;
+                return audioPlaylistFinalResults;
             } else if (isDownloadPage && playlistCrawlMode == PlaylistCrawlMode.AUTO) {
-                logger.info("Skipping audio playlist because user added '/download/' page in auto mode");
+                logger.info("Skipping audio playlist because user added '/download/' page in auto mode -> Return items visible on the website -> Paylist is only display for '/details/' links");
             } else if (playlistCrawlMode == PlaylistCrawlMode.AUTO || playlistCrawlMode == PlaylistCrawlMode.PLAYLIST_AND_FILES) {
                 /* Return playlist and original files. */
-                ret.addAll(audioPlaylistItems);
+                ret.addAll(audioPlaylistFinalResults);
                 return ret;
             } else {
                 /* Do not return any playlist items but only original files. */
@@ -1646,7 +1641,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             for (final String url : urls) {
                 final DownloadLink video = this.createDownloadlink(url);
                 video.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_VIDEO);
-                video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, parseAudioTrackPosition(position));
+                video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION, position);
                 video.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, urls.size());
                 ArchiveOrg.setFinalFilename(video, slug + ".mp4");
                 video.setAvailable(true);
@@ -1678,7 +1673,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 final String title = (String) audiomap.get("title");
                 final DownloadLink audio = this.createDownloadlink(br.getURL(source0.get("file").toString()).toExternalForm());
                 audio.setProperty(ArchiveOrg.PROPERTY_FILETYPE, ArchiveOrg.FILETYPE_AUDIO);
-                audio.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, parseAudioTrackPosition(position));
+                audio.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION, position);
                 audio.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_SIZE, ressourcelist.size());
                 audio.setProperty(ArchiveOrg.PROPERTY_ARTIST, audiomap.get("artist")); // optional field
                 audio.setProperty(ArchiveOrg.PROPERTY_TITLE, title);
@@ -1994,33 +1989,20 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         if (!StringUtils.isEmpty(description)) {
             fp.setComment(description);
         }
-        final Map<Integer, List<Integer>> usedTrackPositions = new HashMap<Integer, List<Integer>>();
         final Map<DownloadLink, List<Integer>> highestTrackPositions = new HashMap<DownloadLink, List<Integer>>();
         int playlistSize = filepathToPlaylistItemMapping != null ? filepathToPlaylistItemMapping.size() : null;
         for (final Map<String, Object> filemap : filemaps) {
             final String source = filemap.get("source").toString(); // "original" or "derivative"
-            final Object audioTrackPositionO = filemap.get("track");
+            final Object originalO = filemap.get("original");
             String filenameOrPath = (String) filemap.get("orig");
             final Object sizeO = filemap.get("size");
+            if (StringUtils.isEmpty(filenameOrPath) && originalO instanceof String) {
+                filenameOrPath = originalO.toString();
+            }
             if (StringUtils.isEmpty(filenameOrPath)) {
-                filenameOrPath = (String) filemap.get("original");
-                if (StringUtils.isEmpty(filenameOrPath)) {
-                    filenameOrPath = (String) filemap.get("name");
-                }
+                filenameOrPath = (String) filemap.get("name");
             }
             final DownloadLink playlistItem = filepathToPlaylistItemMapping != null ? filepathToPlaylistItemMapping.get(filenameOrPath) : null;
-            int[] audioTrackPosition = null;
-            if (playlistItem != null) {
-                /* Get track position from mapping. Trust this mapping more than "track" field in metadata. */
-                audioTrackPosition = parseAudioTrackPosition(playlistItem.getObjectProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, TypeRef.INT_ARRAY));
-            }
-            if (audioTrackPosition == null) {
-                /*
-                 * Obtain position from metadata. This is not the position we want but we will also set it as a property, it could be useful
-                 * too.
-                 */
-                audioTrackPosition = parseAudioTrackPosition(audioTrackPositionO);
-            }
             if (filepathToPlaylistItemMapping != null && (playlistItem == null || !source.equalsIgnoreCase("original"))) {
                 /* Skip non audio and non-original files if a filenameToTrackPositionMapping is available. */
                 skippedItems.add(filemap);
@@ -2028,39 +2010,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
             final String directurl = "https://" + server + dir + "/" + URLEncode.encodeURIComponent(filenameOrPath);
             final DownloadLink file = new DownloadLink(hostPlugin, null, "archive.org", directurl, true);
-            findHighest: if (audioTrackPosition != null) {
-                file.setProperty(ArchiveOrg.PROPERTY_PLAYLIST_POSITION_NEW, audioTrackPosition);
-                /**
-                 * Size of playlist must not be pre-given </br>
-                 * Size of playlist = Highest track-number.
-                 */
-                final Integer medium;
-                final Integer pos;
-                if (audioTrackPosition.length == 1) {
-                    medium = null;
-                    pos = audioTrackPosition[0];
-                } else if (audioTrackPosition.length == 2) {
-                    medium = audioTrackPosition[1];
-                    pos = audioTrackPosition[0];
-                } else {
-                    break findHighest;
-                }
-                List<Integer> list = usedTrackPositions.get(medium);
-                if (list == null) {
-                    list = new ArrayList<Integer>();
-                    usedTrackPositions.put(medium, list);
-                }
-                if (!list.contains(pos)) {
-                    list.add(pos);
-                } else if (filepathToPlaylistItemMapping != null) {
-                    /*
-                     * Log if an item with the same position exists multiple times.
-                     */
-                    logger.info("Found duplicated playlist item on position: " + Arrays.toString(audioTrackPosition));
-                    itemsWithDuplicatedTracknumbers.add(filemap);
-                }
-                highestTrackPositions.put(file, list);
-            }
             file.setProperty(ArchiveOrg.PROPERTY_ARTIST, filemap.get("artist")); // Optional field
             file.setProperty(ArchiveOrg.PROPERTY_TITLE, filemap.get("title")); // Optional field
             if (sizeO != null) {
