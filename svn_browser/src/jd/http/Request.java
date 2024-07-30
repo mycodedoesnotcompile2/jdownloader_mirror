@@ -566,7 +566,7 @@ public abstract class Request {
                 return "image/gif,image/*;q=0.8,*/*;q=0.5";
             } else if (path.matches(".+tiff?$")) {
                 return "image/tiff,image/*;q=0.8,*/*;q=0.5";
-            } else if (path.matches(".+(mp4|mkv|avi)$")) {
+            } else if (path.matches(".+(mp4|mkv|avi|m3u8)$")) {
                 return "video/*;q=0.9,*/*;q=0.5";
             }
         }

@@ -39,6 +39,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.text.NumberFormat;
 import java.text.ParseException;
 
 import javax.swing.JFormattedTextField.AbstractFormatter;
@@ -55,8 +56,9 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
     /**
      *
      */
-    private static final long  serialVersionUID = -3983659343629867162L;
-    private SpinnerNumberModel nm;
+    private static final long    serialVersionUID = -3983659343629867162L;
+    protected SpinnerNumberModel nm;
+    protected final NumberFormat numberFormat;
 
     public SizeSpinner(final long min, final long max, final long steps) {
         this(new SpinnerNumberModel(Long.valueOf(min), Long.valueOf(min), Long.valueOf(max), Long.valueOf(steps)));
@@ -68,6 +70,7 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
     public SizeSpinner(final SpinnerNumberModel model) {
         super(model);
         // this.addFocusListener(this);
+        this.numberFormat = initNumberFormat();
         this.nm = (SpinnerNumberModel) super.getModel();
         final DefaultFormatterFactory factory = new DefaultFormatterFactory(new AbstractFormatter() {
             private static final long serialVersionUID = 7808117078307243989L;
@@ -85,6 +88,10 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
         ((JSpinner.DefaultEditor) this.getEditor()).getTextField().setFormatterFactory(factory);
         ((JSpinner.DefaultEditor) this.getEditor()).getTextField().addFocusListener(this);
         ((JSpinner.DefaultEditor) this.getEditor()).getTextField().addActionListener(this);
+    }
+
+    protected NumberFormat initNumberFormat() {
+        return NumberFormat.getInstance();
     }
 
     /*
@@ -228,7 +235,7 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
      * @return
      */
     protected String longToText(final long longValue) {
-        return SizeFormatter.formatBytes(longValue);
+        return SizeFormatter.formatBytes(numberFormat, longValue);
     }
 
     @Override
@@ -237,6 +244,6 @@ public class SizeSpinner extends ExtSpinner implements FocusListener, ActionList
     }
 
     protected Object textToObject(final String text) {
-        return SizeFormatter.getSize(text, true, true);
+        return SizeFormatter.getSize(numberFormat, text, true, true);
     }
 }

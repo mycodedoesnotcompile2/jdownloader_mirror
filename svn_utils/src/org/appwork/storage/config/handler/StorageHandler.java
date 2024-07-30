@@ -994,15 +994,16 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
     }
 
     private void removeKeyHandler(KeyHandler<?> keyHandler) {
-        final Method getMethod = keyHandler.getGetMethod();
-        if (getMethod != null) {
-            this.method2KeyHandlerMap.remove(getMethod);
+        if (this.key2KeyHandlerMap.remove(keyHandler.getKey()) != null) {
+            final Method getMethod = keyHandler.getGetMethod();
+            if (getMethod != null) {
+                this.method2KeyHandlerMap.remove(getMethod);
+            }
+            final Method setMethod = keyHandler.getSetMethod();
+            if (setMethod != null) {
+                this.method2KeyHandlerMap.remove(setMethod);
+            }
         }
-        final Method setMethod = keyHandler.getSetMethod();
-        if (setMethod != null) {
-            this.method2KeyHandlerMap.remove(setMethod);
-        }
-        this.key2KeyHandlerMap.remove(keyHandler.getKey());
     }
 
     private void addKeyHandler(KeyHandler<?> keyHandler) {

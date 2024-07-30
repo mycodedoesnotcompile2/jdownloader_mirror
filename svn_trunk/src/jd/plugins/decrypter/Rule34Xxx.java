@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 49446 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
+@DecrypterPlugin(revision = "$Revision: 49447 $", interfaceVersion = 3, names = { "rule34.xxx" }, urls = { "https?://(?:www\\.)?rule34\\.xxx/index\\.php\\?page=post\\&s=(view\\&id=\\d+|list\\&tags=.+)" })
 public class Rule34Xxx extends PluginForDecrypt {
     private final String prefixLinkID = getHost().replaceAll("[\\.\\-]+", "") + "://";
 
@@ -275,6 +275,7 @@ public class Rule34Xxx extends PluginForDecrypt {
             FilePackage fp = null;
             if (fpName != null) {
                 fp = FilePackage.getInstance();
+                fp.setCleanupPackageName(Boolean.FALSE);
                 fpName = URLEncode.decodeURIComponent(fpName).trim();
                 fp.setName(fpName);
             }

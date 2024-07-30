@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49425 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
+@DecrypterPlugin(revision = "$Revision: 49452 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
 public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirectoryIndexCrawler {
     private enum DirectoryListingMode {
         NGINX,
@@ -74,6 +74,7 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
 
     protected ArrayList<DownloadLink> crawlHTTPDirectory(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
         /* First check if maybe the user has added a directURL. */
+        // TODO: Add authentication handling see jd.plugins.decrypter.LinkCrawlerDeepHelper
         final String url = param.getCryptedUrl().replaceFirst("(?i)^jd://directoryindex://", "");
         final GetRequest getRequest = br.createGetRequest(url);
         final URLConnectionAdapter con = this.br.openRequestConnection(getRequest);

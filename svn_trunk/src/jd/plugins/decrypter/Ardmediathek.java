@@ -70,10 +70,10 @@ import jd.plugins.components.MediathekHelper;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ARDMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 49317 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 49453 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
-    private static final String  type_embedded                          = "https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
+    private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
     /* Variables */
     private final List<String>   all_known_qualities                    = new ArrayList<String>();
     private final List<String>   selectedQualities                      = new ArrayList<String>();
@@ -429,13 +429,11 @@ public class Ardmediathek extends PluginForDecrypt {
                 }
             }
         }
-        final HashMap<String, DownloadLink> foundQualities = crawlARDMediathekJson2024(param, metadata, streamMap);
-        return this.handleUserQualitySelection(metadata, foundQualities);
+        return crawlARDMediathekJson2024(param, metadata, streamMap);
     }
 
-    private HashMap<String, DownloadLink> crawlARDMediathekJson2024(final CryptedLink param, final ArdMetadata metadata, final Object mediaCollection) throws Exception {
+    private ArrayList<DownloadLink> crawlARDMediathekJson2024(final CryptedLink param, final ArdMetadata metadata, final Object mediaCollection) throws Exception {
         final HashMap<String, DownloadLink> foundQualitiesMap = new HashMap<String, DownloadLink>();
-        final List<String> httpStreamsQualityIdentifiers = new ArrayList<String>();
         /* For http stream quality identifiers which have been created by the hls --> http URLs converter */
         String exampleHTTPURL = null;
         String hlsMaster = null;
@@ -443,18 +441,22 @@ public class Ardmediathek extends PluginForDecrypt {
         int maxHeightProgressive = -1;
         final Map<String, Object> map = (Map<String, Object>) JavaScriptEngineFactory.walkJson(mediaCollection, "widgets/{0}/mediaCollection/embedded");
         final List<Map<String, Object>> mediaArray = (List<Map<String, Object>>) map.get("streams");
+        final ArrayList<DownloadLink> results = new ArrayList<DownloadLink>();
         for (Map<String, Object> media : mediaArray) {
             final List<Map<String, Object>> mediaStreams = (List<Map<String, Object>>) media.get("media");
             /* Look-ahead */
             boolean hasAudiodescription = false;
             boolean hasNormalVersion = false;
             for (final Map<String, Object> mediaStream : mediaStreams) {
-                final String audioKind = (String) JavaScriptEngineFactory.walkJson(mediaStream, "audios/{0}/kind");
-                if (StringUtils.equalsIgnoreCase("audio-description", audioKind)) {
-                    hasAudiodescription = true;
-                    break;
-                } else {
-                    hasNormalVersion = true;
+                final List<Map<String, Object>> audios = (List<Map<String, Object>>) mediaStream.get("audios");
+                for (final Map<String, Object> audio : audios) {
+                    final String audioKind = audio.get("kind").toString();
+                    if (StringUtils.equalsIgnoreCase("audio-description", audioKind)) {
+                        hasAudiodescription = true;
+                        break;
+                    } else {
+                        hasNormalVersion = true;
+                    }
                 }
             }
             if (hasAudiodescription && !hasNormalVersion) {
@@ -464,9 +466,16 @@ public class Ardmediathek extends PluginForDecrypt {
                 // list is sorted from best to lowest quality, first one is m3u8
                 final String url = mediaStream.get("url").toString();
                 final String mimeType = mediaStream.get("mimeType").toString();
-                final String audioKind = (String) JavaScriptEngineFactory.walkJson(mediaStream, "audios/{0}/kind");
                 final Number widthO = (Number) mediaStream.get("maxHResolutionPx");
                 final Number heightO = (Number) mediaStream.get("maxVResolutionPx");
+                final List<Map<String, Object>> audios = (List<Map<String, Object>>) mediaStream.get("audios");
+                if (audios.size() != 1) {
+                    logger.info("Skipping item with 'audios' lenth != 1: " + url);
+                    continue;
+                }
+                final Map<String, Object> audio = audios.get(0);
+                final String audioKind = audio.get("kind").toString();
+                final String audioLanguageCode = audio.get("languageCode").toString();
                 final boolean isAudiodescription;
                 if (StringUtils.equalsIgnoreCase("audio-description", audioKind)) {
                     isAudiodescription = true;
@@ -511,15 +520,14 @@ public class Ardmediathek extends PluginForDecrypt {
                     continue;
                 }
                 final DownloadLink download = addQualityHTTP(param, metadata, foundQualitiesMap, url, null, resolution, isAudiodescription);
-                if (download != null) {
-                    httpStreamsQualityIdentifiers.add(getQualityIdentifier(url, resolution, -1));
-                }
+                download.setProperty("languagecode", audioLanguageCode);
+                results.add(download);
             }
         }
         // hlsMaster =
         // "https://wdradaptiv-vh.akamaihd.net/i/medp/ondemand/weltweit/fsk0/232/2326527/,2326527_32403893,2326527_32403894,2326527_32403895,2326527_32403891,2326527_32403896,2326527_32403892,.mp4.csmil/master.m3u8";
         String http_url_audio = br.getRegex("((?:https?:)?//[^<>\"]+\\.mp3)\"").getMatch(0);
-        if (hlsMaster == null && http_url_audio == null && httpStreamsQualityIdentifiers.isEmpty()) {
+        if (hlsMaster == null && http_url_audio == null && foundQualitiesMap.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* Decide if we need to grab the HLS qualities too. */
@@ -535,13 +543,78 @@ public class Ardmediathek extends PluginForDecrypt {
             addHLS(param, metadata, foundQualitiesMap, br, hlsMaster, false);
         }
         if (http_url_audio != null) {
+            /* Legacy handling, TODO: Remove this */
             if (http_url_audio.startsWith("//")) {
                 /* 2019-04-11: Workaround for missing protocol */
                 http_url_audio = "https:" + http_url_audio;
             }
             addQualityHTTP(param, metadata, foundQualitiesMap, http_url_audio, null, null, false);
+            return this.handleUserQualitySelection(metadata, foundQualitiesMap);
+        } else {
+            return handleUserQualitySelectionArdmediathek(metadata, results);
         }
-        return foundQualitiesMap;
+    }
+
+    private ArrayList<DownloadLink> handleUserQualitySelectionArdmediathek(final ArdMetadata metadata, final ArrayList<DownloadLink> foundQualities) {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        if (foundQualities.isEmpty()) {
+            logger.warning("foundQualitiesMap is empty");
+            return ret;
+        }
+        final Map<String, Map<String, DownloadLink>> audioLanguages = new HashMap<String, Map<String, DownloadLink>>();
+        for (final DownloadLink link : foundQualities) {
+            String languagecode = link.getStringProperty("languagecode");
+            if (languagecode == null) {
+                /* Assume German language */
+                languagecode = "deu";
+            }
+            Map<String, DownloadLink> thisLanguageItems = audioLanguages.get(languagecode);
+            if (thisLanguageItems == null) {
+                thisLanguageItems = new HashMap<String, DownloadLink>();
+                audioLanguages.put(languagecode, thisLanguageItems);
+            }
+            final MediathekProperties data = link.bindData(MediathekProperties.class);
+            final long bitrate = data.getBitrateTotal();
+            final String resolutionStr = data.getResolution();
+            final VideoResolution resolution = VideoResolution.getByStr(resolutionStr);
+            final String identifier = this.getQualityIdentifier(link.getPluginPatternMatcher(), resolution, bitrate);
+            thisLanguageItems.put(identifier, link);
+        }
+        /*
+         * Add selected items for each selected language. </br> 2024-07-29: Currently the user can only select one "preferred" language.
+         */
+        String targetAudioLanguageCode = null;
+        String languagePrioString = cfg.getAudioLanguagePriorityString();
+        if (languagePrioString == null) {
+            languagePrioString = "deu";
+        }
+        final String[] audioPrioList = languagePrioString.toLowerCase(Locale.ENGLISH).replace(" ", "").split(",");
+        for (String audioPrioString : audioPrioList) {
+            if (audioPrioString.equals("de")) {
+                audioPrioString = "deu";
+            } else if (audioPrioString.equals("original")) {
+                audioPrioString = "ov";
+            }
+            if (audioLanguages.containsKey(audioPrioString)) {
+                targetAudioLanguageCode = audioPrioString;
+                break;
+            }
+        }
+        if (targetAudioLanguageCode == null) {
+            /* Fallback to german */
+            if (audioLanguages.containsKey("deu")) {
+                /* Fallback to german */
+                targetAudioLanguageCode = "deu";
+            } else if (audioLanguages.containsKey("ov")) {
+                /* Fallback to original language version */
+                targetAudioLanguageCode = "ov";
+            } else {
+                /* Fallback to first/random languageCode */
+                targetAudioLanguageCode = audioLanguages.keySet().iterator().next();
+            }
+        }
+        final Map<String, DownloadLink> languageQualityMap = audioLanguages.get(targetAudioLanguageCode);
+        return this.handleUserQualitySelection(metadata, languageQualityMap);
     }
 
     private ArrayList<DownloadLink> crawlSandmannDe(final CryptedLink param) throws Exception {
@@ -1429,6 +1502,7 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /** Crawls extended version of ardjson which also contains video metadata. */
+    @Deprecated
     private ArrayList<DownloadLink> crawlARDJsonExtended(final CryptedLink param, final Map<String, Object> mc) throws Exception {
         final ArdMetadata metadata = new ArdMetadata();
         final Map<String, Object> _info = (Map<String, Object>) mc.get("_info");
@@ -1716,7 +1790,7 @@ public class Ardmediathek extends PluginForDecrypt {
     /* Returns quality identifier String, compatible with quality selection values. Format: protocol_bitrateCorrected_heightCorrected */
     private String getQualityIdentifier(final String directurl, final VideoResolution resolution, final long bitrate) {
         final String protocol;
-        if (directurl.contains("m3u8")) {
+        if (StringUtils.containsIgnoreCase(directurl, "m3u8")) {
             protocol = "hls";
         } else {
             protocol = "http";
@@ -2023,6 +2097,32 @@ public class Ardmediathek extends PluginForDecrypt {
 
         public int getWidth() {
             return width;
+        }
+
+        public static VideoResolution getByStr(final String str) {
+            if (str == null) {
+                return null;
+            }
+            final String[] values = str.toLowerCase(Locale.ENGLISH).split("x");
+            if (values.length != 2) {
+                return null;
+            }
+            VideoResolution ret = null;
+            final String widthStr = values[0];
+            if (widthStr.matches("\\d+")) {
+                final int width = Integer.parseInt(widthStr);
+                ret = getByWidth(width);
+                if (ret != null) {
+                    return ret;
+                }
+            }
+            final String heightStr = values[1];
+            if (heightStr.matches("\\d+")) {
+                final int height = Integer.parseInt(heightStr);
+                ret = getByHeight(height);
+                return ret;
+            }
+            return null;
         }
 
         public static VideoResolution getByWidth(int width) {

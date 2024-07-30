@@ -34,6 +34,7 @@
 package org.appwork.utils.formatter;
 
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
 import java.util.regex.Pattern;
 
@@ -123,6 +124,7 @@ public class SizeFormatter {
         }
     }
 
+    @Deprecated
     public static long getSize(final String string) {
         return SizeFormatter.getSize(string, true, false);
     }
@@ -130,12 +132,23 @@ public class SizeFormatter {
     private static final Pattern DOUBLE = Pattern.compile("([\\d]+)[.,:]([\\d]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("([\\d]+)", Pattern.CASE_INSENSITIVE);
 
+    @Deprecated
     public static long getSize(String string, boolean kibi, boolean allowNegative) {
+        return getSize(NumberFormat.getInstance(), string, kibi, allowNegative);
+    }
+
+    public static long getSize(final NumberFormat format, String string, boolean kibi, boolean allowNegative) {
         final boolean negative;
         if (allowNegative) {
             negative = Pattern.compile("\\D*\\-.*").matcher(string).matches();
         } else {
             negative = false;
+        }
+        if (format instanceof DecimalFormat) {
+            final DecimalFormatSymbols symbols = ((DecimalFormat) format).getDecimalFormatSymbols();
+            string = string.replace(Character.toString(symbols.getGroupingSeparator()), "");// remove GroupingSeparator
+            string = string.replace(Character.toString(symbols.getDecimalSeparator()), ".");// convert DecimalSeparator to .(for
+                                                                                            // Double.parseDouble)
         }
         String[][] matches = new Regex(string, SizeFormatter.DOUBLE).getMatches();
         if (matches == null || matches.length == 0) {
@@ -173,6 +186,7 @@ public class SizeFormatter {
         }
     }
 
+    @Deprecated
     public static long getSize(final String string, final boolean kibi) {
         return SizeFormatter.getSize(string, kibi, false);
     }

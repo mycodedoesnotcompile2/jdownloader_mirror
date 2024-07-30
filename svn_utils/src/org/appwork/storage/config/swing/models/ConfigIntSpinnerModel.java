@@ -62,7 +62,6 @@ public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValuePr
         provider.register(this, true);
         final List<SpinnerValidator> spinn = provider.getAnnotations(SpinnerValidator.class);
         if (spinn != null && spinn.size() > 0) {
-
             this.setMinimum(spinn.get(0).min());
             this.setMaximum(spinn.get(0).max());
             this.setStepSize(spinn.get(0).step());
@@ -90,7 +89,7 @@ public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValuePr
 
     @Override
     public Number getNumber() {
-        return this.provider.get();
+        return this.getProvider().get();
     }
 
     /**
@@ -118,16 +117,16 @@ public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValuePr
 
     @Override
     public Object getValue() {
-        return this.provider.get();
+        return getNumber();
     }
 
     @Override
     public void setValue(final Object value) {
         try {
             if (value instanceof Number) {
-                provider.set(((Number) value).intValue());
+                getProvider().set(((Number) value).intValue());
             } else if (value instanceof String && ((String) value).matches("^-?\\d+$")) {
-                provider.set(Integer.valueOf(String.valueOf(value)));
+                getProvider().set(Integer.valueOf(String.valueOf(value)));
             }
         } catch (final ValidationException e) {
             java.awt.Toolkit.getDefaultToolkit().beep();
@@ -164,6 +163,5 @@ public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValuePr
                 ConfigIntSpinnerModel.this.fireStateChanged();
             }
         };
-
     }
 }

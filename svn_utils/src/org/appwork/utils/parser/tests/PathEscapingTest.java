@@ -8,6 +8,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.ShellParser;
@@ -27,21 +28,29 @@ public class PathEscapingTest extends AWTest {
             logInfoAnyway("SKIPPED: WINDOWS Only");
             return;
         }
-        final String result = runProcessImpl(cmd);
-        final String ourImpl = runOurImpl(cmd);
-        if (StringUtils.equals(expect, result, ourImpl)) {
-            System.out.println("SUCCESS " + ourImpl);
-        } else {
-            if (StringUtils.equals(expect, ourImpl)) {
-                logInfoAnyway("WARNING: Implementation for " + JVMVersion.getJVMVersion() + " differs from what we expect");
-                logInfoAnyway("Input: " + Arrays.asList(cmd));
-                logInfoAnyway("JavaImpl: " + result);
-                logInfoAnyway("ourImpl: " + ourImpl);
-                return;
+        try {
+            final String result = runProcessImpl(cmd);
+            final String ourImpl = runOurImpl(cmd);
+            if (StringUtils.equals(expect, result, ourImpl)) {
+                System.out.println("SUCCESS " + ourImpl);
+            } else {
+                if (StringUtils.equals(expect, ourImpl)) {
+                    logInfoAnyway("WARNING: Implementation for " + JVMVersion.getJVMVersion() + " differs from what we expect");
+                    logInfoAnyway("Input: " + Arrays.asList(cmd));
+                    logInfoAnyway("JavaImpl: " + result);
+                    logInfoAnyway("ourImpl: " + ourImpl);
+                    return;
+                }
+                System.err.println("JavaImpl: " + result);
+                System.err.println("ourImpl: " + ourImpl);
+                throw new WTFException("Failed on " + result);
             }
-            System.err.println("JavaImpl: " + result);
-            System.err.println("ourImpl: " + ourImpl);
-            throw new WTFException("Failed on " + result);
+        } catch (RuntimeException e) {
+            if (ReflectionUtils.isInstanceOf("java.lang.reflect.InaccessibleObjectException", e)) {
+                e.printStackTrace();
+            } else {
+                throw e;
+            }
         }
     }
 

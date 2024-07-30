@@ -30,6 +30,6 @@ public class BasicAuthentication extends Authentication {
 
     @Override
     public String toString() {
-        return "Basic-Authorization[Host:" + this.getHost() + "|Realm:" + this.getRealm() + "|Username:" + this.getUsername() + "Password:" + this.getPassword() + "]";
+        return "Basic-Authorization[Host:" + this.getHost() + "|Realm:" + this.getRealm() + "|Username:" + this.getUsername() + "|Password:" + this.getPassword() + "]";
     }
 }

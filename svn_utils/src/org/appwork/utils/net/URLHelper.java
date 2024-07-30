@@ -367,7 +367,7 @@ public class URLHelper {
     }
 
     public static String getBaseURL(final URL url) throws MalformedURLException {
-        final URL baseURI = new URL(url.getProtocol(), toLowerCase(url.getHost()), url.getPort(), url.getPath());
+        final URL baseURI = getURL(url, false, true, false);
         final String base;
         if (baseURI.getPath() != null) {
             base = new Regex(baseURI.toString(), "(https?://.+)/").getMatch(0);
