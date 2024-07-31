@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydaddyCc extends PluginForHost {
     public MydaddyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -160,7 +160,7 @@ public class MydaddyCc extends PluginForHost {
             }
             qualityMap.put(qualityTmp, url);
         }
-        this.dllink = handleQualitySelection(link, qualityMap);
+        this.dllink = handleQualitySelection(br, link, qualityMap);
         final Browser br2 = br.cloneBrowser();
         br2.setFollowRedirects(true);
         URLConnectionAdapter con = null;
@@ -183,7 +183,7 @@ public class MydaddyCc extends PluginForHost {
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
-    protected final String handleQualitySelection(final DownloadLink link, final HashMap<Integer, String> qualityMap) {
+    protected final String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
         if (qualityMap.isEmpty()) {
             return null;
         }

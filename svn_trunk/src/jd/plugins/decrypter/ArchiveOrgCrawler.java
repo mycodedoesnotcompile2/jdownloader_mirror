@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49444 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49460 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -997,14 +997,18 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 desiredFileArchiveFileCount = filemap.get("filecount");
                 singleDesiredFile2 = file;
             }
-            if (isOriginal && totalLengthSecondsStr == null) {
+            if (isOriginal) {
                 originalItems.add(file);
-                totalLengthSecondsStr = (String) filemap.get("length");
+                if (totalLengthSecondsStr == null) {
+                    totalLengthSecondsStr = (String) filemap.get("length");
+                }
             }
             /* Add items to list of all results. */
             /* Check some skip conditions */
             if (isOldVersion) {
                 /* Skip old elements. */
+                skippedItemsFilepaths.add(pathWithFilename);
+            } else if (crawlOriginalFilesOnly && !isOriginal) {
                 skippedItemsFilepaths.add(pathWithFilename);
             } else if (isMetadata && !crawlMetadataFiles) {
                 /* Only include metadata if wished by the user. */

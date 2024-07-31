@@ -15,31 +15,24 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.config.KVSConfig;
-import org.jdownloader.plugins.components.config.KVSConfigXfreehdCom;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
-public class XfreehdCom extends KernelVideoSharingComV2 {
-    public XfreehdCom(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 49465 $", interfaceVersion = 3, names = {}, urls = {})
+public class KernelVideoSharingLove4pornCom extends KernelVideoSharingComV2 {
+    public KernelVideoSharingLove4pornCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.xfreehd.com/signup");
     }
 
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xfreehd.com" });
+        ret.add(new String[] { "love4porn.com" });
         return ret;
     }
 
@@ -62,41 +55,22 @@ public class XfreehdCom extends KernelVideoSharingComV2 {
     }
 
     @Override
-    protected boolean isLoggedIN(final Browser br) {
-        if (br.containsHTML("/logout")) {
+    protected boolean isOfflineWebsite(final Browser br) {
+        final boolean isOffline = super.isOfflineWebsite(br);
+        if (isOffline) {
+            return true;
+        }
+        /* Looks to be online -> Check deeper */
+        final String fuid = this.getFUIDFromURL(br.getURL());
+        if (fuid != null && !br.containsHTML("/embed/" + fuid)) {
+            /* 2024-07-30 */
+            /**
+             * Example: https://love4porn.com/videos/32026/jizzorama-chubby </br>
+             * -> Does not display any kind of error message but item is offline.
+             */
             return true;
         } else {
             return false;
         }
-    }
-
-    @Override
-    protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
-        final int userSelectedQuality = this.getPreferredStreamQuality(link);
-        final String urlsd = br.getRegex("src=\"(https?://[^\"]+)\" title=\"SD\" [^>]*/>").getMatch(0);
-        final String urlhd = br.getRegex("src=\"(https?://[^\"]+)\" title=\"HD\" [^>]*/>").getMatch(0);
-        if (userSelectedQuality != -1 && userSelectedQuality < 720 && urlsd != null) {
-            /* Try to get SD quality */
-            return urlsd;
-        } else if (urlhd != null) {
-            return urlhd;
-        } else {
-            /* Fallback */
-            return super.getDllink(link, br);
-        }
-    }
-
-    @Override
-    protected boolean isOfflineWebsite(final Browser br) {
-        if (br.containsHTML(">\\s*This Video Is No Longer Available")) {
-            return true;
-        } else {
-            return super.isOfflineWebsite(br);
-        }
-    }
-
-    @Override
-    public Class<? extends KVSConfig> getConfigInterface() {
-        return KVSConfigXfreehdCom.class;
     }
 }

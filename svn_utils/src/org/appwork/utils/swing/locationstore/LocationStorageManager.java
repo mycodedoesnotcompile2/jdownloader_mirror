@@ -152,7 +152,7 @@ public class LocationStorageManager extends ShutdownEvent {
     /**
      * @param LocationStorage
      */
-    protected void save(final boolean onShutDown) {
+    public void save(final boolean onShutDown) {
         try {
             if (!write) {
                 return;
@@ -200,6 +200,9 @@ public class LocationStorageManager extends ShutdownEvent {
                             cfg.setExtendedState(newState);
                             write = true;
                         }
+                    }
+                    if (write) {
+                        onUpdate(cfg);
                     }
                     if (write && saver != null) {
                         saver.resetAndStart();

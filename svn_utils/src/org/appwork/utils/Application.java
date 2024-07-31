@@ -953,11 +953,13 @@ public class Application {
      * @param newAppFolder
      * @param newJar
      */
-    public synchronized static void setApplication(final String newAppFolder) {
+    public synchronized static String setApplication(final String newAppFolder) {
         Application.ROOT = null;
+        String old = newAppFolder;
         Application.APP_FOLDER = newAppFolder;
         Application.ensureFrameWorkInit();
         Application.ROOT = getRoot(Application.class);
+        return old;
     }
 
     /**

@@ -76,7 +76,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49345 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49464 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -274,6 +274,13 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             return null;
         }
         return this.getProtocol() + appendWWWIfRequired(host) + "/" + urlSlug + "/";
+    }
+
+    protected String generateContentURLDefaultVideoNoFUID(final String host, final String urlSlug) {
+        if (host == null || urlSlug == null) {
+            return null;
+        }
+        return this.getProtocol() + appendWWWIfRequired(host) + "/video/" + urlSlug + "/";
     }
 
     /**
@@ -684,7 +691,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 }
             }
         }
-        if (!StringUtils.isEmpty(this.dllink) && !isDownload && !enableFastLinkcheck() && !this.isHLS(this.dllink)) {
+        if (!StringUtils.isEmpty(this.dllink) && !isDownload && !enableFastLinkcheck() && !this.isHLS(this.dllink) && !link.isSizeSet()) {
             URLConnectionAdapter con = null;
             try {
                 /* if you don't do this then referrer is fked for the download! -raztoki */
@@ -843,7 +850,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             return AvailableStatus.TRUE;
         } else {
             this.dllink = this.getDllinkViaAPI(br, link, videoID);
-            if (!isDownload) {
+            if (!isDownload && !link.isSizeSet()) {
                 /* Only check directurl during availablecheck, not if user has started downloading. */
                 URLConnectionAdapter con = null;
                 try {
@@ -863,7 +870,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             }
             return AvailableStatus.TRUE;
         }
-        // Enf of function
+        // End of function
     }
 
     protected String getAPIParam1(final String videoID) {
@@ -890,7 +897,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             return true;
         } else if (br._getURL().getPath().matches("(?i)/4(04|10)\\.php.*")) {
             return true;
-        } else if (br.containsHTML("(?i)>\\s*(Sorry, this video was deleted per copyright owner request|Video has been removed due to a violation of the Terms and Conditions|Deleted by the owner request|This video has been removed)")) {
+        } else if (br.containsHTML("(?i)>\\s*(Sorry, this video was deleted per copyright owner request|Video has been removed due to a violation of the Terms and Conditions|Deleted by the owner request|This video has been removed|Video removed due to DMCA)")) {
             return true;
         } else {
             return false;
@@ -1318,6 +1325,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 } else if (videoQualityStr.equalsIgnoreCase("4K")) {
                     videoQuality = 2160;
                 } else if (videoQualityStr.equalsIgnoreCase("HD")) {
+                    // Can also be 720p (e.g. love4porn.com)
                     videoQuality = 1080;
                 } else {
                     /* This should never happen */
@@ -1365,7 +1373,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             /* Prefer known qualities over those where we do not know the quality. */
             if (qualityMap.size() > 0) {
                 logger.info("Found " + qualityMap.size() + " total crypted downloadurls");
-                dllink = handleQualitySelection(link, qualityMap);
+                dllink = handleQualitySelection(br, link, qualityMap);
             } else if (uncryptedUrlWithoutQualityIndicator != null) {
                 logger.info("Seems like there is only a single quality available --> Using that one");
                 dllink = uncryptedUrlWithoutQualityIndicator;
@@ -1395,38 +1403,6 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 } else if (!dups.add(dllinkTmp)) {
                     /* Skip duplicates */
                     continue;
-                }
-                checkurl: if (!this.isHLS(dllinkTmp)) {
-                    URLConnectionAdapter con = null;
-                    try {
-                        final Browser brc = this.br.cloneBrowser();
-                        brc.setFollowRedirects(true);
-                        brc.setAllowedResponseCodes(new int[] { 405 });
-                        con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(dllinkTmp));
-                        if (this.looksLikeHLS(con)) {
-                            logger.info("Found HLS stream instead of expected progressive video stream download");
-                            break checkurl;
-                        }
-                        final String workaroundURL = getHttpServerErrorWorkaroundURL(con);
-                        if (workaroundURL != null && !this.looksLikeDownloadableContent(con)) {
-                            con.disconnect();
-                            con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(workaroundURL));
-                        }
-                        if (!this.looksLikeDownloadableContent(con)) {
-                            brc.followConnection(true);
-                            logger.info("Skipping invalid directurl: " + dllinkTmp);
-                            continue;
-                        } else {
-                            break checkurl;
-                        }
-                    } catch (Exception e) {
-                        logger.log(e);
-                        continue;
-                    } finally {
-                        if (con != null) {
-                            con.disconnect();
-                        }
-                    }
                 }
                 if (!addQualityURL(this.getDownloadLink(), qualityMap, dllinkTmp)) {
                     if (uncryptedUrlWithoutQualityIndicator == null) {
@@ -1467,28 +1443,34 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             /* Stage 3 - wider attempt of "stage 1" in "crypted" handling. Aso allows URLs without the typical "get_file" KVS pattern. */
             foundQualities = 0;
             /* E.g. good for websites like: gottanut.com */
-            final String[][] videoInfos = br.getRegex("(video_url[a-z0-9_]*)\\s*:\\s*(?:\"|\\')((?:https?://|/)[^<>\"\\']+\\.mp4[^<>\"\\']*)(?:\"|\\')").getMatches();
+            final String[][] videoInfos = br.getRegex("(video_(?:alt_)?url[a-z0-9_]*)\\s*:\\s*(?:\"|\\')((?:https?://|/)[^<>\"\\']+\\.mp4[^<>\"\\']*)(?:\"|\\')").getMatches();
             for (final String[] vidInfo : videoInfos) {
                 final String urlVarName = vidInfo[0];
                 final String dllinkTmp = vidInfo[1];
-                String possibleQualityIndicator = br.getRegex(urlVarName + "_text" + "\\s*:\\s*(?:\"|\\')([^<>\"\\']+)(?:\"|\\')").getMatch(0);
-                int videoQuality = -1;
-                if (possibleQualityIndicator != null && possibleQualityIndicator.matches("\\d+p")) {
-                    videoQuality = Integer.parseInt(possibleQualityIndicator.replace("p", ""));
+                String videoQualityText = br.getRegex(Pattern.quote(urlVarName) + "_text" + "\\s*:\\s*(?:\"|\\')([^<>\"\\']+)(?:\"|\\')").getMatch(0);
+                int videoQualityHeight = -1;
+                if (videoQualityText != null && videoQualityText.matches("\\d+p")) {
+                    videoQualityHeight = Integer.parseInt(videoQualityText.replace("p", ""));
+                } else if (videoQualityText != null && videoQualityText.matches("\\d+")) {
+                    videoQualityHeight = Integer.parseInt(videoQualityText);
                 } else {
                     /* Look for quality indicator inside URL. */
                     /*
                      * Just a logger. Some call their (mostly 720p) quality "High Definition" but usually there will only be one quality
                      * available then anyways (e.g. xxxymovies.com)!
                      */
-                    logger.info("Found unidentifyable (text-) quality indicator: " + possibleQualityIndicator);
-                    possibleQualityIndicator = new Regex(dllinkTmp, "(\\d+)p\\.mp4").getMatch(0);
-                    if (possibleQualityIndicator != null) {
-                        videoQuality = Integer.parseInt(possibleQualityIndicator);
+                    logger.info("Found unidentifyable (text-) quality indicator: " + videoQualityText);
+                    videoQualityText = new Regex(dllinkTmp, "(\\d+)p\\.mp4").getMatch(0);
+                    // if (videoQualityText == null) {
+                    // /* 2024-07-30: e.g. thepornbang.com */
+                    // videoQualityText = new Regex(dllinkTmp, "\\d+-(\\d+)\\.mp4").getMatch(0);
+                    // }
+                    if (videoQualityText != null) {
+                        videoQualityHeight = Integer.parseInt(videoQualityText);
                     }
                 }
-                if (videoQuality > 0) {
-                    qualityMap.put(videoQuality, dllinkTmp);
+                if (videoQualityHeight > 0) {
+                    qualityMap.put(videoQualityHeight, dllinkTmp);
                     foundQualities++;
                 } else {
                     uncryptedUrlWithoutQualityIndicator = dllinkTmp;
@@ -1496,7 +1478,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             }
             logger.info("Found " + foundQualities + " qualities in stage 3");
             if (!qualityMap.isEmpty()) {
-                dllink = handleQualitySelection(link, qualityMap);
+                dllink = handleQualitySelection(br, link, qualityMap);
             } else if (uncryptedUrlWithoutQualityIndicator != null) {
                 /* Rare case */
                 logger.info("Selected URL without quality indicator: " + uncryptedUrlWithoutQualityIndicator);
@@ -1659,7 +1641,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             }
             qualityMap.put(height, decryptedVideoURL);
         }
-        return this.handleQualitySelection(link, qualityMap);
+        return this.handleQualitySelection(br, link, qualityMap);
     }
 
     /** Decrypts given URL if needed. */
@@ -1715,7 +1697,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
-    protected final String handleQualitySelection(final DownloadLink link, final HashMap<Integer, String> qualityMap) {
+    protected final String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
         if (qualityMap.isEmpty()) {
             logger.info("Cannot perform quality selection: qualityMap is empty");
             return null;
@@ -1724,7 +1706,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         final Iterator<Entry<Integer, String>> iterator = qualityMap.entrySet().iterator();
         int maxQuality = 0;
         String maxQualityDownloadurl = null;
-        final int userSelectedQuality = this.getPreferredStreamQuality();
+        final int userSelectedQuality = this.getPreferredStreamQuality(link);
         String selectedQualityDownloadurl = null;
         while (iterator.hasNext()) {
             final Entry<Integer, String> entry = iterator.next();
@@ -1749,11 +1731,63 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             chosenQuality = maxQuality;
             downloadurl = maxQualityDownloadurl;
         }
-        link.setProperty(PROPERTY_CHOSEN_QUALITY, chosenQuality);
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             link.setComment("ChosenQuality: " + chosenQuality + "p");
         }
-        return downloadurl;
+        if (downloadurl == null) {
+            return null;
+        }
+        if (chosenQuality == link.getIntegerProperty(PROPERTY_CHOSEN_QUALITY, -1)) {
+            // no need to reevaluate again, chosenQuality is unchanged
+            return downloadurl;
+        } else if (this.isHLS(downloadurl)) {
+            link.setProperty(PROPERTY_CHOSEN_QUALITY, chosenQuality);
+            return downloadurl;
+        } else if (qualityMap.size() == 1) {
+            /* Only one quality available -> No point in checking if that one is valid. */
+            return downloadurl;
+        } else if (this.isHLS(downloadurl)) {
+            /* Do not check HLS URLs */
+            return downloadurl;
+        }
+        /* Check if chosen quality is valid / if link works. */
+        URLConnectionAdapter con = null;
+        try {
+            final Browser brc = br.cloneBrowser();
+            brc.setFollowRedirects(true);
+            brc.setAllowedResponseCodes(new int[] { 405 });
+            con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(downloadurl));
+            if (this.looksLikeHLS(con)) {
+                brc.followConnection();
+                logger.info("Found HLS stream instead of expected progressive video stream download");
+                link.setProperty(PROPERTY_CHOSEN_QUALITY, chosenQuality);
+                return downloadurl;
+            }
+            final String workaroundURL;
+            if (!this.looksLikeDownloadableContent(con) && (workaroundURL = getHttpServerErrorWorkaroundURL(con)) != null) {
+                brc.followConnection(true);
+                /* Try again */
+                con = openAntiDDoSRequestConnection(brc, brc.createHeadRequest(workaroundURL));
+            }
+            if (this.looksLikeDownloadableContent(con)) {
+                /* Success */
+                link.setProperty(PROPERTY_CHOSEN_QUALITY, chosenQuality);
+                link.setDownloadSize(con.getCompleteContentLength());
+                return downloadurl;
+            }
+            /* Check next URL */
+            brc.followConnection(true);
+            logger.info("Skipping invalid quality: " + chosenQuality + " | directurl: " + downloadurl);
+        } catch (Exception e) {
+            logger.log(e);
+        } finally {
+            if (con != null) {
+                con.disconnect();
+            }
+        }
+        final HashMap<Integer, String> nextQualityMap = new HashMap<Integer, String>(qualityMap);
+        nextQualityMap.remove(chosenQuality);
+        return handleQualitySelection(br, link, nextQualityMap);
     }
 
     /** Checks "/get_file/"-style URLs for validity by "blacklist"-style behavior. */
@@ -1991,8 +2025,17 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         }
     }
 
-    /** Returns user selected stream quality (video height). -1 = BEST/default */
-    protected final int getPreferredStreamQuality() {
+    /**
+     * Returns user selected stream quality (video height). -1 = BEST/default
+     *
+     * @param link
+     *            TODO
+     */
+    protected final int getPreferredStreamQuality(DownloadLink link) {
+        final int chosenQuality = link.getIntegerProperty(PROPERTY_CHOSEN_QUALITY, -1);
+        if (chosenQuality > 0) {
+            return chosenQuality;
+        }
         final Class<? extends KVSConfig> cfgO = this.getConfigInterface();
         if (cfgO != null) {
             final KVSConfig cfg = PluginJsonConfig.get(cfgO);
@@ -2062,5 +2105,6 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
+        link.removeProperty(PROPERTY_CHOSEN_QUALITY);
     }
 }

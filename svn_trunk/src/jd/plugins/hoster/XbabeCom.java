@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49352 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
 public class XbabeCom extends KernelVideoSharingComV2 {
     public XbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -91,7 +91,7 @@ public class XbabeCom extends KernelVideoSharingComV2 {
             }
             qualityMap.put(width, url);
         }
-        String dllink = this.handleQualitySelection(link, qualityMap);
+        String dllink = this.handleQualitySelection(br, link, qualityMap);
         if (dllink != null) {
             return dllink;
         } else {
