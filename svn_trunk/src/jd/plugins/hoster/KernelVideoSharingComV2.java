@@ -76,7 +76,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49464 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49475 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1070,7 +1070,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                     /* Access hls master */
                     getPage(brc, this.dllink);
                 }
-                handleConnectionErrors(brc, brc.getHttpConnection());
+                if (!looksLikeHLS(brc.getHttpConnection())) {
+                    handleConnectionErrors(brc, brc.getHttpConnection());
+                }
                 final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
                 if (hlsbest == null) {
                     this.checkErrorsLastResort(brc, link, account);

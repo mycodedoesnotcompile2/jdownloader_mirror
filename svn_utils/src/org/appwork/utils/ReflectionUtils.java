@@ -1062,30 +1062,44 @@ public class ReflectionUtils {
                 return null;
             }
         } else if (Clazz.isString(destType)) {
-            return StringUtils.valueOfOrNull(value);
-        } else if (value instanceof String) {
+            if (value.getClass() == char[].class) {
+                return new String((char[]) value);
+            } else {
+                return StringUtils.valueOfOrNull(value);
+            }
+        } else if (value instanceof CharSequence) {
+            final String stringValue = String.valueOf(value);
             if (Clazz.isNumberType(destType)) {
                 // string to number type
                 if (Clazz.isFixedPointNumber(destType)) {
-                    return cast(Long.valueOf(String.valueOf(value)), destType);
+                    return cast(Long.valueOf(stringValue), destType);
                 } else {
-                    return cast(Double.valueOf(String.valueOf(value)), destType);
+                    return cast(Double.valueOf(stringValue), destType);
                 }
             } else if (Clazz.isBoolean(destType)) {
                 // string to boolean
-                if ("true".equals(value)) {
+                if ("true".equals(stringValue)) {
                     return cast(Boolean.TRUE, destType);
-                } else if ("false".equals(value)) {
+                } else if ("false".equals(stringValue)) {
                     return cast(Boolean.FALSE, destType);
                 }
             } else if (Number.class.equals(destType)) {
                 // string to number class
-                final String numberStr = String.valueOf(value);
-                if (numberStr.matches("-?\\d+")) {
-                    return Long.parseLong((String) value);
-                } else if (numberStr.matches("-?\\d+\\.\\d+")) {
-                    return Double.valueOf(numberStr).longValue();
+                if (stringValue.matches("-?\\d+")) {
+                    return Long.parseLong(stringValue);
+                } else if (stringValue.matches("-?\\d+\\.\\d+")) {
+                    return Double.valueOf(stringValue).longValue();
                 }
+            } else if (Clazz.isCharacter(destType)) {
+                // string to char
+                final char chars[] = stringValue.toCharArray();
+                if (chars.length != 1) {
+                    throw new ClassCastException(stringValue + " cannot be represented with single char");
+                } else {
+                    return chars[0];
+                }
+            } else if (destType == char[].class) {
+                return stringValue.toCharArray();
             } else {
                 // no cast
                 return value;
@@ -1098,13 +1112,21 @@ public class ReflectionUtils {
             } else if (numValue == 0) {
                 return cast(Boolean.FALSE, destType);
             }
-        } else if (value instanceof Character && Clazz.isBoolean(destType)) {
-            // Character(0|1) to Boolean
-            final char numValue = ((Character) value).charValue();
-            if (numValue == '1') {
-                return cast(Boolean.TRUE, destType);
-            } else if (numValue == '0') {
-                return cast(Boolean.FALSE, destType);
+        } else if (value instanceof Character) {
+            if (Clazz.isBoolean(destType)) {
+                // Character(0|1) to Boolean
+                final char numValue = ((Character) value).charValue();
+                if (numValue == '1') {
+                    return cast(Boolean.TRUE, destType);
+                } else if (numValue == '0') {
+                    return cast(Boolean.FALSE, destType);
+                }
+            } else if (Clazz.isCharacter(destType)) {
+                // char to char
+                return value;
+            } else if (Clazz.isFixedPointNumber(destType)) {
+                // char to number
+                return Character.codePointAt(new char[] { (Character) value }, 0);
             }
         }
         Object ret = value;

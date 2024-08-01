@@ -72,6 +72,4 @@ public abstract class ListAccessorInterface implements Iterable<Object> {
      * @return
      */
     public abstract Object remove(int index);
-
-    public abstract Object getAccessedObject();
 }

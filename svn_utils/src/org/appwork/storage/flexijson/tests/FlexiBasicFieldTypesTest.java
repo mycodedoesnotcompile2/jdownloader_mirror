@@ -52,7 +52,7 @@ import org.appwork.utils.reflection.CompiledType;
 public class FlexiBasicFieldTypesTest extends AWTest {
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -65,7 +65,7 @@ public class FlexiBasicFieldTypesTest extends AWTest {
         ObjectContainsAll ie = new ObjectContainsAll();
         final FlexiJSonNode node = mapper.objectToJsonNode(ie);
         String serialized = new FlexiJSonStringBuilder().toJSONString(node);
-        String expected = "{\"arrayList\":[\"eins\",\"drei\"],\"booleanWrapper\":true,\"booleanWrapperNull\":null,\"bytePrimitive\":127,\"byteWrapper\":-128,\"byteWrapperNull\":null,\"charPrimitive\":65535,\"character\":0,\"characterNull\":null,\"charsequence\":\"char seq\",\"charsequenceNull\":null,\"date\":\"2022-01-02T01:02:03.123+01:00\",\"doublePrimitive\":1.7976931348623157E308,\"doubleWrapper\":4.9E-324,\"doubleWrapperNull\":null,\"enumField\":\"DIR\",\"enumFieldNull\":null,\"floatPrimitive\":3.4028235E38,\"floatWrapper\":1.4E-45,\"floatWrapperNull\":null,\"hashMap\":{\"eins\":1,\"zwei\":2},\"hashSet\":[1,4,7],\"intArray\":[1,2,3],\"intPrimitive\":2147483647,\"intWrapper\":-2147483648,\"intWrapperNull\":null,\"integerArray\":[1,null,3],\"interfaceField\":{\"bool\":true},\"list\":[\"eins\",\"drei\"],\"listWithoutGen\":[\"eins\",\"drei\"],\"longPrimitive\":-9223372036854775808,\"longWrapper\":9223372036854775807,\"longWrapperNull\":null,\"map\":{\"eins\":1,\"zwei\":2},\"mapWithoutGen\":{\"eins\":1,\"zwei\":2},\"nullList\":null,\"nullMap\":null,\"nullSet\":null,\"objectHashSet\":[1,4,7],\"objectWithByte\":127,\"objectWithFloat\":1.4E-45,\"set\":[1,4,7],\"setWithoutGen\":[1,4,7],\"shortNull\":null,\"shortPrimitive\":32767,\"shortWrapper\":-32768,\"stringField\":\"fsdajbfdshbdfs98h\",\"stringFieldNull\":null,\"timespan\":\"10h15m\",\"booleanPrimitive\":false}";
+        String expected = "{\"arrayList\":[\"eins\",\"drei\"],\"booleanWrapper\":true,\"booleanWrapperNull\":null,\"bytePrimitive\":127,\"byteWrapper\":-128,\"byteWrapperNull\":null,\"charPrimitive\":\"\uffff\",\"character\":\"\u25cb\",\"characterNull\":null,\"charsequence\":\"char seq\",\"charsequenceNull\":null,\"date\":\"2022-01-02T01:02:03.123+01:00\",\"doublePrimitive\":1.7976931348623157E308,\"doubleWrapper\":4.9E-324,\"doubleWrapperNull\":null,\"enumField\":\"DIR\",\"enumFieldNull\":null,\"floatPrimitive\":3.4028235E38,\"floatWrapper\":1.4E-45,\"floatWrapperNull\":null,\"hashMap\":{\"eins\":1,\"zwei\":2},\"hashSet\":[1,4,7],\"intArray\":[1,2,3],\"intPrimitive\":2147483647,\"intWrapper\":-2147483648,\"intWrapperNull\":null,\"integerArray\":[1,null,3],\"interfaceField\":{\"bool\":true},\"list\":[\"eins\",\"drei\"],\"listWithoutGen\":[\"eins\",\"drei\"],\"longPrimitive\":-9223372036854775808,\"longWrapper\":9223372036854775807,\"longWrapperNull\":null,\"map\":{\"eins\":1,\"zwei\":2},\"mapWithoutGen\":{\"eins\":1,\"zwei\":2},\"nullList\":null,\"nullMap\":null,\"nullSet\":null,\"objectHashSet\":[1,4,7],\"objectWithByte\":127,\"objectWithFloat\":1.4E-45,\"set\":[1,4,7],\"setWithoutGen\":[1,4,7],\"shortNull\":null,\"shortPrimitive\":32767,\"shortWrapper\":-32768,\"stringField\":\"fsdajbfdshbdfs98h\",\"stringFieldNull\":null,\"timespan\":\"10h15m\",\"booleanPrimitive\":false}";
         // System.out.println(serialized);
         // System.err.println(expected);
         assertEquals(serialized, expected);

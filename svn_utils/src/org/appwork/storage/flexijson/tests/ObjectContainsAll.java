@@ -111,18 +111,18 @@ public class ObjectContainsAll implements Storable {
     }
 
     private MyExampleInterface interfaceField = new MyExampleInterface() {
-        private boolean bool = true;
+                                                  private boolean bool = true;
 
-        @Override
-        public boolean getBool() {
-            return bool;
-        }
+                                                  @Override
+                                                  public boolean getBool() {
+                                                      return bool;
+                                                  }
 
-        @Override
-        public void setBool(boolean b) {
-            this.bool = b;
-        }
-    };
+                                                  @Override
+                                                  public void setBool(boolean b) {
+                                                      this.bool = b;
+                                                  }
+                                              };
 
     public MyExampleInterface getInterfaceField() {
         return interfaceField;
@@ -134,7 +134,7 @@ public class ObjectContainsAll implements Storable {
 
     private Byte                     byteWrapper       = Byte.MIN_VALUE;
     private Byte                     byteWrapperNull   = null;
-    private Character                character         = Character.MIN_VALUE;
+    private Character                character         = '\u25cb';
     private Character                characterNull     = null;
     private char                     charPrimitive     = Character.MAX_VALUE;
     private double                   doublePrimitive   = Double.MAX_VALUE;

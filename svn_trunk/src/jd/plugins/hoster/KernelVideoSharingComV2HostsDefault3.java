@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48013 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49481 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault3(final PluginWrapper wrapper) {
         super(wrapper);
@@ -37,6 +37,8 @@ public class KernelVideoSharingComV2HostsDefault3 extends KernelVideoSharingComV
         ret.add(new String[] { "upskirt.tv" });
         /* 2023-07-18 */
         ret.add(new String[] { "freshporno.net" });
+        /* 2024-07-31 */
+        ret.add(new String[] { "xmegadrive.com" });
         return ret;
     }
 

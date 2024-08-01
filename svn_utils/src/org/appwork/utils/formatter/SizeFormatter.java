@@ -134,7 +134,7 @@ public class SizeFormatter {
 
     @Deprecated
     public static long getSize(String string, boolean kibi, boolean allowNegative) {
-        return getSize(NumberFormat.getInstance(), string, kibi, allowNegative);
+        return getSize(null, string, kibi, allowNegative);
     }
 
     public static long getSize(final NumberFormat format, String string, boolean kibi, boolean allowNegative) {

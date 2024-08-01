@@ -169,7 +169,7 @@ public class JSonMapper {
             return createJsonValue(((Class<?>) obj).getName());
         } else if ((mapper = typeMapper.get(clazz)) != null) {
             return mapper.map(obj);
-        } else/* if (obj instanceof Storable) */ {
+        } else/* if (obj instanceof Storable) */{
             final JSonObject ret = createJSonObject(null);
             try {
                 final ClassCache cc = getClassCache(clazz);
@@ -393,7 +393,7 @@ public class JSonMapper {
                                 return returnFallbackOrThrowException(new ClassCastMappingException(json, type, null, e, null));
                             }
                         }
-                    } else if (type instanceof Class && (Clazz.isNumberType(type) || Clazz.isBoolean(type))) {
+                    } else if (type instanceof Class && (Clazz.isNumberType(type) || Clazz.isBoolean(type)) || Clazz.isCharacter(type)) {
                         try {
                             return ReflectionUtils.cast(((JSonValue) json).getValue(), type);
                         } catch (ClassCastException e) {

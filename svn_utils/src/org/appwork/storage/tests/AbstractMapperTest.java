@@ -35,6 +35,7 @@ package org.appwork.storage.tests;
 
 import org.appwork.storage.JSONMapper;
 import org.appwork.storage.SimpleTypeRef;
+import org.appwork.storage.simplejson.mapper.test.CharJSONTest;
 import org.appwork.testframework.AWTest;
 
 /**
@@ -43,37 +44,26 @@ import org.appwork.testframework.AWTest;
  *
  */
 public abstract class AbstractMapperTest extends AWTest {
-
     public void runWith(JSONMapper mapper) throws Exception {
-
         assertEquals("10", mapper.stringToObject("10", String.class));
         assertEquals("1.0", mapper.stringToObject("1.0", String.class));
         assertEquals("false", mapper.stringToObject("false", String.class));
-
         assertEquals(0.0d, mapper.stringToObject("null", double.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Double>(Double.class)));
-
         assertEquals(0.0f, mapper.stringToObject("null", float.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Float>(Float.class)));
-
         assertEquals((long) 0, mapper.stringToObject("null", long.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Long>(Long.class)));
-
         assertEquals(0, mapper.stringToObject("null", int.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Integer>(Integer.class)));
-
-        assertEquals((char) 0, mapper.stringToObject("null", char.class));
+        assertEquals((char) 0, mapper.stringToObject("0", char.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Character>(Character.class)));
-
         assertEquals((short) 0, mapper.stringToObject("null", short.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Short>(Short.class)));
-
         assertEquals((byte) 0, mapper.stringToObject("null", byte.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Byte>(Byte.class)));
-
         assertEquals(false, mapper.stringToObject("null", boolean.class));
         assertEquals(null, mapper.stringToObject("null", new SimpleTypeRef<Boolean>(Boolean.class)));
-
         SimpleStorable obj = new SimpleStorable();
         obj.setB(true);
         obj.setBa(new boolean[] { true, false, true });
@@ -85,9 +75,8 @@ public abstract class AbstractMapperTest extends AWTest {
         obj.setStringa(new String[] { "a", "b", "C" });
         String json = mapper.objectToString(obj);
         // HashMap<String, Object> map = mapper.stringToObject(json, TypeRef.HASHMAP);
-
         SimpleStorable restored = mapper.stringToObject(json, new SimpleTypeRef<SimpleStorable>(SimpleStorable.class));
         assertEqualsDeep(restored, obj);
+        new CharJSONTest().runTest(mapper);
     }
-
 }

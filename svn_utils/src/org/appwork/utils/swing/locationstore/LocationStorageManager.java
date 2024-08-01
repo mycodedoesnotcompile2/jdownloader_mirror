@@ -161,6 +161,7 @@ public class LocationStorageManager extends ShutdownEvent {
                     @Override
                     public byte[] edtRun() {
                         try {
+                            // serialization within edt to avoid concurrent modification of data object
                             return JSonStorage.serializeToJsonByteArray(data);
                         } catch (StorageException e) {
                             LogV3.log(e);

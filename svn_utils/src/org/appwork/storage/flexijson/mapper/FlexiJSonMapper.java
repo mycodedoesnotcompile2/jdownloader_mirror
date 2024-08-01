@@ -174,7 +174,7 @@ public class FlexiJSonMapper {
     protected CompiledType                     autoMapCollectionInterface    = this.autoMapFlexiJSonArrayclass;
     protected CompiledType                     autoMapMapInterface           = this.autoMapFlexiJSonObjectClass;
     protected CompiledType                     autoMapSetInterface           = CompiledType.create(new TypeRef<LinkedHashSet<Object>>() {
-                                                                             });;
+                                                                             });                                 ;
     private ArrayList<FlexiMapperException>    exceptions;
     private boolean                            ignoreDefaultValuesEnabled;
     private boolean                            tagDefaultValuesEnabled;
@@ -259,7 +259,7 @@ public class FlexiJSonMapper {
             } else if (cType.isBoolean()) {
                 return this.createFlexiJSonValue((Boolean) obj);
             } else if (cType.isCharacter()) {
-                return this.createFlexiJSonValue(0 + ((Character) obj).charValue());
+                return this.createFlexiJSonValue(String.valueOf(obj));
             } else if (cType.isNumber()) {
                 return this.createFlexiJSonValue((Number) obj);
             } else {
@@ -270,7 +270,7 @@ public class FlexiJSonMapper {
             if (cType.isBoolean()) {
                 return this.createFlexiJSonValue(((Boolean) obj).booleanValue());
             } else if (cType.isCharacter()) {
-                return this.createFlexiJSonValue(0 + ((Character) obj).charValue());
+                return this.createFlexiJSonValue(String.valueOf(obj));
             } else if (cType.isNumber()) {
                 return this.createFlexiJSonValue((Number) obj);
             } else {
@@ -375,7 +375,7 @@ public class FlexiJSonMapper {
                 }
             }
             return ret;
-        } else/* if (obj instanceof Storable) */ {
+        } else/* if (obj instanceof Storable) */{
             InterfaceStorage<Object> is = null;
             if (obj instanceof Proxy && this.isIncludeInterfaceStorageBackendNode()) {
                 is = InterfaceStorage.get(obj);
@@ -1331,7 +1331,7 @@ public class FlexiJSonMapper {
                     }
                 }
                 return arr;
-            } else if (cType.isBoolean() || cType.isNumber() || cType.isString()) {
+            } else if (cType.isBoolean() || cType.isNumber() || cType.isString() || cType.isCharacter()) {
                 try {
                     return this.cast(((FlexiJSonValue) json), ((FlexiJSonValue) json).getValue(), cType);
                 } catch (final ClassCastException e) {
@@ -1498,6 +1498,8 @@ public class FlexiJSonMapper {
             } else if (destType.isAnyOf(Number.class)) {
                 // is exactly NUMBER.class ( public Number getNumber() )
                 return this.convertStringToNumber(node, StringUtils.valueOfOrNull(value), destType);
+            } else if (destType.isCharacter()) {
+                return ReflectionUtils.cast(value, destType.type);
             } else {
                 throw new ClassCastException("Cannot cast " + value + "+ to " + destType);
             }

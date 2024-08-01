@@ -243,7 +243,7 @@ public class Clazz {
         try {
             final Class ac = (Class) a;
             if (ac.isPrimitive()) {
-                if (a == float.class || a == double.class || a == void.class || a == boolean.class) {
+                if (a == float.class || a == double.class || a == void.class || a == boolean.class || a == char.class) {
                     return false;
                 } else {
                     return true;
@@ -255,7 +255,7 @@ public class Clazz {
                     return true;
                 }
             } else {
-                return a == Character.class;
+                return false;
             }
         } catch (ClassCastException e) {
             return false;
@@ -268,9 +268,7 @@ public class Clazz {
         if (!(a instanceof Class)) {
             return false;
         } else if (((Class) a).isPrimitive()) {
-            return !(a == void.class || a == boolean.class);
-        } else if (a == Character.class) {
-            return true;
+            return !(a == void.class || a == boolean.class || a == char.class);
         } else if (Number.class.isAssignableFrom((Class) a)) {
             return true;
         } else {

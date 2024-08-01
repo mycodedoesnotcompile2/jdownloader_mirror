@@ -110,9 +110,4 @@ public class ListAccessor extends ListAccessorInterface {
     public void add(Object value) {
         list.add(value);
     }
-
-    @Override
-    public Object getAccessedObject() {
-        return list;
-    }
 }

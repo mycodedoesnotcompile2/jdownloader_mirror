@@ -100,9 +100,4 @@ public class CollectionAccessor extends ListAccessorInterface {
     public void add(Object value) {
         collection.add(value);
     }
-
-    @Override
-    public Object getAccessedObject() {
-        return collection;
-    }
 }

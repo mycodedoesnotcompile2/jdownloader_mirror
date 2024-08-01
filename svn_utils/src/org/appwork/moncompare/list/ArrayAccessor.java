@@ -120,9 +120,4 @@ public class ArrayAccessor<MatcherType> extends ListAccessorInterface {
     public void add(Object value) {
         throw new NotSupportedException("Cannot add an entry to an array");
     }
-
-    @Override
-    public Object getAccessedObject() {
-        return array;
-    }
 }
