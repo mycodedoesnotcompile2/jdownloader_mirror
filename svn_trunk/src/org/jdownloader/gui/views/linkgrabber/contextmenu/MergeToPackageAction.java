@@ -5,6 +5,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.plugins.FilePackage;
+
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
@@ -20,10 +26,6 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.LocationInList;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
 
 public class MergeToPackageAction extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements ActionContext {
     /**
@@ -161,15 +163,20 @@ public class MergeToPackageAction extends CustomizableTableContextAppAction<Craw
         for (PackageView<CrawledPackage, CrawledLink> pv : packages) {
             crawledpackagelist.add(pv.getPackage());
         }
-        return mergeCrawledPackageListComments(crawledpackagelist);
+        return mergePackageComments(crawledpackagelist);
     }
 
     /** Merges comments of given packages into one string. */
-    public static String mergeCrawledPackageListComments(final List<CrawledPackage> packages) {
+    public static String mergePackageComments(final List<? extends AbstractPackageNode> packages) {
         final StringBuilder sb = new StringBuilder();
         final HashSet<String> commentDups = new HashSet<String>();
-        for (final CrawledPackage cp : packages) {
-            final String comment = cp.getComment();
+        for (final AbstractPackageNode cp : packages) {
+            final String comment;
+            if (cp instanceof CrawledPackage) {
+                comment = ((CrawledPackage) cp).getComment();
+            } else {
+                comment = ((FilePackage) cp).getComment();
+            }
             if (StringUtils.isNotEmpty(comment)) {
                 final String[] commentLines = Regex.getLines(comment);
                 for (final String commentLine : commentLines) {

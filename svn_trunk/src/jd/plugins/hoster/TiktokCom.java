@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.TiktokComCrawler;
 
-@HostPlugin(revision = "$Revision: 49166 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 49489 $", interfaceVersion = 3, names = { "tiktok.com" }, urls = { "https?://(?:www\\.)?tiktok\\.com/((@[^/]+)/video/|embed/)(\\d+)|https?://m\\.tiktok\\.com/v/(\\d+)\\.html" })
 public class TiktokCom extends PluginForHost {
     public TiktokCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -806,8 +806,8 @@ public class TiktokCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
+        final AccountInfo ai = new AccountInfo();
         account.setType(AccountType.FREE);
         return ai;
     }
@@ -831,27 +831,24 @@ public class TiktokCom extends PluginForHost {
             br.getPage("https://www." + getHost() + "/passport/web/account/info/?" + getWebsiteQuery().toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String msg = entries.get("message").toString();
-            if (msg.equals("success")) {
-                /* Save new cookie timestamp */
-                logger.info("User Cookie login successful");
-                /*
-                 * User can enter whatever he wants into the 'username' field but we want unique usernames --> Grab username from json
-                 * response and set it.
-                 */
-                final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-                account.setUser(data.get("username").toString());
-                if (configUseAPI() && !account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_DOWNLOAD_MODE_HINT)) {
-                    showAccountLoginDownloadModeHint();
-                    account.setProperty(PROPERTY_ACCOUNT_HAS_SHOWN_DOWNLOAD_MODE_HINT, true);
-                }
-                return;
-            } else {
+            if (!msg.equals("success")) {
                 logger.info("User Cookie login failed");
                 if (account.hasEverBeenValid()) {
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
+            }
+            logger.info("User Cookie login successful");
+            /*
+             * User can enter whatever he wants into the 'username' field but we want unique usernames --> Grab username from json response
+             * and set it.
+             */
+            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            account.setUser(data.get("username").toString());
+            if (configUseAPI() && !account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_DOWNLOAD_MODE_HINT)) {
+                showAccountLoginDownloadModeHint();
+                account.setProperty(PROPERTY_ACCOUNT_HAS_SHOWN_DOWNLOAD_MODE_HINT, true);
             }
         }
     }

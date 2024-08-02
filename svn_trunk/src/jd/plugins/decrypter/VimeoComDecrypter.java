@@ -68,7 +68,7 @@ import jd.plugins.hoster.VimeoCom;
 import jd.plugins.hoster.VimeoCom.VIMEO_URL_TYPE;
 import jd.plugins.hoster.VimeoCom.WrongRefererException;
 
-@DecrypterPlugin(revision = "$Revision: 48660 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49491 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimeoComDecrypter extends PluginForDecrypt {
     private final String type_player_private_external_direct = "(?i)https?://player\\.vimeo.com/external/\\d+\\.(source|hd|sd)\\.(mp4|mov|wmv|avi|flv).+";
     private final String type_player_private_play_direct     = "(?i)https?://player\\.vimeo.com/play/\\d+.+";
@@ -534,6 +534,9 @@ public class VimeoComDecrypter extends PluginForDecrypt {
                         } else {
                             throw e;
                         }
+                    }
+                    if (properties.containsKey("vimeo_password")) {
+                        password = (String) properties.get("vimeo_password");
                     }
                 } catch (final DecrypterRetryException e) {
                     logger.log(e);
@@ -1265,6 +1268,7 @@ public class VimeoComDecrypter extends PluginForDecrypt {
                 }
                 urlToAccessOnCorrectPassword = videourl;
             } else {
+                // TODO: needs support for API only password handling
                 pwform = getPasswordForm(br);
                 token = getXsrft(br);
                 if (StringUtils.isEmpty(token)) {

@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.EroProfileCom;
 
-@DecrypterPlugin(revision = "$Revision: 47911 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(www\\.)?eroprofile\\.com/([A-Za-z0-9\\-_]+$|m/(videos|photos)/albums?/[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 49489 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(www\\.)?eroprofile\\.com/([A-Za-z0-9\\-_]+$|m/(videos|photos)/albums?/[A-Za-z0-9\\-_]+)" })
 public class EroProfileComGallery extends PluginForDecrypt {
     public EroProfileComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,12 +68,9 @@ public class EroProfileComGallery extends PluginForDecrypt {
         // Check if account needed but none account entered
         if (br.containsHTML("(?i)>\\s*You are not allowed to view this profile")) {
             throw new AccountRequiredException();
-        } else if (br.containsHTML(EroProfileCom.NOACCESS) && !loggedin) {
+        } else if (EroProfileCom.isAccountRequired(br)) {
             logger.info("Account needed to crawl link: " + url);
             throw new AccountRequiredException();
-        } else if (br.containsHTML(EroProfileCom.NOACCESS)) {
-            logger.info("No cookies, login maybe failed: " + url);
-            return ret;
         } else if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("(?i)>\\s*Album not found\\s*<|>\\s*No photos found|^No htmlCode read$")) {
@@ -157,6 +154,7 @@ public class EroProfileComGallery extends PluginForDecrypt {
         return ret;
     }
 
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }

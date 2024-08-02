@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49489 $", interfaceVersion = 2, names = {}, urls = {})
 public class DasanCo extends YetiShareCore {
     public DasanCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,5 +100,11 @@ public class DasanCo extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        // 2024-08-01
+        return false;
     }
 }
