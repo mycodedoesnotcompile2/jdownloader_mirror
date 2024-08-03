@@ -28,7 +28,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 47486 $", interfaceVersion = 2, names = { "sproutvideo.com" }, urls = { "https?://(?:videos\\.sproutvideo\\.com/embed/[a-f0-9]{18}/[a-f0-9]{16}|\\w+\\.vids\\.io/videos/[a-f0-9]{18})" })
+@HostPlugin(revision = "$Revision: 49499 $", interfaceVersion = 2, names = { "sproutvideo.com" }, urls = { "https?://(?:videos\\.sproutvideo\\.com/embed/[a-f0-9]{18}/[a-f0-9]{16}|\\w+\\.vids\\.io/videos/[a-f0-9]{18})" })
 public class SproutVideoCom extends PluginForHost {
     public SproutVideoCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -165,12 +165,12 @@ public class SproutVideoCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "DRM unsupported");
             }
             final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br.cloneBrowser(), dllink));
-            String dllink = hlsbest.getDownloadurl();
             String betterFilename = link.getName();
             betterFilename = betterFilename.replace(".mp4", "") + "-" + hlsbest.getHeight() + "p.mp4";
             link.setName(betterFilename);
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, dllink, this.dllink.substring(this.dllink.indexOf("?")));
+            final String persistentParameters = dllink.substring(dllink.indexOf("?"));
+            dl = new HLSDownloader(link, br, hlsbest.getDownloadurl(), persistentParameters);
             dl.startDownload();
         } else {
             /* Official download */

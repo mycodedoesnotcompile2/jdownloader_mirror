@@ -55,6 +55,7 @@ import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Property;
 import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
@@ -205,8 +206,12 @@ public class FlexiConfigFromJsonConfigBuilder<T> extends FlexiConfigBuilder<T> {
         case DISK:
             File file = key == null ? new File(resource.getAbsolutePath() + ".json") : new File(resource.getAbsolutePath() + "." + key + ".json");
             if (file.isFile()) {
-                final String json = IO.readFileToString(file);
-                return createParser(json).parse();
+                try {
+                    final String json = IO.readFileToString(file);
+                    return createParser(json).parse();
+                } catch (FlexiParserException e) {
+                    throw Exceptions.addSuppressed(e, new Exception("Related File: " + file));
+                }
             }
             break;
         default:

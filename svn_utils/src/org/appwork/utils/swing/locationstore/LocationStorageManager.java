@@ -201,7 +201,7 @@ public class LocationStorageManager extends ShutdownEvent {
                             cfg.setExtendedState(newState);
                             write = true;
                         }
-                    }
+                    }                  
                     if (write) {
                         onUpdate(cfg);
                     }

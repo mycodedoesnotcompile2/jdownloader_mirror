@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.EroProfileCom;
 
-@DecrypterPlugin(revision = "$Revision: 49489 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(www\\.)?eroprofile\\.com/([A-Za-z0-9\\-_]+$|m/(videos|photos)/albums?/[A-Za-z0-9\\-_]+)" })
+@DecrypterPlugin(revision = "$Revision: 49492 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(www\\.)?eroprofile\\.com/([A-Za-z0-9\\-_]+$|m/(videos|photos)/albums?/[A-Za-z0-9\\-_]+)" })
 public class EroProfileComGallery extends PluginForDecrypt {
     public EroProfileComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +66,7 @@ public class EroProfileComGallery extends PluginForDecrypt {
         br.setFollowRedirects(true);
         br.getPage(url);
         // Check if account needed but none account entered
+        final String lastResortErrormessage = EroProfileCom.getGenericErrorMessage(br);
         if (br.containsHTML("(?i)>\\s*You are not allowed to view this profile")) {
             throw new AccountRequiredException();
         } else if (EroProfileCom.isAccountRequired(br)) {
@@ -140,7 +141,11 @@ public class EroProfileComGallery extends PluginForDecrypt {
                 }
             }
             if (ret.isEmpty()) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (lastResortErrormessage != null) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, lastResortErrormessage);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             if (isProfile) {
                 break;
