@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48749 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49500 $", interfaceVersion = 3, names = {}, urls = {})
 public class HexuploadNet extends XFileSharingProBasic {
     public HexuploadNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +80,7 @@ public class HexuploadNet extends XFileSharingProBasic {
         }
         String ret = super.getDllink(link, account, br, src);
         if (ret == null) {
-            final String base64 = br.getRegex("ldl\\.ld\\('(aHR0c.*?)'").getMatch(0);
+            final String base64 = br.getRegex("(?:start_worker|ldl\\.ld)\\('(aHR0c.*?)'").getMatch(0);
             if (base64 != null) {
                 ret = Encoding.Base64Decode(base64);
             }

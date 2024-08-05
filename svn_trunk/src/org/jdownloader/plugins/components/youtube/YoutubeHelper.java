@@ -1390,7 +1390,7 @@ public class YoutubeHelper {
     String descrambleThrottle(final String value) throws IOException, PluginException {
         String input = value;
         String output = input;
-        final String cacheKey = vid.videoID + html5PlayerJs;
+        final String cacheKey = vid.videoID + "/" + getPlayerID(html5PlayerJs);
         if (output != null) {
             HashMap<String, String> cache = jsCache.get(cacheKey);
             String function = cache != null ? cache.get("n_function") : null;
@@ -1453,9 +1453,18 @@ public class YoutubeHelper {
                     cache.put(resultKey, output);
                 }
             }
-            logger.info("nsig(" + (function != null) + "):" + input + "->" + output + "(cached:" + (cachedResult != null) + ")");
+            logger.info("nsig(" + cacheKey + "," + (function != null) + "):" + input + "->" + output + "(cached:" + (cachedResult != null) + ")");
         }
         return output;
+    }
+
+    private String getPlayerID(String playerJS) {
+        final String ret = new Regex(playerJS, "/player/([^/]+)/player_").getMatch(0);
+        if (ret != null) {
+            return ret;
+        } else {
+            return playerJS;
+        }
     }
 
     String descrambleSignatureNew(final String sig) throws IOException, PluginException {
@@ -1465,7 +1474,7 @@ public class YoutubeHelper {
         String all = null;
         String descrambler = null;
         String des = null;
-        final String cacheKey = vid.videoID + html5PlayerJs;
+        final String cacheKey = vid.videoID + "/" + getPlayerID(html5PlayerJs);
         HashMap<String, String> cache = jsCache.get(cacheKey);
         if (cache != null && !cache.isEmpty()) {
             all = cache.get("all");
@@ -1564,19 +1573,22 @@ public class YoutubeHelper {
         }
     }
 
-    private final Map<String, String> playerSourceCache = new HashMap<String, String>();
+    private static final Map<String, String> PLAYERJS_CACHE = new HashMap<String, String>();
 
     private String ensurePlayerSource() throws IOException {
         final String html5PlayerJs = this.html5PlayerJs;
         if (html5PlayerJs == null) {
             throw new IOException("no html5 player js");
         }
-        String ret = playerSourceCache.get(html5PlayerJs);
-        if (ret == null) {
-            ret = br.cloneBrowser().getPage(html5PlayerJs);
-            playerSourceCache.put(html5PlayerJs, ret);
+        final String key = getPlayerID(html5PlayerJs);
+        synchronized (PLAYERJS_CACHE) {
+            String ret = PLAYERJS_CACHE.get(key);
+            if (ret == null) {
+                ret = br.cloneBrowser().getPage(html5PlayerJs);
+                PLAYERJS_CACHE.put(key, ret);
+            }
+            return ret;
         }
-        return ret;
     }
 
     /**
@@ -2225,7 +2237,7 @@ public class YoutubeHelper {
             logger.info("itag not allowed(dash):" + match.toString());
             return false;
         } else {
-            logger.info("add:" + match.toString());
+            logger.info("add(" + vid.videoID + "/" + getPlayerID(html5PlayerJs) + "):" + match.toString());
             StreamCollection lst = map.get(match.getItag());
             if (lst == null) {
                 lst = new StreamCollection();
@@ -2240,8 +2252,6 @@ public class YoutubeHelper {
         final GetRequest getRequest = br.createGetRequest(url);
         return getPage(br, getRequest);
     }
-
-    protected static boolean API_POSSIBLE = true;
 
     protected boolean isAPIPrefered(Browser br) {
         final String serializedExperimentIdsString = br.getRegex("\"serializedExperimentIds\"\\s*:\\s*\"([0-9 ,]+)\"").getMatch(0);
@@ -2367,19 +2377,20 @@ public class YoutubeHelper {
         final Map<String, Object> map = getYtInitialPlayerResponse();
         final String unavailableStatus = map != null ? (String) JavaScriptEngineFactory.walkJson(map, "playabilityStatus/status") : null;
         final String unavailableReason = getUnavailableReason(unavailableStatus);
-        fmtMaps = new HashSet<StreamMap>();
-        subtitleUrls = new HashSet<String>();
+        fmtMaps = new LinkedHashSet<StreamMap>();
+        subtitleUrls = new LinkedHashSet<String>();
         mpdUrls = new LinkedHashSet<StreamMap>();
-        videoInfo = new HashMap<String, String>();
+        videoInfo = new LinkedHashMap<String, String>();
         vid.ageCheck = br.containsHTML("\"status\"\\s*:\\s*\"LOGIN_REQUIRED\"");
         this.handleContentWarning(br);
         int collected = 0;
-        if (isAPIPrefered(br)) {
+        if (isAPIPrefered(br) || true) {
             collected = collectMapsFromAPIResponse(br);
+            logger.info("found collectMapsFromAPIResponse(" + vid.videoID + "):" + collected);
         }
         if (collected <= 0) {
             collected = collectMapsFromPlayerResponse(map, br.getURL());
-            logger.info("found collectMapsFromPlayerResponse(refreshVideo):" + collected);
+            logger.info("found collectMapsFromPlayerResponse(" + vid.videoID + "):" + collected);
             collectMapsFormHtmlSource(br.getRequest().getHtmlCode(), "base");
         }
         // videos have data available even though they are blocked.
@@ -2611,51 +2622,135 @@ public class YoutubeHelper {
         vid.subtitles = loadSubtitles();
     }
 
+    private static boolean API_IOS_ENABLED = true;
+
+    /**
+     * https://github.com/zerodytrash/YouTube-Internal-Clients
+     *
+     *
+     * does not return opus audio codec
+     */
+    protected Request buildAPI_IOS_Request(Browser br) throws Exception {
+        if (!API_IOS_ENABLED) {
+            logger.info("buildAPI_IOS_Request:disabled");
+            return null;
+        }
+        final Map<String, Object> post = new LinkedHashMap<String, Object>();
+        final Map<String, Object> client = new LinkedHashMap<String, Object>();
+        client.put("clientName", "IOS");
+        client.put("clientVersion", "19.29.1");
+        client.put("deviceMake", "Apple");
+        client.put("deviceModel", "iPhone16,2");
+        client.put("userAgent", "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)");
+        client.put("osName", "iPhone");
+        client.put("osVersion", "17.5.1.21F90");
+        client.put("hl", "en");
+        client.put("timeZone", "UTC");
+        client.put("utcOffsetMinutes", 0);
+        final Map<String, Object> context = new LinkedHashMap<String, Object>();
+        context.put("client", client);
+        post.put("context", context);
+        post.put("videoId", vid.videoID);
+        final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
+        contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
+        final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
+        playbackContext.put("contentPlaybackContext", contentPlaybackContext);
+        post.put("playbackContext", playbackContext);
+        post.put("contentCheckOk", true);
+        post.put("racyCheckOk", true);
+        final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
+        return request;
+    }
+
+    private static boolean API_TV_ENABLED = true;
+
+    /**
+     * https://github.com/zerodytrash/YouTube-Internal-Clients
+     *
+     *
+     * does also return opus audio codec, max video resolution is 1080p
+     */
+    protected Request buildAPI_TV_Request(Browser br) throws Exception {
+        if (!API_TV_ENABLED) {
+            logger.info("buildAPI_TV_Request:disabled");
+            return null;
+        }
+        final Map<String, Object> post = new LinkedHashMap<String, Object>();
+        final Map<String, Object> client = new LinkedHashMap<String, Object>();
+        if (false) {
+            client.put("clientName", "TVHTML5_SIMPLY_EMBEDDED_PLAYER");
+            client.put("clientVersion", "2.0");
+        } else {
+            client.put("clientName", "TVHTML5");
+            client.put("clientVersion", "7.20240724.13.00");
+        }
+        client.put("hl", "en");
+        client.put("timeZone", "UTC");
+        client.put("utcOffsetMinutes", 0);
+        final Map<String, Object> context = new LinkedHashMap<String, Object>();
+        context.put("client", client);
+        post.put("context", context);
+        post.put("videoId", vid.videoID);
+        final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
+        contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
+        final String sts = getSts();
+        if (sts == null) {
+            return null;
+        }
+        contentPlaybackContext.put("signatureTimestamp", Integer.parseInt(sts));
+        final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
+        playbackContext.put("contentPlaybackContext", contentPlaybackContext);
+        post.put("playbackContext", playbackContext);
+        post.put("contentCheckOk", true);
+        post.put("racyCheckOk", true);
+        final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
+        return request;
+    }
+
     protected int collectMapsFromAPIResponse(Browser br) throws InterruptedException, Exception {
-        if (!API_POSSIBLE) {
+        if (!API_IOS_ENABLED && !API_TV_ENABLED) {
             logger.info("collectMapsFromAPIResponse:disabled");
             return -1;
         }
+        int ret = 0;
         try {
-            final Map<String, Object> post = new LinkedHashMap<String, Object>();
-            final Map<String, Object> client = new LinkedHashMap<String, Object>();
-            client.put("clientName", "IOS");
-            client.put("clientVersion", "19.29.1");
-            client.put("deviceMake", "Apple");
-            client.put("deviceModel", "iPhone16,2");
-            client.put("userAgent", "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)");
-            client.put("osName", "iPhone");
-            client.put("osVersion", "17.5.1.21F90");
-            client.put("hl", "en");
-            client.put("timeZone", "UTC");
-            client.put("utcOffsetMinutes", 0);
-            final Map<String, Object> context = new LinkedHashMap<String, Object>();
-            context.put("client", client);
-            post.put("context", context);
-            post.put("videoId", vid.videoID);
-            final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
-            contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
-            final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
-            playbackContext.put("contentPlaybackContext", contentPlaybackContext);
-            post.put("playbackContext", playbackContext);
-            post.put("contentCheckOk", true);
-            post.put("racyCheckOk", true);
             final Browser brc = br.cloneBrowser();
-            final PostRequest request = brc.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
-            request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
-            brc.getPage(request);
-            if (request.getHttpConnection().getResponseCode() == 200) {
-                final Map<String, Object> response = JSonStorage.restoreFromString(request.getHtmlCode(), TypeRef.MAP);
-                return collectMapsFromPlayerResponse(response, "api");
+            final Request request = buildAPI_IOS_Request(brc);
+            if (request != null) {
+                brc.getPage(request);
+                if (request.getHttpConnection().getResponseCode() == 200) {
+                    final Map<String, Object> response = JSonStorage.restoreFromString(request.getHtmlCode(), TypeRef.MAP);
+                    ret += collectMapsFromPlayerResponse(response, "api.ios");
+                } else {
+                    throw new Exception("auto disable api due to unexpected responseCode:" + request.getHttpConnection().getResponseCode());
+                }
             }
-            throw new Exception("auto disable api due to unexpected responseCode:" + request.getHttpConnection().getResponseCode());
         } catch (InterruptedException e) {
             throw e;
         } catch (Exception e) {
-            API_POSSIBLE = false;
+            API_IOS_ENABLED = false;
             logger.log(e);
-            return -1;
         }
+        try {
+            final Browser brc = br.cloneBrowser();
+            final Request request = buildAPI_TV_Request(brc);
+            if (request != null) {
+                brc.getPage(request);
+                if (request.getHttpConnection().getResponseCode() == 200) {
+                    final Map<String, Object> response = JSonStorage.restoreFromString(request.getHtmlCode(), TypeRef.MAP);
+                    ret += collectMapsFromPlayerResponse(response, "api.tv");
+                } else {
+                    throw new Exception("auto disable api due to unexpected responseCode:" + request.getHttpConnection().getResponseCode());
+                }
+            }
+        } catch (InterruptedException e) {
+            throw e;
+        } catch (Exception e) {
+            API_TV_ENABLED = false;
+            logger.log(e);
+        }
+        return ret;
     }
 
     private boolean looksIncomplete(YoutubeStreamData data) {
@@ -2670,10 +2765,7 @@ public class YoutubeHelper {
 
     private String getSts() throws Exception {
         final String player = ensurePlayerSource();
-        String sts = new Regex(player, "\"sts\"\\s*:\\s*(\\d+)").getMatch(0);
-        if (StringUtils.isEmpty(sts)) {
-            sts = "";
-        }
+        final String sts = new Regex(player, "sts\\s*(?::|=)\\s*(?:\")(\\d+)").getMatch(0);
         return sts;
     }
 
@@ -2973,8 +3065,9 @@ public class YoutubeHelper {
                     for (final Map<String, Object> format : adaptiveFormats) {
                         final YoutubeStreamData data = convert(format, dataSrc);
                         if (data != null) {
-                            fmtMaps.add(new StreamMap(data, dataSrc));
-                            ret++;
+                            if (fmtMaps.add(new StreamMap(data, dataSrc))) {
+                                ret++;
+                            }
                         }
                     }
                 }
@@ -2986,8 +3079,9 @@ public class YoutubeHelper {
                     for (final Map<String, Object> format : formats) {
                         final YoutubeStreamData data = convert(format, dataSrc);
                         if (data != null) {
-                            fmtMaps.add(new StreamMap(data, dataSrc));
-                            ret++;
+                            if (fmtMaps.add(new StreamMap(data, dataSrc))) {
+                                ret++;
+                            }
                         }
                     }
                 }
@@ -2999,8 +3093,9 @@ public class YoutubeHelper {
                         final String dataSrc = "new_dashManifestUrl." + src;
                         final List<YoutubeStreamData> datas = parseDashManifest(dataSrc, br, br.getURL(url).toString());
                         for (YoutubeStreamData data : datas) {
-                            fmtMaps.add(new StreamMap(data, dataSrc));
-                            ret++;
+                            if (fmtMaps.add(new StreamMap(data, dataSrc))) {
+                                ret++;
+                            }
                         }
                     } catch (Exception e) {
                         logger.log(e);

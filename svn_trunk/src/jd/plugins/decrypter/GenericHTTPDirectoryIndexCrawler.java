@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49452 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
+@DecrypterPlugin(revision = "$Revision: 49500 $", interfaceVersion = 3, names = { "HTTPDirectoryCrawler" }, urls = { "jd://directoryindex://.+" })
 public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirectoryIndexCrawler {
     private enum DirectoryListingMode {
         NGINX,
@@ -159,7 +159,7 @@ public class GenericHTTPDirectoryIndexCrawler extends abstractGenericHTTPDirecto
             // fast return
             return null;
         }
-        final String[][] filesAndFolders = br.getRegex("<a href=\"([^\"]+)\">([^>]+)</a>(?:\\s*[a-zA-Z0-9 :-]+)\\s*(\\d+|-)").getMatches();
+        final String[][] filesAndFolders = br.getRegex("<a href=\"([^\"]+)\">([^>]+)</a>(?:\\s*[a-zA-Z0-9 :-]+)\\s+(\\d+|-)\\s*[\r\n]").getMatches();
         if (filesAndFolders != null && filesAndFolders.length > 0) {
             final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
             for (final String[] finfo : filesAndFolders) {

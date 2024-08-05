@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.text.TextDownloader;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -40,10 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.KemonoPartyCrawler;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.text.TextDownloader;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49500 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { KemonoPartyCrawler.class })
 public class KemonoParty extends PluginForHost {
     public KemonoParty(PluginWrapper wrapper) {
@@ -99,7 +99,7 @@ public class KemonoParty extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([^/]+)/user/([^/]+)/post/(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([^/]+)/user/([^/]+)/post/([a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
