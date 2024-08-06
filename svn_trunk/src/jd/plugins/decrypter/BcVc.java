@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48205 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49511 $", interfaceVersion = 2, names = {}, urls = {})
 public class BcVc extends PluginForDecrypt {
     public BcVc(PluginWrapper wrapper) {
         super(wrapper);
@@ -189,14 +189,25 @@ public class BcVc extends PluginForDecrypt {
         }
         final String url = (String) JavaScriptEngineFactory.walkJson(entries, "message/url");
         String b64 = UrlQuery.parse(url).get("cr");
-        b64 = Encoding.htmlDecode(b64);
-        final String finallink = Encoding.Base64Decode(b64);
+        final String finallink;
+        if (b64 != null) {
+            b64 = Encoding.htmlDecode(b64);
+            finallink = Encoding.Base64Decode(b64);
+        } else {
+            /* url is not base64 encoded. */
+            finallink = url;
+        }
         logger.info("finallink = " + finallink);
         return this.createDownloadlink(finallink);
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
+    }
+
+    @Override
+    public int getMaxConcurrentProcessingInstances() {
+        return 1;
     }
 }

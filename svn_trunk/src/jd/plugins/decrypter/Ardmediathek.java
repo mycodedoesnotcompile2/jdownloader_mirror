@@ -70,7 +70,7 @@ import jd.plugins.components.MediathekHelper;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ARDMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 49500 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 49504 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -837,6 +837,11 @@ public class Ardmediathek extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlWdrMediathekEmbedded(final CryptedLink param, final String url) throws Exception {
         br.getPage(url);
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            throw new DecrypterRetryException(RetryReason.GEO);
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final String json = br.getRegex("\\$mediaObject\\.jsonpHelper\\.storeAndPlay\\((\\{.*?\\})\\);").getMatch(0);
         if (json == null) {
             /* Assume that content is offline */

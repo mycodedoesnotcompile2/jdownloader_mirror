@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FaceBookComVideos;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49503 $", interfaceVersion = 3, names = {}, urls = {})
 public class FaceBookComGallery extends PluginForDecrypt {
     public FaceBookComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,6 +111,12 @@ public class FaceBookComGallery extends PluginForDecrypt {
      */
     private URL_TYPE getUrlType(final String url) throws MalformedURLException {
         if (url == null) {
+            return null;
+        } else if (!this.canHandle(url)) {
+            /*
+             * Important check! Link cannot be handled by this plugin. Links from other websites could look like Facebook links e.g.
+             * https://www.youtube.com/watch?v=XXXXXXyyyyyy
+             */
             return null;
         }
         if (getVideoidFromURL(url) != null) {
@@ -417,6 +423,7 @@ public class FaceBookComGallery extends PluginForDecrypt {
              * It is really hard to find out why specific Facebook content is offline (permission issue or offline content) so this is a
              * last ditch effort.
              */
+            /* Look for any errors. */
             for (final Object parsedJson : parsedJsons) {
                 final Map<String, Object> videoErrormap = (Map<String, Object>) websiteFindVideoErrorMap(parsedJson, null);
                 if (videoErrormap != null) {
@@ -424,7 +431,7 @@ public class FaceBookComGallery extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             }
-            /* Last resort: Look for any URLs which look like single images or videos. */
+            /* No errors found -> Last resort: Look for any URLs which look like links to other single images or videos. */
             final String[] allurls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
             for (final String thisurl : allurls) {
                 if (!thisurl.equals(br.getURL()) && getUrlType(thisurl) != null) {
