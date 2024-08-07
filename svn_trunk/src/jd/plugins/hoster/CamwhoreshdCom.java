@@ -28,7 +28,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49519 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -75,5 +75,15 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
+    }
+
+    @Override
+    protected boolean isOfflineWebsite(final Browser br) {
+        if (br.containsHTML("<title>404\\s*/\\s*Page not found")) {
+            /* 404 response without 404 responsecode */
+            return true;
+        } else {
+            return super.isOfflineWebsite(br);
+        }
     }
 }

@@ -61,6 +61,7 @@ import org.jdownloader.translate._JDT;
 
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksSettings;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -187,6 +188,27 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         };
     }
 
+    public static enum ConfirmationDialogBehavior implements LabelInterface {
+        DISABLED {
+            @Override
+            public String getLabel() {
+                return "Disabled";
+            }
+        },
+        ENABLED_THRESHOLD_AUTO {
+            @Override
+            public String getLabel() {
+                return "Auto: Threshold & if no other dialogs were shown";
+            }
+        },
+        ENABLED_THRESHOLD_SIMPLE {
+            @Override
+            public String getLabel() {
+                return "Enabled: Threshold";
+            }
+        };
+    }
+
     private boolean ctrlToggle = true;
 
     public static String getTranslationForCtrlToggle() {
@@ -242,17 +264,17 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.assignPriorityEnabled = assignPriorityEnabled;
     }
 
-    public static String getTranslationForPiority() {
+    public static String getTranslationForPriority() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForPriority();
     }
 
-    @Customizer(link = "#getTranslationForPiority")
-    public Priority getPiority() {
+    @Customizer(link = "#getTranslationForPriority")
+    public Priority getPriority() {
         return piority;
     }
 
-    public void setPiority(Priority piority) {
-        this.piority = piority;
+    public void setPriority(Priority priority) {
+        this.piority = priority;
     }
 
     public static String getTranslationForPackageExpandBehavior() {
@@ -616,7 +638,10 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                 }
                 final int numberofPackages = selection.getPackageViews().size();
                 final int numberofLinks = selection.getChildren().size();
-                if (!alreadyDisplayedOtherDialogToUser && numberofPackages >= 1 && numberofLinks >= 1 && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                // TODO: Finish implementation of ConfirmationDialogBehavior
+                final ConfirmationDialogBehavior confirmationDialogBehavior = ConfirmationDialogBehavior.DISABLED;
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && ((confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_AUTO && !alreadyDisplayedOtherDialogToUser) || confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_SIMPLE) && numberofPackages >= 1 && numberofLinks >= 1) {
+                    /* Ask user if he really wants to move items to downloadlist. */
                     if (!UIOManager.I().showConfirmDialog(0, _GUI.T.literall_are_you_sure(), "Are you sure you want to move " + numberofPackages + " packages and " + numberofLinks + " links to downloadlist?", new AbstractIcon(IconKey.ICON_QUESTION, 32), _GUI.T.literally_yes(), _GUI.T.literall_no())) {
                         /* Canceled by user */
                         return;
@@ -722,10 +747,31 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         if (handleDupes == OnDupesLinksAction.GLOBAL) {
             handleDupes = CFG_LINKGRABBER.CFG.getDefaultOnAddedDupesLinksAction();
         }
+        final ConfirmLinksSettings cls = new ConfirmLinksSettings();
+        cls.setMoveLinksMode(MoveLinksMode.MANUAL);
+        cls.setAutoStartDownloads(doAutostart());
+        cls.setClearLinkgrabberlistOnConfirm(isClearListAfterConfirm());
+        // cls.setSwitchToDownloadlistOnConfirm(CFG_LINKGRABBER.CFG.isAutoSwitchToDownloadTableOnConfirmDefaultEnabled());
+        if (isAssignPriorityEnabled()) {
+            cls.setPriority(getPriority());
+        }
+        cls.setPackageExpandBehavior(this.packageExpandBehavior);
+        cls.setForceDownloads(isForceDownloads());
+        // TODO: Remove global check
+        if (handleOffline != OnOfflineLinksAction.GLOBAL) {
+            cls.setHandleOffline(handleOffline);
+        }
+        // TODO: Remove global check
+        if (handleDupes != OnDupesLinksAction.GLOBAL) {
+            cls.setHandleDupes(handleDupes);
+        }
+        cls.setConfirmationDialogBehavior(ConfirmationDialogBehavior.DISABLED); // TODO: Add setting
+        cls.setConfirmationDialogThresholdMinPackages(minNumberofLinksForConfirmMoveToDownloadlistDialog);
+        cls.setConfirmationDialogThresholdMinLinks(minNumberofLinksForConfirmMoveToDownloadlistDialog);
         if (isSelectionOnly()) {
-            confirmSelection(MoveLinksMode.MANUAL, getSelection(), doAutostart(), isClearListAfterConfirm(), JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled(), isAssignPriorityEnabled() ? getPiority() : null, this.packageExpandBehavior, isForceDownloads() ? BooleanStatus.TRUE : BooleanStatus.FALSE, handleOffline, handleDupes);
+            confirmSelection(MoveLinksMode.MANUAL, getSelection(), doAutostart(), isClearListAfterConfirm(), JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled(), isAssignPriorityEnabled() ? getPriority() : null, this.packageExpandBehavior, isForceDownloads() ? BooleanStatus.TRUE : BooleanStatus.FALSE, handleOffline, handleDupes);
         } else {
-            confirmSelection(MoveLinksMode.MANUAL, getAllLinkgrabberItems(), doAutostart(), isClearListAfterConfirm(), JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled(), isAssignPriorityEnabled() ? getPiority() : null, this.packageExpandBehavior, isForceDownloads() ? BooleanStatus.TRUE : BooleanStatus.FALSE, handleOffline, handleDupes);
+            confirmSelection(MoveLinksMode.MANUAL, getAllLinkgrabberItems(), doAutostart(), isClearListAfterConfirm(), JsonConfig.create(LinkgrabberSettings.class).isAutoSwitchToDownloadTableOnConfirmDefaultEnabled(), isAssignPriorityEnabled() ? getPriority() : null, this.packageExpandBehavior, isForceDownloads() ? BooleanStatus.TRUE : BooleanStatus.FALSE, handleOffline, handleDupes);
         }
     }
 
@@ -845,7 +891,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
             setSmallIcon(new ImageIcon(ImageProvider.merge(add, play, 0, 0, 6, 6)));
             setIconKey(null);
         } else {
-            // ContextMenuManager owner = _getOwner();
             if (isSelectionOnly()) {
                 setName(getTextForNoAutoStartSelectionOnly());
             } else {

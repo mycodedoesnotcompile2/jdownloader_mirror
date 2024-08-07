@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 48357 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49515 $", interfaceVersion = 2, names = {}, urls = {})
 public class BsTo extends PluginForDecrypt {
     public BsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -127,7 +127,7 @@ public class BsTo extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)>\\s*Seite nicht gefunden<")) {
+        } else if (br.containsHTML("(?i)>\\s*(Seite|Serie) nicht gefunden[^<]*<")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         // final String urlpart = new Regex(parameter, "(serie/.+)").getMatch(0);

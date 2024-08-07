@@ -34,7 +34,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 46902 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49519 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamshowdownloadCom extends antiDDoSForDecrypt {
     public CamshowdownloadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,16 +73,16 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([^/]+/video/.+|dl/.+|[\\w\\-]+/[\\w\\-]+/model/[\\w\\-]+/[\\w\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(([^/]+/)?video/.+|(dl|download)/.+|[\\w\\-]+/[\\w\\-]+/model/[\\w\\-]+/[\\w\\-]+)");
         }
         return ret.toArray(new String[0]);
     }
 
-    private final String PATTERN_SINGLE = "https?://[^/]+/dl/.+";
+    private final String PATTERN_SINGLE = "(?i)https?://[^/]+/(dl|download)/.+";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String addedurl = param.toString().replaceFirst("http://", "https://");
+        final String addedurl = param.toString().replaceFirst("(?i)http://", "https://");
         String fpName = null;
         if (addedurl.matches(PATTERN_SINGLE)) {
             /* Add single url to array of urls to decrypt. */
@@ -129,14 +129,14 @@ public class CamshowdownloadCom extends antiDDoSForDecrypt {
                 /* Fallback */
                 fpName = new Regex(addedurl, "([^/]+)$").getMatch(0);
             }
-            final String[] links = br.getRegex("\"(/dl/[^<>\"]+)\"").getColumn(0);
+            final String[] links = br.getRegex("\"(/(dl|download)/[^\"]+)\"").getColumn(0);
             if (links == null || links.length == 0) {
                 logger.warning("Decrypter broken for link: " + addedurl);
                 return null;
             }
             /* Those URLs will go back into our crawler and will be crawled one by one (captcha is required for each item). */
             for (final String url : links) {
-                ret.add(this.createDownloadlink(br.getURL(url).toString()));
+                ret.add(this.createDownloadlink(br.getURL(url).toExternalForm()));
             }
             if (fpName != null) {
                 final FilePackage fp = FilePackage.getInstance();
