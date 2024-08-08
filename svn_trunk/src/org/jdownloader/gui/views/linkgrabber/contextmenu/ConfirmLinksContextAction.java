@@ -54,6 +54,7 @@ import org.jdownloader.gui.views.linkgrabber.LinkgrabberSearchField;
 import org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.config.Order;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.ConfirmIncompleteArchiveAction;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
@@ -209,13 +210,12 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         };
     }
 
-    private boolean ctrlToggle = true;
-
     public static String getTranslationForCtrlToggle() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForCtrlToggle();
     }
 
     @Customizer(link = "#getTranslationForCtrlToggle")
+    @Order(301)
     public boolean isCtrlToggle() {
         return ctrlToggle;
     }
@@ -223,8 +223,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     public void setCtrlToggle(boolean ctrlToggle) {
         this.ctrlToggle = ctrlToggle;
     }
-
-    private boolean forceDownloads = false;
 
     public static String getTranslationForForceDownloads() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForForceDownloads();
@@ -239,23 +237,26 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.forceDownloads = forceDownloads;
     }
 
-    private Priority              piority                                               = Priority.DEFAULT;
-    private boolean               assignPriorityEnabled                                 = false;
-    private PackageExpandBehavior packageExpandBehavior                                 = PackageExpandBehavior.GLOBAL;
-    private OnOfflineLinksAction  handleOffline                                         = OnOfflineLinksAction.GLOBAL;
-    private OnDupesLinksAction    handleDupes                                           = OnDupesLinksAction.GLOBAL;
-    private AutoStartOptions      autoStart                                             = AutoStartOptions.AUTO;
-    private boolean               clearListAfterConfirm                                 = false;
-    private boolean               metaCtrl                                              = false;
-    private boolean               moveToDownloadlistConfirmationDialogEnabled           = false;
-    private int                   minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
-    private int                   minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
+    private boolean                    ctrlToggle                                            = true;
+    private boolean                    forceDownloads                                        = false;
+    private Priority                   piority                                               = Priority.DEFAULT;
+    private boolean                    assignPriorityEnabled                                 = false;
+    private PackageExpandBehavior      packageExpandBehavior                                 = PackageExpandBehavior.GLOBAL;
+    private OnOfflineLinksAction       handleOffline                                         = OnOfflineLinksAction.GLOBAL;
+    private OnDupesLinksAction         handleDupes                                           = OnDupesLinksAction.GLOBAL;
+    private AutoStartOptions           autoStart                                             = AutoStartOptions.AUTO;
+    private boolean                    clearListAfterConfirm                                 = false;
+    private boolean                    metaCtrl                                              = false;
+    private ConfirmationDialogBehavior confirmationDialogBehavior                            = ConfirmationDialogBehavior.DISABLED;
+    private int                        minNumberofPackagesForConfirmMoveToDownloadlistDialog = 1;
+    private int                        minNumberofLinksForConfirmMoveToDownloadlistDialog    = 1;
 
     public static String getTranslationForAssignPriorityEnabled() {
         return _JDT.T.ConfirmLinksContextAction_getTranslationForAssignPriorityEnabled();
     }
 
     @Customizer(link = "#getTranslationForAssignPriorityEnabled")
+    @Order(20)
     public boolean isAssignPriorityEnabled() {
         return assignPriorityEnabled;
     }
@@ -269,6 +270,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForPriority")
+    @Order(21)
     public Priority getPriority() {
         return piority;
     }
@@ -282,6 +284,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForPackageExpandBehavior")
+    @Order(30)
     public PackageExpandBehavior getPackageExpandBehavior() {
         return packageExpandBehavior;
     }
@@ -290,17 +293,18 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.packageExpandBehavior = packageExpandBehavior;
     }
 
-    public static String getTranslationForMoveToDownloadlistConfirmationDialogEnabled() {
-        return "Display confirmation dialog if more than a specific amount of packages and links is to be moved?";
+    public static String getTranslationForConfirmationDialogBehavior() {
+        return "Add links conformation dialog behavior";
     }
 
-    @Customizer(link = "#getTranslationForMoveToDownloadlistConfirmationDialogEnabled")
-    public boolean isMoveToDownloadlistConfirmationDialogEnabled() {
-        return moveToDownloadlistConfirmationDialogEnabled;
+    @Customizer(link = "#getTranslationForConfirmationDialogBehavior")
+    @Order(40)
+    public ConfirmationDialogBehavior getConfirmationDialogBehavior() {
+        return this.confirmationDialogBehavior;
     }
 
-    public void setMoveToDownloadlistConfirmationDialogEnabled(boolean bool) {
-        this.moveToDownloadlistConfirmationDialogEnabled = bool;
+    public void setConfirmationDialogBehavior(ConfirmationDialogBehavior behavior) {
+        this.confirmationDialogBehavior = behavior;
     }
 
     public static String getTranslationForMinNumberofPackagesForMoveToDownloadlistConfirmDialog() {
@@ -308,6 +312,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForMinNumberofPackagesForMoveToDownloadlistConfirmDialog")
+    @Order(41)
     public int getMinNumberofPackagesForMoveToDownloadlistConfirmDialog() {
         return this.minNumberofPackagesForConfirmMoveToDownloadlistDialog;
     }
@@ -321,6 +326,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForMinNumberofLinksForMoveToDownloadlistConfirmDialog")
+    @Order(42)
     public int getMinNumberofLinksForMoveToDownloadlistConfirmDialog() {
         return this.minNumberofLinksForConfirmMoveToDownloadlistDialog;
     }
@@ -337,6 +343,8 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     private static final long  serialVersionUID = -3937346180905569896L;
 
     public static void confirmSelection(final MoveLinksMode moveLinksMode, final SelectionInfo<CrawledPackage, CrawledLink> selection, final boolean autoStart, final boolean clearLinkgrabber, final boolean doTabSwitch, final Priority newPriority, final PackageExpandBehavior packageExpandBehavior, final BooleanStatus forcedStart, final OnOfflineLinksAction handleOfflineLinks, final OnDupesLinksAction handleDupes) {
+        // TODO: Make use of this
+        final ConfirmLinksSettings clsDummy = new ConfirmLinksSettings();
         final Thread thread = new Thread() {
             public void run() {
                 OnOfflineLinksAction handleOfflineLoc;
@@ -354,15 +362,16 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                 boolean alreadyDisplayedOtherDialogToUser = false;
                 final HashSet<CrawledLink> toDelete = new HashSet<CrawledLink>();
                 final HashSet<CrawledLink> toKeepInLinkgrabber = new HashSet<CrawledLink>();
-                try {
-                    // this validation step also copies the passwords from the CRawledlinks in the archive settings
-                    final ExtractionExtension extension = ExtractionExtension.getInstance();
-                    ConfirmIncompleteArchiveAction doAction = CFG_GUI.CFG.getConfirmIncompleteArchiveAction();
-                    if (extension != null && !ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST.equals(doAction)) {
+                final ExtractionExtension extractionExtension = ExtractionExtension.getInstance();
+                ConfirmIncompleteArchiveAction doAction = CFG_GUI.CFG.getConfirmIncompleteArchiveAction();
+                if (extractionExtension != null && !ConfirmIncompleteArchiveAction.MOVE_TO_DOWNLOADLIST.equals(doAction)) {
+                    /* Collect incomplete archives */
+                    try {
+                        // this validation step also copies the passwords from the Crawledlinks in the archive settings
                         final ArchiveValidation result = ArchiveValidator.validate(selection, false);
-                        for (Archive a : result.getArchives()) {
+                        for (final Archive a : result.getArchives()) {
                             ConfirmIncompleteArchiveAction doActionForTheCurrentArchive = doAction;
-                            final DummyArchive da = extension.createDummyArchive(a);
+                            final DummyArchive da = extractionExtension.createDummyArchive(a);
                             if (da.isComplete()) {
                                 continue;
                             }
@@ -472,141 +481,149 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                                 break;
                             }
                         }
+                    } catch (final DialogNoAnswerException e) {
+                        /* User did not react -> Do nothing */
+                        return;
+                    } catch (final Throwable ignore) {
+                        org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(ignore);
                     }
-                } catch (final DialogNoAnswerException e) {
-                    /* User did not react -> Do nothing */
-                    return;
-                } catch (Throwable e) {
-                    org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
                 }
-                final ArrayList<CrawledLink> offline = new ArrayList<CrawledLink>();
                 if (handleOfflineLoc != OnOfflineLinksAction.INCLUDE_OFFLINE) {
+                    /* Collect- and handle offline items */
+                    final ArrayList<CrawledLink> offline = new ArrayList<CrawledLink>();
                     for (final CrawledLink cl : selection.getChildren()) {
                         if (toKeepInLinkgrabber.contains(cl)) {
+                            /* Item has already been processed. */
+                            continue;
+                        } else if (toDelete.contains(cl)) {
+                            /* Item has already been processed. */
+                            continue;
+                        } else if (!cl.getDownloadLink().isAvailabilityStatusChecked() || cl.getDownloadLink().isAvailable()) {
+                            /* Item has not been checked or item is online -> We are only collecting offline items here. */
                             continue;
                         }
-                        if (toDelete.contains(cl)) {
-                            continue;
-                        }
-                        if (cl.getDownloadLink().isAvailabilityStatusChecked() && !cl.getDownloadLink().isAvailable()) {
-                            offline.add(cl);
-                            if (handleOfflineLoc == OnOfflineLinksAction.ASK) {
-                                final OnOfflineLinksAction[] options = new OnOfflineLinksAction[] { OnOfflineLinksAction.INCLUDE_OFFLINE, OnOfflineLinksAction.EXCLUDE_OFFLINE, OnOfflineLinksAction.EXCLUDE_OFFLINE_AND_REMOVE };
-                                final ComboBoxDialog combo = new ComboBoxDialog(0, _GUI.T.ConfirmLinksContextAction_run_offline_ask_title(), _GUI.T.ConfirmLinksContextAction_run_offline_ask_question(), options, 1, null, null, null, null) {
-                                    protected javax.swing.JComboBox getComboBox(Object[] options2) {
-                                        OnOfflineLinksAction s = CFG_LINKGRABBER.CFG.getHandleOfflineOnConfirmLatestSelection();
-                                        JComboBox ret = super.getComboBox(options2);
-                                        if (s != null) {
-                                            ret.setSelectedItem(s);
-                                        }
-                                        return ret;
-                                    };
-
-                                    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
-                                        return new ListCellRenderer() {
-                                            @Override
-                                            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                                                if (value == null) {
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
-                                                }
-                                                switch (((OnOfflineLinksAction) value)) {
-                                                case EXCLUDE_OFFLINE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
-                                                case EXCLUDE_OFFLINE_AND_REMOVE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE_AND_REMOVE(), index, isSelected, cellHasFocus);
-                                                case INCLUDE_OFFLINE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
-                                                }
-                                                JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnOfflineLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
-                                                return ret;
-                                            }
-                                        };
+                        offline.add(cl);
+                        if (handleOfflineLoc == OnOfflineLinksAction.ASK) {
+                            final OnOfflineLinksAction[] options = new OnOfflineLinksAction[] { OnOfflineLinksAction.INCLUDE_OFFLINE, OnOfflineLinksAction.EXCLUDE_OFFLINE, OnOfflineLinksAction.EXCLUDE_OFFLINE_AND_REMOVE };
+                            final ComboBoxDialog combo = new ComboBoxDialog(0, _GUI.T.ConfirmLinksContextAction_run_offline_ask_title(), _GUI.T.ConfirmLinksContextAction_run_offline_ask_question(), options, 1, null, null, null, null) {
+                                protected javax.swing.JComboBox getComboBox(Object[] options2) {
+                                    OnOfflineLinksAction s = CFG_LINKGRABBER.CFG.getHandleOfflineOnConfirmLatestSelection();
+                                    JComboBox ret = super.getComboBox(options2);
+                                    if (s != null) {
+                                        ret.setSelectedItem(s);
                                     }
+                                    return ret;
                                 };
-                                final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
-                                try {
-                                    result.throwCloseExceptions();
-                                } catch (Exception e) {
-                                    return;
+
+                                protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
+                                    return new ListCellRenderer() {
+                                        @Override
+                                        public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                                            if (value == null) {
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
+                                            }
+                                            switch (((OnOfflineLinksAction) value)) {
+                                            case EXCLUDE_OFFLINE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
+                                            case EXCLUDE_OFFLINE_AND_REMOVE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_OFFLINE_AND_REMOVE(), index, isSelected, cellHasFocus);
+                                            case INCLUDE_OFFLINE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_OFFLINE(), index, isSelected, cellHasFocus);
+                                            }
+                                            JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnOfflineLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
+                                            return ret;
+                                        }
+                                    };
                                 }
-                                handleOfflineLoc = options[result.getSelectedIndex()];
-                                CFG_LINKGRABBER.CFG.setHandleOfflineOnConfirmLatestSelection(handleOfflineLoc);
-                                alreadyDisplayedOtherDialogToUser = true;
+                            };
+                            final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
+                            try {
+                                result.throwCloseExceptions();
+                            } catch (final Exception e) {
+                                return;
                             }
-                            switch (handleOfflineLoc) {
-                            case EXCLUDE_OFFLINE:
-                                toKeepInLinkgrabber.add(cl);
-                                break;
-                            case EXCLUDE_OFFLINE_AND_REMOVE:
-                                toDelete.add(cl);
-                                break;
-                            }
+                            handleOfflineLoc = options[result.getSelectedIndex()];
+                            /* Store last user selected option. */
+                            CFG_LINKGRABBER.CFG.setHandleOfflineOnConfirmLatestSelection(handleOfflineLoc);
+                            alreadyDisplayedOtherDialogToUser = true;
+                        }
+                        switch (handleOfflineLoc) {
+                        case EXCLUDE_OFFLINE:
+                            toKeepInLinkgrabber.add(cl);
+                            break;
+                        case EXCLUDE_OFFLINE_AND_REMOVE:
+                            toDelete.add(cl);
+                            break;
                         }
                     }
                 }
-                final ArrayList<CrawledLink> dupes = new ArrayList<CrawledLink>();
                 if (handleDupesLoc != OnDupesLinksAction.INCLUDE) {
+                    /* Collect- and handle items which are already in downloadlist. */
+                    final ArrayList<CrawledLink> dupes = new ArrayList<CrawledLink>();
                     for (final CrawledLink cl : selection.getChildren()) {
+                        final String id = cl.getLinkID();
                         if (toKeepInLinkgrabber.contains(cl)) {
+                            /* Item has already been processed and shall be kept in linkgrabber */
+                            continue;
+                        } else if (toDelete.contains(cl)) {
+                            /* Item has already been processed and shall be deleted. */
+                            continue;
+                        } else if (!DownloadController.getInstance().hasDownloadLinkByID(id)) {
+                            /* Item is not a dupe -> Not relevant for us here */
                             continue;
                         }
-                        if (toDelete.contains(cl)) {
-                            continue;
-                        }
-                        String id = cl.getLinkID();
-                        if (DownloadController.getInstance().hasDownloadLinkByID(id)) {
-                            dupes.add(cl);
-                            if (handleDupesLoc == OnDupesLinksAction.ASK) {
-                                final OnDupesLinksAction[] options = new OnDupesLinksAction[] { OnDupesLinksAction.INCLUDE, OnDupesLinksAction.EXCLUDE, OnDupesLinksAction.EXCLUDE_AND_REMOVE };
-                                final ComboBoxDialog combo = new ComboBoxDialog(0, _GUI.T.ConfirmLinksContextAction_run_dupes_ask_title(), _GUI.T.ConfirmLinksContextAction_run_dupes_ask_question(), options, 0, null, null, null, null) {
-                                    protected javax.swing.JComboBox getComboBox(Object[] options2) {
-                                        OnDupesLinksAction s = CFG_LINKGRABBER.CFG.getHandleDupesOnConfirmLatestSelection();
-                                        JComboBox ret = super.getComboBox(options2);
-                                        if (s != null) {
-                                            ret.setSelectedItem(s);
-                                        }
-                                        return ret;
-                                    };
-
-                                    protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
-                                        return new ListCellRenderer() {
-                                            @Override
-                                            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                                                if (value == null) {
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
-                                                }
-                                                switch (((OnDupesLinksAction) value)) {
-                                                case EXCLUDE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES(), index, isSelected, cellHasFocus);
-                                                case EXCLUDE_AND_REMOVE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES_AND_REMOVE(), index, isSelected, cellHasFocus);
-                                                case INCLUDE:
-                                                    return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_DUPES(), index, isSelected, cellHasFocus);
-                                                }
-                                                JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnDupesLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
-                                                return ret;
-                                            }
-                                        };
+                        dupes.add(cl);
+                        if (handleDupesLoc == OnDupesLinksAction.ASK) {
+                            final OnDupesLinksAction[] options = new OnDupesLinksAction[] { OnDupesLinksAction.INCLUDE, OnDupesLinksAction.EXCLUDE, OnDupesLinksAction.EXCLUDE_AND_REMOVE };
+                            final ComboBoxDialog combo = new ComboBoxDialog(0, _GUI.T.ConfirmLinksContextAction_run_dupes_ask_title(), _GUI.T.ConfirmLinksContextAction_run_dupes_ask_question(), options, 0, null, null, null, null) {
+                                protected javax.swing.JComboBox getComboBox(Object[] options2) {
+                                    OnDupesLinksAction s = CFG_LINKGRABBER.CFG.getHandleDupesOnConfirmLatestSelection();
+                                    JComboBox ret = super.getComboBox(options2);
+                                    if (s != null) {
+                                        ret.setSelectedItem(s);
                                     }
+                                    return ret;
                                 };
-                                final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
-                                try {
-                                    result.throwCloseExceptions();
-                                } catch (Exception e) {
-                                    return;
+
+                                protected ListCellRenderer getRenderer(final ListCellRenderer orgRenderer) {
+                                    return new ListCellRenderer() {
+                                        @Override
+                                        public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                                            if (value == null) {
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.AddActionAction_getListCellRendererComponent_no_action_(), index, isSelected, cellHasFocus);
+                                            }
+                                            switch (((OnDupesLinksAction) value)) {
+                                            case EXCLUDE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES(), index, isSelected, cellHasFocus);
+                                            case EXCLUDE_AND_REMOVE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_EXCLUDE_DUPES_AND_REMOVE(), index, isSelected, cellHasFocus);
+                                            case INCLUDE:
+                                                return orgRenderer.getListCellRendererComponent(list, _GUI.T.ConfirmLinksContextAction_getListCellRendererComponent_INCLUDE_DUPES(), index, isSelected, cellHasFocus);
+                                            }
+                                            JLabel ret = (JLabel) orgRenderer.getListCellRendererComponent(list, ((OnDupesLinksAction) value).getLabel(), index, isSelected, cellHasFocus);
+                                            return ret;
+                                        }
+                                    };
                                 }
-                                handleDupesLoc = options[result.getSelectedIndex()];
-                                CFG_LINKGRABBER.CFG.setHandleDupesOnConfirmLatestSelection(handleDupesLoc);
-                                alreadyDisplayedOtherDialogToUser = true;
+                            };
+                            final ComboBoxDialogInterface result = UIOManager.I().show(ComboBoxDialogInterface.class, combo);
+                            try {
+                                result.throwCloseExceptions();
+                            } catch (Exception e) {
+                                return;
                             }
-                            switch (handleDupesLoc) {
-                            case EXCLUDE:
-                                toKeepInLinkgrabber.add(cl);
-                                break;
-                            case EXCLUDE_AND_REMOVE:
-                                toDelete.add(cl);
-                                break;
-                            }
+                            handleDupesLoc = options[result.getSelectedIndex()];
+                            CFG_LINKGRABBER.CFG.setHandleDupesOnConfirmLatestSelection(handleDupesLoc);
+                            alreadyDisplayedOtherDialogToUser = true;
+                        }
+                        /* Evaluate user preferred action */
+                        switch (handleDupesLoc) {
+                        case EXCLUDE:
+                            toKeepInLinkgrabber.add(cl);
+                            break;
+                        case EXCLUDE_AND_REMOVE:
+                            toDelete.add(cl);
+                            break;
                         }
                     }
                 }
@@ -616,18 +633,19 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                     if (toDelete.contains(cl)) {
                         createNewSelectionInfo = true;
                         continue;
-                    }
-                    if (toKeepInLinkgrabber.contains(cl)) {
+                    } else if (toKeepInLinkgrabber.contains(cl)) {
                         createNewSelectionInfo = true;
                         continue;
+                    } else {
+                        toMove.add(cl);
                     }
-                    toMove.add(cl);
                 }
                 if (toDelete.size() > 0) {
+                    /* Delete items which user wants to be deleted. */
                     LinkCollector.getInstance().removeChildren(new ArrayList<CrawledLink>(toDelete));
                 }
                 if (toMove.size() == 0) {
-                    /* No items to move */
+                    /* No items to move left -> Do nothing */
                     return;
                 }
                 final SelectionInfo<CrawledPackage, CrawledLink> finalSelection;
@@ -639,7 +657,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
                 final int numberofPackages = selection.getPackageViews().size();
                 final int numberofLinks = selection.getChildren().size();
                 // TODO: Finish implementation of ConfirmationDialogBehavior
-                final ConfirmationDialogBehavior confirmationDialogBehavior = ConfirmationDialogBehavior.DISABLED;
+                final ConfirmationDialogBehavior confirmationDialogBehavior = clsDummy.getConfirmationDialogBehavior();
                 if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && ((confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_AUTO && !alreadyDisplayedOtherDialogToUser) || confirmationDialogBehavior == ConfirmationDialogBehavior.ENABLED_THRESHOLD_SIMPLE) && numberofPackages >= 1 && numberofLinks >= 1) {
                     /* Ask user if he really wants to move items to downloadlist. */
                     if (!UIOManager.I().showConfirmDialog(0, _GUI.T.literall_are_you_sure(), "Are you sure you want to move " + numberofPackages + " packages and " + numberofLinks + " links to downloadlist?", new AbstractIcon(IconKey.ICON_QUESTION, 32), _GUI.T.literally_yes(), _GUI.T.literall_no())) {
@@ -699,6 +717,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForHandleOffline")
+    @Order(10)
     public OnOfflineLinksAction getHandleOffline() {
         return handleOffline;
     }
@@ -716,6 +735,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForHandleDupes")
+    @Order(11)
     public OnDupesLinksAction getHandleDupes() {
         return handleDupes;
     }
@@ -727,7 +747,6 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         this.handleDupes = handleDupes;
         return this;
     }
-    //
 
     public ConfirmLinksContextAction() {
         super(false, true);
@@ -765,7 +784,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         if (handleDupes != OnDupesLinksAction.GLOBAL) {
             cls.setHandleDupes(handleDupes);
         }
-        cls.setConfirmationDialogBehavior(ConfirmationDialogBehavior.DISABLED); // TODO: Add setting
+        cls.setConfirmationDialogBehavior(this.confirmationDialogBehavior);
         cls.setConfirmationDialogThresholdMinPackages(minNumberofLinksForConfirmMoveToDownloadlistDialog);
         cls.setConfirmationDialogThresholdMinLinks(minNumberofLinksForConfirmMoveToDownloadlistDialog);
         if (isSelectionOnly()) {
@@ -787,6 +806,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
         return ret;
     }
 
+    @Order(300)
     public AutoStartOptions getAutoStart() {
         return autoStart;
     }
@@ -801,6 +821,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForClearListAfterConfirm")
+    @Order(200)
     public boolean isClearListAfterConfirm() {
         return clearListAfterConfirm;
     }
@@ -860,6 +881,7 @@ public class ConfirmLinksContextAction extends CustomizableTableContextAppAction
     }
 
     @Customizer(link = "#getTranslationForSelectionOnly")
+    @Order(1)
     public boolean isSelectionOnly() {
         return selectionOnly;
     }

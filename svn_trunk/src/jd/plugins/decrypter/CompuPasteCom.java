@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48444 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49534 $", interfaceVersion = 2, names = {}, urls = {})
 public class CompuPasteCom extends PluginForDecrypt {
     public CompuPasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +150,7 @@ public class CompuPasteCom extends PluginForDecrypt {
                 captchaForm.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
                 br.submitForm(captchaForm);
             } else {
-                logger.info("No captcha required or required captcha is not supported");
+                logger.info("No captcha required or required type of captcha is not supported");
             }
         }
         String title = null;
