@@ -54,7 +54,6 @@ import org.jdownloader.controlling.contextmenu.MenuLink;
 import org.jdownloader.controlling.contextmenu.SeparatorData;
 import org.jdownloader.controlling.contextmenu.gui.ExtPopupMenu;
 import org.jdownloader.controlling.contextmenu.gui.MenuBuilder;
-import org.jdownloader.extensions.extraction.BooleanStatus;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
@@ -68,13 +67,13 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 import jd.controlling.TaskQueue;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.ConfirmLinksSettings;
 import jd.controlling.linkcollector.LinkCollector.MoveLinksMode;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -175,16 +174,26 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
             if (e.getButton() == MouseEvent.BUTTON2) {
                 if ((e.getModifiers() & InputEvent.CTRL_MASK) == 0) {
                     if ((e.getModifiers() & InputEvent.SHIFT_MASK) == 0) {
+                        final ConfirmLinksSettings cls = new ConfirmLinksSettings();
+                        cls.setMoveLinksMode(MoveLinksMode.MANUAL);
+                        cls.setAutoStartDownloads(org.jdownloader.settings.staticreferences.CFG_LINKGRABBER.LINKGRABBER_AUTO_START_ENABLED.isEnabled());
+                        cls.setClearLinkgrabberlistOnConfirm(false);
+                        cls.setSwitchToDownloadlistOnConfirm(false);
+                        // cls.setPriority(null);
+                        cls.setPackageExpandBehavior(PackageExpandBehavior.UNCHANGED);
+                        cls.setForceDownloads(Boolean.FALSE);
                         // middle click
                         final int row = rowAtPoint(e.getPoint());
                         final AbstractNode obj = this.getModel().getObjectbyRow(row);
+                        final SelectionInfo<CrawledPackage, CrawledLink> si;
                         if (LinkGrabberTable.this.isRowSelected(row)) {
                             // clicked on a selected row. let's confirm them all
-                            ConfirmLinksContextAction.confirmSelection(MoveLinksMode.MANUAL, getSelectionInfo(true, true), org.jdownloader.settings.staticreferences.CFG_LINKGRABBER.LINKGRABBER_AUTO_START_ENABLED.isEnabled(), false, false, null, PackageExpandBehavior.GLOBAL, BooleanStatus.FALSE, CFG_LINKGRABBER.CFG.getDefaultOnAddedOfflineLinksAction(), CFG_LINKGRABBER.CFG.getDefaultOnAddedDupesLinksAction());
+                            si = getSelectionInfo(true, true);
                         } else {
                             // clicked on a not-selected row. only add the context item
-                            ConfirmLinksContextAction.confirmSelection(MoveLinksMode.MANUAL, new SelectionInfo<CrawledPackage, CrawledLink>(obj), org.jdownloader.settings.staticreferences.CFG_LINKGRABBER.LINKGRABBER_AUTO_START_ENABLED.isEnabled(), false, false, null, PackageExpandBehavior.GLOBAL, BooleanStatus.FALSE, CFG_LINKGRABBER.CFG.getDefaultOnAddedOfflineLinksAction(), CFG_LINKGRABBER.CFG.getDefaultOnAddedDupesLinksAction());
+                            si = new SelectionInfo<CrawledPackage, CrawledLink>(obj);
                         }
+                        ConfirmLinksContextAction.confirmSelection(si, cls);
                     }
                 }
             }
