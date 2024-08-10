@@ -3,6 +3,7 @@ package jd.controlling.packagecontroller;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -18,6 +19,8 @@ import javax.swing.SwingUtilities;
 
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.ModifyLock;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.Queue;
 import org.appwork.utils.event.queue.Queue.QueuePriority;
 import org.appwork.utils.event.queue.QueueAction;
@@ -570,11 +573,46 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
     }
 
-    public void merge(final PackageType dest, final java.util.List<PackageType> srcPkgs, final MergePosition mergeposition) {
-        merge(dest, null, srcPkgs, mergeposition);
+    /**
+     * This class describes, how a "merge packages" action shall behave. </br>
+     * Examples of what it can influence: </br>
+     * - position of merged items </br>
+     * - shall package comments be merged or not </br>
+     */
+    public final static class MergePackageSettings {
+        private MergePosition mergeposition        = MergePosition.BOTTOM;
+        private Boolean       mergePackageComments = null;
+
+        public MergePackageSettings() {
+        }
+
+        public MergePosition getMergePosition() {
+            return mergeposition;
+        }
+
+        public void setMergePosition(MergePosition mergeposition) {
+            if (mergeposition == null) {
+                /* Default */
+                this.mergeposition = MergePosition.BOTTOM;
+            } else {
+                this.mergeposition = mergeposition;
+            }
+        }
+
+        public Boolean getMergePackageComments() {
+            return mergePackageComments;
+        }
+
+        public void setMergePackageComments(Boolean mergePackageComments) {
+            this.mergePackageComments = mergePackageComments;
+        }
     }
 
-    public void merge(final PackageType dest, final java.util.List<ChildType> srcLinks, final java.util.List<PackageType> srcPkgs, final MergePosition mergeposition) {
+    public void merge(final PackageType dest, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
+        merge(dest, null, srcPkgs, mergesettings);
+    }
+
+    public void merge(final PackageType dest, final List<ChildType> srcLinks, final List<PackageType> srcPkgs, final MergePackageSettings mergesettings) {
         if (dest == null) {
             return;
         } else if (srcLinks == null && srcPkgs == null) {
@@ -584,7 +622,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
             @Override
             protected Void run() throws RuntimeException {
                 int positionMerge = 0;
-                switch (mergeposition) {
+                switch (mergesettings.getMergePosition()) {
                 case BOTTOM:
                     positionMerge = dest.getChildren().size();
                     break;
@@ -603,13 +641,40 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                     }
                 }
                 if (srcPkgs != null) {
-                    for (PackageType pkg : srcPkgs) {
+                    final HashSet<String> commentDups = new HashSet<String>();
+                    for (final PackageType pkg : srcPkgs) {
                         /* move links from srcPkgs to dest */
                         int size = pkg.getChildren().size();
                         moveOrAddAt(dest, pkg.getChildren(), positionMerge);
                         if (positionMerge != -1) {
                             /* update positionMerge in case we want merge@top */
                             positionMerge += size;
+                        }
+                    }
+                    if (Boolean.TRUE.equals(mergesettings.getMergePackageComments())) {
+                        /* Merge package comments */
+                        /* Place main package at beginning of list so that comment of it is placed first in our merged comment string. */
+                        final StringBuilder sb = new StringBuilder();
+                        srcPkgs.add(0, dest);
+                        for (final PackageType pkg : srcPkgs) {
+                            final String comment = pkg.getComment();
+                            if (StringUtils.isEmpty(comment)) {
+                                continue;
+                            }
+                            final String[] commentLines = Regex.getLines(comment);
+                            for (final String commentLine : commentLines) {
+                                if (!StringUtils.isEmpty(commentLine) && commentDups.add(commentLine)) {
+                                    if (sb.length() > 0) {
+                                        sb.append("\r\n");
+                                    }
+                                    sb.append(commentLine);
+                                }
+                            }
+                        }
+                        final String mergedComments = sb.toString();
+                        if (!StringUtils.isEmpty(mergedComments)) {
+                            /* Set new comment */
+                            dest.setComment(mergedComments);
                         }
                     }
                 }
@@ -927,7 +992,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         });
     }
 
-    public void move(final java.util.List<PackageType> srcPkgs, final PackageType afterDest) {
+    public void move(final List<PackageType> srcPkgs, final PackageType afterDest) {
         if (srcPkgs == null || srcPkgs.size() == 0) {
             return;
         }
@@ -950,7 +1015,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         });
     }
 
-    public void moveAfter(final java.util.List<ChildType> srcLinks, final PackageType dstPkg, final ChildType after) {
+    public void moveAfter(final List<ChildType> srcLinks, final PackageType dstPkg, final ChildType after) {
         if (dstPkg == null || srcLinks == null || srcLinks.size() == 0) {
             return;
         }
@@ -968,7 +1033,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         });
     }
 
-    public void moveBefore(final java.util.List<ChildType> srcLinks, final PackageType dstPkg, final ChildType before) {
+    public void moveBefore(final List<ChildType> srcLinks, final PackageType dstPkg, final ChildType before) {
         if (dstPkg == null || srcLinks == null || srcLinks.size() == 0) {
             return;
         }
@@ -987,8 +1052,8 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     }
 
     /**
-     * Returns packages with identical name and download path. </br> Those are packages you would typically want to merge in other
-     * functions.
+     * Returns packages with identical name and download path. </br>
+     * Those are packages you would typically want to merge in other functions.
      */
     public final Map<String, List<PackageType>> getPackagesWithSameName(final boolean case_insensitive) {
         final boolean readL = this.readLock();
@@ -999,14 +1064,13 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
         }
     }
 
-    public final Map<String, List<PackageType>> getPackagesWithSameName(final ArrayList<PackageType> packages, final boolean case_insensitive) {
+    public final Map<String, List<PackageType>> getPackagesWithSameName(final List<PackageType> packages, final boolean case_insensitive) {
         final Map<String, List<PackageType>> dupes = new HashMap<String, List<PackageType>>();
         for (final PackageType packageNode : this.getPackages()) {
             String packagename = packageNode.getName();
             if (case_insensitive) {
                 packagename = packagename.toLowerCase(Locale.ENGLISH);
             }
-
             String downloaddestination = LinkTreeUtils.getDownloadDirectory(packageNode).getPath();
             if (downloaddestination != null && CrossSystem.isWindows()) {
                 downloaddestination = downloaddestination.toLowerCase(Locale.ENGLISH);
@@ -1023,7 +1087,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
     }
 
     @Deprecated
-    public void move(final java.util.List<ChildType> srcLinks, final PackageType dstPkg, final ChildType afterLink) {
+    public void move(final List<ChildType> srcLinks, final PackageType dstPkg, final ChildType afterLink) {
         moveAfter(srcLinks, dstPkg, afterLink);
     }
 

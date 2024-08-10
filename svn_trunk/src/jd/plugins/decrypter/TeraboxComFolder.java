@@ -47,7 +47,7 @@ import org.appwork.utils.Time;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49573 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "terabox.com", "teraboxapp.com", "dubox.com", "4funbox.com", "mirrobox.com", "1024tera.com", "1024terabox.com", "terabox.app" });
+        ret.add(new String[] { "terabox.com", "teraboxapp.com", "dubox.com", "4funbox.com", "mirrobox.com", "1024tera.com", "1024terabox.com", "terabox.app", "gibibox.com" });
         return ret;
     }
 

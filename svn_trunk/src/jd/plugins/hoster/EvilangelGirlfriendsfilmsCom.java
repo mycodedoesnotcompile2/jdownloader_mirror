@@ -25,11 +25,11 @@ import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48310 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelGirlfriendsfilmsCom extends EvilangelCore {
     public EvilangelGirlfriendsfilmsCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.girlfriendsfilms.com/en/join");
+        this.enablePremium(this.getPremiumRegisterLink());
     }
 
     private static List<String[]> getPluginDomains() {

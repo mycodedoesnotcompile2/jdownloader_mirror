@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
 public class JoinPeerTubeOrg extends antiDDoSForHost {
     public JoinPeerTubeOrg(PluginWrapper wrapper) {
         super(wrapper);

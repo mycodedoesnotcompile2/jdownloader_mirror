@@ -7,7 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.utils.StringUtils;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageController;
+import jd.controlling.packagecontroller.PackageController.MergePackageSettings;
+
 import org.appwork.utils.event.queue.QueueAction;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
@@ -16,13 +20,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
-import org.jdownloader.gui.views.components.packagetable.dragdrop.MergePosition;
-
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageController;
-import jd.plugins.FilePackage;
 
 public class MergeSameNamedPackagesAction<PgkType extends AbstractPackageNode<ChildType, PgkType>, ChildType extends AbstractPackageChildrenNode<PgkType>> extends CustomizableTableContextAppAction implements ActionContext {
     private boolean caseInsensitive = true;
@@ -75,16 +72,16 @@ public class MergeSameNamedPackagesAction<PgkType extends AbstractPackageNode<Ch
                 final Map<String, List<PgkType>> dupes;
                 if (sel != null && selPackageViews.size() > 0) {
                     /* Merge duplicates withing users' selection */
-                    final List<AbstractPackageNode> selectedPackages = new ArrayList<AbstractPackageNode>();
+                    final List<PgkType> selectedPackages = new ArrayList<PgkType>();
                     for (final PackageView<PgkType, ChildType> pv : selPackageViews) {
-                        final AbstractPackageNode<?, ?> selectedpackage = pv.getPackage();
+                        final PgkType selectedpackage = pv.getPackage();
                         selectedPackages.add(selectedpackage);
                     }
                     if (selectedPackages.isEmpty()) {
                         /* User has only selected items we can't work with -> Do nothing */
                         return null;
                     }
-                    dupes = controller.getPackagesWithSameName((ArrayList<PgkType>) selectedPackages, caseInsensitive);
+                    dupes = controller.getPackagesWithSameName(selectedPackages, caseInsensitive);
                 } else {
                     /* Merge duplicates in whole list */
                     dupes = controller.getPackagesWithSameName(caseInsensitive);
@@ -96,23 +93,16 @@ public class MergeSameNamedPackagesAction<PgkType extends AbstractPackageNode<Ch
                 final Iterator<Entry<String, List<PgkType>>> dupes_iterator = dupes.entrySet().iterator();
                 while (dupes_iterator.hasNext()) {
                     final Entry<String, List<PgkType>> entry = dupes_iterator.next();
-                    // final String compareString = entry.getKey();
                     final List<PgkType> thisdupes = entry.getValue();
                     if (thisdupes.size() == 1) {
                         /* We need at least two packages to be able to merge them. */
                         continue;
                     }
-                    final String mergedComments = org.jdownloader.gui.views.linkgrabber.contextmenu.MergeToPackageAction.mergePackageComments(thisdupes);
                     /* Pick package to merge the others into */
                     final PgkType target = thisdupes.remove(0);
-                    if (!StringUtils.isEmpty(mergedComments)) {
-                        if (target instanceof CrawledPackage) {
-                            ((CrawledPackage) target).setComment(mergedComments);
-                        } else {
-                            ((FilePackage) target).setComment(mergedComments);
-                        }
-                    }
-                    controller.merge(target, thisdupes, MergePosition.BOTTOM);
+                    final MergePackageSettings mergesettings = new MergePackageSettings();
+                    mergesettings.setMergePackageComments(true);
+                    controller.merge(target, thisdupes, mergesettings);
                 }
                 return null;
             }

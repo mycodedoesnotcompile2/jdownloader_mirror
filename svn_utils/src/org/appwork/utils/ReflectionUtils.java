@@ -372,10 +372,10 @@ public class ReflectionUtils {
             // java.lang.reflect.InaccessibleObjectException
             field.setAccessible(true);
         } catch (SecurityException e) {
-            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
+            throw initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
         } catch (RuntimeException e) {
             // java.lang.reflect.InaccessibleObjectException
-            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
+            throw initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + returnType), e);
         }
         try {
             final Object returnValue = field.get(instance);
@@ -392,6 +392,16 @@ public class ReflectionUtils {
             throw new InvocationTargetException(e);
         } catch (ClassCastException e) {
             throw new InvocationTargetException(e);
+        }
+    }
+
+    // TODO: replace with Exceptions.initCause in far future to stay compatible
+    private static <E extends Throwable> E initCause(E throwing, Throwable cause) {
+        try {
+            throwing.initCause(cause);
+            return throwing;
+        } catch (Throwable ex) {
+            return Exceptions.addSuppressed(throwing, cause);
         }
     }
 
@@ -413,9 +423,9 @@ public class ReflectionUtils {
                 return null;
             }
         } catch (SecurityException e) {
-            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
+            throw initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
         } catch (RuntimeException e) {
-            throw Exceptions.initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
+            throw initCause(new NoSuchFieldException("Class:" + clazz + "|Field:" + fieldName + "|Type:" + type), e);
         }
     }
 
