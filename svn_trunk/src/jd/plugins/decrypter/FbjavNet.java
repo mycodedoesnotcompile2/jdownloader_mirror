@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import javax.script.ScriptEngine;
 
@@ -36,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48298 $", interfaceVersion = 2, names = { "fbjav.net" }, urls = { "https?://(www\\.)?fbjav\\.(?:net|com)/\\w+-\\d+[^/]*" })
+@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 2, names = { "fbjav.net" }, urls = { "https?://(www\\.)?fbjav\\.(?:net|com)/\\w+-\\d+[^/]*" })
 public class FbjavNet extends antiDDoSForDecrypt {
     public FbjavNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,8 +62,9 @@ public class FbjavNet extends antiDDoSForDecrypt {
             ret.add(thumbnail);
         }
         // final String[][] videoSources = br.getRegex("eid\\s*=\\s*[\"']*(\\d+)[\"']*\\s+dtl\\s*=\\s*[\"']*(\\w+)[\"']*").getMatches();
-        final String[][] videoSources = br.getRegex("dtl\\s*=(\\w+)").getMatches();
+        final String[][] videoSources = br.getRegex("dtl\\s*=(?:'|\")?(\\w+)").getMatches();
         if (videoSources != null && videoSources.length > 0) {
+            final HashSet<String> dupes = new HashSet<String>();
             PluginForDecrypt specialCrawlerplugin = this.getNewPluginForDecryptInstance(ImcontentMe.getPluginDomains().get(0)[0]);
             final ScriptEngine engine = JavaScriptEngineFactory.getScriptEngineManager(null).getEngineByName("javascript");
             final String decodeJS = getDecryptJS(br.cloneBrowser());
@@ -70,6 +72,10 @@ public class FbjavNet extends antiDDoSForDecrypt {
             for (String[] videoSource : videoSources) {
                 // String eid = videoSource[0];
                 String dtl = videoSource[0];
+                if (!dupes.add(dtl)) {
+                    /* Skip dupe */
+                    continue;
+                }
                 try {
                     engine.eval("var res = link_decode(\"" + dtl + "\");");
                     final String resultURL = engine.get("res").toString();
@@ -105,7 +111,7 @@ public class FbjavNet extends antiDDoSForDecrypt {
         // final String scriptURL = "https://static.fbjav.com/wp-content/themes/fbjav/assets/js/custom28919.js";
         // final String scriptURL = "https://fbjav.com/wp-content/themes/fbjav/assets/js/custom.min.js?v11020";
         /* 2023-09-14 */
-        final String scriptURL = "https://fbjav.com/wp-content/cache/minify/b3895.js";
+        final String scriptURL = "/wp-content/themes/fbjav-v3/assets/js/custom.js";
         getPage(br, scriptURL);
         final String func1 = br.getRegex("(function\\s*reverse\\s*\\(\\s*t\\s*\\)\\s*\\{\\s*return[^\\}]+\\s*\\})").getMatch(0);
         if (func1 == null) {

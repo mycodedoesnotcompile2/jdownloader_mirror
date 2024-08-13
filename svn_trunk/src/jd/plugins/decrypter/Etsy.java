@@ -24,6 +24,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -35,10 +36,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48989 $", interfaceVersion = 3, names = { "etsy.com" }, urls = { "https?://(?:www\\.)?etsy\\.com/(?:[^/]+/)?listing/([0-9]+)/([a-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 49577 $", interfaceVersion = 3, names = { "etsy.com" }, urls = { "https?://(?:www\\.)?etsy\\.com/(?:[^/]+/)?listing/([0-9]+)/([a-z0-9\\-]+)" })
 public class Etsy extends PluginForDecrypt {
     public Etsy(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override

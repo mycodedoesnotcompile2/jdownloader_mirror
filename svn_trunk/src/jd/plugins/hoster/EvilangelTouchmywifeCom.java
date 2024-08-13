@@ -25,7 +25,7 @@ import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49578 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelTouchmywifeCom extends EvilangelCore {
     public EvilangelTouchmywifeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +67,6 @@ public class EvilangelTouchmywifeCom extends EvilangelCore {
 
     @Override
     protected boolean allowCookieLoginOnly() {
-        /* 2024-08-09: Untested thus I'am only allowing cookie login as I know for sure that this will work. */
         return true;
     }
 }

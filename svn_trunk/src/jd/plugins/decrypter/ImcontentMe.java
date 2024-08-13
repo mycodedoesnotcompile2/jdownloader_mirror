@@ -41,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 48455 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImcontentMe extends PluginForDecrypt {
     public ImcontentMe(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,7 @@ public class ImcontentMe extends PluginForDecrypt {
         final UrlQuery query = new UrlQuery();
         query.add("key", Encoding.urlEncode(key));
         query.add("sv", "");
-        br.postPage("https://player.imcontent.me/plyr/getvideo", query);
+        br.postPage("https://player.imcontent.me/v2/getVideo", query);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String titleSlug = (String) entries.get("jid");
         final String cryptedData = (String) entries.get("data");

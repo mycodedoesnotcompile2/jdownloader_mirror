@@ -105,8 +105,8 @@ public class ConfigLongSpinnerModel extends SpinnerNumberModel implements ValueP
         return incrValue(-1);
     }
 
-    protected Number incrValue(int i) {
-        return ((Number) getValue()).longValue() + getStepSize().longValue() * i;
+    protected Number incrValue(final int i) {
+        return ConfigIntSpinnerModel.incrValue(this, Byte.class, i);
     }
 
     @Override

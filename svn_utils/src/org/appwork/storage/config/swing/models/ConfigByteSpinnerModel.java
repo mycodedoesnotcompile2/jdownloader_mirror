@@ -104,8 +104,8 @@ public class ConfigByteSpinnerModel extends SpinnerNumberModel implements ValueP
         return incrValue(-1);
     }
 
-    protected Number incrValue(int i) {
-        return ((Number) getValue()).byteValue() + getStepSize().byteValue() * i;
+    protected Number incrValue(final int i) {
+        return ConfigIntSpinnerModel.incrValue(this, Byte.class, i);
     }
 
     @Override

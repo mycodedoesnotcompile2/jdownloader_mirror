@@ -106,7 +106,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 49550 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49581 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1501,7 +1501,7 @@ public class TbCmV2 extends PluginForDecrypt {
                             // proper playlist handling with packaging and correct container URLs
                             final String playlistURL = generatePlaylistURL(vidPlayListID);
                             distribute(createDownloadlink(playlistURL));
-                            break;
+                            continue;
                         } else if (true) {
                             // fast but part of "Releases" or "Playlists" packages
                             final List<Map<String, Object>> vidPlayListVideos = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/playlistRenderer/videos");

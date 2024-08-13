@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 49271 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49579 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -404,7 +404,8 @@ public class VoeSx extends XFileSharingProBasic {
         super.runPostRequestTask(ibr);
         final String redirect = ibr.getRegex("else \\{\\s*window\\.location\\.href = '(https?://[^\"\\']+)';").getMatch(0);
         if (redirect != null) {
-            if (canHandle(redirect)) {
+            final String fuid = this.getFUIDFromURL(this.getDownloadLink());
+            if (canHandle(redirect) || (fuid != null && redirect.endsWith("/" + fuid))) {
                 logger.info("Handle special js redirect: " + redirect);
                 getPage(ibr, redirect);
             } else {

@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.config.swing.models;
 
+import java.util.Comparator;
 import java.util.List;
 
 import javax.swing.SpinnerModel;
@@ -43,6 +44,8 @@ import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.handler.IntegerKeyHandler;
 import org.appwork.storage.config.swing.ValueProvider;
 import org.appwork.storage.config.swing.ValueProviderListener;
+import org.appwork.utils.CompareUtils;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.swing.EDTRunner;
 
 public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValueProviderListener<Integer> {
@@ -111,8 +114,56 @@ public class ConfigIntSpinnerModel extends SpinnerNumberModel implements ValuePr
         return this.incrValue(-1);
     }
 
+    protected static <T extends Number> T incrValue(final SpinnerNumberModel model, Class<T> numClass, final int i) {
+        long stepSize = model.getStepSize().longValue();
+        final Number current = ((Number) model.getValue()).longValue();
+        final Number maximum = ((Number) model.getMaximum()).longValue();
+        final Number minimum = ((Number) model.getMinimum()).longValue();
+        final Number checkAgainst;
+        final Comparator<Number> comparator;
+        if (i > 0) {
+            if (current.intValue() == -1 && CompareUtils.compareNumber(current, minimum) == 0) {
+                return (T) ReflectionUtils.cast(0, numClass);
+            }
+            checkAgainst = maximum;
+            comparator = new Comparator<Number>() {
+                @Override
+                public int compare(Number o1, Number o2) {
+                    return CompareUtils.compareNumber(o2, o1);
+                }
+            };
+        } else {
+            checkAgainst = minimum;
+            comparator = new Comparator<Number>() {
+                @Override
+                public int compare(Number o1, Number o2) {
+                    return CompareUtils.compareNumber(o1, o2);
+                }
+            };
+        }
+        long ret = current.longValue() + stepSize * i;
+        if (comparator.compare(ret, checkAgainst) < 0) {
+            while (stepSize > 0) {
+                if (stepSize % 10 == 0) {
+                    stepSize = stepSize / 10;
+                } else {
+                    stepSize = stepSize / 2;
+                }
+                final long check = current.longValue() + stepSize * i;
+                if (!(comparator.compare(check, checkAgainst) < 0)) {
+                    break;
+                }
+            }
+            if (stepSize == 0) {
+                stepSize = 1;
+            }
+            ret = current.longValue() + stepSize * i;
+        }
+        return (T) ReflectionUtils.cast(ret, numClass);
+    }
+
     protected Number incrValue(final int i) {
-        return ((Number) this.getValue()).intValue() + this.getStepSize().intValue() * i;
+        return incrValue(this, Integer.class, i);
     }
 
     @Override
