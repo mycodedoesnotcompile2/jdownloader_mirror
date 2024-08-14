@@ -84,7 +84,6 @@ import org.jdownloader.plugins.components.youtube.YoutubeConfig.IfUrlisAPlaylist
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.IfUrlisAVideoAndPlaylistAction;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig.ProfileCrawlMode;
 import org.jdownloader.plugins.components.youtube.YoutubeHelper;
-import org.jdownloader.plugins.components.youtube.YoutubeReplacer;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.components.youtube.configpanel.AbstractVariantWrapper;
 import org.jdownloader.plugins.components.youtube.configpanel.YoutubeVariantCollection;
@@ -106,7 +105,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 49581 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49587 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -608,10 +607,7 @@ public class TbCmV2 extends PluginForDecrypt {
                         channelOrPlaylistPackage.setAllowMerge(true);
                         final DownloadLink dummy = this.createDownloadlink("ytdummy");
                         dummy.setProperties(globalPropertiesForDownloadLink);
-                        String formattedPackagename = channelOrPlaylistPackageNamePattern;
-                        for (YoutubeReplacer r : YoutubeHelper.REPLACER) {
-                            formattedPackagename = r.replace(formattedPackagename, this.helper, dummy);
-                        }
+                        final String formattedPackagename = YoutubeHelper.applyReplacer(channelOrPlaylistPackageNamePattern, helper, dummy);
                         if (!StringUtils.isEmpty(formattedPackagename)) {
                             /* Formatted result is valid -> Use it */
                             channelOrPlaylistPackage.setName(formattedPackagename);

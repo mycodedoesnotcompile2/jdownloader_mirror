@@ -1612,13 +1612,21 @@ public class Browser {
     }
 
     public String getURL() {
+        return this.getURL(false);
+    }
+
+    public String getURL(final boolean withUserInfo) {
         final Request lRequest = this.getRequest();
-        return lRequest == null ? null : lRequest.getUrl();
+        return lRequest == null ? null : lRequest.getUrl(withUserInfo);
     }
 
     public URL _getURL() {
+        return this._getURL(false);
+    }
+
+    public URL _getURL(final boolean withUserInfo) {
         final Request lRequest = this.getRequest();
-        return lRequest == null ? null : lRequest.getURL();
+        return lRequest == null ? null : lRequest.getURL(withUserInfo);
     }
 
     private final List<Object[]> LOCATION_MAP = new ArrayList<Object[]>();

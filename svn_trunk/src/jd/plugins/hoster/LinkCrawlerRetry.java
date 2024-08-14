@@ -15,6 +15,7 @@ import jd.controlling.linkcollector.LinkCollector;
 import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
 import jd.controlling.linkcollector.LinkOrigin;
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
 import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -33,7 +34,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 46728 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49586 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     public LinkCrawlerRetry(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,7 +48,11 @@ public class LinkCrawlerRetry extends PluginForHost {
     @Override
     public String getHost(DownloadLink link, Account account, boolean includeSubdomain) {
         if (link != null) {
-            return Browser.getHost(link.getPluginPatternMatcher(), includeSubdomain);
+            String url = LinkCrawler.cleanURL(link.getPluginPatternMatcher());
+            if (url == null) {
+                url = link.getPluginPatternMatcher();
+            }
+            return Browser.getHost(url, includeSubdomain);
         } else {
             return getHost();
         }

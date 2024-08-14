@@ -819,8 +819,12 @@ public abstract class Request {
     }
 
     public String getUrl() {
+        return this.getUrl(false);
+    }
+
+    public String getUrl(final boolean withUserInfo) {
         try {
-            return URLHelper.getURL(this.getURL(), true, false, false).toString();
+            return URLHelper.getURL(this.getURL(withUserInfo), true, withUserInfo, false).toString();
         } catch (final IOException e) {
             ThrowUncheckedException.throwUncheckedException(e);
             return null;
@@ -828,6 +832,19 @@ public abstract class Request {
     }
 
     public URL getURL() {
+        return this.getURL(false);
+    }
+
+    public URL getURL(final boolean withUserInfo) {
+        final Authentication authentication = withUserInfo ? this.getAuthentication() : null;
+        if (authentication != null) {
+            try {
+                return new URL(authentication.getURLWithUserInfo(this.url));
+            } catch (final IOException e) {
+                ThrowUncheckedException.throwUncheckedException(e);
+                return null;
+            }
+        }
         return this.url;
     }
 

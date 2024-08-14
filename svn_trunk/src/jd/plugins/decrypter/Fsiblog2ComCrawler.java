@@ -30,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48309 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49584 $", interfaceVersion = 3, names = {}, urls = {})
 public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public Fsiblog2ComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fsiblog.club", "fsiblog2.com" });
+        ret.add(new String[] { "fsiblog.club", "fsiblog2.com", "fsiblog3.club" });
         return ret;
     }
 
@@ -67,7 +67,8 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        br.getPage(param.getCryptedUrl());
+        final String addedlink = param.getCryptedUrl().replaceFirst("(?i)^http://", "https://");
+        br.getPage(addedlink);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -81,7 +82,7 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
             ret.add(video);
         } else {
             final String[] photos = br.getRegex("class=\"e-gallery-item elementor-gallery-item elementor-animated-content\" href=\"(https?://[^\"]+)\"").getColumn(0);
-            if (photos.length == 0) {
+            if (photos == null || photos.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             for (final String singleLink : photos) {
@@ -89,6 +90,15 @@ public class Fsiblog2ComCrawler extends PluginForDecrypt {
                 link.setAvailable(true);
                 ret.add(link);
             }
+        }
+        for (final DownloadLink result : ret) {
+            /* Direct link cannot be used without correct referer so let's set a contentURL which the user can actually open in browser. */
+            result.setContentUrl(addedlink);
+            /*
+             * Direct-URL cannot be used without correct referer -> Set that here so that DirectHTTP plugin is able to download the file
+             * later on.
+             */
+            result.setReferrerUrl(br.getURL());
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(titleFromURL);

@@ -78,6 +78,8 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
@@ -104,8 +106,6 @@ import org.appwork.utils.swing.dialog.locator.CenterOfScreenDialogLocator;
 import org.appwork.utils.swing.dialog.locator.DialogLocator;
 import org.appwork.utils.swing.windowmanager.WindowManager;
 import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
-
-import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractDialog<T> implements ActionListener, WindowListener, OKCancelCloseUserIODefinition, WindowFocusListener, ComponentListener {
     protected static int                          BUTTON_HEIGHT           = -1;
@@ -1587,8 +1587,28 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
     }
 
     public void setCloseReason(final CloseReason closeReason) {
-        // we need this method to stay compatible the dialog interfaces,
-        throw new WTFException("Not implemented");
+        switch (closeReason) {
+        case OK:
+            this.returnBitMask = Dialog.RETURN_OK;
+            break;
+        case CANCEL:
+            this.returnBitMask = Dialog.RETURN_CANCEL;
+            break;
+        case CLOSE:
+            this.returnBitMask = Dialog.RETURN_CLOSED;
+            break;
+        case TIMEOUT:
+            this.returnBitMask = Dialog.RETURN_CLOSED | Dialog.RETURN_TIMEOUT;
+            break;
+        case INTERRUPT:
+            this.returnBitMask = Dialog.RETURN_CLOSED | Dialog.RETURN_INTERRUPT;
+            break;
+        default:
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                throw new WTFException("Unhandled CloseReason:" + closeReason);
+            }
+            break;
+        }
     }
 
     public void setCountdownPausable(final boolean b) {
