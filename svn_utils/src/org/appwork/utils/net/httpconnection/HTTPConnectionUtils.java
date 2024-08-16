@@ -535,6 +535,8 @@ public class HTTPConnectionUtils {
         if (!StringUtils.isEmpty(contentdisposition)) {
             if (contentdisposition.matches("(?i)^\\s*(attachment|inline)\\s*;?\\s*$")) {
                 return null;
+            } else if (contentdisposition.matches("(?i)^\\s*(attachment|inline)\\s*;?\\s*filename\\s*=\\s*$")) {
+                return null;
             } else if (contentdisposition.matches("(?i).*(;| |^)filename\\*\\s*=\\s*[\\w\\-]*'[\\w\\-]*'.+")) {
                 /* RFC2231, with encoding/language */
                 /* TODO: add support for 'parameter continuations' */
