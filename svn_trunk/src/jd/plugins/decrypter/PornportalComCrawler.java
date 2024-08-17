@@ -52,7 +52,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49496 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49598 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -259,6 +259,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
                     /* Usually empty list --> Usually means that current clip is not available as full clip -> Trailer only */
                     continue;
                 }
+                final String codec = (String) videomap.get("codec");
                 String qualityIdentifier = (String) videomap.get("format");
                 final String streamType = (String) videomap.get("type");
                 final long filesize = JavaScriptEngineFactory.toLong(videomap.get("sizeBytes"), 0);
@@ -272,6 +273,9 @@ public class PornportalComCrawler extends PluginForDecrypt {
                     continue;
                 } else if (StringUtils.isEmpty(qualityIdentifier) || !qualityIdentifier.matches("\\d+p")) {
                     /* Skip invalid entries and hls and dash streams */
+                    continue;
+                } else if (StringUtils.equalsIgnoreCase(codec, "av1")) {
+                    /* 2024-08-16: Skip audio-only items */
                     continue;
                 }
                 /* E.g. '1080p' --> '1080' */

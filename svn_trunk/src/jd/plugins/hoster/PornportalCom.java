@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 49505 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49598 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -393,6 +393,9 @@ public class PornportalCom extends PluginForHost {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (account != null) {
+            this.login(this.br, account, link.getHost(), false);
+        }
         URLConnectionAdapter con = null;
         String newDirecturl = null;
         try {
@@ -402,8 +405,8 @@ public class PornportalCom extends PluginForHost {
              * evaluate the "valid to" parameter stored inside the URL.
              */
             final UrlQuery query = UrlQuery.parse(dllink);
-            final String expireTimestampMillisStr = query.get("validto");
-            if (expireTimestampMillisStr != null && expireTimestampMillisStr.matches("\\d+") && Long.parseLong(expireTimestampMillisStr) < System.currentTimeMillis()) {
+            final String expireTimestampStr = query.get("validto");
+            if (expireTimestampStr != null && expireTimestampStr.matches("\\d+") && Long.parseLong(expireTimestampStr) * 1000l < System.currentTimeMillis()) {
                 logger.info("Directurl is expired according to timestamp from URL-parameter");
                 refreshDirecturlNeeded = true;
             }
@@ -437,8 +440,7 @@ public class PornportalCom extends PluginForHost {
                     /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                /* We should already be loggedIN at this stage! */
-                this.login(this.br, account, link.getHost(), false);
+                // this.login(this.br, account, link.getHost(), false);
                 final PornportalComCrawler crawler = (PornportalComCrawler) this.getNewPluginForDecryptInstance(this.getHost());
                 final ArrayList<DownloadLink> results = crawler.crawlContentAPI(this, contentID, account, null);
                 final String targetLinkid = this.getLinkID(link);

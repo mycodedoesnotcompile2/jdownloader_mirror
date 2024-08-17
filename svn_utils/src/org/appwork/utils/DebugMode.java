@@ -112,7 +112,7 @@ public class DebugMode {
      *
      */
     public static void debugger(boolean breakIf, Object... context) {
-        if (!TRUE_IN_IDE_ELSE_FALSE || !breakIf) {
+        if (!TRUE_IN_IDE_ELSE_FALSE || !breakIf || "true".equalsIgnoreCase(System.getProperty("NO_DEBUG"))) {
             return;
         }
         long t = Time.systemIndependentCurrentJVMTimeMillis();

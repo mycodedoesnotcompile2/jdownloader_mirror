@@ -3,7 +3,7 @@
   "dependencies":null,
   "filter":null,
   "installed":{
-    "date":"2024-07-18T16:01:18.981+02:00",
+    "date":"2024-08-16T17:31:45.247+02:00",
     "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "files":[
@@ -50,7 +50,7 @@
       "jsvg.pom.sha512",
       "meta.json"
     ],
-    "hashes":{"jsvg.jar":"e96a6ae315af2adf84ac743a8d15a4357ecccb6b9f7766f388c9cd26adb5f885"},
+    "hashes":{"jsvg.jar":"bb7e4a0afb9cd1ee2caa2cc7044befe4379080093795c6fb95ce1e475265dc82"},
     "licenses":[{
       "name":"MIT",
       "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
@@ -58,7 +58,7 @@
     }],
     "minJRE":"JVM_1_8",
     "name":"Jsvg",
-    "version":"1.6.0"
+    "version":"1.6.1"
   },
   "minJRE":"1.8",
   "provider":"maven",

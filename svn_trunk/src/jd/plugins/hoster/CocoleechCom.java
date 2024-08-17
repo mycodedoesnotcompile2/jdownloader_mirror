@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49427 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49596 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -236,9 +236,6 @@ public class CocoleechCom extends PluginForHost {
     private Map<String, Object> login(final Account account) throws Exception {
         synchronized (account) {
             account.setPass(correctPassword(account.getPass()));
-            if (!isAPIKey(account.getPass())) {
-                throw new AccountInvalidException("Invalid API key format");
-            }
             br.getPage(API_ENDPOINT + "/info?key=" + Encoding.urlEncode(account.getPass()));
             /* No error here = account is valid. */
             return handleAPIErrors(this.br, account, null);
@@ -301,16 +298,6 @@ public class CocoleechCom extends PluginForHost {
             return Integer.MAX_VALUE;
         } else {
             return 0;
-        }
-    }
-
-    private static boolean isAPIKey(final String str) {
-        if (str == null) {
-            return false;
-        } else if (str.matches("[a-f0-9]{24}")) {
-            return true;
-        } else {
-            return false;
         }
     }
 
