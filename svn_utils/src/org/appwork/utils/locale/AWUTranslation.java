@@ -100,10 +100,10 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Select", "Markieren" })
     String COPYCUTPASTE_SELECT();
+
     // @Default(lngs = { "en", "de" }, values = { "Please open this link in your browser: ", "Bitte öffnen Sie diesen Link in Ihrem
     // Browser:" })
     // String crossSystem_open_url_failed_msg();
-
     @Default(lngs = { "en", "de" }, values = { "Please confirm!", "Bitte bestätigen!" })
     String DIALOG_CONFIRMDIALOG_TITLE();
 
@@ -173,16 +173,32 @@ public interface AWUTranslation extends TranslateInterface {
     String literally_gibibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
+    @Default(lngs = { "en", "de" }, values = { "%s1 GB", "%s1 GB" })
+    String literally_gigabyte(@Name("amount") @Example("1,56") String format);
+
+    @Warning("Do not auto-translate - might result in errors")
     @Default(lngs = { "en", "de" }, values = { "%s1 KB", "%s1 KB" })
     String literally_kibibyte(@Name("amount") @Example("1,56") String format);
+
+    @Warning("Do not auto-translate - might result in errors")
+    @Default(lngs = { "en", "de" }, values = { "%s1 KB", "%s1 KB" })
+    String literally_kilobyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
     @Default(lngs = { "en", "de" }, values = { "%s1 MB", "%s1 MB" })
     String literally_mebibyte(@Name("amount") @Example("1,56") String format);
 
     @Warning("Do not auto-translate - might result in errors")
+    @Default(lngs = { "en", "de" }, values = { "%s1 MB", "%s1 MB" })
+    String literally_megabyte(@Name("amount") @Example("1,56") String format);
+
+    @Warning("Do not auto-translate - might result in errors")
     @Default(lngs = { "en", "de" }, values = { "%s1 TB", "%s1 TB" })
     String literally_tebibyte(@Name("amount") @Example("1,56") String format);
+
+    @Warning("Do not auto-translate - might result in errors")
+    @Default(lngs = { "en", "de" }, values = { "%s1 TB", "%s1 TB" })
+    String literally_terabyte(@Name("amount") @Example("1,56") String format);
 
     @Default(lngs = { "en", "de" }, values = { "Column width locked", "Spaltenbreite verankert" })
     String LockColumnWidthAction2();
@@ -269,9 +285,9 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Regular Expressions", "Reguläre Ausrücke" })
     String SEARCHDIALOG_CHECKBOX_REGULAREXPRESSION();
+
     // @Default(lngs = { "en", "de" }, values = { "Visit our Homepage", "Besuchen Sie unsere Homepage" })
     // String Statusbar_Statusbar_visiturl_tooltip();
-
     @Default(lngs = { "en", "de" }, values = { "This dialog has a countdown and closes after a few seconds. Click to cancel the countdown", "Dieser Dialog hat einen Countdown und schließt sich in einigen Sekunden. Klicken Sie hier um den Countdown abzubrechen." })
     String TIMERDIALOG_TOOLTIP_TIMERLABEL();
 
@@ -407,12 +423,13 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Host:Port" })
     String ProxyDialog_hostport();
+
     // @DoNotTranslate("HTTP")
     // @Default(lngs = { "en" }, values = { "HTTP" })
     // String ProxyDialog_http();
-
     @Default(lngs = { "en" }, values = { "Password" })
     String ProxyDialog_password();
+
     // @DoNotTranslate("Socks5")
     // @Default(lngs = { "en" }, values = { "Socks5" })
     // String ProxyDialog_socks5();
@@ -423,7 +440,6 @@ public interface AWUTranslation extends TranslateInterface {
     //
     // @Default(lngs = { "en" }, values = { "Direct" })
     // String ProxyDialog_direct();
-
     @Default(lngs = { "en" }, values = { "Type" })
     String ProxyDialog_type();
 
@@ -462,12 +478,12 @@ public interface AWUTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Remember" })
     String proxydialog_remember();
+
     // @Default(lngs = { "en", "de" }, values = { "Yes", "Ja" })
     // String lit_yes();
     //
     // @Default(lngs = { "en", "de" }, values = { "System Default", "Systemproxy" })
     // String ProxyDialog_auto();
-
     @Default(lngs = { "en", "de" }, values = { "Close", "Schließen" })
     String lit_close();
 
@@ -502,9 +518,9 @@ public interface AWUTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Socks4a Proxy", "Socks4a Proxy" })
     @DoNotTranslate("Socks4a")
     String proxy_type_socks4a();
+
     // @Default(lngs = { "en", "de" }, values = { "HTTP", "Socks4 Proxy" })
     // String ProxyDialog_https();
-
     @DoNotTranslate("PAC")
     @Default(lngs = { "en", "de" }, values = { "Auto-detect Proxy (Proxy PAC Script)", "Automatische Erkennung (z.B. Proxy PAC Script)" })
     String proxy_type_auto_detect();

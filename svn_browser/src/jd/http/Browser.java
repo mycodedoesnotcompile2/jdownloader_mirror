@@ -976,7 +976,7 @@ public class Browser {
         return this.createJSonPostRequest(url, JSonStorage.serializeToJson(postdata));
     }
 
-    public PostRequest createJSonPostRequest(String url, String jsonPostString) throws IOException {
+    public PostRequest createJSonPostRequest(final String url, final String jsonPostString) throws IOException {
         final PostRequest request = new PostRequest(this.getURL(url));
         request.setPostDataString(jsonPostString);
         request.setContentType("application/json; charset=UTF-8");

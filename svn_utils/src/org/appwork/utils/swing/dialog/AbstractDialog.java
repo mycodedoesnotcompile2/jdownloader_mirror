@@ -1435,8 +1435,8 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
         if (this.isCallerIsEDT()) {
             if (modality != ModalityType.APPLICATION_MODAL) {
                 LogV3.warning("Modeless Dialog from EDT -> Not possible. Reset to Application_modal");
+                modality = ModalityType.APPLICATION_MODAL;
             }
-            modality = ModalityType.APPLICATION_MODAL;
         }
         this.dialog = new InternDialog<T>(this, modality) {
             @Override

@@ -291,8 +291,8 @@ public class CrossSystem {
         WINDOWS_11_21H2(OSFamily.WINDOWS),
         WINDOWS_11_22H2(OSFamily.WINDOWS),
         WINDOWS_11_23H2(OSFamily.WINDOWS),
-        WINDOWS_11_24H2(OSFamily.WINDOWS);
-
+        WINDOWS_11_24H2(OSFamily.WINDOWS),
+        WINDOWS_11_25H1(OSFamily.WINDOWS);
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -359,7 +359,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -762,8 +761,11 @@ public class CrossSystem {
                     final int buildNumber = Integer.parseInt(buildNumberString);
                     // https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
                     // https://en.wikipedia.org/wiki/Windows_11_version_history
+                    // https://betawiki.net/wiki/Windows_as_a_service
                     // https://ss64.com/nt/ver.html
-                    if (buildNumber >= 26052 || buildNumber >= 26080) {
+                    if (buildNumber >= 27548 || buildNumber >= 27686) {
+                        set(OperatingSystem.WINDOWS_11_25H1);
+                    } else if (buildNumber >= 26052 || buildNumber >= 26080 || buildNumber >= 26100) {
                         // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
                         // TODO: update buildNumber
                         set(OperatingSystem.WINDOWS_11_24H2);

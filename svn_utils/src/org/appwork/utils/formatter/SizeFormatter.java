@@ -83,7 +83,6 @@ public class SizeFormatter {
         MB(1024l * 1024l, 1000l * 1000l),
         KB(1024l, 1000l),
         B(1l, 1l);
-
         private final long bytes;
         private final long kibytes;
 
@@ -167,19 +166,19 @@ public class SizeFormatter {
         return -1;
     }
 
-    private static final Pattern TB = Pattern.compile("(tb|tbyte|tig|tib)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern GB = Pattern.compile("(gb|gbyte|gig|gib)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern MB = Pattern.compile("(mb|mbyte|megabyte|mib)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern KB = Pattern.compile("(kb|kbyte|kilobyte|kib)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TB = Pattern.compile("t((é|e)ra(-| )?)?(b|byte|ib|ig|o|octet)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern GB = Pattern.compile("g(iga(-| )?)?(b|byte|ib|ig|o|octet)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MB = Pattern.compile("m((é|e)ga(-| )?)?(b|byte|ib|o|octet)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern KB = Pattern.compile("k(ilo(-| )?)?(b|byte|ib|o|octet)", Pattern.CASE_INSENSITIVE);
 
     private static Unit getBestUnit(String unitText) {
-        if (new Regex(unitText, SizeFormatter.TB).matches()) {
+        if (new Regex(unitText, SizeFormatter.TB).patternFind()) {
             return Unit.TB;
-        } else if (new Regex(unitText, SizeFormatter.GB).matches()) {
+        } else if (new Regex(unitText, SizeFormatter.GB).patternFind()) {
             return Unit.GB;
-        } else if (new Regex(unitText, SizeFormatter.MB).matches()) {
+        } else if (new Regex(unitText, SizeFormatter.MB).patternFind()) {
             return Unit.MB;
-        } else if (new Regex(unitText, SizeFormatter.KB).matches()) {
+        } else if (new Regex(unitText, SizeFormatter.KB).patternFind()) {
             return Unit.KB;
         } else {
             return Unit.B;

@@ -36,14 +36,10 @@ package org.appwork.swing.synthetica;
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DefaultFactory;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultStringValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.RequiresRestart;
-import org.appwork.storage.config.defaults.AbstractDefaultFactory;
-import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.utils.JVMVersion;
 
 /**
  * @author Thomas
@@ -74,22 +70,9 @@ public interface SyntheticaSettings extends ConfigInterface {
     @RequiresRestart("an application Restart is Required")
     boolean isAnimationEnabled();
 
-    class DefaultFontRespectsSystemDPI extends AbstractDefaultFactory<Boolean> {
-        @Override
-        public Boolean getDefaultValue(KeyHandler<Boolean> keyHandler) {
-            // Java9, 11, 17 have HighDPI Support
-            if (JVMVersion.isMinimum(JVMVersion.JAVA_9)) {
-                return Boolean.FALSE;
-            } else {
-                return Boolean.TRUE;
-            }
-        }
-    }
-
     @AboutConfig
     @DescriptionForConfigEntry("Enable/disable support for system DPI settings. Default value is true.")
     @RequiresRestart("an application Restart is Required")
-    @DefaultFactory(value = DefaultFontRespectsSystemDPI.class)
     boolean isFontRespectsSystemDPI();
 
     @AboutConfig

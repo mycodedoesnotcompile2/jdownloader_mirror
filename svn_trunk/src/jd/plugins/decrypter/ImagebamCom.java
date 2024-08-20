@@ -38,7 +38,7 @@ import jd.plugins.hoster.DirectHTTP;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 46042 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49607 $", interfaceVersion = 3, names = {}, urls = {})
 public class ImagebamCom extends PluginForDecrypt {
     public ImagebamCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,7 +161,7 @@ public class ImagebamCom extends PluginForDecrypt {
         } else {
             /* Single image - very similar to "crawlSingleImage". */
             final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-            final String finallink = br.getRegex("class=\"image-loader\">\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
+            final String finallink = br.getRegex("class=\"image-loader\"[^>]*>\\s*<img src=\"(https?://[^\"]+)\"").getMatch(0);
             if (finallink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

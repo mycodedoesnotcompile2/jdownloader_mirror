@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49596 $", interfaceVersion = 3, names = { "hentairead.com" }, urls = { "https?://(?:www\\.)?hentairead.com/hentai/([^/?]+)/?" })
+@DecrypterPlugin(revision = "$Revision: 49603 $", interfaceVersion = 3, names = { "hentairead.com" }, urls = { "https?://(?:www\\.)?hentairead.com/hentai/([^/?]+)/?" })
 public class HentaiReadCom extends PluginForDecrypt {
     public HentaiReadCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,18 +92,31 @@ public class HentaiReadCom extends PluginForDecrypt {
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final List<Map<String, Object>> imagesmaps = (List<Map<String, Object>>) restoreFromString(imagesJsonArrayText, TypeRef.OBJECT);
-        int pageNumber = 1;
+        int page = 1;
         final int padLength = imagesmaps.size();
+        final String contenturlBase = br._getURL().getPath().replaceFirst("/[a-z]+/p/\\d+", "");
         for (final Map<String, Object> imagesmap : imagesmaps) {
             final String imageurl = imagesmap.get("src").toString();
             final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
+            final String thisItemPageURLPart = br.getRegex("(/[a-z]+/p/" + page + ")").getMatch(0);
+            if (thisItemPageURLPart != null) {
+                String assumedContenturl = contenturlBase;
+                if (assumedContenturl.endsWith("/")) {
+                    assumedContenturl = assumedContenturl.substring(0, assumedContenturl.length() - 1);
+                }
+                assumedContenturl += thisItemPageURLPart;
+                /* St nice URL for user when he uses "open in browser" action. */
+                dl.setContentUrl(br.getURL(assumedContenturl).toExternalForm());
+            } else {
+                logger.warning("Failed to find URL to page: " + page);
+            }
             final String extension = getFileNameExtensionFromURL(imageurl);
-            String filename = title + "_" + StringUtils.formatByPadLength(padLength, pageNumber) + extension;
+            String filename = title + "_" + StringUtils.formatByPadLength(padLength, page) + extension;
             dl.setFinalFileName(filename);
             dl.setAvailable(true);
             dl._setFilePackage(fp);
             ret.add(dl);
-            pageNumber++;
+            page++;
         }
         return ret;
     }
