@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48596 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49612 $", interfaceVersion = 3, names = {}, urls = {})
 public class VKontakteRuShorturls extends PluginForDecrypt {
     public VKontakteRuShorturls(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class VKontakteRuShorturls extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
+        br.setFollowRedirects(false);
         return br;
     }
 
@@ -92,8 +92,12 @@ public class VKontakteRuShorturls extends PluginForDecrypt {
             if (paramTO != null) {
                 finallink = Encoding.htmlDecode(paramTO);
                 break;
+            } else if (this.isAbort()) {
+                throw new InterruptedException();
+            } else {
+                /* Continue to next round */
+                round++;
             }
-            round++;
         } while (!this.isAbort());
         logger.info("Final result = " + finallink);
         if (finallink == null) {

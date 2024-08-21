@@ -18,7 +18,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49244 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(\\?filename=.+|/.+)?", "ipfs://[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(/.+)?" })
+@DecrypterPlugin(revision = "$Revision: 49609 $", interfaceVersion = 3, names = { "ipfs.io", "ipfs.io" }, urls = { "https?://(cloudflare-ipfs.com|ipfs.io|ipfs.video|gateway.ipfs.io)/ipfs/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(\\?filename=.+|/.+)?", "ipfs://[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+(/.+)?" })
 public class IPFS extends PluginForDecrypt {
     // https://developers.cloudflare.com/distributed-web/ipfs-gateway
     // https://docs.ipfs.io/concepts/ipfs-gateway/
@@ -82,7 +82,7 @@ public class IPFS extends PluginForDecrypt {
             final String files[][] = br.getRegex("/ipfs/(" + base58Pattern + ")\\?filename=(.*?)\"").getMatches();
             DownloadLink foundMatch = null;
             for (final String[] file : files) {
-                final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin("http://https://" + ipfsGateWay + "/ipfs/" + file[0] + "/"));
+                final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin("https://" + ipfsGateWay + "/ipfs/" + file[0] + "/"));
                 final String name = URLEncode.decodeURIComponent(file[1]);
                 link.setFinalFileName(Encoding.htmlDecode(name));
                 link.setProperty(DirectHTTP.FIXNAME, name);

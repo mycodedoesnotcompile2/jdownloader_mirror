@@ -66,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 49603 $", interfaceVersion = 3, names = { "disk.yandex.net" }, urls = { "http://yandexdecrypted\\.net/\\d+" })
+@HostPlugin(revision = "$Revision: 49609 $", interfaceVersion = 3, names = { "disk.yandex.net" }, urls = { "http://yandexdecrypted\\.net/\\d+" })
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -1539,6 +1539,9 @@ public class DiskYandexNet extends PluginForHost {
      * account e.g. after importing a public file into an account.
      */
     private String getInternalFilePath(final DownloadLink link, final Account account) {
+        if (account == null) {
+            return null;
+        }
         return link.getStringProperty(PROPERTY_PATH_INTERNAL + ":" + JDHash.getMD5(account.getUser()));
     }
 
