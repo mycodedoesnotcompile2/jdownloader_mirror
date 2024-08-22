@@ -23,21 +23,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.HexFormatter;
-import org.jdownloader.downloader.hls.M3U8Playlist;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
-import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler.BrowserCrawledLink;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -53,7 +42,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 49425 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.HexFormatter;
+import org.jdownloader.downloader.hls.M3U8Playlist;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig;
+import org.jdownloader.plugins.components.config.GenericM3u8DecrypterConfig.CrawlSpeedMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer.StreamCodec;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@DecrypterPlugin(revision = "$Revision: 49619 $", interfaceVersion = 3, names = { "m3u8" }, urls = { "(https?://.+\\.m3u8|m3u8://https?://.*)($|(?:\\?|%3F)[^\\s<>\"']*|#.*)" })
 public class GenericM3u8Decrypter extends PluginForDecrypt {
     @Override
     public Boolean siteTesterDisabled() {
@@ -86,10 +87,20 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                 preSetTitle = downloadLink.getStringProperty(GenericM3u8.PRESET_NAME_PROPERTY);
             }
             if (!StringUtils.equals(source.getURL(), param.getCryptedUrl())) {
-                if (source.getCryptedLink() != null) {
+                if (source instanceof BrowserCrawledLink) {
+                    final BrowserCrawledLink bcl = (BrowserCrawledLink) source;
                     refererURL = source.getURL();
-                    br.getPage(source.getURL());
+                    br = bcl.cloneBrowser();
+                    logger.info("Reuse BrowserCrawledLink browser: " + br.getURL());
+                } else if (source.getCryptedLink() != null) {
+                    try {
+                        refererURL = source.getURL();
+                        br.getPage(source.getURL());
+                    } catch (final IOException ignore) {
+                        logger.log(ignore);
+                    }
                 }
+                // stop here as param(CryptedLink) is result of this source(CrawledLink)
                 break;
             } else {
                 source = source.getSourceLink();
@@ -212,9 +223,8 @@ public class GenericM3u8Decrypter extends PluginForDecrypt {
                     if (hls.getAverageBandwidth() > 0 || hls.getBandwidth() > 0) {
                         if (estimatedDurationMillis == null) {
                             /**
-                             * Load first item to get the estimated play-duration which we expect to be the same for all items. </br>
-                             * Based on this we can set estimated filesizes while at the same time providing a super fast crawling
-                             * experience.
+                             * Load first item to get the estimated play-duration which we expect to be the same for all items. </br> Based
+                             * on this we can set estimated filesizes while at the same time providing a super fast crawling experience.
                              */
                             final List<M3U8Playlist> playlist = hls.getM3U8(br);
                             estimatedDurationMillis = M3U8Playlist.getEstimatedDuration(playlist);

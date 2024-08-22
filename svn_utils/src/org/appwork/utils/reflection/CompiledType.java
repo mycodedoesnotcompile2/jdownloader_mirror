@@ -360,7 +360,7 @@ public class CompiledType {
     protected boolean isImplementing(Class<?>... interfaces) {
         NEXT_REQUESTED: for (Class<?> requested : interfaces) {
             for (Class<?> i : raw.getInterfaces()) {
-                if (i == requested) {
+                if (Clazz.isInstanceof(i, requested)) {
                     continue NEXT_REQUESTED;
                 }
             }

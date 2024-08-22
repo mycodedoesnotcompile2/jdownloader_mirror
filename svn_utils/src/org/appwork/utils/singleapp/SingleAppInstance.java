@@ -93,6 +93,7 @@ public class SingleAppInstance {
     *
     */
     public static final String GO_AWAY_INVALID_ID                     = "INTERNAL_INVALID_ID";
+    public static final String CLIENT_ID_OK                           = "INTERNAL_VALID_ID";
     /**
      *
      */
@@ -389,6 +390,19 @@ public class SingleAppInstance {
         }
     }
 
+    public static class IncompleteResponseException extends ErrorReadingResponseException {
+        public final boolean clientOKWasValid;
+
+        /**
+         * @param done
+         * @param clientIDOK
+         */
+        public IncompleteResponseException(boolean clientIDOK) {
+            super("The response was not terminated by a done message");
+            this.clientOKWasValid = clientIDOK;
+        }
+    }
+
     public void sendToRunningInstance(ResponseListener callback, final String... message) throws IOException, ErrorReadingResponseException, InvalidResponseID, NoPortFileException, InterruptedException, ExceptionInRunningInstance {
         if (port < 0) {
             port = readPortFromPortFile();
@@ -425,10 +439,7 @@ public class SingleAppInstance {
                     // signal server EOF
                     chunkedOut.sendEOF();
                     socket.shutdownOutput();
-                    final boolean done = readResponses(callback, bufferedIn);
-                    if (!done) {
-                        throw new ErrorReadingResponseException(MISSING_DONE_RESPONSE_SERVER_SHUT_DOWN);
-                    }
+                    readResponses(callback, bufferedIn);
                 } catch (ErrorReadingResponseException e) {
                     throw e;
                 } catch (InvalidResponseID e) {
@@ -464,9 +475,10 @@ public class SingleAppInstance {
         }
     }
 
-    public boolean readResponses(ResponseListener callback, final BufferedInputStream in) throws InterruptedException, IOException, ExceptionInRunningInstance {
+    public void readResponses(ResponseListener callback, final BufferedInputStream in) throws InterruptedException, IOException, ExceptionInRunningInstance {
         ExceptionInRunningInstance exception = null;
         boolean done = false;
+        boolean clientIDOK = false;
         while (true) {
             if (Thread.interrupted()) {
                 throw new InterruptedException();
@@ -489,11 +501,18 @@ public class SingleAppInstance {
                 throw new InvalidResponseID(response.getMessage());
             } else if (DONE.equals(response.getType())) {
                 done = true;
+                // lagacy
+                clientIDOK = true;
                 break;
             } else if (KEEP_ALIVE.equals(response.getType())) {
+                // lagacy
+                clientIDOK = true;
                 continue;
             } else if (EXCEPTION.equals(response.getType())) {
                 exception = new ExceptionInRunningInstance(response.getMessage());
+                continue;
+            } else if (CLIENT_ID_OK.equals(response.getType())) {
+                clientIDOK = true;
                 continue;
             } else if (callback != null) {
                 callback.onReceivedResponse(response);
@@ -502,7 +521,9 @@ public class SingleAppInstance {
         if (exception != null) {
             throw exception;
         } else {
-            return done;
+            if (!done) {
+                throw new IncompleteResponseException(clientIDOK);
+            }
         }
     }
 
@@ -556,22 +577,32 @@ public class SingleAppInstance {
         }
         this.alreadyUsed = true;
         try {
+            GoAwayException goAwayException = null;
+            ErrorReadingResponseException errorReadingException = null;
+            IOException ioException = null;
             try {
                 // try to connect to running instance
                 this.port = readPortFromPortFile();
                 this.sendToRunningInstance(responseListener, message);
                 throw new AnotherInstanceRunningException(this.appID);
+            } catch (IncompleteResponseException e) {
+                if (e.clientOKWasValid) {
+                    /// There is actually a running instance, but communication failed.no reason to start an own session
+                    throw e;
+                }
+                errorReadingException = e;
             } catch (ErrorReadingResponseException e) {
-                // e.g. readtimeout?
-                throw e;
+                // e.g. readtimeout? - another e.g. incompatible instance
+                errorReadingException = e;
             } catch (NoPortFileException e) {
                 // e.printStackTrace();
                 // probably no other instance
             } catch (GoAwayException e) {
-                throw new AnotherInstanceRunningButFailedToConnectException(this.appID, e);
+                goAwayException = e;// throw new AnotherInstanceRunningButFailedToConnectException(this.appID, e);
             } catch (IOException e) {
                 // e.printStackTrace();
                 // portfile available, but nobody answered - probably the portfile was not removed on exit
+                ioException = e;
             }
             this.lockChannel = new RandomAccessFile(this.lockFile, "rw").getChannel();
             boolean closeLockFlag = true;
@@ -583,9 +614,20 @@ public class SingleAppInstance {
                 } else {
                     closeLockFlag = false;
                 }
+                if (goAwayException != null) {
+                    LogV3.info("Single Instance Issue: Process sent GoAway. Maybe another process with different ID is listening on port " + port + " - change port");
+                }
+                if (errorReadingException != null) {
+                    LogV3.info("Single Instance Issue: Response ReadingError. Maybe an incompatible process is listening on port " + port + " - change port");
+                }
+                if (ioException != null) {
+                    LogV3.info("Single Instance Issue: Response IOException. Maybe an incompatible process is listening on port " + port + " - change port");
+                }
             } catch (final OverlappingFileLockException e) {
+                handleExceptions(goAwayException, errorReadingException, ioException, e);
                 throw new AnotherInstanceRunningButFailedToConnectException(this.appID, e);
             } catch (final IOException e) {
+                handleExceptions(goAwayException, errorReadingException, ioException, e);
                 throw new AnotherInstanceRunningButFailedToConnectException(this.appID, e);
             } finally {
                 if (closeLockFlag) {
@@ -653,6 +695,19 @@ public class SingleAppInstance {
             } catch (final Throwable t) {
             }
             this.cannotStart(e);
+        }
+    }
+
+    protected void handleExceptions(GoAwayException goAwayException, ErrorReadingResponseException errorReadingException, IOException ioException, final Exception e) throws AnotherInstanceRunningButFailedToConnectException, ErrorReadingResponseException {
+        if (goAwayException != null) {
+            Exceptions.addSuppressed(goAwayException, e);
+            throw new AnotherInstanceRunningButFailedToConnectException(this.appID, goAwayException);
+        }
+        if (errorReadingException != null) {
+            throw Exceptions.addSuppressed(errorReadingException, e);
+        }
+        if (ioException != null) {
+            Exceptions.addSuppressed(e, ioException);
         }
     }
 
@@ -851,6 +906,7 @@ public class SingleAppInstance {
             if (!StringUtils.equals(clientID, getServerID())) {
                 client.sendResponse(new Response(GO_AWAY_INVALID_ID, "Bad clientID"));
             } else {
+                client.sendResponse(new Response(CLIENT_ID_OK));
                 String line = client.readLine();
                 String[] message = null;
                 if (line != null && line.length() > 0) {
@@ -903,6 +959,8 @@ public class SingleAppInstance {
                                                     throw new InvalidParameterException(EXCEPTION + " is reserved for internal usage");
                                                 } else if (DONE.equals(response.getType())) {
                                                     throw new InvalidParameterException(DONE + " is reserved for internal usage");
+                                                } else if (CLIENT_ID_OK.equals(response.getType())) {
+                                                    throw new InvalidParameterException(CLIENT_ID_OK + " is reserved for internal usage");
                                                 } else {
                                                     try {
                                                         client.sendResponse(response);
