@@ -102,10 +102,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.YoutubeDashV2;
-import jd.utils.locale.JDL;
 
-@DecrypterPlugin(revision = "$Revision: 49592 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49643 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -301,13 +301,6 @@ public class TbCmV2 extends PluginForDecrypt {
             logger.info("Returning nothing because: Android support is disabled");
             return new ArrayList<DownloadLink>();
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>() {
-            @Override
-            public boolean add(DownloadLink e) {
-                distribute(e);
-                return super.add(e);
-            }
-        };
         // TODO: Maybe remove this as we're not modifying this URL anymore and also all methods to extract information out of YT URLs work
         // domain-independent.
         String cleanedurl = param.getCryptedUrl();
@@ -359,6 +352,13 @@ public class TbCmV2 extends PluginForDecrypt {
         final String playlistHandlingLogtextForUserDisabledCrawlerByLimitSetting = "Doing nothing because user has disabled channel/playlist crawler by setting limit to 0";
         String playlistHandlingHumanReadableTypeOfUrlToCrawl = null;
         String playlistHandlingHumanReadableTitle = null;
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>() {
+            @Override
+            public boolean add(DownloadLink e) {
+                distribute(e);
+                return super.add(e);
+            }
+        };
         if (StringUtils.isEmpty(playlistID) && StringUtils.isEmpty(userName) && !StringUtils.isEmpty(videoID)) {
             /* Single video */
             videoIdsToAdd.add(new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID));
@@ -418,7 +418,7 @@ public class TbCmV2 extends PluginForDecrypt {
                             messageDialogText += "\r\nJDownloader can only crawl the first " + maxItemsPerPage + " items automatically.\r\nIf there are more than " + maxItemsPerPage + " items, you need to use external tools to grab the single URLs to all videos and add those to JD manually.";
                         }
                         messageDialogText += "\r\nIf you wish to hide this dialog, you can pre-select your preferred option under Settings -> Plugins -> youtube.com.";
-                        final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, playlistHandlingHumanReadableTitle, JDL.L("plugins.host.youtube.isplaylist.question.message", messageDialogText), null, JDL.L("plugins.host.youtube.isplaylist.question.onlyplaylist", buttonTextCrawlPlaylistOrProfile), JDL.L("plugins.host.youtube.isvideoandplaylist.question.nothing", "Do nothing?")) {
+                        final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, playlistHandlingHumanReadableTitle, messageDialogText, null, buttonTextCrawlPlaylistOrProfile, "Do nothing?") {
                             @Override
                             public ModalityType getModalityType() {
                                 return ModalityType.MODELESS;
@@ -537,6 +537,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 this.channelID = channelMetadataRenderer.get("externalId").toString();
             }
             if (cfg.getProfileCrawlMode() == ProfileCrawlMode.PLAYLIST && StringUtils.isEmpty(playlistID)) {
+                /* Crawl profile as playlist -> Look for playlistID of default profile playlist "Uploads b <username>". */
                 if (!StringUtils.isEmpty(userName)) {
                     /*
                      * the user channel parser only parses 1050 videos. this workaround finds the user channel playlist and parses this
@@ -624,7 +625,8 @@ public class TbCmV2 extends PluginForDecrypt {
                             if (playlistTitle != null) {
                                 channelOrPlaylistPackage.setName(playlistTitle);
                             } else {
-                                final String internalContainerURL = helper.getChannelPlaylistCrawlerContainerUrlOverride(param.getCryptedUrl());
+                                // final String internalContainerURL =
+                                // helper.getChannelPlaylistCrawlerContainerUrlOverride(param.getCryptedUrl());
                                 String packagename;
                                 if (channelName != null) {
                                     packagename = channelName;
@@ -663,6 +665,28 @@ public class TbCmV2 extends PluginForDecrypt {
             } else {
                 // TODO: Check if this is still needed
                 videoIdsToAdd.addAll(parseVideoIds(video_ids_comma_separated));
+            }
+        }
+        final List<YoutubeStreamData> playlistThumbnails = helper.getPlaylistThumbnails();
+        // TODO: Add setting, see: https://svn.jdownloader.org/issues/90496
+        boolean crawlPlaylistThumbnails = true;
+        if (crawlPlaylistThumbnails && playlistThumbnails != null) {
+            // TODO: Add to list of download-results
+            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                for (final YoutubeStreamData thumbinfo : playlistThumbnails) {
+                    final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbinfo.getUrl()));
+                    if (thumbinfo.getEstimatedContentLength() > 0) {
+                        thumb.setDownloadSize(thumbinfo.estimatedContentLength());
+                    }
+                    thumb.setAvailable(true);
+                    if (channelOrPlaylistPackage != null) {
+                        thumb._setFilePackage(channelOrPlaylistPackage);
+                    }
+                    // TODO: Add customizable filenames
+                    ret.add(thumb);
+                    distribute(thumb);
+                    break;
+                }
             }
         }
         Integer indexFromAddedURL = null;
@@ -991,8 +1015,8 @@ public class TbCmV2 extends PluginForDecrypt {
                     }
                     last = cur;
                 }
-                for (VariantInfo vi : linkVariants) {
-                    ArrayList<VariantInfo> lst = new ArrayList<VariantInfo>();
+                for (final VariantInfo vi : linkVariants) {
+                    final ArrayList<VariantInfo> lst = new ArrayList<VariantInfo>();
                     lst.add(vi);
                     final DownloadLink lnk = createLink(new YoutubeVariantCollection(), vi, lst, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
                     ret.add(lnk);
@@ -1174,6 +1198,7 @@ public class TbCmV2 extends PluginForDecrypt {
             /* Developer mistake */
             throw new IllegalArgumentException();
         }
+        helper.setPlaylistID(playlistID);
         if (helper.getAccountLoggedIn() == null) {
             /*
              * Only set User-Agent if we're not logged in because login session can be bound to User-Agent and tinkering around with
@@ -1217,7 +1242,6 @@ public class TbCmV2 extends PluginForDecrypt {
         List<Map<String, Object>> alerts = null;
         String errorOrWarningMessage = null;
         URL originalURL = null;
-        final ArrayList<YoutubeClipData> ret = new ArrayList<YoutubeClipData>();
         Map<String, Object> ytConfigData = null;
         final Set<String> playListDupes = new HashSet<String>();
         Integer totalNumberofItems = null;
@@ -1449,6 +1473,7 @@ public class TbCmV2 extends PluginForDecrypt {
             logger.info("Channel/playlist URL used differs from URL that was initially added: Original: " + originalURL.toString() + " | Actually used: " + br.getURL());
             helper.setChannelPlaylistCrawlerContainerUrlOverride(br.getURL());
         }
+        final ArrayList<YoutubeClipData> ret = new ArrayList<YoutubeClipData>();
         humanReadableTitle += " sorted by " + activeSort;
         int videoPositionCounter = 0;
         int round = 0;

@@ -19,9 +19,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.RandomUserAgent;
@@ -35,7 +32,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48728 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@HostPlugin(revision = "$Revision: 49640 $", interfaceVersion = 2, names = {}, urls = {})
 public class XupIn extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -160,13 +160,13 @@ public class XupIn extends PluginForHost {
             dlform.put(captchafieldid, code);
         }
         dlform.remove(null);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, false, 1);
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             String page = br.followConnection(true);
             if (page.contains("richtige Passwort erneut ein")) {
                 link.setDownloadPassword(null);
                 throw new PluginException(LinkStatus.ERROR_RETRY, JDL.L("plugins.hoster.xupin.errors.passwrong", "Password wrong"));
-            } else if (br.containsHTML(">Die Sicherheitsfrage wurde falsch eingegeben|/captcha\\.php\"")) {
+            } else if (br.containsHTML(">\\s*Die Sicherheitsfrage wurde falsch eingegeben|/captcha\\.php\"")) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             } else {
                 logger.warning("Unexpected error occured");

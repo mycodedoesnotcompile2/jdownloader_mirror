@@ -40,27 +40,29 @@ public abstract class AbstractLinkQuery extends AbstractQuery {
     private boolean host           = false;
 
     private boolean jobUUID        = false;
-    
+
     private boolean advancedStatus = false;
-    
+
+    private long[]  linkUUIDs      = null;
+
     public boolean isAddedDate() {
         return this.addedDate;
     }
-    
+
     public void setAddedDate(boolean addedDate) {
         this.addedDate = addedDate;
     }
-    
+
     private boolean addedDate = false;
-    
+
     public boolean isJobUUID() {
         return this.jobUUID;
     }
-    
+
     public void setJobUUID(boolean isJobUUID) {
         this.jobUUID = isJobUUID;
     }
-    
+
     private long[] jobUUIDs;
 
     public long[] getJobUUIDs() {
@@ -78,7 +80,7 @@ public abstract class AbstractLinkQuery extends AbstractQuery {
     public void setHost(final boolean host) {
         this.host = host;
     }
-    
+
     public boolean isAdvancedStatus() {
         return this.advancedStatus;
     }
@@ -103,6 +105,21 @@ public abstract class AbstractLinkQuery extends AbstractQuery {
         this.password = password;
     }
 
+    /**
+     * @return the linkUUIDs
+     */
+    public long[] getLinkUUIDs() {
+        return this.linkUUIDs;
+    }
+    
+    /**
+     * @param linkUUIDs
+     *            the linkUUIDs to set
+     */
+    public void setLinkUUIDs(long[] linkUUIDs) {
+        this.linkUUIDs = linkUUIDs;
+    }
+    
     private boolean url = false;
 
 }
