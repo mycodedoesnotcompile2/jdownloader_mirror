@@ -68,7 +68,7 @@ import jd.plugins.components.gopro.SearchResponse;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.hoster.GoProCloud;
 
-@DecrypterPlugin(revision = "$Revision: 49356 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://plus.gopro.com/media-library/[a-zA-Z0-9]+|https?://plus\\.gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
+@DecrypterPlugin(revision = "$Revision: 49649 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://plus.gopro.com/media-library/[a-zA-Z0-9]+|https?://plus\\.gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
 @PluginDependencies(dependencies = { GoProCloud.class })
 public class GoProCloudDecrypter extends antiDDoSForDecrypt {
     private GoProConfig hostConfig;
@@ -128,12 +128,11 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
 
     protected void decryptMedialibrary(final ArrayList<DownloadLink> decryptedLinks, final Account account, CryptedLink cryptedLink) throws Exception {
         final FlexiJSonMapper mapper = new FlexiJSonMapper();
-        String id = new Regex(cryptedLink.getCryptedUrl(), ".*/media-library/([^/]+)").getMatch(0);
-        if (account != null) {
-            login(this.br, account);
-        } else {
+        String id = new Regex(cryptedLink.getCryptedUrl(), "(?i).*/media-library/([^/]+)").getMatch(0);
+        if (account == null) {
             throw new AccountRequiredException();
         }
+        login(this.br, account);
         if (StringUtils.isNotEmpty(id) && !StringUtils.equalsIgnoreCase(id, "links")) {
             scanID(decryptedLinks, account, cryptedLink, mapper, id, null, "premium", null);
         } else {

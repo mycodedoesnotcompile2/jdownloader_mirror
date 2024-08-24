@@ -259,37 +259,44 @@ public class TestSingleInstance extends AWTest {
         IncommingMessageListener listener = new IncommingMessageListener() {
             @Override
             public void onIncommingMessage(ResponseSender sender, String[] message) {
-                try {
-                    server.get().exit(true).join();
-                } catch (InterruptedException ignore) {
-                }
+                // try {
+                // server.get().exit(true).join();
+                // } catch (InterruptedException ignore) {
+                // }
             }
         };
         final ExtSingleAppInstance serverI = new ExtSingleAppInstance("test", listener) {
-            @Override
-            protected boolean closeConnection(ClientConnection client) throws IOException {
-                return true;
-            }
-
-            /*
-             * (non-Javadoc)
-             *
-             * @see org.appwork.utils.singleapp.SingleAppInstance#onUncaughtExceptionDuringHandlingIncommingConnections(java.lang.Throwable)
+            // @Override
+            // protected boolean closeConnection(ClientConnection client) throws IOException {
+            // return true;
+            // }
+            /**
+             * @see org.appwork.utils.singleapp.SingleAppInstance#sendDone(org.appwork.utils.singleapp.SingleAppInstance.ClientConnection)
              */
             @Override
-            protected void onUncaughtExceptionDuringHandlingIncommingConnections(Throwable e) {
-                // should not happen because closeAllConnections will close socket but after that IOExceptions no longer should land here
-                triggerToClear.put(EXCPTION_DUE_TO_CONNECTION_CLOSE, Boolean.TRUE);
+            protected void sendDone(ClientConnection client) throws IOException {
+                // do not send done.this should trigger an error
             }
+            // /*
+            // * (non-Javadoc)
+            // *
+            // * @see
+            // org.appwork.utils.singleapp.SingleAppInstance#onUncaughtExceptionDuringHandlingIncommingConnections(java.lang.Throwable)
+            // */
+            // @Override
+            // protected void onUncaughtExceptionDuringHandlingIncommingConnections(Throwable e) {
+            // // should not happen because closeAllConnections will close socket but after that IOExceptions no longer should land here
+            // triggerToClear.put(EXCPTION_DUE_TO_CONNECTION_CLOSE, Boolean.TRUE);
+            // }
         };
         try {
             server.set(serverI);
             serverI.setForwardMessageDirectIfNoOtherInstanceIsFound(false);
-            serverI.start(mayNotGetResponses, "");
+            serverI.start(mayNotGetResponses, "ThisIsMyMessage");
             try {
                 final SingleAppInstance client = new ExtSingleAppInstance("test", mayNotReceiveMessages);
                 try {
-                    client.start(null, "");
+                    client.start(null, "ThisIsMyMessage2");
                     throw new Exception("Should not reach this part");
                 } catch (ErrorReadingResponseException e) {
                     triggerToClear.remove(EXCEPTION_MISSING_DONE_RESPONSE_SERVER_SHUT_DOWN);

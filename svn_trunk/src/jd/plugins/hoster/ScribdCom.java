@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = { "scribd.com" }, urls = { "https?://(?:www\\.)?(?:(?:de|ru|es)\\.)?scribd\\.com/(doc|document|book|embeds|read)/\\d+" })
 public class ScribdCom extends PluginForHost {
     private final String        formats       = "formats";
     /** The list of server values displayed to the user */
@@ -424,7 +424,7 @@ public class ScribdCom extends PluginForHost {
         }
         final String[] downloadInfo = getDllink(parameter, account, is_audiobook);
         dl = jd.plugins.BrowserAdapter.openDownload(br, parameter, downloadInfo[0], this.isResumeable(parameter, account), 1);
-        if (dl.getConnection().getContentType().contains("html")) {
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             /* Assume that our current account type = free and the file is not downloadable */
             throw new AccountRequiredException();

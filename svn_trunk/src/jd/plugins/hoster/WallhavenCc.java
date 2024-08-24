@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadInterface;
 
-@HostPlugin(revision = "$Revision: 47473 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
 public class WallhavenCc extends PluginForHost {
     public WallhavenCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -281,7 +281,7 @@ public class WallhavenCc extends PluginForHost {
             if (br.getHttpConnection().getResponseCode() == 403) {
                 /* Account required to view adult content. */
                 if (account == null) {
-                    throw new AccountRequiredException();
+                    throw new AccountRequiredException("Account required to download adult content.");
                 } else {
                     logger.warning("Account available and still no permissions to view (NSFW) content -> This should never happen!");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

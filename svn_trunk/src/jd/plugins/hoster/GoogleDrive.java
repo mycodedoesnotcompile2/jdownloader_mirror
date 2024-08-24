@@ -83,7 +83,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49252 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -1691,7 +1691,7 @@ public class GoogleDrive extends PluginForHost {
             } else if (account == null) {
                 /* User does not have an account but the file can only be downloaded by logged-in users. */
                 logger.info("Looks like a private file and no account given -> Ask user to add one");
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("Private file");
             } else {
                 /* User has account but that account is missing permissions to access that file. */
                 link.setProperty(PROPERTY_LAST_IS_PRIVATE_FILE_TIMESTAMP, System.currentTimeMillis());

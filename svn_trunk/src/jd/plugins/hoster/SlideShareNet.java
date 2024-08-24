@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:www\\.)?(slidesharedecrypted\\.net/[a-z0-9\\-_]+/[a-z0-9\\-_]+|slidesharepicturedecrypted\\.net/\\d+)" })
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:www\\.)?(slidesharedecrypted\\.net/[a-z0-9\\-_]+/[a-z0-9\\-_]+|slidesharepicturedecrypted\\.net/\\d+)" })
 public class SlideShareNet extends PluginForHost {
     public SlideShareNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,12 +108,11 @@ public class SlideShareNet extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 con = br.openGetConnection(directlink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                } else {
+                if (!this.looksLikeDownloadableContent(con)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                if (con.getCompleteContentLength() > 0) {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
                 }
             } finally {
                 try {

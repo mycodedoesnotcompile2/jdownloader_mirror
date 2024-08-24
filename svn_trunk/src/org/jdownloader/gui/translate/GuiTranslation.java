@@ -1560,6 +1560,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Original Filename" })
     String PackagizerFilterRuleDialog_createVariablesMenu_filename_org();
 
+    @Default(lngs = { "en" }, values = { "Original Filename without file extension" })
+    String PackagizerFilterRuleDialog_createVariablesMenu_filename_org_without_file_extension();
+
     @Default(lngs = { "en" }, values = { "Original Filetype" })
     String PackagizerFilterRuleDialog_createVariablesMenu_filetype_org();
 
@@ -6495,7 +6498,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "%s1 %s2 %s3-Audio" })
     String YoutubeVariant_name_generic_video3(String res, String fps, String audio);
 
-    @Default(lngs = { "en" }, values = { "Subtitle language. *lng*->EN | *lng[display]* -> Spanish | *lng[full]* -> Spanish (Latin America and the Caribbean)" })
+    @Default(lngs = { "en" }, values = { "Subtitle/Audio language. *lng*->EN | *lng[display]* -> Spanish | *lng[full]* -> Spanish (Latin America and the Caribbean)" })
     String YoutubeHelper_getDescription_language();
 
     @Default(lngs = { "en" }, values = { "Hoster Logo" })
@@ -6527,6 +6530,9 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Filetype" })
     String YOUTUBE_CONFIG_PANEL_TABLE_FILETYPE();
+
+    @Default(lngs = { "en" }, values = { "Language" })
+    String YOUTUBE_CONFIG_PANEL_TABLE_LANGUAGE();
 
     @Default(lngs = { "en" }, values = { "Container" })
     String YOUTUBE_CONFIG_PANEL_TABLE_CONTAINER();

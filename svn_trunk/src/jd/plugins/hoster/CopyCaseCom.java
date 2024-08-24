@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49128 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,7 +210,7 @@ public class CopyCaseCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorID, timeSeconds.longValue() * 1001l);
             } else if (errorID.equalsIgnoreCase("max_filesize_exceeded")) {
                 /* File too big to be downloaded without account / with current account. */
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("Paid account needed to download files of this size");
             } else {
                 /* Unknown error */
                 throw new PluginException(LinkStatus.ERROR_FATAL, errorID);

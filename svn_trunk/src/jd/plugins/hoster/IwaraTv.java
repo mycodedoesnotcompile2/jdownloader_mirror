@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -401,7 +401,7 @@ public class IwaraTv extends PluginForHost {
         String directurl = link.getStringProperty(PROPERTY_DIRECTURL);
         if (StringUtils.isEmpty(directurl)) {
             if (link.hasProperty(PROPERTY_IS_PRIVATE)) {
-                throw new AccountRequiredException();
+                throw new AccountRequiredException("Private video");
             } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

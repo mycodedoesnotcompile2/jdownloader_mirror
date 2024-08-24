@@ -978,7 +978,7 @@ public class SingleAppInstance {
                                 }
                             }
                         } finally {
-                            client.sendResponse(new Response(DONE));
+                            sendDone(client);
                         }
                     } else {
                         onIncommingInvalidMessage(line);
@@ -1018,6 +1018,10 @@ public class SingleAppInstance {
             }
             lastClosedConnection = Time.systemIndependentCurrentJVMTimeMillis();
         }
+    }
+
+    protected void sendDone(final ClientConnection client) throws IOException {
+        client.sendResponse(new Response(DONE));
     }
 
     protected void onIncommingInvalidMessage(String message) {

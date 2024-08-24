@@ -23,12 +23,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hds.HDSDownloader;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hds.HDSContainer;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -48,7 +42,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 49633 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hds.HDSDownloader;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hds.HDSContainer;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+
+@HostPlugin(revision = "$Revision: 49670 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -164,7 +165,6 @@ public class ORFMediathek extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
-        URLConnectionAdapter con = null;
         String dllink = null;
         if (link.getPluginPatternMatcher().matches(TYPE_AUDIO)) {
             br.getPage(link.getPluginPatternMatcher());
@@ -183,15 +183,17 @@ public class ORFMediathek extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             br.getPage("http://bits.orf.at/filehandler/static-api/json/current/data.json?file=" + audioID);
-            dllink = br.getRegex("\"url\":\"(https?[^<>\"]*?)\"").getMatch(0);
+            dllink = br.getRegex("\"url\"\\s*:\\s*\"(https?[^<>\"]*?)\"").getMatch(0);
             if (dllink == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            URLConnectionAdapter con = null;
             try {
-                GetRequest request = br.createGetRequest(dllink);
-                request.getHeaders().put("Accept-Encoding", "identity");
-                con = br.openRequestConnection(request);
-                this.handleConnectionErrors(br, link, con);
+                final Browser br2 = br.cloneBrowser();
+                final GetRequest request = br2.createGetRequest(dllink);
+                request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
+                con = br2.openRequestConnection(request);
+                this.handleConnectionErrors(br2, link, con);
                 if (!looksLikeDownloadableContent(con, link)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
@@ -219,14 +221,15 @@ public class ORFMediathek extends PluginForHost {
             }
         }
         if (isSubtitle(link) || isImage(link) || isVideoProgressiveStream(link)) {
-            final Browser br2 = br.cloneBrowser();
             dllink = link.getStringProperty(PROPERTY_DIRECTURL);
             if (dllink == null) {
                 /* Invalid item (this should never happen!). */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             checkUrlForAgeProtection(link, dllink);
+            URLConnectionAdapter con = null;
             try {
+                final Browser br2 = br.cloneBrowser();
                 con = br2.openHeadConnection(dllink);
                 handleConnectionErrors(br2, link, con);
                 if (con.getCompleteContentLength() > 0) {
@@ -276,8 +279,7 @@ public class ORFMediathek extends PluginForHost {
         if (isAgeRestricted(url)) {
             if (System.currentTimeMillis() - link.getLongProperty(PROPERTY_AGE_RESTRICTED_LAST_RECRAWL_TIMESTAMP, 0) < 30 * 60 * 1000) {
                 /**
-                 * Recrawl has just happened and we were still unable to download the item :( </br>
-                 * This should never happen!
+                 * Recrawl has just happened and we were still unable to download the item :( </br> This should never happen!
                  */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Jugendschutz-Recrawl fehlgeschlagen Grund 1", 10 * 60 * 1000l);
             }
@@ -366,7 +368,7 @@ public class ORFMediathek extends PluginForHost {
         }
         if (isSubtitle(link)) {
             /* Workaround for old downloadcore bug that can lead to incomplete files */
-            br.getHeaders().put("Accept-Encoding", "identity");
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
             handleConnectionErrors(br, link, dl.getConnection());
             dl.startDownload();
@@ -415,7 +417,7 @@ public class ORFMediathek extends PluginForHost {
             /* 2023-11-27: This should never happen */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported protocol rtmp(e)");
         } else {
-            br.getHeaders().put("Accept-Encoding", "identity");
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity");
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             this.handleConnectionErrors(br, link, dl.getConnection());
             dl.startDownload();

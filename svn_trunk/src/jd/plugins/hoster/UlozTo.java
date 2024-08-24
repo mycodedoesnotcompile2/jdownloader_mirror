@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49287 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = {}, urls = {})
 public class UlozTo extends PluginForHost {
     private static final String  QUICKDOWNLOAD                  = "(?i)https?://[^/]+/quickDownload/\\d+";
     /* 2017-01-02: login API seems to be broken --> Use website as workaround */
@@ -798,7 +798,7 @@ public class UlozTo extends PluginForHost {
     private void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         this.checkGeoBlocked(br, account);
         if (this.isPrivateFile(br)) {
-            throw new AccountRequiredException();
+            throw new AccountRequiredException("Private file");
         }
         if (br.containsHTML("Stránka nenalezena")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
