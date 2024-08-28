@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 49598 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -1263,7 +1263,12 @@ public class PornportalCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return Integer.MAX_VALUE;
+        /**
+         * 2024-08-27: They've added rate-limiting for HLS streams. Allowing only max 1 downloads is my simple attempt for this moment.
+         * </br>
+         * See also: https://board.jdownloader.org/showthread.php?t=96341
+         */
+        return 1;
     }
 
     @Override

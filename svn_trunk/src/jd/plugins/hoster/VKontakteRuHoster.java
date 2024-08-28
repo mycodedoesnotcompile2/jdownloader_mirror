@@ -75,7 +75,7 @@ import jd.plugins.decrypter.VKontakteRu;
 import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49612 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://vkontaktedecrypted\\.ru/(picturelink/(?:-)?\\d+_\\d+(\\?tag=[\\d\\-]+)?|audiolink/(?:-)?\\d+_\\d+)|https?://(?:new\\.)?vk\\.com/(doc[\\d\\-]+_[\\d\\-]+|s/v1/doc/[A-Za-z0-9\\-_]+|video[\\d\\-]+_[\\d\\-]+(?:#quality=\\d+p)?)(\\?hash=[^&#]+(\\&dl=[^&#]{16,})?)?|https?://(?:c|p)s[a-z0-9\\-]+\\.(?:vk\\.com|userapi\\.com|vk\\.me|vkuservideo\\.net|vkuseraudio\\.net)/[^<>\"]+\\.(?:mp[34]|(?:rar|zip|pdf).+|[rz][0-9]{2}.+)" })
+@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://vkontaktedecrypted\\.ru/(picturelink/(?:-)?\\d+_\\d+(\\?tag=[\\d\\-]+)?|audiolink/(?:-)?\\d+_\\d+)|https?://(?:new\\.)?vk\\.com/(doc[\\d\\-]+_[\\d\\-]+|s/v1/doc/[A-Za-z0-9\\-_]+|video[\\d\\-]+_[\\d\\-]+(?:#quality=\\d+p)?)(\\?hash=[^&#]+(\\&dl=[^&#]{16,})?)?|https?://(?:c|p)s[a-z0-9\\-]+\\.(?:vk\\.com|userapi\\.com|vk\\.me|vkuservideo\\.net|vkuseraudio\\.net)/[^<>\"]+\\.(?:mp[34]|(?:rar|zip|pdf).+|[rz][0-9]{2}.+)" })
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
@@ -244,6 +244,7 @@ public class VKontakteRuHoster extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         String finalurl = null;
         if (link.getPluginPatternMatcher().matches(TYPE_DIRECT)) {
+            /* Direct link -> No account needed to download it. */
             finalurl = link.getPluginPatternMatcher();
             /* Prefer filename inside url */
             final String filename = extractFileNameFromURL(finalurl);
@@ -980,7 +981,7 @@ public class VKontakteRuHoster extends PluginForHost {
             link.setLivePlugin(this);
         }
         URLConnectionAdapter con = null;
-        boolean closeConnection = true;
+        boolean success = false;
         try {
             if (isDownload && !isHLS(link, finalUrl)) {
                 finalUrl = modifyFinalDownloadurl(finalUrl);
@@ -1003,9 +1004,7 @@ public class VKontakteRuHoster extends PluginForHost {
                         }
                     }
                 }
-                if (isDownload) {
-                    closeConnection = false;
-                }
+                success = true;
                 return 1;
             } else {
                 // request range fucked
@@ -1025,7 +1024,10 @@ public class VKontakteRuHoster extends PluginForHost {
         } catch (final Exception e) {
             return 0;
         } finally {
-            if (closeConnection) {
+            if (!success) {
+                dl = null;
+            }
+            if (!isDownload) {
                 try {
                     if (con != null) {
                         con.disconnect();

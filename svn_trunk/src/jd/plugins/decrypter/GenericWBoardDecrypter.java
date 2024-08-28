@@ -19,7 +19,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49589 $", interfaceVersion = 3, names = { "warez-world.org", "ddl-mdh.org" }, urls = { "https?://(?:www\\.)?warez-world\\.org/(?:download/[^/]+|link/\\d+/\\d+)", "https?://(?:www\\.)?(?:ddl-mdh\\.org|mdh\\.to)/(?:download/[^/]+|video/[^/]+|link/\\d+/\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 49675 $", interfaceVersion = 3, names = { "warez-world.org", "ddl-mdh.org" }, urls = { "https?://(?:www\\.)?warez-world\\.org/(?:download/[^/]+|link/\\d+/\\d+)", "https?://(?:www\\.)?(?:ddl-mdh\\.org|mdh\\.to)/(?:download/[^/]+|video/[^/]+|link/\\d+/\\d+)" })
 public class GenericWBoardDecrypter extends antiDDoSForDecrypt {
     public GenericWBoardDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -31,7 +31,9 @@ public class GenericWBoardDecrypter extends antiDDoSForDecrypt {
         final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
         getPage(parameter);
-        if (!canHandle(br.getURL())) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!canHandle(br.getURL())) {
             // invalid/offline link, redirect to main domain
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

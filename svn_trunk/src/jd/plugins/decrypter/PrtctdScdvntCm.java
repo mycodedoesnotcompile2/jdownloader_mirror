@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.UserAgents;
 
-@DecrypterPlugin(revision = "$Revision: 46050 $", interfaceVersion = 2, names = { "protected.socadvnet.com" }, urls = { "https?://(?:www\\.)?protected\\.socadvnet\\.com/\\?[a-z0-9\\-]+" })
+@DecrypterPlugin(revision = "$Revision: 49675 $", interfaceVersion = 2, names = { "protected.socadvnet.com" }, urls = { "https?://(?:www\\.)?protected\\.socadvnet\\.com/\\?[a-z0-9\\-]+" })
 public class PrtctdScdvntCm extends antiDDoSForDecrypt {
     private Browser xhr = null;
 
@@ -42,18 +42,17 @@ public class PrtctdScdvntCm extends antiDDoSForDecrypt {
     }
 
     /*
-     * At the moment this decrypter only decrypts: turbobit.net, hotfile.com links as "protected.socadvnet.com" only allows crypting links
-     * of this host!
+     * At the moment this crawler only crawls: turbobit.net, hotfile.com links as "protected.socadvnet.com" only allows crypting links of
+     * this host!
      */
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", UserAgents.stringUserAgent());
         final String postvar = new Regex(parameter, "protected\\.socadvnet\\.com/\\?(.+)").getMatch(0);
         if (postvar == null) {
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         getPage(parameter);
         if (!this.canHandle(br.getURL())) {
@@ -80,7 +79,7 @@ public class PrtctdScdvntCm extends antiDDoSForDecrypt {
             linksCount = xhr.getRequest().getHtmlCode().split("\\|");
         }
         if (linksCount == null || linksCount.length == 0) {
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final int linkCounter = linksCount.length;
         if (cpPage != null) {
@@ -107,32 +106,33 @@ public class PrtctdScdvntCm extends antiDDoSForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(false);
         for (int i = 0; i <= linkCounter - 1; i++) {
-            logger.info("Crawling item " + (i + 1) + "/" + linkCounter);
-            final Browser br = this.br.cloneBrowser();
+            final Browser brc = br.cloneBrowser();
             final String actualPage = getList + "?out_name=" + postvar + "&&link_id=" + i;
-            getPage(br, actualPage);
-            if (br.containsHTML("(?i)This file is either removed due to copyright claim or is deleted by the uploader")) {
+            logger.info("Crawling item " + (i + 1) + "/" + linkCounter + " | " + actualPage);
+            getPage(brc, actualPage);
+            if (brc.containsHTML("(?i)This file is either removed due to copyright claim or is deleted by the uploader")) {
                 logger.info("Found one offline link for link " + parameter + " linkid:" + i);
                 continue;
             }
-            String finallink = br.getRegex("http-equiv\\s*=\\s*\"refresh\" content\\s*=\\s*\"0;url\\s*=\\s*(https?[^\"]+)\"").getMatch(0);
+            String finallink = brc.getRegex("http-equiv\\s*=\\s*\"refresh\" content\\s*=\\s*\"0;url\\s*=\\s*(https?[^\"]+)\"").getMatch(0);
             if (finallink == null) {
                 // Handlings for more hosters will come soon i think
-                if (br.containsHTML("turbobit\\.net")) {
+                if (brc.containsHTML("turbobit\\.net")) {
                     final String singleProtectedLink = "/plugin/turbobit.net.free.php?out_name=" + postvar + "&link_id=" + i;
-                    getPage(br, singleProtectedLink);
-                    if (br.getRedirectLocation() == null) {
+                    getPage(brc, singleProtectedLink);
+                    if (brc.getRedirectLocation() == null) {
                         logger.warning("Redirect location for this link is null: " + parameter);
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    final String turboId = new Regex(br.getRedirectLocation(), "https?://turbobit\\.net/download/free/(.+)").getMatch(0);
+                    final String turboId = new Regex(brc.getRedirectLocation(), "https?://turbobit\\.net/download/free/(.+)").getMatch(0);
                     if (turboId == null) {
-                        logger.warning("There is a problem with the link: " + br.getURL());
+                        logger.warning("There is a problem with the link: " + brc.getURL());
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
-                    finallink = "http://turbobit.net/" + turboId + ".html";
+                    finallink = "https://turbobit.net/" + turboId + ".html";
                 }
             }
             if (finallink == null) {
@@ -142,13 +142,13 @@ public class PrtctdScdvntCm extends antiDDoSForDecrypt {
             if (fp != null) {
                 fp.add(link);
             }
-            decryptedLinks.add(link);
+            ret.add(link);
             distribute(link);
             if (this.isAbort()) {
                 break;
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
     private Browser xhrPostPage(String page, String param) throws Exception {
@@ -157,7 +157,7 @@ public class PrtctdScdvntCm extends antiDDoSForDecrypt {
         return xhr;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return true;
     }
