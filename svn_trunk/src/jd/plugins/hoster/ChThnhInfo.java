@@ -25,7 +25,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47942 $", interfaceVersion = 2, names = { "chauthanh.info" }, urls = { "https?://(www\\.)?chauthanh\\.info/(animeDownload/(download|new)/\\d+/[^<>\"/]+/[^<>\"/]+|animeOST/download/[a-z0-9\\-_]+/[a-z0-9\\-_\\.]+|[a-z]+/download/[^<>\"]+\\.html)" })
+@HostPlugin(revision = "$Revision: 49682 $", interfaceVersion = 2, names = { "chauthanh.info" }, urls = { "https?://(www\\.)?chauthanh\\.info/(animeDownload/(download|new)/\\d+/[^<>\"/]+/[^<>\"/]+|animeOST/download/[a-z0-9\\-_]+/[a-z0-9\\-_\\.]+|[a-z]+/download/[^<>\"]+\\.html)" })
 public class ChThnhInfo extends antiDDoSForHost {
     public String dllink = null;
 
@@ -43,9 +43,9 @@ public class ChThnhInfo extends antiDDoSForHost {
         return 1;
     }
 
-    private static final String TYPE1 = "http://(www\\.)?chauthanh\\.info/animeDownload/(download|new)/\\d+/[^<>\"/]+/[^<>\"/]+";
-    private static final String TYPE2 = "http://(www\\.)?chauthanh\\.info/animeOST/download/[a-z0-9\\-_]+/[a-z0-9\\-_\\.]+";
-    private static final String TYPE3 = "http://(www\\.)?chauthanh\\.info/[a-z]+/download/[^<>\"]+\\.html";
+    private static final String TYPE1 = "(?i)https?://(www\\.)?chauthanh\\.info/animeDownload/(download|new)/\\d+/[^<>\"/]+/[^<>\"/]+";
+    private static final String TYPE2 = "(?i)https?://(www\\.)?chauthanh\\.info/animeOST/download/[a-z0-9\\-_]+/[a-z0-9\\-_\\.]+";
+    private static final String TYPE3 = "(?i)https?://(www\\.)?chauthanh\\.info/[a-z]+/download/[^<>\"]+\\.html";
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -84,7 +84,7 @@ public class ChThnhInfo extends antiDDoSForHost {
         if (filename == null || dllink == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (!dllink.contains("chauthanh.info")) {
+        if (!dllink.contains("chauthanh.info") && dllink.startsWith("/")) {
             dllink = "http://chauthanh.info" + dllink;
         }
         link.setFinalFileName(Encoding.htmlDecode(filename).trim());

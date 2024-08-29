@@ -20,6 +20,7 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -27,10 +28,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47824 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49678 $", interfaceVersion = 3, names = {}, urls = {})
 public class MovingImageFansOrg extends PluginForDecrypt {
     public MovingImageFansOrg(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(false);
+        br.setAllowedResponseCodes(400);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -62,10 +71,8 @@ public class MovingImageFansOrg extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(false);
-        br.setAllowedResponseCodes(400);
-        br.getPage(param.getCryptedUrl().replaceFirst("http://", "https://"));
+        final String contenturl = param.getCryptedUrl().replaceFirst("http://", "https://");
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 400) {
             logger.info("Added URL expired and cannot be re-used");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -76,6 +83,7 @@ public class MovingImageFansOrg extends PluginForDecrypt {
         if (finallink == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final DownloadLink link = createDownloadlink(finallink);
         /*
          * Sometimes a password is required in the subsequent crawler and most likely it is the full domain the user added here -> Set PW

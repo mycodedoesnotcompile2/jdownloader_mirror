@@ -47,11 +47,16 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@HostPlugin(revision = "$Revision: 49675 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49681 $", interfaceVersion = 2, names = { "filestore.to" }, urls = { "https?://(?:www\\.)?filestore\\.to/\\?d=([A-Z0-9]+)" })
 public class FilestoreTo extends PluginForHost {
     public FilestoreTo(final PluginWrapper wrapper) {
         super(wrapper);
         enablePremium("https://" + getHost() + "/premium");
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/?p=terms";
     }
 
     @Override
@@ -83,10 +88,7 @@ public class FilestoreTo extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        login(account, true, null);
-        if (!StringUtils.endsWithCaseInsensitive(br.getURL(), "/konto")) {
-            br.getPage("/konto");
-        }
+        login(account, true, "/konto");
         final AccountInfo ai = new AccountInfo();
         final String validUntilString = br.getRegex("(?i)Premium-Status\\s*</small>\\s*<div class=\"value text-success\">\\s*(.*?)\\s*Uhr").getMatch(0);
         if (validUntilString != null) {
@@ -113,26 +115,28 @@ public class FilestoreTo extends PluginForHost {
         }
     }
 
-    private boolean login(final Account account, final boolean validateCookies, final String validateCookiesURL) throws Exception {
+    private boolean login(final Account account, final boolean validateCookies, String validateCookiesURL) throws Exception {
         synchronized (account) {
             final Cookies cookies = account.loadCookies("");
             this.prepBrowser(br);
+            if (validateCookiesURL == null) {
+                validateCookiesURL = "/konto";
+            }
+            if (validateCookiesURL.startsWith("/")) {
+                validateCookiesURL = "https://" + this.getHost() + validateCookiesURL;
+            }
             if (cookies != null) {
                 br.setCookies(getHost(), cookies);
                 if (!validateCookies) {
-                    logger.info("Trust cookies without login");
+                    /* Do not validate cookies */
                     return false;
                 }
                 logger.info("Validating login cookies...");
-                if (validateCookiesURL != null) {
-                    br.getPage(validateCookiesURL);
-                } else {
-                    br.getPage("https://" + this.getHost() + "/konto");
-                }
+                br.getPage(validateCookiesURL);
                 if (this.isLoggedinHTML(br)) {
                     logger.info("Cookie login successful");
                     /* refresh saved cookies timestamp */
-                    account.saveCookies(br.getCookies(getHost()), "");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return true;
                 } else {
                     logger.info("Cookie login failed");
@@ -148,15 +152,19 @@ public class FilestoreTo extends PluginForHost {
             final InputField password = form.getInputFieldByNameRegex("(?i)Password");
             password.setValue(Encoding.urlEncode(account.getPass()));
             br.submitForm(form);
-            if (validateCookiesURL != null) {
+            /**
+             * 2024-08-28: Small workaround: They sometimes redirect to http here which can cause some ISP blocks to engage. </br>
+             * Especially from German provider vodafone.de which would interfere and redirect to: </br>
+             * http://securenet.sicherheit.vodafone.de/campaign/botnet-fixed/get/message.html?url=http://filestore.to/konto
+             */
+            if (!br.getURL().equals(validateCookiesURL)) {
                 br.getPage(validateCookiesURL);
             }
             if (!this.isLoggedinHTML(br)) {
                 throw new AccountInvalidException();
-            } else {
-                account.saveCookies(br.getCookies(getHost()), "");
-                return true;
             }
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return true;
         }
     }
 
@@ -173,11 +181,6 @@ public class FilestoreTo extends PluginForHost {
         } else {
             handleDownload(link, account, true, 0);
         }
-    }
-
-    @Override
-    public String getAGBLink() {
-        return "https://filestore.to/?p=terms";
     }
 
     @Override
