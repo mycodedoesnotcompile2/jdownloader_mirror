@@ -3,8 +3,6 @@ package org.jdownloader.captcha.v2.challenge.cutcaptcha;
 import java.io.IOException;
 import java.net.URL;
 
-import jd.plugins.Plugin;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -20,20 +18,53 @@ import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.solver.browser.AbstractBrowserChallenge;
 import org.jdownloader.captcha.v2.solver.browser.BrowserReference;
 
+import jd.plugins.Plugin;
+
 public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
     private final String siteKey;
+    private final String apiKey;
 
     public String getSiteKey() {
         return siteKey;
     }
 
-    public CutCaptchaChallenge(String siteKey, Plugin pluginForHost) {
-        super("cutcaptcha", pluginForHost);
-        if (siteKey == null || !siteKey.matches("^[\\w-]{5,}$")) {
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public String getSiteUrl() {
+        return this.getPluginBrowser().getURL();
+    }
+
+    public CutCaptchaChallenge(final Plugin plugin, final String siteKey, final String apiKey) {
+        super("cutcaptcha", plugin);
+        if (!looksLikeValidSiteKey(siteKey)) {
             // default: SAs61IAI
             throw new WTFException("Bad SiteKey:" + siteKey);
+        } else if (!looksLikeValidApiKey(apiKey)) {
+            throw new WTFException("Bad APIKey:" + apiKey);
+        }
+        this.siteKey = siteKey;
+        this.apiKey = apiKey;
+    }
+
+    private static boolean looksLikeValidSiteKey(final String siteKey) {
+        if (siteKey == null) {
+            return false;
+        } else if (siteKey.matches("^[a-f0-9]{40}$")) {
+            return true;
         } else {
-            this.siteKey = siteKey;
+            return false;
+        }
+    }
+
+    private static boolean looksLikeValidApiKey(final String siteKey) {
+        if (siteKey == null) {
+            return false;
+        } else if (siteKey.matches("^[\\w-]{5,}$")) {
+            return true;
+        } else {
+            return false;
         }
     }
 
@@ -70,7 +101,7 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
 
     protected final boolean isCaptchaResponseValid() {
         final String v = getResult().getValue();
-        if (isSolved() && isValidToken(v)) {
+        if (isSolved() && looksLikeValidToken(v)) {
             return true;
         } else {
             return false;
@@ -82,12 +113,12 @@ public abstract class CutCaptchaChallenge extends AbstractBrowserChallenge {
         return "cut";
     }
 
-    public static boolean isValidToken(String v) {
+    public static boolean looksLikeValidToken(String v) {
         return v != null && v.matches("[\\w-]{10,}");
     }
 
     @Override
     public boolean validateResponse(AbstractResponse<String> response) {
-        return super.validateResponse(response) && isValidToken(response.getValue());
+        return super.validateResponse(response) && looksLikeValidToken(response.getValue());
     }
 }
