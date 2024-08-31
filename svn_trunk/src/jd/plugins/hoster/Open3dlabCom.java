@@ -38,7 +38,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49228 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49689 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +46,7 @@ public class Open3dlabCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.test.com/help/privacy";
+        return "https://www.iubenda.com/terms-and-conditions/80329401";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -54,6 +54,7 @@ public class Open3dlabCom extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "open3dlab.com" });
         ret.add(new String[] { "smutba.se" });
+        ret.add(new String[] { "sfmlab.com" });
         return ret;
     }
 

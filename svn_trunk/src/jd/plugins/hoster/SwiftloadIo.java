@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49489 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49692 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftloadIo extends PluginForHost {
     public SwiftloadIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class SwiftloadIo extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(d|e)/([a-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(d|e|v)/([a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
