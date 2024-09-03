@@ -24,7 +24,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49640 $", interfaceVersion = 3, names = { "rapideo.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49695 $", interfaceVersion = 3, names = { "rapideo.net" }, urls = { "" })
 public class RapideoPl extends RapideoCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("rapideo.net");
 
@@ -44,24 +44,19 @@ public class RapideoPl extends RapideoCore {
     }
 
     @Override
-    protected String getAPIBase() {
+    protected String getAPIV1Base() {
         /* Do NOT use rapideo.pl here! */
         return "https://enc.rapideo.pl/";
     }
 
     @Override
-    protected String getAPISiteParam() {
+    protected String getAPIV1SiteParam() {
         return "newrd";
     }
 
     @Override
-    protected String getPasswordAPI(final Account account) {
+    protected String getPasswordAPIV1(final Account account) {
         return md5HEX(account.getPass());
-    }
-
-    @Override
-    protected boolean useAPI() {
-        return true;
     }
 
     private static String md5HEX(final String s) {

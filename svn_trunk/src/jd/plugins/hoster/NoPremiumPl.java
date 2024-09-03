@@ -22,7 +22,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49624 $", interfaceVersion = 3, names = { "nopremium.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49695 $", interfaceVersion = 3, names = { "nopremium.pl" }, urls = { "" })
 public class NoPremiumPl extends RapideoCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("nopremium.pl");
 
@@ -42,23 +42,18 @@ public class NoPremiumPl extends RapideoCore {
     }
 
     @Override
-    protected String getAPIBase() {
+    protected String getAPIV1Base() {
         return "https://crypt." + getHost() + "/";
     }
 
     @Override
-    protected String getAPISiteParam() {
+    protected String getAPIV1SiteParam() {
         return "nopremium";
     }
 
     @Override
-    protected String getPasswordAPI(Account account) {
+    protected String getPasswordAPIV1(Account account) {
         return JDHash.getSHA1(JDHash.getMD5(account.getPass()));
-    }
-
-    @Override
-    protected boolean useAPI() {
-        return true;
     }
 
     @Override

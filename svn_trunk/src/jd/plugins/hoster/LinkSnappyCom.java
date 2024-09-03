@@ -71,7 +71,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 49681 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 49697 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -124,7 +124,7 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     /**
-     * Defines max. waittime for cached downloads after last serverside progress change. </br>
+     * Defines max. wait time for cached downloads after last serverside progress change. </br>
      * Longer time than this and progress of serverside download did not change --> Abort
      */
     private final int    CACHE_WAIT_THRESHOLD     = 10 * 60000;

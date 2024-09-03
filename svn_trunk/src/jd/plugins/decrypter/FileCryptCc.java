@@ -64,7 +64,7 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49692 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49697 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -374,6 +374,10 @@ public class FileCryptCc extends PluginForDecrypt {
     }
 
     private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
+        // final ChallengeResponseController crc = ChallengeResponseController.getInstance();
+        // final boolean canHandleCutCaptchaChallenge = false;
+        // TODO: Find out beforehand if there is a CutCaptcha solver available and evaluate this information -> Try to avoid CutCaptcha if
+        // we know that no solver is available.
         /* Prepare browser */
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         int cutCaptchaRetryIndex = -1;
