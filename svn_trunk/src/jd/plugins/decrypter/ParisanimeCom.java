@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49697 $", interfaceVersion = 3, names = { "parisanime.com" }, urls = { "https?://(?:www\\.)?parisanime\\.com/video/[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 49699 $", interfaceVersion = 3, names = { "parisanime.com" }, urls = { "https?://(?:www\\.)?parisanime\\.com/video/[A-Za-z0-9]+" })
 public class ParisanimeCom extends antiDDoSForDecrypt {
     public ParisanimeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,13 +47,14 @@ public class ParisanimeCom extends antiDDoSForDecrypt {
         br.getHeaders().put("Referer", contenturl);
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         getPage(contenturl);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.toString().trim().equalsIgnoreCase("no link found")) {
+        if (br.getHttpConnection().getResponseCode() == 404 || br.getRequest().getHtmlCode().trim().equalsIgnoreCase("no link found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String finallink = this.br.getRegex("data-url=\\'(https?://[^<>\"\\']+)\\'").getMatch(0);
+        String finallink = this.br.getRegex("data-url=\\'((https?:)?//[^<>\"\\']+)\\'").getMatch(0);
         if (finallink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        finallink = br.getURL(finallink).toExternalForm();
         ret.add(createDownloadlink(finallink));
         return ret;
     }
