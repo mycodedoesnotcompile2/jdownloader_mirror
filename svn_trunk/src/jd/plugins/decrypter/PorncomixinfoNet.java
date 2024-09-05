@@ -25,7 +25,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49596 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = {}, urls = {})
 public class PorncomixinfoNet extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
@@ -44,6 +44,12 @@ public class PorncomixinfoNet extends PluginForDecrypt {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "gedecomix.com", "porncomixinfo.com", "porncomixinfo.net" });
         return ret;
+    }
+
+    private List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("porncomixinfo.com"); // 2024-09-04
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
@@ -69,7 +75,10 @@ public class PorncomixinfoNet extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl();
+        String contenturl = param.getCryptedUrl();
+        for (final String deadDomain : getDeadDomains()) {
+            contenturl = contenturl.replace(deadDomain, this.getHost());
+        }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -103,7 +112,8 @@ public class PorncomixinfoNet extends PluginForDecrypt {
                 /* New 2023-10-30 */
                 final String[] imageurls = br.getRegex("=\"image-\\d+\"\\s*src=\"\\s*(https?://[^\"]+)\"").getColumn(0);
                 if (imageurls != null && imageurls.length > 0) {
-                    for (final String imageurl : imageurls) {
+                    for (String imageurl : imageurls) {
+                        imageurl = Encoding.htmlOnlyDecode(imageurl);
                         final DownloadLink link = createDownloadlink(DirectHTTP.createURLForThisPlugin(imageurl));
                         ret.add(link);
                     }

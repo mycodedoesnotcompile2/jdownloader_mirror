@@ -42,19 +42,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48413 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
 
     public HighWayMe2(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://high-way.me/pages/tariffs/");
+        this.enablePremium("https://" + getHost() + "/pages/tariffs/");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://high-way.me/help/terms";
+        return "https://" + getHost() + "/help/terms";
     }
 
     @Override

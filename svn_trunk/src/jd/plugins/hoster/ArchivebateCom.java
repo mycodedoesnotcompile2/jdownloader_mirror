@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchivebateComCrawler;
 
-@HostPlugin(revision = "$Revision: 48630 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ArchivebateComCrawler.class })
 public class ArchivebateCom extends PluginForHost {
     public ArchivebateCom(PluginWrapper wrapper) {
@@ -78,7 +78,7 @@ public class ArchivebateCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://archivebate.com/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -92,7 +92,7 @@ public class ArchivebateCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "/(?:embed|watch)/(\\d+)").getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), "(?i)/(?:embed|watch)/(\\d+)").getMatch(0);
     }
 
     @Override

@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48978 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 4, names = { "simply-premium.com" }, urls = { "" })
 public class SimplyPremiumCom2 extends HighWayCore {
     protected static MultiHosterManagement mhm = new MultiHosterManagement("simply-premium.com");
 
@@ -53,12 +53,12 @@ public class SimplyPremiumCom2 extends HighWayCore {
 
     public SimplyPremiumCom2(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.simply-premium.com/vip");
+        this.enablePremium("https://www." + getHost() + "/vip");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.simply-premium.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     @Override

@@ -27,7 +27,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArchivebateCom;
 
-@DecrypterPlugin(revision = "$Revision: 48667 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = {}, urls = {})
 public class ArchivebateComCrawler extends PluginForDecrypt {
     public ArchivebateComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +79,13 @@ public class ArchivebateComCrawler extends PluginForDecrypt {
         selfhostedVideo.setAvailable(true);
         final String iframePlayerURL = br.getRegex("<iframe src=\"(https?://[^\"]+)\"").getMatch(0);
         String externalDownloadurl = br.getRegex("href=\"(https?://[^\"]+)\" class=\"btn download-btn\"").getMatch(0);
+        if (externalDownloadurl == null) {
+            externalDownloadurl = br.getRegex("name=\"fid\"[^>]*value=\"([^\"]+)").getMatch(0);
+        }
+        if (externalDownloadurl != null) {
+            /* We need the full URL with protocol */
+            externalDownloadurl = br.getURL(externalDownloadurl).toExternalForm();
+        }
         if (iframePlayerURL != null && !this.canHandle(iframePlayerURL)) {
             /* Video is hosted on external website */
             ret.add(this.createDownloadlink(iframePlayerURL));
