@@ -1,15 +1,14 @@
 package jd.plugins;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
 public class MultiHostHost {
     /** How long shall we block this host if a limit gets reached? Until the next day/hour? */
-    public enum LimitResetMode {
-        DAILY;
-    }
-
+    // public enum LimitResetMode {
+    // DAILY;
+    // }
     /** Why was this host blocked? Because of too many errored out tries via JD or because of the multihost/multihost limits? */
     public enum MultihosterHostStatus {
         WORKING,
@@ -17,42 +16,31 @@ public class MultiHostHost {
         DEACTIVATED_JDOWNLOADER,
         DEACTIVATED_MULTIHOST,
         DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE,
-        UNSUPPORTED_JDOWNLOADER,
-        OFFLINE;
+        UNSUPPORTED_JDOWNLOADER;
     }
 
     private String                name                      = null;
-    private String                domain                    = null;
-    private ArrayList<String>     domains                   = new ArrayList<String>();
+    private HashSet<String>       domains                   = new HashSet<String>();
     private boolean               isUnlimitedTraffic        = true;
     private boolean               isUnlimitedLinks          = true;
     private int                   linksLeft                 = -1;
     private int                   linksMax                  = -1;
     private long                  trafficLeft               = -1;
     private long                  trafficMax                = -1;
-    /* Timestamp when limits get reset. */
+    // TODO: Maybe remove this? I didn't see such an information used anywhere.
     private long                  timestampLimitReset       = -1;
-    /* How much traffic is credited when downloading from this host? */
     private short                 trafficUsageFactorPercent = 100;
     private int                   maxChunks                 = 0;
-    private boolean               resume                    = true;
+    private Boolean               resume                    = null;
     private String                statusText                = null;
     private MultihosterHostStatus status                    = MultihosterHostStatus.WORKING;
 
     public MultiHostHost(final String domain) {
-        this.domain = domain;
         this.addDomain(domain);
     }
 
-    protected String getDomain() {
-        return this.domain;
-    }
-
     private void addDomain(String domain) {
-        this.domain = domain;
-        if (!this.domains.contains(domain)) {
-            this.domains.add(domain);
-        }
+        this.domains.add(domain);
     }
 
     protected int getLinksLeft() {
@@ -104,6 +92,10 @@ public class MultiHostHost {
         this.timestampLimitReset = timestampTrafficReset;
     }
 
+    /**
+     * How much traffic is needed and credited when downloading from this host? </br>
+     * 500 = 5 times the size of the downloaded file.
+     */
     protected short getTrafficUsageFactorPercent() {
         return trafficUsageFactorPercent;
     }
@@ -163,7 +155,11 @@ public class MultiHostHost {
     }
 
     public boolean isResume() {
-        return resume;
+        if (resume == null) {
+            return true;
+        } else {
+            return resume;
+        }
     }
 
     public void setResume(boolean resume) {
@@ -172,6 +168,12 @@ public class MultiHostHost {
 
     @Override
     public String toString() {
-        return this.getDomain() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
+        final String title;
+        if (this.domains != null && this.domains.size() > 0) {
+            title = this.domains.iterator().next();
+        } else {
+            title = this.name;
+        }
+        return title + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }
 }

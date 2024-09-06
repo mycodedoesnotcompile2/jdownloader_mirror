@@ -21,16 +21,16 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49713 $", interfaceVersion = 3, names = {}, urls = {})
 public class ThothubOrg extends KernelVideoSharingComV2 {
     public ThothubOrg(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://thothub.org/");
+        this.enablePremium("https://" + getHost() + "/");
     }
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "thothub.org" });
+        ret.add(new String[] { "thothub.org", "thothub.to" });
         return ret;
     }
 

@@ -15,20 +15,25 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -40,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BbcCom;
 
-@DecrypterPlugin(revision = "$Revision: 48410 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49722 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcComiPlayerCrawler extends PluginForDecrypt {
     public BbcComiPlayerCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,31 +88,43 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
         final BbcCom hosterPlugin = (BbcCom) this.getNewPluginForHostInstance("bbc.com");
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        final ArrayList<HlsContainer> hlsContainers = new ArrayList<HlsContainer>();
-        String qualityString = null;
-        final Browser brc = br.cloneBrowser();
-        brc.setFollowRedirects(true);
-        /**
-         * Look for special VPN "shadow ban": All info and streams are available but we'll run into error 403 when we try to access them.
-         */
-        int counterError403VPNBlocked = 0;
         /** E.g. json instead of xml: http://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/<vpid>/format/json */
         /**
          * Thanks goes to: https://github.com/rg3/youtube-dl/blob/master/youtube_dl/extractor/bbc.py
          */
         /* 2021-01-12: Website uses "/pc/" instead of "/iptv-all/" */
-        this.br.getPage("https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/iptv-all/vpid/" + vpid + "/format/json");
+        br.getPage("https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/iptv-all/vpid/" + vpid + "/format/json");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String result = (String) root.get("result");
         if (StringUtils.equalsIgnoreCase(result, "geolocation")) {
             // BbcCom.errorGeoBlocked();
             throw new DecrypterRetryException(RetryReason.GEO, vpid, "This content is not available in your country!");
         }
-        String subtitleURL = null;
+        /**
+         * Look for special VPN "shadow ban": All info and streams are available but we'll run into error 403 when we try to access them.
+         */
+        int counterError403VPNBlocked = 0;
+        final ArrayList<HlsContainer> hlsContainers = new ArrayList<HlsContainer>();
+        String qualityString = null;
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(true);
+        String relativeUrlForNotificationTitle = null;
+        String sourceURL = null;
+        try {
+            sourceURL = ((CrawledLink) param.getSource()).getSourceUrls()[0];
+            relativeUrlForNotificationTitle = new URL(sourceURL).getPath();
+        } catch (final Throwable ignore) {
+        }
+        if (relativeUrlForNotificationTitle == null) {
+            relativeUrlForNotificationTitle = br._getURL().getPath();
+        }
+        final String notificationTitle = "BBC | " + relativeUrlForNotificationTitle;
+        Map<Integer, Set<String>> subtitles = new HashMap<Integer, Set<String>>();
         final List<Map<String, Object>> mediaList = (List<Map<String, Object>>) root.get("media");
+        this.displayBubbleNotification(notificationTitle, "Looking for valid stream in " + mediaList.size() + " media...");
         for (final Map<String, Object> media : mediaList) {
             final String kind = (String) media.get("kind");
             final List<Map<String, Object>> connections = (List<Map<String, Object>>) media.get("connection");
@@ -126,15 +143,19 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
                     } else if (StringUtils.isEmpty(thisHLSMaster)) {
                         continue;
                     }
-                    /* 2021-01-12: TODO: Why do we do this replace again? Higher quality? */
                     List<HlsContainer> results = new ArrayList<HlsContainer>();
-                    if (thisHLSMaster.matches(".*/[^/]*?\\.ism(\\.hlsv2\\.ism)?/.*\\.m3u8.*")) {
+                    /* 2024-09-05: Disabled. */
+                    final boolean trySuperHighQualityTrick = false;
+                    if (thisHLSMaster.matches(".*/[^/]*?\\.ism(\\.hlsv2\\.ism)?/.*\\.m3u8.*") && trySuperHighQualityTrick) {
                         // rewrite to check for all available formats
                         /* 2021-01-12: TODO: This doesn't work anymore?! */
                         try {
                             final String id = new Regex(thisHLSMaster, "/([^/]*?)\\.ism(\\.hlsv2\\.ism)?/").getMatch(0);
                             final String thisHLSMasterCorrected = thisHLSMaster.replaceFirst("/[^/]*?\\.ism(\\.hlsv2\\.ism)?/.*\\.m3u8", "/" + id + ".ism/" + id + ".m3u8");
                             results = HlsContainer.getHlsQualities(brc, thisHLSMasterCorrected);
+                            if (results != null && results.size() > 0) {
+                                logger.info("Successfully grabber superhigh HLS qualities");
+                            }
                         } catch (final Exception e) {
                             logger.log(e);
                             logger.info("Failed to grab superhigh hls_master: " + brc.getURL());
@@ -152,9 +173,27 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
                     } else if (results != null && !results.isEmpty()) {
                         hlsContainers.addAll(results);
                     }
+                    if (this.isAbort()) {
+                        throw new InterruptedException();
+                    }
                 }
             } else if (kind.equalsIgnoreCase("captions")) {
-                subtitleURL = JavaScriptEngineFactory.walkJson(connections, "{0}/href").toString();
+                for (final Map<String, Object> connection : connections) {
+                    final String priorityStr = connection.get("priority").toString();
+                    final String url = connection.get("href").toString();
+                    final int prio;
+                    if (priorityStr != null && priorityStr.matches("\\d+")) {
+                        prio = Integer.parseInt(priorityStr);
+                    } else {
+                        prio = 0;
+                    }
+                    Set<String> subtitlelist = subtitles.get(prio);
+                    if (subtitlelist == null) {
+                        subtitlelist = new HashSet<String>();
+                        subtitles.put(prio, subtitlelist);
+                    }
+                    subtitlelist.add(url);
+                }
             }
         }
         if (hlsContainers == null || hlsContainers.isEmpty()) {
@@ -207,11 +246,6 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
             hlscontainer_chosen.setFramerate(50);
         }
         qualityString = String.format("hls_%s@%d", hlscontainer_chosen.getResolution(), hlscontainer_chosen.getFramerate(25));
-        String sourceURL = null;
-        try {
-            sourceURL = ((CrawledLink) param.getSource()).getSourceUrls()[0];
-        } catch (final Throwable ignore) {
-        }
         final DownloadLink link = new DownloadLink(hosterPlugin, hosterPlugin.getHost(), hlscontainer_chosen.getDownloadurl(), true);
         if (param.getDownloadLink() != null) {
             /* Set properties from previous crawler on new DownloadLink instance e.g. date, title */
@@ -219,25 +253,73 @@ public class BbcComiPlayerCrawler extends PluginForDecrypt {
         }
         link.setProperty(BbcCom.PROPERTY_QUALITY_IDENTIFICATOR, qualityString);
         link.setFinalFileName(BbcCom.getFilename(link));
+        setExtraInformation(link, sourceURL, vpid);
+        distribute(link);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         ret.add(link);
-        if (subtitleURL != null && hosterPlugin.getPluginConfig().getBooleanProperty(BbcCom.SETTING_CRAWL_SUBTITLE, BbcCom.default_SETTING_CRAWL_SUBTITLE)) {
-            final DownloadLink subtitle = new DownloadLink(hosterPlugin, hosterPlugin.getHost(), subtitleURL, true);
-            subtitle.setFinalFileName(link.getFinalFileName().substring(0, link.getFinalFileName().lastIndexOf(".")) + ".ttml");
-            ret.add(subtitle);
-        }
-        /* Set additional properties that are supposed to be set on all results */
-        for (final DownloadLink crawledresult : ret) {
-            crawledresult.setAvailable(true);
-            if (sourceURL != null) {
-                crawledresult.setContentUrl(sourceURL);
+        final boolean userWantsSubtitle = hosterPlugin.getPluginConfig().getBooleanProperty(BbcCom.SETTING_CRAWL_SUBTITLE, BbcCom.default_SETTING_CRAWL_SUBTITLE);
+        if (userWantsSubtitle && !subtitles.isEmpty()) {
+            /* Find first working subtitle as some may be broken or unavailable. */
+            /* Sort map according to internal priority */
+            this.displayBubbleNotification(notificationTitle, "Checking " + subtitles.size() + " subtitles...");
+            final Map<Integer, Set<String>> sortedMap = new TreeMap<Integer, Set<String>>(subtitles);
+            final List<String> sortedSubtitles = new ArrayList<String>();
+            for (final Map.Entry<Integer, Set<String>> entry : sortedMap.entrySet()) {
+                final Set<String> subtitlelist = entry.getValue();
+                sortedSubtitles.addAll(subtitlelist);
             }
-            crawledresult.setProperty(BbcCom.PROPERTY_VIDEOID, vpid);
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                /* 2017-04-25: Easy debug for user TODO: Remove once feedback is provided! */
-                crawledresult.setComment(crawledresult.getPluginPatternMatcher());
+            /* List is sorted by priority 0-100 but we want the higher value first -> Revert order */
+            Collections.reverse(sortedSubtitles);
+            String subtitleValidated = null;
+            long subtitleSize = 0;
+            int index = 0;
+            for (final String thisSubtitleURL : sortedSubtitles) {
+                logger.info("Checking subtitle " + (index + 1) + "/" + sortedSubtitles.size() + " | URL: " + thisSubtitleURL);
+                URLConnectionAdapter con = null;
+                try {
+                    con = br.openGetConnection(thisSubtitleURL);
+                    if (con.isOK()) {
+                        subtitleValidated = thisSubtitleURL;
+                        subtitleSize = con.getCompleteContentLength();
+                        break;
+                    }
+                } catch (final Throwable e) {
+                } finally {
+                    try {
+                        con.disconnect();
+                    } catch (final Throwable e) {
+                    }
+                }
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
+                logger.info("Skipping invalid subtitle: " + thisSubtitleURL);
+                index++;
+            }
+            if (subtitleValidated != null) {
+                final DownloadLink subtitle = new DownloadLink(hosterPlugin, hosterPlugin.getHost(), subtitleValidated, true);
+                subtitle.setFinalFileName(link.getFinalFileName().substring(0, link.getFinalFileName().lastIndexOf(".")) + ".ttml");
+                if (subtitleSize > 0) {
+                    subtitle.setDownloadSize(subtitleSize);
+                }
+                setExtraInformation(link, sourceURL, vpid);
+                ret.add(subtitle);
+                distribute(subtitle);
+            } else {
+                /* All existing subtitles are broken */
+                final String text = "All " + subtitles.size() + " subtitles are broken";
+                logger.info(text);
+                this.displayBubbleNotification(notificationTitle, text);
             }
         }
         return ret;
+    }
+
+    private void setExtraInformation(final DownloadLink link, final String sourceURL, final String vpid) {
+        link.setAvailable(true);
+        if (sourceURL != null) {
+            link.setContentUrl(sourceURL);
+        }
+        link.setProperty(BbcCom.PROPERTY_VIDEOID, vpid);
     }
 }
