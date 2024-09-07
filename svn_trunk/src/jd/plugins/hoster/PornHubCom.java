@@ -86,7 +86,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 49675 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
@@ -1719,28 +1719,6 @@ public class PornHubCom extends PluginForHost {
             return downloadLink.getStringProperty("mainlink", null);
         } else {
             return super.buildExternalDownloadURL(downloadLink, buildForThisPlugin);
-        }
-    }
-
-    @Override
-    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        if (!link.isEnabled() && "".equals(link.getPluginPatternMatcher())) {
-            /*
-             * setMultiHostSupport uses a dummy DownloadLink, with isEnabled == false. we must set to true for the host to be added to the
-             * supported host array.
-             */
-            return true;
-        } else {
-            if ("debrid-link.fr".equals(plugin.getHost()) || "debrid-link.com".equals(plugin.getHost())) {
-                // only supports 360p
-                return false;
-            } else {
-                /* Original plugin can handle every kind of URL! */
-                final boolean downloadViaSourcePlugin = link.getHost().equalsIgnoreCase(plugin.getHost());
-                /* MOCHs can only handle video URLs! */
-                final boolean downloadViaMOCH = !link.getHost().equalsIgnoreCase(plugin.getHost()) && isVideo(link.getStringProperty("mainlink", null));
-                return downloadViaSourcePlugin || downloadViaMOCH;
-            }
         }
     }
 

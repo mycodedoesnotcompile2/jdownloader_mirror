@@ -1,10 +1,13 @@
 package jd.plugins;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
+import org.appwork.storage.Storable;
 import org.appwork.utils.formatter.SizeFormatter;
 
-public class MultiHostHost {
+public class MultiHostHost implements Storable {
     /** How long shall we block this host if a limit gets reached? Until the next day/hour? */
     // public enum LimitResetMode {
     // DAILY;
@@ -20,16 +23,16 @@ public class MultiHostHost {
     }
 
     private String                name                      = null;
-    private HashSet<String>       domains                   = new HashSet<String>();
-    private boolean               isUnlimitedTraffic        = true;
-    private boolean               isUnlimitedLinks          = true;
+    private List<String>          domains                   = new ArrayList<String>();
+    private Boolean               isUnlimitedTraffic        = true;
+    private Boolean               isUnlimitedLinks          = true;
     private int                   linksLeft                 = -1;
     private int                   linksMax                  = -1;
     private long                  trafficLeft               = -1;
     private long                  trafficMax                = -1;
     // TODO: Maybe remove this? I didn't see such an information used anywhere.
     private long                  timestampLimitReset       = -1;
-    private short                 trafficUsageFactorPercent = 100;
+    private short                 trafficCalculationFactorPercent = 100;
     private int                   maxChunks                 = 0;
     private Boolean               resume                    = null;
     private String                statusText                = null;
@@ -39,56 +42,64 @@ public class MultiHostHost {
         this.addDomain(domain);
     }
 
-    private void addDomain(String domain) {
-        this.domains.add(domain);
+    public void addDomain(String domain) {
+        if (!this.domains.contains(domain)) {
+            this.domains.add(domain);
+        }
     }
 
-    protected int getLinksLeft() {
+    public int getLinksLeft() {
         return linksLeft;
     }
 
-    protected void setLinksLeft(int num) {
+    public void setLinksLeft(int num) {
         this.linksLeft = num;
+        this.isUnlimitedLinks = false;
     }
 
-    protected int getLinksMax() {
+    public int getLinksMax() {
         return linksMax;
     }
 
-    protected void setLinksMax(int num) {
+    public void setLinksMax(int num) {
         this.linksMax = num;
+        this.isUnlimitedLinks = false;
     }
 
     /** Only do this when linksMax is given. */
-    protected void setLinksUsed(int num) {
+    public void setLinksUsed(int num) {
         this.linksLeft = this.linksMax - num;
+        this.isUnlimitedLinks = false;
     }
 
-    protected long getTrafficLeft() {
+    public long getTrafficLeft() {
         return trafficLeft;
     }
 
-    protected void setTrafficLeft(long trafficLeft) {
+    public void setTrafficLeft(long trafficLeft) {
         this.trafficLeft = trafficLeft;
+        this.isUnlimitedTraffic = false;
     }
 
-    protected long getTrafficMax() {
+    public long getTrafficMax() {
         return trafficMax;
     }
 
-    protected void setTrafficMax(long bytes) {
+    public void setTrafficMax(long bytes) {
         this.trafficMax = bytes;
+        this.isUnlimitedTraffic = false;
     }
 
-    protected void setTrafficUsed(long bytes) {
+    public void setTrafficUsed(long bytes) {
         this.trafficLeft = this.trafficMax - bytes;
+        this.isUnlimitedTraffic = false;
     }
 
-    protected long getTimestampTrafficReset() {
+    public long getTimestampTrafficReset() {
         return timestampLimitReset;
     }
 
-    protected void setTimestampTrafficReset(long timestampTrafficReset) {
+    public void setTimestampTrafficReset(long timestampTrafficReset) {
         this.timestampLimitReset = timestampTrafficReset;
     }
 
@@ -96,20 +107,36 @@ public class MultiHostHost {
      * How much traffic is needed and credited when downloading from this host? </br>
      * 500 = 5 times the size of the downloaded file.
      */
-    protected short getTrafficUsageFactorPercent() {
-        return trafficUsageFactorPercent;
+    public short getTrafficCalculationFactorPercent() {
+        return trafficCalculationFactorPercent;
     }
 
-    protected void setTrafficUsageFactorPercent(short trafficUsageFactorPercent) {
-        this.trafficUsageFactorPercent = trafficUsageFactorPercent;
+    public void setTrafficCalculationFactorPercent(short num) {
+        this.trafficCalculationFactorPercent = num;
     }
 
     /** Traffic usage factor e.g. 3 -> 300%. */
-    protected void setTrafficUsageFactor(short num) {
-        this.trafficUsageFactorPercent = (short) (100 * num);
+    public void setTrafficCalculationFactor(short num) {
+        this.trafficCalculationFactorPercent = (short) (100 * num);
     }
 
-    protected boolean canDownload(final DownloadLink link) {
+    public boolean isUnlimitedLinks() {
+        if (this.isUnlimitedLinks == null) {
+            return true;
+        } else {
+            return this.isUnlimitedLinks;
+        }
+    }
+
+    public boolean isUnlimitedTraffic() {
+        if (this.isUnlimitedTraffic == null) {
+            return true;
+        } else {
+            return this.isUnlimitedTraffic;
+        }
+    }
+
+    public boolean canDownload(final DownloadLink link) {
         if (isUnlimitedTraffic || isUnlimitedLinks) {
             return true;
         } else if (this.linksLeft <= 0) {
@@ -164,6 +191,18 @@ public class MultiHostHost {
 
     public void setResume(boolean resume) {
         this.resume = resume;
+    }
+
+    public boolean supportsDomain(String domain) {
+        if (domain == null) {
+            return false;
+        }
+        domain = domain.toLowerCase(Locale.ENGLISH);
+        if (this.domains.contains(domain)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override

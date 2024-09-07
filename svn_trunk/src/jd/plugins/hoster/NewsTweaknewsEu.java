@@ -26,7 +26,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48587 $", interfaceVersion = 3, names = { "tweaknews.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "tweaknews.eu" }, urls = { "" })
 public class NewsTweaknewsEu extends UseNet {
     public NewsTweaknewsEu(PluginWrapper wrapper) {
         super(wrapper);
@@ -160,7 +160,7 @@ public class NewsTweaknewsEu extends UseNet {
         } else {
             account.setMaxSimultanDownloads(40);
         }
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 

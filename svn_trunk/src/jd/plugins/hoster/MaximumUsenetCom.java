@@ -5,17 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import jd.PluginWrapper;
-import jd.http.Cookies;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.uio.CloseReason;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
@@ -27,7 +16,18 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
 
-@HostPlugin(revision = "$Revision: 47116 $", interfaceVersion = 3, names = { "maximumusenet.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.DownloadLink;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "maximumusenet.com" }, urls = { "" })
 public class MaximumUsenetCom extends UseNet {
     public MaximumUsenetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -130,7 +130,7 @@ public class MaximumUsenetCom extends UseNet {
             }
             account.setRefreshTimeout(5 * 60 * 60 * 1000l);
             account.setMaxSimultanDownloads(50);
-            ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+            ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
             try {
                 verifyUseNetLogins(account);
                 return ai;

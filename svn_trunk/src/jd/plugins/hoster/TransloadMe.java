@@ -43,7 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
 public class TransloadMe extends PluginForHost {
     private static final String          API_BASE                     = "https://api.transload.me/";
     private static final String          NORESUME                     = "transload_me_NORESUME";
@@ -254,7 +254,6 @@ public class TransloadMe extends PluginForHost {
                 ai = new AccountInfo();
             }
             ai.setTrafficLeft(0);
-            ai.setProperty("multiHostSupport", Property.NULL);
             account.setAccountInfo(ai);
             throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account balance 0.00 USD!", PluginException.VALUE_ID_PREMIUM_DISABLE);
         }

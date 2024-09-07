@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.CzechavComCrawler;
 
-@HostPlugin(revision = "$Revision: 49023 $", interfaceVersion = 2, names = { "czechav.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "czechav.com" }, urls = { "" })
 public class CzechavCom extends PluginForHost {
     public CzechavCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -230,17 +230,6 @@ public class CzechavCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
-    }
-
-    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        final boolean is_this_plugin = link.getHost().equalsIgnoreCase(plugin.getHost());
-        if (is_this_plugin) {
-            /* The original plugin is always allowed to download. */
-            return true;
-        } else {
-            /* Multihost download impossible. */
-            return false;
-        }
     }
 
     @Override

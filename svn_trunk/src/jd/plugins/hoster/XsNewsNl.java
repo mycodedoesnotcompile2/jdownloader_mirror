@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "xsnews.nl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "xsnews.nl" }, urls = { "" })
 public class XsNewsNl extends UseNet {
     public XsNewsNl(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +66,7 @@ public class XsNewsNl extends UseNet {
         synchronized (account) {
             setBrowserExclusive();
             final AccountInfo ai = new AccountInfo();
+            ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
             br.setFollowRedirects(true);
             final Cookies cookies = account.loadCookies("");
             final Cookies userCookies = account.loadUserCookies();
@@ -96,7 +97,6 @@ public class XsNewsNl extends UseNet {
                             verifyUseNetLogins(account);
                             ai.setStatus(oldai.getStatus());
                             ai.setValidUntil(oldai.getLastValidUntil());
-                            ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
                             return ai;
                         } catch (InvalidAuthException e2) {
                         }
@@ -167,7 +167,6 @@ public class XsNewsNl extends UseNet {
                         ai.setValidUntil(date + (12 * 60 * 60 * 1000l));
                     }
                 }
-                ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
                 account.setRefreshTimeout(5 * 60 * 60 * 1000l);
                 return ai;
             } catch (final PluginException e) {

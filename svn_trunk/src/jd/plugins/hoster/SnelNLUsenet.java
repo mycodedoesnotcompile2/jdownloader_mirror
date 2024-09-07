@@ -24,7 +24,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "snelnl.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "snelnl.com" }, urls = { "" })
 public class SnelNLUsenet extends UseNet {
     public SnelNLUsenet(PluginWrapper wrapper) {
         super(wrapper);
@@ -165,7 +165,7 @@ public class SnelNLUsenet extends UseNet {
             }
             throw e;
         }
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 

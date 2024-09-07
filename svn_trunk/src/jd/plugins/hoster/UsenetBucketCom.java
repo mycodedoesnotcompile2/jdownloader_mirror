@@ -20,7 +20,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "usenetbucket.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "usenetbucket.com" }, urls = { "" })
 public class UsenetBucketCom extends UseNet {
     public UsenetBucketCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class UsenetBucketCom extends UseNet {
             }
             throw e;
         }
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 

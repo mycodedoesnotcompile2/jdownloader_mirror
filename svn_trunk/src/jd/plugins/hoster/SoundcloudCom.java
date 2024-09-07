@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49220 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -905,12 +905,6 @@ public class SoundcloudCom extends PluginForHost {
             formattedFilename = setsposition + formattedFilename;
         }
         return formattedFilename;
-    }
-
-    @Override
-    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* Do not allow URLs of this host to be downloaded via multihoster. */
-        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override

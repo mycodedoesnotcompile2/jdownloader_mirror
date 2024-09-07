@@ -52,8 +52,6 @@ import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.awt.image.BufferedImageOp;
 import java.awt.image.ConvolveOp;
-import java.awt.image.DataBufferByte;
-import java.awt.image.DataBufferInt;
 import java.awt.image.FilteredImageSource;
 import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
@@ -120,6 +118,14 @@ public class IconIO {
             return source;
         }
 
+        protected Icon getOrigin() {
+            if (source instanceof ScaledIcon) {
+                return ((ScaledIcon) source).getOrigin();
+            } else {
+                return source;
+            }
+        }
+
         private final int           width;
         private final int           height;
         private final Interpolation interpolation;
@@ -141,7 +147,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -151,7 +157,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -161,7 +167,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -181,15 +187,16 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
         public IconIdentifier getIdentifier() {
             if (source instanceof IDIcon) {
                 return ((IDIcon) source).getIdentifier();
+            } else {
+                return new IconIdentifier("unknown", source.toString());
             }
-            return new IconIdentifier("unknown", source.toString());
         }
     }
 
@@ -335,7 +342,6 @@ public class IconIO {
                 is = URLStream.openStream(resource);
                 final BufferedImage ret = ImageIO.read(is);
                 if (ret != null) {
-                    // return getCroppedImage(ret);
                     return ret;
                 }
             } catch (final IOException e) {
@@ -352,117 +358,6 @@ public class IconIO {
         } else {
             return null;
         }
-    }
-
-    /**
-     * from here http://stackoverflow.com/questions/3224561/crop-image-to-smallest-size-by-removing-transparent-pixels-in-java
-     *
-     * @param source
-     * @return
-     */
-    public static BufferedImage getCroppedImage(BufferedImage source) {
-        if (source != null) {
-            if (source.getType() == BufferedImage.TYPE_INT_ARGB) {
-                try {
-                    // Get our top-left pixel color as our "baseline" for cropping
-                    final int[] pixels = ((DataBufferInt) source.getRaster().getDataBuffer()).getData();
-                    final int width = source.getWidth();
-                    final int height = source.getHeight();
-                    int x0, y0, x1, y1; // the new corners of the trimmed image
-                    int i, j; // i - horizontal iterator; j - vertical iterator
-                    leftLoop: for (i = 0; i < width; i++) {
-                        for (j = 0; j < height; j++) {
-                            final int alpha = (pixels[(j * width + i)] >> 24) & 0xFF;
-                            if (alpha != 0) { // alpha is the very first byte and then every fourth one
-                                break leftLoop;
-                            }
-                        }
-                    }
-                    x0 = i;
-                    topLoop: for (j = 0; j < height; j++) {
-                        for (i = 0; i < width; i++) {
-                            final int alpha = (pixels[(j * width + i)] >> 24) & 0xFF;
-                            if (alpha != 0) {
-                                break topLoop;
-                            }
-                        }
-                    }
-                    y0 = j;
-                    rightLoop: for (i = width - 1; i >= 0; i--) {
-                        for (j = 0; j < height; j++) {
-                            final int alpha = (pixels[(j * width + i)] >> 24) & 0xFF;
-                            if (alpha != 0) {
-                                break rightLoop;
-                            }
-                        }
-                    }
-                    x1 = i + 1;
-                    bottomLoop: for (j = height - 1; j >= 0; j--) {
-                        for (i = 0; i < width; i++) {
-                            final int alpha = (pixels[(j * width + i)] >> 24) & 0xFF;
-                            if (alpha != 0) {
-                                break bottomLoop;
-                            }
-                        }
-                    }
-                    y1 = j + 1;
-                    if (x0 == 0 && y0 == 0 && (x1 - x0) == height && (y1 - y0) == width) {
-                        return source;
-                    } else {
-                        return source.getSubimage(x0, y0, x1 - x0, y1 - y0);
-                    }
-                } catch (final Throwable e) {
-                }
-            } else if (source.getType() == BufferedImage.TYPE_4BYTE_ABGR) {
-                try {
-                    // Get our top-left pixel color as our "baseline" for cropping
-                    final byte[] pixels = ((DataBufferByte) source.getRaster().getDataBuffer()).getData();
-                    final int width = source.getWidth();
-                    final int height = source.getHeight();
-                    int x0, y0, x1, y1; // the new corners of the trimmed image
-                    int i, j; // i - horizontal iterator; j - vertical iterator
-                    leftLoop: for (i = 0; i < width; i++) {
-                        for (j = 0; j < height; j++) {
-                            if (pixels[(j * width + i) * 4] != 0) { // alpha is the very first byte and then every fourth one
-                                break leftLoop;
-                            }
-                        }
-                    }
-                    x0 = i;
-                    topLoop: for (j = 0; j < height; j++) {
-                        for (i = 0; i < width; i++) {
-                            if (pixels[(j * width + i) * 4] != 0) {
-                                break topLoop;
-                            }
-                        }
-                    }
-                    y0 = j;
-                    rightLoop: for (i = width - 1; i >= 0; i--) {
-                        for (j = 0; j < height; j++) {
-                            if (pixels[(j * width + i) * 4] != 0) {
-                                break rightLoop;
-                            }
-                        }
-                    }
-                    x1 = i + 1;
-                    bottomLoop: for (j = height - 1; j >= 0; j--) {
-                        for (i = 0; i < width; i++) {
-                            if (pixels[(j * width + i) * 4] != 0) {
-                                break bottomLoop;
-                            }
-                        }
-                    }
-                    y1 = j + 1;
-                    if (x0 == 0 && y0 == 0 && (x1 - x0) == height && (y1 - y0) == width) {
-                        return source;
-                    } else {
-                        return source.getSubimage(x0, y0, x1 - x0, y1 - y0);
-                    }
-                } catch (final Throwable e) {
-                }
-            }
-        }
-        return source;
     }
 
     /**
@@ -535,7 +430,7 @@ public class IconIO {
             if (sIcon.getIconHeight() == height && sIcon.getIconWidth() == width) {
                 return icon;
             } else {
-                return new ScaledIcon(sIcon.getSource(), width, height, bicubic);
+                return new ScaledIcon(sIcon.getOrigin(), width, height, bicubic);
             }
         }
         return new ScaledIcon(icon, width, height, bicubic);

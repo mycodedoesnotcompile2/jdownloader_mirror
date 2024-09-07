@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 46262 $", interfaceVersion = 3, names = { "simply-debrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "simply-debrid.com" }, urls = { "" })
 public class SimplyDebridCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
 
@@ -95,7 +95,6 @@ public class SimplyDebridCom extends PluginForHost {
         String pw = Encoding.urlEncode(account.getPass());
         String page = "";
         String hosts[] = null;
-        ac.setProperty("multiHostSupport", Property.NULL);
         if (!createSession(account)) {
             // account is invalid
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);

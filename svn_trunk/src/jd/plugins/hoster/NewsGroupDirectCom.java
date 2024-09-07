@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "newsgroupdirect.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "newsgroupdirect.com" }, urls = { "" })
 public class NewsGroupDirectCom extends UseNet {
     public NewsGroupDirectCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -170,7 +170,7 @@ public class NewsGroupDirectCom extends UseNet {
                 // https://newsgroupdirect.com/#pricing
                 account.setMaxSimultanDownloads(50);
                 account.setRefreshTimeout(5 * 60 * 60 * 1000l);
-                ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+                ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
                 try {
                     verifyUseNetLogins(account);
                     return ai;

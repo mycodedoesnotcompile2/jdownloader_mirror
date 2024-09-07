@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48560 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
 public class GenericUseNet extends UseNet {
     public GenericUseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,7 @@ public class GenericUseNet extends UseNet {
         try {
             verifyUseNetLogins(convertNNTPLoginURI(account));
             final AccountInfo ai = new AccountInfo();
-            ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+            ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
             ai.setStatus("Generic usenet:maxDownloads(current)=" + account.getMaxSimultanDownloads());
             account.setRefreshTimeout(2 * 60 * 60 * 1000l);
             return ai;

@@ -218,6 +218,10 @@ public abstract class AbstractTray implements TrayMouseListener {
                 } else {
                     // left
                     position.x = (int) (bounds.x + POPUP_INSETS / scaleX + insets.left / scaleX);
+                    if (position.x < clickedPoint.x) {
+                        // don't show at left corner, better place at mouse position
+                        position.x = clickedPoint.x;
+                    }
                 }
                 if (clickedPoint.getY() - bounds.getY() > (bounds.getY() + bounds.getHeight() - clickedPoint.getY())) {
                     // bottom
@@ -232,16 +236,6 @@ public abstract class AbstractTray implements TrayMouseListener {
                 }
                 break;
             }
-        }
-        // if the tray icon is more left than the left edge of the popup, enlarge the popup
-        try {
-            Rectangle bounds = ma.getUnscaledBounds();
-            int betterX = Math.min(position.x, bounds.x);
-            if (betterX < position.x) {
-                popup.setPreferredSize(new Dimension(ps.width + position.x - betterX, ps.height));
-            }
-        } catch (Throwable e2) {
-            // may throw exceptions
         }
         return position;
     }

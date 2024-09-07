@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.RandomUserAgent;
@@ -32,10 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 49640 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = {}, urls = {})
 public class XupIn extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -177,11 +177,6 @@ public class XupIn extends PluginForHost {
             link.setDownloadPassword(passCode);
         }
         dl.startDownload();
-    }
-
-    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* Do not allow multihost usage. */
-        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override

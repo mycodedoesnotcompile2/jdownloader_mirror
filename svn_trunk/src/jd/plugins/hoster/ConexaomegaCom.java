@@ -21,10 +21,8 @@ import java.util.Random;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
-import jd.config.Property;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -38,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 45814 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
 public class ConexaomegaCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            COOKIE_HOST        = "https://conexaomega.com";
@@ -100,7 +98,6 @@ public class ConexaomegaCom extends PluginForHost {
         if (!login(account, true)) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
-        ai.setProperty("multiHostSupport", Property.NULL);
         br.getPage("https://www." + account.getHoster() + "/gerador");
         final String expireDays = br.getRegex(">Seu plano expira em (\\d+) dias\\.</strong>").getMatch(0);
         if (expireDays != null) {

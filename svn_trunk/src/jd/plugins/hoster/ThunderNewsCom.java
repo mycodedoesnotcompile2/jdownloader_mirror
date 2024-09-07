@@ -20,7 +20,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49049 $", interfaceVersion = 3, names = { "thundernews.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "thundernews.com" }, urls = { "" })
 public class ThunderNewsCom extends UseNet {
     public ThunderNewsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -124,7 +124,7 @@ public class ThunderNewsCom extends UseNet {
             }
             throw e;
         }
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 

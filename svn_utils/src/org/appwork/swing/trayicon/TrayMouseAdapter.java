@@ -198,10 +198,12 @@ public class TrayMouseAdapter implements MouseListener, MouseMotionListener {
      * @return
      */
     protected boolean isOver(Point point) {
+        final Rectangle bounds = this.bounds;
         if (bounds == null) {
             return false;
+        } else {
+            return bounds.contains(point);
         }
-        return bounds.contains(point);
     }
 
     public Rectangle getUnscaledBounds() {

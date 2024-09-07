@@ -18,7 +18,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47116 $", interfaceVersion = 3, names = { "newsdemon.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "newsdemon.com" }, urls = { "" })
 public class NewsDemonCom extends UseNet {
     public NewsDemonCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,7 +115,7 @@ public class NewsDemonCom extends UseNet {
             throw e;
         }
         account.setRefreshTimeout(2 * 60 * 60 * 1000l);
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 

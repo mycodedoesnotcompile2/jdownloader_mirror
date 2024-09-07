@@ -25,7 +25,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48375 $", interfaceVersion = 3, names = { "eweka.nl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "eweka.nl" }, urls = { "" })
 public class UseNetEwekaNl extends UseNet {
     public UseNetEwekaNl(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,7 +103,7 @@ public class UseNetEwekaNl extends UseNet {
             account.setType(AccountType.FREE);
             ai.setTrafficLeft(0);
         }
-        ai.setProperty("multiHostSupport", Arrays.asList(new String[] { "usenet" }));
+        ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 
