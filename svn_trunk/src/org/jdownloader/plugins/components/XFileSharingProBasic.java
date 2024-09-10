@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49675 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49742 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3241,7 +3241,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             final Request request = br.getRequest();
             String correctedBR = correctedBrowserRequestMap.get(request);
             if (correctedBR == null) {
-                correctedBR = br.getRequest().getHtmlCode();
+                try {
+                    correctedBR = br.getRequest().getHtmlCode();
+                } catch (final Throwable e) {
+                    /* E.g. image content */
+                    correctedBR = "";
+                }
                 final ArrayList<String> regexStuff = getCleanupHTMLRegexes();
                 // remove custom rules first!!! As html can change because of generic cleanup rules.
                 /* generic cleanup */

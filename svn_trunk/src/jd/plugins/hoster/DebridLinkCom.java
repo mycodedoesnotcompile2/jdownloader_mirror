@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49248 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49743 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -210,29 +210,29 @@ public class DebridLinkCom extends PluginForHost {
                 continue;
             } else {
                 /* Add all domains of this host */
-                final List<Object> domainsO = (List<Object>) entries.get("domains");
+                final List<String> domains = (List<String>) entries.get("domains");
                 final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
-                for (final Object domainO : domainsO) {
+                for (final String domain : domains) {
                     // supportedHosts.add((String) domainO);
-                    supportedHostsTmp.add((String) domainO);
+                    supportedHostsTmp.add(domain);
                 }
                 /* Workaround: Find our "real host" which we internally use -> We need this later! */
-                final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(this, supportedHostsTmp);
-                if (hostsReal != null && !hostsReal.isEmpty()) {
-                    int index = -1;
-                    for (final String realHost : hostsReal) {
-                        index += 1;
-                        if (realHost == null) {
-                            continue;
-                        } else {
-                            if (!supportedHosts.contains(realHost)) {
-                                supportedHosts.add(realHost);
-                            }
-                            if (index == 0) {
-                                /* Allow only exactly one host as mapping -> Should be fine in most of all cases */
-                                name2RealHostMap.put(hostname, realHost);
-                            }
-                        }
+                final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(null, supportedHostsTmp);
+                if (hostsReal == null) {
+                    continue;
+                }
+                int index = -1;
+                for (final String realHost : hostsReal) {
+                    index += 1;
+                    if (realHost == null) {
+                        continue;
+                    }
+                    if (!supportedHosts.contains(realHost)) {
+                        supportedHosts.add(realHost);
+                    }
+                    if (index == 0) {
+                        /* Allow only exactly one host as mapping -> Should be fine in most of all cases */
+                        name2RealHostMap.put(hostname, realHost);
                     }
                 }
             }

@@ -76,7 +76,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49724 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49739 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -572,10 +572,10 @@ public class AllDebridCom extends PluginForHost {
             /* This is the only error which allows us to remove the apikey and re-login. */
             account.removeProperty(PROPERTY_apikey);
             throw new AccountInvalidException(message);
-        } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
+        } else if (accountErrorsTemporary.contains(errorcode)) {
             throw new AccountUnavailableException(message, 5 * 60 * 1000);
         } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
-            mhm.putError(accountErrorsTemporary, link, 5 * 60 * 1000l, message);
+            mhm.putError(account, link, 5 * 60 * 1000l, message);
         } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
             mhm.handleErrorGeneric(account, link, message, 20);
         } else {
