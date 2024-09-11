@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49078 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexComCrawler extends PornEmbedParser {
     public SexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,7 +91,7 @@ public class SexComCrawler extends PornEmbedParser {
         String externID;
         String title;
         br.setAllowedResponseCodes(502);
-        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final String contenturl = param.getCryptedUrl().replaceFirst("^(?i)http://", "https://");
         String redirect = null;
         if (contenturl.matches(PATTERN_RELATIVE_EXTERN_REDIRECT)) {
             /* Single link which redirects to another website */

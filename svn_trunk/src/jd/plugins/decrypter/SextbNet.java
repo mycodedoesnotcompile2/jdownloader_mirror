@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48459 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
 public class SextbNet extends PluginForDecrypt {
     public SextbNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,6 +81,14 @@ public class SextbNet extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final String slug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final boolean slugContainsNumbers = slug.replaceAll("\\d", "").length() < slug.length();
+        if (!slug.contains("-")) {
+            /* Invalid ID e.g. https://sextb.net/terms */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!slugContainsNumbers) {
+            /* Invalid ID e.g. https://sextb.net/list-directors */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

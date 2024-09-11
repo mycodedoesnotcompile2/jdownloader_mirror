@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 
-@DecrypterPlugin(revision = "$Revision: 49214 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
 public class BiqleRuCrawler extends PluginForDecrypt {
     public BiqleRuCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,7 +88,7 @@ public class BiqleRuCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:watch|video)/(?:-)?\\d+_\\d+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:watch|video)/-?\\d+_\\d+");
         }
         return ret.toArray(new String[0]);
     }
