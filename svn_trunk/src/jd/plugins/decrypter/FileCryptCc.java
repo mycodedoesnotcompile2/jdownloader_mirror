@@ -23,22 +23,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.HexFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
-import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.FileCryptConfig;
-import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -64,7 +48,22 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49742 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
+import org.jdownloader.captcha.v2.challenge.cutcaptcha.CaptchaHelperCrawlerPluginCutCaptcha;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.FileCryptConfig;
+import org.jdownloader.plugins.components.config.FileCryptConfig.CrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 49758 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -374,10 +373,6 @@ public class FileCryptCc extends PluginForDecrypt {
     }
 
     private void handlePasswordAndCaptcha(final CryptedLink param, final String folderID, final String url) throws Exception {
-        // final ChallengeResponseController crc = ChallengeResponseController.getInstance();
-        // final boolean canHandleCutCaptchaChallenge = false;
-        // TODO: Find out beforehand if there is a CutCaptcha solver available and evaluate this information -> Try to avoid CutCaptcha if
-        // we know that no solver is available.
         /* Prepare browser */
         br.addAllowedResponseCodes(500);// submit captcha responds with 500 code
         int cutCaptchaRetryIndex = -1;
@@ -385,7 +380,8 @@ public class FileCryptCc extends PluginForDecrypt {
         final int cutCaptchaAvoidanceMaxRetries = cfg.getMaxCutCaptchaAvoidanceRetries();
         final HashSet<String> usedWrongPasswords = new HashSet<String>();
         boolean captchaSuccess = false;
-        boolean cutCaptchaNeeded = false;
+        boolean lastCaptchaIsCutCaptcha = false;
+        boolean tryToSolveCutCaptcha = false;
         cutcaptchaAvoidanceLoop: while (cutCaptchaRetryIndex++ <= cutCaptchaAvoidanceMaxRetries && !this.isAbort()) {
             logger.info("cutcaptchaAvoidanceLoop " + (cutCaptchaRetryIndex + 1) + " / " + (cutCaptchaAvoidanceMaxRetries + 1));
             /* Website has no language selection as it auto-chooses based on IP and/or URL but we can force English language. */
@@ -411,15 +407,13 @@ public class FileCryptCc extends PluginForDecrypt {
             }
             if (cutCaptchaRetryIndex == 0 && logoPW == null) {
                 /**
-                 * Search password based on folder-logo. </br>
-                 * Only do this one time in the first run of this loop.
+                 * Search password based on folder-logo. </br> Only do this one time in the first run of this loop.
                  */
                 final String customLogoID = br.getRegex("custom/([a-z0-9]+)\\.png").getMatch(0);
                 if (customLogoID != null) {
                     /**
-                     * Magic auto passwords: </br>
-                     * Creators can set custom logos on each folder. Each logo has a unique ID. This way we can try specific passwords first
-                     * that are typically associated with folders published by those sources.
+                     * Magic auto passwords: </br> Creators can set custom logos on each folder. Each logo has a unique ID. This way we can
+                     * try specific passwords first that are typically associated with folders published by those sources.
                      */
                     if ("53d1b".equals(customLogoID) || "80d13".equals(customLogoID) || "fde1d".equals(customLogoID) || "8abe0".equals(customLogoID) || "8f073".equals(customLogoID)) {
                         logoPW = "serienfans.org";
@@ -541,7 +535,7 @@ public class FileCryptCc extends PluginForDecrypt {
                 }
                 this.getPluginConfig().setProperty(PROPERTY_PLUGIN_LAST_USED_PASSWORD, successfullyUsedFolderPassword);
             }
-            cutCaptchaNeeded = false;
+            lastCaptchaIsCutCaptcha = false;
             if (containsCaptcha()) {
                 /* Process captcha */
                 int captchaCounter = -1;
@@ -603,13 +597,25 @@ public class FileCryptCc extends PluginForDecrypt {
                             continue;
                         }
                     } else if (StringUtils.containsIgnoreCase(captchaURL, "cutcaptcha")) {
-                        cutCaptchaNeeded = true;
-                        final boolean tryCutCaptchaInDevMode = false;
-                        if (!Application.isHeadless() && DebugMode.TRUE_IN_IDE_ELSE_FALSE && tryCutCaptchaInDevMode) {
-                            // current implementation via localhost no longer working
-                            final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
-                            captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
-                        } else {
+                        lastCaptchaIsCutCaptcha = true;
+                        if (cutCaptchaRetryIndex == 0 || tryToSolveCutCaptcha) {
+                            logger.info("Attempting to solve CutCaptcha");
+                            try {
+                                final String cutcaptchaToken = new CaptchaHelperCrawlerPluginCutCaptcha(this, br, null).getToken();
+                                captchaForm.put("cap_token", Encoding.urlEncode(cutcaptchaToken));
+                                tryToSolveCutCaptcha = true;
+                            } catch (final Exception e) {
+                                if (tryToSolveCutCaptcha) {
+                                    /* Handling worked before and failed now -> Throw exception */
+                                    throw e;
+                                }
+                                logger.log(e);
+                                logger.info("CutCaptcha failed - most likely no CutCaptcha solver is available");
+                                /* Don't try again! */
+                                tryToSolveCutCaptcha = false;
+                            }
+                        }
+                        if (!tryToSolveCutCaptcha) {
                             logger.info("Trying to avoid cutcaptcha | cutCaptchaRetryIndex = " + cutCaptchaRetryIndex);
                             /* Clear cookies to increase the chances of getting a different captcha type than cutcaptcha. */
                             br.clearCookies(null);
@@ -648,7 +654,7 @@ public class FileCryptCc extends PluginForDecrypt {
             break cutcaptchaAvoidanceLoop;
         }
         if (!captchaSuccess) {
-            if (cutCaptchaRetryIndex >= cutCaptchaAvoidanceMaxRetries && cutCaptchaNeeded) {
+            if (cutCaptchaRetryIndex >= cutCaptchaAvoidanceMaxRetries && lastCaptchaIsCutCaptcha) {
                 throw new DecrypterRetryException(RetryReason.CAPTCHA, "CUTCAPTCHA_IS_NOT_SUPPORTED_" + folderID, "Cutcaptcha is not supported! Please read: support.jdownloader.org/Knowledgebase/Article/View/cutcaptcha-not-supported");
             } else {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);

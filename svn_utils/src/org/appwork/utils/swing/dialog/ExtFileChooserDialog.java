@@ -562,6 +562,16 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         return fileFilter;
     }
 
+    protected boolean useAcceptAllFileFilter = true;
+
+    public boolean isAcceptAllFileFilterUsed() {
+        return useAcceptAllFileFilter;
+    }
+
+    public void setAcceptAllFileFilterUsed(boolean b) {
+        this.useAcceptAllFileFilter = b;
+    }
+
     public FileChooserSelectionMode getFileSelectionMode() {
         return fileSelectionMode;
     }
@@ -734,6 +744,12 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             fc.setFileSelectionMode(fileSelectionMode.getId());
         }
         if (fileFilter != null) {
+            final boolean isAcceptAllFileFilterUsed = isAcceptAllFileFilterUsed();
+            fc.setAcceptAllFileFilterUsed(isAcceptAllFileFilterUsed);
+            final FileFilter allFileFilter = fc.getAcceptAllFileFilter();
+            if (allFileFilter != null) {
+                fc.removeChoosableFileFilter(allFileFilter);
+            }
             if (fileFilter.length == 1) {
                 fc.setFileFilter(fileFilter[0]);
             } else {
@@ -742,6 +758,9 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                         fc.addChoosableFileFilter(filter);
                     }
                 }
+            }
+            if (isAcceptAllFileFilterUsed && allFileFilter != null) {
+                fc.addChoosableFileFilter(allFileFilter);
             }
         }
         if (multiSelection) {

@@ -609,11 +609,11 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
                             /* no encoding */
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
                             this.contentDecoded = false;
-                        } else if ("gzip".equalsIgnoreCase(encoding)) {
+                        } else if ("gzip".equalsIgnoreCase(encoding) || "x-gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
                             this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
                             this.contentDecoded = true;
-                        } else if ("deflate".equalsIgnoreCase(encoding)) {
+                        } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
                             this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
                             this.contentDecoded = true;

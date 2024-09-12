@@ -47,25 +47,24 @@ import java.nio.charset.CodingErrorAction;
  */
 public class CharSequenceUtils {
     public static boolean contentEquals(final CharSequence x, final CharSequence y) {
-        if (x instanceof String) {
-            return ((String) x).contentEquals(y);
+        if (x == y) {
+            return true;
+        } else if (x == null && y != null) {
+            return false;
+        } else if (y == null && x != null) {
+            return false;
+        } else if (y.length() != x.length()) {
+            return false;
         } else {
-            if (x == y) {
-                return true;
-            } else if (x == null && y != null) {
-                return false;
-            } else if (y == null && x != null) {
-                return false;
-            } else if (y.length() != x.length()) {
-                return false;
-            } else {
-                for (int index = 0; index < y.length(); index++) {
-                    if (y.charAt(index) != x.charAt(index)) {
-                        return false;
-                    }
-                }
-                return true;
+            if (x instanceof String) {
+                return ((String) x).contentEquals(y);
             }
+            for (int index = 0; index < y.length(); index++) {
+                if (y.charAt(index) != x.charAt(index)) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 

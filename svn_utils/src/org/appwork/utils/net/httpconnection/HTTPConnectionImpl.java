@@ -1308,7 +1308,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     } else if (HTTPConstants.ResponseCode.SUCCESS_NO_CONTENT.matches(getResponseCode())) {
                         /*
                          * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204
-                         *
+                         * 
                          * Although this status code is intended to describe a response with no body, servers may erroneously include data
                          * following the headers.
                          */
@@ -1489,12 +1489,12 @@ public class HTTPConnectionImpl implements HTTPConnection {
                             // Any data acceptable. CRLF may or may not indicate a line break.
                             this.convertedInputStream = new CountingInputStream(rawInputStream);
                             this.contentDecoded = false;
-                        } else if ("gzip".equalsIgnoreCase(encoding)) {
+                        } else if ("gzip".equalsIgnoreCase(encoding) || "x-gzip".equalsIgnoreCase(encoding)) {
                             /* gzip encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
                             this.convertedInputStream = new CountingGZIPInputStream(rawInputStream);
                             this.contentDecoded = true;
-                        } else if ("deflate".equalsIgnoreCase(encoding)) {
+                        } else if ("deflate".equalsIgnoreCase(encoding) || "x-deflate".equalsIgnoreCase(encoding)) {
                             /* deflate encoding */
                             // TODO: Handle auto-decoding marker. e.g. remove the header if the stream is decoded
                             this.convertedInputStream = new CountingInflaterInputStream(new CountingInputStream(rawInputStream));
