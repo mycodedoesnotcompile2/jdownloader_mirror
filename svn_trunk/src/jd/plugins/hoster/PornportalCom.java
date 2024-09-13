@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49770 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,6 +119,7 @@ public class PornportalCom extends PluginForHost {
         ret.add(new String[] { "seancody.com" });
         ret.add(new String[] { "dancingbear.com" });
         ret.add(new String[] { "adultmobile.com" });
+        ret.add(new String[] { "mygf.com" });
         return ret;
     }
 

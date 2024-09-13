@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49770 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -68,12 +68,12 @@ public class BoxbitApp extends PluginForHost {
     @SuppressWarnings("deprecation")
     public BoxbitApp(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://boxbit.app/!/register");
+        this.enablePremium("https://" + getHost() + "/!/register");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://boxbit.app/";
+        return "https://" + getHost() + "/";
     }
 
     @Override

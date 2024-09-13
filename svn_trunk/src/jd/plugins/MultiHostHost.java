@@ -18,20 +18,21 @@ public class MultiHostHost implements Storable {
         WORKING,
         WORKING_UNSTABLE,
         DEACTIVATED_JDOWNLOADER,
+        DEACTIVATED_JDOWNLOADER_UNSUPPORTED,
         DEACTIVATED_MULTIHOST,
         DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE,
-        DEACTIVATED_MULTIHOST_LIMIT_REACHED,
-        UNSUPPORTED_JDOWNLOADER;
+        DEACTIVATED_MULTIHOST_LIMIT_REACHED;
     }
 
     private String                name                            = null;
     private List<String>          domains                         = new ArrayList<String>();
     private Boolean               isUnlimitedTraffic              = true;
     private Boolean               isUnlimitedLinks                = true;
-    private int                   linksLeft                       = -1;
-    private int                   linksMax                        = -1;
+    private long                  linksLeft                       = -1;
+    private long                  linksMax                        = -1;
     private long                  trafficLeft                     = -1;
     private long                  trafficMax                      = -1;
+    private String                unavailableMessage              = null;
     private long                  unavailableUntilTimestamp       = -1;
     private short                 trafficCalculationFactorPercent = 100;
     private int                   maxChunks                       = 0;
@@ -39,8 +40,27 @@ public class MultiHostHost implements Storable {
     private String                statusText                      = null;
     private MultihosterHostStatus status                          = null;
 
+    public MultiHostHost() {
+    }
+
     public MultiHostHost(final String domain) {
         this.addDomain(domain);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setDomain(final String domain) {
+        if (domain == null) {
+            throw new IllegalArgumentException();
+        }
+        this.domains.clear();
+        this.domains.add(domain);
     }
 
     public void addDomain(final String domain) {
@@ -52,32 +72,42 @@ public class MultiHostHost implements Storable {
         }
     }
 
-    public void addDomains(final ArrayList<String> domains) {
+    public void addDomains(final List<String> domains) {
+        if (domains == null) {
+            throw new IllegalArgumentException();
+        }
         for (final String domain : domains) {
             this.addDomain(domain);
         }
     }
 
-    public int getLinksLeft() {
+    public void setDomains(final List<String> domains) {
+        if (domains == null) {
+            throw new IllegalArgumentException();
+        }
+        this.domains = domains;
+    }
+
+    public long getLinksLeft() {
         return linksLeft;
     }
 
-    public void setLinksLeft(int num) {
+    public void setLinksLeft(long num) {
         this.linksLeft = num;
         this.isUnlimitedLinks = false;
     }
 
-    public int getLinksMax() {
+    public long getLinksMax() {
         return linksMax;
     }
 
-    public void setLinksMax(int num) {
+    public void setLinksMax(long num) {
         this.linksMax = num;
         this.isUnlimitedLinks = false;
     }
 
     /** Only do this when linksMax is given. */
-    public void setLinksUsed(int num) {
+    public void setLinksUsed(long num) {
         this.linksLeft = this.linksMax - num;
         this.isUnlimitedLinks = false;
     }
@@ -106,7 +136,7 @@ public class MultiHostHost implements Storable {
     }
 
     /**
-     * How much traffic is needed and credited when downloading from this host? </br>
+     * How much traffic is needed- and credited from the account when downloading from this host? </br>
      * 500 = 5 times the size of the downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
@@ -138,6 +168,7 @@ public class MultiHostHost implements Storable {
         }
     }
 
+    @Deprecated
     public boolean canDownload(final DownloadLink link) {
         if (isUnlimitedTraffic || isUnlimitedLinks) {
             return true;
@@ -217,6 +248,14 @@ public class MultiHostHost implements Storable {
         return this.domains;
     }
 
+    public String getUnavailableMessage() {
+        return unavailableMessage;
+    }
+
+    public void setUnavailableMessage(String unavailableMessage) {
+        this.unavailableMessage = unavailableMessage;
+    }
+
     public long getUnavailableUntilTimestamp() {
         return unavailableUntilTimestamp;
     }
@@ -229,10 +268,12 @@ public class MultiHostHost implements Storable {
     @Override
     public String toString() {
         final String title;
-        if (this.domains != null && this.domains.size() > 0) {
+        if (this.name != null) {
+            title = this.name;
+        } else if (this.domains != null && this.domains.size() > 0) {
             title = this.domains.iterator().next();
         } else {
-            title = this.name;
+            title = null;
         }
         return title + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }

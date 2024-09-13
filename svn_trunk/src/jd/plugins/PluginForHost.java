@@ -54,6 +54,7 @@ import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.captcha.CaptchaSettings;
 import jd.controlling.captcha.SkipException;
 import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
 import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadSession;
@@ -197,11 +198,11 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-        /**
-         * these patterns should split filename and fileextension (extension must include the
-         * point)
-         */
-        // multipart rar archives
+                                                  /**
+                                                   * these patterns should split filename and fileextension (extension must include the
+                                                   * point)
+                                                   */
+                                                  // multipart rar archives
             Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
             // normal files with extension
             Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
@@ -1130,7 +1131,7 @@ public abstract class PluginForHost extends Plugin {
         return account.getAccountInfo();
     }
 
-    public boolean enoughTrafficFor(final DownloadLink downloadLink, final Account account) throws Exception {
+    public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
         final AccountTrafficView accountTrafficView = getAccountTrafficView(account);
         if (accountTrafficView == null) {
             return true;
@@ -1142,10 +1143,10 @@ public abstract class PluginForHost extends Plugin {
         final long minimum = 1024;
         if (trafficLeft == 0) {
             if (accountTrafficView.isTrafficRefill()) {
-                final long downloadSize = downloadLink.getView().getBytesTotalEstimated();
+                final long downloadSize = link.getView().getBytesTotalEstimated();
                 final long downloadLeft;
                 if (downloadSize >= 0) {
-                    downloadLeft = Math.max(minimum, downloadSize - downloadLink.getView().getBytesLoaded());
+                    downloadLeft = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
                 } else {
                     downloadLeft = minimum;
                 }
@@ -1154,12 +1155,12 @@ public abstract class PluginForHost extends Plugin {
                 return false;
             }
         } else {
-            final long downloadSize = downloadLink.getView().getBytesTotalEstimated();
+            final long downloadSize = link.getView().getBytesTotalEstimated();
             if (downloadSize <= 0) {
                 /* File size is unknown */
                 return true;
             }
-            final long downloadLeft = Math.max(0, downloadSize - downloadLink.getView().getBytesLoaded());
+            final long downloadLeft = Math.max(0, downloadSize - link.getView().getBytesLoaded());
             if (trafficLeft - downloadLeft <= 0) {
                 if (accountTrafficView.isTrafficRefill()) {
                     final long required = Math.max(minimum, downloadLeft - trafficLeft);
@@ -1255,21 +1256,27 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public void handle(final DownloadLink downloadLink, final Account account) throws Exception {
+        ACCOUNTTYPE accountType = null;
         try {
-            preHandle(downloadLink, account, this);
             waitForNextStartAllowed(downloadLink, account);
             if (account != null) {
                 /* with account */
                 if (StringUtils.equalsIgnoreCase(account.getHoster(), downloadLink.getHost())) {
+                    accountType = ACCOUNTTYPE.ORIGINAL;
                     handlePremium(downloadLink, account);
                 } else {
+                    accountType = ACCOUNTTYPE.MULTI;
                     handleMultiHost(downloadLink, account);
                 }
             } else {
                 /* without account */
+                accountType = ACCOUNTTYPE.NONE;
                 handleFree(downloadLink);
             }
             postHandle(downloadLink, account, this);
+        } catch (final Exception e) {
+            handleException(downloadLink, accountType, account, e);
+            throw e;
         } finally {
             try {
                 if (dl != null) {
@@ -1279,6 +1286,18 @@ public abstract class PluginForHost extends Plugin {
                 e.printStackTrace();
             }
             finalHandle(downloadLink, account, this);
+        }
+    }
+
+    protected void handleException(final DownloadLink downloadLink, final ACCOUNTTYPE accountType, final Account account, final Exception e) throws Exception {
+        if (ACCOUNTTYPE.MULTI.equals(accountType) && e instanceof PluginException) {
+            if (((PluginException) e).getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND && AvailableStatus.TRUE.equals(link.getAvailableStatus())) {
+
+                /* File is online according to original filehoster -> Do not trust offline status from multihoster. */
+
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Multihoster " + getHost() + " claims that this file is offline", e);
+            }
+
         }
     }
 
@@ -1348,16 +1367,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         *
+         * 
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         *
+         * 
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         *
+         * 
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         *
-         *
-         *
+         * 
+         * 
+         * 
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -2528,15 +2547,7 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public Downloadable newDownloadable(DownloadLink downloadLink, final Browser br) {
-        if (br != null) {
-            return new DownloadLinkDownloadable(downloadLink) {
-                @Override
-                public Browser getContextBrowser() {
-                    return br.cloneBrowser();
-                }
-            };
-        }
-        return new DownloadLinkDownloadable(downloadLink);
+        return new DownloadLinkDownloadable(downloadLink, br);
     }
 
     /**
