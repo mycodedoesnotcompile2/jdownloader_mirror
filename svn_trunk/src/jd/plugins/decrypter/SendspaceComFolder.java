@@ -18,9 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -40,7 +37,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48459 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(?:www\\.)?sendspace\\.com/(?:folder/[0-9a-zA-Z]+|filegroup/([0-9a-zA-Z%]+))" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
+@DecrypterPlugin(revision = "$Revision: 49779 $", interfaceVersion = 2, names = { "sendspace.com" }, urls = { "https?://(?:www\\.)?sendspace\\.com/(?:folder/[0-9a-zA-Z]+|filegroup/([0-9a-zA-Z%]+))" })
 public class SendspaceComFolder extends PluginForDecrypt {
     public SendspaceComFolder(PluginWrapper wrapper) {
         super(wrapper);

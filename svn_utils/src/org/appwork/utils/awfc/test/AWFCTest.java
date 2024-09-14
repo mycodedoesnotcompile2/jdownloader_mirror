@@ -52,7 +52,6 @@ import org.appwork.utils.formatter.HexFormatter;
  *
  */
 public class AWFCTest extends AWTest {
-
     public static void main(String[] args) {
         run();
     }
@@ -102,7 +101,7 @@ public class AWFCTest extends AWTest {
                         System.out.println(e);
                     } else {
                         System.out.println(e + (e.getHash() != null ? HexFormatter.byteArrayToHex(e.getHash()) : ""));
-                        System.out.println("Hash:" + Hash.getHashBytes(is, "SHA-256", -1, false));
+                        System.out.println("Hash:" + Hash.getHashBytes(is, "SHA-256", -1, false, true));
                         if (e.getSize() > 0 && e.getHash() != null && !Arrays.equals(sha256, e.getHash())) {
                             throw new Exception();
                         }

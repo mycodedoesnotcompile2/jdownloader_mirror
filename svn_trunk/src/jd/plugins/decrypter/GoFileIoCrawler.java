@@ -7,7 +7,6 @@ import java.util.Map.Entry;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.GetRequest;
-import jd.nutils.JDHash;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
@@ -23,12 +22,13 @@ import jd.plugins.hoster.GofileIo;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.Hash;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.parser.UrlQuery;
 
-@DecrypterPlugin(revision = "$Revision: 49041 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 49780 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "https?://(?:www\\.)?gofile\\.io/(?:#download#|\\?c=|d/)([A-Za-z0-9\\-]+)" })
 public class GoFileIoCrawler extends PluginForDecrypt {
 
     @Override
@@ -58,7 +58,7 @@ public class GoFileIoCrawler extends PluginForDecrypt {
                 if (attempt > 0 || passCode == null) {
                     passCode = getUserInput("Password?", param);
                 }
-                query.addAndReplace("password", JDHash.getSHA256(passCode));
+                query.addAndReplace("password", Hash.getSHA256(passCode));
             }
             final GetRequest req = br.createGetRequest("https://api." + this.getHost() + "/contents/" + folderID + "?" + query.toString());
             req.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://" + this.getHost()));

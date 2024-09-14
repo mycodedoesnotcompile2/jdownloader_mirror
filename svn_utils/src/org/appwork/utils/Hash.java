@@ -33,12 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.zip.CRC32;
@@ -50,27 +50,11 @@ import org.appwork.utils.net.LimitedInputStream;
 import org.appwork.utils.net.NullOutputStream;
 
 public class Hash {
-    public static final String HASH_TYPE_SHA256 = "SHA-256";
-    public static final String HASH_TYPE_SHA512 = "SHA-512";
-    public static String       HASH_TYPE_MD5    = "md5";
-    public static String       HASH_TYPE_SHA1   = "SHA-1";
-
-    /**
-     * @param download
-     * @param hashType
-     * @return
-     */
-    public static String getBytesHash(final byte[] download, final String type) {
-        try {
-            return getHash(new ByteArrayInputStream(download), type, -1, true);
-        } catch (InterruptedException e) {
-            // restores the interrupted flag
-            Thread.currentThread().interrupt();
-        } catch (final Throwable e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+    private static final Charset UTF8             = Charset.forName("UTF-8");
+    public static final String   HASH_TYPE_SHA256 = "SHA-256";
+    public static final String   HASH_TYPE_SHA512 = "SHA-512";
+    public static String         HASH_TYPE_MD5    = "md5";
+    public static String         HASH_TYPE_SHA1   = "SHA-1";
 
     public static long getCRC32(final byte[] data) throws IOException {
         final CheckedOutputStream cos = new CheckedOutputStream(new NullOutputStream(), new CRC32());
@@ -95,17 +79,21 @@ public class Hash {
         }
     }
 
+    @Deprecated
     public static String getFileHash(final File arg, final String type) {
         return getFileHash(arg, type, -1);
     }
 
+    @Deprecated
     public static String getFileHash(final File arg, final String type, final long maxHash) {
         if (arg == null || !arg.exists() || arg.isDirectory()) {
             return null;
         }
         try {
-            return getHash(new FileInputStream(arg), type, maxHash, true);
+            return HexFormatter.byteArrayToHex(getHashBytes(new FileInputStream(arg), type, maxHash, true, true));
         } catch (FileNotFoundException ignore) {
+            return null;
+        } catch (IOException ignore) {
             return null;
         } catch (InterruptedException e) {
             // restores the interrupted flag
@@ -114,7 +102,7 @@ public class Hash {
         }
     }
 
-    public static byte[] getHashBytes(final InputStream is, final String type, final long maxRead, boolean closeStream) throws IOException, InterruptedException {
+    public static byte[] getHashBytes(final InputStream is, final String type, final long maxRead, final boolean closeStream, final boolean checkInterruptedFlag) throws IOException, InterruptedException {
         final InputStream inputStream;
         if (maxRead < 0) {
             inputStream = is;
@@ -125,7 +113,7 @@ public class Hash {
             final MessageDigest md = MessageDigest.getInstance(type);
             final byte[] buf = new byte[32767];
             while (true) {
-                if (Thread.interrupted()) {
+                if (checkInterruptedFlag && Thread.interrupted()) {
                     throw new InterruptedException();
                 }
                 final int read = inputStream.read(buf);
@@ -151,9 +139,10 @@ public class Hash {
         }
     }
 
+    @Deprecated
     public static String getHash(final InputStream is, final String type, final long maxRead, boolean closeStream) throws InterruptedException {
         try {
-            return HexFormatter.byteArrayToHex(getHashBytes(is, type, maxRead, closeStream));
+            return HexFormatter.byteArrayToHex(getHashBytes(is, type, maxRead, closeStream, true));
         } catch (IOException e) {
             return null;
         }
@@ -167,16 +156,13 @@ public class Hash {
         return Hash.getBytesHash(download, Hash.HASH_TYPE_MD5);
     }
 
+    @Deprecated
     public static String getMD5(final File arg) {
         return Hash.getFileHash(arg, Hash.HASH_TYPE_MD5);
     }
 
     public static String getMD5(final String arg) {
         return Hash.getStringHash(arg, Hash.HASH_TYPE_MD5);
-    }
-
-    public static String getSHA1(final File arg) {
-        return Hash.getFileHash(arg, Hash.HASH_TYPE_SHA1);
     }
 
     public static String getSHA1(final String arg) {
@@ -195,6 +181,7 @@ public class Hash {
      * @param f
      * @return
      */
+    @Deprecated
     public static String getSHA256(final File f) {
         return Hash.getFileHash(f, Hash.HASH_TYPE_SHA256);
     }
@@ -207,12 +194,25 @@ public class Hash {
         return Hash.getStringHash(createPostData, Hash.HASH_TYPE_SHA256);
     }
 
-    public static String getStringHash(final String arg, final String type) {
-        try {
-            return getBytesHash(arg.getBytes("UTF-8"), type);
-        } catch (final Throwable e) {
-            e.printStackTrace();
+    public static String getBytesHash(final byte[] data, final String type) {
+        if (data == null) {
+            return null;
         }
-        return null;
+        try {
+            final MessageDigest md = MessageDigest.getInstance(type);
+            md.update(data);
+            final byte[] digest = md.digest();
+            return HexFormatter.byteArrayToHex(digest);
+        } catch (final NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static String getStringHash(final String data, final String type) {
+        if (data == null) {
+            return null;
+        }
+        return getBytesHash(data.getBytes(UTF8), type);
     }
 }

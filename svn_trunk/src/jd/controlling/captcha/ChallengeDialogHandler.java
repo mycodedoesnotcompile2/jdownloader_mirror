@@ -150,7 +150,7 @@ public abstract class ChallengeDialogHandler<T extends Challenge<?>> {
         } catch (DialogNoAnswerException e) {
             /* no external response available */
             if (e.isCausedByInterrupt()) {
-                throw Exceptions.initCause(new InterruptedException("Dialog Interrupted"), e);
+                throw Exceptions.addSuppressed(new InterruptedException("Dialog Interrupted"), e);
             } else if (e.isCausedByTimeout()) {
                 throw new SkipException(captchaChallenge, SkipRequest.TIMEOUT, e);
             } else {

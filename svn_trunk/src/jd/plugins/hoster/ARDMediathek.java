@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49500 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 49781 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String             dllink                           = null;
     public static final String PROPERTY_CRAWLER_FORCED_FILENAME = "crawler_forced_filename";
@@ -165,7 +165,7 @@ public class ARDMediathek extends PluginForHost {
             try {
                 final Browser brc = br.cloneBrowser();
                 brc.getHeaders().put("Accept-Encoding", "identity");
-                con = brc.openHeadConnection(dllink);
+                con = brc.openGetConnection(dllink);
                 if (!looksLikeDownloadableContent(con, link)) {
                     connectionErrorhandling(con);
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -180,7 +180,8 @@ public class ARDMediathek extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser brc = br.cloneBrowser();
-                con = brc.openHeadConnection(dllink);
+                /* 2024-09-13: HEAD request is not possible anymore (for ardmediathek.de items). It will return http response code 403. */
+                con = brc.openGetConnection(dllink);
                 if (!looksLikeDownloadableContent(con, link)) {
                     /* Content should definitely be offline in this case! */
                     connectionErrorhandling(con);

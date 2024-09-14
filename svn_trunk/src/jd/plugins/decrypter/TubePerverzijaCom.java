@@ -29,7 +29,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 47355 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49781 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -81,8 +81,7 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             }
         }
         if (ret.isEmpty()) {
-            logger.info("Item offline or we failed to find any supported links");
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Item offline or plugin failed to find any supported links");
         }
         return ret;
     }
