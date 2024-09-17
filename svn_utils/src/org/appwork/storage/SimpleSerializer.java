@@ -50,6 +50,7 @@ import org.appwork.storage.simplejson.JSonNode;
 import org.appwork.storage.simplejson.JSonObject;
 import org.appwork.storage.simplejson.JsonObjectLinkedHashMap;
 import org.appwork.storage.simplejson.mapper.MapperException;
+import org.appwork.utils.AutoCloseInputStream;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -190,6 +191,14 @@ public class SimpleSerializer extends AbstractSerializer implements SerializerIn
             return getMapper(context).inputStreamToObject(stream, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
+        } finally {
+            if (stream instanceof AutoCloseInputStream) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    throw SerializerException.wrap(e);
+                }
+            }
         }
     }
 

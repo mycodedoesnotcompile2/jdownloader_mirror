@@ -107,6 +107,34 @@ public class WeisjJSVG {
             }
             return new SVGIcon(width, height) {
                 /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#getIconHeight()
+                 */
+                @Override
+                public int getIconHeight() {
+                    ensureDimensions();
+                    return super.getIconHeight();
+                }
+
+                private void ensureDimensions() {
+                    final com.github.weisj.jsvg.geometry.size.FloatSize size = svgDocument.size();
+                    if (super.getIconWidth() <= 0) {
+                        setIconWidth((int) size.getWidth());
+                    }
+                    if (super.getIconHeight() <= 0) {
+                        setIconHeight((int) size.getHeight());
+                    }
+                }
+
+                /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#getIconWidth()
+                 */
+                @Override
+                public int getIconWidth() {
+                    ensureDimensions();
+                    return super.getIconWidth();
+                }
+
+                /**
                  * @see org.appwork.utils.images.svg.SVGIcon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
                  */
                 @Override

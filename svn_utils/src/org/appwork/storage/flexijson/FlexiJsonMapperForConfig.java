@@ -98,7 +98,7 @@ public class FlexiJsonMapperForConfig extends FlexiJSonMapper {
                     return 0;
                 }
             });
-            ret.getCommentsBeforeKey().merge(true);
+            ret.getCommentsBeforeKey().merge(this, true);
         }
         return ret;
     }

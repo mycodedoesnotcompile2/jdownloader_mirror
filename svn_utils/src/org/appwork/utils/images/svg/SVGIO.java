@@ -152,7 +152,31 @@ public class SVGIO {
             diagram.updateTime(0d);
             diagram.setIgnoringClipHeuristic(true);
             return new SVGIcon(width, height) {
-                {
+                /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#getIconHeight()
+                 */
+                @Override
+                public int getIconHeight() {
+                    ensureDimensions();
+                    return super.getIconHeight();
+                }
+
+                private void ensureDimensions() {
+                    if (super.getIconWidth() <= 0) {
+                        setIconWidth((int) diagram.getWidth());
+                    }
+                    if (super.getIconHeight() <= 0) {
+                        setIconHeight((int) diagram.getHeight());
+                    }
+                }
+
+                /**
+                 * @see org.appwork.utils.images.svg.SVGIcon#getIconWidth()
+                 */
+                @Override
+                public int getIconWidth() {
+                    ensureDimensions();
+                    return super.getIconWidth();
                 }
 
                 /**

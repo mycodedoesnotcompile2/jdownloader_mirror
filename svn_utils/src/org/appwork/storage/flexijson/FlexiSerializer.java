@@ -52,6 +52,7 @@ import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
+import org.appwork.utils.AutoCloseInputStream;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -206,6 +207,14 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
             return getMapper(context).jsonToObject(node, type);
         } catch (Exception e) {
             throw SerializerException.wrap(e);
+        } finally {
+            if (stream instanceof AutoCloseInputStream) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    throw SerializerException.wrap(e);
+                }
+            }
         }
     }
 

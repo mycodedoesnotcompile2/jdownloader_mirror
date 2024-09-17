@@ -42,6 +42,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
@@ -198,10 +199,11 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
     }
 
     /**
+     * @param mapper
      * @param mergeDifferentTypes
      *
      */
-    public void merge(boolean mergeDifferentTypes) {
+    public void merge(FlexiJSonMapper mapper, boolean mergeDifferentTypes) {
         ArrayList<FlexiCommentJsonNode> newList = new ArrayList<FlexiCommentJsonNode>();
         StringBuilder sb = new StringBuilder();
         FlexiCommentJsonNode last = null;
@@ -210,7 +212,10 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
             if (c instanceof FlexiComment) {
                 if ((last != null && !mergeDifferentTypes && ((FlexiComment) c).getType() != ((FlexiComment) last).getType())) {
                     if (sb.length() > 0) {
-                        FlexiComment com = new FlexiComment(sb.toString(), ((FlexiComment) last).getType(), tags);
+                        FlexiComment com = mapper.createFlexiJsonComment(sb.toString(), null, ((FlexiComment) last).getType());
+                        for (FlexiMapperTags t : tags) {
+                            com.tag(t);
+                        }
                         com.setLocation(last.getLocation());
                         com.setParent(this);
                         newList.add(com);
@@ -228,7 +233,7 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
                 last = c;
             } else {
                 if (sb.length() > 0) {
-                    FlexiComment com = new FlexiComment(sb.toString(), ((FlexiComment) last).getType(), FlexiMapperTags.UNKNOWN);
+                    FlexiComment com = mapper.createFlexiJsonComment(sb.toString(), FlexiMapperTags.UNKNOWN, ((FlexiComment) last).getType());
                     com.setLocation(last.getLocation());
                     com.setParent(this);
                     newList.add(com);
@@ -239,7 +244,10 @@ public class FlexiJSonComments extends ArrayList<FlexiCommentJsonNode> implement
             }
         }
         if (sb.length() > 0) {
-            FlexiComment com = new FlexiComment(sb.toString(), ((FlexiComment) last).getType(), tags);
+            FlexiComment com = mapper.createFlexiJsonComment(sb.toString(), null, ((FlexiComment) last).getType());
+            for (FlexiMapperTags t : tags) {
+                com.tag(t);
+            }
             com.setLocation(last.getLocation());
             com.setParent(this);
             newList.add(com);

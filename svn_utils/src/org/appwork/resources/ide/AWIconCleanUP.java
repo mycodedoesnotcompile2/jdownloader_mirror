@@ -49,7 +49,6 @@ import org.appwork.utils.Files;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.ide.IDEUtils;
-import org.appwork.utils.os.CrossSystem;
 
 /**
  * @author thomas
@@ -85,9 +84,8 @@ public class AWIconCleanUP {
             File svgThemes = new File(new File(project, setup), icon + ".svg");
             File pngglobal = new File(new File(project, global), icon + ".png");
             File svgglobal = new File(new File(project, global), icon + ".svg");
-            if (!CrossSystem.caseSensitiveFileExists(pngglobal) && !CrossSystem.caseSensitiveFileExists(svgglobal) && !CrossSystem.caseSensitiveFileExists(pngThemes) && !CrossSystem.caseSensitiveFileExists(svgThemes)) {
+            if (!pngglobal.exists() && !svgglobal.exists() && !pngThemes.exists() && !svgThemes.exists()) {
                 System.err.println("Missing Icon!: " + icon + " " + clsMap.get(icon));
-
             } else {
                 System.out.println("OK icon: " + icon);
             }
@@ -102,7 +100,7 @@ public class AWIconCleanUP {
     private static void findUnused(final HashSet<String> icons, final File root) {
         org.appwork.utils.Files.walkThroughStructure(new FileHandler<RuntimeException>() {
             @Override
-            public void intro(File f) throws RuntimeException {                
+            public void intro(File f) throws RuntimeException {
             }
 
             @Override
@@ -119,7 +117,7 @@ public class AWIconCleanUP {
             }
 
             @Override
-            public void outro(File f) throws RuntimeException {                
+            public void outro(File f) throws RuntimeException {
             }
         }, root);
     }

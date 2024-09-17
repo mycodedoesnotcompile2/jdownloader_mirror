@@ -643,6 +643,7 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                     return (compareResult > 0);
                 }
             };
+
             protected abstract boolean opEval(int compareResult);
         }
 
@@ -1662,19 +1663,19 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
         return false;
     }
 
-    public static final ThreadLocal<List<TypeHandler>>         TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
-    public static final List<TypeHandler>                      GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
+    public static final ThreadLocal<List<TypeHandler>> TYPE_HANDLERS        = new ThreadLocal<List<TypeHandler>>();
+    public static final List<TypeHandler>              GLOBAL_TYPE_HANDLERS = new ArrayList<TypeHandler>();
     static {
         GLOBAL_TYPE_HANDLERS.add(new TimeSpanHandler());
         GLOBAL_TYPE_HANDLERS.add(new DateHandler());
     }
-    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS        = new ThreadLocal<Map<String, PathHandler>>();
+    public static final ThreadLocal<Map<String, PathHandler>>  PATH_HANDLERS    = new ThreadLocal<Map<String, PathHandler>>();
     /**
      *
      */
-    private static final long                                  serialVersionUID     = 1L;
-    public static final org.appwork.storage.TypeRef<Condition> TYPE                 = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
-                                                                                    };
+    private static final long                                  serialVersionUID = 1L;
+    public static final org.appwork.storage.TypeRef<Condition> TYPE             = new org.appwork.storage.TypeRef<Condition>(Condition.class) {
+                                                                                };
     static {
         IGNORE.add($OPTIONS);
     }
@@ -2396,7 +2397,12 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
                         ret = new Scope(now.get());
                         continue;
                     } else if ($TYPE.equalsIgnoreCase(keyAsString)) {
-                        ret.add(ret.getLast().getClass().getName(), keyAsString);
+                        Object last = ret.getLast();
+                        if (last == null) {
+                            ret.add(KEY_DOES_NOT_EXIST, keyOrg);
+                        } else {
+                            ret.add(ret.getLast().getClass().getName(), keyAsString);
+                        }
                         continue;
                     } else if ($KEYS.equalsIgnoreCase(keyAsString)) {
                         ret.add(this.listKeys(ret.getLast()), keyOrg);

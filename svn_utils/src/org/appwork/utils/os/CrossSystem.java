@@ -60,7 +60,6 @@ import java.util.regex.Pattern;
 import javax.swing.KeyStroke;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Regex;
@@ -170,7 +169,7 @@ public class CrossSystem {
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
         /*
          * https://www.debian.org/releases/
-         *
+         * 
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -187,7 +186,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         *
+         * 
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -199,9 +198,9 @@ public class CrossSystem {
         RASPBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         *
+         * 
          * https://wiki.ubuntu.com/Releases
-         *
+         * 
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -573,7 +572,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         *
+         * 
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -665,43 +664,6 @@ public class CrossSystem {
             CrossSystem.JAVAINT = javaBinary;
         }
         return CrossSystem.JAVAINT;
-    }
-
-    public static boolean caseSensitiveFileExists(final File file) {
-        if (file != null) {
-            if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
-                try {
-                    /**
-                     * this is very fast
-                     */
-                    return CrossSystem17.caseSensitiveFileExists(file);
-                } catch (Throwable e) {
-                    LogV3.defaultLogger().log(e);
-                }
-            }
-            if (file.exists()) {
-                /** this can be slow **/
-                File current = file;
-                String currentName = current.getName();
-                loop: while ((current = current.getParentFile()) != null) {
-                    final String[] list = current.list();
-                    if (list != null) {
-                        for (String listItem : list) {
-                            if (currentName.equals(listItem)) {
-                                currentName = current.getName();
-                                continue loop;
-                            }
-                        }
-                    }
-                    return false;
-                }
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
     }
 
     private static long parseMacOSVersion(final String osVersionProperty) {

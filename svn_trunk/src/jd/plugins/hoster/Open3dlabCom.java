@@ -22,6 +22,7 @@ import java.util.Locale;
 
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.config.Open3dlabComConfig;
+import org.jdownloader.plugins.components.config.Open3dlabComConfigSfmlabCom;
 import org.jdownloader.plugins.components.config.Open3dlabComConfigSmutbaSe;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
@@ -38,7 +39,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49689 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49799 $", interfaceVersion = 3, names = {}, urls = {})
 public class Open3dlabCom extends PluginForHost {
     public Open3dlabCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -254,6 +255,8 @@ public class Open3dlabCom extends PluginForHost {
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         if (this.getHost().equals("open3dlab.com")) {
             return Open3dlabComConfig.class;
+        } else if (this.getHost().equals("sfmlab.com")) {
+            return Open3dlabComConfigSfmlabCom.class;
         } else {
             return Open3dlabComConfigSmutbaSe.class;
         }

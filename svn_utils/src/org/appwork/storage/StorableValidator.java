@@ -71,8 +71,8 @@ import org.appwork.storage.flexijson.JSPath;
 import org.appwork.storage.flexijson.KeyValueElement;
 import org.appwork.storage.flexijson.NodeFilter;
 import org.appwork.storage.flexijson.mapper.ClassCastFlexiMapperException;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiEnumFallback;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
@@ -1024,7 +1024,7 @@ public class StorableValidator<T> {
          */
         public ValidatetoDoss(FlexiJSonNode node, Object value, CompiledType type, Property context, JSPath path) {
             this.node = node;
-            // DebugMode.breakIf(node == null, null);
+            // DebugMode.breakIf(node == null);
             this.context = context;
             this.path = path;
             this.value = value;
