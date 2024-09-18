@@ -19,7 +19,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49799 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49808 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,7 +39,7 @@ public class SaintTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://saint.to/faq";
+        return "https://" + getHost() + "/faq";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -130,7 +130,7 @@ public class SaintTo extends PluginForHost {
             }
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             handleConnectionErrors(br, dl.getConnection());
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }

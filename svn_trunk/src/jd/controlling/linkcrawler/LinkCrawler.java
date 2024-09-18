@@ -70,6 +70,7 @@ import org.appwork.utils.logging2.ClearableLogInterface;
 import org.appwork.utils.logging2.ClosableLogInterface;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
@@ -1690,6 +1691,31 @@ public class LinkCrawler {
         }
     }
 
+    private Map<String, String> findPropertyPatternMatches(final Browser br, final LinkCrawlerRule rule) {
+        final Map<String, List<Pattern>> patternmap = rule._getPropertyPatterns();
+        if (patternmap == null) {
+            return null;
+        }
+        final Map<String, String> results = new HashMap<String, String>();
+        patternmapLoop: for (final Entry<String, List<Pattern>> entry : patternmap.entrySet()) {
+            final String key = entry.getKey();
+            for (final Pattern pattern : entry.getValue()) {
+                final Regex regex = new Regex(br, pattern);
+                if (!regex.patternFind()) {
+                    continue;
+                }
+                String match = new Regex(br, pattern).getMatch(0);
+                if (match == null) {
+                    match = regex.getMatch(-1);
+                }
+                results.put(key, match);
+                /* Take first match */
+                break;
+            }
+        }
+        return results;
+    }
+
     /** Opens connection */
     protected final BrowserCrawledLink openCrawlDeeperConnectionV2(final CrawledLink source, final LinkCrawlerRule matchingRule, final Browser br, final Request req) throws Exception {
         if (req == null) {
@@ -2498,13 +2524,22 @@ public class LinkCrawler {
                                 } else {
                                     maybeURL = checkParam.replaceFirst("^:?/?/?", "");
                                 }
+                                final boolean guessProtocol;
                                 final URL dummyURL;
                                 if (HTMLParser.getProtocol(maybeURL) == null) {
+                                    guessProtocol = true;
                                     dummyURL = new URL("http://" + maybeURL.replaceFirst("^(.+?://)", ""));
                                 } else {
+                                    guessProtocol = false;
                                     dummyURL = new URL(maybeURL);
                                 }
-                                if (dummyURL != null && dummyURL.getHost() != null && dummyURL.getHost().contains(".") && (StringUtils.isNotEmpty(dummyURL.getFile()) || StringUtils.isNotEmpty(dummyURL.getRef()))) {
+                                final boolean validPublicSuffix = PublicSuffixList.getInstance().getDomain(dummyURL.getHost()) != null;
+                                // TODO: add support for literal IPs
+                                if (validPublicSuffix && dummyURL.getHost() != null && dummyURL.getHost().contains(".") && (StringUtils.isNotEmpty(dummyURL.getFile()) || (!guessProtocol && StringUtils.isNotEmpty(dummyURL.getRef())))) {
+                                    // URL must have:
+                                    // -valid host(with at least one dot)
+                                    // -non empty file
+                                    // -or valid protocol and ref
                                     possibleEmbeddedLinks.add(dummyURL.toString());
                                 }
                             } catch (final MalformedURLException e) {

@@ -2,9 +2,13 @@ package jd.controlling.linkcrawler;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -22,11 +26,12 @@ public class LinkCrawlerRule {
         FOLLOWREDIRECT
     }
 
-    protected boolean        enabled       = true;
-    protected List<String[]> cookies       = null;
-    protected List<String[]> headers       = null;
-    protected boolean        updateCookies = false;
-    protected boolean        logging       = false;
+    protected boolean                    enabled          = true;
+    protected Object                     cookies          = null;
+    protected List<String[]>             headers          = null;
+    protected Map<String, List<Pattern>> propertyPatterns = null;
+    protected boolean                    updateCookies    = false;
+    protected boolean                    logging          = false;
 
     public boolean isLogging() {
         return logging;
@@ -44,11 +49,37 @@ public class LinkCrawlerRule {
         this.updateCookies = updateCookies;
     }
 
-    public List<String[]> getCookies() {
+    public List<String[]> getCookiesList() {
+        if (!(this.cookies instanceof List)) {
+            return null;
+        }
+        return (List<String[]>) this.cookies;
+    }
+
+    public Object getCookies() {
         return cookies;
     }
 
-    public void setCookies(List<String[]> cookies) {
+    public void setCookies(final Object obj) {
+        final Cookies cookies = Cookies.parseCookiesFromObject(obj, null);
+        if (cookies == null) {
+            setCookiesList(null);
+            return;
+        }
+        final List<String[]> cookielist = new ArrayList<String[]>();
+        for (final Cookie cookie : cookies.getCookies()) {
+            if (cookie.getHost() != null) {
+                final String[] cookiearray = new String[] { cookie.getKey(), cookie.getValue(), cookie.getHost() };
+                cookielist.add(cookiearray);
+            } else {
+                final String[] cookiearray = new String[] { cookie.getKey(), cookie.getValue() };
+                cookielist.add(cookiearray);
+            }
+        }
+        setCookiesList(cookielist);
+    }
+
+    public void setCookiesList(final List<String[]> cookies) {
         this.cookies = cookies;
     }
 
@@ -58,6 +89,54 @@ public class LinkCrawlerRule {
 
     public void setHeaders(List<String[]> headers) {
         this.headers = headers;
+    }
+
+    public Map<String, Object> getPropertyPatterns() {
+        if (propertyPatterns == null) {
+            return null;
+        }
+        final Map<String, Object> propertyPatternsO = new HashMap<String, Object>();
+        for (final Entry<String, List<Pattern>> entry : propertyPatterns.entrySet()) {
+            final List<String> patternsStr = new ArrayList<String>();
+            for (final Pattern pattern : entry.getValue()) {
+                patternsStr.add(pattern.pattern());
+            }
+            propertyPatternsO.put(entry.getKey(), patternsStr);
+        }
+        return propertyPatternsO;
+    }
+
+    public Map<String, List<Pattern>> _getPropertyPatterns() {
+        return propertyPatterns;
+    }
+
+    public void setPropertyPatterns(final Map<String, Object> propertyPatterns) {
+        if (propertyPatterns == null) {
+            this.propertyPatterns = null;
+            return;
+        }
+        final Map<String, List<Pattern>> compiledPropertiesPatternMap = new HashMap<String, List<Pattern>>();
+        for (final Entry<String, Object> entry : propertyPatterns.entrySet()) {
+            final String key = entry.getKey();
+            if (StringUtils.isEmpty(key)) {
+                /* Invalid item */
+                continue;
+            }
+            final Object value = entry.getValue();
+            final List<Pattern> patterns = new ArrayList<Pattern>();
+            if (value instanceof String) {
+                patterns.add(Pattern.compile(value.toString()));
+            } else if (value instanceof List) {
+                for (final String regexStr : (List<String>) value) {
+                    patterns.add(Pattern.compile(regexStr));
+                }
+            } else {
+                /* Ignore */
+                continue;
+            }
+            compiledPropertiesPatternMap.put(key, patterns);
+        }
+        this.propertyPatterns = compiledPropertiesPatternMap;
     }
 
     protected int maxDecryptDepth = 0;
@@ -120,7 +199,7 @@ public class LinkCrawlerRule {
                     updateCookies.add(new String[] { cookie.getKey(), cookie.getValue() });
                 }
             }
-            setCookies(updateCookies);
+            setCookiesList(updateCookies);
             // TODO: add support for length==3, url pattern matching support
             return true;
         }
@@ -136,7 +215,7 @@ public class LinkCrawlerRule {
         if (onlyOnPatternMatch && !matches(url)) {
             return false;
         }
-        final List<String[]> cookies = getCookies();
+        final List<String[]> cookies = getCookiesList();
         if (cookies == null || cookies.size() == 0) {
             return false;
         }
@@ -179,7 +258,7 @@ public class LinkCrawlerRule {
     }
 
     public boolean applyHeaders(final Browser br, final String url) {
-        final List<String[]> headers = getCookies();
+        final List<String[]> headers = getHeaders();
         if (headers == null || headers.size() == 0) {
             return false;
         }

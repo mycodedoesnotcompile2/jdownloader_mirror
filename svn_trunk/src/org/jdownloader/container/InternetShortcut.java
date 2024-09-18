@@ -30,7 +30,7 @@ import org.appwork.utils.StringUtils;
 
 public class InternetShortcut extends PluginsC {
     public InternetShortcut() {
-        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 49372 $");
+        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 49815 $");
     }
 
     public InternetShortcut newPluginInstance() {
@@ -38,8 +38,7 @@ public class InternetShortcut extends PluginsC {
     }
 
     @Override
-    protected boolean isDeleteContainer(CrawledLink link, File file) {
-        return false;
+    protected void deleteContainer(CrawledLink source, File file) {
     }
 
     public ContainerStatus callDecryption(File lc) {

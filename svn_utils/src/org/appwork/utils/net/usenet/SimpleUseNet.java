@@ -407,6 +407,9 @@ public abstract class SimpleUseNet {
     public synchronized InputStream requestMessageBodyAsInputStream(final String messageID, boolean autoDecode) throws IOException {
         final CommandResponse response = sendCmd(COMMAND.BODY, wrapMessageID(messageID));
         switch (response.getResponseCode()) {
+        case 220:
+            // nzbget --nserv responds with 220
+            break;
         case 222:
             break;
         case 430:
@@ -417,7 +420,7 @@ public abstract class SimpleUseNet {
         if (!autoDecode) {
             return new BodyInputStream(this);
         } else {
-            final ByteArrayOutputStream buffer = new ByteArrayOutputStream() {
+            final ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024 * 1024) {
                 @Override
                 public synchronized byte[] toByteArray() {
                     return buf;
@@ -427,11 +430,11 @@ public abstract class SimpleUseNet {
                 buffer.reset();
                 final int lineLength = readLine(getInputStream(), buffer);
                 if (lineLength > 0) {
-                    String line = new String(buffer.toByteArray(), 0, lineLength, getCharSet());
+                    final String line = new String(buffer.toByteArray(), 0, lineLength, getCharSet());
                     logger.info("Read Response:" + line);
                     if (line.startsWith("=ybegin")) {
                         logger.info("yEnc Body detected");
-                        return new YEncInputStream(this, messageID, buffer);
+                        return newYEncInputStream(this, messageID, buffer);
                     }
                     if (line.matches("^begin \\d{3} .+")) {
                         logger.info("uuEncode Body detected");
@@ -443,6 +446,10 @@ public abstract class SimpleUseNet {
             }
             throw new IOException("Unknown Body Format");
         }
+    }
+
+    protected YEncInputStream newYEncInputStream(SimpleUseNet simpleUseNet, String messageID, ByteArrayOutputStream buffer) throws IOException {
+        return new YEncInputStream(simpleUseNet, messageID, buffer);
     }
 
     private synchronized void sendCommand(String request) throws IOException {

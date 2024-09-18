@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import jd.parser.Regex;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.ReflectionUtils;
@@ -206,15 +207,53 @@ public class Cookies {
      * Firefox: FlagThisCookie: https://github.com/jrie/flagCookies
      */
     public static Cookies parseCookiesFromJsonString(final String jsonStr, final LogInterface logger) {
+        if (jsonStr == null || (!jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") && !jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$"))) {
+            return null;
+        }
+        try {
+            final Object jsonO = JSonStorage.restoreFromString(jsonStr, TypeRef.OBJECT);
+            return parseCookiesFromObject(jsonO, logger);
+        } catch (final JSonMapperException jme) {
+            if (logger != null) {
+                logger.exception(HexFormatter.byteArrayToHex(String.valueOf(jsonStr).getBytes()), jme);
+                logger.info("Failed to parse cookie json");
+            }
+            return null;
+        }
+    }
+
+    public static Cookies parseCookiesFromObject(final Object jsonO, final LogInterface logger) {
+        if(jsonO == null) {
+            return null;
+        }
         try {
             final long timeStamp = Time.timestamp();
-            if (jsonStr != null && (jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") || jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$"))) {
-                final Object jsonO = JSonStorage.restoreFromString(jsonStr, TypeRef.OBJECT);
-                if (jsonO instanceof List) {
-                    final Cookies cookies = new Cookies();
-                    /* E.g. cookies exported via browser addon 'EditThisCookie' */
-                    final List<Object> cookiesO = (List<Object>) jsonO;
-                    for (final Object cookieO : cookiesO) {
+            if (jsonO instanceof List) {
+                /* Cookies from EditThisCookie or JDownloaders' proprietary cookie list format */
+                final Cookies cookies = new Cookies();
+                final List<Object> cookiesO = (List<Object>) jsonO;
+                for (final Object cookieO : cookiesO) {
+                    final Cookie cookie = new Cookie();
+                    if (cookieO instanceof List) {
+                        /* JDownloaders' cookies from LinkCrawler rule: List of lists */
+                        final List<String> cookiesList = (List<String>) cookieO;
+                        final int listSize = cookiesList.size();
+                        if (listSize == 1) {
+                            cookie.setKey(cookiesList.get(0));
+                        } else if (listSize == 2) {
+                            cookie.setKey(cookiesList.get(0));
+                            cookie.setValue(cookiesList.get(1));
+                        } else if (listSize == 3) {
+                            // TODO: Review this
+                            cookie.setKey(cookiesList.get(0));
+                            cookie.setValue(cookiesList.get(1));
+                            cookie.setHost(cookiesList.get(2));
+                        } else {
+                            // wtf
+                            continue;
+                        }
+                    } else {
+                        /* Cookies exported via browser addon 'EditThisCookie': https://www.editthiscookie.com/ */
                         final Map<String, Object> cookieInfo = (Map<String, Object>) cookieO;
                         final String domain = (String) cookieInfo.get("domain");
                         final String key = (String) cookieInfo.get("name");
@@ -225,7 +264,6 @@ public class Cookies {
                             /* Skip invalid objects */
                             continue;
                         }
-                        final Cookie cookie = new Cookie();
                         cookie.setHost(domain);
                         cookie.setPath(path);
                         cookie.setDomain(domain);
@@ -238,92 +276,92 @@ public class Cookies {
                         cookie.setKey(key);
                         cookie.setValue(value);
                         cookie.setSecure(secure);
-                        if (false && cookie.getExpireDate() >= 0) {
-                            cookie.setHostTime(timeStamp);
-                            cookie.setCreationTime(timeStamp);
-                            if (cookie.isExpired()) {
-                                logger.info("Skip expired cookie:" + cookie);
-                                continue;
-                            }
-                        }
                         cookies.add(cookie);
                     }
-                    if (cookies.isEmpty()) {
-                        throw new Exception("no parsed cookies!?");
-                    } else {
-                        return cookies;
-                    }
-                } else if (jsonO instanceof Map) {
-                    final Cookies cookies = new Cookies();
-                    /* E.g. cookies exported via browser addon 'FlagCookies' */
-                    final Map<String, Object> cookieMap = (Map<String, Object>) jsonO;
-                    final String userAgent = (String) cookieMap.get("userAgent");
-                    cookies.setUserAgent(userAgent);
-                    final Iterator<Entry<String, Object>> iteratorOuter = cookieMap.entrySet().iterator();
-                    while (iteratorOuter.hasNext()) {
-                        final Entry<String, Object> entryOuter = iteratorOuter.next();
-                        if (!(entryOuter.getValue() instanceof Map)) {
-                            /* Skip invalid entries */
+                    if (false && cookie.getExpireDate() >= 0) {
+                        cookie.setHostTime(timeStamp);
+                        cookie.setCreationTime(timeStamp);
+                        if (cookie.isExpired()) {
+                            logger.info("Skip expired cookie:" + cookie);
                             continue;
                         }
-                        /* Go through all domains */
-                        final Iterator<Entry<String, Object>> iteratorDomain = ((Map<String, Object>) entryOuter.getValue()).entrySet().iterator();
-                        while (iteratorDomain.hasNext()) {
-                            final Entry<String, Object> entryDomain = iteratorDomain.next();
-                            /* Go through cookie objects */
-                            final Iterator<Entry<String, Object>> iteratorCookies = ((Map<String, Object>) entryDomain.getValue()).entrySet().iterator();
-                            while (iteratorCookies.hasNext()) {
-                                final Entry<String, Object> entryCookie = iteratorCookies.next();
-                                final Map<String, Object> cookieInfo = (Map<String, Object>) entryCookie.getValue();
-                                final String domain = (String) cookieInfo.get("domain");
-                                final String key = (String) cookieInfo.get("name");
-                                final String value = (String) cookieInfo.get("value");
-                                final String path = (String) cookieInfo.get("path");
-                                final boolean secure = ((Boolean) cookieInfo.get("secure")).booleanValue();
-                                if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
-                                    /* Skip invalid objects */
+                    }
+                    cookies.add(cookie);
+                }
+                if (cookies.isEmpty()) {
+                    throw new Exception("no parsed cookies!?");
+                } else {
+                    return cookies;
+                }
+            } else if (jsonO instanceof Map) {
+                final Cookies cookies = new Cookies();
+                /* E.g. cookies exported via browser addon 'FlagCookies' */
+                final Map<String, Object> cookieMap = (Map<String, Object>) jsonO;
+                final String userAgent = (String) cookieMap.get("userAgent");
+                cookies.setUserAgent(userAgent);
+                final Iterator<Entry<String, Object>> iteratorOuter = cookieMap.entrySet().iterator();
+                while (iteratorOuter.hasNext()) {
+                    final Entry<String, Object> entryOuter = iteratorOuter.next();
+                    if (!(entryOuter.getValue() instanceof Map)) {
+                        /* Skip invalid entries */
+                        continue;
+                    }
+                    /* Go through all domains */
+                    final Iterator<Entry<String, Object>> iteratorDomain = ((Map<String, Object>) entryOuter.getValue()).entrySet().iterator();
+                    while (iteratorDomain.hasNext()) {
+                        final Entry<String, Object> entryDomain = iteratorDomain.next();
+                        /* Go through cookie objects */
+                        final Iterator<Entry<String, Object>> iteratorCookies = ((Map<String, Object>) entryDomain.getValue()).entrySet().iterator();
+                        while (iteratorCookies.hasNext()) {
+                            final Entry<String, Object> entryCookie = iteratorCookies.next();
+                            final Map<String, Object> cookieInfo = (Map<String, Object>) entryCookie.getValue();
+                            final String domain = (String) cookieInfo.get("domain");
+                            final String key = (String) cookieInfo.get("name");
+                            final String value = (String) cookieInfo.get("value");
+                            final String path = (String) cookieInfo.get("path");
+                            final boolean secure = ((Boolean) cookieInfo.get("secure")).booleanValue();
+                            if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(key) || StringUtils.isEmpty(value) || StringUtils.isEmpty(path)) {
+                                /* Skip invalid objects */
+                                continue;
+                            }
+                            final Cookie cookie = new Cookie();
+                            cookie.setHost(domain);
+                            cookie.setPath(path);
+                            cookie.setDomain(domain);
+                            final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
+                            if (expirationDate != null) {
+                                cookie.setExpireDate(expirationDate.longValue());
+                            } else {
+                                cookie.setExpireDate(-1);
+                            }
+                            cookie.setKey(key);
+                            cookie.setValue(value);
+                            cookie.setSecure(secure);
+                            if (false && cookie.getExpireDate() >= 0) {
+                                cookie.setHostTime(timeStamp);
+                                cookie.setCreationTime(timeStamp);
+                                if (cookie.isExpired()) {
+                                    logger.info("Skip expired cookie:" + cookie);
                                     continue;
                                 }
-                                final Cookie cookie = new Cookie();
-                                cookie.setHost(domain);
-                                cookie.setPath(path);
-                                cookie.setDomain(domain);
-                                final Long expirationDate = Cookies.parseTimestamp(cookieInfo.get("expirationDate"));
-                                if (expirationDate != null) {
-                                    cookie.setExpireDate(expirationDate.longValue());
-                                } else {
-                                    cookie.setExpireDate(-1);
-                                }
-                                cookie.setKey(key);
-                                cookie.setValue(value);
-                                cookie.setSecure(secure);
-                                if (false && cookie.getExpireDate() >= 0) {
-                                    cookie.setHostTime(timeStamp);
-                                    cookie.setCreationTime(timeStamp);
-                                    if (cookie.isExpired()) {
-                                        logger.info("Skip expired cookie:" + cookie);
-                                        continue;
-                                    }
-                                }
-                                cookies.add(cookie);
                             }
+                            cookies.add(cookie);
                         }
                     }
-                    if (cookies.isEmpty()) {
-                        throw new Exception("no parsed cookies!?");
-                    } else {
-                        return cookies;
-                    }
+                }
+                if (cookies.isEmpty()) {
+                    throw new Exception("no parsed cookies!?");
                 } else {
-                    /* Unknown/Unsupported format */
-                    throw new WTFException("unknown/unsupported format");
+                    return cookies;
                 }
             } else {
-                return null;
+                /* Unknown/Unsupported format */
+                throw new WTFException("unknown/unsupported format");
             }
-        } catch (final Throwable e) {
+        } catch (final Exception e) {
             if (logger != null) {
-                logger.exception(HexFormatter.byteArrayToHex(String.valueOf(jsonStr).getBytes()), e);
+                logger.log(e);
+                logger.info("Failed to process cookie object: Invalid/unsupported format?");
             }
             return null;
         }

@@ -29,7 +29,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 
 public class JD2AccountsImport extends PluginsC {
     public JD2AccountsImport() {
-        super("JD2 Accountdatabase Import", "file:/.+(org\\.jdownloader\\.settings\\.AccountSettings\\.accounts\\.ejs)$", "$Revision: 49093 $");
+        super("JD2 Accountdatabase Import", "file:/.+(org\\.jdownloader\\.settings\\.AccountSettings\\.accounts\\.ejs)$", "$Revision: 49815 $");
     }
 
     public JD2AccountsImport newPluginInstance() {
@@ -47,8 +47,7 @@ public class JD2AccountsImport extends PluginsC {
     }
 
     @Override
-    protected boolean isDeleteContainer(CrawledLink link, File file) {
-        return false;
+    protected void deleteContainer(CrawledLink source, File file) {
     }
 
     public ContainerStatus callDecryption(final File ejsFile) {

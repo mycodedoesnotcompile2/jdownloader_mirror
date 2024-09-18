@@ -62,7 +62,7 @@ public class YEncInputStream extends InputStream {
 
         private final int index;
 
-        protected YEncIndexException(final int index) {
+        public YEncIndexException(final int index) {
             super("part-index-error:" + index + "<->" + YEncInputStream.this.getPartIndex() + "|yEncTrailer:" + getYEncTrailer());
             this.index = index;
             this.messageID = getMessageID();
@@ -94,7 +94,7 @@ public class YEncInputStream extends InputStream {
             return isMultiPart;
         }
 
-        protected YEncSizeException(final long size) {
+        public YEncSizeException(final long size) {
             super((YEncInputStream.this.isMultiPart() ? "part-" : "") + "size-error:" + size + "<->" + YEncInputStream.this.getPartSize() + "|yEncTrailer:" + getYEncTrailer());
             this.size = size;
             this.expected = getPartSize();
@@ -144,7 +144,6 @@ public class YEncInputStream extends InputStream {
     private boolean                     eof          = false;
     protected final static Pattern      NUMBER       = Pattern.compile("\\d+");
     protected final static Pattern      CRC32        = Pattern.compile("[a-fA-F0-9]+");
-
     private final static byte           LF           = '\n';
     private final static byte           CR           = '\r';
     private final static byte           ESCAPE       = '=';
@@ -192,6 +191,7 @@ public class YEncInputStream extends InputStream {
     private final int          partTotal;
     private final SimpleUseNet client;
     private final String       messageID;
+    private final byte[]       lineBuffer;
 
     public String getMessageID() {
         return messageID;
@@ -253,11 +253,24 @@ public class YEncInputStream extends InputStream {
             partBegin = -1;
             partEnd = -1;
         }
-        encodedBuffer = new byte[8192];
-        decodedBuffer = new byte[encodedBuffer.length];
+        lineBuffer = initLineBuffer(getLineLength());
+        encodedBuffer = initEncodedBuffer();
+        decodedBuffer = initDecodedBuffer();
         if (encodedBuffer.length < 5) {
             throw new IllegalArgumentException("encodedBuffer requires minimum size of 5 '=yend'!");
         }
+    }
+
+    protected byte[] initLineBuffer(final int lineLength) {
+        return lineLength > 0 ? new byte[lineLength] : null;
+    }
+
+    protected byte[] initEncodedBuffer() {
+        return new byte[256 * 1024];
+    }
+
+    protected byte[] initDecodedBuffer() {
+        return new byte[encodedBuffer.length];
     }
 
     public int getDecodedBufferSize() {
@@ -293,7 +306,7 @@ public class YEncInputStream extends InputStream {
         }
     }
 
-    private synchronized final int readNextDecodedBytes(final byte[] b, final int off, final int len) throws IOException {
+    private final int readNextDecodedBytes(final byte[] b, final int off, final int len) throws IOException {
         if (len > 0) {
             if (decodedIndex < decodedLength) {
                 final int ret = Math.min(len, decodedLength - decodedIndex);
@@ -309,10 +322,21 @@ public class YEncInputStream extends InputStream {
     }
 
     private final byte[] encodedBuffer;
-    private int          encodedLength = 0;
 
-    private int indexOf(byte[] buf, int size, byte indexOf) {
-        for (int index = 0; index < size; index++) {
+    private int indexOf(byte[] buf, final int startIndex, final int len, final byte indexOf) {
+        final int lineLength = this.getLineLength();
+        if (lineLength > 0 && len > (lineLength * 3)) {
+            final int lineEndIndex = startIndex + lineLength;
+            if (buf[lineEndIndex + 1] == indexOf) {
+                // normal line
+                return lineEndIndex + 1;
+            } else if (buf[lineEndIndex + 2] == indexOf) {
+                // dot line
+                return lineEndIndex + 2;
+            }
+        }
+        final int endIndex = startIndex + len;
+        for (int index = startIndex; index < endIndex; index++) {
             if (buf[index] == indexOf) {
                 return index;
             }
@@ -320,16 +344,24 @@ public class YEncInputStream extends InputStream {
         return -1;
     }
 
-    private byte[] removeCRLF(final byte[] buf, final int length) {
-        final byte[] ret = new byte[length];
+    private byte[] removeCRLF(final byte[] buf, final int startIndex, int endIndex) {
+        int length = endIndex - startIndex;
+        if (buf[endIndex - 1] == CR) {
+            // skip CR at the end, in best case we can return ret in complete
+            length -= 1;
+            endIndex -= 1;
+        }
+        final byte[] ret = (length == getLineLength() && lineBuffer != null) ? lineBuffer : new byte[length];
         int count = 0;
-        for (int index = 0; index < ret.length; index++) {
+        for (int index = startIndex; index < endIndex; index++) {
             final byte b = buf[index];
             if (b != CR && b != LF) {
                 ret[count++] = b;
             }
         }
-        if (count == 0) {
+        if (count == length) {
+            return ret;
+        } else if (count == 0) {
             // empty line
             return null;
         } else {
@@ -337,33 +369,47 @@ public class YEncInputStream extends InputStream {
         }
     }
 
-    private synchronized final int decodeLine() throws IOException {
-        final int lf_index = indexOf(encodedBuffer, encodedLength, LF);
+    private int encodedReadIndex = 0;
+    private int encodedLength    = 0;
+
+    private final int decodeLine() throws IOException {
+        final int encodedReadIndex = this.encodedReadIndex;
+        final int encodedLeft = encodedLength - encodedReadIndex;
+        final int lf_index = indexOf(encodedBuffer, encodedReadIndex, encodedLeft, LF);
         if (lf_index == -1) {
             return 0;
-        } else if (encodedBuffer[0] == '=' && encodedBuffer[1] == 'y' && encodedBuffer[2] == 'e' && encodedBuffer[3] == 'n' && encodedBuffer[4] == 'd') {
+        } else if (encodedBuffer[encodedReadIndex] == '=' && encodedBuffer[encodedReadIndex + 1] == 'y' && encodedBuffer[encodedReadIndex + 2] == 'e' && encodedBuffer[encodedReadIndex + 3] == 'n' && encodedBuffer[encodedReadIndex + 4] == 'd') {
             eof = true;
-            final PushbackInputStream inputStream = new PushbackInputStream(getInputStream(), encodedLength);
-            inputStream.unread(encodedBuffer, 0, encodedLength);
+            final PushbackInputStream inputStream = new PushbackInputStream(getInputStream(), encodedLeft);
+            inputStream.unread(encodedBuffer, encodedReadIndex, encodedLeft);
+            encodedLength = 0;
+            this.encodedReadIndex = 0;
             parseTrailer(inputStream);
             return 0;
         } else {
-            final byte[] buf = removeCRLF(encodedBuffer, lf_index);
+            final byte[] buf = removeCRLF(encodedBuffer, encodedReadIndex, lf_index);
+            final int bufLen = buf.length;
             int decoded = 0;
             if (buf != null) {
                 int index = 0;
-                if (buf.length > 1 && buf[0] == DOT && buf[1] == DOT) {
+                if (bufLen > 1 && buf[0] == DOT && buf[1] == DOT) {
                     // special nntp double dot handling
                     index++;
                 }
-                while (index < buf.length) {
+                while (index < bufLen) {
                     byte b = buf[index++];
                     switch (b) {
-                    case LF:
-                    case CR:
-                        continue;
+                    /*
+                     * see removeCRLF
+                     * 
+                     * case LF:
+                     * 
+                     * case CR:
+                     * 
+                     * continue;
+                     */
                     case ESCAPE:
-                        escape: while (index < buf.length) {
+                        escape: while (index < bufLen) {
                             b = buf[index++];
                             switch (b) {
                             case LF:
@@ -382,13 +428,10 @@ public class YEncInputStream extends InputStream {
                     }
                 }
             }
-            if (lf_index < encodedLength) {
-                final int encodedLeft = encodedLength - lf_index - 1;
-                if (encodedLeft > 0) {
-                    System.arraycopy(encodedBuffer, lf_index + 1, encodedBuffer, 0, encodedLeft);
-                }
-                encodedLength = encodedLeft;
+            if (lf_index + 1 < encodedLength) {
+                this.encodedReadIndex = lf_index + 1;
             } else {
+                this.encodedReadIndex = 0;
                 encodedLength = 0;
             }
             decodedBytes += decoded;
@@ -400,19 +443,24 @@ public class YEncInputStream extends InputStream {
         }
     }
 
-    private synchronized final int fillDecodedBuffer() throws IOException {
+    private final int fillDecodedBuffer() throws IOException {
         if (decodedIndex < decodedLength) {
             return decodedLength - decodedIndex;
+        } else if (eof) {
+            return -1;
         } else {
             decodedIndex = 0;
             decodedLength = 0;
-            int lineDecoded = decodeLine();
-            if (lineDecoded > 0) {
-                decodedLength += lineDecoded;
-                return decodedLength - decodedIndex;
-            } else if (eof) {
+            if (eof) {
                 return -1;
             } else {
+                if (encodedReadIndex > 0) {
+                    // left shift remaining data
+                    final int encodedLeft = encodedLength - encodedReadIndex;
+                    System.arraycopy(encodedBuffer, encodedReadIndex, encodedBuffer, 0, encodedLeft);
+                    encodedReadIndex = 0;
+                    encodedLength = encodedLeft;
+                }
                 final int maxRead = encodedBuffer.length - encodedLength;
                 if (maxRead == 0) {
                     throw new IllegalStateException("maxRead=0");
@@ -426,10 +474,20 @@ public class YEncInputStream extends InputStream {
                 } else {
                     encodedLength += encodedRead;
                 }
-                lineDecoded = decodeLine();
+                int lineDecoded = decodeLine();
                 if (lineDecoded > 0) {
                     decodedLength += lineDecoded;
+                    while (true) {
+                        lineDecoded = decodeLine();
+                        if (lineDecoded > 0) {
+                            decodedLength += lineDecoded;
+                        } else {
+                            break;
+                        }
+                    }
                     return decodedLength - decodedIndex;
+                } else if (eof) {
+                    return -1;
                 } else {
                     return 0;
                 }
@@ -518,7 +576,8 @@ public class YEncInputStream extends InputStream {
                 final String partValueString = getValue(getYEncTrailer(), "part", NUMBER);
                 if (partValueString != null) {
                     final int partValueInt = Integer.parseInt(partValueString);
-                    if (partValueInt != getPartIndex()) {
+                    if (partValueInt != 0 && partValueInt != getPartIndex()) {
+                        // nzbget always returns part=0 in yEnd
                         throw new YEncIndexException(partValueInt);
                     }
                 }
@@ -554,7 +613,7 @@ public class YEncInputStream extends InputStream {
      */
     private void readBodyEnd(final InputStream is) throws IOException {
         final BodyInputStream bodyInputStream = new BodyInputStream(is);
-        final byte[] bodyEndBuf = new byte[32];
+        final byte[] bodyEndBuf = lineBuffer != null ? lineBuffer : new byte[32];
         while (true) {
             if (bodyInputStream.read(bodyEndBuf) == -1) {
                 bodyInputStream.close();
