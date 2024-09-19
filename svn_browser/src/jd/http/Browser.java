@@ -464,28 +464,27 @@ public class Browser {
         final String domain = Browser.getHost(host, includeSubdomain);
         if (domain == null) {
             throw new WTFException("Browser.getHost(host) returned null:" + host);
-        } else {
-            synchronized (Browser.REQUEST_INTERVAL_MAP) {
-                Browser.setRequestIntervalLimitGlobal(domain, includeSubdomain, requestInterval);
-                boolean notifyFlag = false;
-                if (requestInterval <= 0 || burstRequests <= 0 || burstInterval <= 0) {
-                    notifyFlag = Browser.REQUESTS_BURST_INTERVAL_MAP.remove(domain) != null;
-                    // TODO merge/cleanup REQUESTS_BURST_REQUESTS_MAP
-                } else {
-                    final Integer existingBurstInterval = Browser.REQUESTS_BURST_INTERVAL_MAP.put(domain, burstInterval);
-                    notifyFlag = existingBurstInterval == null || existingBurstInterval.intValue() != burstInterval;
-                    Vector<Long> vector = Browser.REQUESTS_BURST_REQUESTS_MAP.get(domain);
-                    if (vector == null) {
-                        vector = new Vector<Long>(burstRequests);
-                        Browser.REQUESTS_BURST_REQUESTS_MAP.put(domain, vector);
-                    } else if (vector.capacity() != burstRequests) {
-                        vector.ensureCapacity(burstRequests);
-                        notifyFlag = true;
-                    }
+        }
+        synchronized (Browser.REQUEST_INTERVAL_MAP) {
+            Browser.setRequestIntervalLimitGlobal(domain, includeSubdomain, requestInterval);
+            boolean notifyFlag = false;
+            if (requestInterval <= 0 || burstRequests <= 0 || burstInterval <= 0) {
+                notifyFlag = Browser.REQUESTS_BURST_INTERVAL_MAP.remove(domain) != null;
+                // TODO merge/cleanup REQUESTS_BURST_REQUESTS_MAP
+            } else {
+                final Integer existingBurstInterval = Browser.REQUESTS_BURST_INTERVAL_MAP.put(domain, burstInterval);
+                notifyFlag = existingBurstInterval == null || existingBurstInterval.intValue() != burstInterval;
+                Vector<Long> vector = Browser.REQUESTS_BURST_REQUESTS_MAP.get(domain);
+                if (vector == null) {
+                    vector = new Vector<Long>(burstRequests);
+                    Browser.REQUESTS_BURST_REQUESTS_MAP.put(domain, vector);
+                } else if (vector.capacity() != burstRequests) {
+                    vector.ensureCapacity(burstRequests);
+                    notifyFlag = true;
                 }
-                if (notifyFlag) {
-                    Browser.REQUEST_INTERVAL_MAP.notifyAll();
-                }
+            }
+            if (notifyFlag) {
+                Browser.REQUEST_INTERVAL_MAP.notifyAll();
             }
         }
     }
@@ -964,8 +963,9 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
+     * 
      */
     @Deprecated
     public PostRequest createPostRequest(String url, final List<KeyValueStringEntry> post, final String encoding) throws IOException {
@@ -1778,8 +1778,8 @@ public class Browser {
     }
 
     /**
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br> auto completes Sec-Fetch-Site, some websites(eg
-     * facebook) check it
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site </br>
+     * auto completes Sec-Fetch-Site, some websites(eg facebook) check it
      */
     protected void autoCompleteHeaders(final Request request) {
         if (request != null) {
@@ -2436,7 +2436,8 @@ public class Browser {
     }
 
     /**
-     * Sets Browser upper page load limit Byte value. </br> Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
+     * Sets Browser upper page load limit Byte value. </br>
+     * Use Integer.MAX_VALUE for "unlimited" (do not use "-1"!).
      *
      * @since JD2
      * @param i
@@ -2581,7 +2582,8 @@ public class Browser {
     }
 
     /**
-     * Checks for block by firewalls and similar. </br> To be called after a sent request.
+     * Checks for block by firewalls and similar. </br>
+     * To be called after a sent request.
      */
     public void checkForBlockedByAfterLoadConnection(Request request) throws IOException {
         if (this.getThrowExceptionOnBlockedBy(request)) {
@@ -2613,7 +2615,8 @@ public class Browser {
             // TODO: Add separate BlockedType for Cloudflare-Captcha, see: https://svn.jdownloader.org/issues/90281
             /**
              * TODO: 2023-12-21: Maybe remove reliance on http status-code as it looks like literally any status code can be returned when a
-             * Cloudflare block happens. </br> I've just added code 502 to the list of "Cloudflare response-codes".
+             * Cloudflare block happens. </br>
+             * I've just added code 502 to the list of "Cloudflare response-codes".
              */
             /*
              * It is really important to also check for Cloudflare html else stuff will fail/break e.g. icerbox.com wrong login ->
@@ -3107,8 +3110,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {
@@ -3215,8 +3218,8 @@ public class Browser {
     }
 
     /**
-     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br> See also:
-     * https://svn.jdownloader.org/issues/89834
+     * Returns true if any antiddos provider/other sort of blocking is blocking at this moment. </br>
+     * See also: https://svn.jdownloader.org/issues/89834
      */
     public boolean isBlocked() {
         final Request request = this.getRequest();

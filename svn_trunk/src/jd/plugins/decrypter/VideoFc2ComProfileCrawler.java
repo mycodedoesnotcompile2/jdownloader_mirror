@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47340 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49820 $", interfaceVersion = 3, names = {}, urls = {})
 public class VideoFc2ComProfileCrawler extends PluginForDecrypt {
     public VideoFc2ComProfileCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -107,7 +107,11 @@ public class VideoFc2ComProfileCrawler extends PluginForDecrypt {
         do {
             final String[] videourls = br.getRegex("(https?://[^/]+/(a/)?content/[A-Za-z0-9]+)").getColumn(0);
             if (videourls == null || videourls.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.containsHTML("class=\"noList_notice\"")) {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             int numberofNewItemsOnThisPage = 0;
             for (final String videourl : videourls) {

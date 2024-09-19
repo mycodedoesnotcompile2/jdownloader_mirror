@@ -43,70 +43,71 @@ public class Cookies {
         final String date = httpConnection.getHeaderField("Date");
         final List<String> setCookies = httpConnection.getHeaderFields("Set-Cookie");
         final Cookies ret = new Cookies();
-        if (setCookies != null && setCookies.size() > 0) {
-            final String host = Browser.getHost(request.getURL());
-            for (int i = 0; i < setCookies.size(); i++) {
-                final String setCookie = setCookies.get(i);
-                final Cookie cookie = new Cookie();
-                cookie.setHost(host);
-                cookie.setHostTime(date);
-                final StringTokenizer st = new StringTokenizer(setCookie, ";");
-                while (st.hasMoreTokens()) {
-                    final String cookieKeyValueString = st.nextToken().trim();
-                    /* Key and Value */
-                    final String keyValuePair[] = new Regex(cookieKeyValueString, "(.*?)=(.*)").getRow(0);
-                    final String key;
-                    final String value;
-                    if (keyValuePair == null || keyValuePair.length == 0) {
-                        if (StringUtils.isNotEmpty(cookieKeyValueString)) {
-                            key = cookieKeyValueString.trim();
-                            value = null;
-                        } else {
-                            continue;
-                        }
-                    } else if (keyValuePair.length == 1) {
-                        key = keyValuePair[0].trim();
+        if (setCookies == null || setCookies.size() == 0) {
+            return ret;
+        }
+        final String host = Browser.getHost(request.getURL());
+        for (int i = 0; i < setCookies.size(); i++) {
+            final String setCookie = setCookies.get(i);
+            final Cookie cookie = new Cookie();
+            cookie.setHost(host);
+            cookie.setHostTime(date);
+            final StringTokenizer st = new StringTokenizer(setCookie, ";");
+            while (st.hasMoreTokens()) {
+                final String cookieKeyValueString = st.nextToken().trim();
+                /* Key and Value */
+                final String keyValuePair[] = new Regex(cookieKeyValueString, "(.*?)=(.*)").getRow(0);
+                final String key;
+                final String value;
+                if (keyValuePair == null || keyValuePair.length == 0) {
+                    if (StringUtils.isNotEmpty(cookieKeyValueString)) {
+                        key = cookieKeyValueString.trim();
                         value = null;
-                    } else if (keyValuePair.length == 2) {
-                        key = keyValuePair[0].trim();
-                        value = keyValuePair[1].trim();
                     } else {
                         continue;
                     }
-                    if (key != null) {
-                        if ("path".equalsIgnoreCase(key)) {
-                            cookie.setPath(value);
-                        } else if ("expires".equalsIgnoreCase(key)) {
-                            cookie.setExpires(value);
-                        } else if ("domain".equalsIgnoreCase(key)) {
-                            cookie.setDomain(value);
-                        } else if ("secure".equalsIgnoreCase(key)) {
-                            cookie.setSecure(true);
-                        } else if ("HttpOnly".equalsIgnoreCase(key)) {
-                            // HttpOnly
-                        } else if ("Max-Age".equalsIgnoreCase(key)) {
-                            // Max-Age
-                            try {
-                                // RFC 6265, section 5.2.2
-                                final long maxAge = Long.parseLong(value);
-                                if (maxAge <= 0) {
-                                    cookie.setExpireDate(1l);// 01/01/1970
-                                } else if (cookie.getHostTime() > 0) {
-                                    cookie.setExpireDate(cookie.getHostTime() + maxAge * 1000l);
-                                }
-                            } catch (final Throwable e) {
+                } else if (keyValuePair.length == 1) {
+                    key = keyValuePair[0].trim();
+                    value = null;
+                } else if (keyValuePair.length == 2) {
+                    key = keyValuePair[0].trim();
+                    value = keyValuePair[1].trim();
+                } else {
+                    continue;
+                }
+                if (key != null) {
+                    if ("path".equalsIgnoreCase(key)) {
+                        cookie.setPath(value);
+                    } else if ("expires".equalsIgnoreCase(key)) {
+                        cookie.setExpires(value);
+                    } else if ("domain".equalsIgnoreCase(key)) {
+                        cookie.setDomain(value);
+                    } else if ("secure".equalsIgnoreCase(key)) {
+                        cookie.setSecure(true);
+                    } else if ("HttpOnly".equalsIgnoreCase(key)) {
+                        // HttpOnly
+                    } else if ("Max-Age".equalsIgnoreCase(key)) {
+                        // Max-Age
+                        try {
+                            // RFC 6265, section 5.2.2
+                            final long maxAge = Long.parseLong(value);
+                            if (maxAge <= 0) {
+                                cookie.setExpireDate(1l);// 01/01/1970
+                            } else if (cookie.getHostTime() > 0) {
+                                cookie.setExpireDate(cookie.getHostTime() + maxAge * 1000l);
                             }
-                        } else {
-                            if (cookie.getKey() == null) {
-                                cookie.setKey(key);
-                                cookie.setValue(value);
-                            }
+                        } catch (final Throwable e) {
+                        }
+                    } else {
+                        if (cookie.getKey() == null) {
+                            cookie.setKey(key);
+                            cookie.setValue(value);
                         }
                     }
                 }
-                if (cookie.getKey() != null) {
-                    ret.add(cookie);
-                }
+            }
+            if (cookie.getKey() != null) {
+                ret.add(cookie);
             }
         }
         return ret;
@@ -188,8 +189,8 @@ public class Cookies {
     }
 
     /* Wrapper */
-    public static Cookies parseCookiesFromJsonString(final String jsonStr) {
-        return Cookies.parseCookiesFromJsonString(jsonStr, null);
+    public static Cookies parseCookiesFromString(final String str) {
+        return Cookies.parseCookiesFromJsonString(str, null);
     }
 
     private static Long parseTimestamp(Object timeStamp) {
@@ -206,32 +207,35 @@ public class Cookies {
      * Parses exported cookies from other applications. 2020-04-30: So far supported formats: Chrome/Opera addon editthiscookie.com ||
      * Firefox: FlagThisCookie: https://github.com/jrie/flagCookies
      */
-    public static Cookies parseCookiesFromJsonString(final String jsonStr, final LogInterface logger) {
-        if (jsonStr == null || (!jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") && !jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$"))) {
-            return null;
-        }
-        try {
-            final Object jsonO = JSonStorage.restoreFromString(jsonStr, TypeRef.OBJECT);
-            return parseCookiesFromObject(jsonO, logger);
-        } catch (final JSonMapperException jme) {
-            if (logger != null) {
-                logger.exception(HexFormatter.byteArrayToHex(String.valueOf(jsonStr).getBytes()), jme);
-                logger.info("Failed to parse cookie json");
-            }
-            return null;
-        }
+    public static Cookies parseCookiesFromJsonString(final String str, final LogInterface logger) {
+        return parseCookiesFromObject(str, logger);
     }
 
-    public static Cookies parseCookiesFromObject(final Object jsonO, final LogInterface logger) {
-        if(jsonO == null) {
+    public static Cookies parseCookiesFromObject(Object input, final LogInterface logger) {
+        if (input == null) {
             return null;
+        }
+        if (input instanceof String) {
+            final String jsonStr = input.toString();
+            if (jsonStr == null || (!jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") && !jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$"))) {
+                return null;
+            }
+            try {
+                input = JSonStorage.restoreFromString(jsonStr, TypeRef.OBJECT);
+            } catch (final JSonMapperException jme) {
+                if (logger != null) {
+                    logger.exception(HexFormatter.byteArrayToHex(String.valueOf(jsonStr).getBytes()), jme);
+                    logger.info("Failed to parse cookie json");
+                }
+                return null;
+            }
         }
         try {
             final long timeStamp = Time.timestamp();
-            if (jsonO instanceof List) {
+            if (input instanceof List) {
                 /* Cookies from EditThisCookie or JDownloaders' proprietary cookie list format */
                 final Cookies cookies = new Cookies();
-                final List<Object> cookiesO = (List<Object>) jsonO;
+                final List<Object> cookiesO = (List<Object>) input;
                 for (final Object cookieO : cookiesO) {
                     final Cookie cookie = new Cookie();
                     if (cookieO instanceof List) {
@@ -293,10 +297,10 @@ public class Cookies {
                 } else {
                     return cookies;
                 }
-            } else if (jsonO instanceof Map) {
+            } else if (input instanceof Map) {
                 final Cookies cookies = new Cookies();
                 /* E.g. cookies exported via browser addon 'FlagCookies' */
-                final Map<String, Object> cookieMap = (Map<String, Object>) jsonO;
+                final Map<String, Object> cookieMap = (Map<String, Object>) input;
                 final String userAgent = (String) cookieMap.get("userAgent");
                 cookies.setUserAgent(userAgent);
                 final Iterator<Entry<String, Object>> iteratorOuter = cookieMap.entrySet().iterator();
