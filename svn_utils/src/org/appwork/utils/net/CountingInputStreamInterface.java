@@ -45,4 +45,6 @@ public interface CountingInputStreamInterface extends CountingConnection {
      * @return
      */
     InputStream getInputStream();
+
+    InputStream getParentInputStream();
 }

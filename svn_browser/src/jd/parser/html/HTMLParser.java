@@ -269,13 +269,11 @@ public class HTMLParser {
             return result.booleanValue();
         }
 
-        @Override
-        public boolean equals(final Object anObject) {
-            if (this == anObject) {
+        public boolean equals(final CharSequence anotherString) {
+            if (this == anotherString) {
                 return true;
             }
-            if (anObject != null && anObject instanceof CharSequence) {
-                final CharSequence anotherString = (CharSequence) anObject;
+            if (anotherString != null) {
                 int n = this.length();
                 if (n == anotherString.length()) {
                     int i = 0;
@@ -289,6 +287,17 @@ public class HTMLParser {
                 }
             }
             return false;
+        }
+
+        @Override
+        public boolean equals(final Object anObject) {
+            if (this == anObject) {
+                return true;
+            } else if (anObject != null && anObject instanceof CharSequence) {
+                return this.equals((CharSequence) anObject);
+            } else {
+                return false;
+            }
         }
 
         public int getStartIndex() {

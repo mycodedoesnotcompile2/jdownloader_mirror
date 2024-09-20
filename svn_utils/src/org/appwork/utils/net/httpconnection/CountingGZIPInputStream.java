@@ -46,15 +46,23 @@ import org.appwork.utils.net.CountingInputStreamInterface;
  *
  */
 public class CountingGZIPInputStream extends GZIPInputStream implements CountingInputStreamInterface {
-    private final CountingInputStream countingIS;
+    private final CountingInputStreamInterface is;
 
     /**
      * @param in
      * @throws IOException
      */
     public CountingGZIPInputStream(InputStream is) throws IOException {
-        super(new CountingInputStream(is));
-        countingIS = (CountingInputStream) in;
+        this((CountingInputStreamInterface) new CountingInputStream(is));
+    }
+
+    /**
+     * @param in
+     * @throws IOException
+     */
+    public CountingGZIPInputStream(CountingInputStreamInterface is) throws IOException {
+        super(is.getInputStream());
+        this.is = is;
     }
 
     /*
@@ -74,6 +82,14 @@ public class CountingGZIPInputStream extends GZIPInputStream implements Counting
      */
     @Override
     public long transferedBytes() {
-        return countingIS.transferedBytes();
+        return is.transferedBytes();
+    }
+
+    /**
+     * @see org.appwork.utils.net.CountingInputStreamInterface#getParentInputStream()
+     */
+    @Override
+    public InputStream getParentInputStream() {
+        return is.getParentInputStream();
     }
 }

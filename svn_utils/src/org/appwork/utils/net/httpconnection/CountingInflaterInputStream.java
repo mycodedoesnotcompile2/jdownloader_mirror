@@ -59,7 +59,7 @@ public class CountingInflaterInputStream extends AutoWrapInflaterInputStream imp
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.net.CountingInputStreamInterface#getInputStream()
      */
     @Override
@@ -70,5 +70,13 @@ public class CountingInflaterInputStream extends AutoWrapInflaterInputStream imp
     @Override
     public long transferedBytes() {
         return countingStream.transferedBytes();
+    }
+
+    /**
+     * @see org.appwork.utils.net.CountingInputStreamInterface#getParentInputStream()
+     */
+    @Override
+    public InputStream getParentInputStream() {
+        return countingStream.getParentInputStream();
     }
 }

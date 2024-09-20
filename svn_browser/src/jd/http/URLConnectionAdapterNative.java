@@ -127,6 +127,22 @@ public class URLConnectionAdapterNative extends NativeHTTPConnectionImpl impleme
     }
 
     @Override
+    public InputStream setInputStream(InputStream is) throws IOException {
+        if (is == null) {
+            throw new IllegalArgumentException();
+        }
+        InputStream ret = this.convertedInputStream;
+        if (ret == null) {
+            ret = this.getInputStream();
+        }
+        if (is == ret) {
+            return is;
+        }
+        this.convertedInputStream = is;
+        return ret;
+    }
+
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder(300);
         final Request req = this.getRequest();

@@ -78,6 +78,7 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.encoding.RFC2047;
+import org.appwork.utils.net.CountingInputStreamInterface;
 
 public class HTTPConnectionUtils {
     public static enum IPVERSION {
@@ -96,6 +97,25 @@ public class HTTPConnectionUtils {
         } else {
             return new InetSocketAddress(addr.getAddress(), addr.getPort());
         }
+    }
+
+    public static String debug(CountingInputStreamInterface countingInputStream) {
+        if (countingInputStream == null) {
+            return null;
+        }
+        final StringBuilder sb = new StringBuilder();
+        CountingInputStreamInterface next = countingInputStream;
+        while (next != null) {
+            sb.append(next.getClass().getName()).append("=").append(next.transferedBytes());
+            InputStream parent = next.getParentInputStream();
+            if (parent instanceof CountingInputStreamInterface) {
+                next = (CountingInputStreamInterface) parent;
+                sb.append("->");
+            } else {
+                break;
+            }
+        }
+        return sb.toString();
     }
 
     public static Boolean verifySSLHostname(HostnameVerifier hostNameVerifier, final SSLSession sslSession, final String host) throws IOException {

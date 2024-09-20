@@ -2,6 +2,7 @@ package jd.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.URL;
@@ -175,6 +176,22 @@ public class URLConnectionAdapterDirectImpl extends HTTPConnectionImpl implement
         return super.getInputStream();
     }
 
+    @Override
+    public InputStream setInputStream(InputStream is) throws IOException {
+        if (is == null) {
+            throw new IllegalArgumentException();
+        }
+        InputStream ret = this.convertedInputStream;
+        if (ret == null) {
+            ret = this.getInputStream();
+        }
+        if (is == ret) {
+            return is;
+        }
+        this.convertedInputStream = is;
+        return ret;
+    }
+
     /** {@inheritDoc} */
     @Override
     public String toString() {
@@ -234,5 +251,13 @@ public class URLConnectionAdapterDirectImpl extends HTTPConnectionImpl implement
         } else {
             return null;
         }
+    }
+
+    private PushbackInputStream pushbackInputStream = null;
+
+    @Override
+    protected void resetConnection() {
+        super.resetConnection();
+        this.pushbackInputStream = null;
     }
 }

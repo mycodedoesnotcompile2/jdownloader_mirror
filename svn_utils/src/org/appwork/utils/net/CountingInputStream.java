@@ -89,4 +89,9 @@ public class CountingInputStream extends FilterInputStream implements CountingIn
     public long transferedBytes() {
         return this.count;
     }
+
+    @Override
+    public InputStream getParentInputStream() {
+        return in;
+    }
 }

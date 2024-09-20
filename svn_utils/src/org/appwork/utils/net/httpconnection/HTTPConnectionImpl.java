@@ -1308,7 +1308,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
                     } else if (HTTPConstants.ResponseCode.SUCCESS_NO_CONTENT.matches(getResponseCode())) {
                         /*
                          * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/204
-                         * 
+                         *
                          * Although this status code is intended to describe a response with no body, servers may erroneously include data
                          * following the headers.
                          */

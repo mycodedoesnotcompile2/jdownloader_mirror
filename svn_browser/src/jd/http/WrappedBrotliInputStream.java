@@ -10,11 +10,13 @@ import org.brotli.dec.BrotliInputStream;
 
 public class WrappedBrotliInputStream extends InputStream implements CountingInputStreamInterface {
     protected volatile BrotliInputStream   bis = null;
+    private final InputStream              isParent;
     protected final PushbackInputStream    is;
     protected volatile CountingInputStream cis = null;
 
     public WrappedBrotliInputStream(final InputStream is) {
-        this.is = new PushbackInputStream(is, 32);
+        this.isParent = is;
+        this.is = new PushbackInputStream(this.isParent, 32);
     }
 
     private synchronized void initializeBrotliInputStream() throws IOException {
@@ -76,5 +78,10 @@ public class WrappedBrotliInputStream extends InputStream implements CountingInp
         } else {
             return cis.transferedBytes();
         }
+    }
+
+    @Override
+    public InputStream getParentInputStream() {
+        return this.isParent;
     }
 }

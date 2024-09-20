@@ -135,6 +135,22 @@ public class URLConnectionAdapterSocks5Impl extends Socks5HTTPConnectionImpl imp
     }
 
     @Override
+    public InputStream setInputStream(InputStream is) throws IOException {
+        if (is == null) {
+            throw new IllegalArgumentException();
+        }
+        InputStream ret = this.convertedInputStream;
+        if (ret == null) {
+            ret = this.getInputStream();
+        }
+        if (is == ret) {
+            return is;
+        }
+        this.convertedInputStream = is;
+        return ret;
+    }
+
+    @Override
     public boolean isLegacyConnectEnabled() {
         return false;
     }

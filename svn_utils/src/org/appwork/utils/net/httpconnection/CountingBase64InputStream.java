@@ -45,33 +45,38 @@ import org.appwork.utils.net.CountingInputStreamInterface;
  *
  */
 public class CountingBase64InputStream extends Base64InputStream implements CountingInputStreamInterface {
-    private final CountingInputStream countingStream;
+    private final CountingInputStreamInterface is;
 
     /**
      * @param rawInputStream
      */
     public CountingBase64InputStream(InputStream is) {
-        super(new CountingInputStream(is));
-        countingStream = (CountingInputStream) in;
+        this((CountingInputStreamInterface) new CountingInputStream(is));
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.net.CountingConnection#transferedBytes()
+    /**
+     * @param rawInputStream
      */
+    public CountingBase64InputStream(CountingInputStreamInterface is) {
+        super(is.getInputStream());
+        this.is = is;
+    }
+
     @Override
     public long transferedBytes() {
-        return countingStream.transferedBytes();
+        return is.transferedBytes();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.net.CountingInputStreamInterface#getInputStream()
-     */
     @Override
     public InputStream getInputStream() {
         return this;
+    }
+
+    /**
+     * @see org.appwork.utils.net.CountingInputStreamInterface#getParentInputStream()
+     */
+    @Override
+    public InputStream getParentInputStream() {
+        return is.getParentInputStream();
     }
 }

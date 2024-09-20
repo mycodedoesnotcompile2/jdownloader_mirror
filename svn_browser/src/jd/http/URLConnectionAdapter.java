@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.http;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketAddress;
 
@@ -34,6 +35,8 @@ public interface URLConnectionAdapter extends org.appwork.utils.net.httpconnecti
     void setRequest(Request request);
 
     public SocketAddress getEndPointSocketAddress();
+
+    public InputStream setInputStream(InputStream is) throws IOException;
 
     public String getCipherSuite();
 

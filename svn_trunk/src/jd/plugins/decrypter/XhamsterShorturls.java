@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47630 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49829 $", interfaceVersion = 3, names = {}, urls = {})
 public class XhamsterShorturls extends PluginForDecrypt {
     public XhamsterShorturls(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +71,7 @@ public class XhamsterShorturls extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String url = param.getCryptedUrl().replaceFirst("http://", "https://");
+        final String url = param.getCryptedUrl().replaceFirst("^http://", "https://");
         br.setFollowRedirects(false);
         br.getPage(url);
         final String finallink = br.getRedirectLocation();
