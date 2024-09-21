@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49829 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49835 $", interfaceVersion = 2, names = {}, urls = {})
 public class ZipComic extends PluginForDecrypt {
     public ZipComic(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,7 +92,7 @@ public class ZipComic extends PluginForDecrypt {
             index++;
         }
         final FilePackage fp = FilePackage.getInstance();
-        if (title != null && !true) {
+        if (title != null) {
             fp.setName(Encoding.htmlDecode(title).trim());
         } else {
             /* Fallback */
