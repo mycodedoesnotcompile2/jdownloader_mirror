@@ -29,6 +29,8 @@ import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.net.URLHelper;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -45,12 +47,13 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 49757 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49837 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -260,15 +263,23 @@ public class BunkrAlbum extends PluginForDecrypt {
         final String filenameFromURL = getFileNameFromURL(new URL(url));
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
+            final String fileExtensionNow = Plugin.getFileNameExtensionFromString(filename);
             /* Add file extension if it is missing */
             String betterFileExtension = null;
             if (filenameFromURL != null) {
                 betterFileExtension = getFileNameExtensionFromString(filenameFromURL, null);
             }
+            final boolean looksLikeVideoFile;
             if (betterFileExtension == null && url.matches("(?i)https?://[^/]+/v/.+")) {
                 betterFileExtension = ".mp4";
+                looksLikeVideoFile = true;
+            } else {
+                looksLikeVideoFile = false;
             }
-            if (betterFileExtension != null) {
+            /* Only correct file-type if none is given or type is substantially different (e.g. old is type audio, new is video). */
+            final CompiledFiletypeExtension cfe_old = CompiledFiletypeFilter.getExtensionsFilterInterface(fileExtensionNow);
+            final CompiledFiletypeExtension cfe_new = CompiledFiletypeFilter.getExtensionsFilterInterface(betterFileExtension);
+            if (betterFileExtension != null && looksLikeVideoFile && (cfe_old == null || !cfe_old.isSameExtensionGroup(cfe_new))) {
                 filename = this.correctOrApplyFileNameExtension(filename, betterFileExtension, null);
             }
             dl.setProperty(Bunkr.PROPERTY_FILENAME_FROM_ALBUM, filename);

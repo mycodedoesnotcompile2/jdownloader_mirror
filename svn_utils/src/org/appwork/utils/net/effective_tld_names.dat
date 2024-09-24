@@ -6725,7 +6725,7 @@ org.zw
 
 // newGTLDs
 
-// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2024-08-25T15:14:38Z
+// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2024-09-13T15:16:52Z
 // This list is auto-generated, don't edit it manually.
 // aaa : American Automobile Association, Inc.
 // https://www.iana.org/domains/root/db/aaa.html
@@ -9118,6 +9118,10 @@ men
 // menu : Dot Menu Registry, LLC
 // https://www.iana.org/domains/root/db/menu.html
 menu
+
+// merck : Merck Registry Holdings, Inc.
+// https://www.iana.org/domains/root/db/merck.html
+merck
 
 // merckmsd : MSD Registry Holdings, Inc.
 // https://www.iana.org/domains/root/db/merckmsd.html
@@ -12286,10 +12290,6 @@ vm.bytemark.co.uk
 // Submitted by Antonio Lain <antlai@cafjs.com>
 cafjs.com
 
-// callidomus : https://www.callidomus.com/
-// Submitted by Marcus Popp <admin@callidomus.com>
-mycd.eu
-
 // Canva Pty Ltd : https://canva.com/
 // Submitted by Joel Aquilina <publicsuffixlist@canva.com>
 canva-apps.cn
@@ -12472,6 +12472,10 @@ co.no
 // Submitted by Thomas Wouters <thomas.wouters@combellgroup.com>
 webhosting.be
 hosting-cluster.nl
+
+// Contentful GmbH : https://www.contentful.com
+// Submitted by Contentful Developer Experience Team <prd-ecosystem-dx@contentful.com>
+ctfcloud.net
 
 // Convex : https://convex.dev/
 // Submitted by James Cowling <security@convex.dev>
@@ -13685,6 +13689,14 @@ häkkinen.fi
 hs.run
 hs.zone
 
+// Harrison Network : https://hrsn.net
+// Submitted by William Harrison <psl@hrsn.net>
+wdh.app
+preview.wdh.app
+hrsn.dev
+t.hrsn.dev
+t.hrsn.net
+
 // Hashbang : https://hashbang.sh
 hashbang.sh
 
@@ -13754,18 +13766,17 @@ hoplix.shop
 orx.biz
 biz.gl
 biz.ng
+co.biz.ng
+dl.biz.ng
+go.biz.ng
+lg.biz.ng
+on.biz.ng
 col.ng
 firm.ng
 gen.ng
 ltd.ng
 ngo.ng
 plc.ng
-// Reserved Third Level Subdomains for BIZ.NG
-co.biz.ng
-dl.biz.ng
-go.biz.ng
-lg.biz.ng
-on.biz.ng
 
 // HostFly : https://www.ie.ua
 // Submitted by Bohdan Dub <support@hostfly.com.ua>
@@ -13884,6 +13895,10 @@ app-ionos.space
 // Submitted by Roman Azarenko <roman.azarenko@iopsys.eu>
 iopsys.se
 
+// IPFS Project : https://ipfs.tech/
+// Submitted by Interplanetary Shipyard <domains@ipshipyard.com>
+*.dweb.link
+
 // IPiFony Systems, Inc. : https://www.ipifony.com/
 // Submitted by Matthew Hardeman <mhardeman@ipifony.com>
 ipifony.net
@@ -13913,7 +13928,6 @@ iserv.dev
 // Submitted by Ihor Kolodyuk <ik@jelastic.com>
 mel.cloudlets.com.au
 cloud.interhostsolutions.be
-mycloud.by
 alp1.ae.flow.ch
 appengine.flow.ch
 es-1.axarnet.cloud
@@ -13935,7 +13949,6 @@ us.reclaim.cloud
 ch.trendhosting.cloud
 de.trendhosting.cloud
 jele.club
-amscompute.com
 dopaas.com
 paas.hosted-by-previder.com
 rag-cloud.hosteur.com
@@ -13943,10 +13956,8 @@ rag-cloud-ch.hosteur.com
 jcloud.ik-server.com
 jcloud-ver-jpc.ik-server.com
 demo.jelastic.com
-kilatiron.com
 paas.massivegrid.com
 jed.wafaicloud.com
-lon.wafaicloud.com
 ryd.wafaicloud.com
 j.scaleforce.com.cy
 jelastic.dogado.eu
@@ -13958,18 +13969,14 @@ mircloud.host
 paas.beebyte.io
 sekd1.beebyteapp.io
 jele.io
-cloud-fr1.unispace.io
 jc.neen.it
-cloud.jelastic.open.tim.it
 jcloud.kz
-upaas.kazteleport.kz
 cloudjiffy.net
 fra1-de.cloudjiffy.net
 west1-us.cloudjiffy.net
 jls-sto1.elastx.net
 jls-sto2.elastx.net
 jls-sto3.elastx.net
-faststacks.net
 fr-1.paas.massivegrid.net
 lon-1.paas.massivegrid.net
 lon-2.paas.massivegrid.net
@@ -13979,11 +13986,9 @@ sg-1.paas.massivegrid.net
 jelastic.saveincloud.net
 nordeste-idc.saveincloud.net
 j.scaleforce.net
-jelastic.tsukaeru.net
 sdscloud.pl
 unicloud.pl
 mircloud.ru
-jelastic.regruhosting.ru
 enscaled.sg
 jele.site
 jelastic.team
@@ -14022,10 +14027,6 @@ js.org
 // Submitted by Wouter Bakker <hostmaster@kaashosting.nl>
 kaas.gg
 khplay.nl
-
-// Kakao : https://www.kakaocorp.com/
-// Submitted by JaeYoong Lee <cec@kakaocorp.com>
-ktistory.com
 
 // Kapsi : https://kapsi.fi
 // Submitted by Tomi Juntunen <erani@kapsi.fi>
@@ -14079,7 +14080,7 @@ lpusercontent.com
 lelux.site
 
 // libp2p project : https://libp2p.io
-// Submitted by Interplanetary Shipyard <psl@ipshipyard.com>
+// Submitted by Interplanetary Shipyard <domains@ipshipyard.com>
 libp2p.direct
 
 // Libre IT Ltd : https://libre.nz
@@ -14510,7 +14511,6 @@ dnsking.ch
 mypi.co
 n4t.co
 001www.com
-ddnslive.com
 myiphost.com
 forumz.info
 soundcast.me
@@ -14526,8 +14526,6 @@ x443.pw
 now-dns.top
 ntdll.top
 freeddns.us
-crafting.xyz
-zapto.xyz
 
 // nsupdate.info : https://www.nsupdate.info/
 // Submitted by Thomas Waldmann <info@nsupdate.info>
@@ -14759,10 +14757,6 @@ xen.prgmr.com
 // priv.at : http://www.nic.priv.at/
 // Submitted by registry <lendl@nic.at>
 priv.at
-
-// Protocol Labs : https://protocol.ai/
-// Submitted by Michael Burns <noc@protocol.ai>
-*.dweb.link
 
 // Protonet GmbH : http://protonet.io
 // Submitted by Martin Meier <admin@protonet.io>
@@ -15347,11 +15341,6 @@ supabase.co
 supabase.in
 supabase.net
 
-// Symfony, SAS : https://symfony.com/
-// Submitted by Fabien Potencier <fabien@symfony.com>
-*.sensiosite.cloud
-*.s5y.io
-
 // Syncloud : https://syncloud.org
 // Submitted by Boris Rybalkin <syncloud@syncloud.it>
 syncloud.it
@@ -15578,9 +15567,11 @@ express.val.run
 web.val.run
 
 // Vercel, Inc : https://vercel.com/
-// Submitted by Connor Davis <security@vercel.com>
+// Submitted by Max Leiter <security@vercel.com>
 vercel.app
+v0.build
 vercel.dev
+vusercontent.net
 now.sh
 
 // VeryPositive SIA : http://very.lv
@@ -15653,12 +15644,6 @@ pages.wiardweb.com
 toolforge.org
 wmcloud.org
 wmflabs.org
-
-// William Harrison : https://wdharrison.com
-// Submitted by William Harrison <publicsuffix@wdharrison.com>
-wdh.app
-preview.wdh.app
-t.hrsn.net
 
 // WISP : https://wisp.gg
 // Submitted by Stepan Fedotov <stepan@wisp.gg>

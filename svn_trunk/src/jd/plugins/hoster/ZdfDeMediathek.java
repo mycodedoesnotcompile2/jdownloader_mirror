@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 49839 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -60,6 +60,7 @@ public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_tv_show          = "tv_show";
     public static final String PROPERTY_date_formatted   = "date_formatted";
     public static final String PROPERTY_tv_station       = "tv_station";
+    public static final String PROPERTY_language         = "language";
     public static final String PROPERTY_convert_subtitle = "convertsubtitle";
     private String             dllink                    = null;
 

@@ -20,6 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.ImgsrcConfig;
+import org.jdownloader.plugins.components.config.ImgsrcConfig.ImageFormat;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -35,7 +38,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.decrypter.ImgSrcRuCrawler;
 
-@HostPlugin(revision = "$Revision: 49829 $", interfaceVersion = 2, names = { "imgsrc.ru" }, urls = { "https?://decryptedimgsrc\\.ru/[^/]+/\\d+\\.html(\\?pwd=[a-z0-9]{32})?" })
+@HostPlugin(revision = "$Revision: 49845 $", interfaceVersion = 2, names = { "imgsrc.ru" }, urls = { "https?://decryptedimgsrc\\.ru/[^/]+/\\d+\\.html(\\?pwd=[a-z0-9]{32})?" })
 public class ImgSrcRu extends PluginForHost {
     private String                         dllink    = null;
     private static AtomicReference<String> userAgent = new AtomicReference<String>(null);
@@ -140,7 +143,12 @@ public class ImgSrcRu extends PluginForHost {
     }
 
     public static final String getPreferredImageFormat() {
-        return "jpeg";
+        final ImgsrcConfig cfg = PluginJsonConfig.get(ImgsrcConfig.class);
+        if (cfg.getPreferredImageFormat() == ImageFormat.JPEG) {
+            return "jpeg";
+        } else {
+            return "webp";
+        }
     }
 
     private String getDllink() {
@@ -276,6 +284,11 @@ public class ImgSrcRu extends PluginForHost {
          * time.
          */
         return 3;
+    }
+
+    @Override
+    public Class<? extends ImgsrcConfig> getConfigInterface() {
+        return ImgsrcConfig.class;
     }
 
     @Override

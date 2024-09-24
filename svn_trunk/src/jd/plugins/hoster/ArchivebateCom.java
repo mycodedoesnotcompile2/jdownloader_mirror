@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchivebateComCrawler;
 
-@HostPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49838 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { ArchivebateComCrawler.class })
 public class ArchivebateCom extends PluginForHost {
     public ArchivebateCom(PluginWrapper wrapper) {
@@ -70,7 +70,7 @@ public class ArchivebateCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            /* Dummy regex: Items will be added via crawlerplugin. */
+            /* Dummy regex: Items will be added via crawler plugin. */
             ret.add("");
         }
         return ret.toArray(new String[0]);
@@ -113,6 +113,13 @@ public class ArchivebateCom extends PluginForHost {
             title = title.trim();
             title = title.replaceFirst(", Archivebate$", "");
             link.setFinalFileName(title + extDefault);
+        }
+        /*
+         * This video existed before but has been deleted. Filename information may still be available which is why we are not checking for
+         * this error case first but at the end of this function.
+         */
+        if (br.containsHTML(">\\s*This video has been deleted")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         return AvailableStatus.TRUE;
     }

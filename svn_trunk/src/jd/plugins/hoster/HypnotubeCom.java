@@ -41,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49696 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49839 $", interfaceVersion = 3, names = {}, urls = {})
 public class HypnotubeCom extends PluginForHost {
     public HypnotubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class HypnotubeCom extends PluginForHost {
     }
 
     private String        dllink         = null;
-    private final Pattern PATTERN_NORMAL = Pattern.compile("(?i)https?://[^/]+/video/([a-z0-9\\-]*)-(\\d+)\\.html", Pattern.CASE_INSENSITIVE);
+    private final Pattern PATTERN_NORMAL = Pattern.compile("https?://[^/]+/video/([a-z0-9\\-]*)-(\\d+)\\.html", Pattern.CASE_INSENSITIVE);
     private final Pattern PATTERN_EMBED  = Pattern.compile("https?://[^/]+/embed/(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public static List<String[]> getPluginDomains() {
