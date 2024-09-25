@@ -63,7 +63,7 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49840 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49859 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -509,9 +509,9 @@ public class FileCryptCc extends PluginForDecrypt {
                             /* Bad user input */
                             throw new DecrypterException(DecrypterException.PASSWORD);
                         }
-                        if (!usedWrongPasswords.contains(passCode)) {
+                        if (usedWrongPasswords.contains(passCode)) {
                             // no need to submit password that has already been tried!
-                            logger.info("Skipping already tried password: " + passCode);
+                            logger.info("Skipping user-entered already tried wrong password: " + passCode);
                             continue;
                         }
                     }

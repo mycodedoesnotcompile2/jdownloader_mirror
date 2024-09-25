@@ -9,19 +9,19 @@ import java.util.Locale;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
-import org.appwork.swing.components.IDIcon;
-import org.appwork.swing.components.IconIdentifier;
-import org.appwork.utils.images.IconIO;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.images.NewTheme;
-
 import jd.config.Property;
 import jd.controlling.faviconcontroller.FavIconRequestor;
 import jd.controlling.faviconcontroller.FavIcons;
 import jd.http.Browser;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
+
+import org.appwork.swing.components.IDIcon;
+import org.appwork.swing.components.IconIdentifier;
+import org.appwork.utils.images.IconIO;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.images.NewTheme;
 
 public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Icon, IDIcon {
     private static final HashMap<String, String> HARDCODEDFAVICONS = new HashMap<String, String>();
@@ -38,10 +38,10 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         HARDCODEDFAVICONS.put("usenet", IconKey.ICON_LOGO_NZB);
         HARDCODEDFAVICONS.put("genericusenet", IconKey.ICON_LOGO_NZB);
     }
-    private static final int     WIDTH  = 16;
-    private static final int     HEIGHT = 16;
-    private final String         domain;
-    private final IconIdentifier iconIdentifier;
+    private static final int                     WIDTH             = 16;
+    private static final int                     HEIGHT            = 16;
+    private final String                         domain;
+    private final IconIdentifier                 iconIdentifier;
 
     private DomainInfo(String tld, String domain) {
         this.tld = Property.dedupeString(tld);
@@ -136,7 +136,7 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
 
     private static final HashMap<String, WeakReference<DomainInfo>> CACHE = new HashMap<String, WeakReference<DomainInfo>>();
 
-    private static String getCacheID(String domain) {
+    private static String getCacheID(final String domain) {
         String ret = domain.toLowerCase(Locale.ENGLISH);
         int index = ret.indexOf(" ");
         if (index > 0) {
@@ -158,9 +158,9 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         final String lcaseTld = getCacheID(domain);
         synchronized (CACHE) {
             DomainInfo ret = null;
-            WeakReference<DomainInfo> domainInfo = CACHE.get(lcaseTld);
+            final WeakReference<DomainInfo> domainInfo = CACHE.get(lcaseTld);
             if (domainInfo == null || (ret = domainInfo.get()) == null) {
-                ret = new DomainInfo(Browser.getHost(lcaseTld), lcaseTld);
+                ret = new DomainInfo(Browser.getHost(lcaseTld, true), lcaseTld);
                 CACHE.put(lcaseTld, new WeakReference<DomainInfo>(ret));
             }
             return ret;

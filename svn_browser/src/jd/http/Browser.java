@@ -180,10 +180,12 @@ public class Browser {
         return Browser.TIMEOUT_READ;
     }
 
+    /** Returns domain without subdomain. */
     public static String getHost(final String url) {
         return Browser.getHost(url, false);
     }
 
+    /** Returns domain without subdomain. */
     public static String getHost(final URL url) {
         return Browser.getHost(url, false);
     }

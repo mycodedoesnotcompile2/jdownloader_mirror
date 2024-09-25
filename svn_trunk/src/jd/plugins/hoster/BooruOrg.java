@@ -36,7 +36,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.BooruOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 49427 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49846 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BooruOrgCrawler.class })
 public class BooruOrg extends PluginForHost {
     public BooruOrg(PluginWrapper wrapper) {
@@ -64,7 +64,7 @@ public class BooruOrg extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/index\\.php\\?page=post\\&s=view\\&id=(\\d+)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/.*?index\\.php\\?page=post\\&s=view\\&id=(\\d+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -88,7 +88,7 @@ public class BooruOrg extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://booru.org/tos.php";
+        return "https://" + getHost() + "/tos.php";
     }
 
     @Override

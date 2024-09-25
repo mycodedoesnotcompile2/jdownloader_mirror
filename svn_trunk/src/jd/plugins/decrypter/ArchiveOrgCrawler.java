@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49492 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 49854 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -478,6 +478,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 contenturl = URLHelper.getUrlWithoutParams(contenturl) + "?" + query.toString();
             }
         }
+        ensureInitHosterplugin();
+        /* Login whenever possible */
+        final Account account = AccountController.getInstance().getValidAccount(hostPlugin.getHost());
+        if (account != null) {
+            hostPlugin.login(account, false);
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         try {
             URLConnectionAdapter con = null;
@@ -506,7 +512,11 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
                 } catch (final Throwable e) {
                 }
             }
-            if (br.getHttpConnection().getResponseCode() == 404) {
+            if (ArchiveOrg.isAccountRequired(br) || ArchiveOrg.isItemUnavailable(br)) {
+                throw new AccountRequiredException();
+            } else if (br.getHttpConnection().getResponseCode() == 403) {
+                throw new AccountRequiredException();
+            } else if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (!isCompressedArchiveURL(br.getURL())) {
                 /* Redirect to some unsupported URL. */
@@ -1717,8 +1727,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             /* This link will go back into this crawler to find all individual downloadlinks. */
             ret.add(createDownloadlink(downloadurl));
             return ret;
-        } else if (br.containsHTML("(?i)>\\s*You must log in to view this content") || br.containsHTML("(?i)>\\s*Item not available|>\\s*The item is not available due to issues with the item's content")) {
-            /* 2021-02-24: <p class="theatre-title">You must log in to view this content</p> */
+        } else if (ArchiveOrg.isItemUnavailable(br) || ArchiveOrg.isAccountRequired(br)) {
             if (br.containsHTML("/download/" + Pattern.quote(identifier))) {
                 /* Account is still required but we can go ahead and crawl all individual file URLs via XML. */
                 ret.add(createDownloadlink(downloadurl));

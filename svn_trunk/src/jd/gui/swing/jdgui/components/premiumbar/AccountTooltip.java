@@ -21,6 +21,11 @@ import javax.swing.ListSelectionModel;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.components.tooltips.PanelToolTip;
 import org.appwork.swing.components.tooltips.TooltipPanel;
 import org.appwork.utils.swing.SwingUtils;
@@ -30,11 +35,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import net.miginfocom.swing.MigLayout;
 
 public class AccountTooltip extends PanelToolTip {
     private Color                 color;
@@ -138,26 +138,29 @@ public class AccountTooltip extends PanelToolTip {
         return super.getPreferredSize();
     }
 
-    private List<DomainInfo> getDomainInfos(AccountServiceCollection accountCollection) {
-        HashSet<DomainInfo> domains = new HashSet<DomainInfo>();
-        for (Account acc : accountCollection) {
-            AccountInfo ai = acc.getAccountInfo();
-            if (ai != null) {
-                final List<String> supported = ai.getMultiHostSupport();
-                if (supported != null) {
-                    /*
-                     * synchronized on list because plugins can change the list in runtime
-                     */
-                    for (String sup : supported) {
-                        LazyHostPlugin plg = HostPluginController.getInstance().get(sup);
-                        if (plg != null) {
-                            domains.add(DomainInfo.getInstance(plg.getHost()));
-                        }
-                    }
+    private List<DomainInfo> getDomainInfos(final AccountServiceCollection accountCollection) {
+        final HashSet<DomainInfo> domains = new HashSet<DomainInfo>();
+        for (final Account acc : accountCollection) {
+            final AccountInfo ai = acc.getAccountInfo();
+            if (ai == null) {
+                continue;
+            }
+            final List<String> supported = ai.getMultiHostSupport();
+            if (supported == null) {
+                continue;
+            }
+            /*
+             * synchronized on list because plugins can change the list in runtime
+             */
+            for (final String sup : supported) {
+                final LazyHostPlugin plg = HostPluginController.getInstance().get(sup);
+                if (plg == null) {
+                    continue;
                 }
+                domains.add(plg.getDomainInfo());
             }
         }
-        ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
+        final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
         Collections.sort(ret, new Comparator<DomainInfo>() {
             @Override
             public int compare(DomainInfo o1, DomainInfo o2) {
