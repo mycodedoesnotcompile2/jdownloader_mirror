@@ -350,13 +350,13 @@ public class AccountInfo extends Property implements AccountTrafficView {
      * @param multiHostPlugin
      * @since JD2
      */
-    public List<String> setMultiHostSupport(final PluginForHost multiHostPlugin, final List<String> multiHostSupport) {
+    public List<String> setMultiHostSupport(final PluginForHost multiHostPlugin, final List<String> multiHostSupportListStr) {
         if (multiHostPlugin != null && multiHostPlugin.getLogger() != null) {
-            return setMultiHostSupport(multiHostPlugin, multiHostSupport, new PluginFinder(LogController.TRASH));
+            return setMultiHostSupport(multiHostPlugin, multiHostSupportListStr, new PluginFinder(LogController.TRASH));
         } else {
             final LogSource logSource = LogController.getFastPluginLogger(Thread.currentThread().getName());
             try {
-                return setMultiHostSupport(multiHostPlugin, multiHostSupport, new PluginFinder(logSource));
+                return setMultiHostSupport(multiHostPlugin, multiHostSupportListStr, new PluginFinder(logSource));
             } finally {
                 logSource.close();
             }
@@ -377,6 +377,19 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
         }
         return setMultiHostSupportV2(multiHostPlugin, mhosts, pluginFinder);
+    }
+
+    public List<String> setMultiHostSupportV2(final PluginForHost multiHostPlugin, final List<MultiHostHost> multiHostSupportList) {
+        if (multiHostPlugin != null && multiHostPlugin.getLogger() != null) {
+            return setMultiHostSupportV2(multiHostPlugin, multiHostSupportList, new PluginFinder(LogController.TRASH));
+        } else {
+            final LogSource logSource = LogController.getFastPluginLogger(Thread.currentThread().getName());
+            try {
+                return setMultiHostSupportV2(multiHostPlugin, multiHostSupportList, new PluginFinder(logSource));
+            } finally {
+                logSource.close();
+            }
+        }
     }
 
     public List<String> setMultiHostSupportV2(final PluginForHost multiHostPlugin, final List<MultiHostHost> multiHostSupportList, final PluginFinder pluginFinder) {
@@ -530,6 +543,16 @@ public class AccountInfo extends Property implements AccountTrafficView {
                     logger.warning("Found more than one possible plugins for one domain: " + maindomainCleaned);
                     logger.log(new Exception("DEBUG: " + maindomainCleaned));
                 }
+                continue cleanListLoop;
+            }
+            final boolean hostIsWorkingAccordingToMultihost = mhost.getStatus() == MultihosterHostStatus.WORKING || mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE;
+            final boolean forcePrintNonWorkingHosts = true;
+            if (forcePrintNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
+                logger.info("Non working host: " + mhost);
+            }
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !hostIsWorkingAccordingToMultihost) {
+                // TODO: Remove this check
+                logger.info("Skipping non working host in stable: " + mhost.getName());
                 continue cleanListLoop;
             }
             final LazyHostPlugin finalplugin = best.get(0);

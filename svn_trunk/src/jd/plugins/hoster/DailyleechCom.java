@@ -16,7 +16,6 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
@@ -53,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     private static final String          PROTOCOL       = "https://";
     /* Connection limits */
@@ -521,11 +520,10 @@ public class DailyleechCom extends PluginForHost {
         }
         br.getPage("/hostsp/");
         final String[] hostlist = br.getRegex("domain=([^<>\"\\'/]+)\"").getColumn(0);
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
-        if (hostlist != null) {
-            supportedHosts.addAll(Arrays.asList(hostlist));
+        if (hostlist == null || hostlist.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupport(this, Arrays.asList(hostlist));
         return ai;
     }
 

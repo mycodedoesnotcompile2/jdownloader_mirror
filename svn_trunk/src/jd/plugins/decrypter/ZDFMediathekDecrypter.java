@@ -59,7 +59,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 49839 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 49860 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -632,12 +632,12 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             final Object captionsO = JavaScriptEngineFactory.walkJson(player, "captions");
             if (captionsO instanceof List && this.subtitlesByLanguage.isEmpty()) {
                 /* Captions can be available in different versions (languages- and types) */
-                final List<Object> subtitlesO = (List<Object>) player.get("captions");
-                for (final Object subtitleO : subtitlesO) {
-                    final Map<String, Object> subInfo = (Map<String, Object>) subtitleO;
-                    final String subtitleType = subInfo.get("class").toString();
-                    final String uri = subInfo.get("uri").toString();
-                    final String subtitleLanguage = subInfo.get("language").toString();
+                final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) player.get("captions");
+                for (final Map<String, Object> subinfo : subtitles) {
+                    final String subtitleType = subinfo.get("class").toString();
+                    final String uri = subinfo.get("uri").toString();
+                    final String subtitleLanguage = subinfo.get("language").toString();
+                    final String format = (String) subinfo.get("format");
                     /* E.g. "ebu-tt-d-basic-de" or "webvtt" */
                     // final String format = (String) subInfo.get("format");
                     /* Skip unsupported formats */
@@ -656,9 +656,9 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         subtitlesVTT = new HashMap<String, String>();
                         subtitlesThisLanguage.put("vtt", subtitlesVTT);
                     }
-                    if (uri.toLowerCase(Locale.ENGLISH).endsWith(".xml")) {
+                    if (uri.toLowerCase(Locale.ENGLISH).endsWith(".xml") || StringUtils.equalsIgnoreCase(format, "ebu-tt-d-basic-de")) {
                         subtitlesXML.put(subtitleType, uri);
-                    } else if (uri.toLowerCase(Locale.ENGLISH).endsWith(".vtt")) {
+                    } else if (uri.toLowerCase(Locale.ENGLISH).endsWith(".vtt") || StringUtils.equalsIgnoreCase(format, "webvtt")) {
                         subtitlesVTT.put(subtitleType, uri);
                     } else {
                         logger.info("Detected unsupported subtitle-format: " + uri);
@@ -829,10 +829,10 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
                         if (duration > 0 && hlscontainer.getBandwidth() > 0) {
                             dl.setDownloadSize(duration / 1000 * hlscontainer.getBandwidth() / 8);
                         }
+                        dl.setProperty(ZdfDeMediathek.PROPERTY_language, language);
                         final String qualitySelectorString = generateQualitySelectorString(protocol, ext, Integer.toString(hlscontainer.getHeight()), language, audio_class);
                         all_found_downloadlinks.put(qualitySelectorString, dl);
                         addDownloadLinkAndGenerateSubtitleDownloadLink(allDownloadLinks, dl);
-                        dl.setProperty(ZdfDeMediathek.PROPERTY_language, language);
                         if (containsQuality(selectedQualityStrings, qualitySelectorString)) {
                             userSelectedQualitiesTmp.add(dl);
                             selectedQualitiesMapTmp.put(qualitySelectorString, dl);

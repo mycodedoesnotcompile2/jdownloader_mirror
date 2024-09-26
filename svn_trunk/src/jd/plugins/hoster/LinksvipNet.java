@@ -44,7 +44,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 47892 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
 public class LinksvipNet extends PluginForHost {
     private static final String                            NICE_HOST                 = "linksvip.net";
     private static final String                            NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -247,9 +247,10 @@ public class LinksvipNet extends PluginForHost {
             }
             br.getPage("/host-support.html");
             final String[] hostlist = br.getRegex("domain=([^<>\"]+)\"").getColumn(0);
-            if (hostlist != null) {
-                supportedHosts = new ArrayList<String>(Arrays.asList(hostlist));
+            if (hostlist == null || hostlist.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
             }
+            supportedHosts = new ArrayList<String>(Arrays.asList(hostlist));
             ai.setUnlimitedTraffic();
         } else {
             account.setType(AccountType.FREE);

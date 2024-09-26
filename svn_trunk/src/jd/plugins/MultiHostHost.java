@@ -36,6 +36,7 @@ public class MultiHostHost implements Storable {
     private long                  unavailableUntilTimestamp       = -1;
     private short                 trafficCalculationFactorPercent = 100;
     private int                   maxChunks                       = 0;
+    private int                   maxDownloads                    = -1;
     private Boolean               resume                          = null;
     private String                statusText                      = null;
     private MultihosterHostStatus status                          = null;
@@ -108,7 +109,7 @@ public class MultiHostHost implements Storable {
         this.isUnlimitedLinks = false;
     }
 
-    /** Only do this when linksMax is given. */
+    /** Only use this when linksMax is given!! */
     public void setLinksUsed(long num) {
         this.linksLeft = this.linksMax - num;
         this.isUnlimitedLinks = false;
@@ -181,14 +182,9 @@ public class MultiHostHost implements Storable {
         }
     }
 
+    /** Returns custom set status text. Typically used to describe why this host is currently not working. */
     public String getStatusText() {
-        if (this.statusText != null) {
-            return statusText;
-        } else if (status != null) {
-            return status.name();
-        } else {
-            return null;
-        }
+        return statusText;
     }
 
     public void setStatusText(String statusText) {
@@ -196,6 +192,7 @@ public class MultiHostHost implements Storable {
     }
 
     public MultihosterHostStatus getStatus() {
+        // TODO: Update this to simply return status without any evaluation
         if (this.unavailableUntilTimestamp > Time.systemIndependentCurrentJVMTimeMillis()) {
             return MultihosterHostStatus.DEACTIVATED_JDOWNLOADER;
         } else if (status == null) {
@@ -262,6 +259,14 @@ public class MultiHostHost implements Storable {
         this.unavailableUntilTimestamp = Time.systemIndependentCurrentJVMTimeMillis() + milliseconds;
     }
 
+    public int getMaxDownloads() {
+        return maxDownloads;
+    }
+
+    public void setMaxDownloads(int maxDownloads) {
+        this.maxDownloads = maxDownloads;
+    }
+
     @Override
     public String toString() {
         final String title;
@@ -272,6 +277,6 @@ public class MultiHostHost implements Storable {
         } else {
             title = null;
         }
-        return title + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
+        return title + " | Status: " + this.getStatus() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }
 }
