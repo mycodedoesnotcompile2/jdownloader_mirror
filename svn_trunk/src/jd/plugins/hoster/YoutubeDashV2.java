@@ -155,7 +155,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 49570 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 49875 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -1105,9 +1105,10 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             }
             return null;
         }
-        final StreamCollection audioStreams = clipData.getStreams(variant.getBaseVariant().getiTagAudio());
-        final StreamCollection videoStreams = clipData.getStreams(variant.getiTagVideo());
-        final StreamCollection dataStreams = clipData.getStreams(variant.getiTagData());
+
+        final StreamCollection audioStreams = clipData.getStreams(variant.getBaseVariant().getiTagAudio(), variant);
+        final StreamCollection videoStreams = clipData.getStreams(variant.getiTagVideo(), variant);
+        final StreamCollection dataStreams = clipData.getStreams(variant.getiTagData(), variant);
         if (variant.getBaseVariant().getiTagAudio() != null && audioStreams == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid Audio Stream");
         } else if (variant.getiTagVideo() != null && videoStreams == null) {

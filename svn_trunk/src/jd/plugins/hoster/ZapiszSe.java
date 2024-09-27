@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
+@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
 public class ZapiszSe extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://zapisz.se";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("zapisz.se");
@@ -235,7 +235,7 @@ public class ZapiszSe extends PluginForHost {
         br.getPage("/addfiles.html");
         final String[] hosts = br.getRegex("<div class=\"col-1-6 host-item\"><img src=\"https?://[^\"]+/img/server/([^\"]+)\\.png\" />").getColumn(0);
         if (hosts == null || hosts.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
         ai.setMultiHostSupport(this, Arrays.asList(hosts));
         account.setConcurrentUsePossible(true);

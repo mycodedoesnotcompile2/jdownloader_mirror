@@ -60,6 +60,7 @@ import java.util.regex.Pattern;
 import javax.swing.KeyStroke;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Regex;
@@ -292,6 +293,7 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -358,6 +360,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -682,6 +685,44 @@ public class CrossSystem {
         return -1;
     }
 
+    @Deprecated
+    public static boolean caseSensitiveFileExists(final File file) {
+        if (file != null) {
+            if (JVMVersion.isMinimum(JVMVersion.JAVA_1_7)) {
+                try {
+                    /**
+                     * this is very fast
+                     */
+                    return CrossSystem17.caseSensitiveFileExists(file);
+                } catch (Throwable e) {
+                    LogV3.defaultLogger().log(e);
+                }
+            }
+            if (file.exists()) {
+                /** this can be slow **/
+                File current = file;
+                String currentName = current.getName();
+                loop: while ((current = current.getParentFile()) != null) {
+                    final String[] list = current.list();
+                    if (list != null) {
+                        for (String listItem : list) {
+                            if (currentName.equals(listItem)) {
+                                currentName = current.getName();
+                                continue loop;
+                            }
+                        }
+                    }
+                    return false;
+                }
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Returns the Mime Class for the current OS
      *
@@ -699,7 +740,7 @@ public class CrossSystem {
         return CrossSystem.OS;
     }
 
-    private static OperatingSystem getWindowsReleaseCMD() {
+    private static OperatingSystem getWindowsReleaseCMD(final String osName) {
         final Object initialValue = new Object();
         final AtomicReference<Object> reference = new AtomicReference<Object>(initialValue);
         final Thread thread = new Thread("getWindowsReleaseCMD: cmd -c ver") {
@@ -721,6 +762,20 @@ public class CrossSystem {
                     process = null;
                     final String buildNumberString = new Regex(line, "Microsoft\\s*Windows\\s*\\[Version\\s*\\d+\\.\\d+\\.(\\d+)").getMatch(0);
                     final int buildNumber = Integer.parseInt(buildNumberString);
+                    // TODO: query is workstation
+                    final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
+                    if (isServer) {
+                        if (buildNumber >= 26040) {
+                            set(OperatingSystem.WINDOWS_SERVER_2025);
+                        } else if (buildNumber >= 20348) {
+                            set(OperatingSystem.WINDOWS_SERVER_2022);
+                        } else if (buildNumber >= 17763) {
+                            set(OperatingSystem.WINDOWS_SERVER_2019);
+                        } else if (buildNumber >= 14393) {
+                            set(OperatingSystem.WINDOWS_SERVER_2016);
+                        }
+                        return;
+                    }
                     // https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
                     // https://en.wikipedia.org/wiki/Windows_11_version_history
                     // https://betawiki.net/wiki/Windows_as_a_service
@@ -796,7 +851,7 @@ public class CrossSystem {
             final String os = osName.toLowerCase(Locale.ENGLISH);
             if (os.contains("windows 11")) {
                 if (forceProbeCMD) {
-                    final OperatingSystem ret = getWindowsReleaseCMD();
+                    final OperatingSystem ret = getWindowsReleaseCMD(os);
                     if (ret != null) {
                         return ret;
                     }
@@ -822,7 +877,7 @@ public class CrossSystem {
                         trustFlag = false;
                     }
                     if (!trustFlag) {
-                        final OperatingSystem ret = getWindowsReleaseCMD();
+                        final OperatingSystem ret = getWindowsReleaseCMD(os);
                         if (ret != null) {
                             return ret;
                         }
@@ -833,7 +888,7 @@ public class CrossSystem {
                 return OperatingSystem.WINDOWS_10;
             } else if (os.contains("windows 8")) {
                 if (forceProbeCMD) {
-                    final OperatingSystem ret = getWindowsReleaseCMD();
+                    final OperatingSystem ret = getWindowsReleaseCMD(os);
                     if (ret != null) {
                         return ret;
                     }

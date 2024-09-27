@@ -54,6 +54,7 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.utils.AutoCloseInputStream;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
 
@@ -224,6 +225,9 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      */
     protected FlexiJSONParser createParser(InputStream stream, Object... context) {
         FlexiJSONParser ret = new FlexiJSONParser(stream);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            ret.setDebug(new StringBuilder());
+        }
         setIgnoreIssuesByContext(ret, context);
         return ret;
     }

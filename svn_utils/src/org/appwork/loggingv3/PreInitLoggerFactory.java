@@ -11,13 +11,12 @@ public class PreInitLoggerFactory extends SimpleLoggerFactory {
 
     public ArrayList<LogRecord2> getCached() {
         synchronized (cached) {
-        return new ArrayList<LogRecord2>(cached);
-        
+            return new ArrayList<LogRecord2>(cached);
         }
     }
 
     @Override
-    public void initDefaults() {
+    public PreInitLoggerFactory initDefaults() {
         addSink(new AbstractSink() {
             @Override
             public void publish(final LogRecord2 record) {
@@ -26,6 +25,7 @@ public class PreInitLoggerFactory extends SimpleLoggerFactory {
                 }
             }
         });
+        return this;
     }
 
     public PreInitLoggerFactory() {

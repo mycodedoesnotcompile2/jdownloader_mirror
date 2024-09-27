@@ -20,7 +20,6 @@ import org.appwork.utils.net.URLHelper;
 
 public class UrlQuery {
     // TODO: Compare/merge with HttpConnection.parseParameterList
-
     public static UrlQuery parse(String query) throws MalformedURLException {
         final UrlQuery ret = new UrlQuery();
         if (query == null) {
@@ -100,6 +99,12 @@ public class UrlQuery {
         return ret.toString();
     }
 
+    /**
+     * WARNING.... this is raw
+     *
+     * @deprecated Use {@link #append(String, String, boolean)} or {@link #appendEncoded(String, String)}
+     */
+    @Deprecated
     public UrlQuery add(String key, String value) {
         this.list.add(new KeyValueStringEntry(key, value));
         return this;

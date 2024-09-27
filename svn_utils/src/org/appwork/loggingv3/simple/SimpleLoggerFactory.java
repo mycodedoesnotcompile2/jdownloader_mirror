@@ -91,12 +91,13 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     public SimpleLoggerFactory() {
     }
 
-    public void initDefaults() {
+    public SimpleLoggerFactory initDefaults() {
         sinkToConsole = new LogToStdOutSink();
         // do not add a file sink by default. Else every application that uses the lib, will create log files. this must be enabled in the
         // application itself, usually by overwriting the facrory and put its path in the properties
         // addSink(sinkToFile);
         addSink(sinkToConsole);
+        return this;
     }
 
     @Override
@@ -228,5 +229,12 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
             }
         }
         return null;
+    }
+
+    /**
+     *
+     */
+    public void set() {
+        LogV3.setFactory(this);
     }
 }

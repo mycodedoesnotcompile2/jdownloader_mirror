@@ -37,6 +37,7 @@ import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -52,7 +53,6 @@ import javax.crypto.spec.SecretKeySpec;
  *
  */
 public class Crypto {
-
     /**
      * Decrypts data which has been encrypted with {@link Crypto#encrypt(String, byte[])}
      *
@@ -139,4 +139,15 @@ public class Crypto {
         return cipher.doFinal(data);
     }
 
+    private static final String       CHAR_POOL    = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"§$%&/()=?{[]}\\'#*+~,.-;:_'";
+    private static final SecureRandom secureRandom = new SecureRandom();
+
+    public static String generateRandomString(int length) {
+        StringBuilder stringBuilder = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int randomIndex = secureRandom.nextInt(CHAR_POOL.length());
+            stringBuilder.append(CHAR_POOL.charAt(randomIndex));
+        }
+        return stringBuilder.toString();
+    }
 }

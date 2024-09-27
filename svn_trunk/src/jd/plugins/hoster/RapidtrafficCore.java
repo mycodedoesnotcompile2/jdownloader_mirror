@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48144 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -140,8 +140,15 @@ public abstract class RapidtrafficCore extends PluginForHost {
         if (br.getRequest() == null || !br.getURL().contains("konto")) {
             br.getPage("/konto");
         }
-        final String hosterNames = " " + br.getRegex("(?i)Tutaj wklej linki do plików z <strong>(.*)</strong>, które chcesz ściągnąć").getMatch(0) + ",";
+        final String hosterNamesRaw = br.getRegex("(?i)Tutaj wklej linki do plików z <strong>(.*)</strong>, które chcesz ściągnąć").getMatch(0);
+        if (hosterNamesRaw == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
+        }
+        final String hosterNames = " " + hosterNamesRaw + ",";
         final String[] hostDomains = new Regex(hosterNames, " ([^,<>\"]*?),").getColumn(0);
+        if (hostDomains == null || hostDomains.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
+        }
         final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hostDomains));
         ai.setMultiHostSupport(this, supportedHosts);
         String transferLeftStr = br.getRegex("(?i)Pozostały transfer: <b>(-?\\d+\\.\\d+ [GM]B)</b>").getMatch(0).replace(".", ",");

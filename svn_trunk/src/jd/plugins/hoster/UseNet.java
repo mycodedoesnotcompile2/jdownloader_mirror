@@ -47,7 +47,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49814 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 49872 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends antiDDoSForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -318,7 +318,6 @@ public class UseNet extends antiDDoSForHost {
 
     protected void handleMultiHost(DownloadLink downloadLink, Account account, UsenetFile usenetFile, String username, String password, UsenetServer server) throws Exception {
         if (usenetFile == null) {
-            logger.severe("UsenetFile is missing!");
             setIncomplete(downloadLink, true);
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (server == null) {

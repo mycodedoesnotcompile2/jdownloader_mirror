@@ -248,7 +248,6 @@ public class Cookies {
                             cookie.setKey(cookiesList.get(0));
                             cookie.setValue(cookiesList.get(1));
                         } else if (listSize == 3) {
-                            // TODO: Review this
                             cookie.setKey(cookiesList.get(0));
                             cookie.setValue(cookiesList.get(1));
                             cookie.setHost(cookiesList.get(2));
