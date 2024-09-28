@@ -901,4 +901,19 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
     public boolean isLegacyConnectEnabled() {
         return legacyConnectFlag;
     }
+
+    /**
+     * @see org.appwork.utils.net.httpconnection.HTTPConnection#setProfiler(org.appwork.utils.net.httpconnection.HTTPConnectionProfilerInterface)
+     */
+    @Override
+    public void setProfiler(HTTPConnectionProfilerInterface profiler) {
+    }
+
+    /**
+     * @see org.appwork.utils.net.httpconnection.HTTPConnection#getProfiler()
+     */
+    @Override
+    public HTTPConnectionProfilerInterface getProfiler() {
+        return null;
+    }
 }

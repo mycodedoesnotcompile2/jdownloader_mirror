@@ -210,23 +210,23 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      *
      */
     @Override
-    public void onConnected(HTTPConnectionImpl httpConnectionImp) {
+    public void onConnected(HTTPConnection httpConnectionImp) {
         this.socketConnectedNanos = Time.getNanoSeconds();
     }
 
     @Override
-    public void onDisconnected(HTTPConnectionImpl httpConnectionImp) {
+    public void onDisconnected(HTTPConnection httpConnectionImp) {
     }
 
     @Override
-    public void onDisconnect(HTTPConnectionImpl httpConnectionImp) {
+    public void onDisconnect(HTTPConnection httpConnectionImp) {
     }
 
     /**
      *
      */
     @Override
-    public void onBeforeSocketGetInputStream(HTTPConnectionImpl httpConnectionImp) {
+    public void onBeforeSocketGetInputStream(HTTPConnection httpConnectionImp) {
         if (requestSentInclPostNanos == null) {
             requestSentInclPostNanos = Time.getNanoSeconds();
         }
@@ -236,7 +236,7 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      *
      */
     @Override
-    public void onAfterSocketGetInputStream(HTTPConnectionImpl httpConnectionImp) {
+    public void onAfterSocketGetInputStream(HTTPConnection httpConnectionImp) {
         inputStreamConnectedNanos = Time.getNanoSeconds();
     }
 
@@ -244,7 +244,7 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      *
      */
     @Override
-    public void onFirstHeaderByteRead(HTTPConnectionImpl httpConnectionImp) {
+    public void onFirstHeaderByteRead(HTTPConnection httpConnectionImp) {
         firstHeaderByteReadNanos = Time.getNanoSeconds();
     }
 
@@ -252,7 +252,7 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      *
      */
     @Override
-    public void onAllResponseHeadersRead(HTTPConnectionImpl httpConnectionImp) {
+    public void onAllResponseHeadersRead(HTTPConnection httpConnectionImp) {
         allResponseHeadersReadNanos = Time.getNanoSeconds();
     }
 
@@ -260,18 +260,18 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      *
      */
     @Override
-    public void onBeforeRequestHeadersSent(HTTPConnectionImpl httpConnectionImp, CharSequence request) {
+    public void onBeforeRequestHeadersSent(HTTPConnection httpConnectionImp, CharSequence request) {
     }
 
     @Override
-    public void onAfterRequestHeadersSent(HTTPConnectionImpl httpConnectionImp) {
+    public void onAfterRequestHeadersSent(HTTPConnection httpConnectionImp) {
         allRequestHeadersSentNanos = Time.getNanoSeconds();
     }
 
     /**
      * @return the allRequestHeadersSentNanos
      */
-    public Long getAllRequestHeadersSentNanos(HTTPConnectionImpl httpConnectionImp) {
+    public Long getAllRequestHeadersSentNanos(HTTPConnection httpConnectionImp) {
         return allRequestHeadersSentNanos;
     }
 
@@ -279,7 +279,7 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      * @param httpConnectionImpl
      */
     @Override
-    public void onFinalizeConnection(HTTPConnectionImpl httpConnectionImpl) {
+    public void onFinalizeConnection(HTTPConnection httpConnectionImpl) {
         connectionFinalizedNanos = Time.getNanoSeconds();
     }
 
@@ -294,14 +294,14 @@ public class HTTPConnectionProfiler implements HTTPConnectionProfilerInterface {
      * @param httpConnectionImpl
      */
     @Override
-    public void onConnect(HTTPConnectionImpl httpConnectionImpl) {
+    public void onConnect(HTTPConnection httpConnectionImpl) {
         if (start == null) {
             start = Time.getNanoSeconds();
         }
     }
 
     @Override
-    public void onSendRequest(HTTPConnectionImpl httpConnectionImp) {
+    public void onSendRequest(HTTPConnection httpConnectionImp) {
     }
 
 }

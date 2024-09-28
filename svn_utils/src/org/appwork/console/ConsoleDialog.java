@@ -50,7 +50,7 @@ public class ConsoleDialog implements ConsoleDialogInterface {
 
     public ConsoleDialog(final AbstractConsole console, String string) {
         if (console == null) {
-            throw new RuntimeException("No Console Available!");
+            throw new IllegalStateException("No Console Available!");
         }
         this.console = console;
         this.title = string;

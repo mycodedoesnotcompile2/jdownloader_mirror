@@ -882,6 +882,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
     /**
      * @return the profiler
      */
+    @Override
     public HTTPConnectionProfilerInterface getProfiler() {
         return profiler;
     }
@@ -890,6 +891,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
      * @param profiler
      *            the profiler to set
      */
+    @Override
     public void setProfiler(HTTPConnectionProfilerInterface profiler) {
         this.profiler = profiler;
     }

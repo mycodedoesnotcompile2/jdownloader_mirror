@@ -814,7 +814,7 @@ public class BasicHTTP implements Interruptible {
                 }
             }
             if (followRedirect != null) {
-                postPage(followRedirect, postData, baos, uploadProgress, downloadProgress);
+                download(followRedirect, downloadProgress, -1, baos, 0, System.currentTimeMillis());
             }
         }
     }

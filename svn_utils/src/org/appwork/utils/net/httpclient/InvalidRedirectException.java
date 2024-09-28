@@ -31,37 +31,17 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection;
+package org.appwork.utils.net.httpclient;
+
+import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 
 /**
  * @author daniel
- * @date Nov 16, 2022
+ * @date 19.11.2018
  *
  */
-public interface HTTPConnectionProfilerInterface {
-
-    public void onConnected(HTTPConnection httpConnectionImp);
-
-    public void onDisconnected(HTTPConnection httpConnectionImp);
-
-    public void onDisconnect(HTTPConnection httpConnectionImp);
-
-    public void onBeforeSocketGetInputStream(HTTPConnection httpConnectionImp);
-
-    public void onAfterSocketGetInputStream(HTTPConnection httpConnectionImp);
-
-    public void onFirstHeaderByteRead(HTTPConnection httpConnectionImp);
-
-    public void onAllResponseHeadersRead(HTTPConnection httpConnectionImp);
-
-    public void onSendRequest(HTTPConnection httpConnectionImp);
-
-    public void onBeforeRequestHeadersSent(HTTPConnection httpConnectionImp, CharSequence request);
-
-    public void onAfterRequestHeadersSent(HTTPConnection httpConnectionImp);
-
-    public void onFinalizeConnection(HTTPConnection httpConnectionImpl);
-
-    public void onConnect(HTTPConnection httpConnectionImpl);
-
+public class InvalidRedirectException extends HttpClientException {
+    public InvalidRedirectException(RequestContext context) {
+        super(context, null);
+    }
 }

@@ -73,7 +73,7 @@ public abstract class Queue {
     protected static AtomicInteger                                      QUEUELOOPPREVENTION = new AtomicInteger(0);
     private final String                                                id;
     protected volatile long                                             timeout             = 10 * 1000l;
-    private final ArrayDeque<?>[]                                       queues;
+    protected final ArrayDeque<?>[]                                     queues;
 
     public Queue(final String id) {
         this.id = id;
@@ -398,15 +398,42 @@ public abstract class Queue {
         return false;
     }
 
-    private QueueAction<?, ? extends Throwable> poll() {
-        for (int i = 0; i < queues.length; i++) {
-            final ArrayDeque<?> queue = queues[i];
-            final QueueAction<?, ? extends Throwable> ret = (QueueAction<?, ? extends Throwable>) queue.poll();
-            if (ret != null) {
-                return ret;
+    protected boolean isQueued(final QueueAction<?, ?> action) {
+        synchronized (getLock()) {
+            for (int i = 0; i < queues.length; i++) {
+                final ArrayDeque<?> queue = queues[i];
+                if (queue.contains(action)) {
+                    return true;
+                }
             }
+            return false;
         }
-        return null;
+    }
+
+    protected QueueAction<?, ? extends Throwable> poll() {
+        synchronized (getLock()) {
+            for (int i = 0; i < queues.length; i++) {
+                final ArrayDeque<?> queue = queues[i];
+                final QueueAction<?, ? extends Throwable> ret = (QueueAction<?, ? extends Throwable>) queue.poll();
+                if (ret != null) {
+                    return ret;
+                }
+            }
+            return null;
+        }
+    }
+
+    protected QueueAction<?, ? extends Throwable> peek() {
+        synchronized (getLock()) {
+            for (int i = 0; i < queues.length; i++) {
+                final ArrayDeque<?> queue = queues[i];
+                final QueueAction<?, ? extends Throwable> ret = (QueueAction<?, ? extends Throwable>) queue.peek();
+                if (ret != null) {
+                    return ret;
+                }
+            }
+            return null;
+        }
     }
 
     private final AtomicReference<QueueAction<?, ? extends Throwable>> pendingItem = new AtomicReference<QueueAction<?, ? extends Throwable>>();

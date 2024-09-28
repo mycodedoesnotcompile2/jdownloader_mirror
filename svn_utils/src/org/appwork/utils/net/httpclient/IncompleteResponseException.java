@@ -31,37 +31,27 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.net.httpconnection;
+package org.appwork.utils.net.httpclient;
+
+import org.appwork.utils.net.httpclient.HttpClient.RequestContext;
 
 /**
  * @author daniel
- * @date Nov 16, 2022
+ * @date 19.11.2018
  *
  */
-public interface HTTPConnectionProfilerInterface {
+public class IncompleteResponseException extends HttpClientException {
+    protected final long loaded;
 
-    public void onConnected(HTTPConnection httpConnectionImp);
+    public long getLoaded() {
+        return loaded;
+    }
 
-    public void onDisconnected(HTTPConnection httpConnectionImp);
-
-    public void onDisconnect(HTTPConnection httpConnectionImp);
-
-    public void onBeforeSocketGetInputStream(HTTPConnection httpConnectionImp);
-
-    public void onAfterSocketGetInputStream(HTTPConnection httpConnectionImp);
-
-    public void onFirstHeaderByteRead(HTTPConnection httpConnectionImp);
-
-    public void onAllResponseHeadersRead(HTTPConnection httpConnectionImp);
-
-    public void onSendRequest(HTTPConnection httpConnectionImp);
-
-    public void onBeforeRequestHeadersSent(HTTPConnection httpConnectionImp, CharSequence request);
-
-    public void onAfterRequestHeadersSent(HTTPConnection httpConnectionImp);
-
-    public void onFinalizeConnection(HTTPConnection httpConnectionImpl);
-
-    public void onConnect(HTTPConnection httpConnectionImpl);
-
+    /**
+     * @param connection
+     */
+    public IncompleteResponseException(final RequestContext context, final long loaded) {
+        super(context, null, null);
+        this.loaded = loaded;
+    }
 }

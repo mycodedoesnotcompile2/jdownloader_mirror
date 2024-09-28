@@ -160,4 +160,15 @@ public interface HTTPConnection {
     void setSSLTrustALL(boolean trustALL);
 
     boolean isSSLTrustALL();
+
+    /**
+     * @param profiler
+     *            the profiler to set
+     */
+    void setProfiler(HTTPConnectionProfilerInterface profiler);
+
+    /**
+     * @return the profiler
+     */
+    HTTPConnectionProfilerInterface getProfiler();
 }
