@@ -22,6 +22,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.BangComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -29,6 +35,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
 import jd.plugins.Account.AccountType;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -41,13 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BangCom;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.BangComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BangCom.class })
 public class BangComCrawler extends PluginForDecrypt {
     public BangComCrawler(PluginWrapper wrapper) {
@@ -185,6 +186,9 @@ public class BangComCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (account != null && br.containsHTML(">\\s*No unlocks")) {
+            account.setError(AccountError.EXPIRED, 3 * 60 * 1000, "Expired trial account (no unlocks left)");
+        }
         Map<String, Object> videoObject = null;
         final String[] jsSnippets = br.getRegex("<script type=\"application/ld\\+json\">(.*?)</script>").getColumn(0);
         for (final String jsSnippet : jsSnippets) {
@@ -263,7 +267,7 @@ public class BangComCrawler extends PluginForDecrypt {
             // final String[] videoQualityLabels = br.getRegex("</svg>([^<]+)</span>").getColumn(0);
             for (final Map<String, Object> file : files) {
                 final String videoDownloadurl = file.get("url").toString();
-                final Number fileSizeO = (Number) file.get("fileSize");
+                final Object fileSizeO = file.get("fileSize");
                 String pixelHeightStr = new Regex(videoDownloadurl, "(\\d+)p\\.mp4").getMatch(0);
                 if (pixelHeightStr == null) {
                     pixelHeightStr = new Regex(videoDownloadurl, "\\d+x(\\d+)-\\d+k\\.").getMatch(0);
@@ -276,7 +280,11 @@ public class BangComCrawler extends PluginForDecrypt {
                 }
                 final DownloadLink video = new DownloadLink(plg, null, this.getHost(), videoDownloadurl, true);
                 if (fileSizeO != null) {
-                    video.setDownloadSize(fileSizeO.longValue());
+                    if (fileSizeO instanceof Number) {
+                        video.setDownloadSize(((Number) fileSizeO).longValue());
+                    } else {
+                        video.setDownloadSize(Long.parseLong(fileSizeO.toString()));
+                    }
                 }
                 if (files.size() == 1) {
                     video.setProperty(BangCom.PROPERTY_QUALITY_IDENTIFIER, BangCom.QUALITY_IDENTIFIER_SINGLEVIDEO);

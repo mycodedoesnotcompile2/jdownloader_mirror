@@ -98,6 +98,27 @@ public class Application {
     public static PauseableOutputStream STD_OUT;
     public static PauseableOutputStream ERR_OUT;
     private static boolean              DID_INIT      = false;
+    private static PrintStream          ORG_STD_OUT;
+
+    public static PrintStream getSystemStdOut() {
+        return ORG_STD_OUT;
+    }
+
+    public static PrintStream getSystemStdErr() {
+        return ORG_STD_ERR;
+    }
+
+    public static PrintStream getWrappedStdOut() {
+        return REDIRECTED_STD_OUT;
+    }
+
+    public static PrintStream getWrappedStdErr() {
+        return REDIRECTED_STD_ERR;
+    }
+
+    private static PrintStream ORG_STD_ERR;
+    private static PrintStream REDIRECTED_STD_OUT;
+    private static PrintStream REDIRECTED_STD_ERR;
     static {
         // its important to do this AFTER the variables init. else statics like REDIRECTED will get overwritten
         if (System.getProperty("NO_SYSOUT_REDIRECT") == null) {
@@ -918,6 +939,8 @@ public class Application {
         if (Application.REDIRECTED) {
             return;
         }
+        ORG_STD_OUT = System.out;
+        ORG_STD_ERR = System.err;
         try {
             if (System.getProperty("sun.stdout.encoding") == null && Charset.defaultCharset() == Charset.forName("cp1252")) {
                 // workaround.
@@ -943,6 +966,8 @@ public class Application {
                 }
             }
         } finally {
+            REDIRECTED_STD_OUT = System.out;
+            REDIRECTED_STD_ERR = System.err;
             Application.REDIRECTED = true;
         }
     }

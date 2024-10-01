@@ -254,16 +254,20 @@ public class ExtractionController extends QueueAction<Void, RuntimeException> im
         return (ExtractionQueue) super.getQueue();
     }
 
-    public void kill() {
-        try {
+    public boolean kill() {
+        if (gotStarted()) {
+            logger.info("abort extraction");
+            logger.flush();
+        } else {
+            logger.close();
+        }
+        if (super.kill()) {
             if (gotStarted()) {
-                logger.info("abort extraction");
-                logger.flush();
-            } else {
-                logger.close();
+                extension.getEventSender().fireEvent(new ExtractionEvent(this, ExtractionEvent.Type.CLEANUP));
             }
-        } finally {
-            super.kill();
+            return true;
+        } else {
+            return false;
         }
     }
 

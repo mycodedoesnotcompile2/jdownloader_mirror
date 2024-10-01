@@ -30,6 +30,18 @@ public class ExtractionQueue extends Queue {
         return this.getCurrentJobs().contains(p);
     }
 
+    @Override
+    public void killQueue() {
+        super.killQueue();
+        final List<QueueAction> currentjobs;
+        synchronized (getLock()) {
+            currentjobs = new ArrayList<QueueAction>(getCurrentJobs());
+        }
+        for (final QueueAction job : currentjobs) {
+            job.kill();
+        }
+    }
+
     public ExtractionController getCurrentQueueEntry() {
         return (ExtractionController) this.getCurrentJobs().peekLast();
     }

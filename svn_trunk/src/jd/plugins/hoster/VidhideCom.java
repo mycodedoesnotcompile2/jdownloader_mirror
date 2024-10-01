@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49612 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -50,7 +50,7 @@ public class VidhideCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "vidhide.com", "vidhidepro.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc" });
+        ret.add(new String[] { "vidhide.com", "vidhidepro.com", "moflix-stream.click", "javplaya.com", "filelions.to", "filelions.com", "filelions.online", "filelions.site", "alions.pro", "azipcdn.com", "vidhidepre.com", "dlions.pro", "playrecord.biz", "mycloudz.cc", "vidhideplus.com", "nikaplayer.com" });
         return ret;
     }
 

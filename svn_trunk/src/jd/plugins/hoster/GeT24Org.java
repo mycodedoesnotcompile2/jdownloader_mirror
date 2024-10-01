@@ -3,6 +3,12 @@ package jd.plugins.hoster;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -19,25 +25,26 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.Hash;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 @HostPlugin(revision = "$Revision: 41665 $", interfaceVersion = 3, names = { "get24.org" }, urls = { "" })
 public class GeT24Org extends PluginForHost {
-    private static final String  VERSION = "0.0.1";
-    private static final Integer MAXSIM  = 3;
+    private static final String VERSION = "0.0.1";
 
     public GeT24Org(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://get24.org/pricing");
+        this.enablePremium("https://" + getHost() + "/pricing");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.getHeaders().put("User-Agent", "Jdownloader " + VERSION);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://get24.org/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -45,37 +52,28 @@ public class GeT24Org extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
-    private Browser newBrowser() {
-        br = new Browser();
-        br.setCookiesExclusive(true);
-        br.getHeaders().put("User-Agent", "Jdownloader " + VERSION);
-        return br;
-    }
-
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        // TODO: status
-        final AccountInfo acc_info = new AccountInfo();
-        this.br = newBrowser();
-        String response = br.postPage("https://get24.org/api/login", "email=" + Encoding.urlEncode(account.getUser()) + "&passwd_sha256=" + Hash.getSHA256(account.getPass()));
+        final AccountInfo ai = new AccountInfo();
+        String response = br.postPage("https://" + getHost() + "/api/login", "email=" + Encoding.urlEncode(account.getUser()) + "&passwd_sha256=" + Hash.getSHA256(account.getPass()));
         if (!Boolean.parseBoolean(PluginJSonUtils.getJson(response, "ok")) && StringUtils.equalsIgnoreCase(PluginJSonUtils.getJson(response, "reason"), "invalid credentials")) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, "Wrong login or password", PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
         Long date_expire = TimeFormatter.getMilliSeconds(PluginJSonUtils.getJson(response, "date_expire"), "yyyy-MM-dd", Locale.ENGLISH);
-        acc_info.setValidUntil(date_expire);
+        ai.setValidUntil(date_expire);
         long transfer_left = (long) (Float.parseFloat(PluginJSonUtils.getJson(response, "transfer_left")) * 1024 * 1024 * 1024);
-        acc_info.setTrafficLeft(transfer_left);
+        ai.setTrafficLeft(transfer_left);
         long transfer_max = (long) (Float.parseFloat(PluginJSonUtils.getJson(response, "transfer_max")) * 1024 * 1024 * 1024);
-        acc_info.setTrafficMax(transfer_max);
-        account.setMaxSimultanDownloads(MAXSIM);
+        ai.setTrafficMax(transfer_max);
+        account.setMaxSimultanDownloads(3);
         account.setConcurrentUsePossible(true);
         // hosts list
-        response = br.getPage("https://get24.org/api/hosts/enabled");
-        List<String> supportedHosts = (List) JavaScriptEngineFactory.jsonToJavaObject(response);
-        acc_info.setMultiHostSupport(this, supportedHosts);
         account.setType(AccountType.PREMIUM);
+        response = br.getPage("https://" + getHost() + "/api/hosts/enabled");
+        final List<String> supportedHosts = (List) JavaScriptEngineFactory.jsonToJavaObject(response);
+        ai.setMultiHostSupport(this, supportedHosts);
         // acc_info.setStatus("Premium User");
-        return acc_info;
+        return ai;
     }
 
     @Override
@@ -84,7 +82,6 @@ public class GeT24Org extends PluginForHost {
     }
 
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        this.br = newBrowser();
         final String directurlproperty = this.getHost() + "directurl";
         String directurl = checkDirectLink(link, directurlproperty);
         if (directurl == null) {

@@ -23,11 +23,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
 public class LinkifierCom extends PluginForHost {
     private static MultiHosterManagement mhm      = new MultiHosterManagement("linkifier.com");
     private static final String          API_KEY  = "d046c4309bb7cabd19f49118a2ab25e0";
@@ -60,54 +62,54 @@ public class LinkifierCom extends PluginForHost {
         userRequest.setContentType("application/json; charset=utf-8");
         userRequest.setPostBytes(JSonStorage.serializeToJsonByteArray(userJson));
         final Map<String, Object> userResponse = restoreFromString(br.getPage(userRequest), TypeRef.MAP);
-        if (Boolean.TRUE.equals(userResponse.get("isActive")) && !Boolean.TRUE.equals(userResponse.get("hasErrors"))) {
-            final PostRequest hosterRequest = new PostRequest(API_BASE + "/DownloadAPI.svc/hosters");
-            hosterRequest.setContentType("application/json; charset=utf-8");
-            hosterRequest.setPostBytes(JSonStorage.serializeToJsonByteArray(userJson));
-            final Map<String, Object> hosterResponse = restoreFromString(br.getPage(hosterRequest), TypeRef.MAP);
-            if ("unlimited".equalsIgnoreCase(String.valueOf(userResponse.get("extraTraffic")))) {
-                ai.setUnlimitedTraffic();
-            }
-            // final long serverDate = ((Number) hosterResponse.get("ServerDate")).longValue();
-            final Number expiryDate = (Number) userResponse.get("expirydate");
-            ai.setValidUntil(expiryDate.longValue());
-            if (!ai.isExpired()) {
-                final List<Map<String, Object>> hosters = (List<Map<String, Object>>) hosterResponse.get("hosters");
-                if (hosters != null) {
-                    final List<String> supportedHosts = new ArrayList<String>();
-                    for (Map<String, Object> host : hosters) {
-                        final String hostername = host.get("hostername") != null ? String.valueOf(host.get("hostername")) : null;
-                        if (Boolean.TRUE.equals(host.get("isActive")) && StringUtils.isNotEmpty(hostername)) {
-                            supportedHosts.add(hostername);
-                        }
-                    }
-                    ai.setMultiHostSupport(this, supportedHosts);
-                }
-                account.setType(AccountType.PREMIUM);
-                account.setMaxSimultanDownloads(0);
-                return ai;
+        if (Boolean.TRUE.equals(userResponse.get("hasErrors"))) {
+            final String errorMsg = userResponse.get("ErrorMSG") != null ? String.valueOf(userResponse.get("ErrorMSG")) : null;
+            if (StringUtils.containsIgnoreCase(errorMsg, "Error verifying api key")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            } else if (StringUtils.containsIgnoreCase(errorMsg, "Could not find a customer with those credentials")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            } else if (StringUtils.isNotEmpty(errorMsg)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, errorMsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
             }
         }
-        final String errorMsg = userResponse.get("ErrorMSG") != null ? String.valueOf(userResponse.get("ErrorMSG")) : null;
-        if (StringUtils.containsIgnoreCase(errorMsg, "Error verifying api key")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } else if (StringUtils.containsIgnoreCase(errorMsg, "Could not find a customer with those credentials")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } else if (StringUtils.isNotEmpty(errorMsg)) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, errorMsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
+        final PostRequest hosterRequest = new PostRequest(API_BASE + "/DownloadAPI.svc/hosters");
+        hosterRequest.setContentType("application/json; charset=utf-8");
+        hosterRequest.setPostBytes(JSonStorage.serializeToJsonByteArray(userJson));
+        final Map<String, Object> hosterResponse = restoreFromString(br.getPage(hosterRequest), TypeRef.MAP);
+        final Object extraTraffic = userResponse.get("extraTraffic");
+        if ("unlimited".equalsIgnoreCase(String.valueOf(extraTraffic))) {
+            ai.setUnlimitedTraffic();
         }
-        if (errorMsg == null) {
-            final Number expiryDate = (Number) userResponse.get("expirydate");
-            if (expiryDate != null && expiryDate.longValue() < System.currentTimeMillis()) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account expired", PluginException.VALUE_ID_PREMIUM_DISABLE);
+        final List<Map<String, Object>> hosters = (List<Map<String, Object>>) hosterResponse.get("hosters");
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        for (final Map<String, Object> host : hosters) {
+            final String domain = host.get("hostername").toString();
+            /* 0 = unlimited */
+            final long maxTrafficDailyMB = ((Number) host.get("Limit")).longValue();
+            /* TODO: Find out what "dl_max" means. */
+            // final long dl_max = ((Number) host.get("dl_max")).longValue();
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            if (Boolean.FALSE.equals(host.get("isActive"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            if (maxTrafficDailyMB > 0) {
+                mhost.setTrafficMax(maxTrafficDailyMB * 1024 * 1024);
+            }
+            supportedhosts.add(mhost);
         }
-        /* 2017-01-05: Free accounts cannot download anything. */
-        account.setType(AccountType.FREE);
-        account.setMaxSimultanDownloads(1);
-        account.setConcurrentUsePossible(false);
-        ai.setStatus("Free Account");
-        ai.setTrafficLeft(0);
+        ai.setMultiHostSupportV2(this, supportedhosts);
+        // final Number trafficUsedToday = (Number) userResponse.get("trafficUsedToday");
+        if (Boolean.TRUE.equals(userResponse.get("isActive"))) {
+            account.setType(AccountType.PREMIUM);
+            final long serverDate = ((Number) hosterResponse.get("ServerDate")).longValue();
+            final long expiryDate = ((Number) userResponse.get("expirydate")).longValue();
+            final long validTime = expiryDate - serverDate;
+            ai.setValidUntil(System.currentTimeMillis() + validTime);
+        } else {
+            /* 2017-01-05: Free accounts cannot download anything. */
+            account.setType(AccountType.FREE);
+            ai.setExpired(true);
+        }
         return ai;
     }
 
@@ -144,93 +146,8 @@ public class LinkifierCom extends PluginForHost {
         downloadRequest.setContentType("application/json; charset=utf-8");
         downloadRequest.setPostBytes(JSonStorage.serializeToJsonByteArray(downloadJson));
         final Map<String, Object> downloadResponse = restoreFromString(br.getPage(downloadRequest), TypeRef.MAP);
-        if (Boolean.FALSE.equals(downloadResponse.get("hasErrors"))) {
-            final String dllink = downloadResponse.get("url") != null ? String.valueOf(downloadResponse.get("url")) : null;
-            if (StringUtils.isEmpty(dllink)) {
-                mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknull", 50, 5 * 60 * 1000l);
-            }
-            br.setConnectTimeout(120 * 1000);
-            br.setReadTimeout(120 * 1000);
-            final Number con_max = (Number) downloadResponse.get("con_max");
-            final Boolean con_resume = (Boolean) downloadResponse.get("con_resume");
-            final boolean resume;
-            final int maxChunks;
-            if (Boolean.FALSE.equals(con_resume)) {
-                maxChunks = 1;
-                resume = false;
-            } else {
-                resume = true;
-                if (con_max != null) {
-                    if (con_max.intValue() <= 1) {
-                        maxChunks = 1;
-                    } else {
-                        maxChunks = -con_max.intValue();
-                    }
-                } else {
-                    maxChunks = 1;
-                }
-            }
-            try {
-                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
-                if (StringUtils.containsIgnoreCase(dl.getConnection().getContentType(), "json") || StringUtils.containsIgnoreCase(dl.getConnection().getContentType(), "text")) {
-                    br.followConnection(true);
-                    String errorMessage = new Regex(br.getRequest().getUrl(), "\\!%20Error%20Code:([^\\&]+)").getMatch(0);
-                    String errDesc = "Unknown error";
-                    try {
-                        errDesc = UrlQuery.parse(br.getRequest().getUrl()).getDecoded("ErrDesc");
-                    } catch (final Throwable e) {
-                    }
-                    if (dl.getConnection().getResponseCode() == 500 && br.containsHTML("<title>[^<]*Error[^<]*</title>")) {
-                        // throw new PluginException(LinkStatus.ERROR_RETRY, ErrDesc == null ? "Server Error" : ErrDesc,
-                        // PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-                        int requests = ((Number) link.getProperty("retryRequests", 0)).intValue() + 1;
-                        link.setProperty("retryRequests", requests);
-                        int waitTime = 0;
-                        switch (requests) {
-                        case 1:
-                            waitTime = 0;
-                            break;
-                        case 2:
-                            waitTime = 3;
-                            break;
-                        case 3:
-                            waitTime = 5;
-                            break;
-                        case 4:
-                            waitTime = 15;
-                            break;
-                        case 5:
-                            waitTime = 30;
-                            break;
-                        default:
-                            waitTime = 3;
-                            break;
-                        }
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errDesc == null ? "Server Error" : errDesc, waitTime * 60 * 1000l + 1);
-                    } else {
-                        mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknofile1", 50, 5 * 60 * 1000l);
-                    }
-                }
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection(true);
-                    mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknofile12", 50, 5 * 60 * 1000l);
-                }
-                dl.startDownload();
-            } catch (PluginException e) {
-                if ("Server: Redirect".equals(e.getMessage())) {
-                    // the server often returns errors on multichunk connections. I aggreed with the admin to auto reduce chunk count to 1
-                    // if we detect this
-                    logger.severe("Server error with multichunk loading. Limiting Link to 1 chunk");
-                    link.setChunks(1);
-                    throw e;
-                } else {
-                    throw e;
-                }
-            }
-            return;
-        }
-        final String errorMsg = downloadResponse.get("ErrorMSG") != null ? String.valueOf(downloadResponse.get("ErrorMSG")) : null;
-        if (errorMsg != null) {
+        if (Boolean.TRUE.equals(downloadResponse.get("hasErrors"))) {
+            final String errorMsg = downloadResponse.get("ErrorMSG") != null ? String.valueOf(downloadResponse.get("ErrorMSG")) : null;
             if (StringUtils.containsIgnoreCase(errorMsg, "Error verifying api key")) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, errorMsg, PluginException.VALUE_ID_PREMIUM_DISABLE);
             } else if (StringUtils.containsIgnoreCase(errorMsg, "Could not find a customer with those credentials")) {
@@ -246,13 +163,89 @@ public class LinkifierCom extends PluginForHost {
             } else if (StringUtils.containsIgnoreCase(errorMsg, "Hoster is not supported")) {
                 mhm.putError(account, link, 5 * 60 * 1000l, errorMsg);
             }
+        }
+        final String dllink = downloadResponse.get("url") != null ? String.valueOf(downloadResponse.get("url")) : null;
+        if (StringUtils.isEmpty(dllink)) {
+            mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknull", 50, 5 * 60 * 1000l);
+        }
+        br.setConnectTimeout(120 * 1000);
+        br.setReadTimeout(120 * 1000);
+        final Number con_max = (Number) downloadResponse.get("con_max");
+        final Boolean con_resume = (Boolean) downloadResponse.get("con_resume");
+        final boolean resume;
+        final int maxChunks;
+        if (Boolean.FALSE.equals(con_resume)) {
+            maxChunks = 1;
+            resume = false;
         } else {
-            final Number expiryDate = (Number) downloadResponse.get("expirydate");
-            if (expiryDate != null && expiryDate.longValue() < System.currentTimeMillis()) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Account expired", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            resume = true;
+            if (con_max != null) {
+                if (con_max.intValue() <= 1) {
+                    maxChunks = 1;
+                } else {
+                    maxChunks = -con_max.intValue();
+                }
+            } else {
+                maxChunks = 1;
             }
         }
-        mhm.handleErrorGeneric(account, this.getDownloadLink(), "unknowndlerror", 50, 5 * 60 * 1000l);
+        try {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
+            if (StringUtils.containsIgnoreCase(dl.getConnection().getContentType(), "json") || StringUtils.containsIgnoreCase(dl.getConnection().getContentType(), "text")) {
+                br.followConnection(true);
+                String errorMessage = new Regex(br.getRequest().getUrl(), "\\!%20Error%20Code:([^\\&]+)").getMatch(0);
+                String errDesc = "Unknown error";
+                try {
+                    errDesc = UrlQuery.parse(br.getRequest().getUrl()).getDecoded("ErrDesc");
+                } catch (final Throwable e) {
+                }
+                if (dl.getConnection().getResponseCode() == 500 && br.containsHTML("<title>[^<]*Error[^<]*</title>")) {
+                    // throw new PluginException(LinkStatus.ERROR_RETRY, ErrDesc == null ? "Server Error" : ErrDesc,
+                    // PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+                    int requests = ((Number) link.getProperty("retryRequests", 0)).intValue() + 1;
+                    link.setProperty("retryRequests", requests);
+                    int waitTime = 0;
+                    switch (requests) {
+                    case 1:
+                        waitTime = 0;
+                        break;
+                    case 2:
+                        waitTime = 3;
+                        break;
+                    case 3:
+                        waitTime = 5;
+                        break;
+                    case 4:
+                        waitTime = 15;
+                        break;
+                    case 5:
+                        waitTime = 30;
+                        break;
+                    default:
+                        waitTime = 3;
+                        break;
+                    }
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errDesc == null ? "Server Error" : errDesc, waitTime * 60 * 1000l + 1);
+                } else {
+                    mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknofile1", 50, 5 * 60 * 1000l);
+                }
+            }
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknofile12", 50, 5 * 60 * 1000l);
+            }
+            dl.startDownload();
+        } catch (PluginException e) {
+            if ("Server: Redirect".equals(e.getMessage())) {
+                // the server often returns errors on multichunk connections. I aggreed with the admin to auto reduce chunk count to 1
+                // if we detect this
+                logger.severe("Server error with multichunk loading. Limiting Link to 1 chunk");
+                link.setChunks(1);
+                throw e;
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override

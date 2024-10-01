@@ -40,18 +40,14 @@ import org.appwork.utils.event.queue.Queue.QueuePriority;
  *
  */
 public abstract class QueueAction<T, E extends Throwable> {
-
     private Throwable        exeption;
-
     private volatile boolean finished         = false;
     private volatile boolean killed           = false;
     private QueuePriority    prio             = QueuePriority.NORM;
     private Queue            queue            = null;
     private T                result           = null;
     private String           callerStackTrace = null;
-
     private volatile boolean started          = false;
-
     private Thread           thread           = null;
 
     public QueueAction() {
@@ -130,14 +126,15 @@ public abstract class QueueAction<T, E extends Throwable> {
         return this.finished;
     }
 
-    public void kill() {
+    public boolean kill() {
         synchronized (this) {
             if (this.finished == true) {
-                return;
+                return false;
             }
             this.killed = true;
             this.finished = true;
             this.notifyAll();
+            return true;
         }
     }
 
@@ -201,7 +198,6 @@ public abstract class QueueAction<T, E extends Throwable> {
         try {
             this.result = this.run();
         } catch (final Throwable th) {
-
             if (queue != null && queue.isDebug()) {
                 org.appwork.loggingv3.LogV3.severe("QueueActionCallerStackTrace:\r\n" + this.callerStackTrace);
             }

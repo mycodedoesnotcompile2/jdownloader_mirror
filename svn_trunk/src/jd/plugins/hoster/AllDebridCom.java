@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49885 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -287,9 +287,10 @@ public class AllDebridCom extends PluginForHost {
             final String host_without_tld = hosterinfos.get("name").toString();
             final Number quota = (Number) hosterinfos.get("quota");
             final String quotaType = (String) hosterinfos.get("quotaType");
+            final List<String> domains = (List<String>) hosterinfos.get("domains");
             final MultiHostHost mhost = new MultiHostHost();
             mhost.setName(host_without_tld);
-            mhost.setDomains((List<String>) hosterinfos.get("domains"));
+            mhost.setDomains(domains);
             /*
              * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and JD
              * also does not accept them but we're doing this check nevertheless.
@@ -318,7 +319,22 @@ public class AllDebridCom extends PluginForHost {
             } else {
                 // No limit
             }
-            supportedHosts.add(mhost);
+            if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
+                /*
+                 * Workaround for them putting turbobit.net and hitfile.net into one entry but this way upper handling would only detect one
+                 * of them.
+                 */
+                final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
+                hitfile.setTrafficLeft(mhost.getTrafficLeft());
+                hitfile.setLinksLeft(mhost.getLinksLeft());
+                supportedHosts.add(hitfile);
+                final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
+                turbobit.setTrafficLeft(mhost.getTrafficLeft());
+                turbobit.setLinksLeft(mhost.getLinksLeft());
+                supportedHosts.add(turbobit);
+            } else {
+                supportedHosts.add(mhost);
+            }
         }
         accountInfo.setMultiHostSupportV2(this, supportedHosts);
         return accountInfo;

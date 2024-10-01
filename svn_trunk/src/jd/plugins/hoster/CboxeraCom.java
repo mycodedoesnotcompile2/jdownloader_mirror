@@ -17,7 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +25,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -41,24 +39,25 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48549 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
-    private static final String                  API_BASE             = "https://api.cboxera.com";
+    private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
-    private static final String                  RECAPTCHAv2_SITEKEY  = "6Ldq4FwUAAAAAJ81U4lQEvQXps384V7eCWJWxdjf";
-    private static MultiHosterManagement         mhm                  = new MultiHosterManagement("cboxera.com");
-    private static LinkedHashMap<String, Object> individualHostLimits = new LinkedHashMap<String, Object>();
+    private static final String          RECAPTCHAv2_SITEKEY = "6Ldq4FwUAAAAAJ81U4lQEvQXps384V7eCWJWxdjf";
+    private static MultiHosterManagement mhm                 = new MultiHosterManagement("cboxera.com");
     /* Connection limits: 2020-03-24: According to API docs "Max Connections: 15 per user/minute" --> WTF --> Set it to unlimited for now */
-    private static final int                     defaultMAXDOWNLOADS  = -1;
-    private static final int                     defaultMAXCHUNKS     = 0;
-    private static final boolean                 defaultRESUME        = true;
-    private static final String                  PROPERTY_logintoken  = "token";
-    private static final String                  PROPERTY_directlink  = "directlink";
+    private static final int             defaultMAXDOWNLOADS = -1;
+    private static final int             defaultMAXCHUNKS    = 0;
+    private static final boolean         defaultRESUME       = true;
+    private static final String          PROPERTY_logintoken = "token";
+    private static final String          PROPERTY_directlink = "directlink";
 
     @SuppressWarnings("deprecation")
     public CboxeraCom(PluginWrapper wrapper) {
@@ -92,22 +91,9 @@ public class CboxeraCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        final long filesize = link.getView().getBytesTotal();
         if (account == null) {
             /* without account its not possible to download the link */
             return false;
-        } else if (individualHostLimits.containsKey(link.getHost()) && filesize > 0) {
-            /* Check if we can download from this individual host --> Lowers required http requests */
-            final Map<String, Long> hostlimits = (Map<String, Long>) individualHostLimits.get(link.getHost());
-            final long bandwidth_limit = hostlimits.get("bandwidth_limit");
-            final long size_limit = hostlimits.get("size_limit");
-            if (bandwidth_limit > -1 && filesize > bandwidth_limit) {
-                // logger.info("Not enough traffic left to download files from " + this.getHost());
-                return false;
-            } else if (size_limit > -1 && filesize > size_limit) {
-                // logger.info("File is too big to be downloaded by multihost " + this.getHost());
-                return false;
-            }
         }
         mhm.runCheck(account, link);
         return true;
@@ -188,11 +174,11 @@ public class CboxeraCom extends PluginForHost {
             br.getPage(API_BASE + "/private/user/info");
             handleErrors(br, account, null);
         }
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         /* 2020-03-24: E.g. free account: "subscription":{"is_vip":false,"bw_limit":"25GB","days":0} */
-        entries = (Map<String, Object>) entries.get("subscription");
-        boolean is_premium = ((Boolean) entries.get("is_vip"));
-        final String trafficleft = (String) entries.get("bw_limit");
+        final Map<String, Object> subscription = (Map<String, Object>) entries.get("subscription");
+        boolean is_premium = ((Boolean) subscription.get("is_vip"));
+        final String trafficleft = (String) subscription.get("bw_limit");
         if (!is_premium) {
             account.setType(AccountType.FREE);
             ai.setStatus("Free account");
@@ -201,7 +187,7 @@ public class CboxeraCom extends PluginForHost {
             account.setType(AccountType.PREMIUM);
             ai.setStatus("Premium account");
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
-            final long premium_days_left = JavaScriptEngineFactory.toLong(entries.get("days"), -1);
+            final long premium_days_left = JavaScriptEngineFactory.toLong(subscription.get("days"), -1);
             final long validuntil = System.currentTimeMillis() + premium_days_left * 24 * 60 * 60 * 1000l;
             ai.setValidUntil(validuntil, this.br);
         }
@@ -213,46 +199,33 @@ public class CboxeraCom extends PluginForHost {
         } else {
             account_type_key = "vip";
         }
-        final ArrayList<String> supportedhostslist = new ArrayList<String>();
-        final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-        final PluginFinder finder = new PluginFinder();
-        for (final Object hostO : ressourcelist) {
-            entries = (Map<String, Object>) hostO;
-            final String host = (String) entries.get("name");
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        for (Map<String, Object> hostinfo : ressourcelist) {
+            final String host = (String) hostinfo.get("name");
             if (StringUtils.isEmpty(host)) {
                 /* This should never happen */
                 continue;
             }
             /* Get host information for on current account type. */
-            entries = (Map<String, Object>) entries.get(account_type_key);
-            final String supported = (String) entries.get("supported");
-            if ("no".equalsIgnoreCase(supported)) {
-                logger.info("Skipping host because: unsupported (according to API json): " + host);
-                continue;
+            hostinfo = (Map<String, Object>) hostinfo.get(account_type_key);
+            final MultiHostHost mhost = new MultiHostHost(host);
+            if ("no".equalsIgnoreCase(hostinfo.get("supported").toString())) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
-            long size_limit = -1;
-            long bandwidth_limit = -1;
             try {
                 /* Given in this format: "5 GB" */
-                final String size_limitStr = (String) entries.get("size_limit");
-                final String bandwidth_limitStr = (String) entries.get("bandwidth_limit");
-                size_limit = SizeFormatter.getSize(size_limitStr);
-                bandwidth_limit = SizeFormatter.getSize(bandwidth_limitStr);
-            } catch (final Throwable e) {
+                final String size_limitStr = (String) hostinfo.get("size_limit");
+                final String bandwidth_limitStr = (String) hostinfo.get("bandwidth_limit");
+                final long size_limit = SizeFormatter.getSize(size_limitStr);
+                final long bandwidth_limit = SizeFormatter.getSize(bandwidth_limitStr);
+                mhost.setTrafficLeft(Math.min(size_limit, bandwidth_limit));
+            } catch (final Throwable ignore) {
                 /* Ignore this */
             }
-            final String originalHost = finder.assignHost(host);
-            if (originalHost == null) {
-                /* This should never happen */
-                continue;
-            }
-            supportedhostslist.add(originalHost);
-            final LinkedHashMap<String, Long> limits = new LinkedHashMap<String, Long>();
-            limits.put("size_limit", size_limit);
-            limits.put("bandwidth_limit", bandwidth_limit);
-            individualHostLimits.put(originalHost, limits);
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedhostslist);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
@@ -266,9 +239,9 @@ public class CboxeraCom extends PluginForHost {
              * 2020-03-24: No idea how long their token is supposed to last but I guess it should be permanent because a full login requires
              * a captcha!
              */
-            if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 300000l && !forceAuthCheck) {
+            if (!forceAuthCheck) {
                 /* We trust our token --> Do not check them */
-                logger.info("Trust login token as it is not that old");
+                logger.info("Trust login token");
                 return;
             }
             br.getPage(API_BASE + "/private/user/info");

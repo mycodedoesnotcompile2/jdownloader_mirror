@@ -33,10 +33,13 @@
  * ==================================================================================================================================================== */
 package org.appwork.testframework;
 
+import static org.appwork.testframework.AWTest.logInfoAnyway;
+
 import java.awt.AWTException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Modifier;
 import java.net.URISyntaxException;
@@ -50,8 +53,10 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.loggingv3.LogV3Factory;
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter;
+import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.utils.Application;
 import org.appwork.utils.ClassPathScanner;
@@ -67,6 +72,20 @@ import org.appwork.utils.reflection.CompiledType;
  *
  */
 public class IDETestRunner {
+    /**
+     * @author thomas
+     * @date 30.09.2024
+     *
+     */
+    public static class MyPrintStream extends PrintStream {
+        /**
+         * @param out
+         */
+        public MyPrintStream(OutputStream out) {
+            super(out);
+        }
+    }
+
     private static File lastExecutedTestsFile = null;
 
     private static void init() {
@@ -91,13 +110,13 @@ public class IDETestRunner {
         init();
         PrintStream outBefore = System.out;
         PrintStream errBefore = System.err;
-        System.setOut(new PrintStream(new LineParsingOutputStream(Charset.forName("UTF-8")) {
+        System.setOut(new MyPrintStream(new LineParsingOutputStream(Charset.forName("UTF-8")) {
             @Override
             protected void onNextLine(NEWLINE newLine, long line, StringBuilder sb, int startIndex, int endIndex) {
                 LogV3.info("stdout> " + sb.substring(startIndex, endIndex));
             }
         }));
-        System.setErr(new PrintStream(new LineParsingOutputStream(Charset.forName("UTF-8")) {
+        System.setErr(new MyPrintStream(new LineParsingOutputStream(Charset.forName("UTF-8")) {
             @Override
             protected void onNextLine(NEWLINE newLine, long line, StringBuilder sb, int startIndex, int endIndex) {
                 LogV3.severe("stderr> " + sb.substring(startIndex, endIndex));
@@ -206,8 +225,18 @@ public class IDETestRunner {
                 fos.close();
             }
             AWTest.logInfoAnyway("[** START **]" + cls.getName());
+            Thread.currentThread().setName("Run Test: " + cls.getName() + " Since " + DateMapper.formatJsonDefault(new Date()));
             System.setProperty("AWTEST.CLASS", cls.getName());
-            ((TestInterface) ClassCache.getClassCache(cls).getInstance()).runTest();
+            LogV3Factory factory = LogV3.getFactory();
+            try {
+                ((TestInterface) ClassCache.getClassCache(cls).getInstance()).runTest();
+            } finally {
+                // restore factory-
+                if (LogV3.getFactory() != factory) {
+                    LogV3.setFactory(factory);
+                    logInfoAnyway("Restore LogFactory!");
+                }
+            }
             if (!CompiledType.isThreadLocalCacheEmpty()) {
                 throw new AWTException("CompiledType.ThreadLocalCache is not empty!");
             } else {

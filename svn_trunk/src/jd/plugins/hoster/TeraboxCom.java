@@ -54,12 +54,12 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 49878 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.dubox.com/");
+        this.enablePremium("https://www." + getHost());
     }
 
     @Override
@@ -69,7 +69,7 @@ public class TeraboxCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.dubox.com/";
+        return "https://www." + getHost();
     }
 
     private static List<String[]> getPluginDomains() {
@@ -326,6 +326,9 @@ public class TeraboxCom extends PluginForHost {
                 final String uname = (String) userinfo.get("uname");
                 if (StringUtils.isEmpty(uname)) {
                     errorAccountInvalid(account);
+                }
+                if (uname.contains("@") && !account.getUser().contains("@")) {
+                    account.setUser(uname);
                 }
             }
             ai.setUnlimitedTraffic();

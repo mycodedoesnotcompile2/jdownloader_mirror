@@ -15,6 +15,16 @@ import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageView;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.raf.FileBytesMap.FileBytesMapView;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.multiprogressbar.MultiProgressBar;
 import org.appwork.swing.components.multiprogressbar.Range;
@@ -31,16 +41,6 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.updatev2.gui.HorizontalPostion;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageView;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.raf.FileBytesMap.FileBytesMapView;
 
 public class ProgressColumn extends ExtProgressColumn<AbstractNode> {
     /**
@@ -349,6 +349,12 @@ public class ProgressColumn extends ExtProgressColumn<AbstractNode> {
         if (value instanceof FilePackage) {
             final FilePackage fp = (FilePackage) value;
             final FilePackageView view = fp.getView();
+            if (!view.isRunning()) {
+                final PluginProgress progress = view.getSinglePluginProgress();
+                if (progress != null && progress.isDisplayInProgressColumnEnabled()) {
+                    return progress.getTotal();
+                }
+            }
             if (view.isFinished()) {
                 return 100;
             } else {
@@ -392,6 +398,12 @@ public class ProgressColumn extends ExtProgressColumn<AbstractNode> {
         if (value instanceof FilePackage) {
             final FilePackage fp = (FilePackage) value;
             final FilePackageView view = fp.getView();
+            if (!view.isRunning()) {
+                final PluginProgress progress = view.getSinglePluginProgress();
+                if (progress != null && progress.isDisplayInProgressColumnEnabled()) {
+                    return progress.getCurrent();
+                }
+            }
             if (view.isFinished()) {
                 return 100;
             } else {

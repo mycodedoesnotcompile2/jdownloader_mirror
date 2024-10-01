@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,10 +43,12 @@ import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.notify.AbstractBubbleSupport;
 import org.jdownloader.gui.notify.BasicNotify;
-import org.jdownloader.gui.notify.BubbleNotify;
 import org.jdownloader.gui.notify.BubbleNotify.AbstractNotifyWindowFactory;
+import org.jdownloader.gui.notify.Element;
 import org.jdownloader.gui.notify.gui.AbstractNotifyWindow;
+import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
@@ -81,6 +84,29 @@ public abstract class PluginsC {
             logger = LogController.TRASH;
         }
         this.logger = logger;
+    }
+
+    private static final PluginsCBubbleSupport INSTANCE = new PluginsCBubbleSupport();
+
+    public static PluginsCBubbleSupport getBubbleSupportInstance() {
+        return INSTANCE;
+    }
+
+    public static class PluginsCBubbleSupport extends AbstractBubbleSupport {
+
+        private PluginsCBubbleSupport() {
+            super(_GUI.T.plugins_optional_JDLightTray_ballon_container(), CFG_BUBBLE.BUBBLE_NOTIFY_CONTAINER_LOADED_ENABLED);
+        }
+
+        @Override
+        public List<Element> getElements() {
+            return null;
+        }
+
+        protected void show(final AbstractNotifyWindowFactory factory) {
+            super.show(factory);
+        }
+
     }
 
     public PluginsC(String name, String pattern, String rev) {
@@ -151,7 +177,8 @@ public abstract class PluginsC {
      * @return Ein ArrayList mit DownloadLinks
      */
     public ArrayList<CrawledLink> getContainedDownloadlinks() {
-        return cls == null ? new ArrayList<CrawledLink>() : cls;
+        final ArrayList<CrawledLink> ret = cls;
+        return ret == null ? new ArrayList<CrawledLink>() : ret;
     }
 
     public synchronized void initContainer(final CrawledLink source, final File file, final byte[] key) throws IOException {
@@ -170,7 +197,9 @@ public abstract class PluginsC {
                 } else if (cs.isStatus(ContainerStatus.STATUS_INVALID_PASSWORD)) {
                     this.displayBubbleNotification("Invalid container password", "Processing the following container failed because the supplied passwords were incorrect:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
                 } else if (cs.isStatus(ContainerStatus.STATUS_FINISHED)) {
-                    this.displayBubbleNotification("Successfully crawled container", "The following container has been processed successfully:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+                    if (getContainedDownloadlinks().size() > 0) {
+                        this.displayBubbleNotification("Successfully crawled container", "The following container has been processed successfully:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+                    }
                     deleteContainer(source, file);
                 }
             } catch (Throwable e) {
@@ -186,7 +215,7 @@ public abstract class PluginsC {
         } else if (isTempContainer(source, file)) {
             logger.fine("Do not ask - just delete temp container: " + getDebugString(source, file));
             return ContainerDeleteOption.DELETE;
-        } else if (cls.size() == 0) {
+        } else if (getContainedDownloadlinks().size() == 0) {
             return ContainerDeleteOption.DONT_DELETE;
         }
         ContainerDeleteOption ret = JsonConfig.create(ContainerConfig.class).getDeleteContainerFilesAfterAddingThemAction();
@@ -235,16 +264,16 @@ public abstract class PluginsC {
         switch (getDeleteOption(source, file)) {
         case DELETE:
             FileCreationManager.getInstance().delete(file, null);
-            this.displayBubbleNotification("Deleted container file", "The following container file has been deleted:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+            this.displayBubbleNotification("Deleted container file", "The following container file has been deleted:\n" + file.getName(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
             break;
         case RECYCLE:
             try {
                 JDFileUtils.moveToTrash(file);
-                this.displayBubbleNotification("Moved container file to trash", "The following processed container file has been moved to trash:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+                this.displayBubbleNotification("Moved container file to trash", "The following processed container file has been moved to trash:\n" + file.getName(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
             } catch (IOException e) {
                 logger.log(e);
                 logger.info("Could not move file to recycle bin: " + file);
-                this.displayBubbleNotification("Failed to move processed container file to trash", "Failed to move the following processed container file to trash:\n" + file.getAbsolutePath(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
+                this.displayBubbleNotification("Failed to move processed container file to trash", "Failed to move the following processed container file to trash:\n" + file.getName(), new AbstractIcon(IconKey.ICON_ADDCONTAINER, 32));
             }
             break;
         case ASK_FOR_DELETE:
@@ -360,7 +389,7 @@ public abstract class PluginsC {
     }
 
     protected void displayBubbleNotification(final String title, final String text, final Icon icon) {
-        BubbleNotify.getInstance().show(new AbstractNotifyWindowFactory() {
+        getBubbleSupportInstance().show(new AbstractNotifyWindowFactory() {
             @Override
             public AbstractNotifyWindow<?> buildAbstractNotifyWindow() {
                 return new BasicNotify(title, text, icon);

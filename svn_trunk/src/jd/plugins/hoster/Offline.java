@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -172,6 +172,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "saikoanimes.net" });
         ret.add(new String[] { "streamhub.to", "streamhub.gg" });
         ret.add(new String[] { "gounlimited.to" });
+        ret.add(new String[] { "uploadbank.com" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

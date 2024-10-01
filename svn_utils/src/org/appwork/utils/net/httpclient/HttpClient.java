@@ -195,9 +195,8 @@ public class HttpClient {
          */
         public String getResponseString(Charset charset) throws IOException, InterruptedException {
             this.ensureExecution();
-            String ct = null;
             if (charset == null) {
-                ct = this.getConnection().getCharset();
+                String ct = this.getConnection().getCharset();
                 if (StringUtils.isEmpty(ct)) {
                     ct = "UTF-8";
                 }
@@ -209,7 +208,7 @@ public class HttpClient {
                 IO.readStreamToOutputStream(-1, fromContext, this.target, true);
             }
             if (this.target instanceof ByteArrayOutputStream) {
-                return ((ByteArrayOutputStream) this.target).toString(ct);
+                return ((ByteArrayOutputStream) this.target).toString(charset.displayName());
             }
             return null;
         }

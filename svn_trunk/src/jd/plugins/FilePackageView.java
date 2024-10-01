@@ -5,12 +5,20 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.swing.Icon;
+
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.packagecontroller.ChildrenView;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.download.DownloadInterface;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.StringUtils;
@@ -32,12 +40,6 @@ import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.TimeOutCondition;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.packagecontroller.ChildrenView;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.download.DownloadInterface;
 
 public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
     private static class LinkInfo {
@@ -89,9 +91,11 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         return finalCount;
     }
 
-    private long                  done = 0;
+    private long                  done                 = 0;
     private int                   enabledCount;
     private PluginStateCollection pluginStates;
+
+    private PluginProgress        singlePluginProgress = null;
 
     public PluginStateCollection getPluginStates() {
         return pluginStates;
@@ -181,6 +185,7 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         private boolean                               allFinished         = true;
         private String                                sameSource          = null;
         private boolean                               sameSourceFullUrl   = true;
+        private Set<PluginProgress>                   pluginProgress      = null;
         private final HashMap<Object, PluginState<?>> pluginStates        = new HashMap<Object, PluginState<?>>();
     }
 
@@ -221,11 +226,11 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
     private final static AbstractIcon          EXTRACTICONSTART     = new AbstractIcon(IconKey.ICON_EXTRACT_RUN, 16);
     private final static AbstractIcon          FALSEICON            = new AbstractIcon(IconKey.ICON_FALSE, 16);
     public final static Comparator<DomainInfo> DOMAININFOCOMPARATOR = new Comparator<DomainInfo>() {
-                                                                        @Override
-                                                                        public int compare(DomainInfo o1, DomainInfo o2) {
-                                                                            return o1.getTld().compareTo(o2.getTld());
-                                                                        }
-                                                                    };
+        @Override
+        public int compare(DomainInfo o1, DomainInfo o2) {
+            return o1.getTld().compareTo(o2.getTld());
+        }
+    };
 
     protected void writeTempToFields(final Temp tmp) {
         long size = -1;
@@ -306,6 +311,11 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         if (!tmp.sameSourceFullUrl) {
             tmp.sameSource += "[...]";
         }
+        if (tmp.pluginProgress != null && tmp.pluginProgress.size() == 1) {
+            this.singlePluginProgress = tmp.pluginProgress.iterator().next();
+        } else {
+            this.singlePluginProgress = null;
+        }
         this.commonSourceUrl = tmp.sameSource;
         this.pluginStates = new PluginStateCollection(tmp.pluginStates.values());
         this.offline = tmp.newOffline;
@@ -384,6 +394,10 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
         PluginState<?> ps = null;
         final PluginProgress prog = link.getPluginProgress();
         if (prog != null) {
+            if (tmp.pluginProgress == null) {
+                tmp.pluginProgress = new HashSet<PluginProgress>();
+            }
+            tmp.pluginProgress.add(prog);
             if (!(prog instanceof ExtractionProgress)) {
                 final Icon icon = prog.getIcon(this);
                 if (icon != null) {
@@ -863,6 +877,10 @@ public class FilePackageView extends ChildrenView<FilePackage, DownloadLink> {
 
     public String getDownloadDirectory() {
         return pkg.getDownloadDirectory();
+    }
+
+    public PluginProgress getSinglePluginProgress() {
+        return singlePluginProgress;
     }
 
     public boolean isRunning() {

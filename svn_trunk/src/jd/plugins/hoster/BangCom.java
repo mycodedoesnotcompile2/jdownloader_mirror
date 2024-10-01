@@ -48,11 +48,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BangComCrawler;
 
-@HostPlugin(revision = "$Revision: 49562 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
 public class BangCom extends PluginForHost {
     public BangCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.bang.com/joinnow");
+        this.enablePremium("https://www." + getHost() + "/joinnow");
     }
 
     /**
@@ -73,7 +73,7 @@ public class BangCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.bang.com/terms-of-service";
+        return "https://www." + getHost() + "/terms-of-service";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -339,7 +339,8 @@ public class BangCom extends PluginForHost {
         ai.setUnlimitedTraffic();
         /* 2023-01-31: A public API is available but so far is not of any use for us: https://api.bang.com */
         final String userJson = br.getRegex("window\\.user = (\\{.*?\\});\\s").getMatch(0);
-        boolean isSubscriptionRunning = br.containsHTML("(?i)>\\s*Click to cancel");
+        boolean isSubscriptionRunning = br.containsHTML(">\\s*Click to cancel");
+        final boolean isTrialSubscription = br.containsHTML(">\\s*TRIAL");
         String email = null;
         if (userJson != null) {
             final Map<String, Object> user = restoreFromString(userJson, TypeRef.MAP);
@@ -359,7 +360,14 @@ public class BangCom extends PluginForHost {
              */
             account.setUser(email);
         }
-        if (!isSubscriptionRunning) {
+        if (isTrialSubscription) {
+            /*
+             * This doesn't mean that the user can actually stream/download premium items! Trial users can only view/download a certain
+             * amount of items. After that, the account is basically useless.
+             */
+            account.setType(AccountType.PREMIUM);
+            ai.setStatus("Trial account");
+        } else if (!isSubscriptionRunning) {
             /* Free Accounts got no advantages over using no account at all -> Do not allow the usage of such accounts. */
             ai.setExpired(true);
             return ai;

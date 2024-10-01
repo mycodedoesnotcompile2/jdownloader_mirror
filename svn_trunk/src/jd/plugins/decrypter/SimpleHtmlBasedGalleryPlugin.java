@@ -32,7 +32,7 @@ import jd.plugins.PluginForDecrypt;
  *
  * Please note: right now, if a model has multiple pages worth of galleries, paging must be done manually.
  */
-@DecrypterPlugin(revision = "$Revision: 47392 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49889 $", interfaceVersion = 2, names = {}, urls = {})
 @Deprecated
 public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
     @Override
@@ -136,7 +136,6 @@ public class SimpleHtmlBasedGalleryPlugin extends PluginForDecrypt {
         SITE_DATA.add(new SiteData(new String[] { "nastypornpics.com" }, "/pics/.+", "/\\?q=[^&]+&log-model=1", "[^\"']+nastypornpics\\.com/pics[^\"']+"));
         SITE_DATA.add(new SiteData(new String[] { "viewgals.com" }, "/pics/.+", "/\\?q=[^&]+&log-model=1", "[^\"']+viewgals\\.com/pics[^\"']+"));
         SITE_DATA.add(new SiteData(new String[] { "sexhd.pics" }, "/gallery/[^/]+/[^/]+/.+", "/gallery/[^/]+/?$", "/gallery/[^/\"']+/[^/\"']+/[^/\"']+/?"));
-        SITE_DATA.add(new SiteData(new String[] { "hqsluts.com" }, "/[^/]+-\\d+", "/sluts/.+", "/[^/\"']+-\\d+/"));
     }
 
     public SimpleHtmlBasedGalleryPlugin(PluginWrapper wrapper) {

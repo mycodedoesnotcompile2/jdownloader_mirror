@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49806 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2772,7 +2772,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             final String captchaResponse;
             final CaptchaHosterHelperInterface captchaHelper;
             if (containsHCaptcha(getCorrectBR(br))) {
-                /* E.g. uploadbank.com */
                 final CaptchaHelperHostPluginHCaptcha hCaptcha = getCaptchaHelperHostPluginHCaptcha(this, br);
                 logger.info("Detected captcha method \"hCaptcha\" type '" + hCaptcha.getType() + "' for this host");
                 captchaHelper = hCaptcha;

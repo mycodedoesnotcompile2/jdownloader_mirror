@@ -62,6 +62,7 @@ public class CFG_BUBBLE {
      **/
     public static final EnumKeyHandler                     FINAL_POSITION_ANCHOR                                   = SH.getKeyHandler("FinalPositionAnchor", EnumKeyHandler.class);
     public static final BooleanKeyHandler                  BUBBLE_NOTIFY_START_STOP_DOWNLOADS_ENABLED              = SH.getKeyHandler("BubbleNotifyStartStopDownloadsEnabled", BooleanKeyHandler.class);
+    public static final BooleanKeyHandler                  BUBBLE_NOTIFY_CONTAINER_LOADED_ENABLED                  = SH.getKeyHandler("BubbleNotifyOnContainerLoadedEnabled", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  BUBBLE_NOTIFY_START_PAUSE_STOP_ENABLED                  = SH.getKeyHandler("BubbleNotifyStartPauseStopEnabled", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  CRAWLER_BUBBLE_CONTENT_OFFLINE_COUNT_VISIBLE            = SH.getKeyHandler("CrawlerBubbleContentOfflineCountVisible", BooleanKeyHandler.class);
     public static final BooleanKeyHandler                  BUBBLE_NOTIFY_ON_CAPTCHA_IN_BACKGROUND_ENABLED          = SH.getKeyHandler("BubbleNotifyOnCaptchaInBackgroundEnabled", BooleanKeyHandler.class);

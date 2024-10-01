@@ -39,6 +39,7 @@ import java.util.Date;
 
 import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.sink.SimpleFormatter.LocalTimeFormat;
+import org.appwork.utils.Application;
 import org.appwork.utils.StringUtils;
 
 /**
@@ -55,7 +56,7 @@ public class LogToStdOutSink extends AbstractSink {
     protected final LocalTimeFormat timeOnly = new LocalTimeFormat("HH:mm:ss.SSS");
 
     public LogToStdOutSink() {
-        this(System.out, System.err);
+        this(getStdOut(), getStdErr());
         formatter = new SimpleFormatter() {
             {
                 offsetForThrownAt = new IntByReference(40);
@@ -73,9 +74,31 @@ public class LogToStdOutSink extends AbstractSink {
         };
     }
 
+    /**
+     * @return
+     */
+    private static PrintStream getStdErr() {
+        PrintStream ret = Application.getWrappedStdErr();
+        if (ret == null) {
+            ret = System.err;
+        }
+        return ret;
+    }
+
+    /**
+     * @return
+     */
+    private static PrintStream getStdOut() {
+        PrintStream ret = Application.getWrappedStdOut();
+        if (ret == null) {
+            ret = System.out;
+        }
+        return ret;
+    }
+
     private LogToStdOutSink(PrintStream out, PrintStream err) {
-        errOut = System.err;
-        stdOut = System.out;
+        errOut = err;
+        stdOut = out;
     }
 
     @Override

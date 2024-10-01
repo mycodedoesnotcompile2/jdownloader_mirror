@@ -63,7 +63,7 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49859 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49883 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -276,19 +276,7 @@ public class FileCryptCc extends PluginForDecrypt {
             redirectLinksHandling: if (thisMirrorResults.isEmpty()) {
                 /* Last resort: Try most time intensive way to crawl links: Crawl each link individually. */
                 logger.info("Trying single link redirect handling");
-                String[] links = br.getRegex("openLink\\('([^<>\"]*?)'").getColumn(0);
-                if (links == null || links.length == 0) {
-                    /* 2023-04-06 */
-                    links = br.getRegex("onclick\\s*=\\s*\"[^\\(]*\\('([^<>\"\\']+)").getColumn(0);
-                    if (links == null || links.length == 0) {
-                        /* 2023-02-03 */
-                        links = br.getRegex("onclick=\"openLink[^\\(\"\\']*\\('([^<>\"\\']+)'").getColumn(0);
-                        if (links == null || links.length == 0) {
-                            /* 2023-02-13 */
-                            links = br.getRegex("'([^\"']+)', this\\);\" class=\"download\"[^>]*target=\"_blank\"").getColumn(0);
-                        }
-                    }
-                }
+                String[] links = br.getRegex("<button[^<>]+\\sdata-[0-9a-z]{5,}=\"([^\"]+)").getColumn(0);
                 if (links == null || links.length == 0) {
                     logger.info("Failed to find redirectLinks");
                     break redirectLinksHandling;

@@ -47,7 +47,7 @@ public class MultiHostHost implements Storable {
 
     public MultiHostHost(final String domain) {
         this.name = domain;
-        this.addDomain(domain);
+        this.setDomain(domain);
     }
 
     public String getName() {

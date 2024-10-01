@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49404 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
 public class FuckingfastCo extends PluginForHost {
     public FuckingfastCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,6 +117,8 @@ public class FuckingfastCo extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* E.g. check for rate-limit */
+        this.throwConnectionExceptions(br, br.getHttpConnection());
         String filename = HTMLSearch.searchMetaTag(br, "title");
         final String filesize = br.getRegex(">\\s*Size: ([^<]+) \\|\\s*Downloads:\\s*\\d+\\s*<").getMatch(0);
         if (filename != null) {
@@ -125,6 +127,8 @@ public class FuckingfastCo extends PluginForHost {
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find file size");
         }
         return AvailableStatus.TRUE;
     }
@@ -141,12 +145,16 @@ public class FuckingfastCo extends PluginForHost {
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        try {
-            final String serversideDlStartedLink = "/f/" + fid + "/dl";
-            final Browser brc = br.cloneBrowser();
-            brc.postPageRaw(serversideDlStartedLink, "");
-        } catch (final Exception ignore) {
-            logger.log(ignore);
+        final boolean signalServerThatDownloadWasStarted = false;
+        if (signalServerThatDownloadWasStarted) {
+            /* Optional step */
+            try {
+                final String serversideDlStartedLink = "/f/" + fid + "/dl";
+                final Browser brc = br.cloneBrowser();
+                brc.postPageRaw(serversideDlStartedLink, "");
+            } catch (final Exception ignore) {
+                logger.log(ignore);
+            }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         handleConnectionErrors(br, dl.getConnection());

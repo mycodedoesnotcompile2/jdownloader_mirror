@@ -33,7 +33,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 47239 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49889 $", interfaceVersion = 2, names = {}, urls = {})
 public class CouchTuner extends antiDDoSForDecrypt {
     public CouchTuner(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,6 +98,9 @@ public class CouchTuner extends antiDDoSForDecrypt {
         for (String link : links) {
             link = br.getURL(Encoding.htmlDecode(link)).toString();
             ret.add(createDownloadlink(link));
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (StringUtils.isNotEmpty(fpName)) {
             final FilePackage fp = FilePackage.getInstance();

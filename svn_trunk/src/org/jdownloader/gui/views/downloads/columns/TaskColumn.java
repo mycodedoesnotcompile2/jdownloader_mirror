@@ -337,8 +337,17 @@ public class TaskColumn extends ExtTextColumn<AbstractNode> {
                 columnHelper.tooltip = null;
             }
         } else {
-            FilePackage fp = (FilePackage) value;
-            FilePackageView view = fp.getView();
+            final FilePackage fp = (FilePackage) value;
+            final FilePackageView view = fp.getView();
+            if (!view.isRunning()) {
+                final PluginProgress prog = view.getSinglePluginProgress();
+                if (prog != null && prog.isDisplayInProgressColumnEnabled()) {
+                    columnHelper.icon = prog.getIcon(this);
+                    columnHelper.string = prog.getMessage(this);
+                    columnHelper.tooltip = null;
+                    return;
+                }
+            }
             final PluginStateCollection ps = view.getPluginStates();
             if (ps != null && ps.size() > 0) {
                 columnHelper.icon = ps.getMergedIcon();

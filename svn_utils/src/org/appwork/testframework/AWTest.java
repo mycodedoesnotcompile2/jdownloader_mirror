@@ -471,7 +471,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                     }
                 };
             }
-        });
+        }.initDefaults());
         LOGGER = ((SimpleLoggerFactory) LogV3.getFactory());
         removeSink(LOGGER.getSinkToFile());
         CONSOLE_LOGGER = new LogToStdOutSink();
@@ -603,9 +603,18 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
     }
 
+    /**
+     * lower than
+     *
+     * @param length
+     * @param i
+     * @throws Exception
+     */
     public static void assertLt(final long length, final long i) throws Exception {
-        if (length >= i) {
-            throw new Exception(length + " <= " + i);
+        if (length < i) {
+            // fine
+        } else {
+            throw new Exception(length + " is not lower than " + i);
         }
     }
 
@@ -661,8 +670,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     public static void assertGt(final long length, final long i) throws Exception {
-        if (length <= i) {
-            throw new Exception(length + " <= " + i);
+        if (length > i) {
+            // finde
+        } else {
+            throw new Exception(length + " is not greater than " + i);
         }
     }
 

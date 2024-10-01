@@ -26,6 +26,16 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.regex.Pattern;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
+import jd.plugins.AddonPanel;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
@@ -89,16 +99,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
-import jd.plugins.AddonPanel;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 
 public class ExtractionExtension extends AbstractExtension<ExtractionConfig, ExtractionTranslation> implements FileCreationListener, MenuExtenderHandler, PackageControllerModifyVetoListener<FilePackage, DownloadLink> {
     private ExtractionQueue       extractionQueue = new ExtractionQueue();
@@ -247,6 +247,10 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     @Override
     public String getIconKey() {
         return org.jdownloader.gui.IconKey.ICON_EXTRACT;
+    }
+
+    public synchronized void abortAll() {
+        extractionQueue.killQueue();
     }
 
     /**
@@ -572,9 +576,6 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
             }
         } else {
             ret = getJobQueue().remove(controller);
-        }
-        if (wasInProgress && ret) {
-            fireEvent(new ExtractionEvent(controller, ExtractionEvent.Type.CLEANUP));
         }
         return ret;
     }

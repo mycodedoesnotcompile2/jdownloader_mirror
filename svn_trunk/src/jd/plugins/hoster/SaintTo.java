@@ -21,7 +21,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49835 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -146,7 +146,7 @@ public class SaintTo extends PluginForHost {
     }
 
     private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
-        final String storedDirecturl = directlinkproperty;
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String dllink;
         final boolean storeDirecturl;
         if (new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT).patternFind()) {

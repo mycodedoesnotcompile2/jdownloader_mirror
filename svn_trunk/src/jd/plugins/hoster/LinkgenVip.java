@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import org.appwork.utils.StringUtils;
@@ -42,11 +43,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49776 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
 public class LinkgenVip extends PluginForHost {
     /* Connection limits */
     private static MultiHosterManagement mhm = new MultiHosterManagement("linkgen.vip");
@@ -229,47 +232,48 @@ public class LinkgenVip extends PluginForHost {
         ai.setValidUntil(premiumValidUntilTimestamp, br);
         ai.setStatus(statusText);
         br.getPage("/host.php");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
         final String[] htmls = br.getRegex("<tr class=\"text-center\">(.*?)</tr>").getColumn(0);
         if (htmls == null || htmls.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #1");
         }
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final String html : htmls) {
-            String host = new Regex(html, "fhimg/[^>]*>([^<]+)<").getMatch(0);
-            if (host == null) {
+            String domain = new Regex(html, "fhimg/[^>]*>([^<]+)<").getMatch(0);
+            if (domain == null) {
                 logger.info("Skipping invalid entry: " + html);
                 continue;
             }
-            host = host.trim();
-            // TODO: Find- and set individual host limits
-            final String[] allRows = new Regex(html, "<td>([^<]+)</td>").getColumn(0);
+            domain = domain.trim();
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            final String[] allRows = new Regex(html, "<td>(.*?)</td>").getColumn(0);
             // final boolean isOnline = new Regex(html, "Online\\s*<").patternFind();
             final boolean isOffline = new Regex(html, "Offline\\s*<").patternFind();
-            // final boolean isUnstable = new Regex(html, "Unstable\\s*<").patternFind();
+            final boolean isUnstable = new Regex(html, "Unstable\\s*<").patternFind();
             if (isOffline) {
-                logger.info("Skipping offline entry: " + host);
-                continue;
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (isUnstable) {
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
             }
             if (allRows != null && allRows.length == 4) {
                 final String maxSizeLimitStr = allRows[2].trim();
                 final String maxTrafficDailyStr = allRows[3].trim();
+                long maxSizeLimit = Long.MAX_VALUE;
+                long maxTrafficDaily = Long.MAX_VALUE;
                 if (!maxSizeLimitStr.equalsIgnoreCase("Unlimited")) {
-                    // TODO
-                } else {
-                    // TODO
+                    maxSizeLimit = SizeFormatter.getSize(maxSizeLimitStr);
                 }
                 if (!maxTrafficDailyStr.equalsIgnoreCase("Unlimited")) {
-                    // TODO
-                } else {
-                    // TODO
+                    maxTrafficDaily = SizeFormatter.getSize(maxTrafficDailyStr);
+                    mhost.setTrafficMax(maxTrafficDaily);
                 }
+                mhost.setTrafficLeft(Math.min(maxSizeLimit, maxTrafficDaily));
             }
-            supportedHosts.add(host);
+            supportedhosts.add(mhost);
         }
-        if (supportedHosts.size() == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
+        if (supportedhosts.size() == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #2");
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

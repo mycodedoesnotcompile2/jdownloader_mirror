@@ -34,22 +34,21 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47749 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
 public class DbreeOrg extends PluginForHost {
     public DbreeOrg(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://dbree.org/terms.html";
+        return "https://" + getHost() + "/terms.html";
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "dbree.org" });
+        ret.add(new String[] { "dbree.org", "dbree.me" });
         return ret;
     }
 

@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImgSrcRu;
 
-@DecrypterPlugin(revision = "$Revision: 49867 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49887 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImgSrcRuCrawler extends PluginForDecrypt {
     // dev notes
     // &pwd= is a md5 hash id once you've provided password for that album.
@@ -331,7 +331,7 @@ public class ImgSrcRuCrawler extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlImages(final CryptedLink param) {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String[] imageIDRegexes = new String[] { "id='p(\\d+)'", "/imgsrc\\.ru_(\\d+)" };
+        final String[] imageIDRegexes = new String[] { "id='p(\\d+)'", "/imgsrc\\.ru_(\\d+)[^']*'[^>]*>\\s*<img[^<]*class='big fts'" };
         final HashSet<String> allimageids = new HashSet<String>();
         for (final String imageIDRegex : imageIDRegexes) {
             final String[] imageids = br.getRegex(imageIDRegex).getColumn(0);

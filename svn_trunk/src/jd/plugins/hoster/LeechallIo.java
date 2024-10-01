@@ -49,11 +49,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49776 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -243,40 +245,42 @@ public class LeechallIo extends PluginForHost {
         ai.setTrafficLeft(dailytrafficmaxbytes - dailytrafficusedbytes);
         /* Collect file hosts where used has reached limits so we can skip them later and log that. */
         final Map<String, Object> resplimits = this.accessAPI("/user/limits");
+        final Map<String, Map<String, Object>> hostsToUserLimits = new HashMap<String, Map<String, Object>>();
         final List<Map<String, Object>> limitlist = (List<Map<String, Object>>) resplimits.get("data");
-        final ArrayList<String> hostsLimitReachedBandwidth = new ArrayList<String>();
-        final ArrayList<String> hostsLimitReachedFileNum = new ArrayList<String>();
         for (final Map<String, Object> limitinfo : limitlist) {
-            final String host = limitinfo.get("host").toString();
-            final Map<String, Object> limitsbandwidth = (Map<String, Object>) limitinfo.get("bandwidth");
-            if (limitsbandwidth != null && Long.parseLong(limitsbandwidth.get("used").toString()) > Long.parseLong(limitsbandwidth.get("total").toString())) {
-                hostsLimitReachedBandwidth.add(host);
-            }
-            final Map<String, Object> limitsfilenum = (Map<String, Object>) limitinfo.get("files");
-            if (limitsfilenum != null && Long.parseLong(limitsfilenum.get("used").toString()) >= Long.parseLong(limitsfilenum.get("total").toString())) {
-                hostsLimitReachedFileNum.add(host);
-            }
+            final String domain = limitinfo.get("host").toString();
+            hostsToUserLimits.put(domain, limitinfo);
         }
         /* Now collect all supported- and working hosts. */
         final Map<String, Object> respsupportedhosts = this.accessAPI("/app/status");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hostlist = (List<Map<String, Object>>) respsupportedhosts.get("data");
         for (final Map<String, Object> hostinfo : hostlist) {
-            final String host = hostinfo.get("host").toString();
-            if (!"working".equals(hostinfo.get("status"))) {
-                logger.info("Skipping host which is not listed as 'working': " + host);
-                continue;
-            } else if (hostsLimitReachedBandwidth.contains(host)) {
-                logger.info("Ignoring host because individual trafficlimit has been reached: " + host);
-                continue;
-            } else if (hostsLimitReachedFileNum.contains(host)) {
-                logger.info("Ignoring host because files number limit has been reached: " + host);
-                continue;
-            } else {
-                supportedHosts.add(host);
+            final String domain = hostinfo.get("host").toString();
+            final Map<String, Object> limitinfo = hostsToUserLimits.get(domain);
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            final String mhostStatus = hostinfo.get("status").toString();
+            if (mhostStatus.equals("unstable")) {
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+            } else if (mhostStatus.equals("broken")) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            if (limitinfo != null) {
+                /* Find individual host limits */
+                final Map<String, Object> limitsbandwidth = (Map<String, Object>) limitinfo.get("bandwidth");
+                if (limitsbandwidth != null) {
+                    mhost.setTrafficMax(Long.parseLong(limitinfo.get("total").toString()));
+                    mhost.setTrafficLeft(mhost.getTrafficLeft() - Long.parseLong(limitsbandwidth.get("used").toString()));
+                }
+                final Map<String, Object> limitsfilenum = (Map<String, Object>) limitinfo.get("files");
+                if (limitsfilenum != null) {
+                    mhost.setLinksMax(Long.parseLong(limitsfilenum.get("total").toString()));
+                    mhost.setLinksLeft(mhost.getLinksMax() - Long.parseLong(limitsfilenum.get("used").toString()));
+                }
+            }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

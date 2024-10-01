@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -41,11 +42,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49069 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -68,21 +71,22 @@ public class JubaGetCom extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setCookie(this.getHost(), "locale", "en");
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     @Override
     public String getAGBLink() {
-        return "https://juba-get.com/terms";
-    }
-
-    private Browser prepBRWebsite(final Browser br) {
-        br.setCookiesExclusive(true);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.setCookie(this.getHost(), "locale", "en");
-        br.setFollowRedirects(true);
-        return br;
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -113,7 +117,6 @@ public class JubaGetCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        prepBRWebsite(this.br);
         if (!attemptStoredDownloadurlDownload(link)) {
             mhm.runCheck(account, link);
             login(account, true, "https://" + this.getHost() + "/generator");
@@ -195,10 +198,10 @@ public class JubaGetCom extends PluginForHost {
         }
         final String hostsHTML = br.getRegex("class=\"fas fa-cloud-download-alt\"></i> Hosts</div>\\s*<div class=\"card-body\">(.*?)</div>").getMatch(0);
         if (hostsHTML == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #1");
         }
         final String[] htmls = hostsHTML.split("<img");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final String html : htmls) {
             String hostWithoutTLD = new Regex(html, "data-original-title=\"([^\" \\(]+)\"").getMatch(0);
             if (hostWithoutTLD == null) {
@@ -209,14 +212,14 @@ public class JubaGetCom extends PluginForHost {
                 /* Skip invalid items */
                 continue;
             }
-            if (html.contains("servidor_online")) {
-                if (!supportedHosts.contains(hostWithoutTLD)) {
-                    supportedHosts.add(hostWithoutTLD);
-                }
-            } else {
-                /* servidor_offline */
-                logger.info("Skipping offline host: " + hostWithoutTLD);
+            final MultiHostHost mhost = new MultiHostHost(hostWithoutTLD);
+            if (!html.contains("servidor_online")) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
+        }
+        if (supportedhosts.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #2");
         }
         // br.getPage("/hosts");
         // final String[] htmls = br.getRegex("<tr>(.*?)</tr>").getColumn(0);
@@ -229,14 +232,13 @@ public class JubaGetCom extends PluginForHost {
         // }
         // supportedHosts.add(host);
         // }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
     private void login(final Account account, final boolean force, final String loginCheckURL) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            prepBRWebsite(this.br);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 this.br.setCookies(this.getHost(), cookies);

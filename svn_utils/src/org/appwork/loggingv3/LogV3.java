@@ -42,6 +42,7 @@ import org.appwork.loggingv3.simple.LogRecord2;
 import org.appwork.loggingv3.simple.LogVetoListener;
 import org.appwork.loggingv3.simple.SimpleLoggerFactory;
 import org.appwork.loggingv3.simple.sink.Sink;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.NullOutputStream;
 
@@ -55,7 +56,9 @@ public class LogV3 {
         Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(final Thread t, final Throwable e) {
+               
                 LogV3.logger(t).exception("Uncaught Exception in: " + t.getId() + "=" + t.getName(), e);
+                DebugMode.debugger();
             }
         });
     }

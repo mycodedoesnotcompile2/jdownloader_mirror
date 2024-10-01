@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -51,11 +52,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48875 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -374,38 +377,51 @@ public class DeepbridCom extends PluginForHost {
         } else {
             supportedhostslistO = (List<Object>) supportedhostsO;
         }
-        final ArrayList<String> supportedhostslist = new ArrayList<String>();
+        final ArrayList<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final HashSet<String> dupes = new HashSet<String>();
+        final String workaroundIcerboxKey = "icerbox";
+        boolean icerboxYes = false;
         for (final Object hostO : supportedhostslistO) {
             /* List can be given in two different varieties */
             if (hostO instanceof Map) {
                 final Map<String, Object> entries = (Map<String, Object>) hostO;
                 for (final Map.Entry<String, Object> entry : entries.entrySet()) {
+                    final MultiHostHost mhost = new MultiHostHost();
                     if (!"up".equalsIgnoreCase((String) entry.getValue())) {
-                        /* Skip hosts which do not work via this MOCH at this moment! */
-                        continue;
+                        mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                     }
-                    final String[] hosts = entry.getKey().split(",");
-                    for (String host : hosts) {
-                        if (host.equalsIgnoreCase("icerbox")) {
+                    final String[] domains = entry.getKey().split(",");
+                    boolean thisIsIcerbox = false;
+                    for (final String domain : domains) {
+                        if (domain.equalsIgnoreCase(workaroundIcerboxKey)) {
                             /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
-                            supportedhostslist.add("icerbox.com");
-                            supportedhostslist.add("icerbox.biz");
+                            icerboxYes = true;
+                            thisIsIcerbox = true;
+                            continue;
                         } else {
-                            supportedhostslist.add(host);
+                            mhost.addDomain(domain);
                         }
                     }
+                    if (thisIsIcerbox) {
+                        continue;
+                    }
+                    supportedhosts.add(mhost);
                 }
             } else if (hostO instanceof String) {
+                final MultiHostHost mhost = new MultiHostHost();
                 final String[] hosts = ((String) hostO).split(",");
                 for (String host : hosts) {
-                    if (host.equalsIgnoreCase("icerbox")) {
+                    if (host.equalsIgnoreCase(workaroundIcerboxKey)) {
                         /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
-                        supportedhostslist.add("icerbox.com");
-                        supportedhostslist.add("icerbox.biz");
+                        icerboxYes = true;
+                        continue;
                     } else {
-                        supportedhostslist.add(host);
+                        mhost.addDomain(host);
                     }
                 }
+                supportedhosts.add(mhost);
+            } else {
+                logger.warning("Found invalid host object: " + hostO);
             }
         }
         try {
@@ -417,17 +433,31 @@ public class DeepbridCom extends PluginForHost {
             getPage(br, "/service");
             final String[] crippled_hosts = br.getRegex("class=\"hosters_([A-Za-z0-9]+)[^\"]*\"").getColumn(0);
             for (final String crippled_host : crippled_hosts) {
-                if (!supportedhostslist.contains(crippled_host)) {
-                    logger.info("Adding host from website which has not been given via API: " + crippled_host);
-                    supportedhostslist.add(crippled_host);
+                if (crippled_host.equalsIgnoreCase(workaroundIcerboxKey)) {
+                    /* 2020-05-20: Workaround: https://board.jdownloader.org/showthread.php?t=84429 */
+                    icerboxYes = true;
+                    continue;
+                } else if (!dupes.add(crippled_host)) {
+                    continue;
                 }
+                logger.info("Adding host from website which has not been given via API: " + crippled_host);
+                final MultiHostHost mhost = new MultiHostHost(crippled_host);
+                supportedhosts.add(mhost);
             }
         } catch (final Throwable e) {
             logger.log(e);
             logger.warning("Website-workaround to find additional supported hosts failed");
         }
+        if (icerboxYes) {
+            /* Small workaround */
+            final String[] extraDomains = new String[] { "icerbox.com", "icerbox.biz" };
+            for (final String domain : extraDomains) {
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                supportedhosts.add(mhost);
+            }
+        }
         account.setConcurrentUsePossible(true);
-        ai.setMultiHostSupport(this, supportedhostslist);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

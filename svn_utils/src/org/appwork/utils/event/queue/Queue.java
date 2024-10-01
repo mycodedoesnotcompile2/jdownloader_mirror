@@ -65,13 +65,13 @@ public abstract class Queue {
     protected boolean                                                   debugFlag           = false;
     protected final java.util.List<QueueAction<?, ? extends Throwable>> queueThreadHistory  = new ArrayList<QueueAction<?, ? extends Throwable>>(20);
     protected final AtomicReference<QueueThread>                        thread              = new AtomicReference<QueueThread>(null);
-    private volatile QueueAction<?, ? extends Throwable>                sourceItem          = null;
+    protected volatile QueueAction<?, ? extends Throwable>              sourceItem          = null;
     protected final LinkedBlockingDeque<QueueAction<?, ?>>              currentJobs         = new LinkedBlockingDeque<QueueAction<?, ?>>();
     protected final AtomicLong                                          addStats            = new AtomicLong(0);
     protected final AtomicLong                                          addWaitStats        = new AtomicLong(0);
     protected final AtomicLong                                          addRunStats         = new AtomicLong(0);
     protected static AtomicInteger                                      QUEUELOOPPREVENTION = new AtomicInteger(0);
-    private final String                                                id;
+    protected final String                                              id;
     protected volatile long                                             timeout             = 10 * 1000l;
     protected final ArrayDeque<?>[]                                     queues;
 
@@ -138,7 +138,7 @@ public abstract class Queue {
         }
     }
 
-    private final boolean notifyEDT = DebugMode.TRUE_IN_IDE_ELSE_FALSE && Application.isHeadless();
+    protected final boolean notifyEDT = DebugMode.TRUE_IN_IDE_ELSE_FALSE && Application.isHeadless();
 
     @SuppressWarnings("unchecked")
     public <E, T extends Throwable> E addWait(final QueueAction<E, T> item) throws T {
@@ -436,7 +436,7 @@ public abstract class Queue {
         }
     }
 
-    private final AtomicReference<QueueAction<?, ? extends Throwable>> pendingItem = new AtomicReference<QueueAction<?, ? extends Throwable>>();
+    protected final AtomicReference<QueueAction<?, ? extends Throwable>> pendingItem = new AtomicReference<QueueAction<?, ? extends Throwable>>();
 
     protected void runQueue() {
         final Object lock = getLock();
@@ -562,7 +562,7 @@ public abstract class Queue {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Thread#toString()
      */
     @Override

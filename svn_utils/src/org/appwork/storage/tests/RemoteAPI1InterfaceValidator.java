@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.moncompare.Condition;
 import org.appwork.remoteapi.RemoteAPIInterface;
 import org.appwork.remoteapi.RemoteAPIRequest;
 import org.appwork.remoteapi.RemoteAPIResponse;
@@ -22,6 +23,7 @@ import org.appwork.testframework.IgnoreInAWTest;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
+import org.appwork.utils.reflection.CompiledType;
 
 public class RemoteAPI1InterfaceValidator extends AWTest {
     public static void main(String[] args) {
@@ -113,9 +115,14 @@ public class RemoteAPI1InterfaceValidator extends AWTest {
                     }
                 }
             }
-            if (paramType instanceof ParameterizedType) {
-                for (Type type : ((ParameterizedType) paramType).getActualTypeArguments()) {
-                    checkTypeStorable(method, type);
+            CompiledType ct = CompiledType.create(paramType);
+            if (ct.isInstanceOf(Condition.class)) {
+                // skip generics check. Generics are no storables here
+            } else {
+                if (paramType instanceof ParameterizedType) {
+                    for (Type type : ((ParameterizedType) paramType).getActualTypeArguments()) {
+                        checkTypeStorable(method, type);
+                    }
                 }
             }
             Class<?> raw = ReflectionUtils.getRaw(paramType);

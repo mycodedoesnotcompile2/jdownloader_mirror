@@ -63,7 +63,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49879 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49883 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -112,17 +112,18 @@ public abstract class EvilangelCore extends PluginForHost {
         return "https://www.famesupport.com/";
     }
 
-    private String       dllink                          = null;
+    private String       dllink                                     = null;
     @Deprecated
-    private final String URL_EVILANGEL_FILM              = "(?i)https?://members\\.evilangel.com/[a-z]{2}/([A-Za-z0-9\\-_%]+)/film/(\\d+)";
+    private final String URL_EVILANGEL_FILM                         = "(?i)https?://members\\.evilangel.com/[a-z]{2}/([A-Za-z0-9\\-_%]+)/film/(\\d+)";
     @Deprecated
-    private final String URL_EVILANGEL_FREE_TRAILER      = "(?i)https?://(?:www\\.)?evilangel\\.com/[a-z]{2}/video/([A-Za-z0-9\\-_%]+)/(\\d+)";
-    private final String URL_VIDEO                       = "(?i)https?://[^/]+/[a-z]{2}/(?:video|movie)/([A-Za-z0-9\\-_%]+)(?:/([A-Za-z0-9\\-_%]+))?/(\\d+)";
-    private final String PROPERTY_ACTORS                 = "actors";
-    private final String PROPERTY_DATE                   = "date";
-    private final String PROPERTY_QUALITY                = "quality";
-    private final String PROPERTY_TITLE                  = "title";
-    private final String PROPERTY_ACCOUNT_CONTENT_SOURCE = "content_source";
+    private final String URL_EVILANGEL_FREE_TRAILER                 = "(?i)https?://(?:www\\.)?evilangel\\.com/[a-z]{2}/video/([A-Za-z0-9\\-_%]+)/(\\d+)";
+    private final String URL_VIDEO                                  = "(?i)https?://[^/]+/[a-z]{2}/(?:video|movie)/([A-Za-z0-9\\-_%]+)(?:/([A-Za-z0-9\\-_%]+))?/(\\d+)";
+    private final String PROPERTY_ACTORS                            = "actors";
+    private final String PROPERTY_DATE                              = "date";
+    private final String PROPERTY_QUALITY                           = "quality";
+    private final String PROPERTY_TITLE                             = "title";
+    private final String PROPERTY_ACCOUNT_CONTENT_SOURCE            = "content_source";
+    private final String PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS = "allows_official_downloads";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -472,26 +473,40 @@ public abstract class EvilangelCore extends PluginForHost {
                              */
                             /* We can always use the file size as usually stream- and download sizes and available qualities are similar. */
                             filesize = download_file_sizes.get(thisChosenQuality).longValue();
-                            final String officialDownloadlink = String.format("https://members.%s/movieaction/download/%s/%s/mp4?codec=h264", getHost(), fileID, thisChosenQuality);
-                            URLConnectionAdapter con = null;
-                            try {
-                                final Browser br_dltest = br.cloneBrowser();
-                                con = br_dltest.openHeadConnection(officialDownloadlink);
-                                if (this.looksLikeDownloadableContent(con)) {
+                            synchronized (account) {
+                                final Boolean accountAllowsOfficialDownloads = (Boolean) account.getProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
+                                final String officialDownloadlink = String.format("https://members.%s/movieaction/download/%s/%s/mp4?codec=h264", getHost(), fileID, thisChosenQuality);
+                                if (Boolean.TRUE.equals(accountAllowsOfficialDownloads)) {
+                                    /* We know that this account allows official downloads so there is no need to check. */
                                     this.dllink = officialDownloadlink;
                                     chosenQualityLabel = thisChosenQuality;
-                                    filesize = con.getCompleteContentLength();
+                                } else if (accountAllowsOfficialDownloads == null) {
+                                    URLConnectionAdapter con = null;
+                                    boolean success = false;
+                                    try {
+                                        final Browser br_dltest = br.cloneBrowser();
+                                        con = br_dltest.openHeadConnection(officialDownloadlink);
+                                        if (this.looksLikeDownloadableContent(con)) {
+                                            this.dllink = officialDownloadlink;
+                                            chosenQualityLabel = thisChosenQuality;
+                                            filesize = con.getCompleteContentLength();
+                                            success = true;
+                                        } else {
+                                            /* Typically http response 404 */
+                                            logger.info("Official download not possible: Received no file content");
+                                        }
+                                    } catch (final Throwable e) {
+                                        logger.log(e);
+                                        logger.info("Official download not possible: Exception");
+                                    } finally {
+                                        try {
+                                            con.disconnect();
+                                        } catch (final Throwable e) {
+                                        }
+                                    }
+                                    account.setProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS, success);
                                 } else {
-                                    /* Typically http response 404 */
-                                    logger.info("Official download not possible: Received no file content");
-                                }
-                            } catch (final Throwable e) {
-                                logger.log(e);
-                                logger.info("Official download not possible: Exception");
-                            } finally {
-                                try {
-                                    con.disconnect();
-                                } catch (final Throwable e) {
+                                    /* This account does not allow official downloads. */
                                 }
                             }
                         } else {
@@ -954,6 +969,8 @@ public abstract class EvilangelCore extends PluginForHost {
                 logger.info("Failed to find additional expire date information");
             }
         }
+        /* Upper handling will re-evaluate and set this flag again if official video downloads are possible. */
+        account.removeProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
         return ai;
     }
 

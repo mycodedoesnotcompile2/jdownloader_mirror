@@ -11,6 +11,9 @@ import javax.swing.JPopupMenu;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 
+import jd.controlling.TaskQueue;
+import jd.gui.swing.jdgui.components.IconedProcessIndicator;
+
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.components.tooltips.ToolTipController;
@@ -24,9 +27,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
-
-import jd.controlling.TaskQueue;
-import jd.gui.swing.jdgui.components.IconedProcessIndicator;
 
 public class ExtractorProgress extends IconedProcessIndicator {
     /**
@@ -63,7 +63,7 @@ public class ExtractorProgress extends IconedProcessIndicator {
 
             protected void initColumns() {
                 super.initColumns();
-                addColumn(new ExtComponentColumn<ExtractionController>("Cancel") {
+                addColumn(new ExtComponentColumn<ExtractionController>(_GUI.T.lit_cancel()) {
                     /**
                      *
                      */
@@ -148,6 +148,24 @@ public class ExtractorProgress extends IconedProcessIndicator {
         };
         table = new ExtractionJobTable(tModel);
         pu.add(table);
+        pu.add(new ExtButton(new AppAction() {
+            private static final long serialVersionUID = -2183896670625238331L;
+            {
+                setSmallIcon(new AbstractIcon(IconKey.ICON_CANCEL, 16));
+                setName(_GUI.T.literally_abort_all());
+            }
+
+            public void actionPerformed(ActionEvent e) {
+                TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        extension.abortAll();
+                        return null;
+                    }
+                });
+                pu.setVisible(false);
+            }
+        }));
         pu.addPopupMenuListener(new PopupMenuListener() {
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
             }

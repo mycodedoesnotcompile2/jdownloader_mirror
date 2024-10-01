@@ -45,11 +45,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 47923 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
 public class FileBitPl extends PluginForHost {
     private static final String          APIKEY   = "YWI3Y2E2NWM3OWQxYmQzYWJmZWU3NTRiNzY0OTM1NGQ5ODI3ZjlhNmNkZWY3OGE1MjQ0ZjU4NmM5NTNiM2JjYw==";
     private static final String          API_BASE = "https://filebit.pl/api/index.php";
@@ -368,16 +370,6 @@ public class FileBitPl extends PluginForHost {
             maxChunks = -maxChunks;
         }
         account.setProperty("filebitpl_maxconnections", maxChunks);
-        br.getPage(API_BASE + "?a=getHostList");
-        final Map<String, Object> resp2 = handleAPIErrors(br, account, null);
-        final List<Map<String, Object>> domaininfos = (List<Map<String, Object>>) resp2.get("data");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
-        for (final Map<String, Object> domaininfo : domaininfos) {
-            final List<String> domains = (List<String>) domaininfo.get("hostdomains");
-            for (final String domain : domains) {
-                supportedHosts.add(domain);
-            }
-        }
         if (!"1".equals(premium)) {
             account.setType(AccountType.FREE);
         } else {
@@ -386,7 +378,17 @@ public class FileBitPl extends PluginForHost {
         if (!StringUtils.isEmpty(accountDescription)) {
             ai.setStatus(accountDescription);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        br.getPage(API_BASE + "?a=getHostList");
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final Map<String, Object> resp2 = handleAPIErrors(br, account, null);
+        final List<Map<String, Object>> domaininfos = (List<Map<String, Object>>) resp2.get("data");
+        for (final Map<String, Object> domaininfo : domaininfos) {
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.setName(domaininfo.get("hostname").toString());
+            mhost.setDomains((List<String>) domaininfo.get("hostdomains"));
+            supportedhosts.add(mhost);
+        }
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
@@ -439,18 +441,22 @@ public class FileBitPl extends PluginForHost {
         if (hostTableText == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final String[] hostInfo = hostTableText.split("<li>");
         for (final String singleHostInfo : hostInfo) {
-            String host = new Regex(singleHostInfo, "<b>([^<>\"]+)</b>").getMatch(0);
-            final boolean isActive = singleHostInfo.contains("online.png");
-            if (StringUtils.isEmpty(host) || !isActive) {
+            String domain = new Regex(singleHostInfo, "<b>([^<>\"]+)</b>").getMatch(0);
+            if (StringUtils.isEmpty(domain)) {
                 continue;
             }
-            host = host.toLowerCase();
-            supportedHosts.add(host);
+            final boolean isActive = singleHostInfo.contains("online.png");
+            domain = domain.toLowerCase();
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            if (!isActive) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

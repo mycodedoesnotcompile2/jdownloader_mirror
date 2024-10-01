@@ -139,13 +139,14 @@ public class Crypto {
         return cipher.doFinal(data);
     }
 
-    private static final String       CHAR_POOL    = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"§$%&/()=?{[]}\\'#*+~,.-;:_'";
-    private static final SecureRandom secureRandom = new SecureRandom();
+    private static final String CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"§$%&/()=?{[]}\\'#*+~,.-;:_'";
 
     public static String generateRandomString(int length) {
-        StringBuilder stringBuilder = new StringBuilder(length);
+        final SecureRandom secureRandom = new SecureRandom();
+        final StringBuilder stringBuilder = new StringBuilder(length);
+        final int poolSize = CHAR_POOL.length();
         for (int i = 0; i < length; i++) {
-            int randomIndex = secureRandom.nextInt(CHAR_POOL.length());
+            int randomIndex = secureRandom.nextInt(poolSize);
             stringBuilder.append(CHAR_POOL.charAt(randomIndex));
         }
         return stringBuilder.toString();

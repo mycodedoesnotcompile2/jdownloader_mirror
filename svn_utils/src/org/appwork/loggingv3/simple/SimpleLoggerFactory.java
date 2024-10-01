@@ -89,6 +89,7 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     protected LogToStdOutSink sinkToConsole;
 
     public SimpleLoggerFactory() {
+ 
     }
 
     public SimpleLoggerFactory initDefaults() {

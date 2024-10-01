@@ -45,6 +45,8 @@ import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -54,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ArteTv;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49869 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49893 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,7 +134,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         return crawlPrograms(param);
     }
 
-    private ArrayList<DownloadLink> crawlPrograms(final CryptedLink param) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlPrograms(final CryptedLink param) throws IOException, PluginException, DecrypterRetryException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final ArteMediathekConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final List<Integer> selectedQualitiesHeight = getSelectedHTTPQualities();
@@ -184,7 +186,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         }
     }
 
-    private ArrayList<DownloadLink> crawlProgram(final CryptedLink param, final Map<String, Object> program) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlProgram(final CryptedLink param, final Map<String, Object> program) throws IOException, PluginException, DecrypterRetryException {
         final Map<String, Object> availability = (Map<String, Object>) program.get("availability");
         if (availability == null) {
             /* Message in browser should be "No video available" */
@@ -200,7 +202,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         return crawlVideo(param, vid);
     }
 
-    private ArrayList<DownloadLink> crawlVideo(final CryptedLink param, final Map<String, Object> vid) throws IOException, PluginException {
+    private ArrayList<DownloadLink> crawlVideo(final CryptedLink param, final Map<String, Object> vid) throws IOException, PluginException, DecrypterRetryException {
         final String kind = vid.get("kind").toString();
         if (!kind.matches("(?i)(PROGRAMM|SHOW)")) {
             if (kind.equals("LIVE")) {
@@ -248,6 +250,15 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         final List<Map<String, Object>> videoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
         if (videoStreams == null || videoStreams.isEmpty()) {
             /* This should never happen */
+            if (usingAPIV2) {
+                final Map<String, Object> eStat = (Map<String, Object>) vid.get("eStat");
+                final String eStat_level2 = eStat.get("level2").toString();
+                if (eStat_level2.equalsIgnoreCase("PROGRAMME_WEB")) {
+                    final String dummyTitle = "VIDEO_NOCH_NICHT_IM_TV_AUSGESTRAHLT_" + title;
+                    final String dummyComment = "Dieses Video wurde noch nicht im TV ausgestrahlt und kann daher nicht per APIv2 abgerufen werden. Mehr Informationen siehe: https://board.jdownloader.org/showthread.php?p=539975#post539975";
+                    throw new DecrypterRetryException(RetryReason.HOST, dummyTitle, dummyComment);
+                }
+            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* First put each language + audio version in separate lists. */

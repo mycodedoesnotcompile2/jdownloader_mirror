@@ -89,6 +89,10 @@ public interface BubbleNotifyConfig extends ConfigInterface {
     @AboutConfig
     public boolean isBubbleNotifyOnUpdateAvailableEnabled();
 
+    @DefaultBooleanValue(true)
+    @AboutConfig
+    public boolean isBubbleNotifyOnContainerLoadedEnabled();
+
     public void setFinalPositionAnchor(Anchor a);
 
     public void setFinalPositionX(int i);
@@ -100,6 +104,8 @@ public interface BubbleNotifyConfig extends ConfigInterface {
     public void setBubbleNotifyOnReconnectStartEnabled(boolean b);
 
     public void setBubbleNotifyOnUpdateAvailableEnabled(boolean b);
+
+    public void setBubbleNotifyOnContainerLoadedEnabled(boolean b);
 
     public void setAnimationEndPositionAnchor(Anchor a);
 

@@ -46,7 +46,6 @@ import java.util.zip.ZipOutputStream;
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
 import jd.controlling.packagecontroller.PackageController;
-import jd.controlling.packagecontroller.PackageControllerQueue.ReadOnlyQueueAction;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLinkProperty;
@@ -603,15 +602,15 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
 
         private final ArrayList<IndexedDownloadLink>         downloadLinks = new ArrayList<IndexedDownloadLink>();
         private final static Comparator<IndexedDownloadLink> COMPARATOR    = new Comparator<IndexedDownloadLink>() {
-            private final int compare(int x, int y) {
-                return (x < y) ? -1 : ((x == y) ? 0 : 1);
-            }
+                                                                               private final int compare(int x, int y) {
+                                                                                   return (x < y) ? -1 : ((x == y) ? 0 : 1);
+                                                                               }
 
-            @Override
-            public int compare(IndexedDownloadLink o1, IndexedDownloadLink o2) {
-                return compare(o1.getIndex(), o2.getIndex());
-            }
-        };
+                                                                               @Override
+                                                                               public int compare(IndexedDownloadLink o1, IndexedDownloadLink o2) {
+                                                                                   return compare(o1.getIndex(), o2.getIndex());
+                                                                               }
+                                                                           };
 
         private FilePackage getLoadedPackage() {
             final FilePackage filePackage = this.filePackage;
@@ -1015,7 +1014,6 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
      * @param file
      */
     private boolean save(java.util.List<FilePackage> packages, File file) throws IOException {
-        final boolean isShuttingDown = ShutdownController.getInstance().isShuttingDown();
         synchronized (SAVELOADLOCK) {
             if (file == null) {
                 if (downloadLists.size() > 0) {
@@ -1145,12 +1143,6 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
                                 }
                                 int childIndex = 0;
                                 for (final DownloadLink link : pkg.getChildren()) {
-                                    if (!isShuttingDown) {
-                                        final QueueAction<?, ? extends Throwable> waiting = DownloadController.this.getQueue().peek();
-                                        if (waiting instanceof ReadOnlyQueueAction) {
-                                            DownloadController.this.getQueue().executeQueuedAction(waiting);
-                                        }
-                                    }
                                     final DownloadLinkStorable linkStorable = new DownloadLinkStorable(link);
                                     final String childEntryID = String.format(childFormat, childIndex++);
                                     final ZipEntry linkEntry = new ZipEntry(packageEntryID + "_" + childEntryID);

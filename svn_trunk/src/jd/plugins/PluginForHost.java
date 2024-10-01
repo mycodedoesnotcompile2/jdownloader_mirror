@@ -1699,7 +1699,7 @@ public abstract class PluginForHost extends Plugin {
             /* This should never happen. */
             throw new AccountInvalidException("Invalid/empty 2FA result.");
         } else if (pattern != null && !new Regex(twoFACode, pattern).patternMatches()) {
-            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid_format(pattern.toString()));
+            throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid_format(pattern.pattern()));
         }
         return twoFACode;
     }
