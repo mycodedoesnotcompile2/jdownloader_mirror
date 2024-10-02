@@ -25,18 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -55,7 +43,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 49901 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -65,7 +65,7 @@ public class LeechallIo extends PluginForHost {
     private final String                 PROPERTY_ACCOUNT_ACCESS_TOKEN      = "access_token";
     private final String                 PROPERTY_ACCOUNT_RECAPTCHA_SITEKEY = "recaptchasitekey";
     private final String                 RECAPTCHA_SITEKEY_STATIC           = "6LdqV7AiAAAAAK50kHwrESPTEwVuBpAX0MCrVI0e"; /* 2023-06-27 */
-    private final String                 H_CAPTCHA_SITEKEY_STATIC           = "b858042e-5b84-454c-8eda-5b3e670486d4";     /* 2024-09-12 */
+    private final String                 H_CAPTCHA_SITEKEY_STATIC           = "b858042e-5b84-454c-8eda-5b3e670486d4";    /* 2024-09-12 */
     /* Don't touch the following! */
     private static final AtomicInteger   runningDls                         = new AtomicInteger(0);
 
@@ -226,8 +226,7 @@ public class LeechallIo extends PluginForHost {
             account.setType(AccountType.FREE);
             /**
              * Free users cannot download anything thus adding such accounts to JDownloader doesn't make any sense -> Mark them as expired.
-             * </br>
-             * Website says: https://leechall.io/downloader --> "Please upgrade premium to use this service."
+             * </br> Website says: https://leechall.io/downloader --> "Please upgrade premium to use this service."
              */
             ai.setExpired(true);
         }
@@ -269,7 +268,7 @@ public class LeechallIo extends PluginForHost {
                 /* Find individual host limits */
                 final Map<String, Object> limitsbandwidth = (Map<String, Object>) limitinfo.get("bandwidth");
                 if (limitsbandwidth != null) {
-                    mhost.setTrafficMax(Long.parseLong(limitinfo.get("total").toString()));
+                    mhost.setTrafficMax(Long.parseLong(limitsbandwidth.get("total").toString()));
                     mhost.setTrafficLeft(mhost.getTrafficLeft() - Long.parseLong(limitsbandwidth.get("used").toString()));
                 }
                 final Map<String, Object> limitsfilenum = (Map<String, Object>) limitinfo.get("files");

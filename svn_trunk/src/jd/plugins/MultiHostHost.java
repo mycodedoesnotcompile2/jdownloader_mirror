@@ -26,15 +26,15 @@ public class MultiHostHost implements Storable {
 
     private String                name                            = null;
     private List<String>          domains                         = new ArrayList<String>();
-    private Boolean               isUnlimitedTraffic              = true;
-    private Boolean               isUnlimitedLinks                = true;
+    private Boolean               isUnlimitedTraffic              = null;
+    private Boolean               isUnlimitedLinks                = null;
     private long                  linksLeft                       = -1;
     private long                  linksMax                        = -1;
     private long                  trafficLeft                     = -1;
     private long                  trafficMax                      = -1;
     private String                unavailableMessage              = null;
     private long                  unavailableUntilTimestamp       = -1;
-    private short                 trafficCalculationFactorPercent = 100;
+    private Short                 trafficCalculationFactorPercent = null;
     private int                   maxChunks                       = 0;
     private int                   maxDownloads                    = -1;
     private Boolean               resume                          = null;
@@ -143,7 +143,11 @@ public class MultiHostHost implements Storable {
      * 500 = 5 times the size of the downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
-        return trafficCalculationFactorPercent;
+        if (trafficCalculationFactorPercent == null) {
+            return 100;
+        } else {
+            return trafficCalculationFactorPercent;
+        }
     }
 
     public void setTrafficCalculationFactorPercent(short num) {
@@ -277,6 +281,6 @@ public class MultiHostHost implements Storable {
         } else {
             title = null;
         }
-        return title + " | Status: " + this.getStatus() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
+        return title + " | Status: " + this.getStatus() + " | StatusText: " + this.getStatusText() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }
 }

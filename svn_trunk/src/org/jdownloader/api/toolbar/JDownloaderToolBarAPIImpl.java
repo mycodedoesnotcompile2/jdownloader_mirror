@@ -1,28 +1,11 @@
 package org.jdownloader.api.toolbar;
 
-import java.awt.MouseInfo;
-import java.awt.Point;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.remoteapi.RemoteAPIRequest;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.config.MinTimeWeakReference;
-import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
-import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
-import org.jdownloader.api.toolbar.LinkCheckResult.STATUS;
-import org.jdownloader.api.toolbar.specialurls.YouTubeSpecialUrlHandling;
-import org.jdownloader.gui.views.linkgrabber.actions.AddLinksProgress;
-import org.jdownloader.plugins.FinalLinkState;
-import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
-import org.jdownloader.updatev2.UpdateController;
 
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadSession;
@@ -42,6 +25,21 @@ import jd.controlling.linkcrawler.UnknownCrawledLinkHandler;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForHost;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.remoteapi.RemoteAPIRequest;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.config.MinTimeWeakReference;
+import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
+import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogCanceledException;
+import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.jdownloader.api.toolbar.LinkCheckResult.STATUS;
+import org.jdownloader.api.toolbar.specialurls.YouTubeSpecialUrlHandling;
+import org.jdownloader.gui.views.linkgrabber.actions.AddLinksProgress;
+import org.jdownloader.plugins.FinalLinkState;
+import org.jdownloader.settings.staticreferences.CFG_RECONNECT;
+import org.jdownloader.updatev2.UpdateController;
 
 //Toolbar NameSpace
 //http://localhost:3128/toolbar/
@@ -373,12 +371,6 @@ public class JDownloaderToolBarAPIImpl implements JDownloaderToolBarAPI {
                 return url;
             }
 
-            protected Point getForcedLocation() {
-                Point loc = MouseInfo.getPointerInfo().getLocation();
-                loc.x -= getPreferredSize().width / 2;
-                loc.y += 30;
-                return loc;
-            }
         };
         if (d.isHiddenByDontShowAgain()) {
             Thread thread = new Thread("AddLinksDialog") {

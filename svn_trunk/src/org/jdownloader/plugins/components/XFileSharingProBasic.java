@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49897 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4073,7 +4073,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             String filesizelimit = new Regex(html, "You can download files up to(.*?)only").getMatch(0);
             if (filesizelimit != null) {
                 filesizelimit = filesizelimit.trim();
-                throw new AccountRequiredException("(Premium) account required  to download files bigger than" + filesizelimit);
+                throw new AccountRequiredException("(Premium) account required  to download files bigger than " + filesizelimit);
             } else {
                 throw new AccountRequiredException();
             }

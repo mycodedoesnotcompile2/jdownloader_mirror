@@ -21,6 +21,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -38,16 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
 public class MydebridCom extends antiDDoSForHost {
     /* Documentation: https://api.mydebrid.com/v1/ */
     private static final String                  API_BASE             = "https://api.mydebrid.com/v1";
@@ -61,20 +60,21 @@ public class MydebridCom extends antiDDoSForHost {
 
     public MydebridCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://mydebrid.com/sign-up");
+        this.enablePremium("https://" + getHost() + "/sign-up");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setAllowedResponseCodes(new int[] { 400 });
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://mydebrid.com/terms-of-service";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.setFollowRedirects(true);
-        br.setAllowedResponseCodes(new int[] { 400 });
-        return br;
+        return "https://" + getHost() + "/terms-of-service";
     }
 
     @Override
@@ -139,7 +139,6 @@ public class MydebridCom extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        prepBR(this.br);
         mhm.runCheck(account, link);
         handleDL(account, link);
     }
@@ -171,7 +170,6 @@ public class MydebridCom extends antiDDoSForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        prepBR(this.br);
         final AccountInfo ai = new AccountInfo();
         loginAPI(account, true);
         final String token = account.getStringProperty(PROPERTY_logintoken);
@@ -179,7 +177,7 @@ public class MydebridCom extends antiDDoSForHost {
             this.postPage(API_BASE + "/account-status", "token=" + Encoding.urlEncode(token));
             handleErrors(br, account, null);
         }
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         boolean is_premium = "premium".equalsIgnoreCase((String) entries.get("accountType"));
         /* 2020-05-06: This will usually return "unlimited" */
         // final String trafficleft = (String) entries.get("remainingTraffic");
@@ -200,7 +198,7 @@ public class MydebridCom extends antiDDoSForHost {
             ai.setUnlimitedTraffic();
         }
         postPage(API_BASE + "/get-hosts", "token=" + token);
-        entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final ArrayList<String> supportedhostslist = new ArrayList<String>();
         final List<Object> ressourcelist = (List<Object>) entries.get("hosts");
         final PluginFinder finder = new PluginFinder();
@@ -275,7 +273,6 @@ public class MydebridCom extends antiDDoSForHost {
         }
         /* Drop previous headers & cookies */
         logger.info("Performing full login");
-        br = this.prepBR(br);
         final String postData = String.format("username=%s&password=%s", Encoding.urlEncode(account.getUser()), Encoding.urlEncode(account.getPass()));
         postPage(API_BASE + "/login", postData);
         token = PluginJSonUtils.getJson(br, "token");
@@ -292,31 +289,33 @@ public class MydebridCom extends antiDDoSForHost {
     /** Handles errors according to: https://api.mydebrid.com/v1/#errors */
     private void handleErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         final String errormsg = getErrormessage(br);
-        if (!StringUtils.isEmpty(errormsg)) {
-            if (errormsg.equalsIgnoreCase("INVALID_CREDENTIALS")) {
-                /* Usually goes along with http response 400 */
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else if (errormsg.equalsIgnoreCase("TOKEN_EXPIRED") || errormsg.equalsIgnoreCase("INVALID_TOKEN")) {
-                /* Existing session expired. */
-                throw new AccountUnavailableException(errormsg, 1 * 60 * 1000l);
-            } else if (errormsg.equalsIgnoreCase("LIMIT_EXCEEDED")) {
-                /* Limit of individual host reached/exceeded */
-                mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
-            } else if (errormsg.equalsIgnoreCase("HOST_UNAVAILABLE")) {
-                mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
-            } else if (errormsg.equalsIgnoreCase("FILE_NOT_FOUND")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (errormsg.equalsIgnoreCase("INVALID_URL")) {
-                /* This should never happen (?) --> Retry */
-                mhm.handleErrorGeneric(account, link, errormsg, 50);
+        if (StringUtils.isEmpty(errormsg)) {
+            /* No error */
+            return;
+        }
+        if (errormsg.equalsIgnoreCase("INVALID_CREDENTIALS")) {
+            /* Usually goes along with http response 400 */
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+        } else if (errormsg.equalsIgnoreCase("TOKEN_EXPIRED") || errormsg.equalsIgnoreCase("INVALID_TOKEN")) {
+            /* Existing session expired. */
+            throw new AccountUnavailableException(errormsg, 1 * 60 * 1000l);
+        } else if (errormsg.equalsIgnoreCase("LIMIT_EXCEEDED")) {
+            /* Limit of individual host reached/exceeded */
+            mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
+        } else if (errormsg.equalsIgnoreCase("HOST_UNAVAILABLE")) {
+            mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
+        } else if (errormsg.equalsIgnoreCase("FILE_NOT_FOUND")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (errormsg.equalsIgnoreCase("INVALID_URL")) {
+            /* This should never happen (?) --> Retry */
+            mhm.handleErrorGeneric(account, link, errormsg, 50);
+        } else {
+            /* Handle all other errors e.g. "MISSING_PARAMS" or "Error processing input" or any other unknown error */
+            if (link == null) {
+                /* No DownloadLink available --> Handle as account error */
+                throw new AccountUnavailableException(errormsg, 10 * 60 * 1000l);
             } else {
-                /* Handle all other errors e.g. "MISSING_PARAMS" or "Error processing input" or any other unknown error */
-                if (link == null) {
-                    /* No DownloadLink available --> Handle as account error */
-                    throw new AccountUnavailableException(errormsg, 10 * 60 * 1000l);
-                } else {
-                    mhm.handleErrorGeneric(account, link, errormsg, 50);
-                }
+                mhm.handleErrorGeneric(account, link, errormsg, 50);
             }
         }
     }
@@ -324,7 +323,7 @@ public class MydebridCom extends antiDDoSForHost {
     private String getErrormessage(final Browser br) {
         String errormsg = null;
         try {
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             errormsg = (String) entries.get("error");
         } catch (final Throwable e) {
         }

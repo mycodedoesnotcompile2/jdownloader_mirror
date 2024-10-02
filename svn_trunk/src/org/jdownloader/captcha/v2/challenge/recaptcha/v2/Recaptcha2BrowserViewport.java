@@ -1,10 +1,10 @@
 package org.jdownloader.captcha.v2.challenge.recaptcha.v2;
 
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.InputEvent;
 
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
@@ -22,7 +22,7 @@ public abstract class Recaptcha2BrowserViewport extends BrowserViewport {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        Point oldloc = MouseInfo.getPointerInfo().getLocation();
+        final Point oldloc = ToolTipController.getMouseLocation();
         int clickX = recaptchaIframe.x + scale(22) + scale(Math.random() * 20);
         int clickY = recaptchaIframe.y + scale(32) + scale(Math.random() * 20);
         WindowsMouseSpeedWorkaround workaround = null;
@@ -44,7 +44,9 @@ public abstract class Recaptcha2BrowserViewport extends BrowserViewport {
         // second click: press button
         getRobot().mousePress(InputEvent.BUTTON1_MASK);
         getRobot().mouseRelease(InputEvent.BUTTON1_MASK);
-        getRobot().mouseMove(oldloc.x, oldloc.y);
+        if (oldloc != null) {
+            getRobot().mouseMove(oldloc.x, oldloc.y);
+        }
         if (CrossSystem.isWindows() && workaround != null && mouseSpeed != null) {
             try {
                 getLogger().info("GetMouseSpeed(After):" + workaround.getMouseSpeed());

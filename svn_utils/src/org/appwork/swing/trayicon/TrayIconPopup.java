@@ -86,7 +86,11 @@ public final class TrayIconPopup extends JPopupMenu implements MouseListener {
                         @Override
                         protected void runInEDT() {
                             if (enteredPopup && hideThreadrunning) {
-                                PointerInfo mouse = MouseInfo.getPointerInfo();
+                                final PointerInfo mouse = MouseInfo.getPointerInfo();
+                                if (mouse == null) {
+                                    setVisible(false);
+                                    return;
+                                }
                                 try {
                                     Point location = getLocationOnScreen();
                                     Point mouseLocation = mouse.getLocation();
@@ -111,8 +115,7 @@ public final class TrayIconPopup extends JPopupMenu implements MouseListener {
                                     }
                                     if (activeFrame) {
                                         return;
-                                    }
-                                    if (mouse.getLocation().x < location.x || mouse.getLocation().x > location.x + TrayIconPopup.this.getSize().width) {
+                                    } else if (mouse.getLocation().x < location.x || mouse.getLocation().x > location.x + TrayIconPopup.this.getSize().width) {
                                         setVisible(false);
                                     } else if (mouse.getLocation().y < location.y || mouse.getLocation().y > location.y + TrayIconPopup.this.getSize().height) {
                                         setVisible(false);

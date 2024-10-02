@@ -24,9 +24,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
-import java.awt.MouseInfo;
 import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -52,6 +50,7 @@ import jd.utils.JDUtilities;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.ExtJFrame;
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.swing.EDTHelper;
 import org.jdownloader.actions.AppAction;
@@ -301,8 +300,12 @@ public final class TrayIconPopup extends ExtJFrame implements MouseListener {
                     } catch (InterruptedException e) {
                     }
                     if (enteredPopup && hideThreadrunning) {
-                        PointerInfo mouse = MouseInfo.getPointerInfo();
-                        Point current = TrayIconPopup.this.getLocation();
+                        final Point mouse = ToolTipController.getMouseLocation();
+                        if (mouse == null) {
+                            dispose();
+                            break;
+                        }
+                        final Point current = TrayIconPopup.this.getLocation();
                         if (mouse.getLocation().x < current.x || mouse.getLocation().x > current.x + TrayIconPopup.this.getSize().width) {
                             dispose();
                             break;

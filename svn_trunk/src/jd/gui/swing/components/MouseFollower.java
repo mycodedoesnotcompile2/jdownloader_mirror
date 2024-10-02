@@ -16,18 +16,18 @@
 
 package jd.gui.swing.components;
 
-import java.awt.MouseInfo;
 import java.awt.Point;
 
 import javax.swing.JComponent;
 import javax.swing.JWindow;
 
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.swing.EDTHelper;
 
 public class MouseFollower {
 
     private static JWindow window;
-    private static Thread follower;
+    private static Thread  follower;
 
     public static void show(JComponent mouseOver) {
         if (window == null) {
@@ -46,18 +46,19 @@ public class MouseFollower {
                         }
                         new EDTHelper<Object>() {
 
-                            private Point loc;
-
                             @Override
                             public Object edtRun() {
-                                try {
-                                    loc = MouseInfo.getPointerInfo().getLocation();
-                                    loc.x += 10;
-                                    loc.y += 10;
-
-                                    window.setLocation(loc);
-                                } catch (Exception e) {
+                                final JWindow window = MouseFollower.window;
+                                if (window == null) {
+                                    return null;
                                 }
+                                final Point loc = ToolTipController.getMouseLocation();
+                                if (loc == null) {
+                                    return null;
+                                }
+                                loc.x += 10;
+                                loc.y += 10;
+                                window.setLocation(loc);
                                 return null;
                             }
 
@@ -78,11 +79,15 @@ public class MouseFollower {
     }
 
     public static void hide() {
+        final JWindow window = MouseFollower.window;
         if (window != null) {
             window.dispose();
-            window = null;
+            MouseFollower.window = null;
+        }
+        final Thread follower = MouseFollower.follower;
+        if (follower != null) {
             follower.interrupt();
-            follower = null;
+            MouseFollower.follower = null;
         }
 
     }

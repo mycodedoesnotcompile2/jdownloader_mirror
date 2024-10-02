@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Insets;
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Shape;
@@ -256,7 +255,11 @@ public class RegexListTextPane extends TextPane implements ToolTipHandler {
     @Override
     public ExtTooltip createExtTooltip(Point position) {
         if (position == null) {
-            position = MouseInfo.getPointerInfo().getLocation();
+            position = ToolTipController.getMouseLocation();
+            if (position == null) {
+                lastPainter = null;
+                return null;
+            }
             SwingUtilities.convertPointFromScreen(position, this);
         }
         // final int row = this.getRowIndexByPoint(position);
@@ -270,7 +273,7 @@ public class RegexListTextPane extends TextPane implements ToolTipHandler {
         for (int i = 0; i < highlights.length; i++) {
             final Highlighter.Highlight h = highlights[i];
             if (h.getPainter() instanceof UnderlineHighlightPainter) {
-                Rectangle bounds = ((UnderlineHighlightPainter) h.getPainter()).getBounds();
+                final Rectangle bounds = ((UnderlineHighlightPainter) h.getPainter()).getBounds();
                 if (bounds != null && bounds.contains(position)) {
                     p = ((UnderlineHighlightPainter) h.getPainter());
                 }
@@ -279,14 +282,11 @@ public class RegexListTextPane extends TextPane implements ToolTipHandler {
         lastPainter = p;
         if (p == null) {
             return null;
-        }
-
-        if (p.isOk()) {
+        } else if (p.isOk()) {
             return createOkTooltip(p.getPattern());
         } else {
             return createFailTooltip(p.getPattern());
         }
-
     }
 
     public ExtTooltip createFailTooltip(String p) {

@@ -6,7 +6,6 @@ import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
@@ -36,6 +35,7 @@ import jd.gui.swing.jdgui.BasicJDTable;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtComponentRowHighlighter;
 import org.appwork.swing.exttable.ExtOverlayRowHighlighter;
@@ -109,7 +109,10 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
     private final boolean                                         wrapAroundEnabled;
 
     public ExtColumn<AbstractNode> getMouseOverColumn() {
-        Point mp = MouseInfo.getPointerInfo().getLocation();
+        final Point mp = ToolTipController.getMouseLocation();
+        if (mp == null) {
+            return null;
+        }
         SwingUtilities.convertPointFromScreen(mp, this);
         return getExtColumnAtPoint(mp);
     }

@@ -2,6 +2,13 @@ package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
 import java.awt.event.ActionEvent;
 
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.controlling.packagecontroller.PackageControllerComparator;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
+
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.utils.event.queue.Queue.QueuePriority;
 import org.appwork.utils.event.queue.QueueAction;
@@ -16,13 +23,6 @@ import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.controlling.packagecontroller.PackageControllerComparator;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
 
 public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableTableContextAppAction<PackageType, ChildrenType> {
     /**
@@ -40,7 +40,7 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
         } else if (view instanceof LinkGrabberView) {
             this.column = LinkGrabberTable.getInstance().getMouseOverColumn();
         }
-        if (getSelection() != null) {
+        if (getSelection() != null && this.column != null) {
             setIconKey(IconKey.ICON_SORT);
             setName(_GUI.T.SortAction_SortAction_object_(column.getName()));
         } else {
@@ -62,6 +62,8 @@ public class SortAction<PackageType extends AbstractPackageNode<ChildrenType, Pa
 
     public void actionPerformed(ActionEvent e) {
         if (!isEnabled()) {
+            return;
+        } else if (column == null) {
             return;
         } else if (!(column.getModel() instanceof PackageControllerTableModel)) {
             return;

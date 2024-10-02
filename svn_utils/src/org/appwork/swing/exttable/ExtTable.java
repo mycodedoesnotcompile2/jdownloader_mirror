@@ -40,9 +40,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.MouseInfo;
 import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -548,7 +546,10 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     @Override
     public ExtTooltip createExtTooltip(Point position) {
         if (position == null) {
-            position = MouseInfo.getPointerInfo().getLocation();
+            position = ToolTipController.getMouseLocation();
+            if (position == null) {
+                return null;
+            }
             SwingUtilities.convertPointFromScreen(position, this);
         }
         final int row = this.getRowIndexByPoint(position);
@@ -1546,13 +1547,9 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                                         new EDTRunner() {
                                             @Override
                                             protected void runInEDT() {
-                                                final PointerInfo pointerInfo = MouseInfo.getPointerInfo();
-                                                final Point mousePosition;
-                                                if (pointerInfo != null) {
-                                                    mousePosition = pointerInfo.getLocation();
+                                                final Point mousePosition = ToolTipController.getMouseLocation();
+                                                if (mousePosition != null) {
                                                     SwingUtilities.convertPointFromScreen(mousePosition, ExtTable.this);
-                                                } else {
-                                                    mousePosition = null;
                                                 }
                                                 if (mousePosition != null) {
                                                     final int rowNow = ExtTable.this.rowAtPoint(mousePosition);

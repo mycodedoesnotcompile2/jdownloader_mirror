@@ -38,14 +38,13 @@ import java.awt.Frame;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
-import java.awt.MouseInfo;
 import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ComponentEvent;
 
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.swing.SwingUtils;
 
 /**
@@ -62,7 +61,7 @@ public class CenterOfScreenLocator extends AbstractLocator {
 
     @Override
     public Point getLocationOnScreen(final Window dialog) {
-        PointerInfo mouse = MouseInfo.getPointerInfo();
+        final Point mouse = ToolTipController.getMouseLocation();
         if (dialog.getParent() == null || !dialog.getParent().isDisplayable() || !dialog.getParent().isVisible()) {
             Rectangle windowBounds = dialog.getBounds();
             return getCenterLocationByWindowBounds(windowBounds);
@@ -84,7 +83,6 @@ public class CenterOfScreenLocator extends AbstractLocator {
             final Point ret = SwingUtils.getCenter(dialog.getParent(), dialog);
             return correct(ret, dialog);
         }
-
     }
 
     public Point getCenterLocationByWindowBounds(Rectangle windowBounds) {

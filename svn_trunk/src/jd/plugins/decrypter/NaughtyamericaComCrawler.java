@@ -36,6 +36,7 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
@@ -48,7 +49,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 48846 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49894 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     public NaughtyamericaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,6 +96,8 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             if (!NaughtyamericaCom.isLoggedIN(this.br)) {
                 acc.setError(AccountError.TEMP_DISABLED, 30 * 1000l, "Session expired?");
                 throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "ACCOUNT_LOGIN_EXPIRED_" + urlSlug, "Refresh your account in settings and try again.");
+            } else if (br.containsHTML(">\\s*Add 3D Videos to")) {
+                throw new AccountRequiredException("Add 3D Videos to your Membership to unlock this video");
             }
             final ArrayList<Integer> selectedQualities = this.getSelectedQualities();
             if (selectedQualities.isEmpty() && !ignoreQualitySelection) {

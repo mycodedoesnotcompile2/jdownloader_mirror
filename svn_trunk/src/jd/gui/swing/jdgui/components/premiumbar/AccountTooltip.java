@@ -3,7 +3,6 @@ package jd.gui.swing.jdgui.components.premiumbar;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +26,7 @@ import jd.plugins.AccountInfo;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.components.tooltips.PanelToolTip;
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.components.tooltips.TooltipPanel;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.locator.AbstractLocator;
@@ -47,9 +47,12 @@ public class AccountTooltip extends PanelToolTip {
             ttPosition.y = activeComponent.getLocationOnScreen().y - getPreferredSize().height;
             ttPosition.x = activeComponent.getLocationOnScreen().x;
             return AbstractLocator.correct(ttPosition, getPreferredSize());
-        } else {
-            return MouseInfo.getPointerInfo().getLocation();
         }
+        final Point mouseLocation = ToolTipController.getMouseLocation();
+        if (mouseLocation != null) {
+            return mouseLocation;
+        }
+        return ttPosition;
     }
 
     public AccountTooltip(AccountTooltipOwner owner, AccountServiceCollection accountCollection) {

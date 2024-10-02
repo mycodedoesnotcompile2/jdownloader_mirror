@@ -26,6 +26,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
+import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.Files;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -47,7 +48,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49872 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 49900 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends antiDDoSForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +72,17 @@ public class UseNet extends antiDDoSForHost {
             private static final long serialVersionUID = 1L;
 
             @Override
-            protected void initAccountConfig(PluginForHost plgh, Account acc, Class<? extends AccountConfigInterface> cf) {
+            protected boolean useCustomUI(KeyHandler<?> h) {
+                if (UsenetAccountConfigInterface.class.isAssignableFrom(h.getDeclaringClass())) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            @Override
+            protected void initAccountConfig(PluginForHost plugin, Account acc, Class<? extends AccountConfigInterface> cf) {
+                super.initAccountConfig(plugin, acc, cf);
                 extend(this, getHost(), getAvailableUsenetServer(), getAccountJsonConfig(acc));
             }
         };

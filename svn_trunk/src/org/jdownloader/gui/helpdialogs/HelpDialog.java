@@ -1,8 +1,6 @@
 package org.jdownloader.gui.helpdialogs;
 
-import java.awt.MouseInfo;
 import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.event.ComponentEvent;
 import java.awt.event.WindowEvent;
 
@@ -10,16 +8,19 @@ import javax.swing.Icon;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.uio.UIOManager;
-import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.locator.DialogLocator;
 import org.appwork.utils.swing.locator.AbstractLocator;
+import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.RestartController;
 
 public class HelpDialog {
@@ -27,15 +28,9 @@ public class HelpDialog {
         show(null, null, point, dontShowAgainKey, flags, title, msg, icon);
     }
 
-    public static Point getMouseLocation() {
-        if (Application.isHeadless()) {
-            return null;
-        } else {
-            final PointerInfo pointerInfo = MouseInfo.getPointerInfo();
-            if (pointerInfo == null) {
-                return null;
-            }
-            return pointerInfo.getLocation();
+    public static void showCaptchaSkippedDialog() {
+        if (CFG_GUI.HELP_DIALOGS_ENABLED.isEnabled()) {
+            HelpDialog.show(false, true, ToolTipController.getMouseLocation(), "SKIPPEDHOSTER", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.ChallengeDialogHandler_viaGUI_skipped_help_title(), _GUI.T.ChallengeDialogHandler_viaGUI_skipped_help_msg(), new AbstractIcon(IconKey.ICON_SKIPPED, 32));
         }
     }
 

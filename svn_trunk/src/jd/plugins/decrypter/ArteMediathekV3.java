@@ -22,7 +22,24 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ArteTv;
+import jd.plugins.hoster.DirectHTTP;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
@@ -39,24 +56,7 @@ import org.jdownloader.plugins.components.config.ArteMediathekConfig.ThumbnailFi
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.ArteTv;
-import jd.plugins.hoster.DirectHTTP;
-
-@DecrypterPlugin(revision = "$Revision: 49893 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49902 $", interfaceVersion = 4, names = {}, urls = {})
 public class ArteMediathekV3 extends PluginForDecrypt {
     public ArteMediathekV3(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,17 +106,17 @@ public class ArteMediathekV3 extends PluginForDecrypt {
     private final String        PROPERTY_DATE               = "date";
     private final String        PROPERTY_ORIGINAL_FILENAME  = "original_filename";
     private final String        PROPERTY_AUDIO_CODE         = "audio_code";                                                             // ex
-                                                                                                                                        // versionCode
-                                                                                                                                        // e.g.
-                                                                                                                                        // VF,
-                                                                                                                                        // VF-STA,
-                                                                                                                                        // VA
+                                                                                                                                         // versionCode
+                                                                                                                                         // e.g.
+                                                                                                                                         // VF,
+                                                                                                                                         // VF-STA,
+                                                                                                                                         // VA
     private final String        PROPERTY_AUDIO_SHORT_LABEL  = "audioShortLabel";                                                        // e.g.
-                                                                                                                                        // DE,
-                                                                                                                                        // FR
+                                                                                                                                         // DE,
+                                                                                                                                         // FR
     private final String        PROPERTY_AUDIO_LABEL        = "audioLabel";                                                             // e.g.
-                                                                                                                                        // Deutsch,
-                                                                                                                                        // Französisch
+                                                                                                                                         // Deutsch,
+                                                                                                                                         // Französisch
     private final String        PROPERTY_WIDTH              = "width";
     private final String        PROPERTY_HEIGHT             = "height";
     private final String        PROPERTY_BITRATE            = "bitrate";
@@ -204,11 +204,10 @@ public class ArteMediathekV3 extends PluginForDecrypt {
 
     private ArrayList<DownloadLink> crawlVideo(final CryptedLink param, final Map<String, Object> vid) throws IOException, PluginException, DecrypterRetryException {
         final String kind = vid.get("kind").toString();
-        if (!kind.matches("(?i)(PROGRAMM|SHOW)")) {
-            if (kind.equals("LIVE")) {
-                logger.info("Livestreams are not supported");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+        if (kind.equalsIgnoreCase("LIVE")) {
+            logger.info("Livestreams are not supported");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!kind.matches("(?i)(BONUS|PROGRAMM|SHOW)")) {
             logger.info("Unknown kind Label: " + kind);
         }
         final ArteTv hosterplugin = (ArteTv) this.getNewPluginForHostInstance(this.getHost());
@@ -242,7 +241,7 @@ public class ArteMediathekV3 extends PluginForDecrypt {
             br.getPage(videoStreamsAPIV3URL);
         } else {
             /* APIv2: This gives us only progressive streams and only up to 720p */
-            final String videoStreamsAPIV2URL = String.format("https://www.arte.tv/hbbtvv2/services/web/index.php/OPA/v3/streams/%s/SHOW/%s", programId, language);
+            final String videoStreamsAPIV2URL = String.format("https://www.arte.tv/hbbtvv2/services/web/index.php/OPA/v3/streams/%s/%s/%s", programId, kind.toUpperCase(Locale.ENGLISH), language);
             br.getPage(videoStreamsAPIV2URL);
             usingAPIV2 = true;
         }
@@ -250,15 +249,6 @@ public class ArteMediathekV3 extends PluginForDecrypt {
         final List<Map<String, Object>> videoStreams = (List<Map<String, Object>>) entries.get("videoStreams");
         if (videoStreams == null || videoStreams.isEmpty()) {
             /* This should never happen */
-            if (usingAPIV2) {
-                final Map<String, Object> eStat = (Map<String, Object>) vid.get("eStat");
-                final String eStat_level2 = eStat.get("level2").toString();
-                if (eStat_level2.equalsIgnoreCase("PROGRAMME_WEB")) {
-                    final String dummyTitle = "VIDEO_NOCH_NICHT_IM_TV_AUSGESTRAHLT_" + title;
-                    final String dummyComment = "Dieses Video wurde noch nicht im TV ausgestrahlt und kann daher nicht per APIv2 abgerufen werden. Mehr Informationen siehe: https://board.jdownloader.org/showthread.php?p=539975#post539975";
-                    throw new DecrypterRetryException(RetryReason.HOST, dummyTitle, dummyComment);
-                }
-            }
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         /* First put each language + audio version in separate lists. */

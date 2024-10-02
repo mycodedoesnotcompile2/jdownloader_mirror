@@ -16,9 +16,10 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -32,37 +33,38 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 2, names = { "multishare.cz" }, urls = { "https?://[\\w\\.]*?multishare\\.cz/((?:[a-z]{2}/)?stahnout/[0-9]+/|html/mms_process\\.php\\?(&?u_ID=\\d+|&?u_hash=[a-f0-9]+|(&?link=https?%3A%2F%2F[^&\\?]+|&?fid=\\d+)){3})" })
+@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 2, names = { "multishare.cz" }, urls = { "https?://[\\w\\.]*?multishare\\.cz/((?:[a-z]{2}/)?stahnout/[0-9]+/|html/mms_process\\.php\\?(&?u_ID=\\d+|&?u_hash=[a-f0-9]+|(&?link=https?%3A%2F%2F[^&\\?]+|&?fid=\\d+)){3})" })
 public class MultiShareCz extends antiDDoSForHost {
     public MultiShareCz(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www.multishare.cz/cenik/");
     }
 
-    private final String                 mhLink            = "https?://[\\w\\.]*?multishare\\.cz/html/mms_process\\.php\\?.+";
-    private static final String          MAINPAGE          = "http://multishare.cz";
-    private static final String          NICE_HOST         = MAINPAGE.replaceAll("(https://|http://)", "");
-    private static final String          NICE_HOSTproperty = MAINPAGE.replaceAll("(https://|http://|\\.|\\-)", "");
-    private Account                      currentAcc        = null;
-    private static MultiHosterManagement mhm               = new MultiHosterManagement("multishare.cz");
-
-    private Browser prepBrowser(Browser prepBr) {
-        // define custom browser headers and language settings.
-        prepBr.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
-        prepBr.getHeaders().put("Accept-Encoding", "json");
-        prepBr.getHeaders().put("User-Agent", "JDownloader");
-        prepBr.setCookie(this.getHost(), "lang", "en");
-        prepBr.setCustomCharset("utf-8");
-        return prepBr;
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
+        br.getHeaders().put("Accept-Encoding", "json");
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setCookie(getHost(), "lang", "en");
+        br.setCustomCharset("utf-8");
+        br.setFollowRedirects(true);
+        return br;
     }
+
+    private final String                 mhLink     = "(?i)https?://[\\w\\.]*?multishare\\.cz/html/mms_process\\.php\\?.+";
+    private Account                      currentAcc = null;
+    private static MultiHosterManagement mhm        = new MultiHosterManagement("multishare.cz");
 
     private void setConstants(final Account acc) {
         this.currentAcc = acc;
@@ -80,47 +82,44 @@ public class MultiShareCz extends antiDDoSForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         setConstants(account);
-        AccountInfo ai = new AccountInfo();
-        login(account);
+        final AccountInfo ai = new AccountInfo();
+        final Map<String, Object> userinfo = login(account);
         account.setConcurrentUsePossible(true);
-        account.setMaxSimultanDownloads(-1);
+        final Object trafficleftO = userinfo.get("credit");
         final String trafficleftStr = PluginJSonUtils.getJsonValue(br, "credit");
-        long trafficleft = 0;
-        if (trafficleftStr != null) {
+        long trafficleftBytes = 0;
+        if (trafficleftO instanceof Number) {
+            trafficleftBytes = ((Number) trafficleftBytes).longValue() * 1024 * 1024;
+        } else if (trafficleftO instanceof String) {
             /* 1 credit = 1 MB */
-            trafficleft = (long) Double.parseDouble(trafficleftStr) * (1024 * 1024l);
-            ai.setTrafficLeft(trafficleft);
+            trafficleftBytes = (long) Double.parseDouble(trafficleftStr) * (1024 * 1024l);
         }
-        if (trafficleft > 0) {
-            ai.setStatus("Premium account");
+        ai.setTrafficLeft(trafficleftBytes);
+        if (trafficleftBytes > 0) {
             account.setType(AccountType.PREMIUM);
         } else {
-            ai.setStatus("Free account");
             account.setType(AccountType.FREE);
         }
-        getPage("https://www." + account.getHoster() + "/api/?sub=supported-hosters");
-        final String[] hosts = PluginJSonUtils.getJsonResultsFromArray(PluginJSonUtils.getJsonArray(br, "server"));
-        final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hosts));
-        /*
-         * set ArrayList<String> with all supported multiHosts of this service
-         */
-        ai.setMultiHostSupport(this, supportedHosts);
+        getPage("https://www." + this.getHost() + "/api/?sub=supported-hosters");
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<String> supportedhosts = (List<String>) entries.get("server");
+        ai.setMultiHostSupport(this, supportedhosts);
         return ai;
     }
 
     @Override
     public String getAGBLink() {
-        return "http://www.multishare.cz/kontakt/";
+        return "https://www." + getHost() + "/kontakt/";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -130,7 +129,6 @@ public class MultiShareCz extends antiDDoSForHost {
             return;
         }
         requestFileInformation(link);
-        br.setFollowRedirects(false);
         String dllink = "https://www." + this.getHost() + "/html/download_free.php?ID=" + getFuid(link);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -190,30 +188,28 @@ public class MultiShareCz extends antiDDoSForHost {
     }
 
     public AvailableStatus requestFileInformationMh(final DownloadLink link) throws PluginException, IOException {
-        prepBrowser(br);
         final Browser brc = br.cloneBrowser();
         URLConnectionAdapter con = null;
         try {
-            brc.setFollowRedirects(true);
             con = brc.openGetConnection(link.getPluginPatternMatcher());
-            if (this.looksLikeDownloadableContent(con)) {
-                if (link.getFinalFileName() == null) {
-                    link.setFinalFileName(getFileNameFromConnection(con));
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    if (con.isContentDecoded()) {
-                        link.setDownloadSize(con.getCompleteContentLength());
-                    } else {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                }
-                link.setAvailable(true);
-                return AvailableStatus.TRUE;
-            } else {
+            if (!this.looksLikeDownloadableContent(con)) {
                 br.followConnection(true);
                 link.setAvailable(false);
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            final String serverFilename = Plugin.getFileNameFromConnection(con);
+            if (link.getFinalFileName() == null && serverFilename != null) {
+                link.setFinalFileName(serverFilename);
+            }
+            if (con.getCompleteContentLength() > 0) {
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
+            }
+            link.setAvailable(true);
+            return AvailableStatus.TRUE;
         } finally {
             try {
                 /* make sure we close connection */
@@ -227,15 +223,10 @@ public class MultiShareCz extends antiDDoSForHost {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         mhm.runCheck(account, link);
         this.setBrowserExclusive();
-        prepBrowser(br);
-        br.setFollowRedirects(false);
         /* login to get u_ID and u_HASH */
         getPage("https://www." + account.getHoster() + "/api/?sub=download-link&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&link=" + Encoding.urlEncode(link.getDownloadURL()));
-        if (br.containsHTML("ERR: Invalid password\\.")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Wrong password", PluginException.VALUE_ID_PREMIUM_DISABLE);
-        } else if (br.containsHTML("ERR: User account is blocked")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "User account is blocked. Please contact multishare support", PluginException.VALUE_ID_PREMIUM_DISABLE);
-        }
+        this.checkErrors(br);
+        // TODO: Add json parser
         final String dllink = PluginJSonUtils.getJsonValue(br, "link");
         final String maxChunks = PluginJSonUtils.getJsonValue(br, "chunks");
         if (dllink == null) {
@@ -252,6 +243,13 @@ public class MultiShareCz extends antiDDoSForHost {
             }
         }
         handleDl(link, dllink, chunks);
+    }
+
+    private void checkErrors(final Browser br) throws AccountInvalidException {
+        final String error = br.getRegex("^ERR: (.+)").getMatch(0);
+        if (error != null) {
+            throw new AccountInvalidException(Encoding.htmlDecode(error).trim());
+        }
     }
 
     private void handleDl(final DownloadLink link, final String dllink, int chunks) throws Exception {
@@ -280,21 +278,12 @@ public class MultiShareCz extends antiDDoSForHost {
         dl.startDownload();
     }
 
-    private void login(final Account account) throws Exception {
+    private Map<String, Object> login(final Account account) throws Exception {
         this.setBrowserExclusive();
-        prepBrowser(br);
-        br.setFollowRedirects(true);
-        getPage("https://www." + account.getHoster() + "/api/?sub=account-details&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-        if (br.containsHTML("ERR: User does not exists")) {
-            final String lang = System.getProperty("user.language");
-            if ("de".equalsIgnoreCase(lang)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        } else if (br.containsHTML("ERR: Invalid password")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Invalid Password", PluginException.VALUE_ID_PREMIUM_DISABLE);
-        }
+        getPage("https://www." + getHost() + "/api/?sub=account-details&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+        this.checkErrors(br);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        return entries;
     }
 
     @Override
@@ -303,12 +292,12 @@ public class MultiShareCz extends antiDDoSForHost {
             return requestFileInformationMh(link);
         }
         this.setBrowserExclusive();
-        prepBrowser(br);
-        br.setFollowRedirects(true);
         // support English page as its easier to understand for all our programmers.
         getPage("https://www." + this.getHost() + "/en/stahnout/" + getFuid(link) + "/");
         // need to find the new error response in English!!
-        if (br.containsHTML("(Požadovaný soubor neexistuje|Je možné, že byl již tento soubor vymazán uploaderem nebo porušoval autorská práva)")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("(Požadovaný soubor neexistuje|Je možné, že byl již tento soubor vymazán uploaderem nebo porušoval autorská práva)")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String title = "<title>Stáhnout (.*?)\\s*\\(([\\d\\.\\, a-zA-Z]+)\\)\\s*\\|\\s*MultiShare.cz</title>";
@@ -325,7 +314,7 @@ public class MultiShareCz extends antiDDoSForHost {
         }
         link.setName(filename.trim());
         if (filesize != null) {
-            filesize = filesize.replace("&nbsp;", "");
+            filesize = Encoding.htmlOnlyDecode(filesize);
             link.setDownloadSize(SizeFormatter.getSize(filesize));
         }
         return AvailableStatus.TRUE;
@@ -339,7 +328,7 @@ public class MultiShareCz extends antiDDoSForHost {
     @Override
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
-            if (link.getDownloadURL().matches(mhLink)) {
+            if (link.getPluginPatternMatcher().matches(mhLink)) {
                 // multihoster link
                 return true;
             }

@@ -21,16 +21,9 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -50,7 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48475 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
 public class MultiVipNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            APIKEY             = "amQy";
@@ -62,27 +55,23 @@ public class MultiVipNet extends PluginForHost {
 
     public MultiVipNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://multivip.net/");
+        this.enablePremium("http://" + getHost());
     }
 
     @Override
-    public String getAGBLink() {
-        return "http://multivip.net/contact.php";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
-        // define custom browser headers
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
         br.getHeaders().put("Accept", "application/json");
         br.getHeaders().put("User-Agent", "JDownloader");
         br.setCustomCharset("utf-8");
-        br.setCookie(this.getHost(), "lang", "en");
+        br.setCookie(getHost(), "lang", "en");
         return br;
     }
 
     @Override
-    public AccountBuilderInterface getAccountFactory(InputChangedCallbackInterface callback) {
-        return new MultiVipNetAccountFactory(callback);
+    public String getAGBLink() {
+        return "http://" + getHost() + "/contact.php";
     }
 
     @Override
@@ -138,7 +127,7 @@ public class MultiVipNet extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
 
     @SuppressWarnings("deprecation")
@@ -159,7 +148,6 @@ public class MultiVipNet extends PluginForHost {
                 }
             }
         }
-        prepBR(this.br);
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         showMessage(link, "Task 1: Generating Link");
         String dllink = checkDirectLink(link, "multivipnetdirectlink");
@@ -253,10 +241,8 @@ public class MultiVipNet extends PluginForHost {
         return null;
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        prepBR(this.br);
         final AccountInfo ai = new AccountInfo();
         account.setMaxSimultanDownloads(20);
         maxPrem.set(20);
@@ -298,7 +284,6 @@ public class MultiVipNet extends PluginForHost {
             ai.setStatus("Free Vip key");
         }
         ai.setMultiHostSupport(this, supportedHosts);
-        account.setValid(true);
         return ai;
     }
 
@@ -322,75 +307,14 @@ public class MultiVipNet extends PluginForHost {
         throw new PluginException(LinkStatus.ERROR_RETRY);
     }
 
-    public static class MultiVipNetAccountFactory extends MigPanel implements AccountBuilderInterface {
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-        private final String      PINHELP          = "Enter your MultiVIP Key";
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "http://" + getHost() + "/";
+    }
 
-        private String getPassword() {
-            if (this.pass == null) {
-                return null;
-            } else {
-                return new String(this.pass.getPassword());
-            }
-        }
-
-        public boolean updateAccount(Account input, Account output) {
-            if (!StringUtils.equals(input.getUser(), output.getUser())) {
-                output.setUser(input.getUser());
-                return true;
-            } else if (!StringUtils.equals(input.getPass(), output.getPass())) {
-                output.setPass(input.getPass());
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        private final ExtPasswordField pass;
-
-        public MultiVipNetAccountFactory(final InputChangedCallbackInterface callback) {
-            super("ins 0, wrap 2", "[][grow,fill]", "");
-            add(new JLabel("MultiVIP Key:"));
-            add(this.pass = new ExtPasswordField() {
-                @Override
-                public void onChanged() {
-                    callback.onChangedInput(this);
-                }
-            }, "");
-            pass.setHelpText(PINHELP);
-        }
-
-        @Override
-        public JComponent getComponent() {
-            return this;
-        }
-
-        @Override
-        public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                // name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-            }
-        }
-
-        @Override
-        public boolean validateInputs() {
-            // final String userName = getUsername();
-            // if (userName == null || !userName.trim().matches("^\\d{9}$")) {
-            // idLabel.setForeground(Color.RED);
-            // return false;
-            // }
-            // idLabel.setForeground(Color.BLACK);
-            return getPassword() != null;
-        }
-
-        @Override
-        public Account getAccount() {
-            return new Account(null, getPassword());
-        }
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        return true;
     }
 
     @Override

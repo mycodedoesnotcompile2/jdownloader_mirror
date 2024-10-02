@@ -42,11 +42,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49822 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
 public class NeodebridCom extends PluginForHost {
     /** Tags: cocoleech.com */
     private static final String          API_BASE                   = "https://neodebrid.com/api/v2";
@@ -54,18 +56,11 @@ public class NeodebridCom extends PluginForHost {
     private final String                 PROPERTY_ACCOUNT_api_token = "api_token";
     private static final boolean         api_supports_free_accounts = false;
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("neodebrid.com");
-    private static final int             defaultMAXDOWNLOADS        = -1;
-    /** 2019-08-26: In my tests, neither chunkload nor resume were possible (premium account!) */
-    private static final boolean         account_premium_resume     = true;
-    private static final int             account_premium_maxchunks  = 1;
-    /** 2019-08-26: TODO: Check/update these Free Account limits */
-    private static final boolean         account_FREE_resume        = true;
-    private static final int             account_FREE_maxchunks     = 1;
 
     @SuppressWarnings("deprecation")
     public NeodebridCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://neodebrid.com/premium");
+        this.enablePremium("https://" + getHost() + "/premium");
     }
 
     @Override
@@ -83,11 +78,21 @@ public class NeodebridCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://neodebrid.com/tos";
+        return "https://" + getHost() + "/tos";
     }
 
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        int maxChunks = link.getIntegerProperty(PROPERTY_MAXCHUNKS, 1);
+        return maxChunks;
     }
 
     @Override
@@ -148,7 +153,7 @@ public class NeodebridCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setProperty(this.getHost() + "directlink", dllink);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, account_premium_resume, this.getMaxChunks(link, account_FREE_maxchunks));
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 404) {
@@ -166,16 +171,7 @@ public class NeodebridCom extends PluginForHost {
             mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
         }
         link.setProperty(this.getHost() + "directlink", dllink);
-        final boolean resume;
-        final int maxchunks;
-        if (account.getType() == AccountType.PREMIUM) {
-            resume = account_premium_resume;
-            maxchunks = this.getMaxChunks(link, account_premium_maxchunks);
-        } else {
-            resume = account_FREE_resume;
-            maxchunks = this.getMaxChunks(link, account_FREE_maxchunks);
-        }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             /* 402 - Payment required */
@@ -327,16 +323,6 @@ public class NeodebridCom extends PluginForHost {
         return null;
     }
 
-    private int getMaxChunks(final DownloadLink link, final int fallback) {
-        final int maxChunksStored = link.getIntegerProperty(PROPERTY_MAXCHUNKS, fallback);
-        if (maxChunksStored > 1) {
-            /* Minus maxChunksStored -> Up to X chunks */
-            return -maxChunksStored;
-        } else {
-            return maxChunksStored;
-        }
-    }
-
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         Map<String, Object> user = loginAPI(account, true);
@@ -360,7 +346,7 @@ public class NeodebridCom extends PluginForHost {
             /* Premium accounts have unlimited files per day */
             filesPerDayLeft = -1;
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
+            account.setMaxSimultanDownloads(Integer.MAX_VALUE);
             ai.setValidUntil(validuntil, this.br);
         } else {
             /**
@@ -422,18 +408,17 @@ public class NeodebridCom extends PluginForHost {
          * Same list on website: https://neodebrid.com/status
          */
         final Map<String, Object> entries = this.callAPI(account, null, br, "/status");
-        final ArrayList<String> supportedhostslist = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hosters = (List<Map<String, Object>>) entries.get("result");
         for (final Map<String, Object> hosterinfo : hosters) {
-            final String host = (String) hosterinfo.get("host");
-            final String status = (String) hosterinfo.get("status");
-            if (host != null && "online".equalsIgnoreCase(status)) {
-                supportedhostslist.add(host);
-            } else {
-                logger.info("Skipping serverside disabled host: " + host + " | Status: " + status);
+            final String domain = (String) hosterinfo.get("host");
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            if (!"online".equalsIgnoreCase(hosterinfo.get("status").toString())) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedhostslist);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
@@ -480,7 +465,7 @@ public class NeodebridCom extends PluginForHost {
     private void handleErrorsAPI(final Account account, final DownloadLink link, final Map<String, Object> entries) throws PluginException, InterruptedException {
         final String status = (String) entries.get("status");
         final String errorStr = (String) entries.get("reason");
-        if ("success".equalsIgnoreCase(status)) {
+        if (status == null || "success".equalsIgnoreCase(status)) {
             /* No error */
             return;
         }

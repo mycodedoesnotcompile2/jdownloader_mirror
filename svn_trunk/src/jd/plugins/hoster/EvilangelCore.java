@@ -26,26 +26,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -63,7 +49,22 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49883 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 49903 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -236,8 +237,7 @@ public abstract class EvilangelCore extends PluginForHost {
                 List<Map<String, Object>> qualitiesList = null;
                 if (htmlVideoJson == null && htmlVideoJson2 == null) {
                     /**
-                     * 2023-04-19: New (tested with: evilangel.com) </br>
-                     * TODO: Test this with other supported websites such as wicked.com.
+                     * 2023-04-19: New (tested with: evilangel.com) </br> TODO: Test this with other supported websites such as wicked.com.
                      */
                     final Browser brc = br.cloneBrowser();
                     brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -334,8 +334,8 @@ public abstract class EvilangelCore extends PluginForHost {
                         }
                     }
                     /**
-                     * A scene can also contain DVD-information. </br>
-                     * --> Ensure to set the correct information which is later used for filenames.
+                     * A scene can also contain DVD-information. </br> --> Ensure to set the correct information which is later used for
+                     * filenames.
                      */
                     final Map<String, Object> movieInfos = (Map<String, Object>) root.get("movieInfos");
                     if (movieInfos != null) {
@@ -475,12 +475,17 @@ public abstract class EvilangelCore extends PluginForHost {
                             filesize = download_file_sizes.get(thisChosenQuality).longValue();
                             synchronized (account) {
                                 final Boolean accountAllowsOfficialDownloads = (Boolean) account.getProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
+                                final Boolean accountStreamingOnly = (Boolean) account.getProperty(PROPERTY_ACCOUNT_STREAMING_ONLY);
                                 final String officialDownloadlink = String.format("https://members.%s/movieaction/download/%s/%s/mp4?codec=h264", getHost(), fileID, thisChosenQuality);
-                                if (Boolean.TRUE.equals(accountAllowsOfficialDownloads)) {
-                                    /* We know that this account allows official downloads so there is no need to check. */
+                                if (Boolean.FALSE.equals(accountStreamingOnly)) {
+                                    /* We know that this account allows official downloads. */
                                     this.dllink = officialDownloadlink;
                                     chosenQualityLabel = thisChosenQuality;
-                                } else if (accountAllowsOfficialDownloads == null) {
+                                } else if (Boolean.TRUE.equals(accountAllowsOfficialDownloads)) {
+                                    /* We know that this account was able to do official downloads so there is no need to check again. */
+                                    this.dllink = officialDownloadlink;
+                                    chosenQualityLabel = thisChosenQuality;
+                                } else if (accountStreamingOnly == null && accountAllowsOfficialDownloads == null) {
                                     URLConnectionAdapter con = null;
                                     boolean success = false;
                                     try {
@@ -588,20 +593,6 @@ public abstract class EvilangelCore extends PluginForHost {
             return 2160;
         } else {
             return height;
-        }
-    }
-
-    private void handleErrorsAfterDirecturlAccess(final DownloadLink link, final Account account, final Browser br, final boolean lastChance) throws PluginException {
-        if (br.containsHTML("limit reached:")) {
-            /* 2022-01-17 adulttime.com: E.g. full response: limit reached: 1.1.1.1:12345678 */
-            if (account != null) {
-                throw new AccountUnavailableException("Limit reached", 1 * 60 * 1000);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Limit reached");
-            }
-        }
-        if (lastChance) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error - broken video?");
         }
     }
 
@@ -822,8 +813,8 @@ public abstract class EvilangelCore extends PluginForHost {
             }
             login.remove("submit");
             /**
-             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br>
-             * Only add "rememberme": "1" if that is not already present in our form.
+             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br> Only add "rememberme":
+             * "1" if that is not already present in our form.
              */
             final String remembermeCookieKey = "rememberme";
             boolean containsRemembermeFieldWithValue1 = false;
@@ -908,70 +899,90 @@ public abstract class EvilangelCore extends PluginForHost {
         }
     }
 
+    public static final String PROPERTY_ACCOUNT_STREAMING_ONLY = "account_streamingOnly";
+    public static final String PROPERTY_ACCOUNT_IS_TRIAL       = "account_isTrial";
+
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        login(account, true);
-        final String json = br.getRegex("window\\.context\\s*=\\s*(\\{.*?\\});\n").getMatch(0);
-        final Map<String, Object> root = restoreFromString(json, TypeRef.MAP);
-        final Map<String, Object> site = (Map<String, Object>) root.get("site");
-        final List<String> contentSources = (List<String>) site.get("contentSource");
-        if (!contentSources.isEmpty()) {
-            account.setProperty(PROPERTY_ACCOUNT_CONTENT_SOURCE, contentSources.get(contentSources.size() - 1));
-        }
-        final Map<String, Object> user = (Map<String, Object>) root.get("user");
-        /* Try to set unique string as username when cookie login was used. */
-        final String email = (String) user.get("email");
-        final String username = (String) user.get("username");
-        if (hasUsedCookieLogin(account) && !StringUtils.isEmpty(email) && account.getUser().contains("@")) {
-            account.setUser(email);
-        } else if (hasUsedCookieLogin(account) && !StringUtils.isEmpty(username)) {
-            account.setUser(username);
-        }
-        /**
-         * TODO: Add support for "scheduledCancelDate" whenever a test account with such a date is available. </br>
-         * "scheduledCancelDate" can also be a Boolean!
-         */
-        final AccountInfo ai = account.getAccountInfo() != null ? account.getAccountInfo() : new AccountInfo();
-        if (Boolean.TRUE.equals(user.get("isExpired"))) {
-            ai.setExpired(true);
-            account.setType(AccountType.FREE);
-        } else {
-            ai.setUnlimitedTraffic();
-            account.setType(AccountType.PREMIUM);
-        }
-        /* This date is not always given. */
-        final String expirationDate = (String) user.get("expirationDate");
-        if (!StringUtils.isEmpty(expirationDate)) {
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(expirationDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
-        }
-        if (account.getType() == AccountType.PREMIUM && StringUtils.isEmpty(expirationDate)) {
-            /**
-             * Use next rebill date as expire date. Doesn't work for all websites. <br>
-             * Examples: <br>
-             * Working for: filthykings.com <br>
-             * Not working for: dfxtra.com
-             */
-            try {
-                final Browser brc = br.cloneBrowser();
-                brc.getHeaders().put("Accept", "application/json, text/plain, */*");
-                brc.getHeaders().put("Referer", "https://" + br.getHost(true) + "/en/payment-info");
-                brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
-                brc.getPage("/membership/info");
-                final Map<String, Object> additionalinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String nextRebillDate = (String) additionalinfo.get("nextRebillDate");
-                if (!StringUtils.isEmpty(nextRebillDate)) {
-                    ai.setValidUntil(TimeFormatter.getMilliSeconds(nextRebillDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
-                } else {
-                    logger.warning("Failed to find nextRebillDate");
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
-                logger.info("Failed to find additional expire date information");
+        synchronized (account) {
+            login(account, true);
+            final String json = br.getRegex("window\\.context\\s*=\\s*(\\{.*?\\});\n").getMatch(0);
+            final Map<String, Object> root = restoreFromString(json, TypeRef.MAP);
+            final Map<String, Object> site = (Map<String, Object>) root.get("site");
+            final List<String> contentSources = (List<String>) site.get("contentSource");
+            if (!contentSources.isEmpty()) {
+                account.setProperty(PROPERTY_ACCOUNT_CONTENT_SOURCE, contentSources.get(contentSources.size() - 1));
             }
+            final Map<String, Object> user = (Map<String, Object>) root.get("user");
+            try {
+                final Number joinProductId = (Number) user.get("joinProductId");
+                final Browser brc = br.cloneBrowser();
+                GetRequest request = brc.createGetRequest("/product/" + joinProductId.toString());
+                request.getHeaders().put("Accept", "application/json, text/plain, */*");
+                request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+                brc.getPage(request);
+                final Map<String, Object> product = restoreFromString(request.getHtmlCode(), TypeRef.MAP);
+                account.setProperty(PROPERTY_ACCOUNT_STREAMING_ONLY, product.get("streamingOnly"));
+                account.setProperty(PROPERTY_ACCOUNT_IS_TRIAL, product.get("isTrial"));
+            } catch (Exception e) {
+                account.removeProperty(PROPERTY_ACCOUNT_STREAMING_ONLY);
+                account.removeProperty(PROPERTY_ACCOUNT_IS_TRIAL);
+                logger.log(e);
+            }
+            /* Try to set unique string as username when cookie login was used. */
+            final String email = (String) user.get("email");
+            final String username = (String) user.get("username");
+            if (hasUsedCookieLogin(account) && !StringUtils.isEmpty(email) && account.getUser().contains("@")) {
+                account.setUser(email);
+            } else if (hasUsedCookieLogin(account) && !StringUtils.isEmpty(username)) {
+                account.setUser(username);
+            }
+            /**
+             * TODO: Add support for "scheduledCancelDate" whenever a test account with such a date is available. </br>
+             * "scheduledCancelDate" can also be a Boolean!
+             */
+            final AccountInfo ai = account.getAccountInfo() != null ? account.getAccountInfo() : new AccountInfo();
+            if (Boolean.TRUE.equals(user.get("isExpired"))) {
+                ai.setExpired(true);
+                account.setType(AccountType.FREE);
+            } else {
+                ai.setUnlimitedTraffic();
+                account.setType(AccountType.PREMIUM);
+            }
+            /* This date is not always given. */
+            final String expirationDate = (String) user.get("expirationDate");
+            if (!StringUtils.isEmpty(expirationDate)) {
+                ai.setValidUntil(TimeFormatter.getMilliSeconds(expirationDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
+            }
+            if (account.getType() == AccountType.PREMIUM && StringUtils.isEmpty(expirationDate)) {
+                /**
+                 * Use next rebill date as expire date. Doesn't work for all websites. <br>
+                 * Examples: <br>
+                 * Working for: filthykings.com <br>
+                 * Not working for: dfxtra.com
+                 */
+                try {
+                    final Browser brc = br.cloneBrowser();
+                    brc.getHeaders().put("Accept", "application/json, text/plain, */*");
+                    brc.getHeaders().put("Referer", "https://" + br.getHost(true) + "/en/payment-info");
+                    brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
+                    brc.getPage("/membership/info");
+                    final Map<String, Object> additionalinfo = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final String nextRebillDate = (String) additionalinfo.get("nextRebillDate");
+                    if (!StringUtils.isEmpty(nextRebillDate)) {
+                        ai.setValidUntil(TimeFormatter.getMilliSeconds(nextRebillDate + " 23:59:59", "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH), br);
+                    } else {
+                        logger.warning("Failed to find nextRebillDate");
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    logger.info("Failed to find additional expire date information");
+                }
+            }
+            /* Upper handling will re-evaluate and set this flag again if official video downloads are possible. */
+            account.removeProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
+            return ai;
         }
-        /* Upper handling will re-evaluate and set this flag again if official video downloads are possible. */
-        account.removeProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
-        return ai;
     }
 
     @Override
@@ -996,7 +1007,7 @@ public abstract class EvilangelCore extends PluginForHost {
     }
 
     @Override
-    protected void handleConnectionErrors(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {
@@ -1007,6 +1018,22 @@ public abstract class EvilangelCore extends PluginForHost {
                 handleErrorsAfterDirecturlAccess(getDownloadLink(), getCurrentAccount(), br, true);
                 super.handleConnectionErrors(br, con);
             }
+        }
+    }
+
+    private void handleErrorsAfterDirecturlAccess(final DownloadLink link, final Account account, final Browser br, final boolean lastChance) throws PluginException {
+        if (br.containsHTML("^limit reached: ")) {
+            /* 2022-01-17 adulttime.com: E.g. full response: limit reached: 1.1.1.1:12345678 */
+            final String msg = "Official downloads download limit reached";
+            final long waitMillis = 5 * 60 * 1000;
+            if (account != null) {
+                throw new AccountUnavailableException(msg, waitMillis);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, waitMillis);
+            }
+        }
+        if (lastChance) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error - broken video?");
         }
     }
 
@@ -1026,6 +1053,9 @@ public abstract class EvilangelCore extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+        if (link == null) {
+            return;
+        }
         link.removeProperty(PROPERTY_QUALITY);
         link.removeProperty(PROPERTY_DATE);
     }

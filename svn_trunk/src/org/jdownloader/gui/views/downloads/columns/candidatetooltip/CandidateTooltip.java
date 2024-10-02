@@ -2,7 +2,6 @@ package org.jdownloader.gui.views.downloads.columns.candidatetooltip;
 
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.util.LinkedList;
 import java.util.List;
@@ -20,6 +19,7 @@ import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
 import jd.plugins.DownloadLink;
 
 import org.appwork.swing.components.tooltips.PanelToolTip;
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.components.tooltips.TooltipPanel;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
@@ -41,8 +41,11 @@ public class CandidateTooltip extends PanelToolTip {
     private Point                      position;
 
     public Point getDesiredLocation(JComponent activeComponent, Point ttPosition) {
-
-        return MouseInfo.getPointerInfo().getLocation();
+        final Point mouseLocation = ToolTipController.getMouseLocation();
+        if (mouseLocation != null) {
+            return mouseLocation;
+        }
+        return ttPosition;
 
     }
 

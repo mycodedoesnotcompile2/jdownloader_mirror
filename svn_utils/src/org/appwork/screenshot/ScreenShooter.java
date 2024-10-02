@@ -45,9 +45,7 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
-import java.awt.MouseInfo;
 import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.Toolkit;
@@ -67,6 +65,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JWindow;
 
+import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -166,7 +165,6 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
                 try {
                     ScreenShooter.layover = ScreenShooter.create();
                 } catch (final AWTException e) {
-                    
                     e.printStackTrace();
                 }
                 ScreenShooter.layover.start();
@@ -177,9 +175,9 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
         if (screenshot != null) {
             try {
                 Dialog.getInstance().showConfirmDialog(0, "", "", new ImageIcon(screenshot), null, null);
-            } catch (final DialogClosedException e) {                
+            } catch (final DialogClosedException e) {
                 e.printStackTrace();
-            } catch (final DialogCanceledException e) {                
+            } catch (final DialogCanceledException e) {
                 e.printStackTrace();
             }
         }
@@ -216,7 +214,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
         this.frame = new JFrame();
         this.frame.addKeyListener(new KeyListener() {
             @Override
-            public void keyPressed(final KeyEvent e) {                
+            public void keyPressed(final KeyEvent e) {
             }
 
             @Override
@@ -227,7 +225,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
             }
 
             @Override
-            public void keyTyped(final KeyEvent e) {                
+            public void keyTyped(final KeyEvent e) {
             }
         });
         this.frame.setUndecorated(false);
@@ -425,7 +423,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
                 }
             }.start();
         } else if (!this.isDragging) {
-            this.startDrag();
+            this.startDrag(e);
         }
     }
 
@@ -436,7 +434,11 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      */
     @Override
     public void mouseDragged(final MouseEvent e) {
-        this.mouse = e.getPoint();
+        if (e != null) {
+            this.mouse = e.getPoint();
+        } else {
+            this.mouse = ToolTipController.getMouseLocation();
+        }
     }
 
     /*
@@ -445,7 +447,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      * @see java.awt.event.MouseListener#mouseEntered(java.awt.event.MouseEvent)
      */
     @Override
-    public void mouseEntered(final MouseEvent e) {        
+    public void mouseEntered(final MouseEvent e) {
     }
 
     /*
@@ -454,7 +456,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      * @see java.awt.event.MouseListener#mouseExited(java.awt.event.MouseEvent)
      */
     @Override
-    public void mouseExited(final MouseEvent e) {        
+    public void mouseExited(final MouseEvent e) {
     }
 
     /*
@@ -467,8 +469,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
         if (e != null) {
             this.mouse = e.getPoint();
         } else {
-            final PointerInfo pi = MouseInfo.getPointerInfo();
-            this.mouse = pi.getLocation();
+            this.mouse = ToolTipController.getMouseLocation();
         }
     }
 
@@ -514,6 +515,9 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
      * @param l
      */
     private void paintMagnifier(final Graphics2D gb) {
+        if (mouse == null) {
+            return;
+        }
         final Point pos = this.getMagnifierPosition();
         // draw and resize the mag image
         gb.drawImage(this.image, pos.x, pos.y, pos.x + ScreenShooter.SIZE, pos.y + ScreenShooter.SIZE, this.mouse.x - ScreenShooter.SCALED_SIZE / 2, this.mouse.y - ScreenShooter.SCALED_SIZE / 2, this.mouse.x + ScreenShooter.SCALED_SIZE / 2, this.mouse.y + ScreenShooter.SCALED_SIZE / 2, Color.BLACK, null);
@@ -554,7 +558,6 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
             gb.fillRect(pos.x + 1, pos.y + ScreenShooter.SIZE - gb.getFontMetrics().getHeight(), ScreenShooter.SIZE - 1, gb.getFontMetrics().getHeight());
             gb.setColor(Color.GRAY);
             gb.drawLine(pos.x, pos.y + ScreenShooter.SIZE - gb.getFontMetrics().getHeight(), pos.x + ScreenShooter.SIZE, pos.y + ScreenShooter.SIZE - gb.getFontMetrics().getHeight());
-
             final String dimension = "(px)W:" + (Math.abs(this.mouse.x - this.dragStart.x) + 1) + "; H:" + (Math.abs(this.mouse.y - this.dragStart.y) + 1);
             gb.getFontMetrics().stringWidth(dimension);
         }
@@ -611,7 +614,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
                         ScreenShooter.this.updateGUI(ScreenShooter.this.getBufferStrategy());
                         try {
                             Thread.sleep(Math.max(0, frame - System.currentTimeMillis() - t));
-                        } catch (final InterruptedException e) {                            
+                        } catch (final InterruptedException e) {
                             e.printStackTrace();
                         }
                         while (!ScreenShooter.this.disposed) {
@@ -625,7 +628,7 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
                                 if (wait > 0) {
                                     Thread.sleep(wait);
                                 }
-                            } catch (final InterruptedException e) {                                
+                            } catch (final InterruptedException e) {
                                 e.printStackTrace();
                             }
                         }
@@ -639,10 +642,14 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
     /**
      *
      */
-    private void startDrag() {
-        this.dragStart = this.mouse;
+    private void startDrag(final MouseEvent e) {
+        if (e != null) {
+            this.dragStart = e.getPoint();
+        } else {
+            this.dragStart = ToolTipController.getMouseLocation();
+        }
+        this.mouse = dragStart;
         this.isDragging = true;
-        System.out.println("Start Drag " + this.dragStart);
     }
 
     /**
@@ -651,7 +658,6 @@ public class ScreenShooter extends JWindow implements MouseListener, MouseMotion
     private void stopDrag() {
         this.isDragging = false;
         this.dragEnd = this.mouse;
-        System.out.println("StopDrag ");
     }
 
     /**
