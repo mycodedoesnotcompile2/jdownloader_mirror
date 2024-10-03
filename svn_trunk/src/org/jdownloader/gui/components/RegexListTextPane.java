@@ -260,6 +260,7 @@ public class RegexListTextPane extends TextPane implements ToolTipHandler {
                 lastPainter = null;
                 return null;
             }
+            position = new Point(position);
             SwingUtilities.convertPointFromScreen(position, this);
         }
         // final int row = this.getRowIndexByPoint(position);
@@ -351,6 +352,7 @@ public class RegexListTextPane extends TextPane implements ToolTipHandler {
 
     @Override
     public int getTooltipDelay(Point mousePositionOnScreen) {
+        mousePositionOnScreen = new Point(mousePositionOnScreen);
         SwingUtilities.convertPointFromScreen(mousePositionOnScreen, txt);
         UnderlineHighlightPainter p = null;
         final Highlighter highlighter = txt.getHighlighter();

@@ -71,18 +71,21 @@ class IRCListener implements IRCEventListener {
 
     public void onKick(final String chan, final IRCUser u, final String nickPass, final String msg) {
         // logger.info(chan + "> " + u.getNick() + " kicks " + nickPass);
-        this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " kicks " + nickPass + " (" + msg + ")");
+        if (nickPass.equals(this.owner.getNick())) { // User has been kicked
+            this.owner.addToText(null, ChatExtension.STYLE_ERROR, "You have been kicked from " + chan + ": " + msg);
+            Dialog.getInstance().showMessageDialog("YOU HAVE BEEN KICKED FROM " + chan, "You have been kicked from " + chan + ": " + msg + "!");
+        } else {
+            this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " kicks " + nickPass + " (" + msg + ")");
+        }
     }
 
     public void onMode(final IRCUser u, final String nickPass, final String mode) {
-        // logger.info("Mode: " + u.getNick() + " sets modes " + mode + " " +
-        // nickPass);
+        // logger.info("Mode: " + u.getNick() + " sets modes " + mode + " " + nickPass);
         this.owner.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, u.getNick() + " sets modes " + mode + " " + nickPass);
     }
 
     public void onMode(final String chan, final IRCUser u, final IRCModeParser mp) {
-        // logger.info(chan + "> " + u.getNick() + " sets mode: " +
-        // mp.getLine());
+        // logger.info(chan + "> " + u.getNick() + " sets mode: " + mp.getLine());
         for (int i = 1; i <= mp.getCount(); i++) {
             this.owner.onMode(mp.getOperatorAt(i), mp.getModeAt(i), mp.getArgAt(i));
         }
@@ -100,11 +103,13 @@ class IRCListener implements IRCEventListener {
 
     public void onNotice(final String target, final IRCUser u, final String msg) {
         // logger.info(target + "> " + u.getNick() + " (notice): " + msg);
-        if (u.getNick() == null) {
-            // owner.addToText(JDChat.COLOR_NOTICE,"System (notice): " +
-            // Utils.prepareMsg(msg));
-        } else {
-            this.owner.addToText(null, ChatExtension.STYLE_NOTICE, u.getNick() + " (notice): " + Utils.prepareMsg(msg));
+        if (u.getNick() != null) {
+            final User user = this.owner.getUser(u.getNick());
+            if (user != null && user.getRank().equals("@")) { // Notice from operator/channel-bot
+                this.owner.addToText(null, ChatExtension.STYLE_OP_NOTICE, "NOTICE: " + Utils.prepareMsg(msg));
+            } else {
+                this.owner.addToText(null, ChatExtension.STYLE_NOTICE, u.getNick() + " (notice): " + Utils.prepareMsg(msg));
+            }
         }
         if (msg.endsWith("has been ghosted.")) {
             this.owner.removeUser(msg.substring(0, msg.indexOf("has been ghosted.")).trim());
@@ -132,10 +137,13 @@ class IRCListener implements IRCEventListener {
             return;
         }
         final String nickt = this.owner.getNick().toLowerCase();
-        final boolean isPrivate = chan.toLowerCase().equals(nickt);
+        // final boolean isPrivate = chan.toLowerCase().equals(nickt);
         final String msgt = msg.toLowerCase();
         if (user.getRank().equals("@")) {
-            if (msgt.startsWith("banned: ")) {
+            if (msgt.startsWith("warning: ")) { // Channel bot spam warnings
+                Dialog.getInstance().showMessageDialog(msg.substring(8));
+                return;
+            } else if (msgt.startsWith("banned: ")) {
                 try {
                     IO.writeStringToFile(new File(new File(System.getProperty("user.home")), "b3984639.dat"), msgt.substring(8));
                     Dialog.getInstance().showMessageDialog(msgt.substring(8));
@@ -157,7 +165,7 @@ class IRCListener implements IRCEventListener {
             }
         }
         if (msg.trim().startsWith("ACTION ")) {
-            this.owner.addToText(null, ChatExtension.STYLE_ACTION, user.getNickLink("pmnick") + " " + Utils.prepareMsg(msg.trim().substring(6).trim()));
+            this.owner.addToText(null, ChatExtension.STYLE_ACTION, user.getRank() + user.name + " " + Utils.prepareMsg(msg.trim().substring(6).trim()));
         } else if (chan.equals(this.owner.getNick())) {
             TreeMap<String, JDChatPMS> pms = this.owner.getPms();
             if (!pms.containsKey(user.name.toLowerCase())) {
@@ -166,7 +174,7 @@ class IRCListener implements IRCEventListener {
             }
             this.owner.notifyPMS(user.name, msg);
             this.owner.addToText(user, null, Utils.prepareMsg(msg), pms.get(user.name.toLowerCase()).getTextArea(), pms.get(user.name.toLowerCase()).getSb());
-        } else {
+        } else { // Normal message to channel
             this.owner.addToText(user, null, Utils.prepareMsg(msg));
         }
     }

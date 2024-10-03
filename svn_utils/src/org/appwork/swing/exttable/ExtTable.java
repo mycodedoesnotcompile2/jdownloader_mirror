@@ -540,7 +540,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.components.tooltips.ToolTipHandler#createExtTooltip()
      */
     @Override
@@ -550,6 +550,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
             if (position == null) {
                 return null;
             }
+            position = new Point(position);
             SwingUtilities.convertPointFromScreen(position, this);
         }
         final int row = this.getRowIndexByPoint(position);
@@ -876,7 +877,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.components.tooltips.ToolTipHandler#updateTooltip(org .appwork.swing.components.tooltips.ExtTooltip,
      * java.awt.event.MouseEvent)
      */
@@ -997,7 +998,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.components.tooltips.ToolTipHandler# isTooltipDisabledUntilNextRefocus()
      */
     @Override
@@ -1008,7 +1009,7 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.components.tooltips.ToolTipHandler# isTooltipWithoutFocusEnabled()
      */
     @Override

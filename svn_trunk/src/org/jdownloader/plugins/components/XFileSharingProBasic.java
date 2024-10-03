@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49897 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4132,11 +4132,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             /* TODO: Maybe add a better check e.g. access mainpage and check loggedin state */
             throw new AccountUnavailableException("Session expired?", 5 * 60 * 1000l);
         }
+        final long waitMillis = 5 * 60 * 1000l;
         String website_error = br.getRegex("class=\"[^\"]*(?:err|alert-danger)[^\"]*\"[^>]*>([^<]+)<").getMatch(0);
         if (website_error != null) {
             website_error = Encoding.htmlDecode(website_error).trim();
             logger.info("Found website error: " + website_error);
-            final long waitMillis = 5 * 60 * 1000l;
             if (link == null) {
                 throw new AccountUnavailableException(website_error, waitMillis);
             } else {
@@ -4149,6 +4149,15 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             website_error = Encoding.htmlDecode(website_error_videoplayer).trim();
             logger.info("Found website videoplayer error: " + website_error_videoplayer);
             throw new PluginException(LinkStatus.ERROR_FATAL, website_error_videoplayer);
+        }
+        if (br.getRequest().getHtmlCode().length() <= 100 && !br.containsHTML("<html")) {
+            /* Assume that we got a small plaintext error response */
+            final String plaintextError = br.getRequest().getHtmlCode().trim();
+            if (link == null) {
+                throw new AccountUnavailableException(plaintextError, waitMillis);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FATAL, plaintextError);
+            }
         }
         logger.warning("Unknown error happened");
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

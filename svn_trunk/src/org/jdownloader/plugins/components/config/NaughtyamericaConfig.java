@@ -40,15 +40,15 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
             return "Grab 1440p?";
         }
 
-        public String getGrab4Kp_label() {
+        public String getGrab4K_label() {
             return "Grab 4k?";
         }
 
-        public String getGrab6Kp_label() {
+        public String getGrab6K_label() {
             return "Grab 6k?";
         }
 
-        public String getGrab8Kp_label() {
+        public String getGrab8K_label() {
             return "Grab 8k?";
         }
     }
@@ -75,6 +75,14 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
     }
 
     @AboutConfig
+    @DescriptionForConfigEntry("Prefer h265 video codec?")
+    @DefaultBooleanValue(false)
+    @Order(9)
+    boolean isPreferH265();
+
+    void setPreferH265(boolean b);
+
+    @AboutConfig
     @DefaultEnumValue("NONE")
     @DescriptionForConfigEntry("Select video image gallery crawl mode:")
     @Order(10)
@@ -89,6 +97,7 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
     boolean isGrabBestVideoQualityOnly();
 
     void setGrabBestVideoQualityOnly(boolean b);
+
     // @AboutConfig
     // @DescriptionForConfigEntry("Grab unknown qualities?")
     // @DefaultBooleanValue(true)

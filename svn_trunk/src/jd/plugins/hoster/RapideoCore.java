@@ -50,11 +50,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49695 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapideoCore extends PluginForHost {
     public RapideoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -174,14 +176,14 @@ public abstract class RapideoCore extends PluginForHost {
         final String[] crippledHosts = br.getRegex("<li>([A-Za-z0-9\\-\\.]+)</li>").getColumn(0);
         if (crippledHosts != null && crippledHosts.length > 0) {
             for (final String crippledhost : crippledHosts) {
-                crippledhosts.add(crippledhost);
+                crippledhosts.add(crippledhost.toLowerCase(Locale.ENGLISH));
             }
         }
         /* Alternative place to obtain supported hosts from */
         final String[] crippledhosts2 = br.getRegex("class=\"active\"[^<]*>([^<]+)</a>").getColumn(0);
         if (crippledhosts2 != null && crippledhosts2.length > 0) {
             for (final String crippledhost : crippledhosts2) {
-                crippledhosts.add(crippledhost);
+                crippledhosts.add(crippledhost.toLowerCase(Locale.ENGLISH));
             }
         }
         /* Alternative place to obtain supported hosts from */
@@ -191,19 +193,14 @@ public abstract class RapideoCore extends PluginForHost {
             final String[] crippledhosts3 = htmlMetadataStr.split(",");
             if (crippledhosts3 != null && crippledhosts3.length > 0) {
                 for (final String crippledhost : crippledhosts3) {
-                    crippledhosts.add(crippledhost);
+                    crippledhosts.add(crippledhost.toLowerCase(Locale.ENGLISH));
                 }
             }
         }
         final List<String> supportedHosts = new ArrayList<String>();
         /* Sanitize data and add to final list */
-        for (String crippledhost : crippledhosts) {
-            crippledhost = crippledhost.toLowerCase(Locale.ENGLISH);
-            if (crippledhost.equalsIgnoreCase("mega")) {
-                supportedHosts.add("mega.nz");
-            } else {
-                supportedHosts.add(crippledhost);
-            }
+        for (final String crippledhost : crippledhosts) {
+            supportedHosts.add(crippledhost);
         }
         /*
          * They only have accounts with traffic, no free/premium difference (other than no traffic) - we treat no-traffic as FREE --> Cannot
@@ -232,7 +229,6 @@ public abstract class RapideoCore extends PluginForHost {
         } else {
             ac.setTrafficLeft(0);
         }
-        final List<String> supportedHosts = getSupportedHostsAPIv1(account);
         /*
          * They only have accounts with traffic, no free/premium difference (other than no traffic) - we treat no-traffic as FREE --> Cannot
          * download anything
@@ -243,7 +239,8 @@ public abstract class RapideoCore extends PluginForHost {
             account.setType(AccountType.FREE);
         }
         account.setConcurrentUsePossible(true);
-        ac.setMultiHostSupport(this, supportedHosts);
+        final List<MultiHostHost> supportedhosts = getSupportedHostsAPIv1(account);
+        ac.setMultiHostSupportV2(this, supportedhosts);
         return ac;
     }
 
@@ -273,8 +270,6 @@ public abstract class RapideoCore extends PluginForHost {
         if (premium_expire_dateO instanceof Number && trafficLeft_gb == 0) {
             // ac.setValidUntil(((Number) premium_expire_dateO).longValue());
         }
-        /* There is no v2 endpoint available to fetch list of supported hosts -> Use v1 endpoint. */
-        final List<String> supportedHosts = getSupportedHostsAPIv1(account);
         /*
          * They only have accounts with traffic, no free/premium difference (other than no traffic) - we treat no-traffic as FREE --> Cannot
          * download anything
@@ -285,29 +280,33 @@ public abstract class RapideoCore extends PluginForHost {
             account.setType(AccountType.FREE);
         }
         account.setConcurrentUsePossible(true);
-        ac.setMultiHostSupport(this, supportedHosts);
+        /* There is no v2 endpoint available to fetch list of supported hosts -> Use v1 endpoint. */
+        final List<MultiHostHost> supportedhosts = getSupportedHostsAPIv1(account);
+        ac.setMultiHostSupportV2(this, supportedhosts);
         return ac;
     }
 
-    private List<String> getSupportedHostsAPIv1(final Account account) throws IOException {
+    private List<MultiHostHost> getSupportedHostsAPIv1(final Account account) throws IOException {
         br.getPage("https://www." + getHost() + "/clipboard.php?json=3");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         final boolean skipNonZeroSdownloadItems = false;
         for (final Map<String, Object> hosterinfo : hosterlist) {
             final List<String> domains = (List<String>) hosterinfo.get("domains");
             final Object sdownload = hosterinfo.get("sdownload");
-            if (sdownload == null || domains == null) {
+            if (domains == null || domains.size() == 0) {
                 /* Skip invalid items (yes they exist, tested 2024-08-20) */
+                logger.info("Skipping invalid entry: " + hosterinfo);
                 continue;
             }
-            if (sdownload.toString().equals("0") || skipNonZeroSdownloadItems == false) {
-                supportedHosts.addAll(domains);
-            } else {
-                logger.info("Skipping serverside disabled domains: " + domains);
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.setDomains(domains);
+            if (!"0".equals(sdownload) && skipNonZeroSdownloadItems == true) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
         }
-        return supportedHosts;
+        return supportedhosts;
     }
 
     private void loginWebsite(final Account account, final boolean verifyCookies) throws Exception {

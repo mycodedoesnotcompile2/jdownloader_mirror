@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,6 @@ public class AlldebridComFolder extends PluginForDecrypt {
 
     /** API docs: https://docs.alldebrid.com/#status */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String addedURL = param.getCryptedUrl();
         /*
          * Important: Every account has its own files. A magnetID generated inside account A will not work in account B! Alldebrid support
@@ -91,30 +90,30 @@ public class AlldebridComFolder extends PluginForDecrypt {
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("agent", AllDebridCom.agent_raw);
         query.appendEncoded("apikey", AllDebridCom.getStoredApiKey(account));
-        query.add("id", magnetID);
+        query.appendEncoded("id", magnetID);
         br.getPage(AllDebridCom.api_base + "/magnet/status?" + query.toString());
-        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (entries.containsKey("error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> magnet = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/magnets");
         final String torrentName = (String) magnet.get("filename");
         final String torrentNameEscaped = Pattern.quote(torrentName);
-        final List<Map<String, Object>> linksO = (List<Map<String, Object>>) magnet.get("links");
-        if (linksO == null || linksO.isEmpty()) {
+        final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) magnet.get("links");
+        if (resourcelist == null || resourcelist.isEmpty()) {
             /* Probably unfinished torrent download */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String folderRoot = torrentName;
         final FilePackage fpRoot = FilePackage.getInstance();
         fpRoot.setName(folderRoot);
-        for (final Map<String, Object> resource : linksO) {
-            final String url = (String) resource.get("link");
-            final String filename = (String) resource.get("filename");
-            final long filesize = ((Number) resource.get("size")).longValue();
+        for (final Map<String, Object> resource : resourcelist) {
+            final String url = resource.get("link").toString();
+            final String filename = resource.get("filename").toString();
             final DownloadLink dl = this.createDownloadlink(url);
             dl.setName(filename);
-            dl.setDownloadSize(filesize);
+            dl.setDownloadSize(((Number) resource.get("size")).longValue());
             final boolean isSpecialRar = filename.matches("^" + torrentNameEscaped + "(\\.rar|\\.part\\d+\\.rar)$");
             if (isSpecialRar) {
                 dl.setRelativeDownloadFolderPath(folderRoot);
@@ -123,7 +122,7 @@ public class AlldebridComFolder extends PluginForDecrypt {
                 /* Check whether or not this file goes into a deeper subfolder level. */
                 String filePath = getFilePath((List<Object>) resource.get("files"), "");
                 /* Path is full path with filename at the end -> Remove that */
-                filePath = filePath.replaceAll("/" + org.appwork.utils.Regex.escape(filename) + "$", "");
+                filePath = filePath.replaceAll("/" + Pattern.quote(filename) + "$", "");
                 if (!StringUtils.isEmpty(filePath)) {
                     /* File that goes into (nested) subfolder. */
                     dl.setRelativeDownloadFolderPath(folderRoot + filePath);

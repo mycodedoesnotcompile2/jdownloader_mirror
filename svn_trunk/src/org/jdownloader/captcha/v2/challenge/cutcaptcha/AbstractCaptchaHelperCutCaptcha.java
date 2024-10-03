@@ -47,10 +47,12 @@ public abstract class AbstractCaptchaHelperCutCaptcha<T extends Plugin> {
         return plugin;
     }
 
+    /** Also referred to as "misery key". */
     public String getSiteKey() {
         return getSiteKey(br.getRequest().getHtmlCode());
     }
 
+    /** Also referred to as "misery key". */
     public String getSiteKey(final String source) {
         if (siteKey != null) {
             return siteKey;

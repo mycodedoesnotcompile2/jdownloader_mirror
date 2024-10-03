@@ -16,9 +16,13 @@
 package jd.plugins.hoster;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
@@ -29,6 +33,8 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -37,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49781 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends antiDDoSForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,9 +56,6 @@ public class XtremestreamCo extends antiDDoSForHost {
     /* DEV NOTES */
     // Tags: Porn plugin
     // other:
-
-    /* Connection stuff */
-    private static final int free_maxdownloads = -1;
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -121,9 +124,7 @@ public class XtremestreamCo extends antiDDoSForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename);
             filename = filename.trim();
-            if (!filename.endsWith(ext)) {
-                filename += ext;
-            }
+            filename = this.correctOrApplyFileNameExtension(filename, ext, null);
             link.setFinalFileName(filename);
         }
         return AvailableStatus.TRUE;
@@ -133,6 +134,50 @@ public class XtremestreamCo extends antiDDoSForHost {
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link);
         /* 2022-02-28: They're using an abnormal kind of m3u8 lists which is why a plugin is required in the first place. */
+        final String referer = link.getReferrerUrl();
+        final Browser br2 = br.cloneBrowser();
+        final String fid = this.getFID(link);
+        String data_folderid = null;
+        String data_xtremestream = null;
+        String dltoken = null;
+        if (referer != null) {
+            /* Attempt official/progressive download */
+            br2.getPage(referer);
+            data_folderid = br2.getRegex("data-folderid=\"([^\"]+)").getMatch(0);
+            data_xtremestream = br2.getRegex("data-xtremestream=\"([^\"]+)").getMatch(0);
+            dltoken = br2.getRegex("data-token=\"([^\"]+)").getMatch(0);
+        } else {
+            /* Fallback with hardcoded referer (fake blog that displays advertisements) */
+            br2.getHeaders().put("Referer", "https://glasbanjaluke.net/");
+            br2.getPage("https://pervm1.xtremestream.co/p/" + fid);
+            data_folderid = br2.getRegex("folder:\\s*\"([^\"]+)").getMatch(0);
+            data_xtremestream = br2.getRegex("xtremestream:\\s*\"([^\"]+)").getMatch(0);
+            dltoken = br2.getRegex("token=([^\"\\&]+)").getMatch(0);
+        }
+        if (data_folderid != null && data_xtremestream != null && dltoken != null) {
+            dltoken = Encoding.htmlDecode(dltoken);
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("folder", data_folderid);
+            postdata.put("xtremestream", data_xtremestream);
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("folder", data_folderid);
+            query.appendEncoded("xtremestream", data_xtremestream);
+            query.appendEncoded("token", dltoken);
+            final PostRequest req = br.createJSonPostRequest("https://download.xtremestream.xyz/generateLinkForPlayer?" + query.toString(), postdata);
+            req.getHeaders().put("Content-Type", "application/json");
+            req.getHeaders().put("Accept", "*/*");
+            br.getPage(req);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            String dllink = entries.get("link").toString();
+            /* Typically https://pervm1.xtremestream.co/ */
+            br.getHeaders().put("Referer", "https://" + data_xtremestream + "." + getHost() + "/");
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+            this.handleConnectionErrors(br, dl.getConnection());
+            dl.startDownload();
+            return;
+        } else {
+            logger.info("Official download is not possible");
+        }
         String hlsMaster = br.getRegex("var m3u8_loader_url = `(https://[^<>\"']+data=)`;").getMatch(0);
         if (hlsMaster == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -162,7 +207,7 @@ public class XtremestreamCo extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

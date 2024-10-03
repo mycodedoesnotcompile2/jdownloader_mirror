@@ -13,15 +13,15 @@
 //
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package org.jdownloader.extensions.chat;
 
 import java.awt.Color;
 
 public class User implements Comparable<User> {
-    public static final int RANK_DEFAULT = -1;
-    public static final int RANK_OP      = 0;
+    public static final int RANK_DEFAULT = 0;
     public static final int RANK_VOICE   = 1;
+    public static final int RANK_HOP     = 2;
+    public static final int RANK_OP      = 3;
 
     public String getColor() {
         String col = Integer.toHexString(new Color(name.hashCode()).getRGB());
@@ -39,6 +39,10 @@ public class User implements Comparable<User> {
             rank = RANK_OP;
             name = name.substring(1);
         }
+        if (name.startsWith("%")) {
+            rank = RANK_HOP;
+            name = name.substring(1);
+        }
         if (name.startsWith("+")) {
             rank = RANK_VOICE;
             name = name.substring(1);
@@ -51,7 +55,7 @@ public class User implements Comparable<User> {
     }
 
     public String getNickLink(String id) {
-        return "<a href='intern:" + id + "|" + name + "'>" + name + "</a>";
+        return "<a style=\"nick\" href='intern:" + id + "|" + name + "'>" + name + "</a>";
     }
 
     private String getRangName() {
@@ -71,6 +75,8 @@ public class User implements Comparable<User> {
             return "@";
         case RANK_VOICE:
             return "+";
+        case RANK_HOP:
+            return "%";
         default:
             return "";
         }
@@ -87,6 +93,9 @@ public class User implements Comparable<User> {
         if (name.startsWith("+")) {
             name = name.substring(1);
         }
+        if (name.startsWith("%")) {
+            name = name.substring(1);
+        }
         return name.equals(this.name);
     }
 
@@ -98,9 +107,10 @@ public class User implements Comparable<User> {
             return "@" + name;
         case RANK_VOICE:
             return "+" + name;
+        case RANK_HOP:
+            return "%" + name;
         default:
             return name;
         }
     }
-
 }

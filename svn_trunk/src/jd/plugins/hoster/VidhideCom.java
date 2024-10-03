@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -293,5 +293,13 @@ public class VidhideCom extends XFileSharingProBasic {
         }
         logger.info("Successfully found dllink via official video download");
         return dllink;
+    }
+
+    @Override
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+        super.checkErrors(br, html, link, account, checkAll);
+        if (br.containsHTML("Video embed restricted for this domain")) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Video embed restricted for this domain");
+        }
     }
 }

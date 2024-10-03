@@ -17,7 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
+import java.util.Locale;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
@@ -42,26 +43,24 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
 public class RapidoxPl extends PluginForHost {
-    private final String                   NICE_HOST                    = "rapidox.pl";
-    private final String                   NICE_HOSTproperty            = NICE_HOST.replaceAll("(\\.|\\-)", "");
-    private final String                   NORESUME                     = NICE_HOSTproperty + "NORESUME";
+    private final String                 NICE_HOST                 = "rapidox.pl";
+    private final String                 NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
     /* Connection limits */
-    private final boolean                  ACCOUNT_PREMIUM_RESUME       = true;
-    private final int                      ACCOUNT_PREMIUM_MAXCHUNKS    = 0;
-    private final int                      ACCOUNT_PREMIUM_MAXDOWNLOADS = -1;
-    private final int                      ACCOUNT_FREE_MAXDOWNLOADS    = 1;
-    private static AtomicReference<String> agent                        = new AtomicReference<String>(null);
-    private static MultiHosterManagement   mhm                          = new MultiHosterManagement("rapidox.pl");
+    private final boolean                ACCOUNT_PREMIUM_RESUME    = true;
+    private final int                    ACCOUNT_PREMIUM_MAXCHUNKS = 0;
+    private static MultiHosterManagement mhm                       = new MultiHosterManagement("rapidox.pl");
 
     public RapidoxPl(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://rapidox.pl/promocje");
+        this.enablePremium("https://" + getHost() + "/promocje");
     }
 
     @Override
@@ -78,7 +77,7 @@ public class RapidoxPl extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://rapidox.pl/regulamin";
+        return "https://" + getHost() + "/regulamin";
     }
 
     @Override
@@ -118,9 +117,9 @@ public class RapidoxPl extends PluginForHost {
         login(account, false);
         String dllink = checkDirectLink(link, NICE_HOSTproperty + "directlink");
         if (dllink == null) {
-            final String downloadURL = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
-            this.postPage(link, account, "https://" + this.getHost() + "/panel/pobierz-plik", "check_links=" + Encoding.urlEncode(downloadURL));
-            final String downloadID = br.getRegex("(?i)rapidox\\.pl/panel/pobierz\\-plik/(\\d+)").getMatch(0);
+            final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+            this.postPage(link, account, "https://" + this.getHost() + "/panel/pobierz-plik", "check_links=" + Encoding.urlEncode(url));
+            final String downloadID = br.getRegex("rapidox\\.pl/panel/pobierz\\-plik/(\\d+)").getMatch(0);
             if (downloadID == null) {
                 mhm.handleErrorGeneric(account, link, "Failed to generate downloadID", 50, 5 * 60 * 1000l);
             }
@@ -129,14 +128,22 @@ public class RapidoxPl extends PluginForHost {
             int counter = 0;
             int getreadymaxreloads = 5;
             final int wait_between_reload = 3;
-            /* How long do we want to wait until the file is on their servers so we can download it? */
-            final int maxreloads = 200;
             do {
                 this.sleep(wait_between_reload * 1000l, link);
                 br.getPage("/panel/pobierz-plik/" + downloadID);
                 hash = br.getRegex("name=\"form_hash\" value=\"([a-z0-9]+)\"").getMatch(0);
                 dlid = br.getRegex("name=\"download\\[\\]\" value=\"(\\d+)\"").getMatch(0);
-            } while (hash == null && dlid == null && counter <= getreadymaxreloads);
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
+                if (hash != null && dlid != null) {
+                    logger.info("Get ready loop: Success :)");
+                    break;
+                } else {
+                    logger.info("Get ready loop: continue: Round: " + counter + "/" + getreadymaxreloads);
+                    continue;
+                }
+            } while (counter <= getreadymaxreloads);
             if (hash == null || dlid == null) {
                 mhm.handleErrorGeneric(account, link, "Failed to generate downloadHash/dlid", 50, 5 * 60 * 1000l);
             }
@@ -151,22 +158,30 @@ public class RapidoxPl extends PluginForHost {
             /* File is on their servers --> Chose download method */
             this.postPage(link, account, "/panel/lista-plikow", "download%5B%5D=" + dlid + "&form_hash=" + hash + "&download_files=Pobierz%21&pobieranie=posrednie");
             /* Access list of downloadable files/links & find correct final downloadlink */
+            /* How long do we want to wait until the file is on their servers so we can download it? */
+            final int maxreloads = 200;
             do {
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
                 this.sleep(wait_between_reload * 1000l, link);
                 this.getPage(link, account, "/panel/lista-plikow");
-                /* TODO: Maybe find a more reliable way to get the final downloadlink... */
+                /* TODO: Find a more reliable way to get the final downloadlink... */
                 final String[][] results = br.getRegex("<span title=\"(https?://.*?)\">(.*?)</span>.*?<a href=\"(https?://[a-z0-9]+\\.rapidox\\.pl/[A-Za-z0-9]+/[^<>\"]*?)\"").getMatches();
-                if (results != null && results.length >= 1) {
-                    for (final String[] result : results) {
-                        if (StringUtils.equals(downloadURL, result[0])) {
-                            dllink = result[2];
-                            break;
-                        } else if (StringUtils.equals(fname, result[1])) {
-                            dllink = result[2];
-                            break;
-                        }
+                if (results == null || results.length == 0) {
+                    logger.info("Run: " + counter + " | Found zero results");
+                    continue;
+                }
+                for (final String[] result : results) {
+                    if (StringUtils.equals(url, result[0])) {
+                        dllink = result[2];
+                        break;
+                    } else if (StringUtils.equals(fname, result[1])) {
+                        dllink = result[2];
+                        break;
                     }
                 }
+                logger.info("Run: " + counter + " | Found no matching results");
             } while (counter <= maxreloads && dllink == null);
             if (dllink == null) {
                 /* Should never happen */
@@ -176,27 +191,17 @@ public class RapidoxPl extends PluginForHost {
         handleDL(account, link, dllink);
     }
 
-    @SuppressWarnings("deprecation")
     private void handleDL(final Account account, final DownloadLink link, final String dllink) throws Exception {
-        /* we want to follow redirects in final stage */
-        br.setFollowRedirects(true);
-        boolean resume = ACCOUNT_PREMIUM_RESUME;
-        if (link.getBooleanProperty(NORESUME, false)) {
-            resume = false;
-            link.setProperty(NORESUME, Boolean.valueOf(false));
+        if (dllink == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setProperty(NICE_HOSTproperty + "directlink", dllink);
         try {
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, ACCOUNT_PREMIUM_MAXCHUNKS);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, ACCOUNT_PREMIUM_RESUME, ACCOUNT_PREMIUM_MAXCHUNKS);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                if (dl.getConnection().getResponseCode() == 416) {
-                    logger.info("Resume impossible, disabling it for the next try");
-                    link.setChunksProgress(null);
-                    link.setProperty(NORESUME, Boolean.valueOf(true));
-                    throw new PluginException(LinkStatus.ERROR_RETRY);
-                }
                 br.followConnection(true);
-                handleAPIErrors(link, account, br);
+                checkErrorsWebsite(link, account, br);
                 mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to downloadable content", 10, 5 * 60 * 1000l);
             }
             this.dl.startDownload();
@@ -212,7 +217,6 @@ public class RapidoxPl extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -234,136 +238,150 @@ public class RapidoxPl extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
-        if (br.getURL() == null || !br.getURL().contains("/panel/twoje-informacje")) {
-            br.getPage("/panel/twoje-informacje");
+        final AccountInfo ai = new AccountInfo();
+        String trafficMaxStr = br.getRegex("Dopuszczalny transfer\\s*:\\s*</b>[\t\n\r ]+([0-9 ]+ MB)").getMatch(0);
+        long trafficMaxBytes = -1;
+        if (trafficMaxStr != null) {
+            /* Fix e.g. 500 000 MB (500 GB) --> 500000MB */
+            trafficMaxStr = trafficMaxStr.replace(" ", "");
+            trafficMaxBytes = SizeFormatter.getSize(trafficMaxStr);
         }
-        String traffic_max = br.getRegex("Dopuszczalny transfer:</b>[\t\n\r ]+([0-9 ]+ MB)").getMatch(0);
-        String traffic_available = br.getRegex("Do wykorzystania:[\t\n\r ]+(-?[0-9 ]+ MB)").getMatch(0);
-        /* Fix e.g. 500 000 MB (500 GB) --> 500000MB */
-        if (traffic_max != null) {
-            traffic_max = traffic_max.replace(" ", "");
-        }
-        if (traffic_available != null) {
-            traffic_available = traffic_available.replace(" ", "");
+        long trafficAvailableBytes = -1;
+        String trafficAvailableStr = br.getRegex("Do wykorzystania:[\t\n\r ]+(-?[0-9 ]+ MB)").getMatch(0);
+        if (trafficAvailableStr != null) {
+            /* Fix e.g. 500 000 MB (500 GB) --> 500000MB */
+            trafficAvailableStr = trafficAvailableStr.replace(" ", "");
+            trafficAvailableBytes = SizeFormatter.getSize(trafficAvailableStr);
         }
         /*
          * Free users = They have no package --> Accept them but set zero traffic left. Of couse traffic left <= 0 --> Also free account.
          */
-        if (traffic_max == null || traffic_max.equals("0MB") || traffic_available == null || traffic_available.indexOf("-") == 0) {
+        if (trafficMaxStr == null || trafficMaxBytes == 0 || trafficAvailableStr == null || trafficAvailableBytes <= 0) {
             account.setType(AccountType.FREE);
-            account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
             /* Free accounts have no traffic - set this so they will not be used (accidently) but still accept them. */
             ai.setTrafficLeft(0);
             ai.setExpired(true);
         } else {
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(Integer.MAX_VALUE);
             ai.setUnlimitedTraffic();
-            ai.setTrafficLeft(SizeFormatter.getSize(traffic_available));
-            ai.setTrafficMax(SizeFormatter.getSize(traffic_max));
+            ai.setTrafficLeft(trafficAvailableBytes);
+            ai.setTrafficMax(trafficMaxBytes);
         }
         /* Only add hosts which are listed as 'on' (working) */
         this.getPage(null, account, "/panel/status_hostingow");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
-        final String hosttable = br.getRegex("</tr></thead><tr>(.*?)</tr></table>").getMatch(0);
-        final String[] hostDomainsInfo = hosttable.split("<td width=\"50px\"");
-        for (final String domaininfo : hostDomainsInfo) {
-            String crippledhost = new Regex(domaininfo, "title=\"([^<>\"]+)\"").getMatch(0);
-            final String status = new Regex(domaininfo, "<td>(on|off)").getMatch(0);
-            if (crippledhost == null || status == null) {
-                continue;
-            } else if (status.equals("off") || !status.equals("on")) {
-                logger.info("This host is currently not active, NOT adding it to the supported host array: " + crippledhost);
-                continue;
-            }
-            crippledhost = crippledhost.toLowerCase();
-            /* First cover special cases */
-            if (crippledhost.equals("_4shared")) {
-                supportedHosts.add("4shared.com");
-            } else {
-                supportedHosts.add(crippledhost);
-            }
+        final String hosttable_html = br.getRegex("</tr></thead><tr>(.*?)</tr></table>").getMatch(0);
+        if (hosttable_html == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to obtain list of supported hosts #1");
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final String[] hostDomainsInfo = hosttable_html.split("<td width=\"50px\"");
+        for (final String domainhtml : hostDomainsInfo) {
+            String crippledhost = new Regex(domainhtml, "title=\"([^\"]+)\"").getMatch(0);
+            if (crippledhost == null) {
+                logger.info("Skipping invalid entry: " + domainhtml);
+                continue;
+            }
+            crippledhost = Encoding.htmlDecode(crippledhost).trim();
+            crippledhost = crippledhost.toLowerCase(Locale.ENGLISH);
+            /* Do some special corrections */
+            if (crippledhost.equals("_4shared")) {
+                crippledhost = "4shared.com";
+            }
+            final String[] trafficPercentages = new Regex(domainhtml, "(\\d+)\\s*%").getColumn(0);
+            final MultiHostHost mhost = new MultiHostHost(crippledhost);
+            final String status = new Regex(domainhtml, ">\\s*(on|off)\\s*<").getMatch(0);
+            if (status == null) {
+                logger.info("Failed to find status for entry: " + crippledhost);
+            } else if (status.equalsIgnoreCase("off")) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (!status.equalsIgnoreCase("on")) {
+                logger.info("Found unknown status (treating it same as status 'off'): " + status);
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            if (trafficPercentages != null && trafficPercentages.length == 2) {
+                final short trafficPercentNormal = Short.parseShort(trafficPercentages[0]);
+                // final short trafficPercentHH = Short.parseShort(trafficPercentages[1]);
+                mhost.setTrafficCalculationFactorPercent(trafficPercentNormal);
+            }
+            supportedhosts.add(mhost);
+        }
+        if (supportedhosts.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to obtain list of supported hosts #2");
+        }
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
-    private void login(final Account account, final boolean force) throws Exception {
+    private void login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
-            try {
-                /* Load cookies */
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Login cookies are available");
-                    br.setCookies(this.getHost(), cookies);
-                    if (!force) {
-                        /* Do not validate cookies */
-                        return;
-                    }
-                    /* Even though login is forced first check if our cookies are still valid --> If not, force login! */
-                    logger.info("Checking login cookies");
-                    br.getPage("https://" + this.getHost() + "/panel/index");
-                    if (isLoggedIN(br)) {
-                        logger.info("Successfully checked login cookies");
-                        return;
-                    } else {
-                        /* Clear cookies to prevent unknown errors as we'll perform a full login below now. */
-                        if (br.getCookies(br.getHost()) != null) {
-                            br.clearCookies(br.getHost());
-                        }
-                    }
+            /* Load cookies */
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            final String urlRelativeHosterInfo = "/panel/twoje-informacje";
+            if (cookies != null) {
+                br.setCookies(this.getHost(), cookies);
+                if (!validateCookies) {
+                    /* Do not validate cookies */
+                    return;
                 }
-                br.setFollowRedirects(true);
-                final String loginpage = "https://" + this.getHost() + "/zaloguj_sie";
-                this.getPage(null, account, loginpage);
-                final String captchaMarker = "class=\"g-recaptcha\"";
-                boolean askedForCaptcha = false;
-                int loginAttempt = 0;
-                do {
-                    loginAttempt++;
-                    logger.info("Performing login attempt number: " + loginAttempt);
-                    Form loginform = br.getFormbyActionRegex(".+/login");
-                    if (loginform == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    loginform.put("login83", Encoding.urlEncode(account.getUser()));
-                    loginform.put("password83", Encoding.urlEncode(account.getPass()));
-                    if (br.containsHTML(captchaMarker)) {
-                        logger.info("Failed to prevent captcha - asking user!");
-                        /* Handle stupid login captcha */
-                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                        loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                        loginform.put("redirect", "");
-                        askedForCaptcha = true;
-                    } else if (loginAttempt > 1) {
-                        logger.info("No captcha required on 2nd login attempt -> Don't even try");
-                        break;
-                    }
-                    br.submitForm(loginform);
-                    br.getPage("/panel/twoje-informacje");
-                    handleAPIErrors(null, account, br);
-                    if (isLoggedIN(br)) {
-                        /* Success */
-                        break;
-                    } else if (askedForCaptcha) {
-                        logger.info("Stopping because: User was already asked for captcha -> Looks like invalid login credentials");
-                        break;
-                    } else {
-                        logger.info("Retrying login - this time a captcha should be required");
-                        this.getPage(null, account, loginpage);
-                    }
-                } while (!askedForCaptcha && loginAttempt <= 1);
-                if (!isLoggedIN(br)) {
-                    throw new AccountInvalidException();
+                /* Even though login is forced first check if our cookies are still valid --> If not, force login! */
+                logger.info("Checking login cookies");
+                br.getPage("https://" + this.getHost() + urlRelativeHosterInfo);
+                if (isLoggedIN(br)) {
+                    logger.info("Successfully checked login cookies");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
+                } else {
+                    /* Clear cookies to prevent unknown errors as we'll perform a full login below now. */
+                    br.clearCookies(br.getHost());
+                    account.clearCookies("");
                 }
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                account.clearCookies("");
-                throw e;
             }
+            final String loginpage = "https://" + this.getHost() + "/zaloguj_sie";
+            this.getPage(null, account, loginpage);
+            final String captchaMarker = "class=\"g-recaptcha\"";
+            boolean askedForCaptcha = false;
+            int loginAttempt = 0;
+            do {
+                loginAttempt++;
+                logger.info("Performing login attempt number: " + loginAttempt);
+                Form loginform = br.getFormbyActionRegex(".+/login");
+                if (loginform == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                loginform.put("login83", Encoding.urlEncode(account.getUser()));
+                loginform.put("password83", Encoding.urlEncode(account.getPass()));
+                if (br.containsHTML(captchaMarker)) {
+                    logger.info("Failed to prevent captcha - asking user!");
+                    /* Handle stupid login captcha */
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                    loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                    loginform.put("redirect", "");
+                    askedForCaptcha = true;
+                } else if (loginAttempt > 1) {
+                    logger.info("No captcha required on 2nd login attempt -> Don't even try");
+                    break;
+                }
+                br.submitForm(loginform);
+                br.getPage(urlRelativeHosterInfo);
+                checkErrorsWebsite(null, account, br);
+                if (isLoggedIN(br)) {
+                    /* Success */
+                    break;
+                } else if (askedForCaptcha) {
+                    logger.info("Stopping because: User was already asked for captcha -> Looks like invalid login credentials");
+                    break;
+                } else {
+                    logger.info("Retrying login - this time a captcha should be required");
+                    this.getPage(null, account, loginpage);
+                }
+            } while (!askedForCaptcha && loginAttempt <= 1);
+            if (!isLoggedIN(br)) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -373,20 +391,22 @@ public class RapidoxPl extends PluginForHost {
 
     private void getPage(final DownloadLink link, final Account account, final String accesslink) throws IOException, PluginException {
         br.getPage(accesslink);
-        handleAPIErrors(link, account, br);
+        checkErrorsWebsite(link, account, br);
     }
 
     private void postPage(final DownloadLink link, final Account account, final String accesslink, final String postdata) throws IOException, PluginException {
         br.postPage(accesslink, postdata);
-        handleAPIErrors(link, account, br);
+        checkErrorsWebsite(link, account, br);
     }
 
-    private void handleAPIErrors(final DownloadLink link, final Account account, final Browser br) throws PluginException {
-        if (br.containsHTML("(?i)Wybierz linki z innego hostingu")) {
+    private void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException {
+        if (br.containsHTML("Wybierz linki z innego hostingu")) {
             /* Host currently not supported */
             mhm.putError(account, getDownloadLink(), 5 * 60 * 1000l, "Host is currently not supported");
         } else if (br.containsHTML("Jeśli widzisz ten komunikat prosimy niezwłocznie skontaktować się z nami pod")) {
             throw new AccountUnavailableException("Your IP has been banned!", 5 * 60 * 1000);
+        } else {
+            /* No error */
         }
     }
 

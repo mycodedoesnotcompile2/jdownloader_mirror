@@ -19,7 +19,7 @@ public interface DeathByCaptchaSettings extends ChallengeSolverConfig {
     void setUserName(String jser);
 
     @AboutConfig
-    @DescriptionForConfigEntry("Your deathbycaptcha.com Password")
+    @DescriptionForConfigEntry("Your deathbycaptcha.com Password or API key")
     String getPassword();
 
     void setPassword(String jser);

@@ -40,16 +40,16 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49697 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
 public class RapidbIt extends PluginForHost {
     private final String                 API_BASE                    = "https://rapidb.it/api";
     private static MultiHosterManagement mhm                         = new MultiHosterManagement("rapidb.it");
-    private final boolean                resume                      = true;
-    private final int                    maxchunks                   = 0;
     private final String                 PROPERTY_ACCOUNT_TOKEN      = "login_token";
     private final String                 PROPERTY_SERVERSIDE_FILE_ID = "file_id";
 
@@ -78,6 +78,14 @@ public class RapidbIt extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
@@ -85,13 +93,6 @@ public class RapidbIt extends PluginForHost {
     @Override
     public String getAGBLink() {
         return "https://" + this.getHost() + "/pl/page/tos";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
-        br.setFollowRedirects(true);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        return br;
     }
 
     @Override
@@ -107,6 +108,15 @@ public class RapidbIt extends PluginForHost {
             mhm.runCheck(account, link);
             return true;
         }
+    }
+
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 0;
     }
 
     @Override
@@ -150,7 +160,7 @@ public class RapidbIt extends PluginForHost {
                 postdata.put("notif_email", false);
                 br.postPageRaw(API_BASE + "/services/downloadfile", JSonStorage.serializeToJson(postdata));
                 this.checkErrors(account, link);
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 handleErrorMap(account, link, entries);
                 file_id = entries.get("file_id").toString();
                 /* Save this ID to re-use on next try. */
@@ -168,7 +178,7 @@ public class RapidbIt extends PluginForHost {
              * want.
              */
             br.getPage(API_BASE + "/files?" + query.toString());
-            final Map<String, Object> dlresponse = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> dlresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             handleErrorMap(account, link, dlresponse);
             final List<Map<String, Object>> files = (List<Map<String, Object>>) dlresponse.get("result");
             if (files.isEmpty()) {
@@ -181,7 +191,7 @@ public class RapidbIt extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Serverside download in progress " + file.get("download_percent") + "%", 10 * 1000l);
             }
             link.setProperty(this.getPropertyKey("directlink"), dllink);
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxchunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 mhm.handleErrorGeneric(account, link, "unknown_dl_error", 10, 5 * 60 * 1000l);
@@ -199,7 +209,7 @@ public class RapidbIt extends PluginForHost {
         boolean valid = false;
         try {
             final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resume, maxchunks);
+            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 valid = true;
                 return true;
@@ -226,9 +236,9 @@ public class RapidbIt extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        final Map<String, Object> user = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         br.getPage(API_BASE + "/system/config");
-        final Map<String, Object> apiconfig = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> apiconfig = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         ai.setCreateTime(((Number) user.get("created")).longValue());
         final int level_id = ((Number) user.get("level_id")).intValue();
         final List<Map<String, Object>> levels = (List<Map<String, Object>>) apiconfig.get("levels");
@@ -248,25 +258,25 @@ public class RapidbIt extends PluginForHost {
         /* Bought traffic + (daily_free_traffic_mb - daily_used_traffic_bytes) */
         ai.setTrafficLeft(pointsBytes + (((Number) level.get("points_free_mb")).longValue() * 1000 * 1000) - ((Number) user.get("points_free_used")).longValue());
         ai.setTrafficMax(pointsBytes);
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> filehostings = (List<Map<String, Object>>) apiconfig.get("filehostings");
         for (final Map<String, Object> filehosting : filehostings) {
-            final List<String> domains = (List<String>) filehosting.get("domains");
-            final String name = filehosting.get("name").toString();
-            if (((Number) filehosting.get("status")).intValue() == 1) {
-                supportedHosts.addAll(domains);
-            } else {
-                logger.info("Skipping currently unsupported/offline host: " + name);
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.setName(filehosting.get("name").toString());
+            mhost.setDomains((List<String>) filehosting.get("domains"));
+            if (((Number) filehosting.get("status")).intValue() != 1) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                mhost.setStatusText((String) filehosting.get("status_reason"));
             }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
 
     private void login(final Account account, final boolean validateLogins) throws IOException, PluginException, InterruptedException {
         synchronized (account) {
-            prepBR(this.br);
             if (account.hasProperty(PROPERTY_ACCOUNT_TOKEN)) {
                 logger.info("Trying to login via token");
                 br.getHeaders().put("Auth", account.getStringProperty(PROPERTY_ACCOUNT_TOKEN));
@@ -293,7 +303,7 @@ public class RapidbIt extends PluginForHost {
             postdata.put("googleauth", null);
             postdata.put("never_expires", true);
             br.postPageRaw(API_BASE + "/users/login", JSonStorage.serializeToJson(postdata));
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String token = (String) entries.get("access_token");
             if (StringUtils.isEmpty(token)) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -305,7 +315,7 @@ public class RapidbIt extends PluginForHost {
 
     private void checkErrors(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         try {
-            final Object jsonO = restoreFromString(br.toString(), TypeRef.OBJECT);
+            final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             if (jsonO == null || !(jsonO instanceof Map)) {
                 return;
             }

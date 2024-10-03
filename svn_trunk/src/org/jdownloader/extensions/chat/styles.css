@@ -1,51 +1,18 @@
 <style type="text/css">
+body       { font-family: Geneva, Arial, Helvetica, sans-serif; font-size:9px; }
+span       { color:#222222; }
+a          { text-decoration:underline; }
+ul         { padding: 0px; margin:0px; }
 
-.system {
-	color:#666666;
-	
-}
-.pm {
-	color:#ff0066;
-	
-}
-.self {
-	color:#222222;
-	
-}
-.time{
-
-}
-.highlight {
-	color:#000000;
-	background-color:#FFFF99;
-	margin-bottom:15px;
-	margin-top:15px;
-}
-.error {
-	color:#ff0000;
-	
-}
-.action {
-	color:#009900;
-	
-}
-.notice {
-	color:#33cccc;
-	
-}
-
-span{
-	color:#222222;
-}
-
-a { text-decoration:none; }
-
-body {
-font-family: Geneva, Arial, Helvetica, sans-serif;
-font-size::9px;
-}
-ul {	
-	padding: 0px;
-	margin:0px;
-}
+.system    { color:#666666; }
+.pm        { color:#ff0066; }
+.self      { color:#222222; }
+.time      { }
+.highlight { color:#000000; background-color:#FFFF99; margin-bottom:15px; margin-top:15px; }
+.error     { color:#ff0000; }
+.action    { font-style:italic; color:#009900; }
+.notice    { color:#00B5B8; }
+.topic     { color:#204A87; font-weight:bold; font-size:12px; margin-bottom:15px; margin-top:15px; }
+.opnotice  { background-color:#FF0000; color:#FFE300; font-size:12px; font-weight:bold; 
+             margin-bottom:20px; margin-top:20px; }
 </style>

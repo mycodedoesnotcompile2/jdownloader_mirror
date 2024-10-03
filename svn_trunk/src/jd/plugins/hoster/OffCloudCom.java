@@ -38,7 +38,8 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.config.TakeValueFromSubconfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -59,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49711 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -100,17 +101,17 @@ public class OffCloudCom extends UseNet {
 
     public OffCloudCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://offcloud.com/");
+        this.enablePremium("https://" + getHost());
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://offcloud.com/legal";
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
-    private Browser newBrowser() {
-        br = new Browser();
-        br.setCookiesExclusive(true);
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         // define custom browser headers and language settings.
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.getHeaders().put("User-Agent", "JDownloader");
@@ -120,7 +121,13 @@ public class OffCloudCom extends UseNet {
         br.setAllowedResponseCodes(500);
         /* 2020-12-10: List of supported websites can be HUGE! */
         // br.setLoadLimit(2 * br.getLoadLimit());
+        br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/legal";
     }
 
     @Override
@@ -175,12 +182,6 @@ public class OffCloudCom extends UseNet {
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USENET };
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (isUsenetLink(link)) {
             super.handleMultiHost(link, account);
@@ -188,7 +189,6 @@ public class OffCloudCom extends UseNet {
             String status = null;
             String filename = null;
             String requestID = null;
-            this.br = newBrowser();
             mhm.runCheck(account, link);
             /*
              * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it
@@ -204,40 +204,43 @@ public class OffCloudCom extends UseNet {
             this.login(account, false);
             String dllink = checkDirectLink(link, this.getHost() + "directlink");
             if (dllink == null) {
+                final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
                 if (cloudOnlyHosts.contains(link.getHost())) {
                     final long timeStarted = System.currentTimeMillis();
                     link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_cloud);
-                    this.postRawAPISafe("https://offcloud.com/cloud/request", "{\"url\":\"" + link.getDownloadURL() + "\",\"conversion\":\"\"}");
+                    this.postRawAPISafe("https://" + getHost() + "/cloud/request", "{\"url\":\"" + url + "\",\"conversion\":\"\"}");
+                    // TODO: Use json parser
                     requestID = PluginJSonUtils.getJsonValue(br, "requestId");
                     if (requestID == null) {
                         /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, this.currDownloadLink, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
+                        mhm.handleErrorGeneric(this.currAcc, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
                     }
                     do {
                         this.sleep(5000l, link);
-                        this.postRawAPISafe("https://offcloud.com/cloud/status", "{\"requestIds\":[\"" + requestID + "\"]}");
+                        this.postRawAPISafe("https://" + getHost() + "/cloud/status", "{\"requestIds\":[\"" + requestID + "\"]}");
                         status = PluginJSonUtils.getJsonValue(br, "status");
                     } while (System.currentTimeMillis() - timeStarted < CLOUD_MAX_WAITTIME && "downloading".equals(status));
                     filename = PluginJSonUtils.getJsonValue(br, "fileName");
                     if (!"downloaded".equals(status)) {
                         logger.warning("Cloud failed");
                         /* Should never happen but will happen */
-                        mhm.handleErrorGeneric(this.currAcc, this.currDownloadLink, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
+                        mhm.handleErrorGeneric(this.currAcc, link, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
                     }
                     /* Filename needed in URL or server will return bad filenames! */
-                    dllink = "https://offcloud.com/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
+                    dllink = "https://" + getHost() + "/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
                 } else {
                     link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
-                    this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + Encoding.urlEncode(this.currDownloadLink.getDownloadURL()));
-                    requestID = PluginJSonUtils.getJsonValue(br, "requestId");
+                    this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + Encoding.urlEncode(url));
+                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    requestID = (String) entries.get("requestId");
                     if (requestID == null) {
                         /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, this.currDownloadLink, "instant_requestIdnull", 50, 5 * 60 * 1000l);
+                        mhm.handleErrorGeneric(this.currAcc, link, "instant_requestIdnull", 50, 5 * 60 * 1000l);
                     }
-                    dllink = PluginJSonUtils.getJsonValue(br, "url");
+                    dllink = (String) entries.get("url");
                     if (StringUtils.isEmpty(dllink)) {
                         /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, this.currDownloadLink, "dllinknull", 50, 5 * 60 * 1000l);
+                        mhm.handleErrorGeneric(this.currAcc, link, "dllinknull", 50, 5 * 60 * 1000l);
                     }
                 }
                 dllink = dllink.replaceAll("\\\\/", "/");
@@ -250,8 +253,6 @@ public class OffCloudCom extends UseNet {
     @SuppressWarnings("deprecation")
     private void handleDL(final Account account, final DownloadLink link, final String dllink) throws Exception {
         final String requestID = link.getStringProperty("offcloudrequestId", null);
-        /* we want to follow redirects in final stage */
-        br.setFollowRedirects(true);
         /* First set hardcoded limit */
         int maxChunks = ACCOUNT_PREMIUM_MAXCHUNKS;
         /* Then check if we got an individual limit. */
@@ -290,7 +291,7 @@ public class OffCloudCom extends UseNet {
                 }
                 updatestatuscode();
                 handleAPIErrors(this.br);
-                mhm.handleErrorGeneric(this.currAcc, this.currDownloadLink, "unknowndlerror", 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(this.currAcc, link, "unknowndlerror", 50, 5 * 60 * 1000l);
             }
             controlSlot(+1);
             try {
@@ -307,7 +308,7 @@ public class OffCloudCom extends UseNet {
                         throw new PluginException(LinkStatus.ERROR_RETRY);
                     }
                 } else if (PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class).isDeleteDownloadHistorySingleLinkEnabled()) {
-                    /* Delete downloadhistory entry of downloaded file from history immediately after each download */
+                    /* Delete download history entry of downloaded file from history immediately after each download */
                     deleteSingleDownloadHistoryEntry(requestID);
                 }
             } catch (final PluginException e) {
@@ -336,7 +337,6 @@ public class OffCloudCom extends UseNet {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -361,34 +361,26 @@ public class OffCloudCom extends UseNet {
         setConstants(account, null);
         final OffCloudComPluginConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class);
         final long last_deleted_complete_download_history_time_ago = getLast_deleted_complete_download_history_time_ago();
-        this.br = newBrowser();
-        final AccountInfo ai = new AccountInfo();
-        if (!account.getUser().matches(".+@.+\\..+")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlease enter your e-mail address in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
         logger.info("last_deleted_complete_download_history_time_ago: " + TimeFormatter.formatMilliSeconds(last_deleted_complete_download_history_time_ago, 0));
-        /* Only do a full login if either we have no login cookie at all or it is expired */
         this.login(account, true);
-        br.postPage("https://offcloud.com/stats/usage-left", "");
-        String remaininglinksnum = PluginJSonUtils.getJsonValue(br, "links");
-        postAPISafe("https://offcloud.com/stats/addons", "");
+        final AccountInfo ai = new AccountInfo();
+        br.postPage("https://" + getHost() + "/stats/usage-left", "");
+        final Map<String, Object> usageleft = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        long remaininglinksnum = ((Number) usageleft.get("links")).longValue();
+        final long premiumUsageBytes = ((Number) usageleft.get("premiumUsage")).longValue();
+        postAPISafe("https://" + getHost() + "/stats/addons", "");
         /*
          * Basically, at the moment we got 3 account types: Premium, Free account with generate-links feature, Free Account without
          * generate-links feature (used free account, ZERO traffic)
          */
-        Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-        List<Object> ressourcelist = (List) entries.get("data");
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("data");
         String packagetype = null;
         String activeTill = null;
         boolean foundPackage = false;
-        for (final Object packageO : ressourcelist) {
-            entries = (Map<String, Object>) packageO;
-            packagetype = (String) entries.get("type");
-            activeTill = (String) entries.get("activeTill");
+        for (final Map<String, Object> packageinfo : ressourcelist) {
+            packagetype = (String) packageinfo.get("type");
+            activeTill = (String) packageinfo.get("activeTill");
             /*
              * 2018-02-07: For some reason, the 'link-unlimited' package (if available) will always expire 1 month after the
              * "premium-downloading" package which is why we get our data from here. At this stage I have no idea whether this applies for
@@ -403,33 +395,34 @@ public class OffCloudCom extends UseNet {
         if (ressourcelist.size() == 0 || "premium-link-increase".equalsIgnoreCase(packagetype)) {
             /* Free usually only has 1 package with packageType "premium-link-increase" */
             account.setType(AccountType.FREE);
-            ai.setStatus("Registered (free) account");
             /* Important: If we found our package, get the remaining links count from there as the other one might be wrong! */
-            if ("premium-link-increase".equalsIgnoreCase(packagetype)) {
-                remaininglinksnum = Long.toString(JavaScriptEngineFactory.toLong(entries.get("remainingLinksCount"), 0));
+            final Object remainingLinksCount = entries.get("remainingLinksCount");
+            if (remainingLinksCount instanceof Number) {
+                remaininglinksnum = ((Number) remainingLinksCount).longValue();
             }
             account.setProperty("accinfo_linksleft", remaininglinksnum);
-            if (remaininglinksnum.equals("0")) {
-                /*
-                 * No links downloadable (anymore) --> No traffic left --> Free account limit reached --> At this stage the user cannot use
-                 * the account for anything
-                 */
-                ai.setTrafficLeft(0);
-            }
         } else if (foundPackage) {
             account.setType(AccountType.PREMIUM);
-            ai.setStatus("Premium account");
             ai.setUnlimitedTraffic();
             activeTill = activeTill.replaceAll("Z$", "+0000");
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(activeTill, "yyyy-MM-dd'T'HH:mm:ss.S", Locale.ENGLISH), this.br);
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(activeTill, "yyyy-MM-dd'T'HH:mm:ss.S", Locale.ENGLISH), br);
             account.setProperty("accinfo_linksleft", remaininglinksnum);
         } else {
             /* This should never happen */
             account.setType(AccountType.UNKNOWN);
             return ai;
         }
+        if (remaininglinksnum == 0) {
+            /*
+             * No links downloadable (anymore) --> No traffic left --> Free account limit reached --> At this stage the user cannot use the
+             * account for anything
+             */
+            ai.setTrafficLeft(0);
+        }
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+        ai.setStatus(account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes));
         /* Only add hosts which are listed as 'active' (working) */
-        postAPISafe("https://offcloud.com/stats/sites", "");
+        postAPISafe("https://" + getHost() + "/stats/sites", "");
         final List<String> supportedHosts = new ArrayList<String>();
         final ArrayList<String> allowedHostStates = new ArrayList<String>();
         final List<String> supportedHostsTmp = new ArrayList<String>();
@@ -440,8 +433,8 @@ public class OffCloudCom extends UseNet {
         if (cfg.isShowHostersWithStatusAwaitingDemand()) {
             allowedHostStates.add("awaiting demand");
         }
-        entries = restoreFromString(br.toString(), TypeRef.MAP);
-        ressourcelist = (List) entries.get("fs");
+        final Map<String, Object> stats = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> filehosts = (List<Map<String, Object>>) stats.get("fs");
         /**
          * Explanation of their status-types: Healthy = working, Fragile = may work or not - if not will be fixed within the next 72 hours
          * (support also said it means that they currently have no accounts for this host), Limited = broken, will be fixed tomorrow, dead =
@@ -450,12 +443,11 @@ public class OffCloudCom extends UseNet {
          * URLs of such hosts, Offcloud will see that there is demand and maybe add it to the list of supported hosts.
          */
         cloudOnlyHosts.clear();
-        for (final Object domaininfo_o : ressourcelist) {
-            final Map<String, Object> domaininfo = (Map<String, Object>) domaininfo_o;
+        for (final Map<String, Object> domaininfo : filehosts) {
             String status = (String) domaininfo.get("isActive");
             String domain = (String) domaininfo.get("displayName");
             if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(status)) {
-                /* Akip invalid objects */
+                /* Skip invalid objects */
                 continue;
             }
             status = status.toLowerCase(Locale.ENGLISH);
@@ -521,13 +513,16 @@ public class OffCloudCom extends UseNet {
                 return;
             } else {
                 this.postAPISafe(API_BASE + "login/check", "");
-                if ("1".equals(PluginJSonUtils.getJsonValue(br, "loggedIn"))) {
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final Object loggedINO = entries.get("loggedIn");
+                if (loggedINO instanceof Number && ((Number) loggedINO).intValue() == 1) {
                     logger.info("Cookie login successful");
                     account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
                 } else {
                     logger.info("Cookie login failed");
                     br.clearCookies(br.getURL());
+                    account.clearCookies("");
                 }
             }
         }
@@ -550,10 +545,9 @@ public class OffCloudCom extends UseNet {
         try {
             hostMaxchunksMap.clear();
             hostMaxdlsMap.clear();
-            this.getAPISafe("https://offcloud.com/api/sites/chunks");
-            final List<Object> ressourcelist = restoreFromString(br.toString(), TypeRef.LIST);
-            for (final Object o : ressourcelist) {
-                final Map<String, Object> entries = (Map<String, Object>) o;
+            this.getAPISafe("https://" + getHost() + "/api/sites/chunks");
+            final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            for (final Map<String, Object> entries : ressourcelist) {
                 final String host = (String) entries.get("host");
                 final Object maxdls_object = entries.get("maxChunksGlobal");
                 final int maxchunks = ((Number) entries.get("maxChunks")).intValue();
@@ -575,28 +569,33 @@ public class OffCloudCom extends UseNet {
     private void clearAllowedIPAddresses() {
         try {
             logger.info("Remove IP handling active: Removing all registered IPs but the current one");
-            postAPISafe("https://www.offcloud.com/account/registered-ips", "");
-            String[] ipdata = null;
-            final String jsoniparray = br.getRegex("\"data\": \\[(.*?)\\]").getMatch(0);
-            if (jsoniparray != null) {
-                ipdata = jsoniparray.split("\\},[\n ]+\\{");
+            postAPISafe("https://www." + getHost() + "/account/registered-ips", "");
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
+            if (data == null || data.size() == 0) {
+                logger.info("Failed to find any data to remove");
+                return;
             }
-            if (ipdata != null && ipdata.length > 1) {
-                final int ipcount = ipdata.length;
-                logger.info("Found " + ipcount + " active IPs");
-                /* Delete all allowed IPs except the one the user has at the moment (first in list). */
-                for (int i = 1; i <= ipdata.length - 1; i++) {
-                    final String singleipdata = ipdata[i];
-                    final String ip = PluginJSonUtils.getJsonValue(singleipdata, "ip");
-                    if (ip == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    postRawAPISafe("https://www.offcloud.com/account/ip/remove/", "{\"ip\":\"" + ip + "\"}");
-                    if ("true".equals(PluginJSonUtils.getJsonValue(br, "result"))) {
-                        logger.info("Successfully removed IP: " + ip);
-                    } else {
-                        logger.warning("Failed to remove IP: " + ip);
-                    }
+            final int ipcount = data.size();
+            logger.info("Found " + ipcount + " active IPs");
+            /* Delete all allowed IPs except the one the user has at the moment (first in list). */
+            int index = -1;
+            for (final Map<String, Object> ipinfo : data) {
+                index++;
+                if (index == 0) {
+                    /* Skip first item as this is our own IP. Removing it would log us out. */
+                    continue;
+                }
+                final String ip = ipinfo.get("ip").toString();
+                postRawAPISafe("https://www." + getHost() + "/account/ip/remove/", "{\"ip\":\"" + ip + "\"}");
+                final Map<String, Object> ip_deleted_response = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.TRUE.equals(ip_deleted_response.get("result"))) {
+                    logger.info("Successfully removed IP: " + ip);
+                } else {
+                    logger.warning("Failed to remove IP: " + ip);
+                }
+                if (this.isAbort()) {
+                    throw new InterruptedException();
                 }
             }
         } catch (final Throwable e) {
@@ -620,8 +619,8 @@ public class OffCloudCom extends UseNet {
             int page = 0;
             do {
                 logger.info("Decrypting requestIDs of page: " + page);
-                this.postRawAPISafe("https://offcloud.com/" + downloadtype + "/history", "{\"page\":" + page + "}");
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                this.postRawAPISafe("https://" + getHost() + "/" + downloadtype + "/history", "{\"page\":" + page + "}");
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Object> history = (List) entries.get("history");
                 for (final Object historyentry_object : history) {
                     final Map<String, Object> historyentry = (Map<String, Object>) historyentry_object;
@@ -669,7 +668,7 @@ public class OffCloudCom extends UseNet {
                         deletedDownloadHistoryEntriesNum++;
                     }
                     postData += "]}";
-                    this.postRawAPISafe("https://offcloud.com/" + downloadtype + "/remove", postData);
+                    this.postRawAPISafe("https://" + getHost() + "/" + downloadtype + "/remove", postData);
                 }
                 if (index == requestIDs.size()) {
                     break;
@@ -693,19 +692,21 @@ public class OffCloudCom extends UseNet {
         try {
             try {
                 logger.info("Trying to delete requestID from history: " + requestID);
-                br.getPage("https://offcloud.com/" + downloadtype + "/remove/" + requestID);
-                if (("true").equals(PluginJSonUtils.getJsonValue(br, "success"))) {
+                br.getPage("https://" + getHost() + "/" + downloadtype + "/remove/" + requestID);
+                final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.TRUE.equals(resp.get("success"))) {
                     success = true;
                 }
             } catch (final Throwable e) {
                 success = false;
             }
-            if (success) {
-                logger.info("Succeeded to delete requestID from download " + downloadtype + " history: " + requestID);
-            } else {
-                logger.warning("Failed to delete requestID from download " + downloadtype + " history: " + requestID);
-            }
-        } catch (final Throwable ex) {
+        } catch (final Throwable ignore) {
+            logger.log(ignore);
+        }
+        if (success) {
+            logger.info("Succeeded to delete requestID from download " + downloadtype + " history: " + requestID);
+        } else {
+            logger.warning("Failed to delete requestID from download " + downloadtype + " history: " + requestID);
         }
         return success;
     }
@@ -740,14 +741,14 @@ public class OffCloudCom extends UseNet {
         br.getPage(accesslink);
         updatestatuscode();
         handleAPIErrors(this.br);
-        return this.br.toString();
+        return this.br.getRequest().getHtmlCode();
     }
 
     private String postAPISafe(final String accesslink, final String postdata) throws IOException, PluginException, InterruptedException {
         br.postPage(accesslink, postdata);
         updatestatuscode();
         handleAPIErrors(this.br);
-        return this.br.toString();
+        return this.br.getRequest().getHtmlCode();
     }
 
     private String postRawAPISafe(final String accesslink, final String postdata) throws IOException, PluginException, InterruptedException {
@@ -755,7 +756,7 @@ public class OffCloudCom extends UseNet {
         br.postPageRaw(accesslink, postdata);
         updatestatuscode();
         handleAPIErrors(this.br);
-        return this.br.toString();
+        return this.br.getRequest().getHtmlCode();
     }
 
     /**
@@ -763,6 +764,7 @@ public class OffCloudCom extends UseNet {
      * with the API errors., 666 = hell
      */
     private void updatestatuscode() {
+        // TODO: Use json parser
         String error = PluginJSonUtils.getJsonValue(br, "error");
         if (error == null) {
             error = PluginJSonUtils.getJsonValue(br, "not_available");

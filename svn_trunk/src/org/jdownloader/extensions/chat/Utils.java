@@ -13,7 +13,6 @@
 //
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package org.jdownloader.extensions.chat;
 
 import java.awt.Color;
@@ -22,7 +21,6 @@ import jd.nutils.encoding.HTMLEntities;
 
 public class Utils {
     public static String getRandomColor() {
-
         String col = Integer.toHexString(new Color((int) (Math.random() * 0xffffff)).darker().getRGB());
         while (col.length() < 6) {
             col = "0" + col;
@@ -32,8 +30,8 @@ public class Utils {
 
     public static String prepareMsg(String msg) {
         msg = HTMLEntities.htmlAngleBrackets(msg + " ");
-        String tmp = msg.replaceAll("((http://)|(www\\.))([^\\s\"]+)", "<a href=\"http://$3$4\">$3$4</a>").trim();
+        // Only format links starting with http - everything else is most likely spam
+        String tmp = msg.replaceAll("(https?://)([^\\s\"]+)", "<a href=\"$1$2\">$1$2</a>").trim();
         return tmp;
-
     }
 }

@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -32,9 +31,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49889 $", interfaceVersion = 2, names = {}, urls = {})
-public class CouchTuner extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 49909 $", interfaceVersion = 2, names = {}, urls = {})
+public class CouchTuner extends PluginForDecrypt {
     public CouchTuner(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -69,7 +69,7 @@ public class CouchTuner extends antiDDoSForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.setFollowRedirects(true);
-        getPage(param.getCryptedUrl());
+        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -81,26 +81,32 @@ public class CouchTuner extends antiDDoSForDecrypt {
         if (StringUtils.isEmpty(fpName)) {
             fpName = br.getRegex("<h2[^>]+class\\s*=\\s*\"[^\"]*title[^\"]*\"[^>]*>\\s*([^<]+)\\s*").getMatch(0);
         }
-        ArrayList<String> links = new ArrayList<String>();
+        String[] iframes = br.getRegex("<iframe[^>]+src=[\"\']([^\"\']+)[\"\']").getColumn(0);
+        if (iframes == null || iframes.length == 0) {
+            iframes = br.getRegex("<iframe[^>]+src=\"([^\"]+)\"[^>]*>").getColumn(0);
+        }
+        final ArrayList<String> links = new ArrayList<String>();
         Collections.addAll(links, br.getRegex("Watch[^\"]*[iI]t[^\"]*[hH]ere.{2,32}<a[^>]+href\\s*=\\s*\"\\s*([^\"]+)\\s*\"").getColumn(0));
         if (links.isEmpty()) {
             Collections.addAll(links, br.getRegex("Watch[^\"]*[iI]t[^\"]*[hH]ere[^\\|]*<a href=\"([^\"]+)\\\"[^\\|]*</a>").getColumn(0));
         }
-        if (links.isEmpty()) {
-            Collections.addAll(links, br.getRegex("<iframe[^>]+src=[\"\']([^\"\']+)[\"\']").getColumn(0));
+        if (links.isEmpty() && iframes != null && iframes.length > 0) {
+            Collections.addAll(links, iframes);
         }
         if (links.isEmpty()) {
             Collections.addAll(links, br.getRegex("<a[^>]+href=\"([^\"]+)\"[^>]*rel=\"bookmark\"[^>]*>").getColumn(0));
         }
-        if (links.isEmpty()) {
-            Collections.addAll(links, br.getRegex("<iframe[^>]+src=\"([^\"]+)\"[^>]*>").getColumn(0));
-        }
         for (String link : links) {
-            link = br.getURL(Encoding.htmlDecode(link)).toString();
+            link = br.getURL(Encoding.htmlDecode(link)).toExternalForm();
             ret.add(createDownloadlink(link));
         }
         if (ret.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (iframes == null || iframes.length == 0) {
+                /* Assume that if there are no iframe results, there is no video player thus no downloadable content. */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         if (StringUtils.isNotEmpty(fpName)) {
             final FilePackage fp = FilePackage.getInstance();

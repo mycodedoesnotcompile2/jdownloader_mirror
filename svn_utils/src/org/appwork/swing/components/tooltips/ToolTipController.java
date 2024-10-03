@@ -316,8 +316,9 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
         try {
             if (point != null && activeComponent != null && activeComponent instanceof JComponent && activeComponent.isShowing() && activeComponent.getParent() != null) {
                 final Rectangle bounds = activeComponent.getBounds();
-                SwingUtilities.convertPointFromScreen(point, activeComponent.getParent());
-                return bounds.contains(point);
+                final Point check = new Point(point);
+                SwingUtilities.convertPointFromScreen(check, activeComponent.getParent());
+                return bounds.contains(check);
             }
         } catch (final Exception e) {
             org.appwork.loggingv3.LogV3.log(e);
@@ -544,7 +545,6 @@ public class ToolTipController implements MouseListener, MouseMotionListener, Wi
         boolean mouseOverComponent = ToolTipController.this.mouseOverComponent(mousePosition);
         if (aC != null && (!focusable || hasFocus || tooltipWithoutFocusEnabled) && !tooltipVisible && mouseOverComponent) {
             if (aC instanceof JTable && ((JTable) aC).getDropLocation() != null) {
-                System.out.println("drop is going on");
                 return;
             }
             final Window ownerWindow = SwingUtilities.getWindowAncestor(aC);

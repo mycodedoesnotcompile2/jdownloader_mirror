@@ -12,6 +12,10 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 
+import jd.gui.swing.components.SetIconInterface;
+import jd.gui.swing.components.SetLabelInterface;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.tooltips.ExtTooltip;
 import org.appwork.swing.components.tooltips.ToolTipController;
@@ -20,10 +24,6 @@ import org.appwork.swing.components.tooltips.TooltipTextDelegateFactory;
 import org.jdownloader.controlling.contextmenu.MenuContainer;
 import org.jdownloader.controlling.contextmenu.gui.AfterLayerUpdateInterface;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.components.SetIconInterface;
-import jd.gui.swing.components.SetLabelInterface;
-import net.miginfocom.swing.MigLayout;
 
 public class MenuEditor extends MigPanel implements ToolTipHandler, SetIconInterface, SetLabelInterface, AfterLayerUpdateInterface {
     /**
@@ -94,8 +94,8 @@ public class MenuEditor extends MigPanel implements ToolTipHandler, SetIconInter
 
     @Override
     public int getTooltipDelay(Point mousePositionOnScreen) {
+        mousePositionOnScreen = new Point(mousePositionOnScreen);
         SwingUtilities.convertPointFromScreen(mousePositionOnScreen, this);
-
         if (mousePositionOnScreen.x < 24) {
             return 200;
         }

@@ -54,6 +54,8 @@ import org.appwork.utils.Application;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
@@ -73,6 +75,7 @@ import org.jdownloader.gui.toolbar.MenuManagerMainToolbar;
 import org.jdownloader.logging.LogController;
 import org.schwering.irc.lib.IRCConnection;
 
+import jd.SecondLevelLaunch;
 import jd.controlling.reconnect.Reconnecter;
 import jd.controlling.reconnect.ReconnecterEvent;
 import jd.controlling.reconnect.ReconnecterListener;
@@ -115,6 +118,8 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     public static final String STYLE_PM             = "pm";
     public static final String STYLE_SELF           = "self";
     public static final String STYLE_SYSTEM_MESSAGE = "system";
+    public static final String STYLE_OP_NOTICE      = "opnotice";
+    public static final String STYLE_TOPIC          = "topic";
     public static String       USERLIST_STYLE;
     static {
         try {
@@ -192,14 +197,23 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         sb.append("<li>");
         if (user != null) {
             if (!color) {
-                sb.append("<span style='").append(user.getStyle()).append(this.getUser(con.getNick()) == user ? ";font-weight:bold" : "").append("'>[").append(df.format(dt)).append("] ").append(user.getNickLink("pmnick")).append(ChatExtension.STYLE_PM.equalsIgnoreCase(style) ? ">> " : ": ").append("</span>");
+                sb.append("<span style='" + user.getStyle() + (this.getUser(con.getNick()) == user ? ";font-weight:bold" : "") + "'>");
+                sb.append("[" + df.format(dt) + "] ");
+                sb.append(user.getRank() + user.name);
+                sb.append(ChatExtension.STYLE_PM.equalsIgnoreCase(style) ? ">> " : ": ");
+                sb.append("</span>");
             } else {
-                sb.append("<span style='color:#000000").append(this.getUser(con.getNick()) == user ? ";font-weight:bold" : "").append("'>[").append(df.format(dt)).append("] ").append(user.getNickLink("pmnick")).append(ChatExtension.STYLE_PM.equalsIgnoreCase(style) ? ">> " : ": ").append("</span>");
+                sb.append("<span style='color:#000000" + (this.getUser(con.getNick()) == user ? ";font-weight:bold" : "") + "'>");
+                sb.append("[" + df.format(dt)).append("] ");
+                sb.append(user.getRank() + user.name);
+                sb.append(ChatExtension.STYLE_PM.equalsIgnoreCase(style) ? ">> " : ": ");
+                sb.append("</span>");
             }
         } else {
             sb.append("<span class='time'>[").append(df.format(dt)).append("] </span>");
         }
-        if (this.conn != null && msg.contains(con.getNick())) {
+        if (this.conn != null && msg.contains(con.getNick()) && style == null) {
+            // Only highlight if no other style set (prevents highlighting system messages)
             style = ChatExtension.STYLE_HIGHLIGHT;
         }
         if (style != null) {
@@ -364,7 +378,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         }
         this.NAMES.clear();
         if (this.conn != null && this.conn.isConnected()) {
-            this.addToText(null, ChatExtension.STYLE_NOTICE, "Change channel to: " + newChannel);
+            this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Change channel to: " + newChannel);
         }
         if (this.conn != null && this.conn.isConnected()) {
             this.conn.doPart(getCurrentChannel(), " --> " + newChannel);
@@ -585,6 +599,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
             @Override
             protected void initMenuPanel(final JPanel menubar) {
                 ChatExtension.this.top = new JTextField(T.jd_plugins_optional_jdchat_JDChat_topic_default());
+                top.setEditable(false);
                 menubar.add(top);
                 ChatExtension.this.top.setToolTipText(T.jd_plugins_optional_jdchat_JDChat_topic_tooltip());
             }
@@ -603,9 +618,11 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
             final int port = getSettings().getIrcPort();
             final String pass = null;
             final String nick = this.getNickname();
-            final long ts = System.currentTimeMillis();
-            String user = "jdchat" + ts;
-            String name = "jdchat" + ts;
+            // Making user name based on startup time, user would have to restart to get around channel ban based on name
+            final long instance_id = SecondLevelLaunch.startup;
+            String name = "jdchat" + instance_id;
+            // Username can only be 9 characters long anyway
+            String user = "jdchat";
             this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Connecting to JDChat...");
             this.conn = new IRCConnection(host, new int[] { port }, pass, nick, user, name);
             this.conn.setTimeout(1000 * 60 * 60);
@@ -675,6 +692,15 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         case 'v':
             if (op == '+') {
                 this.getUser(arg).rank = User.RANK_VOICE;
+                this.updateNamesPanel();
+            } else {
+                this.getUser(arg).rank = User.RANK_DEFAULT;
+                this.updateNamesPanel();
+            }
+            break;
+        case 'h':
+            if (op == '+') {
+                this.getUser(arg).rank = User.RANK_HOP;
                 this.updateNamesPanel();
             } else {
                 this.getUser(arg).rank = User.RANK_DEFAULT;
@@ -821,7 +847,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(rest.trim()) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(rest.trim()));
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_VERSION)) {
-                final String msg = " is using " + JDUtilities.getJDTitle(0) + " with Java " + Application.getJavaVersion() + " on a " + CrossSystem.getOSString() + " system";
+                final String msg = " is using " + JDUtilities.getJDTitle(0) + " with Java " + System.getProperty("java.runtime.name") + "/" + System.getProperty("java.version") + (Application.is64BitJvm() ? "64bit" : "32bit") + CrossSystem.getARCHFamily() + " on a " + CrossSystem.getOSString() + " system, runtime " + TimeFormatter.formatMilliSeconds(Time.systemIndependentCurrentJVMTimeMillis() - SecondLevelLaunch.startup, 0);
                 this.conn.doPrivmsg(channel2, new String(new byte[] { 1 }) + "ACTION " + this.prepareToSend(msg) + new String(new byte[] { 1 }));
                 this.addToText(null, ChatExtension.STYLE_ACTION, this.conn.getNick() + " " + Utils.prepareMsg(msg));
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_MODE)) {
@@ -952,7 +978,7 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     }
 
     public void setTopic(final String msg) {
-        this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "<b>Topic is: " + msg + "</b>");
+        this.addToText(null, ChatExtension.STYLE_TOPIC, "Channel Topic is: " + Utils.prepareMsg(msg));
         new EDTHelper<Object>() {
             @Override
             public Object edtRun() {
