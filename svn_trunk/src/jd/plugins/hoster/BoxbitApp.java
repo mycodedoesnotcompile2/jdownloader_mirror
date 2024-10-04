@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49912 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -261,7 +261,10 @@ public class BoxbitApp extends PluginForHost {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
                 final List<String> fullDomains = (List<String>) hostMapping.get(hostIdentifier);
-                mhost.setDomains(fullDomains);
+                if (fullDomains != null && fullDomains.size() > 0) {
+                    mhost.setDomains(fullDomains);
+                    supportedhostslist.add(mhost);
+                }
             }
         }
         ai.setMultiHostSupportV2(this, supportedhostslist);

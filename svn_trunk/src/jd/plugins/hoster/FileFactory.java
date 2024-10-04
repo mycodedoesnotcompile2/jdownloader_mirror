@@ -64,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49912 $", interfaceVersion = 2, names = {}, urls = {})
 public class FileFactory extends PluginForHost {
     // DEV NOTES
     // other: currently they 302 redirect all non www. to www. which kills most of this plugin.
@@ -192,7 +192,7 @@ public class FileFactory extends PluginForHost {
      * @return
      */
     protected String getAuthKey() {
-        return "cfbc9099994d3bafd5a5f13c38c542f0";
+        return null;
     }
 
     @Override
@@ -595,7 +595,7 @@ public class FileFactory extends PluginForHost {
         // <li class="tooltipster" title="Premium valid until: <strong>30th Jan, 2014</strong>">
         boolean isPremiumLifetime = false;
         boolean isPremium = false;
-        final String accountTypeStr = br.getRegex("member_type\\s*:\\s*\"([^\"]+)").getMatch(0);
+        final String accountTypeStr = br.getRegex("member_type\"?\\s*:\\s*\"([^\"]+)").getMatch(0);
         if (accountTypeStr != null) {
             if (accountTypeStr.equalsIgnoreCase("lifetime")) {
                 isPremiumLifetime = true;
@@ -611,10 +611,10 @@ public class FileFactory extends PluginForHost {
         if (!isPremium && !isPremiumLifetime) {
             /* Fallback/Old handling */
             isPremiumLifetime = br.containsHTML("(?i)<strong>\\s*(Lebenszeit|Lifetime|Livstid|Levenslang|À vie|生涯|Vitalício|De por vida)\\s*</strong>") || br.containsHTML("(?i)>\\s*Lifetime Member\\s*<");
-            isPremium = br.containsHTML("(?i)>\\s*Premium valid until\\s*<");
+            isPremium = br.containsHTML("(?i)(>|\")\\s*Premium valid until\\s*(<|:)");
         }
         long expireTimestamp = 0;
-        final String expireTimestampStr = br.getRegex("premium_ends\\s*:\\s*\"?(\\d+)").getMatch(0);
+        final String expireTimestampStr = br.getRegex("premium_ends\"?\\s*:\\s*\"?(\\d+)").getMatch(0);
         if (expireTimestampStr != null) {
             expireTimestamp = Long.parseLong(expireTimestampStr) * 1000;
         } else {
@@ -662,7 +662,7 @@ public class FileFactory extends PluginForHost {
             ai.setUnlimitedTraffic();
             account.setType(AccountType.FREE);
         }
-        final String createTimestampStr = br.getRegex("created_at\\s*:\\s*\"?(\\d+)").getMatch(0);
+        final String createTimestampStr = br.getRegex("created_at\"?\\s*:\\s*\"?(\\d+)").getMatch(0);
         if (createTimestampStr != null) {
             ai.setCreateTime(Long.parseLong(createTimestampStr) * 1000);
         }
@@ -1018,7 +1018,8 @@ public class FileFactory extends PluginForHost {
     }
 
     private boolean useAPI(final Account account) {
-        return useAPI.get();
+        // 2024-10-03: authkey invalid, again...
+        return useAPI.get() && getAuthKey() != null;
     }
 
     @Override

@@ -47,7 +47,7 @@ import jd.plugins.hoster.WeTransferCom;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig;
 import jd.plugins.hoster.WeTransferCom.WetransferConfig.CrawlMode;
 
-@DecrypterPlugin(revision = "$Revision: 48718 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
+@DecrypterPlugin(revision = "$Revision: 49912 $", interfaceVersion = 3, names = { "wetransfer.com" }, urls = { WeTransferComFolder.patternShort + "|" + WeTransferComFolder.patternNormal + "|" + WeTransferComFolder.patternCollection })
 public class WeTransferComFolder extends PluginForDecrypt {
     public WeTransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,7 +61,7 @@ public class WeTransferComFolder extends PluginForDecrypt {
     }
 
     protected static final String patternShort                 = "https?://(?:we\\.tl|shorturls\\.wetransfer\\.com|go\\.wetransfer\\.com)/([\\w\\-]+)";
-    protected static final String patternNormal                = "https?://(?:\\w+\\.)?wetransfer\\.com/downloads/(?:[a-f0-9]{46}/[a-f0-9]{46}/[a-f0-9]{4,12}|[a-f0-9]{46}/[a-f0-9]{4,12})";
+    protected static final String patternNormal                = "https?://(?:[\\w+\\-]+\\.)?wetransfer\\.com/downloads/(?:[a-f0-9]{46}/[a-f0-9]{46}/[a-f0-9]{4,12}|[a-f0-9]{46}/[a-f0-9]{4,12})";
     protected static final String patternCollection            = "https?://(?:boards|collect)\\.wetransfer\\.com/board/([a-z0-9]+)";
     private static final Pattern  PATTERN_COLLECTION           = Pattern.compile("(?i)https?://(boards|collect)\\.wetransfer\\.com/board/([a-z0-9]+)");
     private static Object         COLLECTION_OBTAIN_TOKEN_LOCK = new Object();
