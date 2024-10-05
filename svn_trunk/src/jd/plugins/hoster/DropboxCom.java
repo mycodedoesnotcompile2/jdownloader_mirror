@@ -23,7 +23,6 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
 import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.InputChangedCallbackInterface;
@@ -60,11 +59,11 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DropBoxComCrawler;
 
-@HostPlugin(revision = "$Revision: 49290 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49916 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.dropbox.com/pricing");
+        this.enablePremium("https://www." + getHost() + "/pricing");
     }
 
     @Override
@@ -79,6 +78,11 @@ public class DropboxCom extends PluginForHost {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return DropBoxConfig.class;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://www." + getHost() + "/terms";
     }
 
     public static Browser prepBrWebsite(final Browser br) {
@@ -176,147 +180,111 @@ public class DropboxCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             /* 2019-09-25: Do nothing, trust filename & size which was set in crawler. At this stage we know that the content is online! */
-        } else {
-            final String dllink = generateDirecturl(link);
-            URLConnectionAdapter con = null;
-            try {
-                /**
-                 * 2023-05-20: Disabled head request because when using it, that will quite often returns a content-length header with value
-                 * 0 plus it sometimes fails with http response != 200 for unknown reasons. For those reasons using a GET request is the way
-                 * to go. </br>
-                 */
-                final boolean useHeadRequestFirst = false;
-                if (useHeadRequestFirst) {
-                    con = br.openHeadConnection(dllink);
-                } else {
-                    con = br.openGetConnection(dllink);
-                }
-                if (useHeadRequestFirst && (con.getResponseCode() == 403 || con.getResponseCode() == 404)) {
-                    /* Workaround/fallback */
-                    logger.info("Looks like HEAD-request is not possible -> Trying GET-request");
-                    try {
-                        br.followConnection(true);
-                    } catch (IOException e) {
-                        logger.log(e);
-                    }
-                    con = br.openGetConnection(dllink);
-                }
-                if (this.looksLikeDownloadableContent(con)) {
-                    /* Success! Element is direct-downloadable. This is what we want. */
-                    link.setProperty(PROPERTY_DIRECTLINK, dllink);
-                    link.setProperty(PROPERTY_IS_OFFICIALLY_DOWNLOADABLE, true);
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    String filenameFromHeader = getFileNameFromConnection(con);
-                    if (!StringUtils.isEmpty(filenameFromHeader)) {
-                        if (Encoding.isHtmlEntityCoded(filenameFromHeader)) {
-                            filenameFromHeader = Encoding.htmlDecode(filenameFromHeader).trim();
-                        }
-                        link.setFinalFileName(filenameFromHeader);
-                    }
-                    return AvailableStatus.TRUE;
-                }
-                br.followConnection(true);
-                if (con.getResponseCode() == 400) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (con.getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (con.getResponseCode() == 460) {
-                    /* Restricted Content: This file is no longer available. For additional information contact Dropbox Support. */
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else if (con.getResponseCode() == 509) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 509", 60 * 60 * 1000l);
-                }
-                if (con.getResponseCode() == 403) {
-                    /*
-                     * Check if the content is offline or just is not downloadable (e.g. owner has disabled download button - can only be
-                     * downloaded by himself or other users with appropriate rights.)
-                     */
-                    logger.info("Error 403 -> Looking to get file infor via root folder URL");
-                    br.getPage(this.getRootFolderURL(link, link.getPluginPatternMatcher()));
-                    if (br.getHttpConnection().getResponseCode() == 403) {
-                        /* Still error 403 -> File is offline. */
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        /**
-                         * 2020-08-04: Rare case: Content is available not not (officially) downloadable. </br>
-                         * For images, in theory a thumbnail might sometimes be downloadable. Video and audio content can sometimes be
-                         * streamed.
-                         */
-                        logger.info("Looks like this file is officially not downloadable");
-                        /* Try to gather more information about this file */
-                        final Map<String, Object> fileinfo = getSingleFileJsonMap(br);
-                        if (fileinfo != null) {
-                            DropBoxComCrawler.parseMiscFileInfo(link, fileinfo);
-                        } else {
-                            logger.warning("Failed to find additional information about officially un-downloadable file");
-                        }
-                        link.setProperty(PROPERTY_IS_OFFICIALLY_DOWNLOADABLE, false);
-                        if (link.hasProperty(PROPERTY_PREVIEW_DOWNLOADLINK)) {
-                            return AvailableStatus.TRUE;
-                        } else {
-                            /**
-                             * File owner has disabled downloads and there is no streaming link available as fallback. </br>
-                             * --> File is online but cannot be downloaded.
-                             */
-                            if (isDownload) {
-                                throw new PluginException(LinkStatus.ERROR_FATAL, "File owner has disabled downloads");
-                            } else {
-                                return AvailableStatus.TRUE;
-                            }
-                        }
-                    }
-                }
-                /* Rare case */
-                logger.info("File is not direct-downloadable");
-                if (br.getURL().contains("/speedbump/")) {
-                    /* 2019-09-26: TODO: Check this - this should only happen for executable files in some cases */
-                    // brc.getURL().replace("/speedbump/", "/speedbump/dl/");
-                }
-                if (isPasswordProtectedWebsite(br)) {
-                    /**
-                     * We know that the file is online but it is password protected. </br>
-                     * Password handling is located in download handling as we do not want to ask the user for a download password during
-                     * linkcheck. </br>
-                     * Also, even if we already know the correct password, we do not want to send it during linkcheck as this would slow
-                     * down linkcheck tremendously.
-                     */
-                    logger.info("Link is password protected");
-                    link.setPasswordProtected(true);
-                    return AvailableStatus.TRUE;
-                } else if (password_cookie_value == null) {
-                    /*
-                     * If password_cookie_value is given, file most likely is password protected but website doesn't ask for password as
-                     * access is currently already granted via cookie session.
-                     */
-                    link.setPasswordProtected(false);
-                }
-                // TODO: Check if this fallback is still needed
-                if (useHeadRequestFirst && RequestMethod.HEAD.equals(con.getRequestMethod())) {
-                    logger.info("Accessing URL after HEAD-request");
-                    br.getPage(dllink);
-                }
-            } finally {
+            return AvailableStatus.TRUE;
+        }
+        final String dllink = generateDirecturl(link);
+        URLConnectionAdapter con = null;
+        try {
+            /**
+             * 2023-05-20: Disabled head request because when using it, that will quite often returns a content-length header with value 0
+             * plus it sometimes fails with http response != 200 for unknown reasons. For those reasons using a GET request is the way to
+             * go. </br>
+             */
+            final boolean useHeadRequestFirst = false;
+            if (useHeadRequestFirst) {
+                con = br.openHeadConnection(dllink);
+            } else {
+                con = br.openGetConnection(dllink);
+            }
+            if (useHeadRequestFirst && (con.getResponseCode() == 403 || con.getResponseCode() == 404)) {
+                /* Workaround/fallback */
+                logger.info("Looks like HEAD-request is not possible -> Trying GET-request");
                 try {
-                    con.disconnect();
-                } catch (Throwable e) {
+                    br.followConnection(true);
+                } catch (IOException e) {
+                    logger.log(e);
                 }
+                con = br.openGetConnection(dllink);
             }
-            if (br.getHttpConnection().getResponseCode() == 429) {
-                /* 2017-01-30 */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 429: 'This account's links are generating too much traffic and have been temporarily disabled!'", 60 * 60 * 1000l);
-            } else if (br.containsHTML("images/sharing/error_")) {
-                /* Offline */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.containsHTML("/images/precaution")) {
-                /* A previously public shared url is now private (== offline) */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (this.looksLikeDownloadableContent(con)) {
+                /* Success! Element is direct-downloadable. This is what we want. */
+                link.setProperty(PROPERTY_DIRECTLINK, dllink);
+                link.setProperty(PROPERTY_IS_OFFICIALLY_DOWNLOADABLE, true);
+                if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
+                    }
+                }
+                String filenameFromHeader = getFileNameFromConnection(con);
+                if (!StringUtils.isEmpty(filenameFromHeader)) {
+                    if (Encoding.isHtmlEntityCoded(filenameFromHeader)) {
+                        filenameFromHeader = Encoding.htmlDecode(filenameFromHeader).trim();
+                    }
+                    link.setFinalFileName(filenameFromHeader);
+                }
+                return AvailableStatus.TRUE;
             }
+            br.followConnection(true);
+        } finally {
+            try {
+                con.disconnect();
+            } catch (Throwable e) {
+            }
+        }
+        this.checkErrorsHTML(br);
+        /* Rare case */
+        logger.info("File is not direct-downloadable");
+        if (isPasswordProtectedWebsite(br)) {
+            /**
+             * We know that the file is online but it is password protected. </br>
+             * Password handling is located in download handling as we do not want to ask the user for a download password during linkcheck.
+             * </br>
+             * Also, even if we already know the correct password, we do not want to send it during linkcheck as this would slow down
+             * linkcheck tremendously.
+             */
+            logger.info("Link is password protected");
+            link.setPasswordProtected(true);
+            return AvailableStatus.TRUE;
+        } else if (password_cookie_value == null) {
+            /*
+             * If password_cookie_value is given, file most likely is password protected but website doesn't ask for password as access is
+             * currently already granted via cookie session.
+             */
+            link.setPasswordProtected(false);
+        }
+        /*
+         * Check if the content is offline or just is not downloadable (e.g. owner has disabled download button - can only be downloaded by
+         * himself or other users with appropriate rights.)
+         */
+        logger.info("Looking to get file info via file view URL");
+        br.getPage(this.getRootFolderURL(link, link.getPluginPatternMatcher()));
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            /* Error 403 -> File is offline. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /**
+         * 2020-08-04: Rare case: Content is available not not (officially) downloadable. </br>
+         * For images, in theory a thumbnail might sometimes be downloadable. Video and audio content can sometimes be streamed.
+         */
+        logger.info("Looks like this file is officially not downloadable");
+        /* Try to gather more information about this file */
+        final Map<String, Object> fileinfo = getSingleFileJsonMap(br);
+        if (fileinfo != null) {
+            DropBoxComCrawler.parseMiscFileInfo(link, fileinfo);
+        } else {
+            logger.warning("Failed to find additional information about officially un-downloadable file. If this info hasn't been set in crawler already, this file will not be downloadable!");
+        }
+        link.setProperty(PROPERTY_IS_OFFICIALLY_DOWNLOADABLE, false);
+        if (isDownload && !link.hasProperty(PROPERTY_PREVIEW_DOWNLOADLINK)) {
+            /**
+             * File owner has disabled downloads and there is no streaming link available as fallback. </br>
+             * --> File is online but cannot be downloaded.
+             */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "File owner has disabled downloads");
         }
         return AvailableStatus.TRUE;
     }
@@ -418,11 +386,6 @@ public class DropboxCom extends PluginForHost {
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://www.dropbox.com/terms";
-    }
-
-    @Override
     public void handleFree(final DownloadLink link) throws Exception {
         String passCode = link.getDownloadPassword();
         final String t1 = new Regex(link.getPluginPatternMatcher(), "://(.*?):.*?@").getMatch(0);
@@ -493,7 +456,7 @@ public class DropboxCom extends PluginForHost {
                     pwform = new Form();
                     pwform.setMethod(MethodType.POST);
                 }
-                pwform.setAction("https://www.dropbox.com/sm/auth");
+                pwform.setAction("https://www." + getHost() + "/sm/auth");
                 if (passCode == null) {
                     passCode = getUserInput("Password?", link);
                 }
@@ -544,7 +507,7 @@ public class DropboxCom extends PluginForHost {
         }
         final String directurlPreview = link.getStringProperty(PROPERTY_PREVIEW_DOWNLOADLINK);
         if (StringUtils.equals(dllink, directurlPreview)) {
-            /* Stream download active -> Filesize can be different from size of original file. */
+            /* Stream download active -> File size can be different from size of original file. */
             link.setVerifiedFileSize(-1);
         }
         /* Important: URL needs to contain "www."! */
@@ -568,7 +531,7 @@ public class DropboxCom extends PluginForHost {
             }
             dl.startDownload();
         } else {
-            /* http download */
+            /* Normal/Progressive download */
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 logger.warning("Final downloadlink lead to HTML code");
                 br.followConnection(true);
@@ -593,14 +556,32 @@ public class DropboxCom extends PluginForHost {
     }
 
     private void checkErrorsHTML(final Browser br) throws PluginException {
-        if (br.containsHTML("(?i)Link Temporarily Disabled")) {
+        final URLConnectionAdapter con = br.getHttpConnection();
+        if (con.getResponseCode() == 400) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 429) {
+            /* 2017-01-30 */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 429: 'This account's links are generating too much traffic and have been temporarily disabled!'", 60 * 60 * 1000l);
+        } else if (con.getResponseCode() == 460) {
+            /* Restricted Content: This file is no longer available. For additional information contact Dropbox Support. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (con.getResponseCode() == 509) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error 509", 60 * 60 * 1000l);
+        } else if (br.containsHTML("images/sharing/error_")) {
+            /* Offline */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("/images/precaution")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "A previously public shared url is now private");
+        } else if (br.containsHTML(">\\s*Link Temporarily Disabled")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Download is temporary disabled because it has been downloaded too frequently", 10 * 60 * 1000l);
         }
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

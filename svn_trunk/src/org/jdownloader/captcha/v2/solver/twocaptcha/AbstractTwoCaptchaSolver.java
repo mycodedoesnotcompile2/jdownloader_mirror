@@ -72,14 +72,14 @@ public abstract class AbstractTwoCaptchaSolver<T> extends CESChallengeSolver<T> 
     }
 
     protected UrlQuery createQueryForUpload(CESSolverJob<T> job, RequestOptions options, final byte[] data) throws SolverException {
-        UrlQuery qi = new UrlQuery();
-        qi.appendEncoded("key", config.getApiKey() + "");
-        qi.appendEncoded("method", "base64");
-        qi.appendEncoded("json", "1");
+        final UrlQuery q = new UrlQuery();
+        q.appendEncoded("key", config.getApiKey() + "");
+        q.appendEncoded("method", "base64");
+        q.appendEncoded("json", "1");
         if (data != null) {
-            qi.appendEncoded("body", org.appwork.utils.encoding.Base64.encodeToString(data, false));
+            q.appendEncoded("body", org.appwork.utils.encoding.Base64.encodeToString(data, false));
         }
-        return qi;
+        return q;
     }
 
     protected RequestOptions prepare(CESSolverJob<T> solverJob) throws SolverException, InterruptedException {

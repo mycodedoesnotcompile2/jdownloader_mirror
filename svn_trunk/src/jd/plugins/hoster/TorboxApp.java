@@ -45,11 +45,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49346 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -211,7 +213,7 @@ public class TorboxApp extends PluginForHost {
     /** Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. */
     private String fixTimeStampString(final String timeStamp) {
         /* 2024-07-10: They sometimes even return timestamps with 5 digits milli/nanosecs e.g.: 2024-07-05T13:57:33.76273+00:00 */
-        // timestamps also have nanosecs?! SimpleDateFormat lenien=true will then parse xxxxxx ms and convert to secs/minutes...
+        // timestamps also have nano seconds?! SimpleDateFormat lenien=true will then parse xxxxxx ms and convert to secs/minutes...
         return timeStamp.replaceFirst("(\\.\\d{4,6})", ".000");
     }
 
@@ -260,16 +262,16 @@ public class TorboxApp extends PluginForHost {
         /* Obtain list of supported hosts */
         final Request req_hosters = br.createGetRequest(API_BASE + "/webdl/hosters");
         final List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) this.callAPI(br, req_hosters, account, null);
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hosterlistitem : hosterlist) {
-            final String domain = hosterlistitem.get("domain").toString();
-            if ((Boolean) hosterlistitem.get("status")) {
-                supportedHosts.add(domain);
-            } else {
-                logger.info("Skipping currently unsupported/offline host: " + domain);
+            final MultiHostHost mhost = new MultiHostHost(hosterlistitem.get("domain").toString());
+            mhost.setName(hosterlistitem.get("name").toString());
+            if (Boolean.FALSE.equals(hosterlistitem.get(""))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         /* Handle notifications */
         if (Boolean.TRUE.equals(user_settings.get("jdownloader_notifications"))) {

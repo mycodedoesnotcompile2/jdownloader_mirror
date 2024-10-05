@@ -17,11 +17,9 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -44,44 +42,45 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
 public class RapidsPl extends PluginForHost {
     /* API documentation: https://new.rapids.pl/api */
-    private static final String                  API_BASE             = "https://api.rapids.pl/api";
-    /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
-    private static LinkedHashMap<String, Object> individualHostLimits = new LinkedHashMap<String, Object>();
+    private static final String  API_BASE            = "https://api.rapids.pl/api";
     /* Connection limits: 2020-03-24: According to API docs "Max Connections: 15 per user/minute" --> WTF --> Set it to unlimited for now */
-    private static final int                     defaultMAXDOWNLOADS  = -1;
-    private static final int                     defaultMAXCHUNKS     = 1;
-    private static final boolean                 defaultRESUME        = false;
-    private static final String                  PROPERTY_logintoken  = "token";
-    private static final String                  PROPERTY_directlink  = "directlink";
+    private static final int     defaultMAXDOWNLOADS = -1;
+    private static final int     defaultMAXCHUNKS    = 1;
+    private static final boolean defaultRESUME       = false;
+    private static final String  PROPERTY_logintoken = "token";
+    private static final String  PROPERTY_directlink = "directlink";
 
     @SuppressWarnings("deprecation")
     public RapidsPl(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://rapids.pl/");
+        this.enablePremium("https://" + getHost());
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://rapids.pl/pomoc/regulamin";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("User-Agent", "JDownloader");
         /* Set headers according to API docs */
         br.getHeaders().put("Content-Type", "application/json");
         br.getHeaders().put("x-lang", "en");
-        br.setFollowRedirects(true);
         br.setAllowedResponseCodes(new int[] { 401, 423 });
+        br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/pomoc/regulamin";
     }
 
     @Override
@@ -179,7 +178,7 @@ public class RapidsPl extends PluginForHost {
                 br.postPageRaw(API_BASE + "/files/check-and-add", String.format("{\"file\":\"%s\"}", link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
                 try {
                     /* We have to use the parser here because json contains two 'status' objects ;) */
-                    Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                    Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                     final List<Object> data = (List<Object>) entries.get("data");
                     if (data.size() > 1) {
                         /* This should never happen */
@@ -228,11 +227,9 @@ public class RapidsPl extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        prepBR(this.br);
         String dllink = checkDirectLink(link, this.getHost() + PROPERTY_directlink);
-        br.setFollowRedirects(true);
         if (dllink == null) {
-            this.loginAPI(account, false);
+            this.loginAPI(account, false, false);
             /*
              * 2020-04-16: We'll use the cacheChecker for all URLs as we do not know which ones provide direct downloads and which ones
              * don't (well we could know this before but the current method is safer as the status of such hosts could change at any time).
@@ -244,8 +241,8 @@ public class RapidsPl extends PluginForHost {
             }
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, defaultRESUME, defaultMAXCHUNKS);
-        link.setProperty(this.getHost() + PROPERTY_directlink, dl.getConnection().getURL().toString());
-        if (dl.getConnection().getContentType().contains("html")) {
+        link.setProperty(this.getHost() + PROPERTY_directlink, dl.getConnection().getURL().toExternalForm());
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection();
             handleErrors(this.br, account, link);
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown download error", 5 * 60 * 1000);
@@ -259,7 +256,6 @@ public class RapidsPl extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 /* 2020-04-16: HeadRequest is not possible! */
                 con = br2.openGetConnection(dllink);
                 if (con.isContentDisposition()) {
@@ -281,16 +277,11 @@ public class RapidsPl extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final Map<String, Object> userinfo = loginAPI(account, true, true);
         final AccountInfo ai = new AccountInfo();
-        loginAPI(account, true);
-        if (br.getURL() == null || !br.getURL().contains("/users")) {
-            br.getPage(API_BASE + "/users");
-            this.handleErrors(this.br, account, null);
-        }
         final String trafficleft = PluginJSonUtils.getJson(br, "transfer");
         if (trafficleft == null || !trafficleft.matches("\\d+")) {
             account.setType(AccountType.FREE);
-            ai.setStatus("Free account");
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
         } else {
             /*
@@ -298,68 +289,58 @@ public class RapidsPl extends PluginForHost {
              * traffic at some point.
              */
             account.setType(AccountType.PREMIUM);
-            ai.setStatus("Premium account");
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
             ai.setTrafficLeft(Long.parseLong(trafficleft));
         }
         br.getPage(API_BASE + "/services");
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-        final ArrayList<String> supportedhostslist = new ArrayList<String>();
-        final List<Object> ressourcelist = (List<Object>) entries.get("data");
-        for (final Object hostO : ressourcelist) {
-            entries = (Map<String, Object>) hostO;
-            final String main_domain_without_tld = (String) entries.get("name");
-            final boolean is_active = ((Boolean) entries.get("is_active")).booleanValue();
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("data");
+        for (final Map<String, Object> hostinfo : ressourcelist) {
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.setName(hostinfo.get("name").toString());
             // final boolean download_by_direct = ((Boolean) entries.get("download_by_direct")).booleanValue();
-            final List<String> domains = (List<String>) entries.get("domains");
-            if (StringUtils.isEmpty(main_domain_without_tld)) {
-                /* This should never happen */
-                continue;
+            if (Boolean.FALSE.equals(hostinfo.get("is_active"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
-            if (!is_active) {
-                logger.info("Skipping host because: unsupported: " + main_domain_without_tld);
-                continue;
-            }
-            for (final String domain_with_tld : domains) {
-                supportedhostslist.add(domain_with_tld);
-            }
+            mhost.setDomains((List<String>) hostinfo.get("domains"));
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedhostslist);
-        account.setConcurrentUsePossible(true);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
-    private void loginAPI(final Account account, final boolean forceAuthCheck) throws IOException, PluginException, InterruptedException {
-        prepBR(this.br);
+    private Map<String, Object> loginAPI(final Account account, final boolean forceAuthCheck, final boolean forceAccessUserInfoPage) throws IOException, PluginException, InterruptedException {
         String token = account.getStringProperty(PROPERTY_logintoken);
+        final String urlUserInfo = "/users";
         /* 2020-04-15: Token expires after max 14 days but can get invalid at any time --> Refresh every 45 minutes */
         final int token_refresh_minutes = 45;
         final boolean needs_token_refresh = System.currentTimeMillis() - account.getCookiesTimeStamp("") >= token_refresh_minutes * 60 * 1000l;
+        Map<String, Object> entries = null;
         if (token != null && needs_token_refresh) {
             logger.info(String.format("Token needs to be refreshed as it is older than %d minutes", token_refresh_minutes));
         } else if (token != null) {
             logger.info("Attempting token login");
             br.getHeaders().put("Authorization", "Bearer " + token);
-            if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 300000l && !forceAuthCheck) {
-                /* We trust our token --> Do not check them */
-                logger.info("Trust login token as it is not that old");
-                return;
+            if (!forceAuthCheck) {
+                /* Do not check token */
+                return null;
             }
-            br.getPage(API_BASE + "/users");
-            if (br.getHttpConnection().getResponseCode() == 200) {
+            br.getPage(API_BASE + urlUserInfo);
+            try {
+                entries = this.handleErrors(br, account, null);
                 logger.info("Token login successful");
-                /* We don't really need the cookies but the timestamp ;) */
-                account.saveCookies(br.getCookies(br.getHost()), "");
-                return;
-            } else {
+                return entries;
+            } catch (final Throwable e) {
+                logger.log(e);
                 logger.info("Token login failed");
             }
         }
         /* Clear previous headers & cookies */
         logger.info("Performing full login");
-        br = this.prepBR(new Browser());
         final String postData = String.format("{\"username\": \"%s\",\"password\": \"%s\"}", account.getUser(), account.getPass());
         br.postPageRaw(API_BASE + "/auth/login", postData);
+        entries = this.handleErrors(br, account, null);
         token = PluginJSonUtils.getJson(br, "access_token");
         if (StringUtils.isEmpty(token)) {
             handleErrors(br, account, null);
@@ -371,13 +352,23 @@ public class RapidsPl extends PluginForHost {
         /* We don't really need the cookies but the timestamp ;) */
         account.saveCookies(br.getCookies(br.getHost()), "");
         br.getHeaders().put("Authorization", "Bearer " + token);
+        if (forceAccessUserInfoPage) {
+            br.getPage(API_BASE + urlUserInfo);
+            entries = this.handleErrors(br, account, null);
+        }
+        return entries;
     }
 
-    private void handleErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
-        /** TODO: This is a bit glitchy */
+    private Map<String, Object> handleErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         final int responsecode = br.getHttpConnection().getResponseCode();
-        final int errorcode = getErrorcode(br);
-        String errormsg = getErrormessage(this.br);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Object codeO = entries.get("code");
+        if (!(codeO instanceof Number)) {
+            /* No error */
+            return entries;
+        }
+        final int errorcode = ((Number) codeO).intValue();
+        String errormsg = entries.get("message").toString();
         if (StringUtils.isEmpty(errormsg)) {
             errormsg = "Unknown error";
         }
@@ -398,7 +389,7 @@ public class RapidsPl extends PluginForHost {
              * E.g. {"message":"Adres z kt\u00f3rego si\u0119 \u0142\u0105czysz zosta\u0142 zablokowany","data":{"captcha-public-key":
              * "6LdSiKUUAAAAALCIB4OPOc4eIc4JA8JRbKD-yIuW"}}
              */
-            if (StringUtils.isEmpty(getErrormessage(this.br))) {
+            if (StringUtils.isEmpty(errormsg)) {
                 errormsg = "Login captcha required";
             }
             throw new AccountUnavailableException(errormsg, 5 * 60 * 1000l);
@@ -429,19 +420,10 @@ public class RapidsPl extends PluginForHost {
                 throw new AccountUnavailableException("Session expired", 1 * 60 * 1000l);
             }
         }
-    }
-
-    private String getErrormessage(final Browser br) {
-        return PluginJSonUtils.getJson(br, "message");
-    }
-
-    private int getErrorcode(final Browser br) {
-        final String errorcodeStr = PluginJSonUtils.getJson(br, "code");
-        if (errorcodeStr != null && errorcodeStr.matches("\\d+")) {
-            return Integer.parseInt(errorcodeStr);
+        if (link == null) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, 3 * 60 * 1000l);
         } else {
-            /* No errorcode */
-            return -1;
+            throw new AccountUnavailableException(errormsg, 3 * 60 * 1000);
         }
     }
 

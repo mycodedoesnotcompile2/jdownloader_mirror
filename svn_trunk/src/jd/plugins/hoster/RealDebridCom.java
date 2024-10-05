@@ -24,34 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -90,7 +62,35 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 49774 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -137,6 +137,16 @@ public class RealDebridCom extends PluginForHost {
     }
 
     @Override
+    public String getAGBLink() {
+        return mProt + mName + "/terms";
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+    }
+
+    @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
@@ -152,12 +162,11 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        if (isDirectRealDBUrl(link)) {
+        if (isDirectRealDebridDirectUrl(link)) {
             URLConnectionAdapter con = null;
             try {
                 final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(true);
-                con = brc.openGetConnection(link.getDownloadURL());
+                con = brc.openGetConnection(link.getPluginPatternMatcher());
                 if (!looksLikeDownloadableContent(con)) {
                     brc.followConnection(true);
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -260,7 +269,7 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (isDirectRealDBUrl(downloadLink)) {
+        if (isDirectRealDebridDirectUrl(downloadLink)) {
             // generated links do not require an account to download
             return true;
         } else if (account == null) {
@@ -327,16 +336,6 @@ public class RealDebridCom extends PluginForHost {
             ai.setExpired(true);
         }
         return ai;
-    }
-
-    @Override
-    public String getAGBLink() {
-        return mProt + mName + "/terms";
-    }
-
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
     @Override
@@ -461,7 +460,7 @@ public class RealDebridCom extends PluginForHost {
     private AvailableStatus check(final Account account, DownloadLink link) throws Exception {
         if (account == null) {
             return AvailableStatus.UNCHECKABLE;
-        } else if (isDirectRealDBUrl(link)) {
+        } else if (isDirectRealDebridDirectUrl(link)) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -591,7 +590,7 @@ public class RealDebridCom extends PluginForHost {
         if (AvailableStatus.UNCHECKABLE.equals(status)) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, 60 * 1000l);
         }
-        if (isDirectRealDBUrl(link)) {
+        if (isDirectRealDebridDirectUrl(link)) {
             showMessage(link, "Task 2: Download begins!");
             handleDL(account, link, link.getPluginPatternMatcher(), null);
         } else {
@@ -895,9 +894,9 @@ public class RealDebridCom extends PluginForHost {
         }
     }
 
-    private boolean isDirectRealDBUrl(final DownloadLink link) {
+    private boolean isDirectRealDebridDirectUrl(final DownloadLink link) {
         final String url = link.getPluginPatternMatcher();
-        if (url.contains("download.") || url.matches("https?://\\w+\\.(rdb\\.so|rdeb\\.io)/dl?/\\w+(/.+)?")) {
+        if (url.contains("download.") || url.matches("(?i)https?://\\w+\\.(rdb\\.so|rdeb\\.io)/dl?/\\w+(/.+)?")) {
             return true;
         } else {
             return false;

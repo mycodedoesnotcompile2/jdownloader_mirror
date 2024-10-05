@@ -137,6 +137,14 @@ public interface ReconnectConfig extends ConfigInterface {
 
     void setAutoReconnectEnabled(boolean b);
 
+    @AboutConfig
+    @DefaultIntValue(10)
+    @DescriptionForConfigEntry("Disable auto reconnect if reconnect method has failed x times in a row (-1 = disable this feature)")
+    @SpinnerValidator(min = -1, max = 100)
+    int getDisableAutoReconnectFails();
+
+    void setDisableAutoReconnectFails(int num);
+
     void setReconnectAllowedToInterruptResumableDownloads(boolean b);
 
     void setDownloadControllerPrefersReconnectEnabled(boolean b);

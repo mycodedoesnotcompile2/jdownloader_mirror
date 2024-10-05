@@ -24,7 +24,6 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig.Quality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -42,9 +41,10 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
-public class XtremestreamCo extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = {}, urls = {})
+public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -113,7 +113,7 @@ public class XtremestreamCo extends antiDDoSForHost {
             referer = "https://tube.perverzija.com/";
         }
         br.getHeaders().put("Referer", referer);
-        getPage(link.getPluginPatternMatcher());
+        br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRequest().getHtmlCode().length() <= 100) {
@@ -141,7 +141,6 @@ public class XtremestreamCo extends antiDDoSForHost {
         String data_xtremestream = null;
         String dltoken = null;
         if (referer != null) {
-            /* Attempt official/progressive download */
             br2.getPage(referer);
             data_folderid = br2.getRegex("data-folderid=\"([^\"]+)").getMatch(0);
             data_xtremestream = br2.getRegex("data-xtremestream=\"([^\"]+)").getMatch(0);
@@ -155,6 +154,7 @@ public class XtremestreamCo extends antiDDoSForHost {
             dltoken = br2.getRegex("token=([^\"\\&]+)").getMatch(0);
         }
         if (data_folderid != null && data_xtremestream != null && dltoken != null) {
+            /* Attempt official/progressive download */
             dltoken = Encoding.htmlDecode(dltoken);
             final Map<String, Object> postdata = new HashMap<String, Object>();
             postdata.put("folder", data_folderid);
@@ -182,7 +182,9 @@ public class XtremestreamCo extends antiDDoSForHost {
         if (hlsMaster == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        hlsMaster += this.getFID(link);
+        if (!hlsMaster.endsWith(fid)) {
+            hlsMaster += fid;
+        }
         br.getPage(hlsMaster);
         final List<HlsContainer> qualities = HlsContainer.getHlsQualities(this.br);
         final HlsContainer bestQuality = HlsContainer.findBestVideoByBandwidth(qualities);

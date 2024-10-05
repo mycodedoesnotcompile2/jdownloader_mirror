@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 49175 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -320,6 +320,9 @@ public class DropBoxComCrawler extends PluginForDecrypt {
             FilePackage fp = null;
             String next_request_voucher = null;
             int website_max_items_per_page = 30;
+            if (StringUtils.isEmpty(rlkey)) {
+                rlkey = UrlQuery.parse(br.getURL()).get("rlkey");
+            }
             if (StringUtils.isEmpty(rlkey)) {
                 rlkey = UrlQuery.parse(param.getCryptedUrl()).get("rlkey");
             }

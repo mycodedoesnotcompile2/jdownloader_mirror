@@ -1,7 +1,9 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
@@ -11,6 +13,7 @@ import jd.http.URLConnectionAdapter;
 import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -19,7 +22,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 48960 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.jdownloader.plugins.config.Order;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.Type;
+
+@DecrypterPlugin(revision = "$Revision: 49914 $", interfaceVersion = 3, names = {}, urls = {})
 public class WebArchiveOrg extends PluginForDecrypt {
     private static final Pattern PATTERN_DIRECT = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)(if|im|oe)_/(https?.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PATTERN_OTHER  = Pattern.compile("https?://web\\.archive\\.org/web/(\\d+)/(https?.+)", Pattern.CASE_INSENSITIVE);
@@ -107,9 +119,20 @@ public class WebArchiveOrg extends PluginForDecrypt {
                         /* E.g. redirect to main page */
                         looksLikeOfflineContent = true;
                     } else {
+                        if (PluginJsonConfig.get(getConfigInterface()).isCrawlEmbeddedFilesEnabled()) {
+                            final String links[] = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+                            if (links != null) {
+                                final Set<String> dupes = new HashSet<String>();
+                                for (final String link : links) {
+                                    if (canHandle(link) && dupes.add(link) && PATTERN_DIRECT.matcher(link).matches()) {
+                                        ret.add(this.createDownloadlink(link));
+                                    }
+                                }
+                            }
+                        }
                         /* E.g. embedded PDF */
                         final String directurl = br.getRegex("<iframe id=\"playback\"[^>]*src=\"(https?://[^\"]+)").getMatch(0);
-                        if (directurl == null) {
+                        if (ret.size() == 0 && directurl == null) {
                             logger.info("URL is not supported or content is offline");
                             looksLikeOfflineContent = true;
                         } else {
@@ -132,5 +155,21 @@ public class WebArchiveOrg extends PluginForDecrypt {
         } else {
             return ret;
         }
+    }
+
+    @PluginHost(host = "web.archive.org", type = Type.CRAWLER)
+    public static interface WebArchiveOrgConfig extends PluginConfigInterface {
+        @AboutConfig
+        @DefaultBooleanValue(false)
+        @DescriptionForConfigEntry("Crawl embedded files from web.archive.org link?")
+        @Order(10)
+        boolean isCrawlEmbeddedFilesEnabled();
+
+        void setCrawlEmbeddedFilesEnabled(boolean b);
+    }
+
+    @Override
+    public Class<WebArchiveOrgConfig> getConfigInterface() {
+        return WebArchiveOrgConfig.class;
     }
 }

@@ -33,17 +33,20 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
 public class TransloadMe extends PluginForHost {
     private static final String          API_BASE                     = "https://api.transload.me/";
     private static final String          NORESUME                     = "transload_me_NORESUME";
@@ -55,19 +58,26 @@ public class TransloadMe extends PluginForHost {
 
     public TransloadMe(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://en.transload.me/?p=register");
+        this.enablePremium("http://en." + getHost() + "/?p=register");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader " + getVersion());
+        br.setCookie(getHost(), "lang", "en");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "http://en.transload.me/?p=login&redir=helpdesk";
-    }
-
-    private Browser prepBrowser(final Browser br) {
-        br.setFollowRedirects(true);
-        br.getHeaders().put("User-Agent", "JDownloader " + getVersion());
-        br.setCookie(getHost(), "lang", "en");
-        return br;
+        return "http://en." + getHost() + "/?p=login&redir=helpdesk";
     }
 
     @Override
@@ -97,13 +107,7 @@ public class TransloadMe extends PluginForHost {
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
-    }
-
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        prepBrowser(br);
         String dllink = checkDirectLink(link, this.getHost() + "directlink");
         if (dllink == null) {
             mhm.runCheck(account, link);
@@ -119,7 +123,6 @@ public class TransloadMe extends PluginForHost {
     @SuppressWarnings("deprecation")
     private void handleDL(final Account account, final DownloadLink link, final String dllink) throws Exception {
         /* we want to follow redirects in final stage */
-        br.setFollowRedirects(true);
         boolean resume = ACCOUNT_PREMIUM_RESUME;
         if (link.getBooleanProperty(NORESUME, false)) {
             resume = false;
@@ -134,8 +137,7 @@ public class TransloadMe extends PluginForHost {
                 link.setProperty(NORESUME, Boolean.valueOf(true));
                 throw new PluginException(LinkStatus.ERROR_RETRY);
             }
-            final String contenttype = dl.getConnection().getContentType();
-            if (contenttype.contains("html")) {
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection();
                 handleErrorsAPI(br, account, link);
                 mhm.handleErrorGeneric(account, link, "unknowndlerror", 5, 2 * 60 * 1000l);
@@ -153,7 +155,6 @@ public class TransloadMe extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (con.isOK() && (con.isContentDisposition() || (!con.getContentType().contains("html") && con.getLongContentLength() > 0))) {
                     return dllink;
@@ -173,28 +174,18 @@ public class TransloadMe extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        if (!account.getUser().matches(".+@.+\\..+")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlease enter your e-mail address in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
         return fetchAccountInfoAPI(account);
     }
 
     private String generateDownloadlinkAPI(final Account account, DownloadLink link) throws Exception {
-        prepBrowser(br);
         getApi("require=downloadfile&link=" + Encoding.urlEncode(link.getDownloadURL()), account, link);
         final String dllink = PluginJSonUtils.getJsonValue(br, "link");
         return dllink;
     }
 
-    public AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
+    private AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
         synchronized (account) {
             final AccountInfo ai = new AccountInfo();
-            prepBrowser(br);
-            br.setFollowRedirects(true);
             getApi("require=accountdetalis", account, null);
             final String result = PluginJSonUtils.getJsonValue(br, "result");
             if ("5".equals(result)) {
@@ -203,9 +194,10 @@ public class TransloadMe extends PluginForHost {
                 final String error = PluginJSonUtils.getJson(br, "error");
                 if (error != null) {
                     /* 2019-08-30: Hmm seems like their API is dead as it always returns error 6 */
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "API error: " + error + " [Website might be dead]", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                    throw new AccountInvalidException(error);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Balance left in USD */
             final String balance = PluginJSonUtils.getJsonValue(br, "balance");
@@ -227,21 +219,26 @@ public class TransloadMe extends PluginForHost {
                 ai.setUnlimitedTraffic();
             }
             getApi("require=supporthost", account, null);
-            final Map<String, Object> host_list = restoreFromString(br.toString(), TypeRef.MAP);
-            final List<Map<String, Object>> list = (List<Map<String, Object>>) host_list.get("host_list");
-            List<String> supportedHosts = new ArrayList<String>();
+            final Map<String, Object> resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final List<Map<String, Object>> list = (List<Map<String, Object>>) resp.get("host_list");
+            final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             for (final Map<String, Object> entry : list) {
+                final MultiHostHost mhost = new MultiHostHost(entry.get("host").toString());
                 final String status = String.valueOf(entry.get("status"));
-                final String host = (String) entry.get("host");
-                if (("0".equals(status) || "1".equals(status)) && host != null) {
-                    // 0 - Works
-                    // 1 - Unstable
-                    // 2 - does Not work
-                    // 3 - Support file exchanger in the recovery process
-                    supportedHosts.add(host);
+                // 0 - Works
+                // 1 - Unstable
+                // 2 - does Not work
+                // 3 - Support file exchanger in the recovery process
+                if (status.equals("1")) {
+                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+                } else if (status.equals("2")) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                } else if (status.equals("3")) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
+                supportedhosts.add(mhost);
             }
-            supportedHosts = ai.setMultiHostSupport(this, supportedHosts);
+            ai.setMultiHostSupportV2(this, supportedhosts);
             return ai;
         }
     }

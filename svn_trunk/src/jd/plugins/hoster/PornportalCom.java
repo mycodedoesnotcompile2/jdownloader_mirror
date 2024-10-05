@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 49879 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,7 @@ public class PornportalCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.supportmg.com/terms-of-service";
+        return "https://www.pornportal.com/legal/tos";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -583,6 +583,7 @@ public class PornportalCom extends PluginForHost {
                     logger.info("Cookie login failed");
                     /* Important: Especially old "Authorization" headers can cause trouble! */
                     brlogin.clearAll();
+                    account.clearCookies("");
                 }
             }
             logger.info("Performing full login");
@@ -957,6 +958,7 @@ public class PornportalCom extends PluginForHost {
                 }
                 ai.setStatus(account.getType().getLabel() + " (" + packageFeaturesCommaSeparated + ")");
                 if (account.getType() == AccountType.PREMIUM) {
+                    /* TODO: 2024-10-04: Check if this is still needed. It has failed for me in all of my tests. */
                     final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
                     if (bundles != null) {
                         /**
@@ -1167,9 +1169,12 @@ public class PornportalCom extends PluginForHost {
                             logger.info("Exception occured in special pornhub handling");
                         }
                     } catch (final Throwable ignore) {
-                        logger.log(ignore);
+                        // logger.log(ignore);
                         logger.warning("Internal Multihoster handling failed");
                     }
+                }
+                if (account.getType() == AccountType.FREE) {
+                    ai.setExpired(true);
                 }
                 return ai;
             } catch (final PluginException e) {

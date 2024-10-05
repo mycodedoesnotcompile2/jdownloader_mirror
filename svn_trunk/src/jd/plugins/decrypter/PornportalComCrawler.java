@@ -52,7 +52,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49879 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -84,14 +84,10 @@ public class PornportalComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            // final String annotationName = domains[0];
             /* Premium URLs */
             String pattern = "https?://site-ma\\." + buildHostsPatternPart(domains) + "/(?:gallery|trailer|scene|series)/(\\d+)(/[a-z0-9\\-]+)?";
             /* Free URLs */
-            pattern += "|https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:scene|series)/(\\d+)(/[a-z0-9\\-]+)?";
-            // if (annotationName.equals("digitalplayground.com")) {
-            // pattern += "|https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/scene/(\\d+)(/[a-z0-9\\-]+)?";
-            // }
+            pattern += "|https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:scene|series|video)/(\\d+)(/[a-z0-9\\-]+)?";
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);
@@ -112,7 +108,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 }
             }
         }
-        final String contentID = new Regex(param.getCryptedUrl(), "(?i)(?:gallery|trailer|scene|series)/(\\d+)").getMatch(0);
+        final String contentID = new Regex(param.getCryptedUrl(), "(?i)(?:gallery|trailer|scene|series|video)/(\\d+)").getMatch(0);
         if (contentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }

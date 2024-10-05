@@ -238,7 +238,20 @@ public class Cookies {
                 final List<Object> cookiesO = (List<Object>) input;
                 for (final Object cookieO : cookiesO) {
                     final Cookie cookie = new Cookie();
-                    if (cookieO instanceof List) {
+                    if (cookieO instanceof String[]) {
+                        /* JDownloaders' cookies from LinkCrawler rule when rule stores them */
+                        final String[] cookiesStringList = (String[]) cookieO;
+                        final Object keyO = cookiesStringList[0];
+                        final Object valueO = cookiesStringList[1];
+                        cookie.setKey(keyO.toString());
+                        if(valueO != null) {
+                            cookie.setValue(valueO.toString());
+                        }
+           
+                        if(cookiesStringList.length == 3) {
+                            cookie.setHost(cookiesStringList[2].toString());
+                        }
+                    } else if (cookieO instanceof List) {
                         /* JDownloaders' cookies from LinkCrawler rule: List of lists */
                         final List<String> cookiesList = (List<String>) cookieO;
                         final int listSize = cookiesList.size();

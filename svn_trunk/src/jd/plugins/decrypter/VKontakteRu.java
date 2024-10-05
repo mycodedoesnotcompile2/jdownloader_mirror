@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 49612 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -3129,7 +3129,7 @@ public class VKontakteRu extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("vk.com/blank.php")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)This content is blocked in your country")) {
+        } else if (br.containsHTML(">\\s*This content is blocked in your country") || br.containsHTML(">\\s*This video is not available in your country")) {
             /* 2022-06-01 */
             // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "This content is blocked in your country");
             throw new DecrypterRetryException(RetryReason.GEO, "GEO_BLOCKED", "This content is blocked in your country");

@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49912 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -254,17 +254,19 @@ public class BoxbitApp extends PluginForHost {
             for (final Map<String, Object> hostInfo : hosts) {
                 final Map<String, Object> hostDetails = (Map<String, Object>) hostInfo.get("details");
                 final String hostIdentifier = (String) hostDetails.get("identifier");
+                final List<String> fullDomains = (List<String>) hostMapping.get(hostIdentifier);
+                if (fullDomains == null || fullDomains.isEmpty()) {
+                    logger.info("Skipping invalid/empty entry: " + hostInfo);
+                    continue;
+                }
                 final MultiHostHost mhost = new MultiHostHost();
                 if (hostDetails.get("status").toString().equalsIgnoreCase("working")) {
                     mhost.setStatus(MultihosterHostStatus.WORKING);
                 } else {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
-                final List<String> fullDomains = (List<String>) hostMapping.get(hostIdentifier);
-                if (fullDomains != null && fullDomains.size() > 0) {
-                    mhost.setDomains(fullDomains);
-                    supportedhostslist.add(mhost);
-                }
+                mhost.setDomains(fullDomains);
+                supportedhostslist.add(mhost);
             }
         }
         ai.setMultiHostSupportV2(this, supportedhostslist);

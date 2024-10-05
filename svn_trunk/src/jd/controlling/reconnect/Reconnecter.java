@@ -53,8 +53,17 @@ public final class Reconnecter {
         this.storage = JsonConfig.create(ReconnectConfig.class);
     }
 
+    // TODO: refactor to return boolean
     public static int getFailedCounter() {
-        return getInstance().storage.getFailedCounter();
+        final int failedCounter = getInstance().storage.getFailedCounter();
+        final int failedLimit = getInstance().storage.getDisableAutoReconnectFails();
+        if (failedLimit == -1) {
+            return 0;
+        } else if (failedCounter > failedLimit) {
+            return 1000;
+        } else {
+            return 0;
+        }
     }
 
     public ReconnectResult doReconnect() {

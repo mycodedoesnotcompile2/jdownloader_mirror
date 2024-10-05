@@ -43,11 +43,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49822 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/ */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -169,18 +171,32 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         ai.setStatus(user.get("type").toString() + " | Total traffic left: " + user.get("traffic_left") + " | Daily links generated: " + daily_links_generated + "/" + daily_links_limit);
         ai.setTrafficMax(((Number) user.get("daily_traffic_limit")).longValue());
         ai.setTrafficLeft(ai.getTrafficMax() - ((Number) user.get("daily_traffic_used")).longValue());
-        final ArrayList<String> supportedhosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hosters = (List<Map<String, Object>>) user.get("hosters");
         for (final Map<String, Object> hoster : hosters) {
             final List<String> domains = (List<String>) hoster.get("alternatives_domain");
             final String primary_domain = hoster.get("primary_domain").toString();
-            if ("online".equals(hoster.get("status"))) {
-                supportedhosts.addAll(domains);
-            } else {
-                logger.info("Skipping currently unsupported/offline host: " + primary_domain);
+            final MultiHostHost mhost = new MultiHostHost(primary_domain);
+            mhost.addDomains(domains);
+            if ("offline".equals(hoster.get("status"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            final long daily_quota_total = ((Number) hoster.get("daily_quota_total")).longValue();
+            final long daily_quota_left = ((Number) hoster.get("daily_quota_left")).longValue();
+            final long weekly_quota_total = ((Number) hoster.get("weekly_quota_total")).longValue();
+            final long weekly_quota_left = ((Number) hoster.get("weekly_quota_left")).longValue();
+            mhost.setTrafficMax(Math.min(daily_quota_total, weekly_quota_total));
+            mhost.setTrafficLeft(Math.min(daily_quota_left, weekly_quota_left));
+            mhost.setLinksMax(((Number) hoster.get("daily_links_limit")).intValue());
+            mhost.setLinksUsed(((Number) hoster.get("daily_links_used")).intValue());
+            /* Double check for reached limit */
+            if (((Number) hoster.get("percentage_used")).intValue() >= 100) {
+                mhost.setTrafficLeft(0);
+                mhost.setLinksLeft(0);
+            }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedhosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         if (daily_links_generated >= daily_links_limit) {
             /* Account cannot be used for downloading. */
