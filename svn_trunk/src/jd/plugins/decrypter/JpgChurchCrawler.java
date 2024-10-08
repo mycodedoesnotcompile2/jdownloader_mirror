@@ -19,11 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
+import java.util.Set;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -47,7 +43,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.JpgChurch;
 
-@DecrypterPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+
+@DecrypterPlugin(revision = "$Revision: 49919 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JpgChurch.class })
 public class JpgChurchCrawler extends PluginForDecrypt {
     public JpgChurchCrawler(PluginWrapper wrapper) {
@@ -99,6 +100,9 @@ public class JpgChurchCrawler extends PluginForDecrypt {
         }
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/embeds(/.*)?$", "");
         contentURLCleaned = contentURLCleaned.replaceFirst("(?i)/albums/?$", "");
+        /* Always use main domain */
+        final String domainInURL = Browser.getHost(contentURLCleaned, true);
+        contentURLCleaned = contentURLCleaned.replace(domainInURL, this.getHost());
         br.getPage(contentURLCleaned);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -181,8 +185,11 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(siteTitle).trim());
         }
-        final HashSet<String> dupes = new HashSet<String>();
-        final int maxItemsPerPage = 42;
+        final Set<String> seekEnds = new HashSet<String>();
+        if (seek != null) {
+            seekEnds.add(seek);
+        }
+        final Set<String> dupes = new HashSet<String>();
         int imagePosition = 1;
         do {
             final String[] htmls = br.getRegex("<div class=\"list-item [^\"]+\"(.*?)class=\"btn-lock fas fa-eye-slash\"[^>]*></div>").getColumn(0);
@@ -229,15 +236,12 @@ public class JpgChurchCrawler extends PluginForDecrypt {
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else if (apiurl == null || token == null || seek == null) {
-                /* This should never happen */
-                logger.info("Stopping because: At least one mandatory pagination param is missing | apiurl=" + apiurl + " | token=" + token + " | seek=" + seek);
-                break;
             } else if (numberofNewItems == 0) {
                 logger.info("Stopping because: Current page contains no new items");
                 break;
-            } else if (numberofNewItems < maxItemsPerPage) {
-                logger.info("Stopping because: Current page contains only " + numberofNewItems + " new of max " + maxItemsPerPage + " items");
+            } else if (apiurl == null || token == null || seek == null) {
+                /* This should never happen */
+                logger.info("Stopping because: At least one mandatory pagination param is missing | apiurl=" + apiurl + " | token=" + token + " | seek=" + seek);
                 break;
             } else {
                 page++;
@@ -245,8 +249,14 @@ public class JpgChurchCrawler extends PluginForDecrypt {
                 query.addAndReplace("seek", URLEncode.encodeURIComponent(seek));
                 br.postPage(apiurl, query);
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                br.getRequest().setHtmlCode(entries.get("html").toString());
-                seek = entries.get("seekEnd").toString();
+                final String html = (String) entries.get("html");
+                if (html != null) {
+                    br.getRequest().setHtmlCode(html);
+                }
+                seek = (String) entries.get("seekEnd");
+                if (seek != null && !seekEnds.add(seek)) {
+                    seek = null;
+                }
             }
         } while (true);
         if (ret.isEmpty()) {

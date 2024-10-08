@@ -47,6 +47,7 @@ import org.appwork.resources.IconRef;
  */
 public enum TrayIconRef implements IconRef {
     trayicon("trayicon");
+
     private final String path;
 
     /**
@@ -70,7 +71,7 @@ public enum TrayIconRef implements IconRef {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.resources.IconRef#image(int)
      */
     @Override
@@ -80,11 +81,18 @@ public enum TrayIconRef implements IconRef {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.resources.IconRef#path()
      */
     @Override
-    public String path() {        
+    public String path() {
         return path;
+    }
+
+    /**
+     * @return
+     */
+    boolean exists() {
+        return AWUTheme.I().hasIcon(path());
     }
 }

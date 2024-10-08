@@ -35,11 +35,15 @@ package org.appwork.utils.images;
 
 import java.awt.Component;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.appwork.utils.CompareUtils;
 
@@ -51,19 +55,19 @@ import org.appwork.utils.CompareUtils;
  *
  */
 public class MultiResIconImpl implements MultiResIcon {
-    private List<BufferedImage> images;
+    private CopyOnWriteArrayList<BufferedImage> images;
 
     public List<BufferedImage> getImages() {
-        return images;
-    }
-
-    public void setImages(List<BufferedImage> images) {
-        this.images = images;
+        return Collections.unmodifiableList(images);
     }
 
     private int           iconWidth;
     private int           iconHeight;
     private BufferedImage largest;
+
+    public BufferedImage getLargest() {
+        return largest;
+    }
 
     public int getIconWidth() {
         return iconWidth;
@@ -87,14 +91,21 @@ public class MultiResIconImpl implements MultiResIcon {
      * @param iconSize2
      */
     public MultiResIconImpl(List<BufferedImage> images, int iconWidth, int iconHeight) {
-        this.images = new ArrayList<BufferedImage>(images);
-        Collections.sort(this.images, new Comparator<BufferedImage>() {
+        ArrayList<BufferedImage> tmp = new ArrayList<BufferedImage>(images);
+        Collections.sort(tmp, new Comparator<BufferedImage>() {
             @Override
             public int compare(BufferedImage o1, BufferedImage o2) {
                 return CompareUtils.compareInt(o1.getWidth() * o1.getHeight(), o2.getWidth() * o2.getHeight());
             }
         });
-        this.largest = images.get(images.size() - 1);
+        this.images = new CopyOnWriteArrayList<BufferedImage>(tmp);
+        this.largest = this.images.get(images.size() - 1);
+        if (iconWidth <= 0) {
+            iconWidth = largest.getWidth();
+        }
+        if (iconHeight <= 0) {
+            iconHeight = largest.getHeight();
+        }
         this.iconWidth = iconWidth;
         this.iconHeight = iconHeight;
     }
@@ -112,22 +123,58 @@ public class MultiResIconImpl implements MultiResIcon {
      */
     @Override
     public void paintIcon(Component c, Graphics g, int x, int y, int width, int height) {
+        AffineTransform currentTransform = ((Graphics2D) g).getTransform();
+        double scaleX = currentTransform.getScaleX();
+        double scaleY = currentTransform.getScaleY();
+        Graphics2D g2d = ((Graphics2D) g);
         BufferedImage base = largest;
         int index = 0;
+        if (width <= 0) {
+            width = largest.getWidth();
+        }
+        if (height <= 0) {
+            height = largest.getHeight();
+        }
         if (width > 0 && height > 0) {
+            int scaledWidth = (int) (width * scaleX);
+            int scaledHeight = (int) (height * scaleY);
             for (BufferedImage image : images) {
                 base = image;
-                if (image.getWidth(null) >= width && image.getHeight(null) >= height) {
+                if (image.getWidth(null) >= scaledWidth && image.getHeight(null) >= scaledHeight) {
                     break;
                 }
                 index++;
             }
+            if (base.getWidth(null) != scaledWidth || base.getHeight(null) != scaledHeight) {
+                // cache
+                base = IconIO.getScaledInstance(base, scaledWidth, scaledHeight, Interpolation.BICUBIC, true);
+                images.add(index, base);
+            }
+            if (scaleX != 1.0 || scaleY != 1.0) {
+                // Inverse the scaling
+                AffineTransform inverseScale = new AffineTransform();
+                inverseScale.scale(1.0 / scaleX, 1.0 / scaleY);
+                g2d.transform(inverseScale); // Apply the inverse scaling
+                // Draw a larger image to compensate for the removed scaling
+                g2d.drawImage(base, 0, 0, scaledWidth, scaledHeight, c);
+                // Restore the original transform to avoid affecting further drawing
+                g2d.setTransform(currentTransform);
+                return;
+            } else {
+                g.drawImage(base, x, y, c);
+            }
         }
-        if (base.getWidth(null) != width || base.getHeight(null) != height) {
-            // cache
-            base = IconIO.getScaledInstance(base, width, height, Interpolation.BICUBIC, true);
-            images.add(index, base);
+    }
+
+    /**
+     * @return the image that represesents exactly the icons size or null
+     */
+    public Image getImage() {
+        for (BufferedImage image : images) {
+            if (image.getWidth(null) == getIconWidth() && image.getHeight(null) == getIconHeight()) {
+                return image;
+            }
         }
-        g.drawImage(base, x, y, c);
+        return null;
     }
 }

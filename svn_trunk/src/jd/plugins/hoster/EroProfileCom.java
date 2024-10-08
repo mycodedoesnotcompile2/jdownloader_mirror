@@ -40,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49804 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:www\\.)?eroprofile\\.com/m/(?:videos|photos)/view/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = { "eroprofile.com" }, urls = { "https?://(?:\\w+\\.)?eroprofile\\.com/(m|p)/(videos|photos)/view/([A-Za-z0-9\\-_]+)" })
 public class EroProfileCom extends PluginForHost {
     public EroProfileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -61,8 +61,6 @@ public class EroProfileCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX };
     }
 
-    /* DEV NOTES */
-    /* Porn_plugin */
     private String dllink = null;
 
     @Override
@@ -76,13 +74,7 @@ public class EroProfileCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
-    }
-
-    @Override
-    public void setBrowser(Browser br) {
-        this.br = br;
-        br.setCookie(this.getHost(), "lang", "en");
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
     }
 
     @Override
@@ -90,7 +82,7 @@ public class EroProfileCom extends PluginForHost {
         return "https://www." + getHost() + "/p/help/termsOfUse";
     }
 
-    private static final String VIDEOLINK = "(?i)https?://(www\\.)?eroprofile\\.com/m/videos/view/[A-Za-z0-9\\-_]+";
+    private static final String VIDEOLINK = "(?i)https?://[^/]+/(m|p)/videos/view/([A-Za-z0-9\\-_]+)";
 
     public static boolean isAccountRequired(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 403) {
@@ -111,10 +103,17 @@ public class EroProfileCom extends PluginForHost {
         return lastResortErrormessage;
     }
 
-    @SuppressWarnings("deprecation")
+    private String getContentURL(final DownloadLink link) {
+        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
+        final String type = urlinfo.getMatch(1);
+        final String contentID = urlinfo.getMatch(2);
+        return "https://www." + getHost() + "/m/" + type + "/view/" + contentID;
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        br.getPage(link.getPluginPatternMatcher());
+        final String contenturl = getContentURL(link);
+        br.getPage(contenturl);
         if (isAccountRequired(br)) {
             return AvailableStatus.TRUE;
         }
@@ -122,7 +121,7 @@ public class EroProfileCom extends PluginForHost {
         final String regexAlbumNotFound = ">\\s*Album not found";
         final String extDefault;
         String filename;
-        if (link.getDownloadURL().matches(VIDEOLINK)) {
+        if (contenturl.matches(VIDEOLINK)) {
             if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(>\\s*Video not found|>\\s*The video could not be found|<title>\\s*EroProfile</title>)")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (br.containsHTML(">\\s*Video processing failed")) {
@@ -209,7 +208,7 @@ public class EroProfileCom extends PluginForHost {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
-                br.setCookies(account.getHoster(), cookies);
+                br.setCookies(getHost(), cookies);
                 if (!validateCookies) {
                     return;
                 }

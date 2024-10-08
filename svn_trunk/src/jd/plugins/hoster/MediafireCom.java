@@ -23,12 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -36,6 +30,7 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -55,7 +50,13 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 49919 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -537,8 +538,6 @@ public class MediafireCom extends PluginForHost {
             }
         }
         br.setAllowedResponseCodes(403);
-        br.getHeaders().put("Accept", "*/*");
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         if (query == null) {
             query = new UrlQuery();
         }
@@ -547,8 +546,11 @@ public class MediafireCom extends PluginForHost {
         }
         query.add("response_format", "json");
         // website still uses 1.4, api is up to 1.5 at this stage -raztoki20160101
-        String a = "https://www.mediafire.com/api/1.5/" + command + "?" + query.toString();
-        br.getPage(a);
+        final String url = "https://www.mediafire.com/api/1.5/" + command + "?" + query.toString();
+        final GetRequest request = br.createGetRequest(url);
+        request.getHeaders().put("Accept", "*/*");
+        request.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        br.getPage(request);
         return handleApiError(br, link, account);
     }
 
@@ -622,7 +624,9 @@ public class MediafireCom extends PluginForHost {
     }
 
     public boolean checkLinks(final DownloadLink[] urls, final Account account) {
+        final Browser oldBr = this.br;
         try {
+            setBrowser(oldBr.cloneBrowser());
             final StringBuilder sb = new StringBuilder();
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
@@ -701,6 +705,8 @@ public class MediafireCom extends PluginForHost {
         } catch (final Exception e) {
             getLogger().log(e);
             return false;
+        } finally {
+            setBrowser(oldBr);
         }
         return true;
     }
@@ -732,9 +738,8 @@ public class MediafireCom extends PluginForHost {
         /* 2020-06-29: Some files will have all information given bur are deleted if delete_date exists! */
         if (delete_date != null && delete_date.matches("\\d{4}-\\d{2}-\\d{2}.*")) {
             /**
-             * For files parsed in context of a folder: </br>
-             * We can't really be sure if the file is online until we actually try to download it but also in browser all files as part of
-             * folders look to be online when viewing folders.
+             * For files parsed in context of a folder: </br> We can't really be sure if the file is online until we actually try to
+             * download it but also in browser all files as part of folders look to be online when viewing folders.
              */
             link.setAvailableStatus(AvailableStatus.FALSE);
         } else {

@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49924 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -2344,6 +2344,40 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         if (grabURLsInsideText && isContentFromWall) {
             ret.addAll(this.crawlUrlsInsidePosts(wall_post_text));
+        }
+        ret.addAll(this.crawlDevPlayground(br));
+        return ret;
+    }
+
+    /** Function to test new crawl stuff */
+    private ArrayList<DownloadLink> crawlDevPlayground(final Browser br) throws IOException {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            logger.info("This does nothing in stable");
+            return ret;
+        }
+        final String[] dataexecs = br.getRegex("data-exec=\"([^\"]+)").getColumn(0);
+        if (dataexecs == null || dataexecs.length == 0) {
+            logger.info("Failed to find any json source");
+            return ret;
+        }
+        String groupID = null;
+        for (String dataexec : dataexecs) {
+            dataexec = Encoding.htmlOnlyDecode(dataexec);
+            final Map<String, Object> entries = restoreFromString(dataexec, TypeRef.MAP);
+            final Map<String, Object> videoShowcaseCommunityCatalogInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityCatalog/init");
+            if (videoShowcaseCommunityCatalogInit != null) {
+                groupID = videoShowcaseCommunityCatalogInit.get("groupId").toString();
+            }
+            final Map<String, Object> videoShowcaseCommunityHeaderInit = (Map<String, Object>) entries.get("VideoShowcaseCommunityHeader/init");
+            if (videoShowcaseCommunityHeaderInit != null) {
+                // TODO
+            }
+        }
+        if (groupID == null) {
+            logger.info("Found groupID:" + groupID);
+        } else {
+            logger.warning("Failed to find groupID");
         }
         return ret;
     }

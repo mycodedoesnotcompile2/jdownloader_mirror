@@ -359,4 +359,33 @@ public class Clazz {
             return a;
         }
     }
+
+    /**
+     * get the default value - the value a field of this class would have as long as no value is assigned<br>
+     * private byte myByte;
+     *
+     * @param returnType
+     * @return
+     */
+    public static Object getDefaultValue(final Class<?> returnType) {
+        if (returnType == byte.class) {
+            return (byte) 0;
+        } else if (returnType == char.class) {
+            return (char) 0;
+        } else if (returnType == short.class) {
+            return (short) 0;
+        } else if (returnType == int.class) {
+            return (int) 0;
+        } else if (returnType == long.class) {
+            return (long) 0l;
+        } else if (returnType == double.class) {
+            return (double) 0.0;
+        } else if (returnType == float.class) {
+            return (float) 0.0;
+        } else if (returnType == boolean.class) {
+            return false;
+        } else {
+            return null;
+        }
+    }
 }

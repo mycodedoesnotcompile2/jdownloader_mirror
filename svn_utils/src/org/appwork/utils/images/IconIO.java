@@ -60,6 +60,9 @@ import java.awt.image.RGBImageFilter;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -89,6 +92,8 @@ public class IconIO {
      */
     public static final String                       SVG_FACTORY_KEY = "SVG_FACTORY";
     private static final AtomicReference<SVGFactory> SVG_FACTORY     = new AtomicReference<SVGFactory>();
+    private static Boolean                           ICO_SUPPORTED;
+    private volatile static Method                   ICO_DECODER;
 
     public static SVGFactory getSvgFactory() {
         SVGFactory factory = SVG_FACTORY.get();
@@ -147,7 +152,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconHeight()
          */
         @Override
@@ -157,7 +162,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#getIconWidth()
          */
         @Override
@@ -167,7 +172,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see javax.swing.Icon#paintIcon(java.awt.Component, java.awt.Graphics, int, int)
          */
         @Override
@@ -187,7 +192,7 @@ public class IconIO {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see org.appwork.swing.components.IdentifierInterface#toIdentifier()
          */
         @Override
@@ -378,28 +383,53 @@ public class IconIO {
     }
 
     public static Icon getIcon(final URL resource, final int size) {
+        return getIcon(resource, size, size);
+    }
+
+    public static Icon getIcon(final URL resource, final int w, int h) {
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {
                     InputStream is = resource.openStream();
                     try {
-                        return getSvgFactory().getIconFromSVG(is, size, size, null);
+                        return getSvgFactory().getIconFromSVG(is, w, h, null);
                     } finally {
                         is.close();
                     }
                 } catch (IOException e) {
                     LogV3.log(e);
-                    return new ImageIcon(ImageProvider.createIcon("DUMMY", size, size));
+                    return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
                 }
             } else {
                 LogV3.warning("SVG Factory not found!");
-                return new ImageIcon(ImageProvider.createIcon("DUMMY", size, size));
+                return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
             }
         }
-        if (size <= 0) {
+        if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".ico") && isIcoSupported()) {
+            try {
+                InputStream is = resource.openStream();
+                try {
+                    List<BufferedImage> images = (List<BufferedImage>) ICO_DECODER.invoke(null, is);
+                    if (images != null && images.size() > 0) {
+                        MultiResIconImpl ret = new MultiResIconImpl(images, w, h);
+                        return ret;
+                    }
+                } finally {
+                    is.close();
+                }
+            } catch (IllegalAccessException e) {
+                LogV3.log(e);
+            } catch (InvocationTargetException e) {
+                LogV3.log(e);
+            } catch (IOException e) {
+                LogV3.log(e);
+            }
+            return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
+        }
+        if (w <= 0 && h <= 0) {
             return new ImageIcon(IconIO.getImage(resource));
         } else {
-            return new ImageIcon(IconIO.getScaledInstance(IconIO.getImage(resource), size, size, Interpolation.BICUBIC, true));
+            return new ImageIcon(IconIO.getScaledInstance(IconIO.getImage(resource), w, h, Interpolation.BICUBIC, true));
         }
     }
 
@@ -658,6 +688,12 @@ public class IconIO {
                 return (BufferedImage) img;
             }
         }
+        if (icon instanceof MultiResIconImpl) {
+            Image ret = ((MultiResIconImpl) icon).getImage();
+            if (ret != null) {
+                return IconIO.toBufferedImage(ret);
+            }
+        }
         final int w = icon.getIconWidth();
         final int h = icon.getIconHeight();
         if (org.appwork.utils.Application.isHeadless()) {
@@ -851,5 +887,35 @@ public class IconIO {
      */
     public static Image getImageFromDataUrl(String dataURL) throws IOException {
         return ImageIO.read(IO.dataUrlToInputStream(dataURL));
+    }
+
+    /**
+     * @return
+     */
+    public static boolean isIcoSupported() {
+        if (ICO_SUPPORTED != null) {
+            return ICO_SUPPORTED == Boolean.TRUE;
+        }
+        try {
+            Class<?> cls = Class.forName("net.sf.image4j.codec.ico.ICODecoder");
+            Method method = cls.getMethod("read", new Class[] { InputStream.class });
+            ParameterizedType type = (ParameterizedType) method.getGenericReturnType();
+            if (type.getRawType() == List.class) {
+                if (type.getActualTypeArguments()[0] == BufferedImage.class) {
+                    ICO_DECODER = method;
+                    ICO_SUPPORTED = true;
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            LogV3.log(e);
+            ICO_SUPPORTED = false;
+        } catch (NoSuchMethodException e) {
+            LogV3.log(e);
+            ICO_SUPPORTED = false;
+        } catch (SecurityException e) {
+            LogV3.log(e);
+            ICO_SUPPORTED = false;
+        }
+        return ICO_SUPPORTED == Boolean.TRUE;
     }
 }

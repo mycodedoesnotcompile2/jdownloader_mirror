@@ -51,6 +51,7 @@ import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
@@ -519,30 +520,31 @@ abstract public class ZeveraCore extends UseNet {
          * Function for logging hosts which users might report missing in our list -> With this logger those can be easily identified.
          */
         final List<String> cachehosts = (List<String>) hosterinfo.get("cache");
+        final Map<String, Number> fairusefactor = (Map<String, Number>) hosterinfo.get("fairusefactor");
         for (final String cachehost : cachehosts) {
             if (!supportedHostsMainDomains.contains(cachehost)) {
                 logger.info("Host which is only in cache list but not in any other supported list: " + cachehost);
             }
         }
-        final HashSet<String> supportedHostsAllDomains = new HashSet<String>();
+        if (supportsUsenet(account)) {
+            supportedHostsMainDomains.add("usenet");
+        }
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
         for (final String mainDomain : supportedHostsMainDomains) {
+            final MultiHostHost mhost = new MultiHostHost(mainDomain);
             final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
             if (allDomains != null) {
-                supportedHostsAllDomains.addAll(allDomains);
-            } else {
-                /* Fallback */
-                logger.warning("Possible serverside mistake: Domain is missing in aliases list: " + mainDomain);
-                supportedHostsAllDomains.add(mainDomain);
+                mhost.addDomains(allDomains);
             }
+            final Number fairusefactorThisHost = fairusefactor.get(mainDomain);
+            if (fairusefactorThisHost != null) {
+                /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
+                mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
+            }
+            supportedhosts.add(mhost);
         }
-        if (supportsUsenet(account)) {
-            supportedHostsAllDomains.add("usenet");
-        } else {
-            /* Remove this in case it was contained in the serverside list because we know that it is not supported. */
-            supportedHostsAllDomains.remove("usenet");
-        }
-        ai.setMultiHostSupport(this, new ArrayList<String>(supportedHostsAllDomains));
+        ai.setMultiHostSupportV2(this, supportedhosts);
         if (account.getType() == AccountType.FREE && supportsFreeAccountDownloadMode(account)) {
             /* Display info-dialog regarding free account usage */
             handleFreeModeLoginDialog(account, "https://www." + account.getHoster() + "/free");

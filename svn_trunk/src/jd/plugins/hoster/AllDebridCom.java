@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49885 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -223,7 +223,6 @@ public class AllDebridCom extends PluginForHost {
             br.getPage(api_base + "/user?" + agent);
             final Map<String, Object> data = handleErrors(account, null);
             final Map<String, Object> user = (Map<String, Object>) data.get("user");
-            // final List<String> notifications = (List<String>) user.get("notifications");
             final String userName = (String) user.get("username");
             if (!StringUtils.isEmpty(userName)) {
                 account.setUser(userName);
@@ -233,47 +232,50 @@ public class AllDebridCom extends PluginForHost {
              * property in our Account object!
              */
             account.setPass(null);
-            if ((Boolean) user.get("isPremium") == Boolean.FALSE) {
-                /*
-                 * "Real" free account (or expired trial premium [= user downloaded more than 25GB trial quota]) --> Cannot download and
-                 * cannot even login via API officially!
-                 */
-                throw new AccountInvalidException("Free accounts are not supported!");
-            }
             final Number premiumUntil = (Number) user.get("premiumUntil");
             if (premiumUntil != null) {
                 ai.setValidUntil(premiumUntil.longValue() * 1000l, br);
             }
-            if ((Boolean) user.get("isTrial") == Boolean.TRUE) {
+            if (Boolean.TRUE.equals(user.get("isTrial"))) {
                 /*
                  * 2020-03-27: Premium "test" accounts which last 7 days and have a total of 25GB as quota. Once that limit is reached, they
                  * can only download from "Free" hosts (only a hand full of hosts).
                  */
-                ai.setStatus("Premium Account (Free trial, reverts to free once traffic is used up)");
+                ai.setStatus("Trial account, reverts to free once traffic is used up");
                 final Number remainingTrialQuota = (Number) user.get("remainingTrialQuota");
+                /* 2020-03-27: Hardcoded maxTraffic value */
+                final long maxTraffic = SizeFormatter.getSize("25GB");
                 if (remainingTrialQuota != null) {
-                    /* 2020-03-27: Hardcoded maxTraffic value */
-                    final long maxTraffic = SizeFormatter.getSize("25GB");
                     final long remainingTrialTraffic = remainingTrialQuota.longValue() * 1000 * 1000;
                     ai.setTrafficLeft(remainingTrialTraffic);
                     if (remainingTrialTraffic <= maxTraffic) {
                         ai.setTrafficMax(maxTraffic);
                     }
+                } else {
+                    ai.setTrafficMax(maxTraffic);
                 }
+            } else if (!Boolean.TRUE.equals(user.get("isPremium"))) {
+                /*
+                 * "Real" free account (or expired trial premium [= user downloaded more than 25GB trial quota]) --> Cannot download and
+                 * cannot even login via API officially!
+                 */
+                account.setType(AccountType.FREE);
+                throw new AccountInvalidException("Free accounts are not supported!");
             }
             final Number fidelityPoints = (Number) user.get("fidelityPoints");
             if (fidelityPoints != null) {
                 ai.setPremiumPoints(fidelityPoints.longValue());
             }
             account.setType(AccountType.PREMIUM);
+            // final List<String> notifications = (List<String>) user.get("notifications");
             return user;
         }
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo accountInfo = new AccountInfo();
-        login(account, accountInfo, true);
+        final AccountInfo ai = new AccountInfo();
+        login(account, ai, true);
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
         br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -309,7 +311,6 @@ public class AllDebridCom extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             /* Add all domains of host */
-            // TODO: Make use of this quota information
             if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
                 // quota is traffic in MB
                 mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
@@ -336,8 +337,8 @@ public class AllDebridCom extends PluginForHost {
                 supportedHosts.add(mhost);
             }
         }
-        accountInfo.setMultiHostSupportV2(this, supportedHosts);
-        return accountInfo;
+        ai.setMultiHostSupportV2(this, supportedHosts);
+        return ai;
     }
 
     private Thread showPINLoginInformation(final String pin_url, final int timeoutSeconds) {
@@ -639,7 +640,7 @@ public class AllDebridCom extends PluginForHost {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, this.getMaxChunks(account, link, url));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
-                checkRateLimit(br, dl.getConnection(), account, link);
+                this.checkErrorsWebsite(br, link, account);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Directurl did not lead to downloadable content");
             }
         } catch (final Exception e) {
@@ -695,7 +696,7 @@ public class AllDebridCom extends PluginForHost {
             try {
                 if (!looksLikeDownloadableContent(check)) {
                     brc.followConnection(true);
-                    checkRateLimit(brc, check, account, link);
+                    this.checkErrorsWebsite(brc, link, account);
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Final downloadurl did not lead to downloadable content");
                 } else if (check.getCompleteContentLength() < 0) {
                     logger.info("don't use verified filesize because complete content length isn't available:" + check.getCompleteContentLength() + "==" + link.getVerifiedFileSize());
@@ -756,26 +757,41 @@ public class AllDebridCom extends PluginForHost {
         dl = new jd.plugins.BrowserAdapter().openDownload(br, downloadLinkDownloadable, br.createGetRequest(dllink), true, chunks);
         if (!looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
-            checkRateLimit(br, dl.getConnection(), account, link);
-            if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
-            } else if (dl.getConnection().getResponseCode() == 416) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 416 - try later or with less chunks");
-            } else if (br.containsHTML("range not ok")) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Range not ok");
-            } else {
-                /* unknown error */
-                logger.severe("Error: Unknown Error");
-                mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to a file", 50);
-            }
+            this.checkErrorsWebsite(br, link, account);
+            /* unknown error */
+            logger.severe("Error: Unknown Error");
+            mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to a file", 50);
         }
         try {
             dl.startDownload();
-        } catch (PluginException e) {
+        } catch (final PluginException e) {
             if (StringUtils.containsIgnoreCase(e.getMessage(), "Server: Too Many Requests")) {
                 setRateLimit(link, account, url);
             }
             throw e;
+        }
+    }
+
+    private void checkErrorsWebsite(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        final URLConnectionAdapter con = br.getHttpConnection();
+        checkRateLimit(br, con, account, link);
+        if (con.getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404");
+        } else if (con.getResponseCode() == 416) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 416 - try later or with less chunks");
+        } else if (br.containsHTML("range not ok")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Range not ok");
+        }
+        String errorServerNotAllowed = br.getRegex(">(Server not allowed[^<]+)").getMatch(0);
+        if (errorServerNotAllowed != null) {
+            /* User has tried to use a non-allowed server IP or VPN IP. */
+            errorServerNotAllowed = Encoding.htmlOnlyDecode(errorServerNotAllowed);
+            errorServerNotAllowed += " | allow it here: alldebrid.com/vpn/ and here: alldebrid.com/account/";
+            if (account != null) {
+                throw new AccountUnavailableException(errorServerNotAllowed, 5 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, errorServerNotAllowed);
+            }
         }
     }
 
@@ -863,21 +879,23 @@ public class AllDebridCom extends PluginForHost {
     }
 
     private String updateProtocolInDirecturl(String dllink) throws MalformedURLException {
-        if (!PluginJsonConfig.get(AlldebridComConfig.class).isUseHTTPSForDownloads()) {
-            // https://svn.jdownloader.org/issues/87886
-            final URL url = new URL(dllink);
-            if (StringUtils.equals("https", url.getProtocol())) {
-                logger.info("https for final downloadurls is disabled:" + dllink);
-                String newDllink = dllink.replaceFirst("https://", "http://");
-                if (url.getPort() != -1) {
-                    // remove custom https port
-                    newDllink = dllink.replace(":" + url.getPort() + "/", "/");
-                }
-                /* Check if link has changed */
-                if (!newDllink.equals(dllink)) {
-                    logger.info("New final downloadurl: " + newDllink);
-                    dllink = newDllink;
-                }
+        if (PluginJsonConfig.get(AlldebridComConfig.class).isUseHTTPSForDownloads()) {
+            /* Do not change url and assume protocol is https. */
+            return dllink;
+        }
+        // https://svn.jdownloader.org/issues/87886
+        final URL url = new URL(dllink);
+        if (StringUtils.equals("https", url.getProtocol())) {
+            logger.info("https for final downloadurls is disabled:" + dllink);
+            String newDllink = dllink.replaceFirst("https://", "http://");
+            if (url.getPort() != -1) {
+                // remove custom https port
+                newDllink = dllink.replace(":" + url.getPort() + "/", "/");
+            }
+            /* Check if link has changed */
+            if (!newDllink.equals(dllink)) {
+                logger.info("New final downloadurl: " + newDllink);
+                dllink = newDllink;
             }
         }
         return dllink;
@@ -996,32 +1014,31 @@ public class AllDebridCom extends PluginForHost {
 
     private String checkDirectLink(final Account account, final DownloadLink link, final String property) {
         final String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                // HEAD requests are causing issues serverside, headers are missing in combination with keepalive
-                con = br2.openGetConnection(dllink);
-                if (looksLikeDownloadableContent(con)) {
-                    return dllink;
-                } else {
-                    br2.followConnection(true);
-                    checkRateLimit(br2, con, account, link);
-                    throw new IOException();
-                }
-            } catch (final Exception e) {
-                logger.log(e);
-                link.removeProperty(property);
-                link.removeProperty(property + "_paws");
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
-            }
-        } else {
+        if (dllink == null) {
             return null;
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
+            // HEAD requests are causing issues serverside, headers are missing in combination with keepalive
+            con = br2.openGetConnection(dllink);
+            if (looksLikeDownloadableContent(con)) {
+                return dllink;
+            } else {
+                br2.followConnection(true);
+                this.checkErrorsWebsite(br2, link, account);
+                throw new IOException();
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            link.removeProperty(property);
+            link.removeProperty(property + "_paws");
+            return null;
+        } finally {
+            if (con != null) {
+                con.disconnect();
+            }
         }
     }
 
@@ -1052,7 +1069,7 @@ public class AllDebridCom extends PluginForHost {
         return chunks;
     }
 
-    private void checkRateLimit(Browser br, URLConnectionAdapter con, final Account account, final DownloadLink link) throws PluginException {
+    private void checkRateLimit(final Browser br, URLConnectionAdapter con, final Account account, final DownloadLink link) throws PluginException {
         if (br.containsHTML("rate limiting, please retry") || con.getResponseCode() == 429) {
             Browser.setRequestIntervalLimitGlobal(br.getHost(), 2000);
             setRateLimit(link, account, con.getURL());

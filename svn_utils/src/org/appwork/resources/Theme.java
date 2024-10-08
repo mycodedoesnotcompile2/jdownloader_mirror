@@ -240,29 +240,22 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      * @return
      */
     protected URL lookupImageUrl(String relativePath, int size) {
-        URL url = this.getURL("images/", relativePath + "_" + size, ".png", false);
-        if (url == null) {
-            url = this.getURL("images/", relativePath, ".png", false);
-        }
-        if (url == null) {
-            url = this.getURL("images/", relativePath, ".svg", false);
-            if (url != null && IconIO.getSvgFactory() == null) {
-                url = null;
+        for (boolean useFallback : new boolean[] { false, true }) {
+            URL url = this.getURL("images/", relativePath + "_" + size, ".png", useFallback);
+            if (url == null && IconIO.getSvgFactory() != null) {
+                url = this.getURL("images/", relativePath, ".svg", useFallback);
+            }
+            if (url == null) {
+                url = this.getURL("images/", relativePath, ".png", useFallback);
+            }
+            if (url == null && IconIO.isIcoSupported()) {
+                url = this.getURL("images/", relativePath, ".ico", useFallback);
+            }
+            if (url != null) {
+                return url;
             }
         }
-        if (url == null) {
-            url = this.getURL("images/", relativePath + "_" + size, ".png", true);
-        }
-        if (url == null) {
-            url = this.getURL("images/", relativePath, ".png", true);
-        }
-        if (url == null) {
-            url = this.getURL("images/", relativePath, ".svg", true);
-            if (url != null && IconIO.getSvgFactory() == null) {
-                url = null;
-            }
-        }
-        return url;
+        return null;
     }
 
     /**

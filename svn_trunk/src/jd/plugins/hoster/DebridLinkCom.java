@@ -54,11 +54,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49743 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -190,45 +192,56 @@ public class DebridLinkCom extends PluginForHost {
         /* Update list of supported hosts */
         /* https://debrid-link.com/api_doc/v2/downloader-regex */
         br.getPage(this.getApiBase() + "/downloader/hosts?keys=status%2CisFree%2Cname%2Cdomains");
-        final List<String> supportedHosts = new ArrayList<String>();
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Object> hosters = (List<Object>) entries.get("value");
+        final Map<String, Object> resp_downloader_hosts = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> hosters = (List<Map<String, Object>>) resp_downloader_hosts.get("value");
+        br.getPage(this.getApiBase() + "/downloader/limits/all");
+        final Map<String, Object> resp_downloader_limits_all = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> resp_downloader_limits_all_value = (Map<String, Object>) resp_downloader_limits_all.get("value");
+        final List<Map<String, Object>> resp_downloader_limits_all_value_hosters = (List<Map<String, Object>>) resp_downloader_limits_all_value.get("hosters");
         final HashMap<String, String> name2RealHostMap = new HashMap<String, String>();
         final AccountInfo dummyAccInfo = new AccountInfo();
-        for (final Object hostO : hosters) {
-            entries = (Map<String, Object>) hostO;
-            final String hostname = (String) entries.get("name");
-            final int status = ((Number) entries.get("status")).intValue();
-            final boolean isFreeHost = ((Boolean) entries.get("isFree")).booleanValue();
-            /* Don't add hosts if they are down or disabled, */
-            if (status == -1 || status == 0) {
-                logger.info("NOT adding host " + hostname + " to host array because it is down or disabled");
-                continue;
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        for (final Map<String, Object> hosterinfo : hosters) {
+            final String hostname = hosterinfo.get("name").toString();
+            final MultiHostHost mhost = new MultiHostHost();
+            final int status = ((Number) hosterinfo.get("status")).intValue();
+            final boolean isFreeHost = ((Boolean) hosterinfo.get("isFree")).booleanValue();
+            if (status == -1) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (status == 0) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             } else if (isFree && !isFreeHost) {
-                /* Don't add hosts which are not supported via the current account type - important for free accounts. */
-                logger.info("NOT adding host " + hostname + " to host array because user has a free account and this is not a free host");
-                continue;
-            } else {
-                /* Add all domains of this host */
-                final List<String> domains = (List<String>) entries.get("domains");
-                final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
-                for (final String domain : domains) {
-                    // supportedHosts.add((String) domainO);
-                    supportedHostsTmp.add(domain);
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+            }
+            /* Add all domains of this host */
+            final List<String> domains = (List<String>) hosterinfo.get("domains");
+            mhost.setDomains(domains);
+            /* Find- and set limits */
+            Map<String, Object> limit_info_map = null;
+            for (final Map<String, Object> hoster_limit_info : resp_downloader_limits_all_value_hosters) {
+                final String hoster_limit_info_hostname = hoster_limit_info.get("name").toString();
+                if (hoster_limit_info_hostname.equals(hostname)) {
+                    limit_info_map = hoster_limit_info;
+                    break;
                 }
-                /* Workaround: Find our "real host" which we internally use -> We need this later! */
-                final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(null, supportedHostsTmp);
-                if (hostsReal == null) {
-                    continue;
-                }
+            }
+            if (limit_info_map != null) {
+                final Map<String, Object> trafficLimit = (Map<String, Object>) limit_info_map.get("daySize");
+                mhost.setTrafficMax(((Number) trafficLimit.get("value")).longValue());
+                mhost.setTrafficLeft(mhost.getTrafficMax() - ((Number) trafficLimit.get("current")).longValue());
+                final Map<String, Object> downloadsNumberLimit = (Map<String, Object>) limit_info_map.get("dayCount");
+                mhost.setLinksMax(((Number) downloadsNumberLimit.get("value")).longValue());
+                mhost.setLinksLeft(mhost.getLinksMax() - ((Number) downloadsNumberLimit.get("current")).longValue());
+            }
+            /* Workaround: Find our "real host" which we internally use -> We need this later! */
+            final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(null, domains);
+            if (hostsReal != null) {
+                /* Legacy code */
                 int index = -1;
                 for (final String realHost : hostsReal) {
                     index += 1;
                     if (realHost == null) {
                         continue;
-                    }
-                    if (!supportedHosts.contains(realHost)) {
-                        supportedHosts.add(realHost);
                     }
                     if (index == 0) {
                         /* Allow only exactly one host as mapping -> Should be fine in most of all cases */
@@ -236,28 +249,27 @@ public class DebridLinkCom extends PluginForHost {
                     }
                 }
             }
+            supportedhosts.add(mhost);
         }
-        ac.setMultiHostSupport(this, supportedHosts);
-        br.getPage(this.getApiBase() + "/downloader/limits/all");
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("value");
+        ac.setMultiHostSupportV2(this, supportedhosts);
         /** How much percent of the (daily?) quota is used up so far? */
-        final Map<String, Object> usagePercentMap = (Map<String, Object>) entries.get("usagePercent");
+        final Map<String, Object> usagePercentMap = (Map<String, Object>) resp_downloader_limits_all_value.get("usagePercent");
+        final Map<String, Object> nextResetSecondsMap = (Map<String, Object>) resp_downloader_limits_all_value.get("nextResetSeconds");
         final int usedPercent = ((Number) usagePercentMap.get("current")).intValue();
+        if (usedPercent >= 100) {
+            throw new AccountUnavailableException("Reached daily download limit", 5 * 60 * 1000l);
+        }
         if (!StringUtils.isEmpty(ac.getStatus())) {
             ac.setStatus(ac.getStatus() + " | " + usedPercent + "% used");
         }
-        final Map<String, Object> nextResetSecondsMap = (Map<String, Object>) entries.get("nextResetSeconds");
         final int nextResetSeconds = ((Number) nextResetSecondsMap.get("value")).intValue();
         synchronized (quotaReachedHostsList) {
             quotaReachedHostsList.clear();
             nextQuotaReachedResetTimestamp.set(System.currentTimeMillis() + nextResetSeconds * 1001l);
-            final List<Object> hosters2 = (List<Object>) entries.get("hosters");
-            for (final Object hostO : hosters2) {
-                entries = (Map<String, Object>) hostO;
-                final String hostname = (String) entries.get("name");
-                final Map<String, Object> trafficLimit = (Map<String, Object>) entries.get("daySize");
-                final Map<String, Object> downloadsNumberLimit = (Map<String, Object>) entries.get("dayCount");
+            for (final Map<String, Object> this_hoster_limit_info : resp_downloader_limits_all_value_hosters) {
+                final String hostname = this_hoster_limit_info.get("name").toString();
+                final Map<String, Object> trafficLimit = (Map<String, Object>) this_hoster_limit_info.get("daySize");
+                final Map<String, Object> downloadsNumberLimit = (Map<String, Object>) this_hoster_limit_info.get("dayCount");
                 /* Check if user has exceeded any of the current host limits -> Then we won't allow this user to download. */
                 boolean userHasReachedLimit = ((Number) trafficLimit.get("current")).longValue() >= ((Number) trafficLimit.get("value")).longValue() || ((Number) downloadsNumberLimit.get("current")).longValue() >= ((Number) downloadsNumberLimit.get("value")).longValue();
                 if (userHasReachedLimit) {

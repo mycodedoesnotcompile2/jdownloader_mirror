@@ -78,8 +78,6 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.JSonStorage;
@@ -91,6 +89,7 @@ import org.appwork.uio.UserIODefinition;
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.ImageProvider.ImageProvider;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -106,6 +105,8 @@ import org.appwork.utils.swing.dialog.locator.CenterOfScreenDialogLocator;
 import org.appwork.utils.swing.dialog.locator.DialogLocator;
 import org.appwork.utils.swing.windowmanager.WindowManager;
 import org.appwork.utils.swing.windowmanager.WindowManager.FrameState;
+
+import net.miginfocom.swing.MigLayout;
 
 public abstract class AbstractDialog<T> implements ActionListener, WindowListener, OKCancelCloseUserIODefinition, WindowFocusListener, ComponentListener {
     protected static int                          BUTTON_HEIGHT           = -1;
@@ -663,6 +664,7 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
                     dialog.pack();
                 }
             } catch (Exception e) {
+                Exceptions.resetInterruptFlag(e);
                 // try catch as long as we are sure that this cannot throw anything
             }
             this.setVisible(true);

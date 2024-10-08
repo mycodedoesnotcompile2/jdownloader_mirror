@@ -34,8 +34,10 @@
 package org.appwork.storage.flexijson.mapper.mod;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
@@ -199,11 +201,11 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
             return -1;
         }
         final int modsBefore = this.changes;
-        final FlexiJSonObject set = mod.getSet();
+        final LinkedHashMap<String, Object> set = mod.getSet();
         if (set != null) {
             this.set(set, false);
         }
-        final FlexiJSonObject setIfUnset = mod.getSetIfUnset();
+        final LinkedHashMap<String, Object> setIfUnset = mod.getSetIfUnset();
         if (setIfUnset != null) {
             this.set(setIfUnset, true);
         }
@@ -300,9 +302,9 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
      * @param onlyIfUnset
      * @throws MergeException
      */
-    private void set(final FlexiJSonObject set, final boolean onlyIfUnset) throws MergeException {
-        for (final KeyValueElement e : set.getElements()) {
-            final FlexiJSonNode value = e.getValue();
+    private void set(final LinkedHashMap<String, Object> set, final boolean onlyIfUnset) throws MergeException {
+        for (final Entry<String, Object> e : set.entrySet()) {
+            final Object value = e.getValue();
             if (value == null) {
                 continue;
             }
@@ -331,7 +333,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
     private LogInterface logger = new ConsoleLogImpl();
     private int          changes;
 
-    protected void set(final JSPath jsPath, final FlexiJSonNode value, final boolean onlyIfUnset) throws IllegalPathException, FlexiMapperException {
+    protected void set(final JSPath jsPath, final Object value, final boolean onlyIfUnset) throws IllegalPathException, FlexiMapperException {
         final FlexiJSonNode targetNode = this.resolve(this.targetObject, jsPath, value);
         if (targetNode == value) {
             // already done by the resolver
@@ -343,7 +345,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
         if (parent instanceof FlexiJSonArray) {
             // try {
             int index2 = ((FlexiJSonArray) parent).indexOf(targetNode);
-            ((FlexiJSonArray) parent).set(index2, value);
+            ((FlexiJSonArray) parent).set(index2, mapper.objectToJsonNode(value));
             if (this.logger != null) {
                 this.logger.info("Set in array " + value);
             }
@@ -389,9 +391,10 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
             }
             System.out.println(value.toString());
             if (element != null) {
-                element.setValue(value);
-                value.setParent(parent);
-                ((FlexiJSonObject) parent).put(String.valueOf(pathElement), value);
+                FlexiJSonNode node = mapper.objectToJsonNode(value);
+                element.setValue(node);
+                node.setParent(parent);
+                ((FlexiJSonObject) parent).put(String.valueOf(pathElement), node);
             }
             if (this.logger != null) {
                 final Object old = ((FlexiJSonObject) parent).getNode(String.valueOf(pathElement));
@@ -476,8 +479,9 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
      * @param value
      * @return
      * @throws IllegalPathException
+     * @throws FlexiMapperException
      */
-    private FlexiJSonNode resolve(FlexiJSonNode parent, final JSPath jsPath, FlexiJSonNode value) throws IllegalPathException {
+    private FlexiJSonNode resolve(FlexiJSonNode parent, final JSPath jsPath, Object value) throws IllegalPathException, FlexiMapperException {
         // customPathhandlers.put(null, );
         // Map<String, PathHandler> before = Condition.PATH_HANDLERS.get();
         // try {
@@ -487,7 +491,8 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
         // Condition.PATH_HANDLERS.set(before);
         // }
         try {
-            ResolverCondition resolver = new ResolverCondition(this, jsPath.getLast(), value);
+            FlexiJSonNode node = mapper.objectToJsonNode(value);
+            ResolverCondition resolver = new ResolverCondition(this, jsPath.getLast(), node);
             resolver.initFlexiHandler();
             Object ret = resolver.resolveKeyPath(new Scope(parent), jsPath).getLast();
             if (ret == Condition.KEY_DOES_NOT_EXIST || ret == null) {

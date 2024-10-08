@@ -286,7 +286,6 @@ public abstract class Plugin implements ActionListener {
                 ret = ret.substring(0, anchorIndex);
             }
         }
-        ret = URLEncode.decodeURIComponent(ret);
         {
             final int fileIndex = Math.max(ret.lastIndexOf("/"), ret.lastIndexOf("\\"));
             /* cut off directory */
@@ -294,6 +293,7 @@ public abstract class Plugin implements ActionListener {
                 ret = ret.substring(fileIndex + 1);
             }
         }
+        ret = URLEncode.decodeURIComponent(ret);
         ret = Encoding.htmlOnlyDecode(ret);
         return ret;
     }

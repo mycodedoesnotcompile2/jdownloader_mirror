@@ -1630,7 +1630,11 @@ public class StorableValidator<T> {
             final Condition c = new Condition(toDo.path.withPrefix(Condition.$$THIS).toPathString(true), FlexiCondition.parse("{$ne:null}", true, Condition.class));
             boolean result = c.matches(this.result);
             if (!result) {
-                add(new ValidatorValueIsNullException(StorableValidator.this, toDo.path, toDo.node, toDo.type, a));
+                FlexiJSonNode node = toDo.node;
+                if (node == null) {
+                    node = this.rootNode.resolvePath(toDo.path.getParent());
+                }
+                add(new ValidatorValueIsNullException(StorableValidator.this, toDo.path, node, toDo.type, a));
             }
         } catch (final Exception e) {
             throw new WTFException(e);

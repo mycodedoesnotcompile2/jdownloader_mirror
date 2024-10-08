@@ -50,16 +50,12 @@ import org.appwork.storage.flexijson.JSPath.MetaElement;
 import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
-import org.appwork.storage.flexijson.mapper.mod.FlexiModifier;
-import org.appwork.storage.flexijson.mapper.mod.JsonModification;
-import org.appwork.storage.flexijson.mapper.mod.MergeException;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyPrinterForConfig;
 import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.PropertyJSonPrettyStringify;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
-import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -639,36 +635,6 @@ public class FlexiUtils {
             throw new WTFException(e);
         } catch (final FlexiParserException e) {
             throw new WTFException(e);
-        }
-    }
-
-    /**
-     * Overwrites all fields in add or creates a new file
-     *
-     * @param file
-     * @param add
-     * @return
-     * @throws IOException
-     * @throws FlexiMapperException
-     * @throws FlexiParserException
-     * @throws MergeException
-     */
-    public static FlexiJSonObject overwrite(final File file, final FlexiJSonObject add) throws FlexiParserException, FlexiMapperException, IOException, MergeException {
-        try {
-            if (file.isFile()) {
-                final FlexiJSonObject node = FlexiUtils.readObject(file, FlexiJSonObject.class);
-                final JsonModification mod = new JsonModification();
-                mod.setSet(add);
-                new FlexiModifier(node).merge(mod);
-                IO.secureWrite(file, serializeToPrettyJson(node), SYNC.META_AND_DATA);
-                return node;
-            } else {
-                IO.secureWrite(file, serializeToPrettyJson(add), SYNC.META_AND_DATA);
-                return add;
-            }
-        } catch (final IOException e) {
-            e.printStackTrace();
-            throw e;
         }
     }
 

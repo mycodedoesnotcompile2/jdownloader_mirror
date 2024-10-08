@@ -50,7 +50,7 @@ public class LinkCrawlerRule {
     }
 
     public Object getCookies() {
-        return cookies;
+        return _getCookies();
     }
 
     public void setCookies(final Object obj) {
@@ -76,8 +76,12 @@ public class LinkCrawlerRule {
         return headers;
     }
 
-    public void setHeaders(List<String[]> headers) {
-        this.headers = headers;
+    public void setHeaders(final List<String[]> headers) {
+        if (headers == null || headers.size() == 0) {
+            this.headers = null;
+        } else {
+            this.headers = new ArrayList<String[]>(headers);
+        }
     }
 
     public Map<String, Object> getPropertyPatterns() {
@@ -195,12 +199,16 @@ public class LinkCrawlerRule {
         return false;
     }
 
-    private void _setCookies(List<String[]> cookies) {
+    protected void _setCookies(final List<String[]> cookies) {
         if (cookies == null || cookies.size() == 0) {
             this.cookies = null;
         } else {
-            this.cookies = cookies;
+            this.cookies = new ArrayList<String[]>(cookies);
         }
+    }
+
+    protected List<String[]> _getCookies() {
+        return cookies;
     }
 
     public void applyCookiesAndHeaders(final Browser br, final String url, final boolean onlyOnPatternMatch) {
@@ -213,7 +221,7 @@ public class LinkCrawlerRule {
         if (onlyOnPatternMatch && !matches(url)) {
             return false;
         }
-        final List<String[]> cookies = this.cookies;
+        final List<String[]> cookies = _getCookies();
         if (cookies == null || cookies.size() == 0) {
             return false;
         }

@@ -67,6 +67,10 @@ public class CompiledTypeTests<T extends Object> extends AWTest {
         B
     }
 
+    public static interface MyInterface {
+        public String getString();
+    }
+
     /*
      * (non-Javadoc)
      *
@@ -74,6 +78,18 @@ public class CompiledTypeTests<T extends Object> extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
+        Class<?> clss = new MyInterface() {
+            @Override
+            public String getString() {
+                return null;
+            }
+        }.getClass();
+        CompiledType inter = CompiledType.create(MyInterface.class);
+        CompiledType anonym = CompiledType.create(clss);
+        assertTrue(anonym.isInstanceOf(MyInterface.class));
+        // To Discuss. name of anonym interface implementation? analog to skip anonym?
+        assertTrue(MyInterface.class.getSimpleName().equals(anonym.toString(new JavaSyntax(true).skipAnonymousClasses(true))));
+        assertTrue("".equals(anonym.toString()));
         ClassCache cc = ClassCache.getClassCache(A.class);
         assertTrue(cc.getAllGetter().size() == 1);
         final AbstractNameScheme javaRule = new JavaSyntax();

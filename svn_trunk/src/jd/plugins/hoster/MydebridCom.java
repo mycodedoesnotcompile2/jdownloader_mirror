@@ -21,18 +21,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
-import jd.config.Property;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -42,11 +41,12 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
 public class MydebridCom extends antiDDoSForHost {
     /* Documentation: https://api.mydebrid.com/v1/ */
     private static final String                  API_BASE             = "https://api.mydebrid.com/v1";
@@ -104,30 +104,47 @@ public class MydebridCom extends antiDDoSForHost {
     }
 
     private void handleDL(final Account account, final DownloadLink link) throws Exception {
-        String dllink = checkDirectLink(link, this.getHost() + PROPERTY_directlink);
-        if (dllink == null) {
+        final String directlinkproperty = this.getHost() + PROPERTY_directlink;
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Trying to re-use stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
             this.loginAPI(account, false);
             final String token = account.getStringProperty(PROPERTY_logintoken);
             postPage(API_BASE + "/get-download-url", String.format("token=%s&fileUrl=%s", Encoding.urlEncode(token), Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this))));
-            dllink = PluginJSonUtils.getJsonValue(br, "downloadUrl");
+            final Map<String, Object> entries = handleErrors(br, account, null);
+            dllink = (String) entries.get("downloadUrl");
             if (StringUtils.isEmpty(dllink)) {
-                handleErrors(this.br, account, link);
-                mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
+                /* This should never happen */
+                mhm.handleErrorGeneric(account, link, "Failed to find final downloadurl", 50, 5 * 60 * 1000l);
             }
         }
         boolean resume = defaultRESUME;
         int maxchunks = defaultMAXCHUNKS;
         if (individualHostLimits.containsKey(link.getHost())) {
-            final Map<String, Long> limitMap = (Map<String, Long>) individualHostLimits.get(link.getHost());
+            final Map<String, Integer> limitMap = (Map<String, Integer>) individualHostLimits.get(link.getHost());
             resume = limitMap.get("resumable") == 1 ? true : false;
-            maxchunks = ((Number) limitMap.get("max_chunks")).intValue();
+            maxchunks = limitMap.get("max_chunks").intValue();
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxchunks);
-        link.setProperty(this.getHost() + PROPERTY_directlink, dl.getConnection().getURL().toString());
-        if (dl.getConnection().getContentType().contains("html")) {
-            br.followConnection();
-            handleErrors(this.br, account, link);
-            mhm.handleErrorGeneric(account, link, "unknown_dl_error", 20, 5 * 60 * 1000l);
+        try {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxchunks);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection();
+                handleErrors(this.br, account, link);
+                mhm.handleErrorGeneric(account, link, "Unknown download error", 20, 5 * 60 * 1000l);
+            }
+        } catch (final Exception e) {
+            if (storedDirecturl != null) {
+                link.removeProperty(directlinkproperty);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
+            } else {
+                throw e;
+            }
+        }
+        if (storedDirecturl == null) {
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         this.dl.startDownload();
     }
@@ -143,53 +160,26 @@ public class MydebridCom extends antiDDoSForHost {
         handleDL(account, link);
     }
 
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                con = br2.openHeadConnection(dllink);
-                if (con.getContentType().contains("text") || !con.isOK() || con.getLongContentLength() == -1) {
-                    link.setProperty(property, Property.NULL);
-                    dllink = null;
-                }
-            } catch (final Exception e) {
-                logger.log(e);
-                link.setProperty(property, Property.NULL);
-                dllink = null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
-            }
-        }
-        return dllink;
-    }
-
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
-        loginAPI(account, true);
+        Map<String, Object> entries = loginAPI(account, true);
         final String token = account.getStringProperty(PROPERTY_logintoken);
         if (br.getURL() == null || !br.getURL().contains("/account-status")) {
             this.postPage(API_BASE + "/account-status", "token=" + Encoding.urlEncode(token));
-            handleErrors(br, account, null);
+            entries = handleErrors(br, account, null);
         }
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final AccountInfo ai = new AccountInfo();
         boolean is_premium = "premium".equalsIgnoreCase((String) entries.get("accountType"));
         /* 2020-05-06: This will usually return "unlimited" */
         // final String trafficleft = (String) entries.get("remainingTraffic");
         if (!is_premium) {
             /* Assume free accounts cannot be used to download anything */
             account.setType(AccountType.FREE);
-            ai.setStatus("Free account");
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
             ai.setTrafficLeft(0);
+            ai.setExpired(true);
         } else {
             account.setType(AccountType.PREMIUM);
-            ai.setStatus("Premium account");
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
             final String expireDate = (String) entries.get("expiryDate");
             if (!StringUtils.isEmpty(expireDate)) {
@@ -198,101 +188,107 @@ public class MydebridCom extends antiDDoSForHost {
             ai.setUnlimitedTraffic();
         }
         postPage(API_BASE + "/get-hosts", "token=" + token);
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final ArrayList<String> supportedhostslist = new ArrayList<String>();
-        final List<Object> ressourcelist = (List<Object>) entries.get("hosts");
+        final Map<String, Object> get_hosts_resp = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) get_hosts_resp.get("hosts");
         final PluginFinder finder = new PluginFinder();
-        for (final Object hostO : ressourcelist) {
-            entries = (Map<String, Object>) hostO;
-            final String host = (String) entries.get("name");
-            if (StringUtils.isEmpty(host)) {
-                /* This should never happen */
-                continue;
+        for (final Map<String, Object> hostinfo : ressourcelist) {
+            final String domain = hostinfo.get("name").toString();
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            /* These fields contain either the string "unlimited" */
+            final Object trafficMaxO = hostinfo.get("dailyLimit");
+            final Object trafficLeftO = hostinfo.get("remaining");
+            if (trafficLeftO instanceof Number) {
+                mhost.setTrafficLeft(((Number) trafficLeftO).longValue());
             }
-            long max_chunks = 1;
-            long resumable = 0;
-            // final long hostTrafficMaxDaily = JavaScriptEngineFactory.toLong(entries.get("dailyLimit"), 0);
-            final long hostTrafficLeft = JavaScriptEngineFactory.toLong(entries.get("remaining"), -1);
-            if (hostTrafficLeft == 0) {
-                logger.info("Skipping host because no traffic left: " + host);
-                continue;
+            if (trafficMaxO instanceof Number) {
+                mhost.setTrafficMax(((Number) trafficMaxO).longValue());
             }
-            max_chunks = JavaScriptEngineFactory.toLong(entries.get("maxChunks"), 1);
+            mhost.setMaxDownloads(((Number) hostinfo.get("maxDownloads")).intValue());
+            int max_chunks = ((Number) hostinfo.get("maxChunks")).intValue();
             if (max_chunks <= 0) {
                 max_chunks = 1;
             } else if (max_chunks > 1) {
                 max_chunks = -max_chunks;
             }
-            final boolean canResume = ((Boolean) entries.get("resumable")).booleanValue();
+            final boolean canResume = ((Boolean) hostinfo.get("resumable")).booleanValue();
+            final int resumable;
             if (canResume) {
                 resumable = 1;
             } else {
                 resumable = 0;
             }
-            final String originalHost = finder.assignHost(host);
+            final String originalHost = finder.assignHost(domain);
             if (originalHost == null) {
                 /* This should never happen */
-                logger.info("Skipping host because failed to find supported/original host: " + host);
+                logger.info("Skipping host because failed to find supported/original host: " + domain);
                 continue;
             }
-            supportedhostslist.add(originalHost);
-            final LinkedHashMap<String, Long> limits = new LinkedHashMap<String, Long>();
+            supportedhosts.add(mhost);
+            final LinkedHashMap<String, Integer> limits = new LinkedHashMap<String, Integer>();
             limits.put("max_chunks", max_chunks);
             limits.put("resumable", resumable);
             individualHostLimits.put(originalHost, limits);
         }
-        ai.setMultiHostSupport(this, supportedhostslist);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
 
-    private void loginAPI(final Account account, final boolean forceAuthCheck) throws Exception {
+    private Map<String, Object> loginAPI(final Account account, final boolean forceAuthCheck) throws Exception {
         String token = account.getStringProperty(PROPERTY_logintoken);
+        Map<String, Object> entries = null;
         if (token != null) {
             logger.info("Attempting token login");
-            /*
-             * 2020-03-24: No idea how long their token is supposed to last but I guess it should be permanent because a full login requires
-             * a captcha!
-             */
-            if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 5 * 60 * 1000l && !forceAuthCheck) {
-                /* We trust our token --> Do not check it */
-                logger.info("Trust login token as it is not that old");
-                return;
+            if (!forceAuthCheck) {
+                /* Do not validate token */
+                return null;
             }
             this.postPage(API_BASE + "/account-status", "token=" + Encoding.urlEncode(token));
             if (br.getHttpConnection().getResponseCode() == 200) {
                 logger.info("Token login successful");
                 /* We don't really need the cookies but the timestamp ;) */
-                account.saveCookies(br.getCookies(br.getHost()), "");
-                return;
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                return entries;
             } else {
                 /* Most likely 401 unauthorized */
                 logger.info("Token login failed");
-                br.clearAll();
+                br.clearCookies(null);
+                account.removeProperty(PROPERTY_logintoken);
             }
         }
         /* Drop previous headers & cookies */
         logger.info("Performing full login");
         final String postData = String.format("username=%s&password=%s", Encoding.urlEncode(account.getUser()), Encoding.urlEncode(account.getPass()));
         postPage(API_BASE + "/login", postData);
+        entries = handleErrors(br, account, null);
         token = PluginJSonUtils.getJson(br, "token");
         if (StringUtils.isEmpty(token)) {
-            handleErrors(br, account, null);
             /* This should never happen - do not permanently disable accounts for unexpected login errors! */
             throw new PluginException(LinkStatus.ERROR_PREMIUM, "Unknown login failure", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
         }
         account.setProperty(PROPERTY_logintoken, token);
-        /* We don't really need the cookies but the timestamp ;) */
-        account.saveCookies(br.getCookies(br.getHost()), "");
+        return entries;
     }
 
     /** Handles errors according to: https://api.mydebrid.com/v1/#errors */
-    private void handleErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
-        final String errormsg = getErrormessage(br);
-        if (StringUtils.isEmpty(errormsg)) {
-            /* No error */
-            return;
+    private Map<String, Object> handleErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException jme) {
+            final String errortext = "Bad API response";
+            if (link != null) {
+                mhm.handleErrorGeneric(account, this.getDownloadLink(), errortext, 50, 5 * 60 * 1000l);
+            } else {
+                throw Exceptions.addSuppressed(new AccountUnavailableException(errortext, 1 * 60 * 1000l), jme);
+            }
         }
+        if (Boolean.TRUE.equals(entries.get("success"))) {
+            /* No error */
+            return entries;
+        }
+        final String errormsg = entries.get("error").toString();
         if (errormsg.equalsIgnoreCase("INVALID_CREDENTIALS")) {
             /* Usually goes along with http response 400 */
             throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -318,16 +314,8 @@ public class MydebridCom extends antiDDoSForHost {
                 mhm.handleErrorGeneric(account, link, errormsg, 50);
             }
         }
-    }
-
-    private String getErrormessage(final Browser br) {
-        String errormsg = null;
-        try {
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            errormsg = (String) entries.get("error");
-        } catch (final Throwable e) {
-        }
-        return errormsg;
+        /* This code should never be reached */
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
 
     @Override

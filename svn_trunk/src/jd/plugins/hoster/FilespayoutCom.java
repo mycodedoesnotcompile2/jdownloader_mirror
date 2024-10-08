@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -26,9 +27,9 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
-public class FreedlInk extends XFileSharingProBasic {
-    public FreedlInk(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = {}, urls = {})
+public class FilespayoutCom extends XFileSharingProBasic {
+    public FilespayoutCom(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -37,13 +38,13 @@ public class FreedlInk extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2023-12-06: reCaptchaV2 <br />
+     * captchatype-info: 2024-10-07: null <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "freedl.ink", "frdl.to" });
+        ret.add(new String[] { "filespayout.com" });
         return ret;
     }
 
@@ -65,13 +66,13 @@ public class FreedlInk extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
+            return true;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
@@ -80,29 +81,15 @@ public class FreedlInk extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
+            return 0;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
-    // @Override
-    // protected String regexWaittime(final Browser br) {
-    // String waitSecondsStr = super.regexWaittime(br);
-    // if (waitSecondsStr == null && this.isLoggedin(br)) {
-    // /**
-    // * 2024-07-15: Workaround for broken website when user is logged in: Website owner forgot to add wait time in html while it is
-    // * required. </br>
-    // * Reference: https://board.jdownloader.org/showthread.php?t=95609
-    // */
-    // logger.info("Pre download wait workaround active");
-    // waitSecondsStr = "60";
-    // }
-    // return waitSecondsStr;
-    // }
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
@@ -117,5 +104,15 @@ public class FreedlInk extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected String regexWaittime(final String html) {
+        final String waitStr = new Regex(html, "id=\"seconds\"[^>]*>\\s*(\\d+)").getMatch(0);
+        if (waitStr != null) {
+            return waitStr;
+        } else {
+            return super.regexWaittime(html);
+        }
     }
 }

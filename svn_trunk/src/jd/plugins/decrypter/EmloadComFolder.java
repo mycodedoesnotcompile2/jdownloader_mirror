@@ -18,11 +18,14 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -33,9 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
-@DecrypterPlugin(revision = "$Revision: 47434 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
 public class EmloadComFolder extends antiDDoSForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
@@ -76,14 +77,14 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
         }
         getPage(parameter);
         /* Keep this errorhandling although, if an account is available, we should be logged in at this stage! */
-        if (br.containsHTML(">This link only for premium")) {
-            final DownloadLink link = createOfflinelink(parameter);
-            link.setName("PremiumOnly:" + link.getName());
-            ret.add(link);
-            return ret;
-        } else if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("file-remove-|is empty...<")) {
-            ret.add(createOfflinelink(parameter));
-            return ret;
+        if (br.containsHTML(">\\s*This link only for premium")) {
+            throw new AccountRequiredException();
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("file-remove-|is empty...<")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*This could be due to the following reasons")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String fpName = br.getRegex("<h2>Folder :([^<>\"]+): \\d+ Files </h2>").getMatch(0);
         final String[] links = br.getRegex("(https?://(?:www\\.)?wdupload\\.com/(?:v2/)?file/[^<>\"]+)\"").getColumn(0);

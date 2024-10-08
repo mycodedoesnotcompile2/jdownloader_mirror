@@ -61,6 +61,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.zip.GZIPInputStream;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Files.AbstractHandler;
 import org.appwork.utils.IO.BOM.BOMInputStream;
 import org.appwork.utils.net.Base64InputStream;
@@ -250,6 +251,7 @@ public class IO {
         UTF16LE(new byte[] { (byte) 255, (byte) 254 }, "UTF-16LE"),
         UTF32BE(new byte[] { (byte) 0, (byte) 0, (byte) 254, (byte) 255 }, "UTF-32BE"),
         UTF32LE(new byte[] { (byte) 0, (byte) 0, (byte) 255, (byte) 254 }, "UTF-32LE");
+
         public static class BOMInputStream extends FilterInputStream {
             private final BOM bom;
 
@@ -381,6 +383,7 @@ public class IO {
                         if (retry == 2 && CrossSystem.isWindows()) {
                             // http://stackoverflow.com/questions/10516472/file-createnewfile-randomly-fails
                             // http://bugs.java.com/bugdatabase/view_bug.do?bug_id=6213298
+                            LogV3.info("GC");
                             System.gc();
                         }
                         try {
@@ -413,7 +416,7 @@ public class IO {
     /*
      * this function reads a line from a bufferedinputstream up to a maxLength. in case the line is longer than maxLength the rest of the
      * line is read but not returned
-     * 
+     *
      * this function skips emtpy lines
      */
     public static byte[] readFile(final File ressource, final int maxSize) throws IOException {

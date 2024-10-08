@@ -208,7 +208,7 @@ public class Cookies {
      * Firefox: FlagThisCookie: https://github.com/jrie/flagCookies
      */
     public static Cookies parseCookiesFromJsonString(final String str, final LogInterface logger) {
-        return parseCookiesFromObject(str, logger);
+        return Cookies.parseCookiesFromObject(str, logger);
     }
 
     public static Cookies parseCookiesFromObject(Object input, final LogInterface logger) {
@@ -217,7 +217,7 @@ public class Cookies {
         }
         if (input instanceof String) {
             final String jsonStr = input.toString();
-            if (jsonStr == null || (!jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") && !jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$"))) {
+            if (jsonStr == null || !jsonStr.matches("(?s)^\\s*\\{.*\\}\\s*$") && !jsonStr.matches("(?s)^\\s*\\[.*\\]\\s*$")) {
                 return null;
             }
             try {
@@ -232,28 +232,13 @@ public class Cookies {
         }
         try {
             final long timeStamp = Time.timestamp();
-            if (input instanceof List) {
-                /* Cookies from EditThisCookie or JDownloaders' proprietary cookie list format */
-                final Cookies cookies = new Cookies();
-                final List<Object> cookiesO = (List<Object>) input;
-                for (final Object cookieO : cookiesO) {
+            final List<Object> entries = ReflectionUtils.wrapList(input, false, Object.class);
+            if (entries != null) {
+                final Cookies ret = new Cookies();
+                for (final Object entry : entries) {
                     final Cookie cookie = new Cookie();
-                    if (cookieO instanceof String[]) {
-                        /* JDownloaders' cookies from LinkCrawler rule when rule stores them */
-                        final String[] cookiesStringList = (String[]) cookieO;
-                        final Object keyO = cookiesStringList[0];
-                        final Object valueO = cookiesStringList[1];
-                        cookie.setKey(keyO.toString());
-                        if(valueO != null) {
-                            cookie.setValue(valueO.toString());
-                        }
-           
-                        if(cookiesStringList.length == 3) {
-                            cookie.setHost(cookiesStringList[2].toString());
-                        }
-                    } else if (cookieO instanceof List) {
-                        /* JDownloaders' cookies from LinkCrawler rule: List of lists */
-                        final List<String> cookiesList = (List<String>) cookieO;
+                    final List<String> cookiesList = ReflectionUtils.wrapList(entry, false, String.class);
+                    if (cookiesList != null) {
                         final int listSize = cookiesList.size();
                         if (listSize == 1) {
                             cookie.setKey(cookiesList.get(0));
@@ -268,9 +253,9 @@ public class Cookies {
                             // wtf
                             continue;
                         }
-                    } else {
+                    } else if (entry instanceof Map) {
                         /* Cookies exported via browser addon 'EditThisCookie': https://www.editthiscookie.com/ */
-                        final Map<String, Object> cookieInfo = (Map<String, Object>) cookieO;
+                        final Map<String, Object> cookieInfo = (Map<String, Object>) entry;
                         final String domain = (String) cookieInfo.get("domain");
                         final String key = (String) cookieInfo.get("name");
                         final String value = (String) cookieInfo.get("value");
@@ -292,7 +277,8 @@ public class Cookies {
                         cookie.setKey(key);
                         cookie.setValue(value);
                         cookie.setSecure(secure);
-                        cookies.add(cookie);
+                    } else {
+                        continue;
                     }
                     if (false && cookie.getExpireDate() >= 0) {
                         cookie.setHostTime(timeStamp);
@@ -302,19 +288,19 @@ public class Cookies {
                             continue;
                         }
                     }
-                    cookies.add(cookie);
+                    ret.add(cookie);
                 }
-                if (cookies.isEmpty()) {
+                if (ret.isEmpty()) {
                     throw new Exception("no parsed cookies!?");
                 } else {
-                    return cookies;
+                    return ret;
                 }
             } else if (input instanceof Map) {
-                final Cookies cookies = new Cookies();
+                final Cookies ret = new Cookies();
                 /* E.g. cookies exported via browser addon 'FlagCookies' */
                 final Map<String, Object> cookieMap = (Map<String, Object>) input;
                 final String userAgent = (String) cookieMap.get("userAgent");
-                cookies.setUserAgent(userAgent);
+                ret.setUserAgent(userAgent);
                 final Iterator<Entry<String, Object>> iteratorOuter = cookieMap.entrySet().iterator();
                 while (iteratorOuter.hasNext()) {
                     final Entry<String, Object> entryOuter = iteratorOuter.next();
@@ -361,14 +347,14 @@ public class Cookies {
                                     continue;
                                 }
                             }
-                            cookies.add(cookie);
+                            ret.add(cookie);
                         }
                     }
                 }
-                if (cookies.isEmpty()) {
+                if (ret.isEmpty()) {
                     throw new Exception("no parsed cookies!?");
                 } else {
-                    return cookies;
+                    return ret;
                 }
             } else {
                 /* Unknown/Unsupported format */

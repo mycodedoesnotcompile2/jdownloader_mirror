@@ -50,11 +50,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49927 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmloadCom extends PluginForHost {
     public EmloadCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.emload.com/premium");
+        this.enablePremium("https://www." + getHost() + "/premium");
     }
 
     @Override
@@ -182,7 +182,9 @@ public class EmloadCom extends PluginForHost {
         String filename = br.getRegex("filename wordwrap\"[^>]*>([^<]+)<").getMatch(0);
         String filesize = br.getRegex("filesize\"[^>]*>([^<]+)<").getMatch(0);
         if (!StringUtils.isEmpty(filename)) {
-            link.setName(Encoding.htmlDecode(filename).trim());
+            filename = Encoding.htmlDecode(filename).trim();
+            /* 2024-10-07: Server sends empty content-disposition string -> Set final filename here. */
+            link.setFinalFileName(filename);
         }
         if (!StringUtils.isEmpty(filesize)) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -205,18 +207,31 @@ public class EmloadCom extends PluginForHost {
             final String premiumonly_api = PluginJSonUtils.getJson(br, "premium_only_files");
             if (br.containsHTML("This link only for premium") || !StringUtils.isEmpty(premiumonly_api)) {
                 throw new AccountRequiredException();
+            } else if (br.containsHTML(">\\s*Max Filesize Limit Reached")) {
+                /* "As a free user you can download files up to X mb" */
+                throw new AccountRequiredException();
             }
-            /* 2020-01-20: TODO: Fix this! */
-            final String dl_server = br.getRegex("freeaccess=\"(http[^<>\"]+)\"").getMatch(0);
-            final String dl_token = br.getRegex("freetoken=\"([^<>\"]+)\"").getMatch(0);
-            final String userid = br.getRegex("uid\\s*?=\\s*?\"(\\d+)\"").getMatch(0);
-            if (StringUtils.isEmpty(dl_server) || StringUtils.isEmpty(dl_token) || StringUtils.isEmpty(userid)) {
+            String dl_server = br.getRegex("freeaccess=\"(http[^\"]+)").getMatch(0);
+            if (dl_server == null) {
+                /* 2024-10-07 */
+                dl_server = br.getRegex("data-srv=\"(http[^\"]+)").getMatch(0);
+            }
+            String dl_token = br.getRegex("freetoken=\"([^\"]+)").getMatch(0);
+            if (dl_token == null) {
+                /* 2024-10-07 */
+                dl_token = br.getRegex("data-dl=\"([^\"]+)").getMatch(0);
+            }
+            if (StringUtils.isEmpty(dl_server) || StringUtils.isEmpty(dl_token)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             /* 2018-10-18: Captcha is skippable */
             final boolean skipCaptcha = true;
             if (!skipCaptcha) {
+                final String userid = br.getRegex("uid\\s*?=\\s*?\"(\\d+)\"").getMatch(0);
+                if (userid == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
                 br.getPage("/api/" + userid + "/ddelay?userid=" + userid);
                 /* Usually 45 seconds */
                 final String waittimeStr = PluginJSonUtils.getJson(this.br, "");

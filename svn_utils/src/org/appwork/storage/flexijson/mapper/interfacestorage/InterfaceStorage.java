@@ -217,7 +217,7 @@ public class InterfaceStorage<InterfaceType> implements InvocationHandler {
      * @param old
      * @param object
      */
-    protected void onSet(String key, Object old, Object object) {        
+    protected void onSet(String key, Object old, Object object) {
     }
 
     private Object getWithUsingTheCache(final Getter getter, final String key) throws FlexiParserException, FlexiMapperException {
@@ -377,29 +377,7 @@ public class InterfaceStorage<InterfaceType> implements InvocationHandler {
             }
             return mapper.jsonToObject(defaultNode, new SimpleTypeRef<Object>(method.getGenericReturnType()));
         }
-        // internal defaultvalue
-        final Class<?> returnType = method.getReturnType();
-        if (Clazz.isByte(returnType)) {
-            return (byte) 0;
-        } else if (Clazz.isCharacter(returnType)) {
-            return (char) 0;
-        } else if (Clazz.isShort(returnType)) {
-            return (short) 0;
-        } else if (Clazz.isInteger(returnType)) {
-            return (int) 0;
-        } else if (Clazz.isLong(returnType)) {
-            return (long) 0l;
-        } else if (Clazz.isDouble(returnType)) {
-            return (double) 0.0;
-        } else if (Clazz.isFloat(returnType)) {
-            return (float) 0.0;
-        } else if (method.getReturnType() == Boolean.class) {
-            return Boolean.FALSE;
-        } else if (method.getReturnType() == boolean.class) {
-            return false;
-        } else {
-            return null;
-        }
+        return Clazz.getDefaultValue(method.getReturnType());
     }
 
     private volatile HashMap<String, PropertyHandler<InterfaceType, Object>> propertyHandlers = new HashMap<String, PropertyHandler<InterfaceType, Object>>();

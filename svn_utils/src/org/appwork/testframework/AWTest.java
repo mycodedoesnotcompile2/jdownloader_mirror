@@ -33,7 +33,6 @@
  * ==================================================================================================================================================== */
 package org.appwork.testframework;
 
-import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -55,7 +54,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
-import javax.imageio.ImageIO;
+import javax.swing.Icon;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -71,8 +70,10 @@ import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
+import org.appwork.utils.UniqueAlltimeID;
 import org.appwork.utils.net.LineParsingOutputStream;
 import org.appwork.utils.net.NoClosingInputStream;
 import org.appwork.utils.reflection.CompiledType;
@@ -636,9 +637,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             if (entry == null) {
                 throw new Exception("Path in Zip is missing: " + zip + "!" + path);
             }
-            final BufferedImage image = ImageIO.read(zipFile.getInputStream(entry));
-            if (w != image.getWidth() || h != image.getHeight()) {
-                throw new Exception("Image " + zip + "!" + path + " has wrong dimensions: " + image.getWidth() + "/" + image.getHeight() + " (Expected: " + w + "/" + h + ")");
+            File tmp = Application.getResource("tmp/image" + UniqueAlltimeID.next() + "." + Files.getExtension(path, true));
+            IO.secureWrite(tmp, IO.readStream(-1, zipFile.getInputStream(entry)));
+            Icon icon = org.appwork.resources.Theme.getFACTORY().urlToIcon(tmp.toURL(), -1, -1);
+            tmp.delete();
+            tmp.deleteOnExit();
+            if ( icon.getIconWidth()<w || icon.getIconHeight()<h) {
+                throw new Exception("Image " + zip + "!" + path + " has wrong dimensions: " + icon.getIconWidth() + "/" + icon.getIconHeight() + " (Expected: " + w + "/" + h + ")");
             }
         } finally {
             zipFile.close();

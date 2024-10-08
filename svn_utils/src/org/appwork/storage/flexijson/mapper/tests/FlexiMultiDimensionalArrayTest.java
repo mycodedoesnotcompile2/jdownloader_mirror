@@ -5,8 +5,8 @@
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
  *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Schwabacher StraÃŸe 117
+ *         90763 FÃ¼rth
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,57 +31,45 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.resources;
+package org.appwork.storage.flexijson.mapper.tests;
 
-import java.awt.Image;
-import java.net.URL;
+import java.lang.reflect.Type;
 
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.JComponent;
-
-import org.appwork.utils.ImageProvider.ImageProvider;
-import org.appwork.utils.images.IconIO;
-import org.appwork.utils.images.Interpolation;
+import org.appwork.storage.SimpleTypeRef;
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiParserException;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
+import org.appwork.storage.flexijson.mapper.FlexiMapperException;
+import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
+import org.appwork.testframework.AWTest;
+import org.appwork.utils.reflection.CompiledType;
+import org.appwork.utils.reflection.TypeBuilder;
 
 /**
  * @author thomas
- * @date 23.10.2023
+ * @date 25.06.2021
  *
  */
-public class DefaultIconFactory implements IconFactory {
-    /**
-     * @see org.appwork.resources.IconFactory#urlToIcon(java.net.URL, int, int)
-     */
-    @Override
-    public Icon urlToIcon(URL url, int w, int h) {
-        return IconIO.getIcon(url, w, h);
+public class FlexiMultiDimensionalArrayTest extends AWTest {
+    public static void main(String[] args) throws FlexiMapperException, FlexiParserException {
+        run();
     }
 
-    /**
-     * @see org.appwork.resources.IconFactory#scale(javax.swing.Icon, int, int)
+    /*
+     * (non-Javadoc)
+     *
+     * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
-    public Icon scale(Icon ret, int w, int h) {
-        return IconIO.getScaledInstance(ret, w, h, Interpolation.BILINEAR);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#getDisabled(javax.swing.JComponent, javax.swing.Icon)
-     */
-    @Override
-    public Icon getDisabled(JComponent component, Icon icon) {
-        return ImageProvider.getDisabledIcon(component, icon);
-    }
-
-    /**
-     * @see org.appwork.resources.IconFactory#toImage(javax.swing.Icon)
-     */
-    @Override
-    public Image toImage(Icon icon) {
-        if (icon instanceof ImageIcon) {
-            ((ImageIcon) icon).getImage();
-        }
-        return IconIO.toBufferedImage(icon);
+    public void runTest() throws Exception {
+        String input;
+        FlexiJSonNode node = new FlexiJSONParser(input = "[[1],[2],[3]]").parse();
+        int[][] result = (int[][]) new FlexiJSonMapper().jsonToObject(node, CompiledType.create(int[][].class));
+        Type type = new TypeBuilder().parse("int[][]");
+        int[][] result2 = (int[][]) new FlexiJSonMapper().jsonToObject(node, new SimpleTypeRef<Object>(type));
+        assertEqualsDeep(result, result2);
+        String loopResult = new FlexiJSonStringBuilder().toJSONString(new FlexiJSonMapper().objectToJsonNode(result));
+        assertEquals(input, loopResult);
     }
 }

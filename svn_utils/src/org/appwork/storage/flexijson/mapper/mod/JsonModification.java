@@ -34,6 +34,7 @@
 package org.appwork.storage.flexijson.mapper.mod;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -182,25 +183,26 @@ public class JsonModification<TargetType, MatcherType> implements Storable {
         this.priority = priority;
     }
 
-    private TargetType setIfUnset;
+    // LinkedHashMap is important, because some mods may rely on previous ones
+    private LinkedHashMap<String, Object> setIfUnset;
 
     @StorableDoc("Define fields to set if the path is not available in the target object - this can be used to define defaults")
-    public TargetType getSetIfUnset() {
+    public LinkedHashMap<String, Object> getSetIfUnset() {
         return setIfUnset;
     }
 
-    public void setSetIfUnset(TargetType setIfUnset) {
+    public void setSetIfUnset(LinkedHashMap<String, Object> setIfUnset) {
         this.setIfUnset = setIfUnset;
     }
 
-    private TargetType set;
+    private LinkedHashMap<String, Object> set;
 
     @StorableDoc("Define fields to set. Fields will get overwrittten")
-    public TargetType getSet() {
+    public LinkedHashMap<String, Object> getSet() {
         return set;
     }
 
-    public void setSet(TargetType set) {
+    public void setSet(LinkedHashMap<String, Object> set) {
         this.set = set;
     }
 

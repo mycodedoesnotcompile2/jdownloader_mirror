@@ -42,7 +42,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 49696 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,6 +69,18 @@ public class JpgChurch extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "jpg5.su", "jpg4.su", "jpg3.su", "jpg2.su", "jpg1.su", "jpeg.pet", "jpg.pet", "jpg.fishing", "jpg.fish", "jpg.church" });
         return ret;
+    }
+
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("jpg.church"); // 2024-10-07
+        deadDomains.add("jpg.fish"); // 2024-10-07
+        deadDomains.add("jpg.fishing"); // 2024-10-07
+        deadDomains.add("jpg.pet"); // 2024-10-07
+        deadDomains.add("jpeg.pet"); // 2024-10-07
+        deadDomains.add("jpg1.su"); // 2024-10-07
+        deadDomains.add("jpg2.su"); // 2024-10-07)
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {

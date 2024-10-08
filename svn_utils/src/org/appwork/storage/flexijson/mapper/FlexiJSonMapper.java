@@ -91,6 +91,7 @@ import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.FlexiUtils;
 import org.appwork.storage.flexijson.KeyValueElement;
+import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiStorableInterface;
 import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.LocaleMapMapper;
@@ -174,7 +175,7 @@ public class FlexiJSonMapper {
     protected CompiledType                     autoMapCollectionInterface    = this.autoMapFlexiJSonArrayclass;
     protected CompiledType                     autoMapMapInterface           = this.autoMapFlexiJSonObjectClass;
     protected CompiledType                     autoMapSetInterface           = CompiledType.create(new TypeRef<LinkedHashSet<Object>>() {
-                                                                             });                                 ;
+                                                                             });;
     private ArrayList<FlexiMapperException>    exceptions;
     private boolean                            ignoreDefaultValuesEnabled;
     private boolean                            tagDefaultValuesEnabled;
@@ -375,7 +376,7 @@ public class FlexiJSonMapper {
                 }
             }
             return ret;
-        } else/* if (obj instanceof Storable) */{
+        } else/* if (obj instanceof Storable) */ {
             InterfaceStorage<Object> is = null;
             if (obj instanceof Proxy && this.isIncludeInterfaceStorageBackendNode()) {
                 is = InterfaceStorage.get(obj);
@@ -421,8 +422,20 @@ public class FlexiJSonMapper {
                                 empty = this.createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                             }
                             if (empty != null) {
-                                if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
-                                    continue;
+                                if (cType.isAnonymousInterfaceImpl()) {
+                                    // empty is a proxy of the interface
+                                    try {
+                                        Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
+                                            continue;
+                                        }
+                                    } catch (NoSuchMethodException e) {
+                                        // seems to be a Anonymous method only available in the impl.no way to get a default value
+                                    }
+                                } else {
+                                    if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
+                                        continue;
+                                    }
                                 }
                             }
                         }
@@ -432,7 +445,17 @@ public class FlexiJSonMapper {
                                 empty = this.createDefaultObject(obj, cType, ret, g, cType.getClassCache().getSetter(g.key), context);
                             }
                             if (empty != null) {
-                                if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
+                                if (cType.isAnonymousInterfaceImpl()) {
+                                    // empty is a proxy of the interface
+                                    try {
+                                        Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
+                                            subNode.tag(FlexiMapperTags.DEFAULT_VALUE);
+                                        }
+                                    } catch (NoSuchMethodException e) {
+                                        // seems to be a Anonymous method only available in the impl.no way to get a default value
+                                    }
+                                } else if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
                                     subNode.tag(FlexiMapperTags.DEFAULT_VALUE);
                                 }
                             }
@@ -778,6 +801,10 @@ public class FlexiJSonMapper {
                 final FlexiJSonObject dummy = new FlexiJSonObject();
                 return this.initProxy(cType, dummy);
             }
+        }
+        if (cType.isInstanceOf(FlexiStorableInterface.class) && cType.isAnonymousInterfaceImpl()) {
+            final FlexiJSonObject dummy = new FlexiJSonObject();
+            return this.initProxy(CompiledType.create(cType.raw.getInterfaces()[0]), dummy);
         }
         /**
          * give the type mappers a try

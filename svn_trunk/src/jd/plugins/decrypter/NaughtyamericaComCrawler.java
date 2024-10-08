@@ -49,8 +49,10 @@ import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
 import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 49907 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49926 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
+    private NaughtyamericaConfig cfg;
+
     public NaughtyamericaComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -70,7 +72,24 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         return crawlContent(param, false);
     }
 
+    private DownloadLink getPreferredVariant(List<DownloadLink> entries, boolean preferh265) {
+        if (entries.size() == 0) {
+            return null;
+        } else if (entries.size() == 1) {
+            return entries.get(0);
+        }
+        for (final DownloadLink link : entries) {
+            if (preferh265 && link.getPluginPatternMatcher().contains("265.")) {
+                return link;
+            } else if (!preferh265 && !link.getPluginPatternMatcher().contains("265.")) {
+                return link;
+            }
+        }
+        return entries.get(0);
+    }
+
     public ArrayList<DownloadLink> crawlContent(final CryptedLink param, final boolean ignoreQualitySelection) throws Exception {
+        cfg = PluginJsonConfig.get(NaughtyamericaConfig.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         /* 2016-12-12: Prefer current website instead of beta */
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)beta\\.", "");
@@ -186,16 +205,11 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                     best.add(dl);
                 }
             }
-            logger.info("Found qualities: Total: " + alldirecturls.size() + " | Known: " + foundQualities.keySet() + " | Unknown: " + unknownQualities.size());
+            logger.info("Found qualities: Total: " + alldirecturls.size() + " | Known: " + foundQualities.keySet() + " | Unknown: " + unknownQualities.size() + " | SelectedQualities: " + selectedQualities);
             if (cfg.isGrabBestVideoQualityOnly()) {
-                for (DownloadLink link : best) {
-                    if (preferh265 && link.getPluginPatternMatcher().contains("265.")) {
-                        ret.add(link);
-                        break;
-                    } else if (!preferh265 && !link.getPluginPatternMatcher().contains("265.")) {
-                        ret.add(link);
-                        break;
-                    }
+                final DownloadLink bestVariant = getPreferredVariant(best, preferh265);
+                if (bestVariant != null) {
+                    ret.add(bestVariant);
                 }
             } else if (foundQualities.size() > 0) {
                 /* Add user selected qualities */
@@ -205,21 +219,11 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 while (iterator.hasNext()) {
                     final Entry<Integer, List<DownloadLink>> entry = iterator.next();
                     final int quality = entry.getKey();
-                    if (selectedQualities.contains(quality)) {
-                        if (entry.getValue().size() == 1) {
-                            ret.addAll(entry.getValue());
-                        } else {
-                            for (DownloadLink link : entry.getValue()) {
-                                if (preferh265 && link.getPluginPatternMatcher().contains("265.")) {
-                                    ret.add(link);
-                                    break;
-                                } else if (!preferh265 && !link.getPluginPatternMatcher().contains("265.")) {
-                                    ret.add(link);
-                                    break;
-                                }
-                            }
+                    if (selectedQualities.contains(quality) || isQualitySelected(quality)) {
+                        final DownloadLink bestVariant = getPreferredVariant(entry.getValue(), preferh265);
+                        if (bestVariant != null) {
+                            ret.add(bestVariant);
                         }
-
                     }
                 }
                 if (ret.isEmpty() && addUnknownQualitiesAsFallback) {
@@ -318,6 +322,9 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             return 3466;
         } else if (qualityStr.equalsIgnoreCase("4k")) {
             return 2160;
+        } else if (qualityStr.equalsIgnoreCase("vrdesktopsd")) {
+            /* Oculus Rift (low quality) */
+            return 1800;
         } else if (qualityStr.equalsIgnoreCase("vrdesktophd")) {
             /* Quest1/Oculus Rift 4K */
             return 2048;
@@ -328,6 +335,12 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         } else if (qualityStr.equalsIgnoreCase("sbs")) {
             /* Playstation VR -> Also 1080p */
             return 1080;
+        } else if (qualityStr.equalsIgnoreCase("smartphonevr60")) {
+            /* Smartphone (60 FPS) */
+            return 1080;
+        } else if (qualityStr.equalsIgnoreCase("smartphonevr30")) {
+            /* Smartphone (30 FPS) */
+            return 900;
         } else if (qualityStr.equalsIgnoreCase("smartphonevr00")) {
             /* Smartphone (Legacy) */
             return 1024;
@@ -341,6 +354,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         }
     }
 
+    @Deprecated
     private ArrayList<Integer> getSelectedQualities() {
         final ArrayList<Integer> selectedQualities = new ArrayList<Integer>();
         final NaughtyamericaConfig cfg = PluginJsonConfig.get(NaughtyamericaConfig.class);
@@ -349,19 +363,22 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         }
         if (cfg.isGrab6K()) {
             // Multiple different video-heights possible
-            selectedQualities.add(3465);
             selectedQualities.add(3466);
+            selectedQualities.add(3465);
         }
         if (cfg.isGrab4K()) {
             // Multiple different video-heights possible
-            selectedQualities.add(2048);
             selectedQualities.add(2160);
+            selectedQualities.add(2048);
+            selectedQualities.add(1800);
         }
         if (cfg.isGrab1440p()) {
             selectedQualities.add(1440);
         }
         if (cfg.isGrab1080p()) {
             selectedQualities.add(1080);
+            selectedQualities.add(1024);
+            selectedQualities.add(900);
         }
         if (cfg.isGrab720p()) {
             selectedQualities.add(720);
@@ -370,6 +387,41 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             selectedQualities.add(480);
         }
         return selectedQualities;
+    }
+
+    @Override
+    public void clean() {
+        try {
+            super.clean();
+        } finally {
+            cfg = null;
+        }
+    }
+
+    private boolean isQualitySelected(final int height) {
+        if (height > 3466) {
+            // 8k
+            return cfg.isGrab8K();
+        } else if (height > 2160 && height <= 3466) {
+            // 6k
+            return cfg.isGrab6K();
+        } else if (height > 1440 && height <= 2160) {
+            // 4k
+            return cfg.isGrab4K();
+        } else if (height > 1080 && height <= 1440) {
+            // 2k
+            return cfg.isGrab1440p();
+        } else if (height > 720 && height <= 1080) {
+            // full hd
+            return cfg.isGrab1080p();
+        } else if (height > 480 && height <= 720) {
+            // hd
+            return cfg.isGrab720p();
+        } else if (height > 0 && height <= 480) {
+            // 480p
+            return cfg.isGrab480p();
+        }
+        return false;
     }
 
     public static String getVideoUrlFree(final String filename_url) {

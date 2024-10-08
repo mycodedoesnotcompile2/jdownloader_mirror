@@ -17,10 +17,20 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -30,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "myspass.de", "tvtotal.prosieben.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$", "https?://tvtotal\\.prosieben\\.de/(videos/.*?/\\d+/|videoplayer/\\?id=\\d+)" })
+@HostPlugin(revision = "$Revision: 49927 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,7 +51,7 @@ public class MySpassDe extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.myspass.de/myspass/kontakt/";
+        return "https://www." + getHost() + "/myspass/kontakt/";
     }
 
     @Override
@@ -57,6 +67,11 @@ public class MySpassDe extends PluginForHost {
     private String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), "(\\d+)/?$").getMatch(0);
     }
+
+    private static final AtomicReference<String> token                   = new AtomicReference<String>(null);
+    private static final AtomicReference<String> cdn                     = new AtomicReference<String>(null);
+    private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
+    private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
 
     /*
      * Example final url (18.05.2015):
@@ -77,73 +92,76 @@ public class MySpassDe extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(fid + ext);
         }
-        // br.getPage("http://www.myspass.de/myspass/includes/apps/video/getvideometadataxml.php?id=" + fid + "&0." +
-        // System.currentTimeMillis());
-        /* 2018-12-29: New */
-        br.getPage("https://www.myspass.de/includes/apps/video/getvideometadataxml.php?id=" + fid);
-        /* Alternative: http://www.myspass.de/myspass/includes/apps/video/getvideometadataxml.php?id=<fid> */
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("<url_flv><\\!\\[CDATA\\[\\]\\]></url_flv>")) {
+        synchronized (token) {
+            if (token.get() == null || System.currentTimeMillis() - timestampTokenRefreshed.get() > 30 * 60 * 1000) {
+                logger.info("Obtaining fresh token");
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("https://www." + getHost() + "/_next/static/chunks/pages/_app-42298c98727543c2.js");
+                final String freshToken = brc.getRegex("Bearer ([a-f0-9]{256})").getMatch(0);
+                if (freshToken == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                token.set(freshToken);
+                timestampTokenRefreshed.set(System.currentTimeMillis());
+                String freshCDN = brc.getRegex("uri:`(https?://[^/]+)\\$").getMatch(0);
+                if (freshCDN == null) {
+                    logger.warning("Failed to find CDN -> Using static fallback");
+                    freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
+                }
+                cdn.set(freshCDN);
+            }
+        }
+        synchronized (cdn) {
+            if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
+                logger.info("Obtaining fresh cdn value");
+                final Browser brc = br.cloneBrowser();
+                brc.getPage("https://www." + getHost() + "/_next/static/chunks/329-696a1b2fb2c4bf5e.js");
+                String freshCDN = brc.getRegex("uri:`(https?://[^/]+)\\$").getMatch(0);
+                if (freshCDN == null) {
+                    logger.warning("Failed to find CDN -> Using static fallback");
+                    freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
+                }
+                cdn.set(freshCDN);
+                timestampCDNRefreshed.set(System.currentTimeMillis());
+            }
+        }
+        final Browser brv = br.cloneBrowser();
+        brv.getHeaders().put("Authorization", "Bearer " + token.get());
+        brv.getPage("https://cms-myspass.vanilla-ott.com/api/videos/" + fid + "?populate[season][fields]=name&populate[format][fields]=name&");
+        if (brv.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* Build our filename */
-        /* Links added via decrypter can have this set to FALSE as it is not needed for all filenames e.g. stock car crash challenge. */
-        final boolean needs_series_filename = link.getBooleanProperty("needs_series_filename", true);
+        final Map<String, Object> entries = restoreFromString(brv.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Object errorO = entries.get("error");
+        if (errorO != null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Map<String, Object> attr = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/attributes");
+        // final String broadcast_date = attr.get("broadcast_date").toString();
+        String title = attr.get("title").toString();
+        title = title.replaceFirst("\\(Folge \\d+\\)", "");
+        final String unique_name = attr.get("unique_name").toString();
+        final String description = (String) attr.get("teaser_text");
+        this.dllink = (String) attr.get("video_url");
+        if (this.dllink.startsWith("/")) {
+            /* Add host, can be found here: https://www.myspass.de/_next/static/chunks/329-696a1b2fb2c4bf5e.js */
+            this.dllink = cdn.get() + this.dllink;
+        }
+        if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
+            link.setComment(description);
+        }
+        final String format = (String) JavaScriptEngineFactory.walkJson(attr, "format/data/attributes/name");
+        final String seasonStr = new Regex(unique_name, "(?i)Staffel (\\d+)").getMatch(0);
+        final String episodeStr = new Regex(unique_name, "(?i)Folge (\\d+)").getMatch(0);
         final DecimalFormat df = new DecimalFormat("00");
-        String filename = getXML("format") + " - ";
-        if (needs_series_filename) { // Sometimes episode = 9/Best Of, need regex to get only the integer
-            filename += "S" + df.format(Integer.parseInt(getXML("season"))) + "E" + getXML("episode") + " - ";
+        String filename = format + " - ";
+        if (seasonStr != null && episodeStr != null) { // Sometimes episode = 9/Best Of, need regex to get only the integer
+            filename += "S" + df.format(Integer.parseInt(seasonStr)) + "E" + df.format(Integer.parseInt(episodeStr)) + " - ";
         }
-        filename += getXML("title");
-        dllink = getXML("url_flv");
+        filename += title;
         filename = filename.trim();
         filename = Encoding.htmlDecode(filename);
-        /*
-         * 2019-10-30: They've changed their final downloadurls. They modify the one which is present in their XML. However, older Clips
-         * which can be accessed via tvtotal.prosieben.de are still easily downloadable.F
-         */
-        final boolean enable_old_clips_workaround = true;
-        if (enable_old_clips_workaround && link.getPluginPatternMatcher().contains("tvtotal.prosieben.de")) {
-            logger.info("Attempting workaround for old clips");
-            br.getPage(link.getPluginPatternMatcher());
-            final String dllink_alt = br.getRegex("videoURL\\s*:\\s*'(http[^<>\"\\']+)'").getMatch(0);
-            if (dllink_alt != null) {
-                logger.info("Workaround for old clips seems to be successful");
-                dllink = dllink_alt;
-            } else {
-                logger.info("Workaround for old clips failed");
-            }
-        }
-        if (dllink != null) {
-            try {
-                /* 2020-09-29 */
-                logger.info("Trying to 'fix' final downloadurl");
-                final Regex dllinkInfo = new Regex(this.dllink, "(?i)/myspass2009/\\d+/(\\d+)/(\\d+)/(\\d+)/");
-                if (dllinkInfo.patternFind()) {
-                    final long fidLong = Long.parseLong(fid);
-                    for (int i = 0; i <= 2; i++) {
-                        final String tmpStr = dllinkInfo.getMatch(i);
-                        final long tmpInt = Long.parseLong(tmpStr);
-                        if (tmpInt > fidLong) {
-                            final long newLong = tmpInt / fidLong;
-                            this.dllink = dllink.replace(tmpStr, Long.toString(newLong));
-                        }
-                    }
-                } else {
-                    logger.info("Directurl does not need to be changed - it should be fine: " + dllink);
-                }
-            } catch (final Exception ignore) {
-                ignore.printStackTrace();
-                logger.warning("Failed to fix final downloadurl --> Download might not be possible!");
-            }
-            if (!isDownload) {
-                link.setFinalFileName(applyFilenameExtension(filename, ext));
-                basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), ext);
-            }
-        } else {
-            link.setName(applyFilenameExtension(filename, ext));
-        }
+        link.setFinalFileName(filename + ext);
         return AvailableStatus.TRUE;
     }
 
@@ -153,18 +171,23 @@ public class MySpassDe extends PluginForHost {
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        /* 2017-02-04: Without the Range Header we'll be limited to ~100 KB/s */
-        link.setProperty(DirectHTTP.PROPERTY_ServerComaptibleForByteRangeRequest, true);
-        br.getHeaders().put(OPEN_RANGE_REQUEST);
-        /* Workaround for old downloadcore bug that can lead to incomplete files */
-        br.getHeaders().put("Accept-Encoding", "identity");
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
-        handleConnectionErrors(br, dl.getConnection());
-        dl.startDownload();
-    }
-
-    private String getXML(final String parameter) {
-        return br.getRegex("<" + parameter + "><\\!\\[CDATA\\[(.*?)\\]\\]></" + parameter + ">").getMatch(0);
+        if (dllink.contains(".m3u8")) {
+            br.getPage(dllink);
+            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            final String url_hls = hlsbest.getStreamURL();
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, url_hls);
+            dl.startDownload();
+        } else {
+            /* 2017-02-04: Without the Range Header we'll be limited to ~100 KB/s */
+            link.setProperty(DirectHTTP.PROPERTY_ServerComaptibleForByteRangeRequest, true);
+            br.getHeaders().put(OPEN_RANGE_REQUEST);
+            /* Workaround for old downloadcore bug that can lead to incomplete files */
+            br.getHeaders().put("Accept-Encoding", "identity");
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
+            handleConnectionErrors(br, dl.getConnection());
+            dl.startDownload();
+        }
     }
 
     private void setConfigElements() {
@@ -173,7 +196,7 @@ public class MySpassDe extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -171,6 +171,7 @@ public class SyntheticaHelper {
         }
         if (CrossSystem.isMac()) {
             if (checkIfMacInitWillFail()) {
+                LogV3.info("GC");
                 System.gc();
                 if (checkIfMacInitWillFail()) {
                     throw new IOException("Cannot Init LookAndFeel. Windows Are Open");

@@ -973,11 +973,7 @@ public class FlexiJSONParser {
         }
     }
 
-    protected Object assignFinalType(Object path, Token type) throws FlexiParserException {
-        // if (isNaN.isFinished()) {
-        // throwParserExceptionInternal(ParsingError.ERROR_NUMBER_NAN, path, null, container, null);
-        // return Double.NaN;
-        // }
+    protected Object assignFinalType(Object path, Token type) throws FlexiParserException {  
         String str = null;
         if (tokenParserExtensions != null) {
             for (FlexiJSONParserExtension sp : tokenParserExtensions) {

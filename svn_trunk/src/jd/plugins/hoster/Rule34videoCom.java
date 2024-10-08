@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49171 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -65,9 +65,14 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
     protected AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
         /* Collect some information for custom filenames */
-        final String uploader = br.getRegex("class=\"avatar\"[^>]*title=\"([^\"]+)").getMatch(0);
+        String uploader = br.getRegex("class=\"avatar\"[^>]*title=\"([^\"]+)").getMatch(0);
+        if (uploader == null) {
+            /* 2024-10-07 */
+            uploader = br.getRegex("src=\"[^\"]+/avatars/[^\"]+\" alt=\"[^\"]+\"/>\\s*</div>([^<]+)</a>").getMatch(0);
+        }
         if (uploader != null) {
-            link.setProperty(PROPERTY_USERNAME, Encoding.htmlDecode(uploader).trim());
+            uploader = Encoding.htmlDecode(uploader).trim();
+            link.setProperty(PROPERTY_USERNAME, uploader);
         }
         final String uploaddate = br.getRegex("\"uploadDate\"\\s*:\\s*\"([^\"]+)").getMatch(0);
         if (uploaddate != null) {

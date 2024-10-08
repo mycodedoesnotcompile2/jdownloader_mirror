@@ -161,7 +161,7 @@ public class IncreasingNonce {
                 this.value = now;
             }
             final long ret = this.value;
-            LogV3.info("EventCount: " + ret + "(" + DateMapper.formatJsonDefault(ret) + ")" + " (Offset " + (now - ret) + ")");
+            // LogV3.info("EventCount: " + ret + "(" + DateMapper.formatJsonDefault(ret) + ")" + " (Offset " + (now - ret) + ")");
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
                 try {
                     final File file = Application.getResource("tmp/eventCountDebug");

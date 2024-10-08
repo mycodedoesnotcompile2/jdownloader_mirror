@@ -35,6 +35,7 @@ package org.appwork.storage.flexijson.mapper.mod.tests;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.moncompare.Condition;
@@ -71,7 +72,7 @@ public class FlexiMergerTest extends AWTest {
             FlexiJSonObject base = new FlexiJSonObject();
             FlexiModifier<FlexiJSonObject, Boolean> mod = new FlexiModifier<FlexiJSonObject, Boolean>(base);
             JsonModification<FlexiJSonObject, Boolean> mods = new JsonModification<FlexiJSonObject, Boolean>();
-            FlexiJSonObject set = new FlexiJSonObject();
+            LinkedHashMap<String, Object> set = new LinkedHashMap<String, Object>();
             set.put("a.b.c", 1);
             set.put("a.array[1]", 1);
             set.put("a.array[3]", 3);
@@ -160,7 +161,7 @@ public class FlexiMergerTest extends AWTest {
             String json = FlexiUtils.serializeMinimized(base);
             assertEquals("{\"a\":{\"b\":{\"c\":1},\"array\":[null,1,null,3]},\"bool\":true}", json);
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 set.put("a.array[{§project:{§§this:1}}].§first", 3);
                 set.put("a[{§project:{c:{§exists:true}}}].§first.value", true);
                 mods.setSet(set);
@@ -169,7 +170,7 @@ public class FlexiMergerTest extends AWTest {
                 assertEquals("{\"a\":{\"b\":{\"c\":1,\"value\":true},\"array\":[null,3,null,3]},\"bool\":true}", json);
             }
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 set.put("[0]", true);
                 mods.setSet(set);
                 mod.merge(mods);
@@ -178,7 +179,7 @@ public class FlexiMergerTest extends AWTest {
                 System.out.println(1);
             }
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 set.put("a.array[key]", true);
                 mods.setSet(set);
                 try {
@@ -191,7 +192,7 @@ public class FlexiMergerTest extends AWTest {
                 assertEquals("{\"a\":{\"b\":{\"c\":1,\"value\":true},\"array\":[null,3,null,3]},\"bool\":true,\"0\":true}", json);
             }
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 set.put("0", true);
                 mods.setSet(set);
                 mod.merge(mods);
@@ -199,7 +200,7 @@ public class FlexiMergerTest extends AWTest {
                 assertEquals("{\"a\":{\"b\":{\"c\":1,\"value\":true},\"array\":[null,3,null,3]},\"bool\":true,\"0\":true}", json);
             }
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 mods.setSet(set);
                 mods.setUnset(new HashSet<String>(Arrays.asList("a.b.c", "a.b.array[0]", "a.array[0]")));
                 mod.merge(mods);
@@ -207,7 +208,7 @@ public class FlexiMergerTest extends AWTest {
                 assertEquals("{\"a\":{\"b\":{\"value\":true},\"array\":[3,null,3]},\"bool\":true,\"0\":true}", json);
             }
             {
-                set = new FlexiJSonObject();
+                set = new LinkedHashMap<String, Object>();
                 set.put("newEntry", "test");
                 set.put("a", null);
                 set.put("a.b.newEntry2", "yeah");

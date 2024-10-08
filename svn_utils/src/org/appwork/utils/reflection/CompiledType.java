@@ -293,7 +293,12 @@ public class CompiledType {
      */
     public void appendName(AbstractNameScheme rule, StringBuilder sb) {
         if (raw != null && raw.isAnonymousClass() && rule.isSkipAnonymousClasses()) {
-            superType.appendName(rule, sb);
+            if (superType == null) {
+                // anonym interface implementation
+                CompiledType.create(raw.getInterfaces()[0]).appendName(rule, sb);
+            } else {
+                superType.appendName(rule, sb);
+            }
             return;
         }
         if (raw == null) {
@@ -1345,5 +1350,12 @@ public class CompiledType {
      */
     public CompiledType getComponentType() {
         return getComponentTypeFor(raw);
+    }
+
+    /**
+     * @return
+     */
+    public boolean isAnonymousInterfaceImpl() {
+        return raw.isAnonymousClass() && superType == null && raw.getInterfaces().length == 1;
     }
 }

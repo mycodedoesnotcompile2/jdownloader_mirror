@@ -22,12 +22,14 @@ import java.awt.geom.Point2D;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import javax.swing.Icon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.resources.AWUTheme;
 import org.appwork.resources.IconRef;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.action.BasicAction;
@@ -91,7 +93,26 @@ public abstract class AbstractTray implements TrayMouseListener {
     }
 
     protected TrayIcon initTray() {
-        final Image img = this.createTrayImage(TrayIconRef.trayicon);
+        IconRef icon = TrayIconRef.trayicon;
+        if (!TrayIconRef.trayicon.exists()) {
+            icon = new IconRef() {
+                @Override
+                public String path() {
+                    return "icon";
+                }
+
+                @Override
+                public Image image(int size) {
+                    return AWUTheme.I().getImage("icon", size);
+                }
+
+                @Override
+                public Icon icon(int size) {
+                    return AWUTheme.I().getIcon("icon", size);
+                }
+            };
+        }
+        final Image img = this.createTrayImage(icon);
         final TrayIcon trayIcon = new TrayIcon(img, null, null);
         trayIcon.setImageAutoSize(true);
         return trayIcon;
