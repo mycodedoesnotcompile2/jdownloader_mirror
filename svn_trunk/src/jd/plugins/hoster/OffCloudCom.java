@@ -55,12 +55,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -77,11 +79,6 @@ public class OffCloudCom extends UseNet {
     private static final boolean                  ACCOUNT_PREMIUM_RESUME                       = true;
     private static final int                      ACCOUNT_PREMIUM_MAXCHUNKS                    = 0;
     private static final int                      ACCOUNT_PREMIUM_MAXDOWNLOADS                 = 20;
-    /*
-     * This is the interval in which the complete download history will be deleted from the account (if setting is enabled by the user && JD
-     * does check the account)
-     */
-    private static final long                     DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL    = 1 * 60 * 60 * 1000l;
     private static final long                     CLOUD_MAX_WAITTIME                           = 600000l;
     private int                                   statuscode                                   = 0;
     /* Contains <host><number of max possible chunks per download> */
@@ -185,69 +182,69 @@ public class OffCloudCom extends UseNet {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (isUsenetLink(link)) {
             super.handleMultiHost(link, account);
-        } else {
-            String status = null;
-            String filename = null;
-            String requestID = null;
-            mhm.runCheck(account, link);
-            /*
-             * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it
-             * is needed to get the individual host limits.
-             */
-            synchronized (CTRLLOCK) {
-                if (hostMaxchunksMap.isEmpty() || hostMaxdlsMap.isEmpty()) {
-                    logger.info("Performing accountcheck to set individual host limits");
-                    this.fetchAccountInfo(account);
-                }
-            }
-            setConstants(account, link);
-            this.login(account, false);
-            String dllink = checkDirectLink(link, this.getHost() + "directlink");
-            if (dllink == null) {
-                final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
-                if (cloudOnlyHosts.contains(link.getHost())) {
-                    final long timeStarted = System.currentTimeMillis();
-                    link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_cloud);
-                    this.postRawAPISafe("https://" + getHost() + "/cloud/request", "{\"url\":\"" + url + "\",\"conversion\":\"\"}");
-                    // TODO: Use json parser
-                    requestID = PluginJSonUtils.getJsonValue(br, "requestId");
-                    if (requestID == null) {
-                        /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
-                    }
-                    do {
-                        this.sleep(5000l, link);
-                        this.postRawAPISafe("https://" + getHost() + "/cloud/status", "{\"requestIds\":[\"" + requestID + "\"]}");
-                        status = PluginJSonUtils.getJsonValue(br, "status");
-                    } while (System.currentTimeMillis() - timeStarted < CLOUD_MAX_WAITTIME && "downloading".equals(status));
-                    filename = PluginJSonUtils.getJsonValue(br, "fileName");
-                    if (!"downloaded".equals(status)) {
-                        logger.warning("Cloud failed");
-                        /* Should never happen but will happen */
-                        mhm.handleErrorGeneric(this.currAcc, link, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
-                    }
-                    /* Filename needed in URL or server will return bad filenames! */
-                    dllink = "https://" + getHost() + "/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
-                } else {
-                    link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
-                    this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + Encoding.urlEncode(url));
-                    final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    requestID = (String) entries.get("requestId");
-                    if (requestID == null) {
-                        /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, link, "instant_requestIdnull", 50, 5 * 60 * 1000l);
-                    }
-                    dllink = (String) entries.get("url");
-                    if (StringUtils.isEmpty(dllink)) {
-                        /* Should never happen */
-                        mhm.handleErrorGeneric(this.currAcc, link, "dllinknull", 50, 5 * 60 * 1000l);
-                    }
-                }
-                dllink = dllink.replaceAll("\\\\/", "/");
-            }
-            link.setProperty("offcloudrequestId", requestID);
-            handleDL(account, link, dllink);
+            return;
         }
+        String status = null;
+        String filename = null;
+        String requestID = null;
+        mhm.runCheck(account, link);
+        /*
+         * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it is
+         * needed to get the individual host limits.
+         */
+        synchronized (CTRLLOCK) {
+            if (hostMaxchunksMap.isEmpty() || hostMaxdlsMap.isEmpty()) {
+                logger.info("Performing accountcheck to set individual host limits");
+                this.fetchAccountInfo(account);
+            }
+        }
+        setConstants(account, link);
+        this.login(account, false);
+        String dllink = checkDirectLink(link, this.getHost() + "directlink");
+        if (dllink == null) {
+            final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+            if (cloudOnlyHosts.contains(link.getHost())) {
+                final long timeStarted = System.currentTimeMillis();
+                link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_cloud);
+                this.postRawAPISafe("https://" + getHost() + "/cloud/request", "{\"url\":\"" + url + "\",\"conversion\":\"\"}");
+                // TODO: Use json parser
+                requestID = PluginJSonUtils.getJsonValue(br, "requestId");
+                if (requestID == null) {
+                    /* Should never happen */
+                    mhm.handleErrorGeneric(this.currAcc, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
+                }
+                do {
+                    this.sleep(5000l, link);
+                    this.postRawAPISafe("https://" + getHost() + "/cloud/status", "{\"requestIds\":[\"" + requestID + "\"]}");
+                    status = PluginJSonUtils.getJsonValue(br, "status");
+                } while (System.currentTimeMillis() - timeStarted < CLOUD_MAX_WAITTIME && "downloading".equals(status));
+                filename = PluginJSonUtils.getJsonValue(br, "fileName");
+                if (!"downloaded".equals(status)) {
+                    logger.warning("Cloud failed");
+                    /* Should never happen but will happen */
+                    mhm.handleErrorGeneric(this.currAcc, link, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
+                }
+                /* Filename needed in URL or server will return bad filenames! */
+                dllink = "https://" + getHost() + "/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
+            } else {
+                link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
+                this.postAPISafe(API_BASE + "instant/download", "proxyId=&url=" + Encoding.urlEncode(url));
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                requestID = (String) entries.get("requestId");
+                if (requestID == null) {
+                    /* Should never happen */
+                    mhm.handleErrorGeneric(this.currAcc, link, "instant_requestIdnull", 50, 5 * 60 * 1000l);
+                }
+                dllink = (String) entries.get("url");
+                if (StringUtils.isEmpty(dllink)) {
+                    /* Should never happen */
+                    mhm.handleErrorGeneric(this.currAcc, link, "dllinknull", 50, 5 * 60 * 1000l);
+                }
+            }
+            dllink = dllink.replaceAll("\\\\/", "/");
+        }
+        link.setProperty("offcloudrequestId", requestID);
+        handleDL(account, link, dllink);
     }
 
     @SuppressWarnings("deprecation")
@@ -423,16 +420,8 @@ public class OffCloudCom extends UseNet {
         ai.setStatus(account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes));
         /* Only add hosts which are listed as 'active' (working) */
         postAPISafe("https://" + getHost() + "/stats/sites", "");
-        final List<String> supportedHosts = new ArrayList<String>();
-        final ArrayList<String> allowedHostStates = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<String> supportedHostsTmp = new ArrayList<String>();
-        allowedHostStates.add("cloud only");
-        allowedHostStates.add("healthy");
-        allowedHostStates.add("fragile");
-        allowedHostStates.add("limited");
-        if (cfg.isShowHostersWithStatusAwaitingDemand()) {
-            allowedHostStates.add("awaiting demand");
-        }
         final Map<String, Object> stats = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> filehosts = (List<Map<String, Object>>) stats.get("fs");
         /**
@@ -443,56 +432,77 @@ public class OffCloudCom extends UseNet {
          * URLs of such hosts, Offcloud will see that there is demand and maybe add it to the list of supported hosts.
          */
         cloudOnlyHosts.clear();
+        hostMaxchunksMap.clear();
+        hostMaxdlsMap.clear();
+        this.getAPISafe("https://" + getHost() + "/api/sites/chunks");
+        final List<Map<String, Object>> chunklimits = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         for (final Map<String, Object> domaininfo : filehosts) {
-            String status = (String) domaininfo.get("isActive");
-            String domain = (String) domaininfo.get("displayName");
-            if (StringUtils.isEmpty(domain) || StringUtils.isEmpty(status)) {
-                /* Skip invalid objects */
-                continue;
-            }
-            status = status.toLowerCase(Locale.ENGLISH);
-            domain = domain.toLowerCase(Locale.ENGLISH);
-            final boolean hostStatusIsAllowed = allowedHostStates.contains(status);
-            if (!hostStatusIsAllowed) {
-                logger.info("NOT adding this host because of non allowed status: " + domain + " | Status: " + status);
-                continue;
-            }
+            final String status = domaininfo.get("isActive").toString().toLowerCase(Locale.ENGLISH);
+            // final String name = domaininfo.get("name").toString();
+            final String domain = domaininfo.get("displayName").toString();
+            final List<String> domains = (List<String>) domaininfo.get("tags");
+            final Object deadFor = domaininfo.get("deadFor");
             /* Workaround to get real/mapped domain */
             supportedHostsTmp.clear();
             supportedHostsTmp.add(domain);
             ai.setMultiHostSupport(this, supportedHostsTmp);
             final List<String> realHostArrayTmp = ai.getMultiHostSupport();
-            if (realHostArrayTmp == null || realHostArrayTmp.isEmpty()) {
-                logger.info("Skipping host because it's not supported by JD: " + domain);
-                continue;
+            if (realHostArrayTmp != null && !realHostArrayTmp.isEmpty()) {
+                /* Legacy handling */
+                /* Add real host to full list of supported hosts */
+                if (status.equals("cloud only")) {
+                    cloudOnlyHosts.add(domain);
+                }
             }
-            /* Add real host to full list of supported hosts */
-            supportedHosts.add(realHostArrayTmp.get(0));
-            if (status.equals("cloud only")) {
-                cloudOnlyHosts.add(domain);
+            final Object maxAmount = domaininfo.get("maxAmount");
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            mhost.addDomains(domains);
+            Map<String, Object> thisHostChunkLimitsMap = null;
+            for (final Map<String, Object> map : chunklimits) {
+                final String host = map.get("host").toString();
+                if (mhost.getDomains().contains(host)) {
+                    thisHostChunkLimitsMap = map;
+                    break;
+                }
             }
+            if (deadFor != null) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (!cfg.isShowHostersWithStatusAwaitingDemand() && status.equals("awaiting demand")) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (status.equals("fragile")) {
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+            }
+            mhost.setStatusText(status);
+            if (maxAmount instanceof Number) {
+                mhost.setTrafficMax(((Number) maxAmount).longValue());
+            }
+            if (thisHostChunkLimitsMap != null) {
+                /* Set host specific limits */
+                /* Legacy handling */
+                final Object maxdls_object = thisHostChunkLimitsMap.get("maxChunksGlobal");
+                final int maxchunks = ((Number) thisHostChunkLimitsMap.get("maxChunks")).intValue();
+                hostMaxchunksMap.put(domain, this.correctChunks(maxchunks));
+                if (maxdls_object instanceof Number) {
+                    final int maxdls = ((Number) maxdls_object).intValue();
+                    hostMaxdlsMap.put(domain, this.correctMaxdls(maxdls));
+                }
+                /* New handling */
+                mhost.setMaxChunks(maxchunks);
+            }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         /* 2020-12-11: Check this account more often */
         account.setRefreshTimeout(15 * 60 * 1000l);
-        getAndSetChunklimits();
         /* Let's handle some settings stuff. */
         if (cfg.isClearAllowedIpAddressesEnabled()) {
             this.clearAllowedIPAddresses();
         }
         if (cfg.isDeleteDownloadHistoryCompleteInstantEnabled()) {
-            /*
-             * Go in here if user wants to have it's history deleted && last deletion was before DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL
-             * or never executed (0).
-             */
             this.deleteCompleteDownloadHistory(PROPERTY_DOWNLOADTYPE_instant);
             account.setProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
         }
         if (cfg.isDeleteDownloadHistoryCompleteCloudEnabled()) {
-            /*
-             * Go in here if user wants to have it's history deleted && last deletion was before DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL
-             * or never executed (0).
-             */
             this.deleteCompleteDownloadHistory(PROPERTY_DOWNLOADTYPE_cloud);
             account.setProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
         }
@@ -511,19 +521,18 @@ public class OffCloudCom extends UseNet {
             if (!validateCookies) {
                 logger.info("Trust cookies without check");
                 return;
+            }
+            this.postAPISafe(API_BASE + "login/check", "");
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Object loggedINO = entries.get("loggedIn");
+            if (loggedINO instanceof Number && ((Number) loggedINO).intValue() == 1) {
+                logger.info("Cookie login successful");
+                account.saveCookies(br.getCookies(br.getHost()), "");
+                return;
             } else {
-                this.postAPISafe(API_BASE + "login/check", "");
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final Object loggedINO = entries.get("loggedIn");
-                if (loggedINO instanceof Number && ((Number) loggedINO).intValue() == 1) {
-                    logger.info("Cookie login successful");
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                    return;
-                } else {
-                    logger.info("Cookie login failed");
-                    br.clearCookies(br.getURL());
-                    account.clearCookies("");
-                }
+                logger.info("Cookie login failed");
+                br.clearCookies(br.getURL());
+                account.clearCookies("");
             }
         }
         logger.info("Performing full login");
@@ -534,32 +543,6 @@ public class OffCloudCom extends UseNet {
             throw new AccountUnavailableException("Unknown login error", 5 * 60 * 1000l);
         }
         account.saveCookies(br.getCookies(br.getHost()), "");
-    }
-
-    /**
-     * Set chunklimits if possible. Do NOT yet use this list as supported host array as it maybe also contains dead hosts - we want to try
-     * to only add the ones which they say are working at the moment.
-     */
-    @SuppressWarnings({ "unchecked" })
-    private void getAndSetChunklimits() {
-        try {
-            hostMaxchunksMap.clear();
-            hostMaxdlsMap.clear();
-            this.getAPISafe("https://" + getHost() + "/api/sites/chunks");
-            final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            for (final Map<String, Object> entries : ressourcelist) {
-                final String host = (String) entries.get("host");
-                final Object maxdls_object = entries.get("maxChunksGlobal");
-                final int maxchunks = ((Number) entries.get("maxChunks")).intValue();
-                hostMaxchunksMap.put(host, this.correctChunks(maxchunks));
-                if (maxdls_object != null) {
-                    final int maxdls = ((Number) maxdls_object).intValue();
-                    hostMaxdlsMap.put(host, this.correctMaxdls(maxdls));
-                }
-            }
-        } catch (final Throwable e) {
-            /* Don't let the login fail because of this */
-        }
     }
 
     /**
@@ -1099,11 +1082,11 @@ public class OffCloudCom extends UseNet {
             }
 
             public String getDeleteDownloadHistoryCompleteInstantEnabled_description() {
-                return "<html>Delete complete 'Instant' download history each 60 minutes when?\r\n<html><p style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a lot of links, the first time can take over 10 minutes!</p></html>";
+                return "<html>Delete complete 'Instant' download history on each account check?\r\n<html><p style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a lot of links, the first time can take over 10 minutes!</p></html>";
             }
 
             public String getDeleteDownloadHistoryCompleteCloudEnabled_description() {
-                return "<html>Delete complete 'Cloud' download history each 60 minutes when?\r\n<html><p style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a lot of links, the first time can take over 10 minutes!\r\nOnly failed- and completed entries will be deleted - entries which are still downloading will NOT be deleted!</p></html>";
+                return "<html>Delete complete 'Cloud' download history on each account check?\r\n<html><p style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a lot of links, the first time can take over 10 minutes!\r\nOnly failed- and completed entries will be deleted - entries which are still downloading will NOT be deleted!</p></html>";
             }
 
             public String getClearAllowedIpAddressesEnabled_description() {
@@ -1111,7 +1094,7 @@ public class OffCloudCom extends UseNet {
             }
 
             public String getShowHostersWithStatusAwaitingDemand_label() {
-                return "<html>Show hosts with status 'Awaiting Demand' in hostlist?</html>";
+                return "<html>Include hosts with status 'Awaiting Demand' in hostlist?</html>";
             }
 
             public String getShowHostersWithStatusAwaitingDemand_description() {
@@ -1168,6 +1151,7 @@ public class OffCloudCom extends UseNet {
 
     @Override
     public void extendAccountSettingsPanel(Account account, PluginConfigPanelNG panel) {
+        super.extendAccountSettingsPanel(account, panel);
         final AccountInfo ai = account.getAccountInfo();
         if (ai == null) {
             return;

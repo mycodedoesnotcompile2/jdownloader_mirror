@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -28,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48932 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49940 $", interfaceVersion = 3, names = {}, urls = {})
 public class LulustreamCom extends XFileSharingProBasic {
     public LulustreamCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +44,7 @@ public class LulustreamCom extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "lulustream.com", "luluvdo.com", "tnmr.org" });
+        ret.add(new String[] { "lulustream.com", "luluvdo.com", "lulu.st", "tnmr.org" });
         return ret;
     }
 
@@ -180,19 +179,5 @@ public class LulustreamCom extends XFileSharingProBasic {
     @Override
     protected Boolean requiresCaptchaForOfficialVideoDownload() {
         return Boolean.TRUE;
-    }
-
-    @Override
-    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        final String dllink = super.getDllink(link, account, br, src);
-        /*
-         * 2024-04-17: Small workaround: They're using DRM protected HLS streams so let's not return those at all to enforce a fallback to
-         * official video download.
-         */
-        if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
-            return null;
-        } else {
-            return dllink;
-        }
     }
 }

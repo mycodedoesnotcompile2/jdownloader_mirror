@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3658,6 +3658,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (waitStr == null) {
                 /* More open RegEx */
                 waitStr = new Regex(html, "class=\"seconds\"[^>]*>\\s*(\\d+)\\s*<").getMatch(0);
+                if (waitStr == null) {
+                    /* 2024-10-08: via id e.g. uploadfox.net, file-up.org */
+                    waitStr = new Regex(html, "id=\"seconds\"[^>]*>\\s*(\\d+)\\s*<").getMatch(0);
+                }
             }
         }
         return waitStr;

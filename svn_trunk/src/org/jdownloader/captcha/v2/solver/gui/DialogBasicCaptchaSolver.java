@@ -118,7 +118,7 @@ public class DialogBasicCaptchaSolver extends AbstractDialogSolver<String> {
                 return null;
             }
             handler.run();
-            return handler.getCaptchaCode();
+            return handler.getResult();
         } finally {
             job.getLogger().info("Dialog closed. Response far: " + job.getResponse());
             if (jacListener != null) {

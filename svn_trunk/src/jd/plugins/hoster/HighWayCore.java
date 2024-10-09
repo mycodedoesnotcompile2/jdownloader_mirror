@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -64,12 +63,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -726,14 +727,6 @@ public abstract class HighWayCore extends UseNet {
             } else {
                 ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Remaining today: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
             }
-            final Map<String, Object> usenetLogins = (Map<String, Object>) accountInfo.get("usenet");
-            if (this.useApikeyLogin() && usenetLogins != null) {
-                /* Try to set unique username as user could enter anything in the username field in this case */
-                final String uniqueUsername = (String) usenetLogins.get("username");
-                if (!StringUtils.isEmpty(uniqueUsername)) {
-                    account.setUser(uniqueUsername);
-                }
-            }
             account.setConcurrentUsePossible(true);
             /* Set supported hosts, host specific limits and account limits. */
             account.setProperty(PROPERTY_ACCOUNT_MAXCHUNKS, accountInfo.get("max_chunks"));
@@ -743,7 +736,8 @@ public abstract class HighWayCore extends UseNet {
             } else {
                 account.setProperty(PROPERTY_ACCOUNT_RESUME, false);
             }
-            final Set<String> supportedHosts = new HashSet<String>();
+            final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+            final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
             final PluginFinder pluginFinder = new PluginFinder(getLogger());
             synchronized (getMapLock()) {
                 final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
@@ -756,55 +750,78 @@ public abstract class HighWayCore extends UseNet {
                 /* Available hosts are returned by API depending on users' account type e.g. free users have much less supported hosts. */
                 final List<Object> array_hoster = (List) entries.get("hoster");
                 for (final Object hoster : array_hoster) {
-                    final Map<String, Object> hoster_map = (Map<String, Object>) hoster;
-                    final String domain = hoster_map.get("name").toString();
+                    final Map<String, Object> hostermap = (Map<String, Object>) hoster;
+                    final int activeStatus = ((Number) hostermap.get("active")).intValue();
+                    final String domain = hostermap.get("name").toString();
+                    final int trafficCalcFactorPercent = ((Number) hostermap.get("berechnung")).intValue();
+                    final int chunks = ((Number) hostermap.get("chunks")).intValue();
+                    final int downloads = ((Number) hostermap.get("downloads")).intValue();
+                    final boolean resume = ((Number) hostermap.get("resume")).intValue() == 1 ? true : false;
                     /* Workaround to find the real domain which we need to assign the properties to later on! */
                     final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
                     supportedHostsTmp.add(domain);
                     ai.setMultiHostSupport(this, supportedHostsTmp, pluginFinder);
                     final List<String> realDomainList = ai.getMultiHostSupport();
-                    if (realDomainList == null || realDomainList.isEmpty()) {
-                        /* Skip unsupported hosts or host plugins which don't allow multihost usage. */
-                        logger.info("Skipping host not supported by JD or not multihoster-supported by JD: " + domain);
-                        continue;
-                    }
-                    final String realDomain = realDomainList.get(0);
-                    // final String unlimited = (String) hoster_map.get("unlimited");
-                    if (((Number) hoster_map.get("active")).intValue() != 1) {
-                        logger.info("Skipping serverside inactive domain: " + domain);
-                        continue;
-                    }
-                    if (supportedHosts.add(realDomain)) {
-                        hostTrafficCalculationMap.put(realDomain, ((Number) hoster_map.get("berechnung")).intValue());
-                        hostMaxchunksMap.put(realDomain, correctChunks(((Number) hoster_map.get("chunks")).intValue()));
-                        hostMaxdlsMap.put(realDomain, ((Number) hoster_map.get("downloads")).intValue());
-                        if (((Number) hoster_map.get("resume")).intValue() == 1) {
-                            hostResumeMap.put(realDomain, true);
-                        } else {
-                            hostResumeMap.put(realDomain, false);
+                    if (realDomainList != null && realDomainList.size() > 0) {
+                        /* Legacy handling */
+                        final String realDomain = realDomainList.get(0);
+                        // final String unlimited = (String) hoster_map.get("unlimited");
+                        if (activeStatus != 1) {
+                            logger.info("Skipping serverside inactive domain: " + domain);
+                            continue;
                         }
-                    } else {
-                        // multiple entries, eg 1fichier(resume=true) and and megadl.fr(resume=false) but with different properties!?
-                        if (((Number) hoster_map.get("resume")).intValue() == 1) {
-                            hostResumeMap.put(realDomain, true);
+                        if (supportedhosts_dupes_for_legacy_handling.add(realDomain)) {
+                            hostTrafficCalculationMap.put(realDomain, trafficCalcFactorPercent);
+                            hostMaxchunksMap.put(realDomain, correctChunks(chunks));
+                            hostMaxdlsMap.put(realDomain, downloads);
+                            hostResumeMap.put(realDomain, resume);
                         } else {
-                            // do not disable resume
+                            // multiple entries, eg 1fichier(resume=true) and and megadl.fr(resume=false) but with different properties!?
+                            if (((Number) hostermap.get("resume")).intValue() == 1) {
+                                hostResumeMap.put(realDomain, true);
+                            } else {
+                                // do not disable resume
+                            }
                         }
                     }
+                    final MultiHostHost mhost = new MultiHostHost(domain);
+                    if (activeStatus != 1) {
+                        mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                    }
+                    mhost.setTrafficCalculationFactorPercent((short) trafficCalcFactorPercent);
+                    mhost.setMaxChunks(chunks);
+                    mhost.setMaxDownloads(downloads);
+                    mhost.setResume(resume);
+                    final long maxTrafficDaily = ((Number) hostermap.get("maxTrafficDaily")).longValue();
+                    // final long usedTrafficDaily = ((Number) hostermap.get("usedTrafficDaily")).longValue();
+                    final long remainingTrafficDaily = ((Number) hostermap.get("remainingTrafficDaily")).longValue();
+                    /* -1 = no limit */
+                    if (maxTrafficDaily != -1 && remainingTrafficDaily != -1) {
+                        mhost.setTrafficMax(maxTrafficDaily);
+                        mhost.setTrafficLeft(remainingTrafficDaily);
+                    }
+                    supportedhosts.add(mhost);
                 }
             }
             /* Get- and store usenet logindata. These can differ from the logindata the user has added but may as well be equal to those. */
-            if (usenetLogins != null && StringUtils.isAllNotEmpty((String) usenetLogins.get("username"), (String) usenetLogins.get("pass"))) {
-                account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenetLogins.get("username"));
+            final Map<String, Object> usenetLogins = (Map<String, Object>) accountInfo.get("usenet");
+            if (usenetLogins != null && !usenetLogins.isEmpty()) {
+                final String usenetUsername = usenetLogins.get("username").toString();
+                if (this.useApikeyLogin()) {
+                    /* Try to set unique username as user could enter anything in the username field in this case */
+                    if (!StringUtils.isEmpty(usenetUsername)) {
+                        account.setUser(usenetUsername);
+                    }
+                }
+                account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenetUsername);
                 account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenetLogins.get("pass"));
                 account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, accountInfo.get("usenet_connection"));
             } else {
-                supportedHosts.remove("usenet");
                 account.removeProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
                 account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
                 account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);
             }
-            ai.setMultiHostSupport(this, new ArrayList<String>(supportedHosts));
+            ai.setMultiHostSupportV2(this, supportedhosts);
             return ai;
         }
     }

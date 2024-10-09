@@ -37,7 +37,7 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-public abstract class AbstractImageCaptchaDialog extends AbstractCaptchaDialog<Object> {
+public abstract class AbstractImageCaptchaDialog<T> extends AbstractCaptchaDialog<T> {
     public static Image[] getGifImages(InputStream openStream) {
         try {
             GifDecoder decoder = new GifDecoder();
@@ -85,7 +85,7 @@ public abstract class AbstractImageCaptchaDialog extends AbstractCaptchaDialog<O
     protected Rectangle bounds;
     protected double    scaleFaktor;
 
-    public AbstractImageCaptchaDialog(ImageCaptchaChallenge<?> challenge, int flags, String title, DialogType type, DomainInfo domainInfo, String explain, Image... images) {
+    public AbstractImageCaptchaDialog(ImageCaptchaChallenge<T> challenge, int flags, String title, DialogType type, DomainInfo domainInfo, String explain, Image... images) {
         super(challenge, flags, title, type, domainInfo, explain);
         // if we have gif images, but read them as non indexed images, we try to fix this here.
         java.util.List<Image> ret = new ArrayList<Image>();
@@ -187,18 +187,17 @@ public abstract class AbstractImageCaptchaDialog extends AbstractCaptchaDialog<O
             paintTimer.setRepeats(true);
             paintTimer.start();
         }
-        JComponent b = createInputComponent();
-        if (b != null) {
-            b.addMouseListener(this);
-            b.addMouseMotionListener(this);
-            ret.add(b);
+        final JComponent inputComponent = createInputComponent();
+        if (inputComponent != null) {
+            if (mouseListener != null) {
+                inputComponent.addMouseListener(mouseListener);
+            }
+            if (mouseMotionListener != null) {
+                inputComponent.addMouseMotionListener(mouseMotionListener);
+            }
+            ret.add(inputComponent);
         }
         return ret;
-    }
-
-    @Override
-    protected String createReturnValue() {
-        return null;
     }
 
     public Image[] getImages() {

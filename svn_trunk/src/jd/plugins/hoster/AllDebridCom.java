@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49937 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -568,7 +568,9 @@ public class AllDebridCom extends PluginForHost {
         downloadErrorsFileUnavailable.add("MUST_BE_PREMIUM");
         downloadErrorsFileUnavailable.add("DOWNLOAD_FAILED");
         downloadErrorsFileUnavailable.add("DELAYED_INVALID_ID");
-        if (errorcode.equalsIgnoreCase("LINK_HOST_NOT_SUPPORTED")) {
+        if (errorcode.equalsIgnoreCase("LINK_DOWN")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (errorcode.equalsIgnoreCase("LINK_HOST_NOT_SUPPORTED")) {
             if (isSelfhosted) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {

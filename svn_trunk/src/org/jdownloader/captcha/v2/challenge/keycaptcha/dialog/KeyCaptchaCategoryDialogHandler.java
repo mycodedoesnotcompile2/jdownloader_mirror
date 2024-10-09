@@ -1,11 +1,11 @@
 package org.jdownloader.captcha.v2.challenge.keycaptcha.dialog;
 
-import org.jdownloader.captcha.v2.AbstractDialogHandler;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaCategoryChallenge;
-
+import jd.controlling.captcha.ChallengeDialogHandler;
 import jd.gui.swing.dialog.DialogType;
 
-public class KeyCaptchaCategoryDialogHandler extends AbstractDialogHandler<KeyCaptchaCategoryDialog, KeyCaptchaCategoryChallenge, String> {
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaCategoryChallenge;
+
+public class KeyCaptchaCategoryDialogHandler extends ChallengeDialogHandler<KeyCaptchaCategoryDialog, KeyCaptchaCategoryChallenge, String> {
 
     public KeyCaptchaCategoryDialogHandler(KeyCaptchaCategoryChallenge captchaChallenge) {
         super(captchaChallenge.getDomainInfo(), captchaChallenge);
@@ -13,14 +13,20 @@ public class KeyCaptchaCategoryDialogHandler extends AbstractDialogHandler<KeyCa
     }
 
     @Override
-    protected KeyCaptchaCategoryDialog createDialog(DialogType dialogType, int flag, final Runnable onDispose) {
-        return new KeyCaptchaCategoryDialog(captchaChallenge, flag, dialogType, getHost(), captchaChallenge) {
+    protected KeyCaptchaCategoryDialog createDialog(DialogType dialogType, int flag) {
+        final KeyCaptchaCategoryDialog dialog = new KeyCaptchaCategoryDialog(captchaChallenge, flag, dialogType, getHost()) {
             public void dispose() {
-
-                super.dispose();
-                onDispose.run();
+                try {
+                    super.dispose();
+                } finally {
+                    synchronized (KeyCaptchaCategoryDialogHandler.this) {
+                        KeyCaptchaCategoryDialogHandler.this.notifyAll();
+                    }
+                }
             }
         };
+        dialog.setTimeout(getTimeoutInMS());
+        return dialog;
     }
 
 }

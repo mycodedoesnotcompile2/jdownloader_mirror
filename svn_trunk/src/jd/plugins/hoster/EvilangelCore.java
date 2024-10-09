@@ -26,6 +26,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -49,22 +64,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49903 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -237,7 +237,8 @@ public abstract class EvilangelCore extends PluginForHost {
                 List<Map<String, Object>> qualitiesList = null;
                 if (htmlVideoJson == null && htmlVideoJson2 == null) {
                     /**
-                     * 2023-04-19: New (tested with: evilangel.com) </br> TODO: Test this with other supported websites such as wicked.com.
+                     * 2023-04-19: New (tested with: evilangel.com) </br>
+                     * TODO: Test this with other supported websites such as wicked.com.
                      */
                     final Browser brc = br.cloneBrowser();
                     brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
@@ -334,8 +335,8 @@ public abstract class EvilangelCore extends PluginForHost {
                         }
                     }
                     /**
-                     * A scene can also contain DVD-information. </br> --> Ensure to set the correct information which is later used for
-                     * filenames.
+                     * A scene can also contain DVD-information. </br>
+                     * --> Ensure to set the correct information which is later used for filenames.
                      */
                     final Map<String, Object> movieInfos = (Map<String, Object>) root.get("movieInfos");
                     if (movieInfos != null) {
@@ -405,7 +406,7 @@ public abstract class EvilangelCore extends PluginForHost {
                     contentSource = account.getStringProperty(PROPERTY_ACCOUNT_CONTENT_SOURCE);
                 }
                 // siteName = "wicked";
-                if (contentSource != null) {
+                apiHandling: if (contentSource != null) {
                     logger.info("Looking for additional metadata and/or official downloads...");
                     try {
                         final String jsonAPI = br.getRegex("window\\.env\\s*=\\s*(\\{.*?\\});").getMatch(0);
@@ -434,89 +435,6 @@ public abstract class EvilangelCore extends PluginForHost {
                         if (!StringUtils.isEmpty(releaseDate)) {
                             link.setProperty(PROPERTY_DATE, releaseDate);
                         }
-                        /* Now try to find the filesize of our previously chosen download quality. */
-                        final Number upcoming = (Number) clip.get("upcoming");
-                        if (upcoming != null && upcoming.intValue() == 1) {
-                            /* Full Video hasn't been released yet -> Wait for release */
-                            final long date_timestamp = ((Number) clip.get("date")).longValue() * 1000;
-                            waitUntilRelease = date_timestamp - System.currentTimeMillis();
-                            if (waitUntilRelease <= 0) {
-                                logger.info("Calculated unplausible time until video gets released -> Fallback to default");
-                                waitUntilRelease = 5 * 60 * 1000l;
-                            }
-                        }
-                        final Map<String, Number> download_file_sizes = (Map<String, Number>) clip.get("download_file_sizes");
-                        if (download_file_sizes != null && download_file_sizes.size() > 0) {
-                            final String preChosenQualityMapping = getQualityFilesizeMapping(link.getStringProperty(PROPERTY_QUALITY));
-                            final String preferredQualityMappingStr = getQualityFilesizeMapping(preferredQualityStr);
-                            String thisChosenQuality = null;
-                            if (preChosenQualityMapping != null && download_file_sizes.containsKey(preChosenQualityMapping)) {
-                                filesize = download_file_sizes.get(preChosenQualityMapping).longValue();
-                                thisChosenQuality = preChosenQualityMapping;
-                            } else if (preferredQualityMappingStr != null && download_file_sizes.containsKey(preferredQualityMappingStr)) {
-                                thisChosenQuality = preferredQualityMappingStr;
-                            } else {
-                                /* Find best quality */
-                                long filesizeMax = -1;
-                                for (final Entry<String, Number> entry : download_file_sizes.entrySet()) {
-                                    final long thisFilesize = entry.getValue().longValue();
-                                    if (thisChosenQuality == null || thisFilesize > filesizeMax) {
-                                        thisChosenQuality = entry.getKey();
-                                        filesizeMax = thisFilesize;
-                                    }
-                                }
-                                logger.info("Chose best quality: " + thisChosenQuality);
-                            }
-                            /*
-                             * 2024-09-27: At this moment we do not yet know in beforehand if the user is allowed to do official downloads
-                             * (there are also cheaper "stream only" accounts) -> Need to check.
-                             */
-                            /* We can always use the file size as usually stream- and download sizes and available qualities are similar. */
-                            filesize = download_file_sizes.get(thisChosenQuality).longValue();
-                            synchronized (account) {
-                                final Boolean accountAllowsOfficialDownloads = (Boolean) account.getProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
-                                final Boolean accountStreamingOnly = (Boolean) account.getProperty(PROPERTY_ACCOUNT_STREAMING_ONLY);
-                                final String officialDownloadlink = String.format("https://members.%s/movieaction/download/%s/%s/mp4?codec=h264", getHost(), fileID, thisChosenQuality);
-                                if (Boolean.FALSE.equals(accountStreamingOnly)) {
-                                    /* We know that this account allows official downloads. */
-                                    this.dllink = officialDownloadlink;
-                                    chosenQualityLabel = thisChosenQuality;
-                                } else if (Boolean.TRUE.equals(accountAllowsOfficialDownloads)) {
-                                    /* We know that this account was able to do official downloads so there is no need to check again. */
-                                    this.dllink = officialDownloadlink;
-                                    chosenQualityLabel = thisChosenQuality;
-                                } else if (accountStreamingOnly == null && accountAllowsOfficialDownloads == null) {
-                                    URLConnectionAdapter con = null;
-                                    boolean success = false;
-                                    try {
-                                        final Browser br_dltest = br.cloneBrowser();
-                                        con = br_dltest.openHeadConnection(officialDownloadlink);
-                                        if (this.looksLikeDownloadableContent(con)) {
-                                            this.dllink = officialDownloadlink;
-                                            chosenQualityLabel = thisChosenQuality;
-                                            filesize = con.getCompleteContentLength();
-                                            success = true;
-                                        } else {
-                                            /* Typically http response 404 */
-                                            logger.info("Official download not possible: Received no file content");
-                                        }
-                                    } catch (final Throwable e) {
-                                        logger.log(e);
-                                        logger.info("Official download not possible: Exception");
-                                    } finally {
-                                        try {
-                                            con.disconnect();
-                                        } catch (final Throwable e) {
-                                        }
-                                    }
-                                    account.setProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS, success);
-                                } else {
-                                    /* This account does not allow official downloads. */
-                                }
-                            }
-                        } else {
-                            logger.info("Looks like official download is not possible");
-                        }
                         final List<Map<String, Object>> actors = (List<Map<String, Object>>) clip.get("actors");
                         if (actors.size() > 0) {
                             String actorsCommaSeparated = "";
@@ -530,6 +448,97 @@ public abstract class EvilangelCore extends PluginForHost {
                                 index += 1;
                             }
                             link.setProperty(PROPERTY_ACTORS, actorsCommaSeparated);
+                        }
+                        /* Now try to find the filesize of our previously chosen download quality. */
+                        final Number upcoming = (Number) clip.get("upcoming");
+                        if (upcoming != null && upcoming.intValue() == 1) {
+                            /* Full Video hasn't been released yet -> Wait for release */
+                            final long date_timestamp = ((Number) clip.get("date")).longValue() * 1000;
+                            waitUntilRelease = date_timestamp - System.currentTimeMillis();
+                            if (waitUntilRelease <= 0) {
+                                logger.info("Calculated unplausible time until video gets released -> Fallback to default");
+                                waitUntilRelease = 5 * 60 * 1000l;
+                            }
+                        }
+                        final Map<String, Number> download_file_sizes = (Map<String, Number>) clip.get("download_file_sizes");
+                        if (download_file_sizes == null || download_file_sizes.isEmpty()) {
+                            logger.info("Looks like official download is not possible");
+                            break apiHandling;
+                        }
+                        final String preChosenQualityMapping = getQualityFilesizeMapping(link.getStringProperty(PROPERTY_QUALITY));
+                        final String preferredQualityMappingStr = getQualityFilesizeMapping(preferredQualityStr);
+                        String thisChosenQuality = null;
+                        if (preChosenQualityMapping != null && download_file_sizes.containsKey(preChosenQualityMapping)) {
+                            filesize = download_file_sizes.get(preChosenQualityMapping).longValue();
+                            thisChosenQuality = preChosenQualityMapping;
+                        } else if (preferredQualityMappingStr != null && download_file_sizes.containsKey(preferredQualityMappingStr)) {
+                            thisChosenQuality = preferredQualityMappingStr;
+                        } else {
+                            /* Find best quality */
+                            long highestQualityValue = -1;
+                            boolean findBestByFilesize = false;
+                            for (final Entry<String, Number> entry : download_file_sizes.entrySet()) {
+                                final String thisqualityLabel = entry.getKey();
+                                final long thisFilesize = entry.getValue().longValue();
+                                final long thisQualityValue;
+                                if (findBestByFilesize) {
+                                    thisQualityValue = thisFilesize;
+                                } else {
+                                    thisQualityValue = getQualityLabelToHeight(thisqualityLabel);
+                                }
+                                if (thisChosenQuality == null || thisQualityValue > highestQualityValue) {
+                                    thisChosenQuality = entry.getKey();
+                                    highestQualityValue = thisQualityValue;
+                                }
+                            }
+                            logger.info("Choose best quality: " + thisChosenQuality);
+                        }
+                        /*
+                         * 2024-09-27: At this moment we do not yet know in beforehand if the user is allowed to do official downloads
+                         * (there are also cheaper "stream only" accounts) -> Need to check.
+                         */
+                        /* We can always use the file size as usually stream- and download sizes and available qualities are similar. */
+                        filesize = download_file_sizes.get(thisChosenQuality).longValue();
+                        synchronized (account) {
+                            final Boolean accountAllowsOfficialDownloads = (Boolean) account.getProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS);
+                            final Boolean accountStreamingOnly = (Boolean) account.getProperty(PROPERTY_ACCOUNT_STREAMING_ONLY);
+                            final String officialDownloadlink = String.format("https://members.%s/movieaction/download/%s/%s/mp4?codec=h264", getHost(), fileID, thisChosenQuality);
+                            if (Boolean.FALSE.equals(accountStreamingOnly)) {
+                                /* We know that this account allows official downloads. */
+                                this.dllink = officialDownloadlink;
+                                chosenQualityLabel = thisChosenQuality;
+                            } else if (Boolean.TRUE.equals(accountAllowsOfficialDownloads)) {
+                                /* We know that this account was able to do official downloads so there is no need to check again. */
+                                this.dllink = officialDownloadlink;
+                                chosenQualityLabel = thisChosenQuality;
+                            } else if (accountStreamingOnly == null && accountAllowsOfficialDownloads == null) {
+                                URLConnectionAdapter con = null;
+                                boolean success = false;
+                                try {
+                                    final Browser br_dltest = br.cloneBrowser();
+                                    con = br_dltest.openHeadConnection(officialDownloadlink);
+                                    if (this.looksLikeDownloadableContent(con)) {
+                                        this.dllink = officialDownloadlink;
+                                        chosenQualityLabel = thisChosenQuality;
+                                        filesize = con.getCompleteContentLength();
+                                        success = true;
+                                    } else {
+                                        /* Typically http response 404 */
+                                        logger.info("Official download not possible: Received no file content");
+                                    }
+                                } catch (final Throwable e) {
+                                    logger.log(e);
+                                    logger.info("Official download not possible: Exception");
+                                } finally {
+                                    try {
+                                        con.disconnect();
+                                    } catch (final Throwable e) {
+                                    }
+                                }
+                                account.setProperty(PROPERTY_ACCOUNT_ALLOWS_OFFICIAL_DOWNLOADS, success);
+                            } else {
+                                /* This account does not allow official downloads. */
+                            }
                         }
                     } catch (final Throwable ignore) {
                         logger.warning("Error while trying to find additional metadata");
@@ -703,6 +712,17 @@ public abstract class EvilangelCore extends PluginForHost {
         }
     }
 
+    /** Returns height to given quality label. Returns -1 if nothing is found. */
+    private static int getQualityLabelToHeight(final String label) {
+        if (label.equals("4k")) {
+            return 2160;
+        } else if (label.matches("\\d+p")) {
+            return Integer.parseInt(label.replace("p", ""));
+        } else {
+            return -1;
+        }
+    }
+
     // private String findDesiredQuality(final Browser br, final String qualityStr) {
     // return br.getRegex("\"(/[^\"]*/download/\\d+/" + qualityStr + "[^\"]*)\"").getMatch(0);
     // }
@@ -813,8 +833,8 @@ public abstract class EvilangelCore extends PluginForHost {
             }
             login.remove("submit");
             /**
-             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br> Only add "rememberme":
-             * "1" if that is not already present in our form.
+             * 2021-09-01: Form may contain "rememberme" two times with value "0" AND "1"! Same via browser! </br>
+             * Only add "rememberme": "1" if that is not already present in our form.
              */
             final String remembermeCookieKey = "rememberme";
             boolean containsRemembermeFieldWithValue1 = false;

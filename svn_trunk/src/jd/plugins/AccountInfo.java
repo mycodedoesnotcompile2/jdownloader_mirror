@@ -615,6 +615,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
         /* sorting will now work properly since they are all pre-corrected to lowercase. */
         Collections.sort(finalresults, new NaturalOrderComparator());
         this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults));
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.setProperty("multiHostSupportv2", new CopyOnWriteArrayList<MultiHostHost>(finalresults2));
+        }
         return finalresults;
     }
 
@@ -633,7 +636,14 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /** 2024-09-06: wrapper function */
-    public List<MultiHostHost> getMultiHostSupport2() {
+    public List<MultiHostHost> getMultiHostSupportV2() {
+        final boolean allowUseNewHandling = true;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowUseNewHandling) {
+            final Object prop = this.getProperty("multiHostSupportv2");
+            if (prop != null && prop instanceof List) {
+                return (List<MultiHostHost>) prop;
+            }
+        }
         final List<String> domains = getMultiHostSupport();
         if (domains == null) {
             return null;
@@ -650,7 +660,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
 
     /** Returns information about specific host if it is supported. */
     public MultiHostHost getMultihostSupportedHost(final String domain) {
-        final List<MultiHostHost> mhosts = getMultiHostSupport2();
+        final List<MultiHostHost> mhosts = getMultiHostSupportV2();
         if (mhosts == null || mhosts.size() == 0) {
             return null;
         }
@@ -663,7 +673,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     public void updateMultihostSupportedHost(final MultiHostHost mhost) {
-        final List<MultiHostHost> mhosts = getMultiHostSupport2();
+        final List<MultiHostHost> mhosts = getMultiHostSupportV2();
         if (mhosts == null || mhosts.size() == 0) {
             return;
         }

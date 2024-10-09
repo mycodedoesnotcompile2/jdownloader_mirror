@@ -18,31 +18,21 @@ import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.SwingUtils;
-import org.appwork.utils.swing.dialog.AbstractDialog;
 import org.appwork.utils.swing.dialog.InputDialog;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.solverjob.ChallengeSolverJobListener;
-import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.AbstractIcon;
 
-public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListener, ChallengeSolverJobListener, ConfirmDialogInterface {
+public class OAuthDialog extends AbstractCaptchaDialog<Boolean> implements ActionListener, ChallengeSolverJobListener, ConfirmDialogInterface {
 
-    // private BufferedImage[] kcImages;
-    // private int kcSampleImg;
-
-    private JPanel         p;
-
-    private OAuthChallenge challenge;
+    private JPanel p;
 
     public OAuthDialog(int flag, DialogType type, DomainInfo domain, OAuthChallenge challenge) {
-        super(flag | UIOManager.BUTTONS_HIDE_OK, _GUI.T.OAUTH_DIALOG_TITLE(domain.getTld()), new AbstractIcon(IconKey.ICON_BROWSE, 32), null, _GUI.T.lit_close());
-        // challenge.getExplain()
-        // super(flag | Dialog.STYLE_HIDE_ICON | UIOManager.LOGIC_COUNTDOWN, title, null, null, null);
+        super(challenge, flag | UIOManager.BUTTONS_HIDE_OK, _GUI.T.OAUTH_DIALOG_TITLE(domain.getTld()), type, domain, null);
 
-        this.challenge = challenge;
         challenge.getJob().getEventSender().addListener(this, true);
         setLeftActions(new BasicAction() {
             {
@@ -58,7 +48,8 @@ public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListen
     }
 
     protected void openBrowser() {
-        if (CrossSystem.openURL(challenge.getUrl()) != null || true) {
+        final String url = ((OAuthChallenge) challenge).getUrl();
+        if (CrossSystem.openURL(url) != null || true) {
             new Thread() {
                 {
                     setDaemon(true);
@@ -66,7 +57,7 @@ public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListen
 
                 @Override
                 public void run() {
-                    final InputDialog oauthDialog = new InputDialog(UIOManager.LOGIC_COUNTDOWN, _GUI.T.lit_open_browser(), challenge.getExplain(), challenge.getUrl(), null, _GUI.T.lit_continue(), null);
+                    final InputDialog oauthDialog = new InputDialog(UIOManager.LOGIC_COUNTDOWN, _GUI.T.lit_open_browser(), challenge.getExplain(), url, null, _GUI.T.lit_continue(), null);
                     oauthDialog.setTimeout(5 * 60 * 1000);
                     UIOManager.I().show(InputDialogInterface.class, oauthDialog);
                 }
@@ -91,7 +82,6 @@ public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListen
 
     @Override
     protected Boolean createReturnValue() {
-
         return false;
     }
 
@@ -131,78 +121,7 @@ public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListen
         p = new JPanel(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[][grow,fill]"));
         JLabel lbl;
         p.add(lbl = new JLabel("<html>" + challenge.getExplain().replace("\r\n", "<br>") + "</html>"));
-
-        // if (challenge instanceof AccountLoginOAuthChallenge) {
-        // ExtTextField ttx = new ExtTextField() {
-        // private Border orgBorder;
-        // private JLabel label;
-        // private int labelWidth;
-        // private int iconGap;
-        // private Icon hosterIcon;
-        //
-        // {
-        // orgBorder = getBorder();
-        // setBorder(BorderFactory.createCompoundBorder(orgBorder, BorderFactory.createEmptyBorder(0, 28, 0, 0)));
-        //
-        // label = new JLabel() {
-        // public boolean isShowing() {
-        //
-        // return true;
-        // }
-        //
-        // public boolean isVisible() {
-        // return true;
-        // }
-        // };
-        //
-        // label.setText("Code: ");
-        // labelWidth = label.getPreferredSize().width;
-        // hosterIcon = challenge.getDomainInfo().getIcon(24);
-        // if (hosterIcon == null) {
-        // hosterIcon = challenge.getDomainInfo().getFavIcon();
-        // }
-        // iconGap = hosterIcon.getIconWidth() + 5;
-        // label.setSize(labelWidth, 24);
-        // // label.setEnabled(false);
-        // setBorder(BorderFactory.createCompoundBorder(orgBorder, BorderFactory.createEmptyBorder(0, labelWidth + 20 + iconGap, 0, 0)));
-        // }
-        //
-        // protected void paintComponent(Graphics g) {
-        //
-        // super.paintComponent(g);
-        // Graphics2D g2 = (Graphics2D) g;
-        // Composite comp = g2.getComposite();
-        //
-        // g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.1f));
-        //
-        // g2.setColor(Color.BLACK);
-        //
-        // g2.fillRect(1, 1, labelWidth + 5 + iconGap + 8 - 1, getHeight() - 1);
-        // g2.setColor(getBackground().darker());
-        // g2.drawLine(labelWidth + 5 + iconGap + 8, 1, labelWidth + iconGap + 5 + 8, getHeight() - 1);
-        //
-        // g2.setComposite(comp);
-        // hosterIcon.paintIcon(this, g2, 3, 3);
-        //
-        // g2.translate(iconGap + 1, 0);
-        // label.getUI().paint(g2, label);
-        //
-        // // label.paintComponents(g2);
-        // g2.translate(-iconGap - 1, 0);
-        //
-        // // g2.dispose();
-        //
-        // }
-        // };
-        //
-        // ttx.setText(((AccountLoginOAuthChallenge) challenge).getUserCode());
-        // ttx.setEditable(false);
-        // // ttx.setLabelMode(true);
-        // p.add(ttx, "pushx,growx");
-        // }
         SwingUtils.setOpaque(lbl, false);
-
-        // drawPanel.setPreferredSize(background.getPreferredSize());
         return p;
     }
 
@@ -227,7 +146,13 @@ public class OAuthDialog extends AbstractDialog<Boolean> implements ActionListen
 
     @Override
     public String getMessage() {
-        return challenge.getExplain() + "\r\n" + challenge.getUrl();
+        final String url = ((OAuthChallenge) challenge).getUrl();
+        return challenge.getExplain() + "\r\n" + url;
+    }
+
+    @Override
+    protected JPanel createCaptchaPanel() {
+        return null;
     }
 
 }

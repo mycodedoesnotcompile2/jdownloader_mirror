@@ -37,6 +37,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +82,8 @@ public abstract class TypeRef<T> {
     public static final TypeRef<ArrayList<String>>                  STRING_LIST    = new TypeRef<ArrayList<String>>() {
                                                                                    };
     public static final TypeRef<Integer>                            INT            = new SimpleTypeRef<Integer>(Integer.class);
+    public static final TypeRef<LinkedHashMap<String, Object>>      LINKED_MAP     = new TypeRef<LinkedHashMap<String, Object>>() {
+                                                                                   };
     private final Type                                              type;
     private final Class<?>                                          rawClass;
 
@@ -91,14 +94,14 @@ public abstract class TypeRef<T> {
         } else {
             this.type = ((ParameterizedType) superClass).getActualTypeArguments()[0];
         }
-        rawClass = initRawClass(getType());
+        this.rawClass = this.initRawClass(this.getType());
     }
 
     /**
      * @param type
      * @return
      */
-    protected Class<?> initRawClass(Type type) {
+    protected Class<?> initRawClass(final Type type) {
         if (type instanceof Class) {
             return ((Class<?>) type);
         } else if (type instanceof ParameterizedType) {
@@ -119,9 +122,9 @@ public abstract class TypeRef<T> {
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (obj instanceof TypeRef) {
-            return getType().equals(((TypeRef) obj).getType());
+            return this.getType().equals(((TypeRef) obj).getType());
         }
         return false;
     }
@@ -133,7 +136,7 @@ public abstract class TypeRef<T> {
      */
     @Override
     public int hashCode() {
-        return getType().hashCode();
+        return this.getType().hashCode();
     }
 
     public TypeRef(final Type t) {
@@ -141,7 +144,7 @@ public abstract class TypeRef<T> {
             throw new IllegalArgumentException("type is null");
         }
         this.type = t;
-        rawClass = initRawClass(getType());
+        this.rawClass = this.initRawClass(this.getType());
     }
 
     public Type getType() {
@@ -152,6 +155,6 @@ public abstract class TypeRef<T> {
      * @return
      */
     public Class<?> getRawClass() {
-        return rawClass;
+        return this.rawClass;
     }
 }

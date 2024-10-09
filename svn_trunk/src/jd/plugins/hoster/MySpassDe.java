@@ -25,6 +25,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -40,11 +41,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49927 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
+@HostPlugin(revision = "$Revision: 49937 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspassdecrypted\\.de/.+\\d+/?$|https://(?:www\\.)?myspass\\.de/player\\?video=\\d+" })
 public class MySpassDe extends PluginForHost {
     public MySpassDe(PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
     private String dllink = null;
@@ -73,11 +79,6 @@ public class MySpassDe extends PluginForHost {
     private static final AtomicLong              timestampTokenRefreshed = new AtomicLong(0);
     private static final AtomicLong              timestampCDNRefreshed   = new AtomicLong(0);
 
-    /*
-     * Example final url (18.05.2015):
-     * http://x3583brainc11021.s.o.l.lb.core-cdn.net/secdl/78de6150fffffffffff1f136aff77d61/55593149/11021brainpool/ondemand
-     * /3583brainpool/163840/myspass2009/14/660/10680/18471/18471_61.mp4
-     */
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         return requestFileInformation(link, false);
@@ -96,7 +97,14 @@ public class MySpassDe extends PluginForHost {
             if (token.get() == null || System.currentTimeMillis() - timestampTokenRefreshed.get() > 30 * 60 * 1000) {
                 logger.info("Obtaining fresh token");
                 final Browser brc = br.cloneBrowser();
-                brc.getPage("https://www." + getHost() + "/_next/static/chunks/pages/_app-42298c98727543c2.js");
+                brc.getPage(link.getPluginPatternMatcher());
+                String jsurl = brc.getRegex("(/_next/static/chunks/pages/_app-[a-f0-9]+\\.js)").getMatch(0);
+                if (jsurl == null) {
+                    /* Fallback 2024-10-08 */
+                    logger.warning("Failed to find jsurl #1 -> Fallback");
+                    jsurl = "/_next/static/chunks/pages/_app-2573dd750bcd852c.js";
+                }
+                brc.getPage(jsurl);
                 final String freshToken = brc.getRegex("Bearer ([a-f0-9]{256})").getMatch(0);
                 if (freshToken == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -109,20 +117,6 @@ public class MySpassDe extends PluginForHost {
                     freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
                 }
                 cdn.set(freshCDN);
-            }
-        }
-        synchronized (cdn) {
-            if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
-                logger.info("Obtaining fresh cdn value");
-                final Browser brc = br.cloneBrowser();
-                brc.getPage("https://www." + getHost() + "/_next/static/chunks/329-696a1b2fb2c4bf5e.js");
-                String freshCDN = brc.getRegex("uri:`(https?://[^/]+)\\$").getMatch(0);
-                if (freshCDN == null) {
-                    logger.warning("Failed to find CDN -> Using static fallback");
-                    freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
-                }
-                cdn.set(freshCDN);
-                timestampCDNRefreshed.set(System.currentTimeMillis());
             }
         }
         final Browser brv = br.cloneBrowser();
@@ -143,10 +137,6 @@ public class MySpassDe extends PluginForHost {
         final String unique_name = attr.get("unique_name").toString();
         final String description = (String) attr.get("teaser_text");
         this.dllink = (String) attr.get("video_url");
-        if (this.dllink.startsWith("/")) {
-            /* Add host, can be found here: https://www.myspass.de/_next/static/chunks/329-696a1b2fb2c4bf5e.js */
-            this.dllink = cdn.get() + this.dllink;
-        }
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
@@ -154,11 +144,14 @@ public class MySpassDe extends PluginForHost {
         final String seasonStr = new Regex(unique_name, "(?i)Staffel (\\d+)").getMatch(0);
         final String episodeStr = new Regex(unique_name, "(?i)Folge (\\d+)").getMatch(0);
         final DecimalFormat df = new DecimalFormat("00");
-        String filename = format + " - ";
+        String filename = format;
         if (seasonStr != null && episodeStr != null) { // Sometimes episode = 9/Best Of, need regex to get only the integer
-            filename += "S" + df.format(Integer.parseInt(seasonStr)) + "E" + df.format(Integer.parseInt(episodeStr)) + " - ";
+            filename += " - S" + df.format(Integer.parseInt(seasonStr)) + "E" + df.format(Integer.parseInt(episodeStr));
         }
-        filename += title;
+        /* Avoid adding information twice */
+        if (!format.contains(title)) {
+            filename += " - " + title;
+        }
         filename = filename.trim();
         filename = Encoding.htmlDecode(filename);
         link.setFinalFileName(filename + ext);
@@ -170,6 +163,30 @@ public class MySpassDe extends PluginForHost {
         requestFileInformation(link, true);
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        if (this.dllink.startsWith("/")) {
+            synchronized (cdn) {
+                if (cdn.get() == null || System.currentTimeMillis() - timestampCDNRefreshed.get() > 30 * 60 * 1000) {
+                    logger.info("Obtaining fresh cdn value");
+                    final Browser brc = br.cloneBrowser();
+                    brc.getPage(link.getPluginPatternMatcher());
+                    String jsurl = brc.getRegex("(/_next/static/chunks/329-[0-f0-9]+\\.js)").getMatch(0);
+                    if (jsurl == null) {
+                        /* Fallback 2024-10-08 */
+                        logger.warning("Failed to find jsurl #2 -> Fallback");
+                        jsurl = "/_next/static/chunks/329-696a1b2fb2c4bf5e.js";
+                    }
+                    brc.getPage(jsurl);
+                    String freshCDN = brc.getRegex("uri:`(https?://[^/,]*?)\\$").getMatch(0);
+                    if (freshCDN == null) {
+                        logger.warning("Failed to find CDN -> Using static fallback");
+                        freshCDN = "https://cms-myspass.vanilla-ott.com/api/videos/"; // 2024-10-07
+                    }
+                    cdn.set(freshCDN);
+                    timestampCDNRefreshed.set(System.currentTimeMillis());
+                }
+            }
+            this.dllink = cdn.get() + this.dllink;
         }
         if (dllink.contains(".m3u8")) {
             br.getPage(dllink);
@@ -197,6 +214,11 @@ public class MySpassDe extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        return false;
     }
 
     @Override

@@ -12,32 +12,36 @@ import javax.swing.JPanel;
 import jd.gui.swing.dialog.DialogType;
 import net.miginfocom.swing.MigLayout;
 
+import org.appwork.exceptions.ThrowUncheckedException;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.captcha.v2.AbstractCaptchaDialog;
+import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptcha;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaImages;
 import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaPuzzleChallenge;
-import org.jdownloader.captcha.v2.challenge.keycaptcha.KeyCaptchaPuzzleResponseData;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-public class KeyCaptchaPuzzleDialog extends AbstractCaptchaDialog<KeyCaptchaPuzzleResponseData> implements ActionListener {
-    private JLayeredPane              drawPanel;
+public class KeyCaptchaPuzzleDialog extends AbstractCaptchaDialog<String> implements ActionListener {
+    private JLayeredPane     drawPanel;
     // private BufferedImage[] kcImages;
     // private int kcSampleImg;
-    private JPanel                    p;
+    private JPanel           p;
     // private final Dimension dimensions;
-    ArrayList<Integer>                mouseArray;
-    private KeyCaptchaPuzzleChallenge challenge;
-    private KeyCaptchaImages          imageData;
+    ArrayList<Integer>       mouseArray;
 
-    public KeyCaptchaPuzzleDialog(KeyCaptchaPuzzleChallenge captchaChallenge, int flag, DialogType type, DomainInfo domain, KeyCaptchaPuzzleChallenge challenge) {
+    private KeyCaptchaImages imageData;
+
+    public KeyCaptchaPuzzleDialog(KeyCaptchaPuzzleChallenge captchaChallenge, int flag, DialogType type, DomainInfo domain) {
         super(captchaChallenge, flag, _GUI.T.KeyCaptchaDialog(domain.getTld()), type, domain, _GUI.T.KeyCaptchaDialog_explain(domain.getTld()));
         // super(flag | Dialog.STYLE_HIDE_ICON | UIOManager.LOGIC_COUNTDOWN, title, null, null, null);
-        this.challenge = challenge;
         // dimensions = new Dimension(465, 250);
-        imageData = challenge.getHelper().getPuzzleData().getImages();
+        imageData = captchaChallenge.getHelper().getPuzzleData().getImages();
+    }
+
+    protected KeyCaptcha getKeyCaptcha() {
+        return ((KeyCaptchaPuzzleChallenge) challenge).getHelper();
     }
 
     protected int getPreferredHeight() {
@@ -55,11 +59,17 @@ public class KeyCaptchaPuzzleDialog extends AbstractCaptchaDialog<KeyCaptchaPuzz
     }
 
     @Override
-    protected KeyCaptchaPuzzleResponseData createReturnValue() {
-        if (Dialog.isOK(getReturnmask())) {
-            return new KeyCaptchaPuzzleResponseData(getPosition(drawPanel), mouseArray);
+    protected String createReturnValue() {
+        if (!Dialog.isOK(getReturnmask())) {
+            return null;
         }
-        return null;
+        try {
+            return getKeyCaptcha().sendPuzzleResult(mouseArray, getPosition(drawPanel));
+        } catch (Exception e) {
+            // Dirty hack as createReturnValue doesn't throw anything
+            ThrowUncheckedException.throwUncheckedException(e);
+            return null;
+        }
     }
 
     private String getPosition(final JLayeredPane drawPanel) {
@@ -88,6 +98,7 @@ public class KeyCaptchaPuzzleDialog extends AbstractCaptchaDialog<KeyCaptchaPuzz
 
     @Override
     protected JPanel createCaptchaPanel() {
+        final KeyCaptchaPuzzleChallenge challenge = (KeyCaptchaPuzzleChallenge) this.challenge;
         // loadImage(imageUrl);
         // use a container
         p = new JPanel(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[][grow,fill]"));

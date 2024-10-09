@@ -48,11 +48,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49049 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
 public class WebShareCz extends PluginForHost {
     public WebShareCz(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://webshare.cz/#/vip-benefits");
+        this.enablePremium("https://" + getHost() + "/#/vip-benefits");
     }
 
     @Override

@@ -21,13 +21,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -52,8 +45,15 @@ import jd.plugins.hoster.FileupOrg;
 import jd.plugins.hoster.TakefileLink;
 import jd.plugins.hoster.UploadBoyCom;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 49393 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49932 $", interfaceVersion = 2, names = {}, urls = {})
 public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     private static final String[] domains        = new String[] { "up-4.net", "up-4ever.com", "up-4ever.net", "subyshare.com", "brupload.net", "powvideo.net", "youwatch.org", "salefiles.com", "free-uploading.com", "rapidfileshare.net", "fireget.com", "mixshared.com", "novafile.com", "novafile.org", "qtyfiles.com", "free-uploading.com", "free-uploading.com", "downloadani.me", "clicknupload.org", "isra.cloud", "world-files.com", "katfile.com", "filefox.cc", "cosmobox.org", "userupload.net", "tstorage.info", "fastfile.cc", "datanodes.to", "filestore.me", "ezvn.net", "filoz.net", "rapidbytez.com" };
     /* This list contains all hosts which need special Patterns (see below) - all other XFS hosts have the same folder patterns! */
@@ -93,7 +93,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
         final List<String> ret = new ArrayList<String>();
         /* First add domains with normal patterns! */
         for (int i = 0; i < domains.length; i++) {
-            ret.add("https?://(?:www\\.)?" + Pattern.quote(domains[i]) + "/(users/[a-z0-9_]+(?:/[^\\?\r\n]+)?|folder/\\d+/[^\\?\r\n]+)");
+            ret.add("https?://(?:www\\.)?" + Pattern.quote(domains[i]) + "/(users/[a-z0-9_]+(?:/[^\\?\r\n]+)?|folder/\\d+/[^\\?\r\n]+|f/[a-z0-9]{32})");
         }
         for (final String fileupDomain : getFileUpDomains()) {
             ret.add("https?://(?:www\\.)?" + Pattern.quote(fileupDomain) + "/users/[a-z0-9_]+(?:/[^\\?\r\n]+)?");
@@ -248,9 +248,11 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
 
     protected String getPackagename(final CryptedLink param, final Browser br) {
         final String username = new Regex(param.getCryptedUrl(), "/users/([^/]+)").getMatch(0);
-        String fpName = regexPackagenameFromURL(param.getCryptedUrl());
+        final String fpNameURL = regexPackagenameFromURL(param.getCryptedUrl());
+        final String fpNameHtml = regexPackagenameFromHTML(br);
+        String fpName = fpNameHtml;
         if (fpName == null) {
-            fpName = regexPackagenameFromHTML(br);
+            fpName = fpNameURL;
         }
         if (fpName == null) {
             /* Final fallback */
@@ -262,7 +264,7 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
     protected String regexPackagenameFromURL(final String url) {
         String fpName = new Regex(url, "(?i)(folder/\\d+/|f/[a-z0-9]+/|go/[a-z0-9]+/)[^/]+/(.+)").getMatch(1); // name
         if (fpName == null) {
-            fpName = new Regex(url, "(?i)(folder/\\d+/|f/[a-z0-9]+/|go/[a-z0-9]+/)(.+)").getMatch(1); // id
+            fpName = new Regex(url, "(?i)/(folder|f|go)/([a-z0-9]+)").getMatch(1); // id
             if (fpName == null) {
                 fpName = new Regex(url, "(?i)users/[a-z0-9_]+/[^/]+/(.+)").getMatch(0); // name
                 if (fpName == null) {
@@ -285,23 +287,31 @@ public class GenericXFileShareProFolder extends antiDDoSForDecrypt {
             fpName = br.getRegex("page_main_title\"[^>]*>([^<]+)<").getMatch(0);
         } else {
             // ex-load.com
-            fpName = br.getRegex("Files in\\s*(.*?)\\s*folder\\s*</title>").getMatch(0);
+            fpName = br.getRegex("Files in\\s+([^<]+?)\\s+folder[^<]*</").getMatch(0);
             if (fpName == null) {
-                // file-al
-                fpName = br.getRegex("Files of\\s*(.*?)\\s*folder\\s*</title>").getMatch(0);
+                // file-al, katfile.com
+                // File of USER_NAME: FOLDER_NAME folder....
+                fpName = br.getRegex("Files of(\\s+[a-zA-Z0-9]+: )?\\s*([^<>]+?)\\s+folder[^<>]*(<|>)").getMatch(1);
             }
             if (fpName == null) {
-                fpName = br.getRegex("<title>\\s*(.*?)\\s*folder\\s*</title>").getMatch(0);
+                // katfile.com
+                fpName = br.getRegex("Files\\s+in\\s+folder\\s+([^<]+?)\\s*</").getMatch(0);
             }
             if (fpName == null) {
-                fpName = br.getRegex("<h1.*?</i>\\s*(.*?)\\s*</h1>").getMatch(0);
+                fpName = br.getRegex("<title>\\s*([^<]+?)\\s+folder\\s*</title>").getMatch(0);
+            }
+            if (fpName == null) {
+                fpName = br.getRegex("<h1.*?</i>\\s*([^<]+?)\\s*</h1>").getMatch(0);
             }
             if (fpName == null) {
                 /* 2019-02-08: E.g. for photo galleries (e.g. imgbaron.com) */
-                fpName = br.getRegex("<H1>\\s*?(.*?)\\s*?</H1>").getMatch(0);
+                fpName = br.getRegex("<H1>\\s*?([^<]+?)\\s*?</H1>").getMatch(0);
             }
         }
-        return fpName;
+        if (fpName != null) {
+            return Encoding.htmlOnlyDecode(fpName);
+        }
+        return null;
     }
 
     private ArrayList<DownloadLink> parsePage(final ArrayList<String> dupes, final FilePackage fp, final CryptedLink param) throws PluginException {

@@ -35,9 +35,9 @@ import org.jdownloader.gui.translate._GUI;
 /**
  * This Dialog is used to display a Inputdialog for the captchas
  */
-public class ClickCaptchaDialog extends AbstractImageCaptchaDialog {
+public class ClickCaptchaDialog extends AbstractImageCaptchaDialog<ClickedPoint> {
 
-    private Point resultPoint = null;
+    private volatile Point resultPoint = null;
 
     // public ClickCaptchaDialog(final int flag, DialogType type, final DomainInfo DomainInfo, final Image image, final String explain) {
     // this(flag, type, DomainInfo, new Image[] { image }, explain);
@@ -50,20 +50,19 @@ public class ClickCaptchaDialog extends AbstractImageCaptchaDialog {
 
     @Override
     public JComponent layoutDialogContent() {
-        JComponent ret = super.layoutDialogContent();
-
+        final JComponent ret = super.layoutDialogContent();
         iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
         iconPanel.setToolTipText(getHelpText());
         iconPanel.addMouseListener(new MouseListener() {
 
             @Override
             public void mouseReleased(MouseEvent e) {
-                resultPoint = e.getPoint();
-
+                final Point resultPoint = e.getPoint();
                 resultPoint.x -= getOffset().x;
                 resultPoint.y -= getOffset().y;
                 resultPoint.x *= getScaleFaktor();
                 resultPoint.y *= getScaleFaktor();
+                ClickCaptchaDialog.this.resultPoint = resultPoint;
                 setReturnmask(true);
                 dispose();
             }
@@ -89,13 +88,15 @@ public class ClickCaptchaDialog extends AbstractImageCaptchaDialog {
 
     @Override
     protected JComponent createInputComponent() {
-        ExtTextField ret = new ExtTextField();
+        final ExtTextField ret = new ExtTextField();
         ret.setText(getHelpText());
         ret.setEditable(false);
         return ret;
     }
 
-    public ClickedPoint getResult() {
+    @Override
+    protected ClickedPoint createReturnValue() {
+        final Point resultPoint = this.resultPoint;
         if (resultPoint == null) {
             return null;
         }

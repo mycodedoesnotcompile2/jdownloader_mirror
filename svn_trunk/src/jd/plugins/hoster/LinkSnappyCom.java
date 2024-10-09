@@ -60,6 +60,8 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
@@ -71,7 +73,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -240,56 +242,47 @@ public class LinkSnappyCom extends PluginForHost {
             }
             br.getPage("/api/FILEHOSTS");
             final Map<String, Object> hosterMapResponse = this.handleErrors(br, null, account);
-            final ArrayList<String> supportedHosts = new ArrayList<String>();
+            final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             /* Connection info map */
             final HashMap<String, Map<String, Object>> allHosterInfoMap = new HashMap<String, Map<String, Object>>();
             final Map<String, Object> hosterMap = (Map<String, Object>) hosterMapResponse.get("return");
             final Iterator<Entry<String, Object>> it = hosterMap.entrySet().iterator();
-            final ArrayList<String> allSkippedHosts = new ArrayList<String>();
             while (it.hasNext()) {
                 final Entry<String, Object> entry = it.next();
                 final Map<String, Object> thisHosterInformation = (Map<String, Object>) entry.getValue();
-                final String host = entry.getKey();
-                if (StringUtils.isEmpty(host)) {
-                    continue;
-                }
-                final long status = JavaScriptEngineFactory.toLong(thisHosterInformation.get("Status"), 0);
-                final Object quotaO = thisHosterInformation.get("Quota");
-                long quota = -1;
-                if (quotaO instanceof Number) {
-                    quota = ((Number) quotaO).longValue();
-                }
+                final String domain = entry.getKey();
+                final int status = Integer.parseInt(thisHosterInformation.get("Status").toString());
+                // final int connlimit = Integer.parseInt(thisHosterInformation.get("connlimit").toString());
                 // final long noretry = JavaScriptEngineFactory.toLong(hosterInformation.get("noretry"), 0);
-                final long canDownload = JavaScriptEngineFactory.toLong(thisHosterInformation.get("canDownload"), 0);
-                final long usage = JavaScriptEngineFactory.toLong(thisHosterInformation.get("Usage"), 0);
-                if (canDownload != 1) {
-                    logger.info("Skipping host as it is because API says download is not possible (canDownload!=1): " + host);
-                    allSkippedHosts.add(host);
-                    continue;
-                } else if (status != 1) {
-                    /* Host is currently not working or disabled for this MOCH --> Do not add it to the list of supported hosts */
-                    logger.info("Skipping host as it is not available at the moment (status!=1): " + host);
-                    allSkippedHosts.add(host);
-                    continue;
-                } else if (quota != -1 && quota - usage <= 0) {
-                    /* User does not have any traffic left for this host */
-                    logger.info("Skipping host as account has no quota left for it: " + host);
-                    allSkippedHosts.add(host);
-                    continue;
-                }
+                final long usage = ((Number) thisHosterInformation.get("Usage")).longValue();
+                final boolean resume = ((Number) thisHosterInformation.get("resume")).intValue() == 1;
+                final Object quotaO = thisHosterInformation.get("Quota");
+                final long canDownload = ((Number) thisHosterInformation.get("canDownload")).longValue();
                 /* Workaround to find real host. */
                 final ArrayList<String> tempList = new ArrayList<String>();
-                tempList.add(host);
+                tempList.add(domain);
                 final List<String> realHosts = ac.setMultiHostSupport(this, tempList);
-                if (realHosts == null || realHosts.isEmpty()) {
-                    logger.info("Skipping host because we don't have a plugin for it or the plugin we have doesn't allow multihost usage: " + host);
-                    continue;
+                if (realHosts != null && !realHosts.isEmpty()) {
+                    /* Legacy handling */
+                    final String realHost = realHosts.get(0);
+                    allHosterInfoMap.put(realHost, thisHosterInformation);
                 }
-                final String realHost = realHosts.get(0);
-                allHosterInfoMap.put(realHost, thisHosterInformation);
-                supportedHosts.add(realHost);
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                if (canDownload != 1) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                } else if (status != 1) {
+                    /* Host is currently not working or disabled */
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                }
+                // mhost.setTrafficUsed(usage);
+                mhost.setResume(resume);
+                // mhost.setMaxChunks(connlimit);
+                if (quotaO instanceof Number) {
+                    mhost.setTrafficMax(((Number) quotaO).longValue());
+                    mhost.setTrafficLeft(mhost.getTrafficMax() - usage);
+                }
+                supportedhosts.add(mhost);
             }
-            logger.info("All skipped hosts: " + allSkippedHosts);
             account.setProperty(PROPERTY_HOSTER_INFO_MAP, allHosterInfoMap);
             // final List<String> mapped = ac.setMultiHostSupport(this, supportedHosts);
             /* Free account information & downloading is only possible via website; not via API! */
@@ -321,7 +314,7 @@ public class LinkSnappyCom extends PluginForHost {
                     ac.setStatus("Free Account [Failed to find number of URLs left]");
                 }
             }
-            ac.setMultiHostSupport(this, supportedHosts);
+            ac.setMultiHostSupportV2(this, supportedhosts);
             return ac;
         }
     }

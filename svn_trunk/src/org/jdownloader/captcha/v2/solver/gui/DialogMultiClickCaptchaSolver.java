@@ -56,8 +56,9 @@ public class DialogMultiClickCaptchaSolver extends AbstractDialogSolver<MultiCli
                 checkInterruption();
                 handler = new MultiClickCaptchaDialogHandler(captchaChallenge);
                 handler.run();
-                if (handler.getPoint() != null) {
-                    solverJob.addAnswer(new MultiClickCaptchaResponse(captchaChallenge, this, handler.getPoint(), 100));
+                final MultiClickedPoint result = handler.getResult();
+                if (result != null) {
+                    solverJob.addAnswer(new MultiClickCaptchaResponse(captchaChallenge, this, result, 100));
                 }
             }
         }

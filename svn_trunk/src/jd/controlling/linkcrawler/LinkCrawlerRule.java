@@ -12,6 +12,7 @@ import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
 
+import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
@@ -53,6 +54,7 @@ public class LinkCrawlerRule {
         return _getCookies();
     }
 
+    @AllowNonStorableObjects
     public void setCookies(final Object obj) {
         final Cookies cookies = Cookies.parseCookiesFromObject(obj, null);
         if (cookies == null) {

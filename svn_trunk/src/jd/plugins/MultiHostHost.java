@@ -4,11 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.storage.Storable;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
 
-public class MultiHostHost implements Storable {
+public class MultiHostHost {
     /** How long shall we block this host if a limit gets reached? Until the next day/hour? */
     // public enum LimitResetMode {
     // DAILY;
@@ -58,7 +57,7 @@ public class MultiHostHost implements Storable {
         this.name = name;
     }
 
-    public void setDomain(final String domain) {
+    protected void setDomain(final String domain) {
         if (domain == null) {
             throw new IllegalArgumentException();
         }
@@ -133,6 +132,7 @@ public class MultiHostHost implements Storable {
         this.isUnlimitedTraffic = false;
     }
 
+    /** Only use this if trafficMax has been set before!! */
     public void setTrafficUsed(long bytes) {
         this.trafficLeft = this.trafficMax - bytes;
         this.isUnlimitedTraffic = false;
@@ -155,19 +155,11 @@ public class MultiHostHost implements Storable {
     }
 
     public boolean isUnlimitedLinks() {
-        if (this.isUnlimitedLinks == null) {
-            return true;
-        } else {
-            return this.isUnlimitedLinks;
-        }
+        return isUnlimitedLinks == null || isUnlimitedLinks.booleanValue();
     }
 
     public boolean isUnlimitedTraffic() {
-        if (this.isUnlimitedTraffic == null) {
-            return true;
-        } else {
-            return this.isUnlimitedTraffic;
-        }
+        return isUnlimitedTraffic == null || isUnlimitedTraffic.booleanValue();
     }
 
     @Deprecated
@@ -195,11 +187,23 @@ public class MultiHostHost implements Storable {
         this.statusText = statusText;
     }
 
+    /** Returns title for this entry which is either its' name, the first entry in the domain list or null. */
+    public String getTitle() {
+        if (this.name != null) {
+            return this.name;
+        } else if (this.domains != null && this.domains.size() > 0) {
+            return this.domains.iterator().next();
+        } else {
+            return null;
+        }
+    }
+
     public MultihosterHostStatus getStatus() {
         // TODO: Update this to simply return status without any evaluation
         if (this.unavailableUntilTimestamp > Time.systemIndependentCurrentJVMTimeMillis()) {
             return MultihosterHostStatus.DEACTIVATED_JDOWNLOADER;
         } else if (status == null) {
+            /* Default */
             return MultihosterHostStatus.WORKING;
         } else {
             return status;
@@ -273,14 +277,7 @@ public class MultiHostHost implements Storable {
 
     @Override
     public String toString() {
-        final String title;
-        if (this.name != null) {
-            title = this.name;
-        } else if (this.domains != null && this.domains.size() > 0) {
-            title = this.domains.iterator().next();
-        } else {
-            title = null;
-        }
+        final String title = getTitle();
         return title + " | Status: " + this.getStatus() + " | StatusText: " + this.getStatusText() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }
 }

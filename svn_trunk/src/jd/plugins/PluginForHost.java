@@ -46,51 +46,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -190,6 +145,52 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -198,11 +199,10 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-        /**
-         * these patterns should split filename and fileextension (extension must include the
-         * point)
-         */
-        // multipart rar archives
+            /**
+             * these patterns should split filename and fileextension (extension must include the point)
+             */
+            // multipart rar archives
             Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
             // normal files with extension
             Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
@@ -3083,7 +3083,47 @@ public abstract class PluginForHost extends Plugin {
         return null;
     }
 
-    public void extendAccountSettingsPanel(Account acc, PluginConfigPanelNG panel) {
+    public void extendAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {
+        final AccountInfo ai = acc.getAccountInfo();
+        if (ai == null) {
+            return;
+        }
+        final List<MultiHostHost> hosts = ai.getMultiHostSupportV2();
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && hosts != null) {
+            for (final MultiHostHost mhost : hosts) {
+                if (mhost.getDomains().isEmpty()) {
+                    /* Skip invalid items */
+                    continue;
+                }
+                final StringBuilder sb = new StringBuilder();
+                final String domain = mhost.getDomains().get(0);
+                final String hostStr;
+                boolean hasWorkingStatus = false;
+                if (mhost.getStatus() == MultihosterHostStatus.WORKING) {
+                    hostStr = domain;
+                    hasWorkingStatus = true;
+                } else if (mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE) {
+                    hostStr = "<span style=\"background-color:#ffca28;\">" + domain + "</span>";
+                } else {
+                    final String statusText;
+                    if (mhost.getStatusText() != null) {
+                        statusText = mhost.getStatusText();
+                    } else {
+                        statusText = mhost.getStatus().toString();
+                    }
+                    hostStr = "<s>" + domain + "</s> | " + statusText;
+                }
+                if (!mhost.isUnlimitedTraffic()) {
+                    sb.append("|" + SizeFormatter.formatBytes(mhost.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(mhost.getTrafficMax()));
+                }
+                if (!mhost.isUnlimitedLinks()) {
+                    sb.append("|Links left: " + mhost.getLinksLeft() + "/" + mhost.getLinksMax());
+                }
+                if (!hasWorkingStatus || sb.length() > 0) {
+                    panel.addStringPair(hostStr, sb.toString());
+                }
+            }
+        }
     }
 
     /**
@@ -3110,7 +3150,7 @@ public abstract class PluginForHost extends Plugin {
      */
     public void validateLogins(final Account account) throws AccountInvalidException {
         if (this.hasFeature(FEATURE.USERNAME_IS_EMAIL)) {
-            if (!looksLikeValidEmailAddress(account.getUser())) {
+            if (!looksLikeValidEmailAddress(account, account.getUser())) {
                 throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorInputIsNotEmailAddress());
             }
         }
@@ -3129,15 +3169,9 @@ public abstract class PluginForHost extends Plugin {
         }
     }
 
-    public static boolean looksLikeValidEmailAddress(final String str) {
+    public boolean looksLikeValidEmailAddress(final Account account, final String email) {
         // TODO: Move this function to a better place
-        if (str == null) {
-            return false;
-        } else if (str.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
-            return true;
-        } else {
-            return false;
-        }
+        return email != null && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
     public boolean isSameAccount(Account downloadAccount, AbstractProxySelectorImpl downloadProxySelector, Account candidateAccount, AbstractProxySelectorImpl candidateProxySelector) {

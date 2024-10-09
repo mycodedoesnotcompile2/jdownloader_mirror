@@ -8,6 +8,18 @@ import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 
 public interface EvilangelCoreConfig extends PluginConfigInterface {
+    public static final TRANSLATION TRANSLATION = new TRANSLATION();
+
+    public static class TRANSLATION {
+        public String getPreferredQuality_label() {
+            return "Preferred quality";
+        }
+
+        public String getBestQualitySelectionMethod_label() {
+            return "Best quality selection method";
+        }
+    }
+
     public static enum Quality implements LabelInterface {
         BEST {
             @Override
@@ -72,4 +84,27 @@ public interface EvilangelCoreConfig extends PluginConfigInterface {
     EvilangelComConfig.Quality getPreferredQuality();
 
     void setPreferredQuality(EvilangelComConfig.Quality quality);
+
+    public static enum BestSelectionMethod implements LabelInterface {
+        RESOLUTION {
+            @Override
+            public String getLabel() {
+                return "Video resolution";
+            }
+        },
+        FILE_SIZE {
+            @Override
+            public String getLabel() {
+                return "File size";
+            }
+        }
+    }
+
+    @AboutConfig
+    @DefaultEnumValue("RESOLUTION")
+    @Order(20)
+    @DescriptionForConfigEntry("Defines how the best video quality will be determined.")
+    BestSelectionMethod getBestQualitySelectionMethod();
+
+    void setBestQualitySelectionMethod(BestSelectionMethod method);
 }

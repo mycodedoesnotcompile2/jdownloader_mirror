@@ -127,7 +127,7 @@ public abstract class AbstractBrowserSolver extends ChallengeSolver<String> {
                     }
                     checkInterruption();
                     handler.run();
-                    String response = handler.getResponseString();
+                    final String response = handler.getResult();
                     if (response != null) {
                         job.addAnswer(new BrowserResponse(captchaChallenge, this, response, 100));
                     }

@@ -22,14 +22,13 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49024 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileupOrg extends XFileSharingProBasic {
     public FileupOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -119,7 +118,7 @@ public class FileupOrg extends XFileSharingProBasic {
     public String[] scanInfo(final String html, final String[] fileInfo) {
         super.scanInfo(html, fileInfo);
         if (StringUtils.isEmpty(fileInfo[1])) {
-            fileInfo[1] = new Regex(html, "You have requested.*?https?://(?:www\\.)?[^/]+/\\s*?" + this.getFUIDFromURL(this.getDownloadLink()) + "</span>\\s*?\\((\\d+(?:\\.\\d{1,2})? [A-Za-z]{2,5})\\)</p>").getMatch(0);
+            fileInfo[1] = new Regex(html, "(?i)You have requested.*?https?://(?:www\\.)?[^/]+/\\s*?" + this.getFUIDFromURL(this.getDownloadLink()) + "</span>\\s*?\\((\\d+(?:\\.\\d{1,2})? [A-Za-z]{2,5})\\)</p>").getMatch(0);
         }
         return fileInfo;
     }
@@ -131,12 +130,17 @@ public class FileupOrg extends XFileSharingProBasic {
     }
 
     @Override
-    public String regexWaittime(Browser br) {
-        String ttt = super.regexWaittime(br);
-        if (StringUtils.isEmpty(ttt)) {
-            ttt = new Regex(br.getRequest().getHtmlCode(), "<span id=\"countdown\">[^<>]*?<span class=\"label label\\-danger seconds\">(\\d+)</span>").getMatch(0);
+    public String regexWaittime(final String html) {
+        String waitSeconds = new Regex(html, "<span id=\"countdown\">[^<>]*?<span class=\"label label\\-danger seconds\">(\\d+)</span>").getMatch(0);
+        if (StringUtils.isEmpty(waitSeconds)) {
+            // 2024-10-08
+            waitSeconds = new Regex(html, "id=\"seconds\"[^>]*>\\s*(\\d+)\\s*<").getMatch(0);
         }
-        return ttt;
+        if (waitSeconds != null) {
+            return waitSeconds;
+        } else {
+            return super.regexWaittime(html);
+        }
     }
 
     @Override

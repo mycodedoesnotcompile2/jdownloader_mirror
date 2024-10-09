@@ -56,8 +56,9 @@ public class DialogClickCaptchaSolver extends AbstractDialogSolver<ClickedPoint>
                 checkInterruption();
                 handler = new ClickCaptchaDialogHandler(captchaChallenge);
                 handler.run();
-                if (handler.getPoint() != null) {
-                    solverJob.addAnswer(new ClickCaptchaResponse(captchaChallenge, this, handler.getPoint(), 100));
+                final ClickedPoint result = handler.getResult();
+                if (result != null) {
+                    solverJob.addAnswer(new ClickCaptchaResponse(captchaChallenge, this, result, 100));
                 }
             }
         }

@@ -23,6 +23,24 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistFilenameScheme;
+import org.jdownloader.plugins.components.archiveorg.ArchiveOrgLendingInfo;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -45,29 +63,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.ExtensionsFilterInterface;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgConfig.PlaylistFilenameScheme;
-import org.jdownloader.plugins.components.archiveorg.ArchiveOrgLendingInfo;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49922 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://archive.org/account/login.createaccount.php");
+        this.enablePremium("https://" + getHost() + "/account/login.createaccount.php");
     }
 
     @Override
@@ -77,7 +77,7 @@ public class ArchiveOrg extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://archive.org/about/terms.php";
+        return "https://" + getHost() + "/about/terms.php";
     }
 
     @Override
@@ -85,8 +85,9 @@ public class ArchiveOrg extends PluginForHost {
         if (isAudioPlaylistItem(link)) {
             /**
              * This enables us to add the same link twice, one time as playlist item (with different filenames) and one time as "original
-             * file". </br> We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and
-             * "original" at the same time.
+             * file". </br>
+             * We basically need to trick our own duplicate detection to allow the user to add a file as playlist item and "original" at the
+             * same time.
              */
             return super.getLinkID(link) + "_audio_playlist_item";
         } else if (this.isBook(link)) {
@@ -296,8 +297,9 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Returns true if this book page is borrowed at this moment. </br> This information is only useful with the combination of the
-     * borrow-cookies and can become invalid at any point of time if e.g. the user returns the book manually via browser.
+     * Returns true if this book page is borrowed at this moment. </br>
+     * This information is only useful with the combination of the borrow-cookies and can become invalid at any point of time if e.g. the
+     * user returns the book manually via browser.
      */
     private boolean isLendAtThisMoment(final DownloadLink link) {
         final long borrowedUntilTimestamp = link.getLongProperty(PROPERTY_IS_BORROWED_UNTIL_TIMESTAMP, -1);
@@ -331,8 +333,8 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * A special string that is the same as the bookID but different for multi volume books. </br> ...thus only relevant for multi volume
-     * books.
+     * A special string that is the same as the bookID but different for multi volume books. </br>
+     * ...thus only relevant for multi volume books.
      */
     private String getBookSubPrefix(final DownloadLink link) {
         return link.getStringProperty(PROPERTY_BOOK_SUB_PREFIX);
@@ -409,9 +411,10 @@ public class ArchiveOrg extends PluginForHost {
         if (link.getHashInfo() != null) {
             /**
              * Check if we can use the current HashInfo. Delete it if we can't be sure that the file we are going to download is the same
-             * file/version which was initially crawled. </br> Getting the current/new file-hash would also be too much effort and in most
-             * of all cases the files won't have changed until download is initiated but it is relly important to clear the hash if in doubt
-             * otherwise the user may get a "CRC check failed" error message for no reason.
+             * file/version which was initially crawled. </br>
+             * Getting the current/new file-hash would also be too much effort and in most of all cases the files won't have changed until
+             * download is initiated but it is relly important to clear the hash if in doubt otherwise the user may get a "CRC check failed"
+             * error message for no reason.
              */
             boolean deleteHashInfo = false;
             final long lastModifiedTimestampFromAPI = link.getLongProperty(PROPERTY_TIMESTAMP_FROM_API_LAST_MODIFIED, -1);
@@ -624,19 +627,6 @@ public class ArchiveOrg extends PluginForHost {
                     br.setCookies(account.getHoster(), userCookies);
                     return;
                 } else if (this.checkCookies(this.br, account, userCookies)) {
-                    /*
-                     * User can entry anything into username field when using cookie login but we want unique strings --> Try to find
-                     * "real username" in HTML code.
-                     */
-                    String realUsername = br.getRegex("username=\"([^\"]+)\"").getMatch(0);
-                    if (realUsername == null) {
-                        logger.warning("Failed to find \"real\" username");
-                    } else {
-                        realUsername = Encoding.htmlDecode(realUsername).trim();
-                        if (!StringUtils.equals(realUsername, account.getUser())) {
-                            account.setUser(realUsername);
-                        }
-                    }
                     return;
                 } else {
                     if (account.hasEverBeenValid()) {
@@ -665,9 +655,6 @@ public class ArchiveOrg extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
-            if (!account.getUser().matches(".+@.+\\..+")) {
-                throw new AccountInvalidException("Please enter your e-mail address in the username field!");
-            }
             br.getPage("https://" + this.getHost() + "/account/login");
             br.postPageRaw(br.getURL(), "remember=true&referer=https%3A%2F%2Farchive.org%2FCREATE%2F&login=true&submit_by_js=true&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
             if (!isLoggedIN(br)) {
@@ -678,7 +665,8 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /**
-     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br> It is typically valid for one hour.
+     * Borrows given bookID which gives us a token we can use to download all pages of that book. </br>
+     * It is typically valid for one hour.
      */
     private void borrowBook(final Browser br, final Account account, final String bookID, final boolean skipAllExceptLastStep) throws Exception {
         if (account == null) {
@@ -712,9 +700,9 @@ public class ArchiveOrg extends PluginForHost {
                     if (StringUtils.equalsIgnoreCase(error, "This book is not available to borrow at this time. Please try again later.")) {
                         /**
                          * Happens if you try to borrow a book that can't be borrowed or if you try to borrow a book while too many
-                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br> With setting this
-                         * timestamp we can ensure not to waste more http requests on trying to borrow books but simply set error status on
-                         * all future links [for the next 60 minutes].
+                         * (2022-08-31: max 10) books per hour have already been borrowed with the current account. </br>
+                         * With setting this timestamp we can ensure not to waste more http requests on trying to borrow books but simply
+                         * set error status on all future links [for the next 60 minutes].
                          */
                         account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_BORROW_LIMIT_REACHED, Time.systemIndependentCurrentJVMTimeMillis());
                         /*

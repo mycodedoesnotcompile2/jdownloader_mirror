@@ -8,6 +8,9 @@ import javax.swing.JLabel;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter.HighlightPainter;
 
+import jd.gui.swing.components.linkbutton.JLink;
+import jd.http.Cookies;
+
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.swing.components.ExtTextField;
@@ -17,9 +20,6 @@ import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
-import jd.gui.swing.components.linkbutton.JLink;
-import jd.http.Cookies;
 
 public class DefaultEditAccountPanelCookieLogin extends MigPanel implements AccountBuilderInterface {
     /**
@@ -192,7 +192,7 @@ public class DefaultEditAccountPanelCookieLogin extends MigPanel implements Acco
         if (StringUtils.isEmpty(this.getUsername())) {
             usernameLabel.setForeground(Color.RED);
             userok = false;
-        } else if (this.usernameIsEmail && !PluginForHost.looksLikeValidEmailAddress(this.getUsername())) {
+        } else if (this.usernameIsEmail && !plg.looksLikeValidEmailAddress(null, this.getUsername())) {
             /* E-Mail is needed but user did not enter a valid-looking e-mail address. */
             usernameLabel.setForeground(Color.RED);
             userok = false;

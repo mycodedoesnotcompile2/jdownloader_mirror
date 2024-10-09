@@ -22,7 +22,9 @@ import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
+
 import javax.swing.JComponent;
+
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.DomainInfo;
@@ -33,7 +35,7 @@ import org.jdownloader.gui.translate._GUI;
 /**
  * This Dialog is used to display a Inputdialog for the captchas
  */
-public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog {
+public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog<MultiClickedPoint> {
 
     private ArrayList<Point> rp = null;
 
@@ -48,17 +50,14 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog {
 
     @Override
     public JComponent layoutDialogContent() {
-        JComponent ret = super.layoutDialogContent();
-
+        final JComponent ret = super.layoutDialogContent();
         iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
         iconPanel.setToolTipText(getHelpText());
         iconPanel.addMouseListener(new MouseListener() {
 
             @Override
             public void mouseReleased(MouseEvent e) {
-
                 final Point resultPoint = e.getPoint();
-
                 resultPoint.x -= getOffset().x;
                 resultPoint.y -= getOffset().y;
                 resultPoint.x *= getScaleFaktor();
@@ -92,13 +91,14 @@ public class MultiClickCaptchaDialog extends AbstractImageCaptchaDialog {
 
     @Override
     protected JComponent createInputComponent() {
-        ExtTextField ret = new ExtTextField();
+        final ExtTextField ret = new ExtTextField();
         ret.setText(getHelpText());
         ret.setEditable(false);
         return ret;
     }
 
-    public MultiClickedPoint getResult() {
+    @Override
+    protected MultiClickedPoint createReturnValue() {
         if (rp == null) {
             return null;
         }

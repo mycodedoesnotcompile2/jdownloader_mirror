@@ -35,7 +35,7 @@ import org.jdownloader.gui.translate._GUI;
 /**
  * This Dialog is used to display a Inputdialog for the captchas
  */
-public class CaptchaDialog extends AbstractImageCaptchaDialog implements ActionListener {
+public class CaptchaDialog extends AbstractImageCaptchaDialog<String> implements ActionListener {
 
     private ExtTextField textField;
     private String       suggest;
@@ -124,8 +124,13 @@ public class CaptchaDialog extends AbstractImageCaptchaDialog implements ActionL
 
     }
 
-    public String getResult() {
-        return textField == null ? null : textField.getText();
+    @Override
+    protected String createReturnValue() {
+        final ExtTextField textField = this.textField;
+        if (textField == null) {
+            return null;
+        }
+        return textField.getText();
     }
 
     public void suggest(String value) {

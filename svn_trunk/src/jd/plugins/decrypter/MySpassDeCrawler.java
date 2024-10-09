@@ -19,7 +19,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.appwork.utils.parser.UrlQuery;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,35 +36,37 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49927 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https?://(?:www\\.)?myspass\\.de/(?:(?:myspass/)?shows/(?:tv|web)shows/.+|channels/.+)" })
+@DecrypterPlugin(revision = "$Revision: 49928 $", interfaceVersion = 3, names = { "myspass.de" }, urls = { "https://(?:www\\.)?myspass\\.de/details\\?.+" })
 public class MySpassDeCrawler extends PluginForDecrypt {
     public MySpassDeCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static final String type_hoster = "^https?://(?:www\\.)?myspass\\.de/(?:(?:myspass/)?shows/(?:tv|web)shows/([a-z0-9\\-_]+/[^/]+/|.+video\\.php\\?id=)\\d+/?|channels/[^/]+/\\d+/\\d+/?)$";
-
-    /** Handling for old website in revision: 39533 */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
-        final boolean fastlinkcheck = JDUtilities.getPluginForHost(this.getHost()).getPluginConfig().getBooleanProperty("FAST_LINKCHECK", true);
-        if (parameter.matches(type_hoster)) {
-            /* Single item */
-            final DownloadLink dl = createDownloadlink(parameter.replace("myspass.de", "myspassdecrypted.de/"));
-            dl.setContentUrl(parameter);
-            ret.add(dl);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
+        final UrlQuery query = UrlQuery.parse(contenturl);
+        final String singleVideoID = query.get("videoId");
+        if (singleVideoID != null) {
+            /* Pass to hoster plugin */
+            ret.add(this.createDownloadlink(String.format("https://www.myspass.de/player?video=%s", singleVideoID)));
             return ret;
         }
+        if (true) {
+            /* Not (yet) supported */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* Old code down below */
+        final boolean fastlinkcheck = JDUtilities.getPluginForHost(this.getHost()).getPluginConfig().getBooleanProperty("FAST_LINKCHECK", true);
         br.setFollowRedirects(true);
-        br.getPage(parameter);
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("404 - SEITE NICHT GEFUNDEN")) {
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String show = br.getRegex("itemprop='name'>([^<>\"]*?) - (im kostenlosen|Ganze Folgen|Der gratis) [^<>]+</title>").getMatch(0);
         if (show == null) {
             /* Fallback to url */
-            show = new Regex(parameter, ".+/shows/[^/]+/([^/]+)/?").getMatch(0);
+            show = new Regex(contenturl, ".+/shows/[^/]+/([^/]+)/?").getMatch(0);
             show = show.replace("-", " ");
         }
         show = Encoding.htmlDecode(show).trim();
@@ -118,7 +120,6 @@ public class MySpassDeCrawler extends PluginForDecrypt {
                 }
                 filename_temp += ".mp4";
                 dl.setName(filename_temp);
-                dl.setMimeHint(CompiledFiletypeFilter.VideoExtensions.MP4);
                 if (fastlinkcheck) {
                     dl.setAvailable(true);
                 }
@@ -131,18 +132,18 @@ public class MySpassDeCrawler extends PluginForDecrypt {
             // class="float-left seasonTab baxx-tabbes-tab full_episode_seasonTab"
             String[] html_list_season = this.br.getRegex("<option data\\-remote\\-args=\"\\&seasonId[^\"]+\\&category=full_episode.*?\\</option>").getColumn(-1);
             if (html_list_season == null || html_list_season.length == 0 && videoid != null) {
-                if (!parameter.contains(videoid) || parameter.matches("(?i)https?://[^/]+/channels/[^/]+/\\d+/?$")) {
+                if (!contenturl.contains(videoid) || contenturl.matches("(?i)https?://[^/]+/channels/[^/]+/\\d+/?$")) {
                     /* No downloadable content (e.g. overview of channel (Displays trailer in browser)) */
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 /* Single video */
-                final DownloadLink dl = createDownloadlink(parameter.replace("myspass.de", "myspassdecrypted.de/") + videoid + "/");
-                dl.setContentUrl(parameter);
+                final DownloadLink dl = createDownloadlink(contenturl.replace("myspass.de", "myspassdecrypted.de/") + videoid + "/");
+                dl.setContentUrl(contenturl);
                 ret.add(dl);
                 return ret;
             }
             if (html_list_season == null || html_list_season.length == 0) {
-                throw new DecrypterException("Decrypter broken for link: " + parameter);
+                throw new DecrypterException("Decrypter broken for link: " + contenturl);
             }
             for (final String html_season : html_list_season) {
                 /* Reset variables which we re-use. */

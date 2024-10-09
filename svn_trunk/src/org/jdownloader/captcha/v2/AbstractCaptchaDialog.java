@@ -37,13 +37,16 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 
+import jd.controlling.linkcrawler.CrawledLink;
 import jd.gui.swing.dialog.DialogType;
 import jd.gui.swing.jdgui.JDGui;
+import jd.plugins.DownloadLink;
 import jd.plugins.Plugin;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import net.miginfocom.swing.MigLayout;
 
+import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
@@ -79,52 +82,13 @@ import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> implements MouseListener, MouseMotionListener {
+public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> {
     // private LocationStorage config;
     protected boolean hideCaptchasForHost = false;
-    private Point     lastMouse;
 
     @Override
     protected FrameState getWindowStateOnVisible() {
         return AbstractCaptchaDialog.getWindowState();
-    }
-
-    @Override
-    public void mouseDragged(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseMove()) {
-            cancel();
-        }
-    }
-
-    @Override
-    public void mouseMoved(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseMove()) {
-            if (lastMouse != null && !lastMouse.equals(e.getPoint())) {
-                cancel();
-            }
-        }
-        lastMouse = e.getPoint();
-    }
-
-    @Override
-    public void mouseClicked(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseClick()) {
-            cancel();
-        }
-    }
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseClick()) {
-            cancel();
-        }
-    }
-
-    @Override
-    public void mouseReleased(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseClick()) {
-            cancel();
-        }
     }
 
     @Override
@@ -152,23 +116,11 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
     }
 
     @Override
-    public void mouseEntered(MouseEvent e) {
-        // no cancel here. this would cancel the timeout if the dialog appears under the mouse - even if it does not move
-    }
-
-    @Override
-    public void mouseExited(MouseEvent e) {
-        if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseMove()) {
-            cancel();
-        }
-    }
-
-    @Override
     protected T createReturnValue() {
         return null;
     }
 
-    void createPopup() {
+    protected void createPopup() {
         final JPopupMenu popup = new JPopupMenu();
         JMenuItem mi;
         if (getType() == DialogType.HOSTER) {
@@ -292,15 +244,17 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
         return hideAllCaptchas;
     }
 
-    protected Plugin             plugin;
-    protected boolean            stopDownloads = false;
-    protected DialogType         type;
-    protected boolean            refresh;
-    protected boolean            stopCrawling;
-    protected boolean            stopShowingCrawlerCaptchas;
-    protected final Challenge<?> challenge;
+    protected Plugin              plugin;
+    protected boolean             stopDownloads = false;
+    protected DialogType          type;
+    protected boolean             refresh;
+    protected boolean             stopCrawling;
+    protected boolean             stopShowingCrawlerCaptchas;
+    protected final Challenge<T>  challenge;
+    protected MouseMotionListener mouseMotionListener;
+    protected MouseListener       mouseListener;
 
-    public AbstractCaptchaDialog(Challenge<?> challenge, int flags, String title, DialogType type, DomainInfo domainInfo, String explain) {
+    public AbstractCaptchaDialog(Challenge<T> challenge, int flags, String title, DialogType type, DomainInfo domainInfo, String explain) {
         super(flags, title, null, _GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_continue(), type == DialogType.CRAWLER ? _GUI.T.lit_cancel() : _GUI.T.AbstractCaptchaDialog_AbstractCaptchaDialog_cancel());
         this.challenge = challenge;
         if (JsonConfig.create(GraphicalUserInterfaceSettings.class).isCaptchaDialogUniquePositionByHosterEnabled()) {
@@ -309,9 +263,22 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
             setLocator(new RememberAbsoluteDialogLocator("CaptchaDialog"));
         }
         setDimensor(new RememberLastDialogDimension("Captcha-" + domainInfo.getTld()));
-        this.explain = explain;
+        if (explain != null) {
+            this.explain = explain;
+        } else {
+            this.explain = challenge.getExplain();
+        }
         this.hosterInfo = domainInfo;
         this.type = type;
+        setPlugin(challenge.getPlugin());
+        if (!challenge.keepAlive()) {
+            // no reason to let the user stop the countdown if the result cannot be used after the countdown anyway
+            setCountdownPausable(false);
+        }
+    }
+
+    protected Challenge<T> getChallenge() {
+        return challenge;
     }
 
     public static FrameState getWindowState() {
@@ -538,8 +505,9 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
         switch (type) {
         case HOSTER:
             return ((PluginForHost) plugin).getHost(((PluginForHost) plugin).getDownloadLink(), null, false);
+        case ACCOUNT:
         case CRAWLER:
-            return ((PluginForDecrypt) plugin).getHost();
+            return plugin.getHost();
         default:
             return challenge.getHost();
         }
@@ -574,174 +542,169 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
     }
 
     public String getFilename() {
-        if (!JsonConfig.create(GeneralSettings.class).isShowFileNameInCaptchaDialogEnabled()) {
-            return null;
-        }
         switch (type) {
-        case HOSTER:
-            if (plugin == null || ((PluginForHost) plugin).getDownloadLink() == null) {
+        case HOSTER: {
+            final DownloadLink link;
+            if (plugin == null || (link = ((PluginForHost) plugin).getDownloadLink()) == null) {
                 return null;
             }
-            return ((PluginForHost) plugin).getDownloadLink().getView().getDisplayName();
+            return link.getView().getDisplayName();
         }
-        return null;
+        case CRAWLER: {
+            final CrawledLink link;
+            if (plugin == null || (link = ((PluginForDecrypt) plugin).getCurrentLink()) == null) {
+                return null;
+            }
+            return link.getName();
+        }
+        default:
+            return null;
+        }
+    }
+
+    protected Header createHeader() {
+        final Header headerPanel;
+        final String headerText;
+        if (type == DialogType.ACCOUNT) {
+            // TODO:
+            throw new WTFException("FIXME");
+        } else if (type == DialogType.HOSTER) {
+            if (!JsonConfig.create(GeneralSettings.class).isShowFileNameInCaptchaDialogEnabled()) {
+                return null;
+            }
+            final String fileName = getFilename();
+            headerPanel = new Header("ins 0 0 1 0", "[grow,fill]", "[]");
+            final long fileSize = getFilesize();
+            if (fileSize > 0) {
+                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header(fileName, SizeFormatter.formatBytes(fileSize), hosterInfo.getTld()));
+            } else {
+                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header2(fileName, hosterInfo.getTld()));
+            }
+        } else if (type == DialogType.CRAWLER) {
+            headerPanel = new Header("ins 0 0 1 0", "[grow,fill]", "[grow,fill]");
+            final String crawlerStatus = getCrawlerStatus();
+            if (crawlerStatus == null) {
+                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header_crawler(hosterInfo.getTld()));
+            } else {
+                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header_crawler2(crawlerStatus, hosterInfo.getTld()));
+            }
+        } else {
+            return null;
+        }
+
+        final JLabel header = new JLabel() {
+            private boolean setting = false;
+
+            protected void paintComponent(Graphics g) {
+                if (headerText != null) {
+                    setting = true;
+                    try {
+                        setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this, this.getFontMetrics(getFont()), headerText, getWidth() - 30));
+                    } catch (Throwable e) {
+                        // http://www.oracle.com/technetwork/java/faq-sun-packages-142232.html
+                        e.printStackTrace();
+                        setText(headerText);
+                    }
+                    setting = false;
+                }
+                super.paintComponent(g);
+            }
+
+            public void repaint() {
+                if (setting) {
+                    return;
+                }
+                super.repaint();
+            }
+
+            public void revalidate() {
+                if (setting) {
+                    return;
+                }
+                super.revalidate();
+            }
+        };
+        header.setIcon(hosterInfo.getFavIcon());
+        headerPanel.add(header);
+        return headerPanel;
     }
 
     @Override
     public JComponent layoutDialogContent() {
-        // getDialog().setModalityType(ModalityType.MODELESS);
+        getDialog().setModalityType(getModalityType());
         final LAFOptions lafOptions = LAFOptions.getInstance();
         MigPanel field = new MigPanel("ins 0,wrap 1", "[grow,fill]", "[grow,fill]");
         SwingUtils.setOpaque(field, false);
-        // field.setOpaque(false);
         getDialog().setMinimumSize(new Dimension(0, 0));
-        // getDialog().setIconImage(hosterInfo.getFavIcon().getImage());
         final JPanel panel = new JPanel(getDialogLayout());
         SwingUtils.setOpaque(panel, false);
         LAFOptions.applyBackground(lafOptions.getColorForPanelBackground(), field);
         getDialog().setModalExclusionType(ModalExclusionType.TOOLKIT_EXCLUDE);
-        Header headerPanel = null;
-        if (type == DialogType.HOSTER) {
-            // setBorder(new JTextField().getBorder());
-            headerPanel = new Header("ins 0 0 1 0", "[grow,fill]", "[]");
-            // headerPanel.setOpaque(false);
-            // headerPanel.setOpaque(false);
-            // headerPanel.setOpaque(false);
-            final String headerText;
-            if (getFilename() != null) {
-                if (getFilesize() > 0) {
-                    headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header(getFilename(), SizeFormatter.formatBytes(getFilesize()), hosterInfo.getTld()));
-                } else {
-                    headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header2(getFilename(), hosterInfo.getTld()));
-                }
-            } else {
-                headerText = null;
-            }
-            JLabel header = new JLabel() {
-                private boolean setting = false;
 
-                protected void paintComponent(Graphics g) {
-                    if (headerText != null) {
-                        setting = true;
-                        try {
-                            setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this, this.getFontMetrics(getFont()), headerText, getWidth() - 30));
-                        } catch (Throwable e) {
-                            // http://www.oracle.com/technetwork/java/faq-sun-packages-142232.html
-                            e.printStackTrace();
-                            setText(headerText);
-                        }
-                        setting = false;
-                    }
-                    super.paintComponent(g);
-                }
-
-                // public Dimension getPreferredSize() {
-                // return new Dimension(10, 10);
-                // }
-                public void repaint() {
-                    if (setting) {
-                        return;
-                    }
-                    super.repaint();
-                }
-
-                public void revalidate() {
-                    if (setting) {
-                        return;
-                    }
-                    super.revalidate();
-                }
-            };
-            header.setIcon(hosterInfo.getFavIcon());
-            // if (col >= 0) {
-            // header.setBackground(new Color(col));
-            // header.setOpaque(false);
-            // }
-            // header.setOpaque(false);
-            // header.setLabelMode(true);
-            if (getFilename() != null) {
-                headerPanel.add(header);
-            } else {
-                headerPanel = null;
-            }
-        } else {
-            // setBorder(new JTextField().getBorder());
-            headerPanel = new Header("ins 0 0 1 0", "[grow,fill]", "[grow,fill]");
-            final String headerText;
-            if (getCrawlerStatus() == null) {
-                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header_crawler(hosterInfo.getTld()));
-            } else {
-                headerText = (_GUI.T.CaptchaDialog_layoutDialogContent_header_crawler2(getCrawlerStatus(), hosterInfo.getTld()));
-            }
-            // headerPanel.setOpaque(false);
-            JLabel header = new JLabel() {
-                private boolean setting = false;
-
-                protected void paintComponent(Graphics g) {
-                    if (headerText != null) {
-                        setting = true;
-                        try {
-                            setText(org.appwork.sunwrapper.sun.swing.SwingUtilities2Wrapper.clipStringIfNecessary(this, this.getFontMetrics(getFont()), headerText, getWidth() - 30));
-                        } catch (Throwable e) {
-                            // http://www.oracle.com/technetwork/java/faq-sun-packages-142232.html
-                            e.printStackTrace();
-                            setText(headerText);
-                        }
-                        setting = false;
-                    }
-                    super.paintComponent(g);
-                }
-
-                // public Dimension getPreferredSize() {
-                // return new Dimension(10, 10);
-                // }
-                public void repaint() {
-                    if (setting) {
-                        return;
-                    }
-                    super.repaint();
-                }
-
-                public void revalidate() {
-                    if (setting) {
-                        return;
-                    }
-                    super.revalidate();
-                }
-            };
-            header.setIcon(hosterInfo.getFavIcon());
-            // if (col >= 0) {
-            // header.setBackground(new Color(col));
-            // header.setOpaque(false);
-            // }
-            // header.setOpaque(false);
-            // header.setLabelMode(true);
-            headerPanel.add(header);
-        }
-        HeaderScrollPane sp;
         addBeforeImage(field);
         iconPanel = createCaptchaPanel();
-        SwingUtils.setOpaque(iconPanel, false);
-        // iconPanel.add(refreshBtn, "alignx right,aligny bottom");
-        iconPanel.addMouseMotionListener(this);
-        iconPanel.addMouseListener(this);
-        field.add(iconPanel);
-        sp = createHeaderScrollPane(field);
+        if (iconPanel != null) {
+            SwingUtils.setOpaque(iconPanel, false);
+            // iconPanel.add(refreshBtn, "alignx right,aligny bottom");
+            if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseMove()) {
+                iconPanel.addMouseMotionListener(mouseMotionListener = new MouseMotionListener() {
+                    private Point lastMouse;
+
+                    @Override
+                    public void mouseDragged(MouseEvent e) {
+                        cancel();
+                    }
+
+                    @Override
+                    public void mouseMoved(MouseEvent e) {
+                        if (lastMouse != null && !lastMouse.equals(e.getPoint())) {
+                            cancel();
+                        }
+                        lastMouse = e.getPoint();
+                    }
+                });
+            }
+            if (CFG_CAPTCHA.CFG.isCancelDialogCountdownOnMouseClick()) {
+                iconPanel.addMouseListener(mouseListener = new MouseListener() {
+
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        cancel();
+                    }
+
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        cancel();
+                    }
+
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        cancel();
+                    }
+
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        // no cancel here. this would cancel the timeout if the dialog appears under the mouse - even if it does not move
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        cancel();
+                    }
+                });
+            }
+            field.add(iconPanel);
+        }
+        final HeaderScrollPane sp = createHeaderScrollPane(field);
         if (!CFG_GUI.CFG.isCaptchaDialogBorderAroundImageEnabled()) {
             sp.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
             SwingUtils.setOpaque(field, false);
         }
         panel.add(sp);
-        if (headerPanel != null) {
-            sp.setColumnHeaderView(headerPanel);
-            // sp.setMinimumSize(new Dimension(Math.max(images[0].getWidth(null) + 10, headerPanel.getPreferredSize().width + 10),
-            // images[0].getHeight(null) + headerPanel.getPreferredSize().height));
+        final Header header = createHeader();
+        if (header != null) {
+            sp.setColumnHeaderView(header);
         }
-        // if (config.isValid()) {
-        //
-        // getDialog().setSize(new Dimension(Math.max(config.getX(), images[0].getWidth(null)), Math.max(config.getY(),
-        // images[0].getHeight(null))));
-        // }
         return panel;
     }
 
@@ -775,7 +738,7 @@ public abstract class AbstractCaptchaDialog<T> extends AbstractDialog<T> impleme
         return JDGui.getInstance().getMainFrame();
     }
 
-    public void setPlugin(Plugin plugin) {
+    protected void setPlugin(Plugin plugin) {
         this.plugin = plugin;
     }
 }
