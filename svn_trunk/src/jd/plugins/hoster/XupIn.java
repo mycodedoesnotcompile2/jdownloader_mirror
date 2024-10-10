@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 2, names = {}, urls = {})
 public class XupIn extends PluginForHost {
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
@@ -74,7 +74,7 @@ public class XupIn extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.xup.in/terms/";
+        return "https://www." + getHost() + "/terms/";
     }
 
     @Override
@@ -156,7 +156,7 @@ public class XupIn extends PluginForHost {
         }
         final String captchafieldid = "vchep";
         if (dlform.hasInputFieldByName(captchafieldid)) {
-            final String code = this.getCaptchaCode("http://www0.xup.in/captcha.php", link);
+            final String code = this.getCaptchaCode("https://www0." + getHost() + "/captcha.php", link);
             dlform.put(captchafieldid, code);
         }
         dlform.remove(null);

@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -109,7 +109,7 @@ public class UsenextCom extends UseNet {
         postRequest.getHeaders().put("x-ui-language", "en-US");
         postRequest.getHeaders().put("Origin", "https://www." + br.getHost());
         br.setCurrentURL("https://www." + br.getHost() + "/");
-        sendRequest(postRequest);
+        br.getPage(postRequest);
         if (br.containsHTML("\"AUTH_NOT_AUTHENTICATED\"")) {
             throw new AccountInvalidException();
         } else {
@@ -139,7 +139,7 @@ public class UsenextCom extends UseNet {
             final String dashboardUrlRelative = "/ma";
             if (cookies != null) {
                 br.setCookies(cookies);
-                getPage(br, "https://www." + getHost() + dashboardUrlRelative);
+                br.getPage("https://www." + getHost() + dashboardUrlRelative);
                 try {
                     json = queryAPI(account, br);
                     logger.info("Cookie login successful");
@@ -151,7 +151,7 @@ public class UsenextCom extends UseNet {
             }
             if (json == null) {
                 logger.info("Performing full login");
-                getPage(br, "https://www." + getHost() + "/");
+                br.getPage("https://www." + getHost() + "/");
                 String clientID = null;
                 final String buildManifest = br.getRegex("(/_next/static/[^\"]*?buildManifest.js)\"").getMatch(0);
                 if (buildManifest != null) {
@@ -168,15 +168,15 @@ public class UsenextCom extends UseNet {
                     logger.warning("Fallback to static clientID value");
                     clientID = "852f41f8997141c5b9b59e6d15e03f33"; // 2023-01-04
                 }
-                getPage(br, "https://auth." + getHost() + "/login?culture=de-DE&client_id=" + URLEncode.encodeURIComponent(clientID) + "&CustomCSS=https%3A%2F%2Fwww.usenext.com%2Fauth-css%2Fauth.override.css&returnUrl=https%3A%2F%2Fwww.usenext.com%2F%3Fclient_id%3D" + URLEncode.encodeURIComponent(clientID));
+                br.getPage("https://auth." + getHost() + "/login?culture=de-DE&client_id=" + URLEncode.encodeURIComponent(clientID) + "&CustomCSS=https%3A%2F%2Fwww.usenext.com%2Fauth-css%2Fauth.override.css&returnUrl=https%3A%2F%2Fwww.usenext.com%2F%3Fclient_id%3D" + URLEncode.encodeURIComponent(clientID));
                 final Form login = br.getFormbyKey("username");
                 if (login == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 login.put("username", Encoding.urlEncode(account.getUser()));
                 login.put("password", Encoding.urlEncode(account.getPass()));
-                submitForm(br, login);
-                getPage(br, "https://www." + getHost() + dashboardUrlRelative);
+                br.submitForm(login);
+                br.getPage("https://www." + getHost() + dashboardUrlRelative);
                 json = queryAPI(account, br);
             }
             final Map<String, Object> volume = (Map<String, Object>) JavaScriptEngineFactory.walkJson(json, "data/radiusData/volume");

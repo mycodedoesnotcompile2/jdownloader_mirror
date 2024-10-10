@@ -22,7 +22,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
 public class FiveEuroUseNetCom extends UseNet {
     public FiveEuroUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +46,7 @@ public class FiveEuroUseNetCom extends UseNet {
         boolean freshLogin = true;
         if (cookies != null) {
             br.setCookies(getHost(), cookies);
-            getPage("https://www.5eurousenet.com/en/user");
+            br.getPage("https://www.5eurousenet.com/en/user");
             final Form login = br.getFormbyActionRegex("/login");
             if (login != null && login.containsHTML("name") && login.containsHTML("pass")) {
                 logger.info("Cookie login failed");
@@ -61,7 +61,7 @@ public class FiveEuroUseNetCom extends UseNet {
         if (freshLogin) {
             account.clearCookies("");
             final String userName = account.getUser();
-            getPage("https://www.5eurousenet.com/en/user/login");
+            br.getPage("https://www.5eurousenet.com/en/user/login");
             Form login = br.getFormbyActionRegex(".*?user/login\\?");
             if (login == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -84,7 +84,7 @@ public class FiveEuroUseNetCom extends UseNet {
                     setDownloadLink(before);
                 }
             }
-            submitForm(login);
+            br.submitForm(login);
             login = br.getFormbyActionRegex(".*?user/login");
             if (login != null && login.containsHTML("name") && login.containsHTML("pass")) {
                 throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);

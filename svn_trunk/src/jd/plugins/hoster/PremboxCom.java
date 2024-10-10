@@ -16,14 +16,15 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.ConditionalSkipReasonException;
 import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
@@ -34,7 +35,6 @@ import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -43,12 +43,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48764 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -87,25 +89,26 @@ public class PremboxCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public PremboxCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://prembox.com/register.html");
+        this.enablePremium("https://" + getHost() + "/register.html");
         this.setConfigElements();
     }
 
     @Override
-    public String getAGBLink() {
-        return "https://prembox.com/contact.html";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("User-Agent", "JDownloader");
         br.setCustomCharset("utf-8");
         br.setConnectTimeout(60 * 1000);
         br.setReadTimeout(60 * 1000);
         /* Not necessarily needed as long as we use the API */
-        br.setCookie(this.getHost(), "lang", "en");
+        br.setCookie(getHost(), "lang", "en");
         br.setFollowRedirects(true);
         return br;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://" + getHost() + "/contact.html";
     }
 
     @Override
@@ -155,11 +158,9 @@ public class PremboxCom extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         mhm.runCheck(account, link);
-        this.prepBR(br);
         /*
          * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it is
          * needed to get the individual host limits.
@@ -187,18 +188,24 @@ public class PremboxCom extends PluginForHost {
             }
             logger.info("Generating new directurl");
             String dllink = null;
+            final UrlQuery query = getLoginPassPostData(account);
+            final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+            query.appendEncoded("url", url);
             if (cloudOnlyHosts.contains(link.getHost()) || link.hasProperty(PROPERTY_ENFORCE_CLOUD_DOWNLOAD)) {
                 /* Try max 10 minutes */
                 int counter = 0;
                 int count_max = 15;
                 /* TODO: Use json parser here */
-                br.postPage(API_SERVER + "/downloadLink", "directDownload=0&" + getLoginPassPostData(account) + "&url=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                query.appendEncoded("directDownload", "0");
+                br.postPage(API_SERVER + "/downloadLink", query);
                 this.handleErrors(br, account);
                 /* 'downloadLink' value will be "fileNotReadyYet" at this stage. */
                 do {
                     // this.postAPISafe(API_SERVER + "/serverFileStatus", "login=" + JSonUtils.escape(this.currAcc.getUser()) + "&pass=" +
                     // JSonUtils.escape(this.currAcc.getPass()) + "&url=" + Encoding.urlEncode(this.currDownloadLink.getDownloadURL()));
-                    br.postPage(API_SERVER + "/serverFileStatus", getLoginPassPostData(account) + "&url=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                    final UrlQuery query2 = getLoginPassPostData(account);
+                    query2.appendEncoded("url", url);
+                    br.postPage(API_SERVER + "/serverFileStatus", query2);
                     this.handleErrors(br, account);
                     dllink = PluginJSonUtils.getJsonValue(br, "downloadLink");
                     if (!StringUtils.isEmpty(dllink)) {
@@ -216,7 +223,8 @@ public class PremboxCom extends PluginForHost {
             } else {
                 link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
                 /* TODO: Use json parser here */
-                br.postPage(API_SERVER + "/downloadLink", "directDownload=1&" + getLoginPassPostData(account) + "&url=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+                query.appendEncoded("directDownload", "1");
+                br.postPage(API_SERVER + "/downloadLink", query);
                 this.handleErrors(br, account);
                 // this.postAPISafe(API_SERVER + "/serverFileStatus", "directDownload=1&login=" + JSonUtils.escape(this.currAcc.getUser()) +
                 // "&pass=" + JSonUtils.escape(this.currAcc.getPass()) + "&url=" +
@@ -298,16 +306,15 @@ public class PremboxCom extends PluginForHost {
         }
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes", "deprecation" })
+    @SuppressWarnings({ "unchecked", "deprecation" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account);
-        final AccountInfo ai = new AccountInfo();
-        Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(this.br.toString());
-        entries = (Map<String, Object>) entries.get("data");
-        final Map<String, Object> trafficStandard = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "traffic/standard");
-        final Map<String, Object> trafficDaily = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "traffic/daily");
-        String status = null;
+        final Map<String, Object> resp1 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> resp1_data = (Map<String, Object>) resp1.get("data");
+        final Map<String, Object> trafficStandard = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp1_data, "traffic/standard");
+        final Map<String, Object> trafficDaily = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp1_data, "traffic/daily");
+        String statustext = null;
         long trafficLeftTotal = 0;
         long expireTimestampStandard = JavaScriptEngineFactory.toLong(trafficStandard.get("expireTstamp"), -1);
         long expireTimestampDaily = JavaScriptEngineFactory.toLong(trafficDaily.get("expireTstamp"), -1);
@@ -315,18 +322,18 @@ public class PremboxCom extends PluginForHost {
         /* Accounts can also have negative traffic (=no traffic left) */
         long trafficLeftStandard = JavaScriptEngineFactory.toLong(trafficStandard.get("left"), 0);
         long traffic_left_daily = JavaScriptEngineFactory.toLong(trafficDaily.get("left"), 0);
-        final String accounttype = (String) entries.get("accountType");
+        final String accounttype = (String) resp1_data.get("accountType");
         if (traffic_left_daily > 0 && trafficLeftStandard > 0) {
-            status = " account with daily & standard traffic";
+            statustext = " account with daily & standard traffic";
             trafficLeftTotal = traffic_left_daily + trafficLeftStandard;
         } else if (traffic_left_daily > 0) {
-            status = " account with daily traffic";
+            statustext = " account with daily traffic";
             trafficLeftTotal = traffic_left_daily;
         } else if (trafficLeftStandard > 0) {
-            status = " account with standard traffic";
+            statustext = " account with standard traffic";
             trafficLeftTotal = trafficLeftStandard;
         } else {
-            status = " account without traffic";
+            statustext = " account without traffic";
             trafficLeftTotal = 0;
         }
         if (expireTimestampStandard > expireTimestampDaily) {
@@ -334,27 +341,26 @@ public class PremboxCom extends PluginForHost {
         } else {
             expireTimestamp = expireTimestampDaily;
         }
+        final AccountInfo ai = new AccountInfo();
         expireTimestamp = expireTimestamp * 1000;
         if ("premium".equals(accounttype) && expireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
-            status = "Premium" + status;
-            ai.setStatus("Premium account");
+            statustext = "Premium" + statustext;
         } else {
             account.setType(AccountType.FREE);
-            status = "Free" + status;
-            ai.setStatus("Registered (free) account");
+            statustext = "Free" + statustext;
         }
         /* 2021-09-16: Free- and premium accounts can have expire-dates(?) */
         if (expireTimestamp > System.currentTimeMillis()) {
             ai.setValidUntil(expireTimestamp, this.br);
         }
-        ai.setStatus(status);
+        ai.setStatus(statustext);
         ai.setTrafficLeft(trafficLeftTotal);
         account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
         br.getPage(API_SERVER + "/supportedHosts");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
-        entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(this.br.toString());
-        final List<Object> ressourcelist = (List) entries.get("data");
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final Map<String, Object> resp2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> domaininfos = (List<Map<String, Object>>) resp2.get("data");
         /**
          * Explanation of their status-types: Healthy = working, Fragile = may work or not - if not will be fixed within the next 72 hours
          * (support also said it means that they currently have no accounts for this host), Limited = broken, will be fixed tomorrow, dead =
@@ -366,46 +372,40 @@ public class PremboxCom extends PluginForHost {
             hostMaxchunksMap.clear();
             hostMaxdlsMap.clear();
             hostResumeMap.clear();
-            for (final Object domaininfo_o : ressourcelist) {
-                final Map<String, Object> domaininfo = (Map<String, Object>) domaininfo_o;
+            for (final Map<String, Object> domaininfo : domaininfos) {
                 /*
                  * 2017-03-03: Admin asked why we do not show all hosts so we told them that we skip offline hosts. This is a possibility
                  * for them to easily force JD to display certain hosts. So far it has not been used (not present in json).
                  */
-                final Object force_display_o = domaininfo.get("force_display");
-                final boolean force_display = force_display_o != null ? ((Boolean) force_display_o).booleanValue() : false;
+                final boolean force_display = Boolean.TRUE.equals(domaininfo.get("force_display"));
                 final boolean canResume = ((Boolean) domaininfo.get("resumable")).booleanValue();
                 final long isoffline = JavaScriptEngineFactory.toLong(domaininfo.get("tmpTurnedOff"), 0);
-                final long cloudonly = JavaScriptEngineFactory.toLong(domaininfo.get("serverOnly"), 0);
-                final int maxChunks = (int) JavaScriptEngineFactory.toLong(domaininfo.get("maxChunks"), 1);
-                final int maxDownloads = (int) JavaScriptEngineFactory.toLong(domaininfo.get("maxDownloads"), 1);
-                final String host = (String) domaininfo.get("host");
-                if (isoffline == 1 && !force_display) {
-                    /* Do not add hosts that do not work at the moment. */
-                    logger.info("Skipping host disabled by multihost: " + host);
-                    continue;
-                }
-                final ArrayList<String> dummyList = new ArrayList<String>();
-                dummyList.add(host);
+                final int maxChunks = ((Number) domaininfo.get("maxChunks")).intValue();
+                final int maxDownloads = ((Number) domaininfo.get("maxDownloads")).intValue();
+                final String domain = (String) domaininfo.get("host");
                 /* Workaround to get our internal/real domain of the host in case we got a plugin for it. */
+                final ArrayList<String> dummyList = new ArrayList<String>();
+                dummyList.add(domain);
                 final List<String> realHosts = ai.setMultiHostSupport(this, dummyList);
                 if (realHosts != null && !realHosts.isEmpty()) {
+                    /* Legacy handling */
                     final String realHost = realHosts.get(0);
-                    supportedHosts.add(realHost);
-                    if (cloudonly == 1) {
+                    if (JavaScriptEngineFactory.toLong(domaininfo.get("serverOnly"), 0) == 1) {
                         cloudOnlyHosts.add(realHost);
                     }
-                    hostMaxchunksMap.put(host, this.correctChunks(maxChunks));
-                    hostMaxdlsMap.put(host, this.correctMaxdls(maxDownloads));
-                    hostResumeMap.put(host, canResume);
-                } else {
-                    logger.info("Skipping host which we don't have a plugin for: " + host);
+                    hostMaxchunksMap.put(domain, this.correctChunks(maxChunks));
+                    hostMaxdlsMap.put(domain, this.correctMaxdls(maxDownloads));
+                    hostResumeMap.put(domain, canResume);
                 }
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                if (isoffline == 1 && !force_display) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                }
+                mhost.setResume(canResume);
             }
         }
-        ai.setMultiHostSupport(this, supportedHosts);
-        final long last_deleted_complete_download_history_time_ago = getLast_deleted_complete_download_history_time_ago(account);
-        if (this.getPluginConfig().getBooleanProperty(CLEAR_DOWNLOAD_HISTORY, default_clear_download_history_complete) && (last_deleted_complete_download_history_time_ago >= DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL || last_deleted_complete_download_history_time_ago == 0)) {
+        ai.setMultiHostSupportV2(this, supportedhosts);
+        if (this.getPluginConfig().getBooleanProperty(CLEAR_DOWNLOAD_HISTORY, default_CLEAR_DOWNLOAD_HISTORY) && getLast_deleted_complete_download_history_time_ago(account) >= DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL) {
             /*
              * Go in here if user wants to have it's history deleted && last deletion was before DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL
              * or never executed (0).
@@ -415,8 +415,11 @@ public class PremboxCom extends PluginForHost {
         return ai;
     }
 
-    private String getLoginPassPostData(final Account account) throws Exception {
-        return "login=" + URLEncoder.encode(account.getUser(), "UTF-8") + "&pass=" + URLEncoder.encode(account.getPass(), "UTF-8");
+    private UrlQuery getLoginPassPostData(final Account account) throws Exception {
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("login", account.getUser());
+        query.appendEncoded("pass", account.getPass());
+        return query;
     }
 
     /**
@@ -425,7 +428,6 @@ public class PremboxCom extends PluginForHost {
      * @throws Exception
      */
     private void login(final Account account) throws Exception {
-        this.prepBR(br);
         br.postPage(API_SERVER + "/login", getLoginPassPostData(account));
         this.handleErrors(this.br, account);
     }
@@ -464,11 +466,11 @@ public class PremboxCom extends PluginForHost {
 
     /* Returns the time difference between now and the last time the complete download history has been deleted. */
     private long getLast_deleted_complete_download_history_time_ago(final Account account) {
-        return System.currentTimeMillis() - account.getLongProperty(PROPERTY_ACCOUNT_last_time_deleted_history, System.currentTimeMillis());
+        return System.currentTimeMillis() - account.getLongProperty(PROPERTY_ACCOUNT_last_time_deleted_history, 0);
     }
 
     private void handleErrors(final Browser br, final Account account) throws Exception {
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final boolean success = ((Boolean) entries.get("success")).booleanValue();
         final String error = (String) entries.get("error");
         final Object errorDescrO = entries.get("errorDescr");
@@ -579,10 +581,10 @@ public class PremboxCom extends PluginForHost {
         }
     }
 
-    private final boolean default_clear_download_history_complete = false;
+    private final boolean default_CLEAR_DOWNLOAD_HISTORY = false;
 
     public void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), CLEAR_DOWNLOAD_HISTORY, "Delete download history every 60 minutes (on each 2nd full account check)?").setDefaultValue(default_clear_download_history_complete));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), CLEAR_DOWNLOAD_HISTORY, "Delete download history every 60 minutes?").setDefaultValue(default_CLEAR_DOWNLOAD_HISTORY));
     }
 
     @Override

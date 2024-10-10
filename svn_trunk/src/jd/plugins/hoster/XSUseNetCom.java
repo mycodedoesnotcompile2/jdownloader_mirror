@@ -24,7 +24,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "xsusenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "xsusenet.com" }, urls = { "" })
 public class XSUseNetCom extends UseNet {
     public XSUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public class XSUseNetCom extends UseNet {
         try {
             if (cookies != null) {
                 br.setCookies(getHost(), cookies);
-                getPage("https://my.xsusenet.com");
+                br.getPage("https://my.xsusenet.com");
                 if (!isLoggedIN(br)) {
                     logger.info("Cookie login failed");
                     br.getCookies(getHost()).clear();
@@ -97,20 +97,20 @@ public class XSUseNetCom extends UseNet {
                 if (userName == null || !userName.matches("^.+?@.+?\\.[^\\.]+")) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter your e-mail/password for xsusenet.com website!", PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
-                getPage("https://my.xsusenet.com/index.php?/clientarea/");
+                br.getPage("https://my.xsusenet.com/index.php?/clientarea/");
                 final Form login = br.getFormByInputFieldKeyValue("action", "login");
                 if (login == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 login.put("username", Encoding.urlEncode(userName));
                 login.put("password", Encoding.urlEncode(account.getPass()));
-                submitForm(login);
+                br.submitForm(login);
                 if (!isLoggedIN(br)) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
             }
             if (br.getRequest() == null || !StringUtils.endsWithCaseInsensitive(br.getURL(), "/index.php?/clientarea/")) {
-                this.getPage("https://my.xsusenet.com/index.php?/clientarea/");
+                br.getPage("https://my.xsusenet.com/index.php?/clientarea/");
             }
             account.saveCookies(br.getCookies(getHost()), "");
             /* Detect account type. Very important because different Usenet servers are used for free/premium accounts! */

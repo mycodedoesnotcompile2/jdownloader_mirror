@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -49,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
 public class RapidsPl extends PluginForHost {
     /* API documentation: https://new.rapids.pl/api */
     private static final String  API_BASE            = "https://api.rapids.pl/api";
@@ -277,6 +278,7 @@ public class RapidsPl extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        // TODO: Make use of the parsed json
         final Map<String, Object> userinfo = loginAPI(account, true, true);
         final AccountInfo ai = new AccountInfo();
         final String trafficleft = PluginJSonUtils.getJson(br, "transfer");
@@ -321,7 +323,7 @@ public class RapidsPl extends PluginForHost {
             logger.info(String.format("Token needs to be refreshed as it is older than %d minutes", token_refresh_minutes));
         } else if (token != null) {
             logger.info("Attempting token login");
-            br.getHeaders().put("Authorization", "Bearer " + token);
+            br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
             if (!forceAuthCheck) {
                 /* Do not check token */
                 return null;
@@ -351,7 +353,7 @@ public class RapidsPl extends PluginForHost {
         account.setProperty(PROPERTY_logintoken, token);
         /* We don't really need the cookies but the timestamp ;) */
         account.saveCookies(br.getCookies(br.getHost()), "");
-        br.getHeaders().put("Authorization", "Bearer " + token);
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
         if (forceAccessUserInfoPage) {
             br.getPage(API_BASE + urlUserInfo);
             entries = this.handleErrors(br, account, null);

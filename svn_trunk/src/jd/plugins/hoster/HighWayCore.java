@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -695,7 +695,7 @@ public abstract class HighWayCore extends UseNet {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             this.login(account, true);
-            this.getPage(this.getAPIBase() + "?hoster&user");
+            br.getPage(this.getAPIBase() + "?hoster&user");
             final AccountInfo ai = new AccountInfo();
             final Map<String, Object> entries = this.checkErrors(this.br, null, account);
             final Map<String, Object> accountInfo = (Map<String, Object>) entries.get("user");

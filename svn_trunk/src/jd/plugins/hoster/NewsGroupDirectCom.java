@@ -29,7 +29,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "newsgroupdirect.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "newsgroupdirect.com" }, urls = { "" })
 public class NewsGroupDirectCom extends UseNet {
     public NewsGroupDirectCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +80,7 @@ public class NewsGroupDirectCom extends UseNet {
                 boolean freshLogin = true;
                 if (cookies != null) {
                     br.setCookies(getHost(), cookies);
-                    getPage("https://newsgroupdirect.com/member");
+                    br.getPage("https://newsgroupdirect.com/member");
                     final Form login = br.getFormbyActionRegex("/login");
                     if (login != null && login.containsHTML("email") && login.containsHTML("login_password")) {
                         freshLogin = true;
@@ -93,14 +93,14 @@ public class NewsGroupDirectCom extends UseNet {
                 if (freshLogin) {
                     account.clearCookies("");
                     final String userName = account.getUser();
-                    getPage("https://newsgroupdirect.com/login-form");
+                    br.getPage("https://newsgroupdirect.com/login-form");
                     Form login = br.getFormbyActionRegex("/login");
                     if (login == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     login.put("email", Encoding.urlEncode(userName));
                     login.put("login_password", Encoding.urlEncode(account.getPass()));
-                    submitForm(login);
+                    br.submitForm(login);
                     login = br.getFormbyActionRegex("/login");
                     if (login != null && login.containsHTML("email") && login.containsHTML("login_password")) {
                         throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);

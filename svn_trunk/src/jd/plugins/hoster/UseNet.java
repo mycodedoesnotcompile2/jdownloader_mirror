@@ -9,6 +9,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.storage.config.handler.KeyHandler;
+import org.appwork.utils.Files;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.appwork.utils.net.httpconnection.HTTPProxyException;
+import org.appwork.utils.net.usenet.InvalidAuthException;
+import org.appwork.utils.net.usenet.MessageBodyNotFoundException;
+import org.appwork.utils.net.usenet.SimpleUseNet;
+import org.appwork.utils.net.usenet.UUInputStream;
+import org.appwork.utils.net.usenet.UnrecognizedCommandException;
+import org.appwork.utils.net.usenet.YEncInputStream;
+import org.jdownloader.plugins.components.usenet.SimpleUseNetDownloadInterface;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetConfigPanel;
+import org.jdownloader.plugins.components.usenet.UsenetFile;
+import org.jdownloader.plugins.components.usenet.UsenetFileSegment;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.config.AccountConfigInterface;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.proxy.ProxyController;
 import jd.http.Browser;
@@ -26,32 +47,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-import org.appwork.storage.config.handler.KeyHandler;
-import org.appwork.utils.Files;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyException;
-import org.appwork.utils.net.usenet.InvalidAuthException;
-import org.appwork.utils.net.usenet.MessageBodyNotFoundException;
-import org.appwork.utils.net.usenet.SimpleUseNet;
-import org.appwork.utils.net.usenet.UUInputStream;
-import org.appwork.utils.net.usenet.UnrecognizedCommandException;
-import org.appwork.utils.net.usenet.YEncInputStream;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.components.usenet.SimpleUseNetDownloadInterface;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetConfigPanel;
-import org.jdownloader.plugins.components.usenet.UsenetFile;
-import org.jdownloader.plugins.components.usenet.UsenetFileSegment;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.AccountConfigInterface;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49900 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
-public class UseNet extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+public class UseNet extends PluginForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USENET };
     }
 
     protected boolean isUsenetLink(DownloadLink link) {
@@ -92,7 +96,7 @@ public class UseNet extends antiDDoSForHost {
         return 2;
     }
 
-    protected Account convertNNTPLoginURI(Account account) throws Exception {
+    protected Account convertNNTPLoginURI(final Account account) throws Exception {
         final String nntpLoginURI[] = new Regex(account.getUser(), "nntp(s)?://(.*?)(:(.*?))?@([^:/]*?)(:(\\d+))?/?(\\d+)?$").getRow(0);
         if (nntpLoginURI != null && nntpLoginURI.length == 8) {
             final boolean isSSL = "s".equals(nntpLoginURI[0]);
@@ -123,7 +127,7 @@ public class UseNet extends antiDDoSForHost {
         return account;
     }
 
-    protected void verifyUseNetLogins(Account account) throws Exception, InvalidAuthException {
+    protected void verifyUseNetLogins(final Account account) throws Exception, InvalidAuthException {
         final UsenetServer server = getUseNetServer(account);
         final URL url = new URL(null, "socket://" + server.getHost() + ":" + server.getPort(), ProxyController.SOCKETURLSTREAMHANDLER);
         final List<HTTPProxy> proxies = selectProxies(url);
@@ -284,11 +288,6 @@ public class UseNet extends antiDDoSForHost {
         }
     }
 
-    @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USENET };
-    }
-
     protected boolean setUseNetFileName(DownloadLink downloadLink, UsenetFile usenetFile, String bodyFileName) {
         boolean changedFlag = false;
         if (StringUtils.isNotEmpty(bodyFileName)) {
@@ -337,7 +336,6 @@ public class UseNet extends antiDDoSForHost {
         final URL url = new URL(null, "socket://" + server.getHost() + ":" + server.getPort(), ProxyController.SOCKETURLSTREAMHANDLER);
         final List<HTTPProxy> proxies = selectProxies(url);
         final HTTPProxy proxy = proxies.get(0);
-
         final SimpleUseNet client = new SimpleUseNet(proxy, getLogger()) {
             private final byte[] encodedBuffer = new byte[512 * 1024];
             private final byte[] decodedBuffer = new byte[encodedBuffer.length];
@@ -576,12 +574,18 @@ public class UseNet extends antiDDoSForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-        if (link != null) {
-            link.removeProperty(PRECHECK_DONE);
-            link.removeProperty(LAST_MESSAGE_NOT_FOUND);
-            link.removeProperty(MESSAGE_NOT_FOUND_COUNT);
-            setIncomplete(link, false);
+        if (link == null) {
+            return;
         }
+        link.removeProperty(PRECHECK_DONE);
+        link.removeProperty(LAST_MESSAGE_NOT_FOUND);
+        link.removeProperty(MESSAGE_NOT_FOUND_COUNT);
+        setIncomplete(link, false);
+    }
+
+    @Override
+    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        return false;
     }
 
     @Override

@@ -20,7 +20,6 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -49,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48398 $", interfaceVersion = 2, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/(?!d/)[A-Za-z0-9]+" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 2, names = { "mountfile.net" }, urls = { "https?://(?:www\\.)?mountfile\\.net/(?!d/)[A-Za-z0-9]+" })
 public class MountFileNet extends antiDDoSForHost {
     /* For reconnect special handling */
     private static Object            CTRLLOCK                      = new Object();
@@ -60,12 +59,13 @@ public class MountFileNet extends antiDDoSForHost {
 
     public MountFileNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://mountfile.net/premium/");
+        this.enablePremium("https://" + getHost() + "/premium/");
+        setConfigElements();
     }
 
     @Override
     public String getAGBLink() {
-        return "https://mountfile.net/terms/";
+        return "https://" + getHost() + "/terms/";
     }
 
     public boolean hasAutoCaptcha() {
@@ -89,8 +89,10 @@ public class MountFileNet extends antiDDoSForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        getPage(link.getDownloadURL());
-        if (br.containsHTML(">File not found<") || br.getURL().equals("http://mountfile.net/")) {
+        getPage(link.getPluginPatternMatcher());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*File not found\\s*<") || br.getURL().matches("(?i)https?://mountfile\\.net/")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Regex fileInfo = br.getRegex("<h2\\s*style\\s*=\\s*\"margin:0\"\\s*>\\s*([^<>\"]*?)\\s*</h2>\\s*<div\\s*class\\s*=\\s*\"comment\"\\s*>\\s*([0-9\\.,\\sTGKBM]+)");
@@ -370,8 +372,6 @@ public class MountFileNet extends antiDDoSForHost {
     private void setConfigElements() {
         this.getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, this.getPluginConfig(), this.EXPERIMENTALHANDLING, JDL.L("plugins.hoster.mountfilenet.useExperimentalWaittimeHandling", "Activate experimental waittime handling to prevent additional captchas?")).setDefaultValue(false));
     }
-
-    private static AtomicReference<String> userAgent = new AtomicReference<String>(null);
 
     @Override
     public void reset() {

@@ -18,6 +18,7 @@ public class MultiHostHost {
         WORKING_UNSTABLE,
         DEACTIVATED_JDOWNLOADER,
         DEACTIVATED_JDOWNLOADER_UNSUPPORTED,
+        DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN,
         DEACTIVATED_MULTIHOST,
         DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE,
         DEACTIVATED_MULTIHOST_LIMIT_REACHED;
@@ -119,6 +120,7 @@ public class MultiHostHost {
     }
 
     public void setTrafficLeft(long trafficLeft) {
+        // TODO: review this
         this.trafficLeft = trafficLeft;
         this.isUnlimitedTraffic = false;
     }
@@ -128,12 +130,14 @@ public class MultiHostHost {
     }
 
     public void setTrafficMax(long bytes) {
+        // TODO: review this
         this.trafficMax = bytes;
         this.isUnlimitedTraffic = false;
     }
 
     /** Only use this if trafficMax has been set before!! */
     public void setTrafficUsed(long bytes) {
+        // TODO: review this
         this.trafficLeft = this.trafficMax - bytes;
         this.isUnlimitedTraffic = false;
     }
@@ -192,7 +196,7 @@ public class MultiHostHost {
         if (this.name != null) {
             return this.name;
         } else if (this.domains != null && this.domains.size() > 0) {
-            return this.domains.iterator().next();
+            return this.domains.get(0);
         } else {
             return null;
         }

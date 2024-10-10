@@ -51,6 +51,10 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
         public String getGrab8K_label() {
             return "Grab 8k?";
         }
+
+        public String getGrabThumbnail_label() {
+            return "Grab thumbnail?";
+        }
     }
 
     public static enum VideoImageGalleryCrawlMode implements LabelInterface {
@@ -97,7 +101,6 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
     boolean isGrabBestVideoQualityOnly();
 
     void setGrabBestVideoQualityOnly(boolean b);
-
     // @AboutConfig
     // @DescriptionForConfigEntry("Grab unknown qualities?")
     // @DefaultBooleanValue(true)
@@ -165,4 +168,11 @@ public interface NaughtyamericaConfig extends PluginConfigInterface {
     boolean isGrab8K();
 
     void setGrab8K(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @Order(200)
+    boolean isGrabThumbnail();
+
+    void setGrabThumbnail(boolean b);
 }

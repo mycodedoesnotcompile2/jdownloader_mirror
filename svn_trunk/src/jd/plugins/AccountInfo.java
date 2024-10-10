@@ -499,15 +499,16 @@ public class AccountInfo extends Property implements AccountTrafficView {
         cleanListLoop: for (final Entry<String, MultiHostHost> entry : cleanList.entrySet()) {
             final String maindomainCleaned = entry.getKey();
             final MultiHostHost mhost = entry.getValue();
-            finalresults2.add(mhost);
             final Set<LazyHostPlugin> plugins = mapping.get(maindomainCleaned);
             if (plugins == null) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED);
                 unassignedMultiHostSupport.add(maindomainCleaned);
+                finalresults2.add(mhost);
                 continue cleanListLoop;
             }
             /* Multiple possible results -> Evaluate what's the best */
             final List<LazyHostPlugin> best = new ArrayList<LazyHostPlugin>();
+            int numberofSkippedbyPluginAllowHandleEntries = 0;
             for (final LazyHostPlugin plugin : plugins) {
                 if (plugin.isOfflinePlugin()) {
                     skippedOfflineEntries.add(maindomainCleaned);
@@ -522,6 +523,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                         final PluginForHost plg = pluginFinder.getPlugin(plugin);
                         if (!plg.allowHandle(link, multiHostPlugin)) {
                             skippedbyPluginAllowHandleEntries.add(plugin.getHost());
+                            numberofSkippedbyPluginAllowHandleEntries++;
                             continue;
                         }
                     } catch (final Throwable e) {
@@ -535,6 +537,10 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 best.add(plugin);
             }
             if (best.size() == 0) {
+                if (numberofSkippedbyPluginAllowHandleEntries == plugins.size()) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
+                    finalresults2.add(mhost);
+                }
                 unassignedMultiHostSupport.add(maindomainCleaned);
                 continue cleanListLoop;
             } else if (best.size() > 1) {
@@ -545,6 +551,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 }
                 continue cleanListLoop;
             }
+            finalresults2.add(mhost);
             final boolean hostIsWorkingAccordingToMultihost = mhost.getStatus() == MultihosterHostStatus.WORKING || mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE;
             final boolean forcePrintNonWorkingHosts = true;
             if (forcePrintNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
@@ -562,7 +569,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
             // TODO: Improve this
             mhost.getDomains().clear();
-            mhost.addDomain(pluginHost);
+            mhost.setDomain(pluginHost);
         }
         /**
          * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>

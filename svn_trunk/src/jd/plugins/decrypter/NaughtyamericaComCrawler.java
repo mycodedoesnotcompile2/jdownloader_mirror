@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,6 +23,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -39,17 +45,14 @@ import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 49926 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49943 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -95,10 +98,10 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)beta\\.", "");
         final String urlSlug = new Regex(contenturl, "/([a-z0-9\\-]+)$").getMatch(0);
         final String contentID = new Regex(contenturl, "(\\d+)$").getMatch(0);
-        final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
-        if (acc != null) {
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
             final PluginForHost hostPlugin = this.getNewPluginForHostInstance(this.getHost());
-            ((jd.plugins.hoster.NaughtyamericaCom) hostPlugin).login(acc, false);
+            ((jd.plugins.hoster.NaughtyamericaCom) hostPlugin).login(account, false);
             br.getPage(getVideoUrlPremium(urlSlug));
         } else {
             br.getPage(getVideoUrlFree(urlSlug));
@@ -111,9 +114,9 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String title = urlSlug;
-        if (acc != null) {
+        if (account != null) {
             if (!NaughtyamericaCom.isLoggedIN(this.br)) {
-                acc.setError(AccountError.TEMP_DISABLED, 30 * 1000l, "Session expired?");
+                account.setError(AccountError.TEMP_DISABLED, 30 * 1000l, "Session expired?");
                 throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "ACCOUNT_LOGIN_EXPIRED_" + urlSlug, "Refresh your account in settings and try again.");
             } else if (br.containsHTML(">\\s*Add 3D Videos to")) {
                 throw new AccountRequiredException("Add 3D Videos to your Membership to unlock this video");
@@ -124,7 +127,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             }
             final HashSet<String> alldirecturls = new HashSet<String>();
             String[] directurls = br.getRegex("playVideoStream\\([^\\)]*'(https?://[^<>\"\\']+)").getColumn(0);
-            if (directurls.length == 0) {
+            if (directurls == null || directurls.length == 0) {
                 /*
                  * Fallback e.g. for vr content which is only available in one quality(?) e.g.
                  * https://members.naughtyamerica.com/scene/rpvr-rorysummeralex-30918
@@ -202,8 +205,13 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                     best.clear();
                     best.add(dl);
                 } else if (qualityHeight == qualityHeightMax) {
+                    /* Same quality as best but possibly different codec */
                     best.add(dl);
                 }
+            }
+            for (final DownloadLink result : best) {
+                /* Small hint for hoster plugin */
+                result.setProperty("best", true);
             }
             logger.info("Found qualities: Total: " + alldirecturls.size() + " | Known: " + foundQualities.keySet() + " | Unknown: " + unknownQualities.size() + " | SelectedQualities: " + selectedQualities);
             if (cfg.isGrabBestVideoQualityOnly()) {
@@ -213,7 +221,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 }
             } else if (foundQualities.size() > 0) {
                 /* Add user selected qualities */
-                /* TODO: Add plugin setting for this */
+                /* TODO: Add plugin setting for adding/not-adding "unknown" variants */
                 final boolean addUnknownQualitiesAsFallback = true;
                 final Iterator<Entry<Integer, List<DownloadLink>>> iterator = foundQualities.entrySet().iterator();
                 while (iterator.hasNext()) {
@@ -284,10 +292,26 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 zip.setProperty(NaughtyamericaCom.PROPERTY_MAINLINK, contenturl);
                 ret.add(zip);
             }
+            String thumbnailURL = br.getRegex("poster:\\s*'([^<>\"\\']+)'").getMatch(0);
+            // TODO: Add setting and only add thumbnail if wished by the user
+            if (thumbnailURL != null && (ignoreQualitySelection || true)) {
+                final URL url_parsed = br.getURL(thumbnailURL);
+                thumbnailURL = url_parsed.toExternalForm();
+                final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailURL));
+                final String filename = Plugin.getFileNameFromURL(url_parsed);
+                if (filename != null) {
+                    thumb.setFinalFileName(filename);
+                }
+                thumb.setAvailable(true);
+                ret.add(thumb);
+            } else {
+                /* Thumbnail should always be available */
+                logger.warning("Failed to find thumbnail URL");
+            }
         } else {
             /* We're not logged in but maybe the user has an account to download later or a multihoster account --> Add one dummy url. */
             final String quality_dummy = "1080";
-            final String type_dummy = "full";
+            final String type_dummy = "trailer";
             final String linkid = title + type_dummy + quality_dummy;
             final DownloadLink dl = this.createDownloadlink("http://naughtyamericadecryptedlvl3.secure.naughtycdn.com/mfhg/members/chanelvan/" + urlSlug + "_" + quality_dummy + ".mp4");
             dl.setLinkID(linkid);
@@ -299,6 +323,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             dl.setProperty(NaughtyamericaCom.PROPERTY_CONTENT_ID, contentID);
             dl.setProperty(NaughtyamericaCom.PROPERTY_VIDEO_QUALITY, quality_dummy);
             dl.setProperty(NaughtyamericaCom.PROPERTY_URL_SLUG, urlSlug);
+            dl.setProperty(NaughtyamericaCom.PROPERTY_MAINLINK, contenturl);
             dl.setAvailable(true);
             ret.add(dl);
         }
@@ -425,6 +450,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
     }
 
     public static String getVideoUrlFree(final String filename_url) {
+        /* Alternative: tour.naughtyamerica.com */
         return "https://www." + DOMAIN_BASE + "/scene/" + filename_url;
     }
 
@@ -444,10 +470,12 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         }
     }
 
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

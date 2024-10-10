@@ -62,7 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49935 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -454,7 +454,7 @@ public class OffCloudCom extends UseNet {
                     cloudOnlyHosts.add(domain);
                 }
             }
-            final Object maxAmount = domaininfo.get("maxAmount");
+            final Object maxTrafficBytesO = domaininfo.get("maxAmount");
             final MultiHostHost mhost = new MultiHostHost(domain);
             mhost.addDomains(domains);
             Map<String, Object> thisHostChunkLimitsMap = null;
@@ -473,8 +473,10 @@ public class OffCloudCom extends UseNet {
                 mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
             }
             mhost.setStatusText(status);
-            if (maxAmount instanceof Number) {
-                mhost.setTrafficMax(((Number) maxAmount).longValue());
+            if (maxTrafficBytesO instanceof Number) {
+                final long maxTrafficBytes = ((Number) maxTrafficBytesO).longValue();
+                mhost.setTrafficLeft(maxTrafficBytes);
+                mhost.setTrafficMax(maxTrafficBytes);
             }
             if (thisHostChunkLimitsMap != null) {
                 /* Set host specific limits */

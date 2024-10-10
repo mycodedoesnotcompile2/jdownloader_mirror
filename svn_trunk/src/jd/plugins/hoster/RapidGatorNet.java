@@ -70,11 +70,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49808 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://rapidgator.net/article/premium");
+        this.enablePremium("https://" + getHost() + "/article/premium");
     }
 
     @Override
@@ -154,7 +154,7 @@ public class RapidGatorNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://rapidgator.net/article/terms";
+        return "https://" + getHost() + "/article/terms";
     }
 
     private String getContentURL(final DownloadLink link) {

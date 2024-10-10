@@ -50,11 +50,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NaughtyamericaComCrawler;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
+@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
 public class NaughtyamericaCom extends PluginForHost {
     public NaughtyamericaCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://natour.naughtyamerica.com/signup/signup.php");
+        this.enablePremium("https://natour." + getHost() + "/signup/signup.php");
     }
 
     @Override
@@ -80,23 +80,21 @@ public class NaughtyamericaCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean allowCookieLoginOnly         = false;
-    private static final int     FREE_MAXCHUNKS               = 1;
-    private static final int     FREE_MAXDOWNLOADS            = 1;
+    private static final boolean allowCookieLoginOnly      = false;
+    private static final int     FREE_MAXCHUNKS            = 1;
     /*
      * 2017-01-23: Max 100 connections tital seems to be a stable value - I'd not recommend allowing more as this will most likely cause
      * failing downloads which start over and over.
      */
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = -5;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
-    private final String         type_pic                     = ".+\\.jpg.*?";
-    private String               dllink                       = null;
-    public static final String   PROPERTY_CONTENT_ID          = "fid";
-    public static final String   PROPERTY_VIDEO_QUALITY       = "quality";
-    public static final String   PROPERTY_URL_SLUG            = "filename_url";
-    public static final String   PROPERTY_PICTURE_NUMBER      = "picnumber";
-    public static final String   PROPERTY_CRAWLER_FILENAME    = "crawler_filename";
-    public static final String   PROPERTY_MAINLINK            = "mainlink";
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = -5;
+    private final String         type_pic                  = ".+\\.jpg.*?";
+    private String               dllink                    = null;
+    public static final String   PROPERTY_CONTENT_ID       = "fid";
+    public static final String   PROPERTY_VIDEO_QUALITY    = "quality";
+    public static final String   PROPERTY_URL_SLUG         = "filename_url";
+    public static final String   PROPERTY_PICTURE_NUMBER   = "picnumber";
+    public static final String   PROPERTY_CRAWLER_FILENAME = "crawler_filename";
+    public static final String   PROPERTY_MAINLINK         = "mainlink";
 
     public void correctDownloadLink(final DownloadLink link) {
         link.setPluginPatternMatcher(link.getPluginPatternMatcher().replaceAll("(?i)https?://naughtyamericadecrypted", "https://"));
@@ -116,6 +114,11 @@ public class NaughtyamericaCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final Account account = AccountController.getInstance().getValidAccount(this);
+        return requestFileInformation(link, account);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         /* 2022-03-17: This property should always exist but to keep compatibility to older plugin revisions we're not yet enforcing it. */
@@ -123,9 +126,8 @@ public class NaughtyamericaCom extends PluginForHost {
         if (crawlerForcedFilename != null) {
             link.setFinalFileName(crawlerForcedFilename);
         }
-        final Account aa = AccountController.getInstance().getValidAccount(this);
-        if (aa != null) {
-            login(aa, false);
+        if (account != null) {
+            login(account, false);
             dllink = link.getPluginPatternMatcher();
         } else {
             logger.info("No account available, checking trailer download");
@@ -142,9 +144,14 @@ public class NaughtyamericaCom extends PluginForHost {
             /* 2019-01-18: Trailer is only available in a single quality */
             dllink = br.getRegex("file\\s*?:\\s*?\"(https?[^<>\"]+)\"").getMatch(0);
             if (StringUtils.isEmpty(dllink)) {
-                link.getLinkStatus().setStatusText("Trailer not found: Cannot find download filesize without valid premium account");
+                logger.info("Trailer not found -> Premium account needed to download this item");
                 return AvailableStatus.TRUE;
             }
+        }
+        boolean isFreshDirectURL = false;
+        if (isTrailer(link) && account != null) {
+            dllink = refreshDirecturl(account, link);
+            isFreshDirectURL = true;
         }
         URLConnectionAdapter con = null;
         try {
@@ -154,10 +161,14 @@ public class NaughtyamericaCom extends PluginForHost {
                 logger.info("Final downloadurl seems to be expired");
                 try {
                     brc.followConnection(true);
-                } catch (IOException ignore) {
-                    logger.log(ignore);
+                } catch (final IOException e) {
+                    if (isFreshDirectURL) {
+                        throw e;
+                    } else {
+                        logger.log(e);
+                    }
                 }
-                final String directURL = refreshDirecturl(aa, link);
+                final String directURL = refreshDirecturl(account, link);
                 brc = br.cloneBrowser();
                 con = brc.openHeadConnection(directURL);
                 if (!looksLikeDownloadableContent(con)) {
@@ -169,7 +180,11 @@ public class NaughtyamericaCom extends PluginForHost {
                 dllink = directURL;
             }
             if (con.getCompleteContentLength() > 0) {
-                link.setVerifiedFileSize(con.getCompleteContentLength());
+                if (con.isContentDecoded()) {
+                    link.setDownloadSize(con.getCompleteContentLength());
+                } else {
+                    link.setVerifiedFileSize(con.getCompleteContentLength());
+                }
             }
             final String filenameFromConnection = getFileNameFromConnection(con);
             if (link.getFinalFileName() == null && filenameFromConnection != null) {
@@ -195,30 +210,47 @@ public class NaughtyamericaCom extends PluginForHost {
         /* Find expected result. */
         final CryptedLink forCrawler = new CryptedLink(mainlink, link);
         final ArrayList<DownloadLink> results = ((jd.plugins.decrypter.NaughtyamericaComCrawler) crawler).crawlContent(forCrawler, true);
-        DownloadLink result = null;
+        DownloadLink fresh = null;
         if (link.hasProperty(PROPERTY_PICTURE_NUMBER)) {
             /* Image */
             for (final DownloadLink tmp : results) {
                 if (StringUtils.equals(tmp.getStringProperty(PROPERTY_PICTURE_NUMBER), link.getStringProperty(PROPERTY_PICTURE_NUMBER))) {
-                    result = tmp;
+                    fresh = tmp;
                     break;
                 }
             }
         } else {
             /* Video */
-            for (final DownloadLink tmp : results) {
-                if (StringUtils.equals(this.getLinkID(tmp), this.getLinkID(link))) {
-                    result = tmp;
+            DownloadLink best = null;
+            for (final DownloadLink result : results) {
+                if (StringUtils.equals(this.getLinkID(result), this.getLinkID(link))) {
+                    fresh = result;
                     break;
                 }
+                if (result.hasProperty("best")) {
+                    best = result;
+                }
+            }
+            if (fresh == null && isTrailer(link)) {
+                /* Single item which was added before a premium account was available -> Auto select best */
+                logger.info("Fallback to best item");
+                fresh = best;
             }
         }
-        if (result == null) {
+        if (fresh == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to refresh directurl");
         }
-        this.correctDownloadLink(result);
-        final String directURL = result.getPluginPatternMatcher();
+        this.correctDownloadLink(fresh);
+        final String directURL = fresh.getPluginPatternMatcher();
         return directURL;
+    }
+
+    private boolean isTrailer(final DownloadLink link) {
+        if (StringUtils.containsIgnoreCase(link.getLinkID(), "trailer")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private String getFID(final DownloadLink dl) {
@@ -237,110 +269,104 @@ public class NaughtyamericaCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     public void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                /* For developers: Disable this Boolean if normal login process breaks down and you're unable or too lazy to fix it! */
-                final Cookies userCookies = account.loadUserCookies();
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null || userCookies != null) {
-                    /*
-                     * Try to avoid login captcha by re-using cookies.
-                     */
-                    if (userCookies != null) {
-                        br.setCookies(userCookies);
-                    } else {
-                        br.setCookies(cookies);
-                    }
-                    if (!force) {
-                        return;
-                    }
-                    br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster());
-                    if (isLoggedIN(br)) {
-                        logger.info("Cookie login successful");
-                        account.saveCookies(br.getCookies(account.getHoster()), "");
-                        return;
-                    } else {
-                        logger.info("Cookie login failed");
-                        if (userCookies != null) {
-                            if (account.hasEverBeenValid()) {
-                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                            } else {
-                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                            }
-                        } else {
-                            /* Full login required */
-                            br.clearAll();
-                        }
-                    }
+            br.setCookiesExclusive(true);
+            /* For developers: Disable this Boolean if normal login process breaks down and you're unable or too lazy to fix it! */
+            final Cookies userCookies = account.loadUserCookies();
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null || userCookies != null) {
+                /*
+                 * Try to avoid login captcha by re-using cookies.
+                 */
+                if (userCookies != null) {
+                    br.setCookies(userCookies);
+                } else {
+                    br.setCookies(cookies);
                 }
-                if (allowCookieLoginOnly) {
-                    showCookieLoginInfo();
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
+                if (!force) {
+                    return;
                 }
-                logger.info("Performing full login");
-                br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/");
-                br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/login");
-                final Regex httpRedirect = br.getRegex("http-equiv=\"refresh\" content=\"(\\d+);\\s*url=(/[^<>\"]+)\"");
-                if (httpRedirect.matches()) {
-                    /* 2019-01-21: Hmm leads to HTTP/1.1 405 Not Allowed */
-                    /*
-                     * <meta http-equiv="refresh" content="10; url=/distil_r_captcha.html?requestId=<requestId>c&httpReferrer=%2Flogin" />
-                     */
-                    final String waitStr = httpRedirect.getMatch(0);
-                    final String redirectURL = httpRedirect.getMatch(1);
-                    int wait = 10;
-                    if (waitStr != null) {
-                        wait = Integer.parseInt(waitStr);
-                    }
-                    Thread.sleep(wait * 1001l);
-                    br.getPage(redirectURL);
-                }
-                Form loginform = br.getFormbyKey("username");
-                if (loginform == null) {
-                    loginform = br.getForm(0);
-                }
-                if (loginform == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                loginform.put("dest", "");
-                loginform.put("username", Encoding.urlEncode(account.getUser()));
-                loginform.put("password", Encoding.urlEncode(account.getPass()));
-                /* Handle login captcha if required */
-                if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                    loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
-                }
-                final Request request = br.createFormRequest(loginform);
-                request.getHeaders().put("Origin", "https://members.naughtyamerica.com");
-                br.getPage(request);
-                final Form continueform = br.getFormbyKey("response");
-                if (continueform != null) {
-                    /* Redirect from probiller.com to main website --> Login complete */
-                    br.submitForm(continueform);
-                }
-                if (br.getURL().contains("/postLogin")) {
-                    br.getPage("//" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + br.getHost());
-                }
-                if (br.getURL().contains("beta.") || br.getURL().contains("/login")) {
-                    /* 2016-12-12: Redirects to their beta-page might happen --> Go back to the old/stable version of their webpage. */
-                    br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster());
-                }
-                final String loginCookie = br.getCookie(br.getHost(), "nrc", Cookies.NOTDELETEDPATTERN);
-                if (!isLoggedIN(br) && loginCookie == null) {
-                    throw new AccountInvalidException();
-                }
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
+                br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster());
+                if (isLoggedIN(br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(account.getHoster()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
                     account.clearCookies("");
+                    if (userCookies != null) {
+                        if (account.hasEverBeenValid()) {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                        } else {
+                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                        }
+                    } else {
+                        /* Full login required */
+                        br.clearAll();
+                    }
                 }
-                throw e;
             }
+            if (allowCookieLoginOnly) {
+                showCookieLoginInfo();
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
+            }
+            logger.info("Performing full login");
+            br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/");
+            br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster() + "/login");
+            final Regex httpRedirect = br.getRegex("http-equiv=\"refresh\" content=\"(\\d+);\\s*url=(/[^<>\"]+)\"");
+            if (httpRedirect.matches()) {
+                /* 2019-01-21: Hmm leads to HTTP/1.1 405 Not Allowed */
+                /*
+                 * <meta http-equiv="refresh" content="10; url=/distil_r_captcha.html?requestId=<requestId>c&httpReferrer=%2Flogin" />
+                 */
+                final String waitStr = httpRedirect.getMatch(0);
+                final String redirectURL = httpRedirect.getMatch(1);
+                int wait = 10;
+                if (waitStr != null) {
+                    wait = Integer.parseInt(waitStr);
+                }
+                Thread.sleep(wait * 1001l);
+                br.getPage(redirectURL);
+            }
+            Form loginform = br.getFormbyKey("username");
+            if (loginform == null) {
+                loginform = br.getForm(0);
+            }
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            loginform.put("dest", "");
+            loginform.put("username", Encoding.urlEncode(account.getUser()));
+            loginform.put("password", Encoding.urlEncode(account.getPass()));
+            /* Handle login captcha if required */
+            if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(loginform)) {
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            }
+            final Request request = br.createFormRequest(loginform);
+            request.getHeaders().put("Origin", "https://members.naughtyamerica.com");
+            br.getPage(request);
+            final Form continueform = br.getFormbyKey("response");
+            if (continueform != null) {
+                /* Redirect from probiller.com to main website --> Login complete */
+                br.submitForm(continueform);
+            }
+            if (br.getURL().contains("/postLogin")) {
+                br.getPage("//" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + br.getHost());
+            }
+            if (br.getURL().contains("beta.") || br.getURL().contains("/login")) {
+                /* 2016-12-12: Redirects to their beta-page might happen --> Go back to the old/stable version of their webpage. */
+                br.getPage("https://" + NaughtyamericaComCrawler.DOMAIN_PREFIX_PREMIUM + account.getHoster());
+            }
+            final String loginCookie = br.getCookie(br.getHost(), "nrc", Cookies.NOTDELETEDPATTERN);
+            if (!isLoggedIN(br) && loginCookie == null) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -363,7 +389,6 @@ public class NaughtyamericaCom extends PluginForHost {
         login(account, true);
         ai.setUnlimitedTraffic();
         account.setType(AccountType.PREMIUM);
-        account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
         account.setConcurrentUsePossible(true);
         /* 2022-03-17: Their cookies are not valid for a long time -> Be sure to keep them active */
         account.setRefreshTimeout(5 * 60 * 1000l);
@@ -378,6 +403,8 @@ public class NaughtyamericaCom extends PluginForHost {
         }
         if (username == null) {
             logger.warning("Failed to find real username inside html code");
+        } else {
+            username = Encoding.htmlDecode(username).trim();
         }
         if (account.loadUserCookies() != null && username != null) {
             /*
@@ -413,7 +440,7 @@ public class NaughtyamericaCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        requestFileInformation(link);
+        requestFileInformation(link, account);
         handleDownload(account, link);
     }
 
@@ -441,6 +468,19 @@ public class NaughtyamericaCom extends PluginForHost {
     }
 
     @Override
+    public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        if (acc == null) {
+            /* no account, yes we can expect captcha */
+            return true;
+        } else if (acc.getType() == AccountType.FREE) {
+            /* free accounts also have captchas */
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
     public String buildExternalDownloadURL(final DownloadLink link, final PluginForHost buildForThisPlugin) {
         if (StringUtils.equals("premiumize.me", buildForThisPlugin.getHost())) {
             return jd.plugins.decrypter.NaughtyamericaComCrawler.getVideoUrlFree(getUrlSlug(link));
@@ -461,7 +501,7 @@ public class NaughtyamericaCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

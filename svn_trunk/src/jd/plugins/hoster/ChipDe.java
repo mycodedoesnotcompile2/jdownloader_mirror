@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 2, names = { "chip.de" }, urls = { "https?://(?:www\\.)?(?:chip\\.de/downloads|download\\.chip\\.(?:eu|asia)/.{2})/[A-Za-z0-9_\\-]+_\\d+\\.html|https?://(?:[a-z0-9]+\\.)?chip\\.de/[^/]+/[^/]+_\\d+\\.html" })
 public class ChipDe extends PluginForHost {
     public ChipDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -262,7 +262,8 @@ public class ChipDe extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         final String directlinkproperty = "directlink";
-        if (link.getPluginPatternMatcher().matches(type_chip_de_video)) {
+        final String contenturl = link.getPluginPatternMatcher();
+        if (contenturl.matches(type_chip_de_video)) {
             requestFileInformation(link);
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -271,7 +272,7 @@ public class ChipDe extends PluginForHost {
                 /* We use APIs which we can trust so retrying is okay ;) */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 5 * 60 * 1000l);
             }
-        } else if (link.getDownloadURL().matches(type_chip_eu_file)) {
+        } else if (contenturl.matches(type_chip_eu_file)) {
             /* Re-Use saved direct-downloadlinks */
             final boolean resume = false;
             final int maxchunks = 1;
@@ -290,7 +291,7 @@ public class ChipDe extends PluginForHost {
                 if (getfileUrl.startsWith("http") && !getfileUrl.contains("chip.eu/")) {
                     errorExternalDownloadImpossible();
                 }
-                this.br.getPage(getfileUrl);
+                br.getPage(getfileUrl);
                 dllink = br.getRegex("If not, please click <a href=\"(http[^<>\"]*?)\"").getMatch(0);
                 if (dllink == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -309,7 +310,7 @@ public class ChipDe extends PluginForHost {
             if (fname != null) {
                 link.setFinalFileName(Encoding.htmlDecode(fname));
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
             dl.startDownload();
         } else {
             /* Normal chip.de downloads (application downloads) */
@@ -324,7 +325,7 @@ public class ChipDe extends PluginForHost {
                 }
                 final boolean looksLikeDownloadIsPossible = br.containsHTML("js_manual_installation");
                 final String textNoDownloadAvailable = "No download button available";
-                final String step1 = br.getRegex("class=\"[^\"]*download_button[^\"]+\"[^>]*><a rel=\"nofollow\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
+                final String step1 = br.getRegex("class=\"[^\"]*download_button[^\"]+\"[^>]*>\\s*<a rel=\"nofollow\"[^>]*href=\"(https?://[^\"]+)").getMatch(0);
                 if (step1 == null) {
                     /*
                      * 2021-07-22: Treat such files as non-downloadable although this could also mean there is a plugin failure. Some items
@@ -368,7 +369,7 @@ public class ChipDe extends PluginForHost {
                 dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
                 String etag = this.br.getRequest().getResponseHeader("ETag");
                 if (etag != null) {
-                    /* chip.de servers will often | always return md5 hash via headers! */
+                    /* chip.de servers will often return md5 file hash via headers! */
                     try {
                         etag = etag.replace("\"", "");
                         final String[] etagInfo = etag.split(":");
@@ -392,7 +393,7 @@ public class ChipDe extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }
@@ -439,14 +440,13 @@ public class ChipDe extends PluginForHost {
     /** Externally hosted content is not directly downloadable via chip.de servers thus cannot be downloaded via this plugin! */
     private boolean isExternalDownload(final DownloadLink link) {
         final String dltarget = link.getStringProperty(PROPERTY_DOWNLOAD_TARGET);
-        if (dltarget != null) {
-            if (dltarget.equalsIgnoreCase("intern")) {
-                return false;
-            } else {
-                return true;
-            }
-        } else {
+        if (dltarget == null) {
             return false;
+        }
+        if (dltarget.equalsIgnoreCase("intern")) {
+            return false;
+        } else {
+            return true;
         }
     }
 

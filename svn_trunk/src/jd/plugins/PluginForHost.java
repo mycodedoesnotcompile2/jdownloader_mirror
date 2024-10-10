@@ -3097,31 +3097,49 @@ public abstract class PluginForHost extends Plugin {
                 }
                 final StringBuilder sb = new StringBuilder();
                 final String domain = mhost.getDomains().get(0);
-                final String hostStr;
-                boolean hasWorkingStatus = false;
-                if (mhost.getStatus() == MultihosterHostStatus.WORKING) {
+                String hostStr;
+                final MultihosterHostStatus status = mhost.getStatus();
+                if (status == MultihosterHostStatus.WORKING) {
                     hostStr = domain;
-                    hasWorkingStatus = true;
-                } else if (mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE) {
+                } else if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
                     hostStr = "<span style=\"background-color:#ffca28;\">" + domain + "</span>";
                 } else {
+                    // if (status == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
+                    // hostStr = "<span style=\"background-color:#ef5350;\">" + domain + "</span>";
+                    // }
                     final String statusText;
                     if (mhost.getStatusText() != null) {
                         statusText = mhost.getStatusText();
                     } else {
-                        statusText = mhost.getStatus().toString();
+                        statusText = status.toString();
                     }
-                    hostStr = "<s>" + domain + "</s> | " + statusText;
+                    hostStr = "<span style=\"background-color:#ef5350;\">" + domain + "</span> | " + statusText;
                 }
-                if (!mhost.isUnlimitedTraffic()) {
-                    sb.append("|" + SizeFormatter.formatBytes(mhost.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(mhost.getTrafficMax()));
+                boolean isLimitReached = false;
+                if (mhost.isUnlimitedTraffic() && mhost.isUnlimitedLinks()) {
+                    sb.append("Unlimited");
+                } else {
+                    if (!mhost.isUnlimitedTraffic()) {
+                        sb.append("|" + SizeFormatter.formatBytes(mhost.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(mhost.getTrafficMax()));
+                        if (mhost.getTrafficLeft() <= 0) {
+                            isLimitReached = true;
+                        }
+                    }
+                    if (!mhost.isUnlimitedLinks()) {
+                        sb.append("|Links left: " + mhost.getLinksLeft() + "/" + mhost.getLinksMax());
+                        if (mhost.getLinksLeft() <= 0) {
+                            isLimitReached = true;
+                        }
+                    }
                 }
-                if (!mhost.isUnlimitedLinks()) {
-                    sb.append("|Links left: " + mhost.getLinksLeft() + "/" + mhost.getLinksMax());
+                if (mhost.getTrafficCalculationFactorPercent() != 100) {
+                    sb.append("|Factor: x" + mhost.getTrafficCalculationFactorPercent() / 100);
                 }
-                if (!hasWorkingStatus || sb.length() > 0) {
-                    panel.addStringPair(hostStr, sb.toString());
+                String limitText = sb.toString();
+                if (isLimitReached) {
+                    limitText = "<span style=\"background-color:#ffca28;\">" + limitText + "</span>";
                 }
+                panel.addStringPair(hostStr, limitText);
             }
         }
     }

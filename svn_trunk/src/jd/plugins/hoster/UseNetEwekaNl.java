@@ -25,7 +25,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "eweka.nl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "eweka.nl" }, urls = { "" })
 public class UseNetEwekaNl extends UseNet {
     public UseNetEwekaNl(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class UseNetEwekaNl extends UseNet {
         // final String server = br.getRegex("<td><b>Server</b></td>.*?<td.*?>(.*?)</td>").getMatch(0);
         // final String port = br.getRegex("<td><b>Port</b></td>.*?<td.*?>(\\d+)</td>").getMatch(0);
         // TODO: use these infos for available servers
-        getPage("/myeweka?p=acd");
+        br.getPage("/myeweka?p=acd");
         final String connections = br.getRegex("(?i)<td><b>Connections</b></td>.*?<td.*?>(\\d+)</td>").getMatch(0);
         if (connections != null) {
             account.setMaxSimultanDownloads(Integer.parseInt(connections));
@@ -151,7 +151,7 @@ public class UseNetEwekaNl extends UseNet {
                     }
                 }
                 logger.info("Performing full login");
-                getPage("https://www." + this.getHost() + "/myeweka/?lang=en");
+                br.getPage("https://www." + this.getHost() + "/myeweka/?lang=en");
                 final Form loginform = br.getFormbyProperty("id", "login-form");
                 if (loginform == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -159,7 +159,7 @@ public class UseNetEwekaNl extends UseNet {
                 loginform.setMethod(MethodType.POST);
                 loginform.put("identifier", Encoding.urlEncode(account.getUser()));
                 loginform.put("password", Encoding.urlEncode(account.getPass()));
-                submitForm(loginform);
+                br.submitForm(loginform);
                 if (!isLoggedIN(br)) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
                 }
@@ -175,7 +175,7 @@ public class UseNetEwekaNl extends UseNet {
 
     private boolean checkLogin(final Browser br, final Cookies cookies) throws Exception {
         br.setCookies(cookies);
-        getPage("https://www." + this.getHost() + "/en/myeweka?p=pro");
+        br.getPage("https://www." + this.getHost() + "/en/myeweka?p=pro");
         if (isLoggedIN(br)) {
             return true;
         } else {

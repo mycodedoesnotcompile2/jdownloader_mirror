@@ -27,6 +27,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.HexFormatter;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.challenge.clickcaptcha.ClickedPoint;
@@ -63,7 +64,7 @@ import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49883 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileCryptCc extends PluginForDecrypt {
     public FileCryptCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -286,6 +287,8 @@ public class FileCryptCc extends PluginForDecrypt {
                 brc.setCookie(br.getHost(), "BetterJsPopCount", "1");
                 int index = -1;
                 final HashSet<String> dupes = new HashSet<String>();
+                final String[] filenames = br.getRegex("<td title=\"([^\"]+)\">[^<]+<span><a href=[^>]*class=\"external_link\"").getColumn(0);
+                final String[] filesizes = br.getRegex("</a></span></td><td>(\\d+[^<]+)</td>").getColumn(0);
                 redirectLinksLoop: for (final String singleLink : links) {
                     index++;
                     logger.info("Processing redirectLinksLoop position: " + index + "/" + links.length + " | " + singleLink);
@@ -314,6 +317,17 @@ public class FileCryptCc extends PluginForDecrypt {
                     }
                     if (extractionPasswordList != null) {
                         link.setSourcePluginPasswordList(extractionPasswordList);
+                    }
+                    /* Set weak file name/size if that information is found. */
+                    if (filenames != null && filenames.length == links.length) {
+                        String filename = filenames[index];
+                        filename = Encoding.htmlDecode(filename).trim();
+                        link.setName(filename);
+                    }
+                    if (filesizes != null && filesizes.length == links.length) {
+                        String filesize = filenames[index];
+                        filesize = Encoding.htmlDecode(filesize).trim();
+                        link.setDownloadSize(SizeFormatter.getSize(filesize));
                     }
                     thisMirrorResults.add(link);
                     distribute(link);

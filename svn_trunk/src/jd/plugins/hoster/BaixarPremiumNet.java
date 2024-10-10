@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49770 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
 public class BaixarPremiumNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            NICE_HOST          = "baixarpremium.net";
@@ -111,8 +111,21 @@ public class BaixarPremiumNet extends PluginForHost {
         for (String crippledhost : crippledHosts) {
             crippledhost = crippledhost.trim();
             crippledhost = crippledhost.toLowerCase(Locale.ENGLISH);
+            if (crippledhost.contains(" ")) {
+                /* Skip invalid items */
+                continue;
+            }
             if (crippledhost.equals("icerbox")) {
+                /* We support multiple hosts named "icerbox" with different TLDs! */
                 supportedHosts.add("icerbox.com");
+            } else if (crippledhost.equals("fileal")) {
+                supportedHosts.add("file.al");
+            } else if (crippledhost.equals("1ficher")) {
+                /* Fix spelling mistake */
+                supportedHosts.add("1fichier.com");
+            } else if (crippledhost.equals("kee2share")) {
+                /* Fix spelling mistake */
+                supportedHosts.add("keep2share.cc");
             } else {
                 supportedHosts.add(crippledhost);
             }
@@ -160,7 +173,7 @@ public class BaixarPremiumNet extends PluginForHost {
             handleErrorRetries("dllinknull", 5, 10 * 60 * 1000l);
         }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 1);
-        if (dl.getConnection().getContentType().contains("text")) {
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             handleDlErrors(this.br, this.currAcc);
             handleErrorRetries("unknowndlerror", 5, 10 * 60 * 1000l);
