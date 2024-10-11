@@ -1,6 +1,5 @@
 package org.jdownloader.captcha.v2.solver.twocaptcha;
 
-import java.awt.Color;
 import java.awt.Point;
 
 import javax.swing.BorderFactory;
@@ -25,9 +24,7 @@ import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
 import net.miginfocom.swing.MigLayout;
 
 public class TwoCaptchaTooltip extends PanelToolTip {
-    private Color        color;
-    private ServicePanel owner;
-    private JComponent   activeComponent;
+    private JComponent activeComponent;
 
     public Point getDesiredLocation(JComponent activeComponent, Point ttPosition) {
         if (activeComponent != null) {
@@ -38,10 +35,8 @@ public class TwoCaptchaTooltip extends PanelToolTip {
         return AbstractLocator.correct(ttPosition, getPreferredSize());
     }
 
-    public TwoCaptchaTooltip(ServicePanel owner, final TwoCaptchaSolver solver) {
+    public TwoCaptchaTooltip(final ServicePanel owner, final TwoCaptchaSolver solver) {
         super(new TooltipPanel("ins 0,wrap 1", "[grow,fill]", "[grow,fill]"));
-        this.owner = owner;
-        color = (LAFOptions.getInstance().getColorForTooltipForeground());
         JProgressBar progress = new JProgressBar();
         progress.setIndeterminate(true);
         panel.setLayout(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[]"));
@@ -77,9 +72,9 @@ public class TwoCaptchaTooltip extends PanelToolTip {
                             header.setForeground(LAFOptions.getInstance().getColorForTooltipForeground());
                             panel.add(header, "spanx,gapbottom 5,pushx,growx");
                             panel.add(lbl(_GUI.T.lit_accountid(), NewTheme.I().getIcon(IconKey.ICON_PREMIUM, 18), JLabel.LEFT));
-                            panel.add(lbl(account.getUserName() + ""));
+                            panel.add(lbl(account.getUserName()));
                             panel.add(lbl(_GUI.T.ServicePanel9kwTooltip_runInEDT_credits_(), NewTheme.I().getIcon(IconKey.ICON_MONEY, 18), JLabel.LEFT));
-                            panel.add(lbl(account.getBalance() + " USD"));
+                            panel.add(lbl(String.format("%.3f", account.getBalance()) + " USD"));
                             // panel.add(lbl(_GUI.T.lit_rate(), NewTheme.I().getIcon(IconKey.ICON_PLAY, 18), JLabel.LEFT));
                             // panel.add(lbl(account.getRate() + " USD Cent/Captcha"));
                             // panel.add(lbl(_GUI.T.ServicePanelDBCTooltip_captcha_free(), NewTheme.I().getIcon(IconKey.ICON_OCR, 18),

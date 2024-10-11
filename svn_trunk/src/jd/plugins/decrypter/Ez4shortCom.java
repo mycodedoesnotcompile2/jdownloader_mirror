@@ -24,7 +24,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 47375 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49946 $", interfaceVersion = 3, names = {}, urls = {})
 public class Ez4shortCom extends MightyScriptAdLinkFly {
     public Ez4shortCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -32,7 +32,7 @@ public class Ez4shortCom extends MightyScriptAdLinkFly {
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "ez4short.com" });
+        ret.add(new String[] { "ez4short22.com" });
         return ret;
     }
 
@@ -61,6 +61,8 @@ public class Ez4shortCom extends MightyScriptAdLinkFly {
     @Override
     protected String getSpecialReferer() {
         /* 2023-02-23 */
-        return "https://techmody.io/";
+        // return "https://techmody.io/";
+        /* 2024-10-09 */
+        return "https://retrotechreborn.com/";
     }
 }

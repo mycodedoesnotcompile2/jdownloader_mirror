@@ -2637,7 +2637,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Do not start downloads if others wait for a Reconnect" })
     String ReconnectSettings_ReconnectSettings_prefer_reconnect_desc();
 
-    @Default(lngs = { "en" }, values = { "Reconnects can interrupt resumable downloads" })
+    @Default(lngs = { "en" }, values = { "Reconnects are allowed to interrupt resumable downloads" })
     String ReconnectSettings_ReconnectSettings_interrupt_resumable_allowed();
 
     @Default(lngs = { "en" }, values = { "Enter a comment or leave empty..." })

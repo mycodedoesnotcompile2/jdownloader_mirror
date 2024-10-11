@@ -52,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 49943 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49946 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -114,6 +114,13 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String title = urlSlug;
+        String description = br.getRegex("<p class=\"more-info-details\" style=\"color: #cccccc;\">([^<]+)</p>").getMatch(0); // loggedIN
+        if (description == null) {
+            description = br.getRegex("<h2 class=\"light-grey-text\">Synopsis</h2>([^<]+)").getMatch(0); // loggedOut
+        }
+        if (description != null) {
+            description = Encoding.htmlDecode(description).trim();
+        }
         if (account != null) {
             if (!NaughtyamericaCom.isLoggedIN(this.br)) {
                 account.setError(AccountError.TEMP_DISABLED, 30 * 1000l, "Session expired?");
@@ -292,22 +299,6 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 zip.setProperty(NaughtyamericaCom.PROPERTY_MAINLINK, contenturl);
                 ret.add(zip);
             }
-            String thumbnailURL = br.getRegex("poster:\\s*'([^<>\"\\']+)'").getMatch(0);
-            // TODO: Add setting and only add thumbnail if wished by the user
-            if (thumbnailURL != null && (ignoreQualitySelection || true)) {
-                final URL url_parsed = br.getURL(thumbnailURL);
-                thumbnailURL = url_parsed.toExternalForm();
-                final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailURL));
-                final String filename = Plugin.getFileNameFromURL(url_parsed);
-                if (filename != null) {
-                    thumb.setFinalFileName(filename);
-                }
-                thumb.setAvailable(true);
-                ret.add(thumb);
-            } else {
-                /* Thumbnail should always be available */
-                logger.warning("Failed to find thumbnail URL");
-            }
         } else {
             /* We're not logged in but maybe the user has an account to download later or a multihoster account --> Add one dummy url. */
             final String quality_dummy = "1080";
@@ -327,8 +318,40 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             dl.setAvailable(true);
             ret.add(dl);
         }
+        final HashSet<String> thumbnailURLs = new HashSet<String>();
+        String thumbnailURLWhenLoggedIn = br.getRegex("poster:\\s*'([^<>\"\\']+)'").getMatch(0);
+        if (thumbnailURLWhenLoggedIn != null) {
+            thumbnailURLs.add(thumbnailURLWhenLoggedIn);
+        }
+        /* Not logged in: Thumbnail may be available in formats .webp and .jpg */
+        final String[] moreThumbnailURLs = br.getRegex("attr\\(\"poster\",\\s*\"([^\"]+)").getColumn(0);
+        if (moreThumbnailURLs != null && moreThumbnailURLs.length > 0) {
+            for (final String url : moreThumbnailURLs) {
+                thumbnailURLs.add(url);
+            }
+        }
+        // TODO: Add setting and only add thumbnails if wished by the user
+        if (thumbnailURLs.size() > 0 && (ignoreQualitySelection || true)) {
+            for (String thumbnailURL : thumbnailURLs) {
+                final URL url_parsed = br.getURL(thumbnailURL);
+                thumbnailURL = url_parsed.toExternalForm();
+                final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailURL));
+                final String filename = Plugin.getFileNameFromURL(url_parsed);
+                if (filename != null) {
+                    thumb.setFinalFileName(filename);
+                }
+                thumb.setAvailable(true);
+                ret.add(thumb);
+            }
+        } else {
+            /* Thumbnail should always be available */
+            logger.warning("Failed to find thumbnail URL");
+        }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);
+        if (description != null) {
+            fp.setComment(description);
+        }
         fp.addLinks(ret);
         return ret;
     }

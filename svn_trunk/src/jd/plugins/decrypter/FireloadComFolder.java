@@ -18,7 +18,9 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -26,8 +28,6 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -36,7 +36,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.FireloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 47844 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49949 $", interfaceVersion = 3, names = {}, urls = {})
 public class FireloadComFolder extends PluginForDecrypt {
     public FireloadComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,10 +68,9 @@ public class FireloadComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         final Regex folderInfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
-        final String folderID = folderInfo.getMatch(0);
+        final String addedFolderHash = folderInfo.getMatch(0);
         String folderNameFromURL = folderInfo.getMatch(1);
         if (folderNameFromURL != null) {
             folderNameFromURL = Encoding.htmlDecode(folderNameFromURL).trim();
@@ -79,9 +78,11 @@ public class FireloadComFolder extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.getURL().contains(folderID)) {
+        } else if (!br.getURL().contains(addedFolderHash)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final int maxItemsPerPage = 100;
+        final String folderIDFromHTML = br.getRegex("nodeId'\\)\\.val\\('(\\d+)'\\)").getMatch(0);
         String currentFolderName = br.getRegex("(?i)<h2>\\s*Folder \\'([^\\']+)'\\s*</h2>").getMatch(0);
         if (currentFolderName == null) {
             /* Fallback */
@@ -89,7 +90,7 @@ public class FireloadComFolder extends PluginForDecrypt {
         }
         if (currentFolderName == null) {
             /* Final fallback */
-            currentFolderName = folderID;
+            currentFolderName = addedFolderHash;
         }
         currentFolderName = Encoding.htmlDecode(currentFolderName).trim();
         String filePath = this.getAdoptedCloudFolderStructure("");
@@ -97,41 +98,85 @@ public class FireloadComFolder extends PluginForDecrypt {
             filePath += "/";
         }
         filePath += currentFolderName;
-        final String tableHTML = br.getRegex("<tbody><tr><td class=\"reponsiveMobileHide\"(.*?)</tbody>").getMatch(0);
-        if (tableHTML == null) {
+        FilePackage fp = null;
+        if (filePath != null) {
+            fp = FilePackage.getInstance();
+            fp.setName(filePath);
+        }
+        /* Customized YetiShareFolder handling */
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("url_hash", addedFolderHash);
+        query.appendEncoded("nodeId", folderIDFromHTML);
+        query.appendEncoded("filterText", "");
+        query.appendEncoded("filterOrderBy", "order_by_filename_asc");
+        query.appendEncoded("perPage", Integer.toString(maxItemsPerPage));
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        int page = 0;
+        pagination: do {
+            query.addAndReplace("pageStart", Integer.toString(page));
+            br.postPage("/ajax/_view_folder_v2_file_listing.ajax.php", query);
+            final int numberofItemsOld = ret.size();
+            final String[] fileHTMLSnippets = br.getRegex("(<li.*?</li>)").getColumn(0);
+            if (fileHTMLSnippets != null && fileHTMLSnippets.length > 0) {
+                for (final String html : fileHTMLSnippets) {
+                    final String url = new Regex(html, "dtfullurl\\s*=\\s*\"(https?[^\"]+)\"").getMatch(0);
+                    final String filename = new Regex(html, "dtfilename\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                    final String uploaddateStr = new Regex(html, "dtuploaddate\\s*=\\s*\"([^\"]+)\"").getMatch(0);
+                    final String filesizeStr = new Regex(html, "dtsizeraw\\s*=\\s*\"(\\d+)\"").getMatch(0);
+                    final String internalFileID = new Regex(html, "fileId\\s*=\\s*\"(\\d+)\"").getMatch(0);
+                    if (StringUtils.isEmpty(url) || StringUtils.isEmpty(internalFileID)) {
+                        /* Skip invalid items */
+                        continue;
+                    }
+                    final DownloadLink dl = createDownloadlink(url);
+                    if (!StringUtils.isEmpty(filename)) {
+                        dl.setName(Encoding.htmlDecode(filename).trim());
+                    }
+                    if (!StringUtils.isEmpty(filesizeStr)) {
+                        dl.setDownloadSize(Long.parseLong(filesizeStr));
+                    }
+                    dl.setProperty(org.jdownloader.plugins.components.YetiShareCore.PROPERTY_INTERNAL_FILE_ID, internalFileID);
+                    if (uploaddateStr != null) {
+                        /* 2020-11-26: For Packagizer/EventScripter - not used anywhere else. */
+                        dl.setProperty(YetiShareCore.PROPERTY_UPLOAD_DATE_RAW, uploaddateStr);
+                    }
+                    /* We know for sure that this file is online! */
+                    dl.setAvailable(true);
+                    if (filePath.length() > 0) {
+                        dl.setRelativeDownloadFolderPath(filePath);
+                    }
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                }
+            }
+            /* Now crawl subfolders inside this folder */
+            final String[] folderHashes = br.getRegex("(/folder/[a-f0-9]{32})").getColumn(0);
+            for (String folderHash : folderHashes) {
+                if (folderHash.equalsIgnoreCase(addedFolderHash)) {
+                    /* Don't re-add the folder we're just crawling! */
+                    continue;
+                }
+                final String folderURL = br.getURL(folderHash).toString();
+                final DownloadLink folder = this.createDownloadlink(folderURL);
+                /*
+                 * 2020-11-13: Not required. If a "root" folder is password-protected, all files within it are usually not password
+                 * protected (WTF) and/or can require another password which can be different. Also subfolders inside folders will usually
+                 * not require a password at all but users CAN set a (different) password on them.
+                 */
+                // folder.setDownloadPassword(passCode);
+                ret.add(folder);
+                distribute(folder);
+            }
+            final int numberofItemsAddedThisPage = ret.size() - numberofItemsOld;
+            logger.info("Crawled page " + page + "| Found items so far: " + ret.size());
+            if (numberofItemsAddedThisPage < maxItemsPerPage) {
+                logger.info("Stopping because: Reached end?");
+                break pagination;
+            }
+        } while (!this.isAbort());
+        if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final String[] htmls = tableHTML.split("<tr><td");
-        if (htmls == null || htmls.length == 0) {
-            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_FOLDER_" + filePath);
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(filePath);
-        for (final String html : htmls) {
-            String url = new Regex(html, "href=\"([^\"]+)").getMatch(0);
-            if (url == null) {
-                logger.warning("Skipping invalid HTML snippet: " + html);
-                continue;
-            }
-            /* Make full URL out of relative URL. */
-            url = br.getURL(url).toString();
-            final DownloadLink link = this.createDownloadlink(url);
-            final boolean isFolder = this.canHandle(url);
-            if (!isFolder) {
-                /* File */
-                final String filename = new Regex(html, "target=\"_blank\"[^>]*>([^<]+)</a>").getMatch(0);
-                if (filename != null) {
-                    link.setName(Encoding.htmlDecode(filename).trim());
-                }
-                final String filesize = new Regex(html, "\\&nbsp;\\&nbsp;\\(([^<\\)]+)\\)<br").getMatch(0);
-                if (filesize != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(filesize));
-                }
-                /* We know that that file is online. */
-                link.setAvailable(true);
-                link._setFilePackage(fp);
-            }
-            ret.add(link);
         }
         return ret;
     }

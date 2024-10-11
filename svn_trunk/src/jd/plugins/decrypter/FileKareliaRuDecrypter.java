@@ -33,21 +33,21 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46918 $", interfaceVersion = 2, names = { "file.karelia.ru" }, urls = { "https?://(?:www\\.)?file\\.(?:karelia|sampo)\\.ru/[a-z0-9]+/" })
+@DecrypterPlugin(revision = "$Revision: 49947 $", interfaceVersion = 2, names = { "file.karelia.ru" }, urls = { "https?://(?:www\\.)?file\\.(?:karelia|sampo)\\.ru/[a-z0-9]+/" })
 public class FileKareliaRuDecrypter extends PluginForDecrypt {
     public FileKareliaRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public static boolean isOffline(final Browser br) {
-        return br.containsHTML("(?i)>\\s*Файла не существует или он был удалён с сервера") || br.getHttpConnection().getResponseCode() == 404;
+        return br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*Файла не существует или он был удалён с сервера");
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String folderid = new Regex(param.toString(), "([a-z0-9]+)/$").getMatch(0);
-        final String parameter = String.format("http://file.karelia.ru/%s/", folderid);
-        br.getPage(parameter);
+        final String contenturl = String.format("http://file.karelia.ru/%s/", folderid);
+        br.getPage(contenturl);
         if (isOffline(this.br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -60,8 +60,8 @@ public class FileKareliaRuDecrypter extends PluginForDecrypt {
             if (singleLink == null || filename == null) {
                 continue;
             }
-            final DownloadLink dl = createDownloadlink(parameter.replace("file.karelia.ru/", "file.kareliadecrypted.ru/") + System.currentTimeMillis() + new Random().nextInt(100000));
-            dl.setContentUrl(parameter);
+            final DownloadLink dl = createDownloadlink(contenturl.replace("file.karelia.ru/", "file.kareliadecrypted.ru/") + System.currentTimeMillis() + new Random().nextInt(100000));
+            dl.setContentUrl(contenturl);
             filename = Encoding.htmlDecode(filename).trim();
             dl.setFinalFileName(filename);
             dl.setProperty("plainfilename", filename);
@@ -79,7 +79,7 @@ public class FileKareliaRuDecrypter extends PluginForDecrypt {
         /* Only add zip url if we found nothing else */
         final boolean allowAddSingleZipFile = false; // 2022-10-20: Single zip file handling is broken and not needed anymore
         if (ret.isEmpty() && allowAddSingleZipFile) {
-            final DownloadLink dl = createDownloadlink(parameter.replace("file.karelia.ru/", "file.kareliadecrypted.ru/") + System.currentTimeMillis() + new Random().nextInt(100000));
+            final DownloadLink dl = createDownloadlink(contenturl.replace("file.karelia.ru/", "file.kareliadecrypted.ru/") + System.currentTimeMillis() + new Random().nextInt(100000));
             dl.setFinalFileName(folderid + ".zip");
             dl.setLinkID(folderid);
             final String filesize = br.getRegex("общим размером <strong id=\"totalSize\">([^<>\"]*?)</strong>").getMatch(0);
@@ -90,9 +90,14 @@ public class FileKareliaRuDecrypter extends PluginForDecrypt {
             ret.add(dl);
         }
         if (ret.size() > 1) {
+            String folderTitle = br.getRegex("class=\"title\">\\s*<h2>([^<]+)</h2>").getMatch(0);
+            if (folderTitle == null) {
+                folderTitle = folderid;
+            }
+            folderTitle = Encoding.htmlDecode(folderTitle).trim();
             /* Only set packagename if we got multiple items */
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(folderid);
+            fp.setName(folderTitle);
             fp.addLinks(ret);
         }
         return ret;

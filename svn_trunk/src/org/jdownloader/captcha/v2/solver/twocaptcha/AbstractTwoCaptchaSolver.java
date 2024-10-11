@@ -2,6 +2,7 @@ package org.jdownloader.captcha.v2.solver.twocaptcha;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.uio.MessageDialogInterface;
 import org.appwork.uio.UIOManager;
@@ -14,6 +15,8 @@ import org.jdownloader.captcha.v2.solver.CESChallengeSolver;
 import org.jdownloader.captcha.v2.solver.CESSolverJob;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.logging.LogController;
+
+import jd.http.Browser;
 
 public abstract class AbstractTwoCaptchaSolver<T> extends CESChallengeSolver<T> {
     private String                            accountStatusString;
@@ -34,6 +37,15 @@ public abstract class AbstractTwoCaptchaSolver<T> extends CESChallengeSolver<T> 
         config = JsonConfig.create(TwoCaptchaConfigInterface.class);
         logger = LogController.getInstance().getLogger(TwoCaptchaSolver.class.getName());
         threadPool.allowCoreThreadTimeOut(true);
+    }
+
+    public Browser createNewBrowserInstance() {
+        final Browser br = new Browser();
+        br.setReadTimeout(5 * 60000);
+        br.setFollowRedirects(true);
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
+        br.setLogger(this.logger);
+        return br;
     }
 
     public synchronized void dellong_debuglog() {
@@ -71,24 +83,13 @@ public abstract class AbstractTwoCaptchaSolver<T> extends CESChallengeSolver<T> 
         return queryPoll;
     }
 
-    protected UrlQuery createQueryForUpload(CESSolverJob<T> job, RequestOptions options, final byte[] data) throws SolverException {
-        final UrlQuery q = new UrlQuery();
-        q.appendEncoded("key", config.getApiKey() + "");
-        q.appendEncoded("method", "base64");
-        q.appendEncoded("json", "1");
-        if (data != null) {
-            q.appendEncoded("body", org.appwork.utils.encoding.Base64.encodeToString(data, false));
-        }
-        return q;
-    }
-
     protected RequestOptions prepare(CESSolverJob<T> solverJob) throws SolverException, InterruptedException {
         RequestOptions options = new RequestOptions();
         validateApiKey(solverJob);
         return options;
     }
 
-    protected void validateApiKey(CESSolverJob<T> job) throws SolverException {
+    protected void validateApiKey(final CESSolverJob<T> job) throws SolverException {
         if (!config.getApiKey().matches("^[a-f0-9]{32}$")) {
             showMessageAndQuit("2Captcha.com Error", "API Key is not correct!" + "\n" + "Needs to match [a-f0-9]{32}.");
         }

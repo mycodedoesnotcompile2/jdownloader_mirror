@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -894,6 +894,38 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    /** Return error text displayed on website if an account is needed to download specific files. */
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        final List<String> texts = new ArrayList<String>();
+        texts.add("The file you requested reached max downloads");
+        texts.add("This file reached max downloads");
+        texts.add("Available Only for Premium Members");
+        texts.add("File is available only for Premium users");
+        texts.add("Please Buy Premium To download");
+        texts.add("This file is not available for free download");
+        texts.add("Only Premium user can download this file");
+        /* 2019-05-30: Example: xvideosharing.com */
+        texts.add("This video is available for Premium users only");
+        String msg = null;
+        for (final String text : texts) {
+            msg = br.getRegex(">(\\s*" + Pattern.quote(text) + "[^<]*)").getMatch(0);
+            if (msg != null) {
+                break;
+            }
+        }
+        if (msg == null) {
+            msg = br.getRegex(">((\\s*Sorry\\s*,)?\\s*This file (can|only can|can only) be downloaded by[^<]+)").getMatch(0);
+            if (msg == null) {
+                /* class="err">You can download files up to 1 Mb only.<br>Upgrade your account to download bigger files.</div> */
+                msg = br.getRegex(">\\s*(You can download files up to \\d+ [^<]*)").getMatch(0);
+            }
+        }
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+        }
+        return msg;
+    }
+
     /**
      * Checks premiumonly status via current Browser-HTML AND URL via isPremiumOnlyURL.
      *
@@ -901,16 +933,18 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      *         false: Link is downloadable for all users.
      */
     public boolean isPremiumOnly(final Browser br) {
-        if (br == null) {
-            return false;
+        if (isPremiumOnlyURL(br)) {
+            return true;
         }
-        final boolean premiumonly_by_url = isPremiumOnlyURL(br);
-        final String premiumonly_filehost_regex = "( can download files up to |>\\s*Upgrade your account to download (?:larger|bigger) files|>\\s*The file you requested reached max downloads limit for Free Users|Please Buy Premium To download this file\\s*<|>\\s*This file reached max downloads limit|>\\s*This file is available for\\s*(<[^>]*>)?\\s*Premium Users only|>\\s*Available Only for Premium Members|>\\s*File is available only for Premium users|>(\\s*Sorry\\s*,)?\\s*This file (can|only can|can only) be downloaded by)";
-        final String premiumonly_videohost_regex = ">\\s*This video is available for Premium users only";
-        final boolean premiumonly_filehost = br.getRegex(premiumonly_filehost_regex).patternFind();
-        /* 2019-05-30: Example: xvideosharing.com */
-        final boolean premiumonly_videohost = br.containsHTML(premiumonly_videohost_regex);
-        return premiumonly_by_url || premiumonly_filehost || premiumonly_videohost;
+        final String premiumonly_filehost_regex = "( can download files up to |>\\s*This file is available for\\s*(<[^>]*>)?\\s*Premium Users only)";
+        if (br.getRegex(premiumonly_filehost_regex).patternFind()) {
+            return true;
+        }
+        final String msg = getPremiumOnlyErrorMessage(br);
+        if (msg != null) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -918,8 +952,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
      *         false: Downloadserver is not in maintenance mode and should be possible.
      */
     protected boolean isServerUnderMaintenance(final Browser br) {
-        final String pattern = "(?i)>\\s*This server is in maintenance mode";
-        return br.getHttpConnection().getResponseCode() == 500 || (br.containsHTML(pattern) && new Regex(correctBR(br), pattern).patternFind());
+        return br.getHttpConnection().getResponseCode() == 500 || br.containsHTML(">\\s*This server is in maintenance mode");
     }
 
     protected boolean isOffline(final DownloadLink link, final Browser br) {
@@ -995,6 +1028,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (this.looksLikeDownloadableContent(con)) {
                 final long completeContentLength = con.getCompleteContentLength();
                 if (completeContentLength >= 0 && completeContentLength < 100) {
+                    logger.info("File looks to be too small");
                     br.followConnection();
                     runPostRequestTask(br);
                     correctBR(br);
@@ -1007,15 +1041,9 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         link.setVerifiedFileSize(completeContentLength);
                     }
                 }
-                final String headerFilename = Plugin.getFileNameFromDispositionHeader(con);
-                if (!StringUtils.isEmpty(headerFilename)) {
-                    link.setFinalFileName(headerFilename);
-                } else {
-                    final String filenameFromURL = Plugin.getFileNameFromURL(con.getURL());
-                    if (filenameFromURL != null) {
-                        /* Fallback */
-                        link.setFinalFileName(filenameFromURL);
-                    }
+                final String connectionFilename = Plugin.getFileNameFromConnection(con);
+                if (!StringUtils.isEmpty(connectionFilename)) {
+                    link.setFinalFileName(connectionFilename);
                 }
                 storeDirecturl(link, account, con.getURL().toExternalForm());
                 return true;
@@ -4073,14 +4101,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Error happened when generating Download Link'", 10 * 60 * 1000l);
         }
         /** Error handling for premiumonly links */
-        if (isPremiumOnly(br)) {
-            String filesizelimit = new Regex(html, "You can download files up to(.*?)only").getMatch(0);
-            if (filesizelimit != null) {
-                filesizelimit = filesizelimit.trim();
-                throw new AccountRequiredException("(Premium) account required  to download files bigger than " + filesizelimit);
-            } else {
-                throw new AccountRequiredException();
-            }
+        final String premiumOnlyMessage = this.getPremiumOnlyErrorMessage(br);
+        if (premiumOnlyMessage != null) {
+            throw new AccountRequiredException(premiumOnlyMessage);
+        } else if (isPremiumOnly(br)) {
+            throw new AccountRequiredException();
         } else if (new Regex(html, "(?i)>\\s*Expired download session").patternFind()) {
             /* Rare error */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Expired download session'", 10 * 60 * 1000l);

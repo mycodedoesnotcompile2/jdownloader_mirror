@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 49578 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49949 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -187,7 +187,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         return crawlProcessFolderNEW(param, br, param.getCryptedUrl(), currentFolderID);
     }
 
-    private ArrayList<DownloadLink> crawlProcessFolderNEW(final CryptedLink param, final Browser br, final String contenturl, final String currentFolderID) throws Exception {
+    private ArrayList<DownloadLink> crawlProcessFolderNEW(final CryptedLink param, final Browser br, final String contenturl, final String addedFolderHash) throws Exception {
         // final String expectedMaxNumberofItemsPerPage = br.getRegex("var perPage = (\\d+);").getMatch(0);
         final UrlQuery folderquery = new UrlQuery();
         final String folderIDFromHTML = br.getRegex("loadImages\\('folder', '(\\d+)'").getMatch(0);
@@ -196,6 +196,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             throw new AccountRequiredException();
         }
+        final int maxItemsPerPage = 100;
         if (folderIDFromHTML != null) {
             folderquery.add("pageType", "folder");
             folderquery.add("nodeId", folderIDFromHTML);
@@ -203,7 +204,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             folderquery.add("pageType", "nonaccountshared");
             folderquery.add("nodeId", "");
         }
-        folderquery.add("perPage", "0");
+        folderquery.add("perPage", Integer.toString(maxItemsPerPage));
         folderquery.add("filterOrderBy", "");
         folderquery.add("additionalParams%5BsearchTerm%5D", "");
         folderquery.add("additionalParams%5BfilterUploadedDateRange%5D", "");
@@ -278,11 +279,12 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             logger.warning("Failed to find absolute folder path");
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        do {
+        pagination: do {
             logger.info("Crawling page: " + page);
             /* 2021-04-30: "</div></div>" when loggedin */
+            final int numberofResultsOld = ret.size();
             final String[] fileHTMLSnippets = br.getRegex("<div[^>]*(dttitle.*?)(?:</span></div>|</div></div>)").getColumn(0);
-            if (fileHTMLSnippets.length > 0) {
+            if (fileHTMLSnippets != null && fileHTMLSnippets.length > 0) {
                 for (final String html : fileHTMLSnippets) {
                     final String url = new Regex(html, "dtfullurl\\s*=\\s*\"(https?[^\"]+)\"").getMatch(0);
                     final String filename = new Regex(html, "dtfilename\\s*=\\s*\"([^\"]+)\"").getMatch(0);
@@ -295,7 +297,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                     }
                     final DownloadLink dl = createDownloadlink(url);
                     if (!StringUtils.isEmpty(filename)) {
-                        dl.setName(filename);
+                        dl.setName(Encoding.htmlDecode(filename).trim());
                     }
                     if (!StringUtils.isEmpty(filesizeStr)) {
                         dl.setDownloadSize(Long.parseLong(filesizeStr));
@@ -322,25 +324,29 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             }
             /* Now crawl subfolders inside this folder */
             final String[] folderHashes = br.getRegex("(/folder/[a-f0-9]{32})").getColumn(0);
-            for (String folderHash : folderHashes) {
-                if (folderHash.equalsIgnoreCase(currentFolderID)) {
-                    /* Don't re-add the folder we're just crawling! */
-                    continue;
+            if (folderHashes != null && folderHashes.length > 0) {
+                for (String folderHash : folderHashes) {
+                    if (folderHash.equalsIgnoreCase(addedFolderHash)) {
+                        /* Don't re-add the folder we're just crawling! */
+                        continue;
+                    }
+                    final String folderURL = br.getURL(folderHash).toString();
+                    final DownloadLink folder = this.createDownloadlink(folderURL);
+                    /*
+                     * 2020-11-13: Not required. If a "root" folder is password-protected, all files within it are usually not password
+                     * protected (WTF) and/or can require another password which can be different. Also subfolders inside folders will
+                     * usually not require a password at all but users CAN set a (different) password on them.
+                     */
+                    // folder.setDownloadPassword(passCode);
+                    ret.add(folder);
+                    distribute(folder);
                 }
-                final String folderURL = br.getURL(folderHash).toString();
-                final DownloadLink folder = this.createDownloadlink(folderURL);
-                /*
-                 * 2020-11-13: Not required. If a "root" folder is password-protected, all files within it are usually not password
-                 * protected (WTF) and/or can require another password which can be different. Also subfolders inside folders will usually
-                 * not require a password at all but users CAN set a (different) password on them.
-                 */
-                // folder.setDownloadPassword(passCode);
-                ret.add(folder);
-                distribute(folder);
             }
-            if (fileHTMLSnippets.length == 0 && folderHashes.length == 0) {
-                logger.info("Stopping because failed to find any items on current page");
-                break;
+            final int numberofItemsNewThisPage = ret.size() - numberofResultsOld;
+            logger.info("Crawled page " + page + " | New this page: " + numberofItemsNewThisPage + " | Total so far: " + ret.size());
+            if (numberofItemsNewThisPage < maxItemsPerPage) {
+                logger.info("Stopping because: Reached end?");
+                break pagination;
             }
             final String nextpageStr = br.getRegex("onClick=\"loadImages\\('(?:folder|nonaccountshared)', '\\d+', (\\d+),[^\\)]+\\); return false;\"><span>Next</span>").getMatch(0);
             /* Only continue if found page matches expected page! */
@@ -351,16 +357,17 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                 entries = restoreFromString(br.toString(), TypeRef.MAP);
                 htmlInsideJson = (String) entries.get("html");
                 br.getRequest().setHtmlCode(htmlInsideJson);
+                continue pagination;
             } else {
                 /* We should be on the last page */
-                logger.info("Failed to find nextpage -> Stopping");
-                break;
+                logger.info("Stopping because: Failed to find nextpage -> Stopping");
+                break pagination;
             }
         } while (!this.isAbort());
         if (ret.isEmpty()) {
             String offlineName;
-            if (currentFolderID != null) {
-                offlineName = currentFolderID;
+            if (addedFolderHash != null) {
+                offlineName = addedFolderHash;
             } else {
                 offlineName = br._getURL().getPath();
             }

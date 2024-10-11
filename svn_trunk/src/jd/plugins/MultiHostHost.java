@@ -109,12 +109,6 @@ public class MultiHostHost {
         this.isUnlimitedLinks = false;
     }
 
-    /** Only use this when linksMax is given!! */
-    public void setLinksUsed(long num) {
-        this.linksLeft = this.linksMax - num;
-        this.isUnlimitedLinks = false;
-    }
-
     public long getTrafficLeft() {
         return trafficLeft;
     }
@@ -132,13 +126,6 @@ public class MultiHostHost {
     public void setTrafficMax(long bytes) {
         // TODO: review this
         this.trafficMax = bytes;
-        this.isUnlimitedTraffic = false;
-    }
-
-    /** Only use this if trafficMax has been set before!! */
-    public void setTrafficUsed(long bytes) {
-        // TODO: review this
-        this.trafficLeft = this.trafficMax - bytes;
         this.isUnlimitedTraffic = false;
     }
 
@@ -162,8 +149,20 @@ public class MultiHostHost {
         return isUnlimitedLinks == null || isUnlimitedLinks.booleanValue();
     }
 
+    public void setUnlimitedLinks(Boolean param) {
+        this.isUnlimitedLinks = param;
+        this.linksLeft = -1;
+        this.linksMax = -1;
+    }
+
     public boolean isUnlimitedTraffic() {
         return isUnlimitedTraffic == null || isUnlimitedTraffic.booleanValue();
+    }
+
+    public void setUnlimitedTraffic(Boolean param) {
+        this.isUnlimitedTraffic = param;
+        this.trafficLeft = -1;
+        this.trafficMax = -1;
     }
 
     @Deprecated

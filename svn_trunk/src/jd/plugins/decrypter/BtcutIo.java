@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperCrawlerPluginHCaptcha;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -34,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49071 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49946 $", interfaceVersion = 3, names = {}, urls = {})
 public class BtcutIo extends PluginForDecrypt {
     public BtcutIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,6 +52,7 @@ public class BtcutIo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "btcut.io", "psa.btcut.io" });
+        // ret.add(new String[] { "ez4short.com" });
         return ret;
     }
 
@@ -84,16 +86,23 @@ public class BtcutIo extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String adSessionInitLink = br.getRegex("fetch\\('(https?://[^']+\\?sessionId=[a-f0-9]+)'").getMatch(0);
+        if (adSessionInitLink != null) {
+            final Browser brc = br.cloneBrowser();
+            brc.getPage(adSessionInitLink);
+        }
         final String additionalParam = br.getRegex("var url8j = \"(https?://[^\"]+)\";").getMatch(0);
         /* https://www.google.es/url... */
-        String googleLink = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(https?://[^\"]+)").getMatch(0);
-        if (additionalParam != null && !googleLink.contains("url8j=")) {
-            googleLink += "&url8j=" + Encoding.urlEncode(additionalParam);
+        String htmlRefresh = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(https?://[^\"]+)").getMatch(0);
+        if (additionalParam != null && !htmlRefresh.contains("url8j=")) {
+            htmlRefresh += "&url8j=" + Encoding.urlEncode(additionalParam);
         }
-        br.getPage(googleLink);
+        br.getPage(htmlRefresh);
         /* Goes to tiktokcounter.net */
         final String jsredirect = br.getRegex("var redirectUrl='(https?://[^\"\\']+)").getMatch(0);
-        br.getPage(jsredirect);
+        if (jsredirect != null) {
+            br.getPage(jsredirect);
+        }
         if (additionalParam != null) {
             /* TODO: This next step shouldn't be needed */
             final String path = br._getURL().getPath();
@@ -101,10 +110,9 @@ public class BtcutIo extends PluginForDecrypt {
         }
         /* Redirect to the next fake blog page */
         final String nextRedirect = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);
-        if (nextRedirect == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (nextRedirect != null) {
+            br.getPage(nextRedirect);
         }
-        br.getPage(nextRedirect);
         final String validatorName = br.getRegex("el\\.name = \"(validator\\d+)\";").getMatch(0);
         if (validatorName == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -118,6 +126,11 @@ public class BtcutIo extends PluginForDecrypt {
         String finalresult = null;
         for (int i = 0; i <= 4; i++) {
             logger.info("Loop: " + i);
+            if (CaptchaHelperCrawlerPluginHCaptcha.containsHCaptcha(br)) {
+                final String hcaptchaResponse = new CaptchaHelperCrawlerPluginHCaptcha(this, br).getToken();
+                continueform.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
+                continueform.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
+            }
             br.submitForm(continueform);
             finalresult = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);
             if (finalresult != null) {

@@ -27,12 +27,10 @@ import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
-import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -182,12 +180,23 @@ public class UbiqfileCom extends XFileSharingProBasic {
         /* 2019-06-27: Special */
         return false;
     }
+    // @Override
+    // protected String getPremiumOnlyErrorMessage(final Browser br) {
+    // String msg = br.getRegex(">\\s*(This file is not available for free download[^<]*)").getMatch(0);
+    // if (msg != null) {
+    // msg = Encoding.htmlDecode(msg).trim();
+    // return msg;
+    // } else {
+    // return super.getPremiumOnlyErrorMessage(br);
+    // }
+    // }
 
     @Override
-    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
-        super.checkErrors(br, html, link, account, checkAll);
-        if (br.containsHTML("(?i)>\\s*This file is not available for free download")) {
-            throw new AccountRequiredException();
+    public boolean isPremiumOnly(final Browser br) {
+        if (br.containsHTML(">\\s*This file is not available for free download")) {
+            return true;
+        } else {
+            return super.isPremiumOnly(br);
         }
     }
 }

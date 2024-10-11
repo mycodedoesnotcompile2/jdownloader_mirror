@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48304 $", interfaceVersion = 2, names = { "500px.com" }, urls = { "https?://(?:www\\.)?500px\\.com/p/([^/\\?]+).*" })
+@DecrypterPlugin(revision = "$Revision: 49949 $", interfaceVersion = 2, names = { "500px.com" }, urls = { "https?://(?:www\\.)?500px\\.com/p/([^/\\?&]+).*" })
 public class FivehundretPxComCrawler extends PluginForDecrypt {
     public FivehundretPxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,12 +83,16 @@ public class FivehundretPxComCrawler extends PluginForDecrypt {
         }
         synchronized (USER_ID_MAP) {
             String userID = getUserID(username);
-            if (userID == null) {
+            findUserID: if (userID == null) {
                 userID = "";
                 final Browser brc = br.cloneBrowser();
                 brc.getPage("https://api.500px.com/v1/users/search?term=" + URLEncode.encodeURIComponent(username));
                 final Map<String, Object> map = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Map<String, Object>> users = (List<Map<String, Object>>) map.get("users");
+                if (users == null || users.size() == 0) {
+                    logger.info("Bad userID response");
+                    break findUserID;
+                }
                 for (Map<String, Object> user : users) {
                     final String realUserName = StringUtils.valueOfOrNull(user.get("username"));
                     if (username.equalsIgnoreCase(realUserName)) {

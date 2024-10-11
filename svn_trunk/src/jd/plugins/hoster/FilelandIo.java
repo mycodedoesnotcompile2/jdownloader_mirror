@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilelandIo extends XFileSharingProBasic {
     public FilelandIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -110,6 +110,20 @@ public class FilelandIo extends XFileSharingProBasic {
     protected boolean supports_availablecheck_filesize_html() {
         return false;
     }
+    // @Override
+    // protected String getPremiumOnlyErrorMessage(final Browser br) {
+    // String msg = br.getRegex("<span>\\s*(You're attempting to download a.*?)<br>\\s*</span>\\s*<br>").getMatch(0);
+    // if (msg != null) {
+    // msg = Encoding.htmlDecode(msg);
+    // final String filePrice = br.getRegex("(File Price:\\s*\\$\\d+\\.\\d+)").getMatch(0);
+    // if (filePrice != null) {
+    // msg += "\r\n" + filePrice;
+    // }
+    // return msg;
+    // } else {
+    // return super.getPremiumOnlyErrorMessage(br);
+    // }
+    // }
 
     @Override
     public boolean isPremiumOnly(final Browser br) {

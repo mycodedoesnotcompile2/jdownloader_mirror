@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/ */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -188,7 +188,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             mhost.setTrafficMax(Math.min(daily_quota_total, weekly_quota_total));
             mhost.setTrafficLeft(Math.min(daily_quota_left, weekly_quota_left));
             mhost.setLinksMax(((Number) hoster.get("daily_links_limit")).intValue());
-            mhost.setLinksUsed(((Number) hoster.get("daily_links_used")).intValue());
+            mhost.setLinksLeft(mhost.getLinksMax() - ((Number) hoster.get("daily_links_used")).intValue());
             /* Double check for reached limit */
             if (((Number) hoster.get("percentage_used")).intValue() >= 100) {
                 mhost.setTrafficLeft(0);
@@ -259,7 +259,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         accountErrorsTemporary.add("LINK_GENERATION_LIMIT_EXCEEDED");
         accountErrorsTemporary.add("PREMIUM_TRAFFIC_UNAVAILABLE");
         accountErrorsTemporary.add("RATE_LIMIT_EXCEEDED");
-        accountErrorsTemporary.add("SERVER_TRAFFIC_LIMIT_REACHED");
         accountErrorsTemporary.add("TRAFFIC_LIMIT_EXCEEDED");
         accountErrorsTemporary.add("USER_QUOTA_EXCEEDED");
         accountErrorsTemporary.add("WEEKLY_LIMIT_EXCEEDED");
@@ -271,6 +270,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         downloadErrorsHostUnavailable.add("HOSTER_NOT_AVAILABLE_BY_API");
         downloadErrorsHostUnavailable.add("HOSTER_TEMPORARILY_UNAVAILABLE");
         downloadErrorsHostUnavailable.add("UNSUPPORTED_HOSTER");
+        downloadErrorsHostUnavailable.add("SERVER_TRAFFIC_LIMIT_REACHED");
         final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
         downloadErrorsFileUnavailable.add("BAD_LINK");
         downloadErrorsFileUnavailable.add("FILESIZE_LIMIT");
@@ -283,7 +283,11 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         downloadErrorsFileUnavailable.add("MUST_BE_PREMIUM");
         downloadErrorsFileUnavailable.add("RESOURCE_RETRIEVAL_FAILURE");
         final String message = entries.get("message").toString();
-        final String errorcode = entries.get("category_error").toString();
+        String errorcode = (String) entries.get("category_error");
+        if (errorcode == null) {
+            /* 2024-10-10: Looks like both version of this key exist */
+            errorcode = entries.get("error_category").toString();
+        }
         if (accountErrorsPermanent.contains(errorcode)) {
             throw new AccountInvalidException(message);
         } else if (accountErrorsTemporary.contains(errorcode)) {

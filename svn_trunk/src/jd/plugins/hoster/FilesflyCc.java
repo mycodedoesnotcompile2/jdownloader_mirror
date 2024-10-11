@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47897 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilesflyCc extends XFileSharingProBasic {
     public FilesflyCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -90,6 +90,20 @@ public class FilesflyCc extends XFileSharingProBasic {
             return 1;
         }
     }
+    // @Override
+    // protected String getPremiumOnlyErrorMessage(final Browser br) {
+    // String msg = br.getRegex("<h5><p style=\"color:#b30000\">(.*?)</p></h4>").getMatch(0);
+    // if (msg != null) {
+    // msg = Encoding.htmlDecode(msg);
+    // final String filePrice = br.getRegex("File price:\\s*<strong>(\\d+\\.\\d{2} USD)").getMatch(0);
+    // if (filePrice != null) {
+    // msg += "\r\nFile Price: " + filePrice;
+    // }
+    // return msg;
+    // } else {
+    // return super.getPremiumOnlyErrorMessage(br);
+    // }
+    // }
 
     @Override
     public boolean isPremiumOnly(final Browser br) {

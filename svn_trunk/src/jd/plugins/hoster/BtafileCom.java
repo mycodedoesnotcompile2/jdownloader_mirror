@@ -21,14 +21,12 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48654 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49946 $", interfaceVersion = 3, names = {}, urls = {})
 public class BtafileCom extends XFileSharingProBasic {
     public BtafileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -105,18 +103,5 @@ public class BtafileCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return 1;
-    }
-
-    @Override
-    public boolean isPremiumOnly(final Browser br) {
-        /* 2020-05-08: Special */
-        boolean premiumonly = super.isPremiumOnly(br);
-        if (!premiumonly) {
-            premiumonly = br.containsHTML(">\\s*This file reached max free downloads limit");
-            if (!premiumonly) {
-                premiumonly = new Regex(getCorrectBR(br), ">\\s*This file reached max free downloads limit").patternFind();
-            }
-        }
-        return premiumonly;
     }
 }

@@ -49,7 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49247 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -145,7 +145,7 @@ public class SendCm extends XFileSharingProBasic {
     public AvailableStatus requestFileInformationWebsite(final DownloadLink link, Account account, final boolean isDownload) throws Exception {
         final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
         // 2023-04-12: MD5 seems to be base64 encoded but doesn't match, maybe just fake info?!*/
-        final String sha256 = br.getRegex("(?i)SHA-256\\s*:\\s*</b>\\s*([a-f0-9]{64})\\s*</span>").getMatch(0);
+        final String sha256 = br.getRegex("SHA-256\\s*:\\s*</b>\\s*([a-f0-9]{64})\\s*</span>").getMatch(0);
         if (sha256 != null) {
             link.setSha256Hash(sha256);
         }
@@ -248,13 +248,13 @@ public class SendCm extends XFileSharingProBasic {
         if (betterFilename == null) {
             betterFilename = br.getRegex("data-feather\\s*=\\s*\"file\"[^>]*>\\s*</i>\\s*([^<]*?)\\s*</h\\d+>").getMatch(0);
             if (betterFilename == null) {
-                betterFilename = br.getRegex("(?i)\\&text=([^\"]+)\" target=\"_blank\">\\s*Share on Telegram").getMatch(0);
+                betterFilename = br.getRegex("\\&text=([^\"]+)\" target=\"_blank\">\\s*Share on Telegram").getMatch(0);
             }
         }
         if (betterFilename != null) {
             fileInfo[0] = betterFilename;
         }
-        final String betterFilesize = br.getRegex("(?i)id=\"downloadbtn[>]*><i [^>]*></i>\\s*Download \\[([^<\\]]+)\\]</button>").getMatch(0);
+        final String betterFilesize = br.getRegex("id=\"downloadbtn[>]*><i [^>]*></i>\\s*Download \\[([^<\\]]+)\\]</button>").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }
@@ -284,7 +284,7 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     public boolean isPremiumOnly(final Browser br) {
-        if (br.containsHTML("(?i)>\\s*This file is available for")) {
+        if (br.containsHTML(">\\s*This file is available for")) {
             /* 2022-10-04 */
             return true;
         } else {
@@ -326,7 +326,7 @@ public class SendCm extends XFileSharingProBasic {
 
     @Override
     protected String regexAPIKey(final Browser br) {
-        final String apikey = br.getRegex("(?i)<span class=\"input-group-text\"[^>]*>\\s*([a-z0-9]{20,})\\s*</span>").getMatch(0);
+        final String apikey = br.getRegex("<span class=\"input-group-text\"[^>]*>\\s*([a-z0-9]{20,})\\s*</span>").getMatch(0);
         if (apikey != null) {
             return apikey;
         } else {

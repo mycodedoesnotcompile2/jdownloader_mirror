@@ -2,6 +2,7 @@ package org.jdownloader.captcha.v2.solver.twocaptcha;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
@@ -33,8 +34,7 @@ import jd.http.Browser;
 import jd.http.requests.PostRequest;
 
 public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
-    private static final TwoCaptchaSolver INSTANCE     = new TwoCaptchaSolver();
-    private static final String           WEBSITE_BASE = "https://2captcha.com";
+    private static final TwoCaptchaSolver INSTANCE = new TwoCaptchaSolver();
 
     public static TwoCaptchaSolver getInstance() {
         return INSTANCE;
@@ -70,34 +70,48 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
     protected void solveCES(CESSolverJob<String> job) throws InterruptedException, SolverException {
         final Challenge<String> captchaChallenge = job.getChallenge();
         try {
+            final Map<String, Object> v2postdata = new HashMap<String, Object>(); // APIv2
+            v2postdata.put("clientKey", config.getApiKey());
+            final Map<String, Object> v2task = new HashMap<String, Object>(); // APIv2
             final UrlQuery q = new UrlQuery();
             q.appendEncoded("key", config.getApiKey());
             q.appendEncoded("json", "1");
             q.appendEncoded("soft_id", getSoftID());
             if (captchaChallenge instanceof RecaptchaV2Challenge) {
                 final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
+                v2task.put("type", "RecaptchaV2TaskProxyless");
+                v2task.put("websiteKey", challenge.getSiteKey());
+                v2task.put("websiteURL", challenge.getSiteUrl());
                 q.appendEncoded("googlekey", challenge.getSiteKey());
                 q.appendEncoded("pageurl", challenge.getSiteUrl());
                 final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
                 if (recaptchaChallenge != null) {
                     if (challenge.isEnterprise()) {
+                        v2task.put("isEnterprise", true);
                         q.appendEncoded("enterprise", "1");
                     }
                     final Map<String, Object> action = challenge.getV3Action();
                     if (action != null && action.containsKey("action")) {
+                        v2task.put("type", "RecaptchaV3TaskProxyless");
+                        v2task.put("pageAction", String.valueOf(action.get("action")));
                         q.appendEncoded("version", "v3");
                         q.appendEncoded("action", String.valueOf(action.get("action")));
                     } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
                         q.appendEncoded("invisible", "1");
+                        v2task.put("isInvisible", true);
                     }
                 }
             } else if (captchaChallenge instanceof HCaptchaChallenge) {
                 final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
+                v2task.put("type", "HCaptchaTaskProxyless");
+                v2task.put("websiteURL", challenge.getSiteUrl());
+                v2task.put("websiteKey", challenge.getSiteKey());
                 q.appendEncoded("method", "hcaptcha");
                 q.appendEncoded("sitekey", challenge.getSiteKey());
                 q.appendEncoded("pageurl", challenge.getSiteUrl());
                 final AbstractHCaptcha<?> hCaptcha = challenge.getAbstractCaptchaHelperHCaptcha();
                 if (hCaptcha != null && AbstractHCaptcha.TYPE.INVISIBLE.equals(hCaptcha.getType())) {
+                    v2task.put("isInvisible", true);
                     q.appendEncoded("invisible", "1");
                 }
             } else if (captchaChallenge instanceof CutCaptchaChallenge) {
@@ -108,6 +122,10 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
                 q.appendEncoded("misery_key", challenge.getSiteKey());
                 q.appendEncoded("api_key", challenge.getApiKey());
                 q.appendEncoded("pageurl", challenge.getSiteUrl());
+                v2task.put("type", "CutCaptchaTaskProxyless");
+                v2task.put("miseryKey", challenge.getSiteKey());
+                v2task.put("apiKey", challenge.getApiKey());
+                v2task.put("websiteURL", challenge.getSiteUrl());
             } else {
                 /* Image captcha: https://2captcha.com/api-docs/normal-captcha */
                 final ImageCaptchaChallenge challenge = (ImageCaptchaChallenge<String>) job.getChallenge();
@@ -117,218 +135,72 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
                 if (challenge.getExplain() != null) {
                     q.appendEncoded("comment", challenge.getExplain());
                 }
+                v2task.put("type", "ImageToTextTask");
+                v2task.put("body", Base64.encodeToString(data, false));
+                v2task.put("comment", challenge.getExplain());
             }
+            boolean clickCaptcha = false;
+            if (clickCaptcha) {
+                v2task.put("type", "CoordinatesTask");
+                // v2task.put("body", Base64.encodeToString(data, false));
+                // v2task.put("comment", challenge.getExplain());
+                /* We want a single set of coordinates -> One click */
+                v2task.put("maxClicks", 1);
+            }
+            v2postdata.put("task", v2task);
             job.showBubble(this);
             checkInterruption();
             job.getChallenge().sendStatsSolving(this);
             job.setStatus(SolverStatus.SOLVING);
             /* Submit captcha */
-            final Browser br = new Browser();
-            br.setReadTimeout(5 * 60000);
-            final String json = br.postPage(WEBSITE_BASE + "/in.php", q);
-            final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
+            final Browser br = this.createNewBrowserInstance();
+            final PostRequest req_createTask = br.createJSonPostRequest(this.getApiBaseV2() + "/createTask", v2postdata);
+            br.getPage(req_createTask);
+            final BalanceResponse resp_createTask = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
             });
-            if (response.getStatus() != 1) {
-                throw new IOException("Captcha image upload failure");
+            if (resp_createTask.getErrorId() != 0) {
+                throw new IOException("Captcha image upload failure, status: " + resp_createTask.getStatus());
             }
-            final String id = response.getRequest();
+            final String id = resp_createTask.getTaskId();
+            final Map<String, Object> postdata_getTaskResult = new HashMap<String, Object>();
+            postdata_getTaskResult.put("clientKey", this.config.getApiKey());
+            postdata_getTaskResult.put("taskId", id);
             job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 10)));
             while (job.getJob().isAlive() && !job.getJob().isSolved()) {
                 checkInterruption();
-                final UrlQuery queryPoll = createQueryForPolling();
-                queryPoll.appendEncoded("id", id);
-                final String ret = br.getPage(WEBSITE_BASE + "/res.php?" + queryPoll.toString());
-                logger.info(ret);
-                if (StringUtils.equalsIgnoreCase(ret, "CAPCHA_NOT_READY")) {
+                final PostRequest req_getTaskResult = br.createJSonPostRequest(this.getApiBaseV2() + "/getTaskResult", postdata_getTaskResult);
+                br.getPage(req_getTaskResult);
+                final BalanceResponse resp_getTaskResult = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
+                });
+                logger.info(br.getRequest().getHtmlCode());
+                final String status = resp_getTaskResult.getStatus();
+                if (status.equals("processing")) {
                     Thread.sleep(5000);
                     continue;
-                } else if (StringUtils.startsWithCaseInsensitive(ret, "OK|")) {
-                    job.setAnswer(new TwoCaptchaResponse(captchaChallenge, this, id, ret.substring(3)));
+                } else if (status.equals("ready")) {
+                    final Solution solution = resp_getTaskResult.getSolution();
+                    final String resultText;
+                    if (solution.getgRecaptchaResponse() != null) {
+                        resultText = solution.getgRecaptchaResponse();
+                    } else if (solution.getToken() != null) {
+                        resultText = solution.getToken();
+                    } else if (solution.getCorrdinates() != null && solution.getCorrdinates().size() > 0) {
+                        // TODO
+                        resultText = "TODO";
+                    } else {
+                        resultText = solution.getText();
+                    }
+                    job.setAnswer(new TwoCaptchaResponse(captchaChallenge, this, id, resultText));
+                    return;
+                } else {
+                    throw new IOException("Captcha task polling failure, status: " + status);
                 }
-                return;
             }
         } catch (IOException e) {
             job.getChallenge().sendStatsError(this, e);
             job.getLogger().log(e);
         } finally {
             System.out.println(1);
-        }
-    }
-
-    /**
-     * https://2captcha.com/2captcha-api#error_handling
-     *
-     * @param job
-     * @param challenge
-     * @param response
-     * @return
-     * @throws InterruptedException
-     * @throws Exception
-     */
-    private boolean handleResponse(final CESSolverJob<String> job, final String challengeID, final String challengeResponse) throws InterruptedException, Exception {
-        if ("CAPCHA_NOT_READY".equals(challengeResponse)) {
-            Thread.sleep(5000);
-            return false;
-        } else if ("ERROR_CAPTCHA_UNSOLVABLE".equals(challengeResponse)) {
-            return true;
-        } else if ("IP_BANNED".equals(challengeResponse)) {
-            throw new Exception(challengeResponse);
-        } else if (challengeResponse.startsWith("ERROR")) {
-            throw new Exception(challengeResponse);
-        } else if (challengeResponse.startsWith("OK|")) {
-            job.setAnswer(new TwoCaptchaResponse(job.getChallenge(), this, challengeID, challengeResponse.substring(3)));
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /* https://2captcha.com/2captcha-api#solving_hcaptcha */
-    private void handleHCaptcha(CESSolverJob<String> job) throws InterruptedException {
-        final HCaptchaChallenge challenge = (HCaptchaChallenge) job.getChallenge();
-        job.showBubble(this);
-        checkInterruption();
-        try {
-            challenge.sendStatsSolving(this);
-            final Browser br = new Browser();
-            br.setReadTimeout(5 * 60000);
-            job.setStatus(SolverStatus.SOLVING);
-            UrlQuery q = new UrlQuery();
-            final String apiKey = config.getApiKey();
-            q.appendEncoded("key", apiKey);
-            q.appendEncoded("method", "hcaptcha");
-            q.appendEncoded("json", "1");
-            q.appendEncoded("soft_id", getSoftID());
-            q.appendEncoded("sitekey", challenge.getSiteKey());
-            q.appendEncoded("pageurl", challenge.getSiteUrl());
-            final AbstractHCaptcha<?> hCaptcha = challenge.getAbstractCaptchaHelperHCaptcha();
-            if (hCaptcha != null && AbstractHCaptcha.TYPE.INVISIBLE.equals(hCaptcha.getType())) {
-                q.appendEncoded("invisible", "1");
-            }
-            final String json = br.getPage("https://2captcha.com/in.php?" + q.toString());
-            final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
-            });
-            if (1 == response.getStatus()) {
-                final String id = response.getRequest();
-                job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 20)));
-                while (job.getJob().isAlive() && !job.getJob().isSolved()) {
-                    q = new UrlQuery();
-                    q.appendEncoded("key", apiKey);
-                    q.appendEncoded("action", "get");
-                    q.appendEncoded("id", id);
-                    final String challengeResponse = br.getPage("https://2captcha.com/res.php?" + q.toString());
-                    logger.info(challengeResponse);
-                    if (handleResponse(job, id, challengeResponse)) {
-                        return;
-                    }
-                }
-            } else {
-                job.getLogger().warning(json);
-            }
-        } catch (Exception e) {
-            job.getChallenge().sendStatsError(this, e);
-            job.getLogger().log(e);
-        }
-    }
-
-    /**
-     * https://2captcha.com/2captcha-api#solving_recaptchav2_new </br>
-     * https://2captcha.com/2captcha-api#solving_recaptchav3
-     */
-    private void handleRecaptchaV2(CESSolverJob<String> job) throws InterruptedException {
-        final RecaptchaV2Challenge challenge = (RecaptchaV2Challenge) job.getChallenge();
-        job.showBubble(this);
-        checkInterruption();
-        try {
-            challenge.sendStatsSolving(this);
-            final Browser br = new Browser();
-            br.setReadTimeout(5 * 60000);
-            job.setStatus(SolverStatus.SOLVING);
-            UrlQuery q = new UrlQuery();
-            q.appendEncoded("key", config.getApiKey());
-            q.appendEncoded("method", "userrecaptcha");
-            q.appendEncoded("json", "1");
-            q.appendEncoded("soft_id", getSoftID());
-            q.appendEncoded("googlekey", challenge.getSiteKey());
-            q.appendEncoded("pageurl", challenge.getSiteUrl());
-            final AbstractRecaptchaV2<?> recaptchaChallenge = challenge.getAbstractCaptchaHelperRecaptchaV2();
-            if (recaptchaChallenge != null) {
-                if (challenge.isEnterprise()) {
-                    q.appendEncoded("enterprise", "1");
-                }
-                final Map<String, Object> action = challenge.getV3Action();
-                if (action != null && action.containsKey("action")) {
-                    q.appendEncoded("version", "v3");
-                    q.appendEncoded("action", String.valueOf(action.get("action")));
-                } else if (TYPE.INVISIBLE.equals(recaptchaChallenge.getType())) {
-                    q.appendEncoded("invisible", "1");
-                }
-            }
-            final String json = br.getPage("https://2captcha.com/in.php?" + q.toString());
-            final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
-            });
-            if (1 == response.getStatus()) {
-                final String id = response.getRequest();
-                job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 20)));
-                while (job.getJob().isAlive() && !job.getJob().isSolved()) {
-                    q = new UrlQuery();
-                    q.appendEncoded("key", config.getApiKey());
-                    q.appendEncoded("action", "get");
-                    q.appendEncoded("id", id);
-                    final String challengeResponse = br.getPage("https://2captcha.com/res.php?" + q.toString());
-                    logger.info(challengeResponse);
-                    if (handleResponse(job, id, challengeResponse)) {
-                        return;
-                    }
-                }
-            } else {
-                job.getLogger().warning(json);
-            }
-        } catch (Exception e) {
-            job.getChallenge().sendStatsError(this, e);
-            job.getLogger().log(e);
-        }
-    }
-
-    /* https://2captcha.com/2captcha-api#cutcaptcha-method */
-    private void handleCutCaptcha(final CESSolverJob<String> job) throws InterruptedException {
-        final CutCaptchaChallenge challenge = (CutCaptchaChallenge) job.getChallenge();
-        job.showBubble(this);
-        checkInterruption();
-        try {
-            challenge.sendStatsSolving(this);
-            final Browser br = new Browser();
-            br.setReadTimeout(5 * 60000);
-            job.setStatus(SolverStatus.SOLVING);
-            UrlQuery q = new UrlQuery();
-            q.appendEncoded("key", config.getApiKey());
-            q.appendEncoded("method", "cutcaptcha");
-            q.appendEncoded("json", "1");
-            q.appendEncoded("soft_id", getSoftID());
-            q.appendEncoded("misery_key", challenge.getSiteKey());
-            q.appendEncoded("api_key", challenge.getApiKey());
-            q.appendEncoded("pageurl", challenge.getSiteUrl());
-            final String json = br.getPage("https://2captcha.com/in.php?" + q.toString());
-            final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
-            });
-            if (1 == response.getStatus()) {
-                final String id = response.getRequest();
-                job.setStatus(new SolverStatus(_GUI.T.DeathByCaptchaSolver_solveBasicCaptchaChallenge_solving(), NewTheme.I().getIcon(IconKey.ICON_WAIT, 20)));
-                while (job.getJob().isAlive() && !job.getJob().isSolved()) {
-                    q = this.createQueryForPolling();
-                    q.appendEncoded("id", id);
-                    final String challengeResponse = br.getPage("https://2captcha.com/res.php?" + q.toString());
-                    logger.info(challengeResponse);
-                    if (handleResponse(job, id, challengeResponse)) {
-                        return;
-                    }
-                }
-            } else {
-                job.getLogger().warning(json);
-            }
-        } catch (Exception e) {
-            job.getChallenge().sendStatsError(this, e);
-            job.getLogger().log(e);
         }
     }
 
@@ -359,7 +231,7 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
         }
         final TwoCaptchaResponse twocaptcharesponse = (TwoCaptchaResponse) response;
         final String captchaID = twocaptcharesponse.getCaptchaID();
-        final Browser br = new Browser();
+        final Browser br = this.createNewBrowserInstance();
         try {
             final String url;
             if (positiveFeedback) {
@@ -374,8 +246,9 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
             postdata.put("taskId", captchaID);
             final PostRequest req = br.createJSonPostRequest(this.getApiBaseV2() + url, postdata);
             br.getPage(req);
-            final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            if ("success".equalsIgnoreCase(entries.get("status").toString())) {
+            final BalanceResponse resp = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<BalanceResponse>() {
+            });
+            if ("success".equalsIgnoreCase(resp.getStatus())) {
                 return true;
             } else {
                 return false;
@@ -390,50 +263,146 @@ public class TwoCaptchaSolver extends AbstractTwoCaptchaSolver<String> {
         public BalanceResponse() {
         }
 
-        private int status;
+        private int      errorId;
+        private String   taskId;
+        private Double   balance;
+        private String   cost;
+        private String   status;
+        private Solution solution;
 
-        public int getStatus() {
+        public int getErrorId() {
+            return errorId;
+        }
+
+        public void setErrorId(int errorId) {
+            this.errorId = errorId;
+        }
+
+        public Double getBalance() {
+            return balance;
+        }
+
+        public void setBalance(Double balance) {
+            this.balance = balance;
+        }
+
+        public String getStatus() {
             return status;
         }
 
-        public void setStatus(int status) {
+        public void setStatus(String status) {
             this.status = status;
         }
 
-        public String getRequest() {
-            return request;
+        public String getCost() {
+            return cost;
         }
 
-        public void setRequest(String request) {
-            this.request = request;
+        public void setCost(String cost) {
+            this.cost = cost;
         }
 
-        private String request;
+        public Solution getSolution() {
+            return solution;
+        }
+
+        public void setSolution(Solution solution) {
+            this.solution = solution;
+        }
+
+        public String getTaskId() {
+            return taskId;
+        }
+
+        public void setTaskId(String taskId) {
+            this.taskId = taskId;
+        }
+    }
+
+    public static class Solution implements Storable {
+        public Solution() {
+        }
+
+        /* Same for reCaptcha and hCaptcha */
+        private String            gRecaptchaResponse;
+        private String            token;
+        private String            text;
+        private List<Coordinates> corrdinates;
+
+        public String getgRecaptchaResponse() {
+            return gRecaptchaResponse;
+        }
+
+        public void setgRecaptchaResponse(String gRecaptchaResponse) {
+            this.gRecaptchaResponse = gRecaptchaResponse;
+        }
+
+        public String getToken() {
+            return token;
+        }
+
+        public void setToken(String token) {
+            this.token = token;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public void setText(String text) {
+            this.text = text;
+        }
+
+        public List<Coordinates> getCorrdinates() {
+            return corrdinates;
+        }
+
+        public void setCorrdinates(List<Coordinates> corrdinates) {
+            this.corrdinates = corrdinates;
+        }
+    }
+
+    public static class Coordinates implements Storable {
+        public Coordinates() {
+        }
+
+        private int x;
+        private int y;
+
+        public int getX() {
+            return x;
+        }
+
+        public void setX(int x) {
+            this.x = x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public void setY(int y) {
+            this.y = y;
+        }
     }
 
     public TwoCaptchaAccount loadAccount() {
         final TwoCaptchaAccount ret = new TwoCaptchaAccount();
         try {
-            final Browser br = new Browser();
-            final UrlQuery q = new UrlQuery();
-            q.appendEncoded("key", config.getApiKey());
-            q.appendEncoded("action", "getbalance");
-            q.appendEncoded("json", "1");
-            final String json = br.getPage("https://2captcha.com/res.php?" + q.toString());
-            final String validcheck = br.getRegex("^([0-9.,]+$)").getMatch(0);
-            if (validcheck != null) {
-                // capmonster.cloud
-                ret.setBalance(Double.parseDouble(validcheck.replace(",", ".")));
-            } else {
-                final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
-                });
-                if (1 != response.getStatus()) {
-                    ret.setError("Bad Login: " + json);
-                }
-                ret.setBalance(Double.parseDouble(response.getRequest()));
+            final Browser br = this.createNewBrowserInstance();
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("clientKey", this.config.getApiKey());
+            final PostRequest req = br.createJSonPostRequest(this.getApiBaseV2() + "/getBalance", postdata);
+            final String json = br.getPage(req);
+            final BalanceResponse response = JSonStorage.restoreFromString(json, new TypeRef<BalanceResponse>() {
+            });
+            if (response.getErrorId() != 0) {
+                ret.setError("Bad Login: " + json);
+                return ret;
             }
+            ret.setBalance(response.getBalance());
             ret.setUserName(config.getApiKey());
-        } catch (Exception e) {
+        } catch (final Exception e) {
             logger.log(e);
             ret.setError(e.getMessage());
         }

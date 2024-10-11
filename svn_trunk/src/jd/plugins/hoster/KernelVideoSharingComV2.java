@@ -76,7 +76,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49716 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49946 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -930,7 +930,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         texts.add("Только зарегистрированные пользователи сайта могут иметь доступ к личным видео");
         String msg = null;
         for (final String text : texts) {
-            msg = br.getRegex(">(\\s*" + Pattern.quote(text) + "[^<]+)").getMatch(0);
+            msg = br.getRegex(">(\\s*" + Pattern.quote(text) + "[^<]*)").getMatch(0);
             if (msg != null) {
                 msg = Encoding.htmlDecode(msg).trim();
                 break;
