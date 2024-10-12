@@ -127,6 +127,11 @@ public class URLConnectionAdapterHTTPProxyImpl extends HTTPProxyHTTPConnectionIm
     }
 
     @Override
+    public byte[] peek(int numBytes) throws IOException {
+        return URLConnectionAdapterDirectImpl.peek(this, numBytes);
+    }
+
+    @Override
     public InputStream setInputStream(InputStream is) throws IOException {
         if (is == null) {
             throw new IllegalArgumentException();

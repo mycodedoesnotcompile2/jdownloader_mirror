@@ -140,6 +140,11 @@ public class URLConnectionAdapterSocks4Impl extends Socks4HTTPConnectionImpl imp
     }
 
     @Override
+    public byte[] peek(int numBytes) throws IOException {
+        return URLConnectionAdapterDirectImpl.peek(this, numBytes);
+    }
+
+    @Override
     public InputStream setInputStream(InputStream is) throws IOException {
         if (is == null) {
             throw new IllegalArgumentException();

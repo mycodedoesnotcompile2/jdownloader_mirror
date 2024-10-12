@@ -432,6 +432,16 @@ public class FlexiJSonMapper {
                                     } catch (NoSuchMethodException e) {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
+                                } else if (cType.isAnonymousClass()) {
+                                    // empty is a proxy of the interface
+                                    try {
+                                        Method correctedGetter = cType.superType.raw.getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
+                                            continue;
+                                        }
+                                    } catch (NoSuchMethodException e) {
+                                        // seems to be a Anonymous method only available in the impl.no way to get a default value
+                                    }
                                 } else {
                                     if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
                                         continue;
@@ -824,7 +834,11 @@ public class FlexiJSonMapper {
             }
         }
         try {
-            return cType.newInstance();
+            if (cType.isAnonymousClass()) {
+                return cType.superType.newInstance();
+            } else {
+                return cType.newInstance();
+            }
         } catch (final InstantiationException e) {
             this.returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
         } catch (final IllegalAccessException e) {

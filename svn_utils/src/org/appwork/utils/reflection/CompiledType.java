@@ -68,6 +68,7 @@ import org.appwork.storage.flexijson.JSPath;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Property;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 
@@ -998,10 +999,14 @@ public class CompiledType {
      * @throws InstantiationException
      */
     public Object newInstance() throws InstantiationException, IllegalAccessException {
-        if (raw == null) {
-            throw new InstantiationException("Cannot create an instance of " + this);
-        } else {
-            return raw.newInstance();
+        try {
+            if (raw == null) {
+                throw new InstantiationException("Cannot create an instance of " + this);
+            } else {
+                return raw.newInstance();
+            }
+        } catch (java.lang.InstantiationException e) {
+            throw Exceptions.addSuppressed(e, new Exception("Empty Constructor missing: " + this.toString()));
         }
     }
 
@@ -1357,5 +1362,12 @@ public class CompiledType {
      */
     public boolean isAnonymousInterfaceImpl() {
         return raw.isAnonymousClass() && superType == null && raw.getInterfaces().length == 1;
+    }
+
+    /**
+     * @return
+     */
+    public boolean isAnonymousClass() {
+        return raw.isAnonymousClass() && superType != null;
     }
 }

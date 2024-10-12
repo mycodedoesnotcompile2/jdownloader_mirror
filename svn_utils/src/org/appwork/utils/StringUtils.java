@@ -483,10 +483,9 @@ public class StringUtils {
     }
 
     /**
-     * @param parameters
-     * @param string
-     * @return
+     * @deprecated does not add seperator if the first element is ""
      */
+    @Deprecated
     public static String join(Object[] parameters, String separator) {
         StringBuilder sb = new StringBuilder();
         for (Object s : parameters) {
@@ -498,6 +497,10 @@ public class StringUtils {
         return sb.toString();
     }
 
+    /**
+     * @deprecated does not add seperator if the first element is ""
+     */
+    @Deprecated
     public static String join(String separator, Object... parameters) {
         StringBuilder sb = new StringBuilder();
         for (Object s : parameters) {
@@ -510,10 +513,9 @@ public class StringUtils {
     }
 
     /**
-     * @param signParams
-     * @param separator
-     * @return
+     * @deprecated does not add seperator if the first element is ""
      */
+    @Deprecated
     public static String join(Collection<? extends Object> params, String separator) {
         return join(params.toArray(new Object[] {}), separator);
     }
@@ -523,11 +525,9 @@ public class StringUtils {
     }
 
     /**
-     * @param <T>
-     * @param requiredBy
-     * @param string
-     * @param stringifyer
+     * @deprecated does not add seperator if the first element is ""
      */
+    @Deprecated
     public static <T> String join(Collection<T> params, String separator, Stringifier<T> stringifier) {
         StringBuilder sb = new StringBuilder();
         for (T o : params) {
@@ -539,22 +539,6 @@ public class StringUtils {
                 sb.append(separator);
             }
             sb.append(s);
-        }
-        return sb.toString();
-    }
-
-    /**
-     * @param fcgiPorts
-     * @param separator
-     * @return
-     */
-    public static String join(String separator, int... ints) {
-        StringBuilder sb = new StringBuilder();
-        for (Object s : ints) {
-            if (sb.length() > 0) {
-                sb.append(separator);
-            }
-            sb.append(String.valueOf(s));
         }
         return sb.toString();
     }

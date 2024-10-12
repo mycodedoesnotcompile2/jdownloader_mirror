@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
 
@@ -13,15 +14,49 @@ public class MultiHostHost {
     // DAILY;
     // }
     /** Why was this host blocked? Because of too many errored out tries via JD or because of the multihost/multihost limits? */
-    public enum MultihosterHostStatus {
-        WORKING,
-        WORKING_UNSTABLE,
-        DEACTIVATED_JDOWNLOADER,
-        DEACTIVATED_JDOWNLOADER_UNSUPPORTED,
-        DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN,
-        DEACTIVATED_MULTIHOST,
-        DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE,
-        DEACTIVATED_MULTIHOST_LIMIT_REACHED;
+    public enum MultihosterHostStatus implements LabelInterface {
+        WORKING {
+            @Override
+            public String getLabel() {
+                return "Working";
+            }
+        },
+        WORKING_UNSTABLE {
+            @Override
+            public String getLabel() {
+                return "Working but unstable/beta/testing";
+            }
+        },
+        DEACTIVATED_JDOWNLOADER {
+            @Override
+            public String getLabel() {
+                return "Temporarily deactivated by JD";
+            }
+        },
+        DEACTIVATED_JDOWNLOADER_UNSUPPORTED {
+            @Override
+            public String getLabel() {
+                return "JD does not support this host";
+            }
+        },
+        DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN {
+            @Override
+            public String getLabel() {
+                return "MOCH usage not allowed by original plugin";
+            }
+        },
+        DEACTIVATED_MULTIHOST {
+            @Override
+            public String getLabel() {
+                return "Flagged as not working by MOCH";
+            }
+        },
+        DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE {
+            @Override
+            public String getLabel() {
+                return "Cannot be used with your current type of account";
+            }
+        };
     }
 
     private String                name                            = null;
@@ -246,6 +281,15 @@ public class MultiHostHost {
             return true;
         } else {
             return false;
+        }
+    }
+
+    /** Returns first domain of list of supported domains if list size is > 0. */
+    public String getDomain() {
+        if (this.getDomains().size() > 0) {
+            return this.getDomains().get(0);
+        } else {
+            return null;
         }
     }
 

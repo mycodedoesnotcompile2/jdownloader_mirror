@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49946 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49951 $", interfaceVersion = 3, names = {}, urls = {})
 public class BtcutIo extends PluginForDecrypt {
     public BtcutIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,6 @@ public class BtcutIo extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "btcut.io", "psa.btcut.io" });
-        // ret.add(new String[] { "ez4short.com" });
         return ret;
     }
 

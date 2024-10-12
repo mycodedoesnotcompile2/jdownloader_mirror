@@ -120,6 +120,11 @@ public class URLConnectionAdapterSocks5Impl extends Socks5HTTPConnectionImpl imp
     }
 
     @Override
+    public byte[] peek(int numBytes) throws IOException {
+        return URLConnectionAdapterDirectImpl.peek(this, numBytes);
+    }
+
+    @Override
     public InputStream getInputStream() throws IOException {
         if (this.convertedInputStream == null && !RequestMethod.HEAD.equals(this.getRequestMethod())) {
             super.getInputStream();

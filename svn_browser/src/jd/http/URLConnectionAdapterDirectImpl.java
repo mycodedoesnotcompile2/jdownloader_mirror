@@ -6,6 +6,7 @@ import java.io.PushbackInputStream;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.URL;
+import java.util.Arrays;
 
 import jd.http.requests.PostFormDataRequest;
 import jd.http.requests.PostRequest;
@@ -13,6 +14,7 @@ import jd.parser.Regex;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.CountingPushbackInputStream;
 import org.appwork.utils.net.httpconnection.HTTPConnection;
 import org.appwork.utils.net.httpconnection.HTTPConnectionImpl;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
@@ -48,6 +50,39 @@ public class URLConnectionAdapterDirectImpl extends HTTPConnectionImpl implement
     @Override
     protected boolean isResponseCodeAllowed(final int code) {
         return this.isAllResponseCodesAllowed() || super.isResponseCodeAllowed(code);
+    }
+
+    public static byte[] peek(final URLConnectionAdapter con, final int numBytes) throws IOException {
+        final InputStream conInputStream = con.getInputStream();
+        final CountingPushbackInputStream is;
+        if (conInputStream instanceof CountingPushbackInputStream && ((CountingPushbackInputStream) conInputStream).capacity() >= numBytes) {
+            is = (CountingPushbackInputStream) conInputStream;
+        } else {
+            is = new CountingPushbackInputStream(conInputStream, numBytes);
+            con.setInputStream(is);
+        }
+        final byte[] probe = new byte[numBytes];
+        int probeIndex = 0;
+        try {
+            for (probeIndex = 0; probeIndex < probe.length; probeIndex++) {
+                final int read = is.read();
+                if (read != -1) {
+                    probe[probeIndex] = (byte) read;
+                } else {
+                    break;
+                }
+            }
+            return Arrays.copyOf(probe, probeIndex);
+        } finally {
+            if (probeIndex > 0) {
+                is.unread(probe, 0, probeIndex);
+            }
+        }
+    }
+
+    @Override
+    public byte[] peek(int numBytes) throws IOException {
+        return URLConnectionAdapterDirectImpl.peek(this, numBytes);
     }
 
     @Override

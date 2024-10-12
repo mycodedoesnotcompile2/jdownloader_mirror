@@ -796,55 +796,56 @@ public class FavIcons {
                 con = favBr.openGetConnection(url);
                 /* we use bufferedinputstream to reuse it later if needed */
                 bytes = IO.readStream(-1, con.getInputStream());
-                if (con.isOK() && !StringUtils.containsIgnoreCase(con.getContentType(), "text")) {
-                    try {
-                        List<BufferedImage> ret = null;
-                        if (bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) {
-                            final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text") || con.getCompleteContentLength() <= 0) {
+                    return null;
+                }
+                try {
+                    List<BufferedImage> ret = null;
+                    if (bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) {
+                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                        if (img != null) {
+                            ret = new ArrayList<BufferedImage>();
+                            ret.add(img);
+                        }
+                    } else if (bytes[0] == 71 && bytes[1] == 73 && bytes[2] == 70) {
+                        final GifDecoder gifDecoder = new GifDecoder();
+                        /* reset bufferedinputstream to begin from start */
+                        if (gifDecoder.read(new ByteArrayInputStream(bytes)) == 0) {
+                            final BufferedImage img = gifDecoder.getImage();
                             if (img != null) {
                                 ret = new ArrayList<BufferedImage>();
                                 ret.add(img);
                             }
-                        } else if (bytes[0] == 71 && bytes[1] == 73 && bytes[2] == 70) {
-                            final GifDecoder gifDecoder = new GifDecoder();
-                            /* reset bufferedinputstream to begin from start */
-                            if (gifDecoder.read(new ByteArrayInputStream(bytes)) == 0) {
-                                final BufferedImage img = gifDecoder.getImage();
-                                if (img != null) {
-                                    ret = new ArrayList<BufferedImage>();
-                                    ret.add(img);
-                                }
+                        }
+                    }
+                    /* try first with iconloader */
+                    if (ret == null) {
+                        try {
+                            ret = ICODecoder.read(new ByteArrayInputStream(bytes));
+                        } catch (final IOException e) {
+                            final String max = new Regex(e.getMessage(), "Failed to read image #\\s*(\\d+)").getMatch(0);
+                            if (max != null && Integer.parseInt(max) > 1) {
+                                final byte[] copy = bytes.clone();
+                                // TODO: modify icon header to stop at last okay image
+                                ret = ICODecoder.read(new ByteArrayInputStream(copy));
+                            } else {
+                                throw e;
                             }
                         }
-                        /* try first with iconloader */
-                        if (ret == null) {
-                            try {
-                                ret = ICODecoder.read(new ByteArrayInputStream(bytes));
-                            } catch (final IOException e) {
-                                final String max = new Regex(e.getMessage(), "Failed to read image #\\s*(\\d+)").getMatch(0);
-                                if (max != null && Integer.parseInt(max) > 1) {
-                                    final byte[] copy = bytes.clone();
-                                    // TODO: modify icon header to stop at last okay image
-                                    ret = ICODecoder.read(new ByteArrayInputStream(copy));
-                                } else {
-                                    throw e;
-                                }
-                            }
-                        }
-                        final BufferedImage img = returnBestImage(ret);
-                        if (img != null) {
-                            return img;
-                        } else {
-                            throw new Throwable("Try again with other ImageLoader");
-                        }
-                    } catch (Throwable e) {
-                        /* maybe redirect to different icon format? */
-                        final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
-                        if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
-                            return img;
-                        } else {
-                            logger.log(e);
-                        }
+                    }
+                    final BufferedImage img = returnBestImage(ret);
+                    if (img != null) {
+                        return img;
+                    } else {
+                        throw new Throwable("Try again with other ImageLoader");
+                    }
+                } catch (Throwable e) {
+                    /* maybe redirect to different icon format? */
+                    final BufferedImage img = downloadImage(con, logger, new ByteArrayInputStream(bytes));
+                    if (img != null && img.getHeight() > 1 && img.getWidth() > 1) {
+                        return img;
+                    } else {
+                        logger.log(e);
                     }
                 }
             }

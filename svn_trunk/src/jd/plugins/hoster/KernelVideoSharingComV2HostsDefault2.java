@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48936 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49956 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault2(final PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +35,7 @@ public class KernelVideoSharingComV2HostsDefault2 extends KernelVideoSharingComV
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "alotporn.com" });
         ret.add(new String[] { "camvideos.tv" });
-        ret.add(new String[] { "cambro.tv" });
+        ret.add(new String[] { "cambro.tv", "cambro.io" });
         return ret;
     }
 

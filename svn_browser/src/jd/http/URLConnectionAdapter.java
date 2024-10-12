@@ -47,4 +47,6 @@ public interface URLConnectionAdapter extends org.appwork.utils.net.httpconnecti
     public boolean isAllResponseCodesAllowed();
 
     public void setAllResponseCodesAllowed(boolean b);
+
+    public byte[] peek(int numBytes) throws IOException;
 }

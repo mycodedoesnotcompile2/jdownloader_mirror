@@ -62,7 +62,7 @@ import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49833 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49956 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditCom extends PluginForHost {
     public RedditCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -596,6 +596,7 @@ public class RedditCom extends PluginForHost {
         final String ret = super.correctOrApplyFileNameExtension(filenameOrg, newExtension, connection);
         if (StringUtils.endsWithCaseInsensitive(filenameOrg, ".gif") && StringUtils.endsWithCaseInsensitive(ret, ".jpg") && (connection.getRange() == null || connection.getRange()[0] == 0)) {
             try {
+                // TODO: use URLConnectionAdapter.peek
                 final CountingPushbackInputStream is = new CountingPushbackInputStream(connection.getInputStream(), 32);
                 connection.setInputStream(is);
                 final byte[] magic = new byte[4];

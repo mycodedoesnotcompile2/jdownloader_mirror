@@ -95,7 +95,7 @@ public class FlexiConfigBuilderTest extends AWTest {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
@@ -209,10 +209,10 @@ public class FlexiConfigBuilderTest extends AWTest {
             final FlexiConfigBuilder<TestConfigInterface> builder = new FlexiConfigBuilder<TestConfigInterface>(TestConfigInterface.class, res).setReadSources(Source.DISK);
             new AssertAnException<org.appwork.storage.flexijson.FlexiParserException>() {
                 @Override
-                public void run() throws Exception {
+                protected void run() throws Exception {
                     builder.setAutoWriteEnabled(false).getStorage();
                 }
-            }.start();
+            };
             FlexiConfigBuilder<TestConfigInterface> builder3 = new FlexiConfigBuilder<TestConfigInterface>(TestConfigInterface.class, res) {
                 public org.appwork.storage.flexijson.FlexiJSONParser createParser(String json) {
                     FlexiJSONParser ret = super.createParser(json);

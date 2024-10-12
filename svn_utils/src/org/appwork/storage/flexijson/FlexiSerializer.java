@@ -251,7 +251,7 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
     public <T> T convert(Object o, TypeRef<T> type, Object... context) throws SerializerException {
         try {
             final boolean ensureNewInstances = contextContainsAll(context, SC.ENSURE_NEW_INSTANCES);
-            if (!ensureNewInstances && Clazz.isInstanceof(o.getClass(), ReflectionUtils.getRaw(type.getType()))) {
+            if (o != null && !ensureNewInstances && Clazz.isInstanceof(o.getClass(), ReflectionUtils.getRaw(type.getType()))) {
                 return (T) o;
             } else {
                 return getMapper(context).convert(o, type);

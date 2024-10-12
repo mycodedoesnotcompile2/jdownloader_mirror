@@ -457,7 +457,7 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
         final long verifiedFileSize = downloadable.getVerifiedFileSize();
         final String rangeRequest;
         if (tryRangeRequest && (unMarkedAreas.size() > 0 && unMarkedAreas.get(0).getFrom() > 0) || Boolean.TRUE.equals(requestRangeIfPossible)) {
-            final ChunkRange chunkRange = unMarkedAreas.get(0);
+            final ChunkRange chunkRange = unMarkedAreas.get(0);// TODO: unMarkedAreas.size kann 0 sein
             rangeRequest = chunkRange.getRangeHeaderContent(true);
         } else {
             rangeRequest = null;

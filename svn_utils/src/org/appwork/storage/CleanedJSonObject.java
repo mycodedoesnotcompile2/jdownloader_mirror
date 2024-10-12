@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.GetterSetter;
 
 public class CleanedJSonObject {
@@ -215,9 +216,13 @@ public class CleanedJSonObject {
             empty = compareFactory.createInstance(object.getClass());
         }
         if (empty == null) {
-            final Constructor<?> c = this.object.getClass().getDeclaredConstructor(new Class[] {});
-            c.setAccessible(true);
-            empty = c.newInstance();
+            try {
+                final Constructor<?> c = this.object.getClass().getDeclaredConstructor(new Class[] {});
+                c.setAccessible(true);
+                empty = c.newInstance();
+            } catch (NoSuchMethodException e) {
+                throw Exceptions.addSuppressed(e, new Exception("No Constructor in " + object.getClass()));
+            }
         }
         for (final GetterSetter gs : getGettersSetteres(this.object.getClass())) {
             if ("class".equals(gs.getKey())) {

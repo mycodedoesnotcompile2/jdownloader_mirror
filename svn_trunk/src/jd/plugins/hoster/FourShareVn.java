@@ -49,11 +49,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49206 $", interfaceVersion = 2, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/f/([a-f0-9]{16})" })
+@HostPlugin(revision = "$Revision: 49954 $", interfaceVersion = 2, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/f/([a-z0-9]{16,})" })
 public class FourShareVn extends PluginForHost {
     public FourShareVn(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://up.4share.vn/?act=gold");
+        this.enablePremium("https://" + getHost() + "/payment/card");
     }
 
     @Override
@@ -81,14 +81,6 @@ public class FourShareVn extends PluginForHost {
         } else {
             return 1;
         }
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        if ("up.4share.vn".equals(host)) {
-            return "4share.vn";
-        }
-        return super.rewriteHost(host);
     }
 
     @Override
@@ -160,6 +152,8 @@ public class FourShareVn extends PluginForHost {
         } else if (br.containsHTML("(?i)>\\s*File đã xóa?")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* Look for other errors */
+        handleErrorsWebsite(br);
         return AvailableStatus.TRUE;
     }
 
@@ -323,18 +317,18 @@ public class FourShareVn extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        String dllink = null;
         // Can be skipped
-        // int wait = 60;
-        // final String waittime = br.getRegex("var counter=(\\d+);").getMatch(0);
-        // if (waittime != null) {
-        // wait = Integer.parseInt(waittime);
-        // }
-        // sleep(wait * 1001l, downloadLink);
-        if (br.containsHTML("chứa file này đang bảo dưỡng")) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server is under maintenance!");
+        final boolean skipWait = true;
+        if (!skipWait) {
+            int wait = 60;
+            final String waittime = br.getRegex("var counter=(\\d+);").getMatch(0);
+            if (waittime != null) {
+                wait = Integer.parseInt(waittime);
+            }
+            sleep(wait * 1001l, link);
         }
-        for (int i = 0; i <= 3; i++) {
+        boolean success = false;
+        captchaloop: for (int i = 0; i <= 3; i++) {
             Form captchaform = br.getFormbyKey("free_download");
             if (captchaform == null) {
                 captchaform = new Form();
@@ -350,25 +344,18 @@ public class FourShareVn extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             captchaform.put("g-recaptcha-response", recaptchaV2Response);
-            br.submitForm(captchaform);
-            dllink = br.getRedirectLocation();
-            if (dllink == null && br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)")) {
-                continue;
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, captchaform, this.isResumeable(link, null), this.getMaxChunks(link, null));
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                handleErrorsWebsite(br);
+                dl = null;
+                continue captchaloop;
             }
-            break;
+            success = true;
+            break captchaloop;
         }
-        if (dllink == null && br.containsHTML("(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)")) {
+        if (!success) {
             throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-        } else if (dllink == null) {
-            handleErrorsWebsite(br);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-        if (!looksLikeDownloadableContent(dl.getConnection())) {
-            logger.warning("The final dllink seems not to be a file!");
-            br.followConnection(true);
-            handleErrorsWebsite(br);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         dl.startDownload();
     }
@@ -433,7 +420,6 @@ public class FourShareVn extends PluginForHost {
         synchronized (account) {
             /* Load cookies */
             this.setBrowserExclusive();
-            boolean refresh = true;
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
                 br.setCookies(cookies);
@@ -444,31 +430,30 @@ public class FourShareVn extends PluginForHost {
                 br.getPage("https://" + getHost() + "/member");
                 if (this.isLoggedINWebsite(br)) {
                     logger.info("Cookie login successful");
-                    refresh = false;
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
                 } else {
                     logger.info("Cookie login failed");
-                    refresh = true;
                     account.clearCookies("");
                 }
             }
-            if (refresh) {
-                br.getPage("https://4share.vn/");
-                br.getPage("/default/login");
-                final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lfnb8YUAAAAAElE9DwwEWA881UX3-chISAQZApu") {
-                    @Override
-                    public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
-                        return TYPE.INVISIBLE;
-                    }
-                };
-                br.getHeaders().put("Accept", "application/json, text/plain, */*");
-                br.postPage("/a_p_i/public-common/login", "username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&captcha=" + Encoding.urlEncode(rc2.getToken()));
-                if (br.getCookie(br.getHost(), "currentUser", Cookies.NOTDELETEDPATTERN) == null) {
-                    throw new AccountInvalidException();
+            logger.info("Performing full login");
+            br.getPage("https://" + getHost() + "/");
+            br.getPage("/default/login");
+            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lfnb8YUAAAAAElE9DwwEWA881UX3-chISAQZApu") {
+                @Override
+                public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
+                    return TYPE.INVISIBLE;
                 }
-                br.getPage("/member");
-                if (!this.isLoggedINWebsite(br)) {
-                    throw new AccountInvalidException();
-                }
+            };
+            br.getHeaders().put("Accept", "application/json, text/plain, */*");
+            br.postPage("/a_p_i/public-common/login", "username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&captcha=" + Encoding.urlEncode(rc2.getToken()));
+            if (br.getCookie(br.getHost(), "currentUser", Cookies.NOTDELETEDPATTERN) == null) {
+                throw new AccountInvalidException();
+            }
+            br.getPage("/member");
+            if (!this.isLoggedINWebsite(br)) {
+                throw new AccountInvalidException();
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
@@ -494,11 +479,7 @@ public class FourShareVn extends PluginForHost {
 
     private Object checkErrors(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         try {
-            final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            // if (jsonO == null || !(jsonO instanceof Map)) {
-            // return jsonO;
-            // }
-            final Map<String, Object> entries = (Map<String, Object>) jsonO;
+            final Map<String, Object> entries = (Map<String, Object>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
             final Number errorNumberO = (Number) entries.get("errorNumber");
             final Object payload = entries.get("payload");
             if (errorNumberO == null || errorNumberO.intValue() == 0) {

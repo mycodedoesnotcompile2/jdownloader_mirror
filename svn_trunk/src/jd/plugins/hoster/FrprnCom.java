@@ -26,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.decrypter.FrprnComCrawler;
 
-@HostPlugin(revision = "$Revision: 48971 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49953 $", interfaceVersion = 3, names = {}, urls = {})
 public class FrprnCom extends KernelVideoSharingComV2 {
     public FrprnCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class FrprnCom extends KernelVideoSharingComV2 {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:videos|embed)/(\\d+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:videos|embed)/(\\d+)/");
         }
         return ret.toArray(new String[0]);
     }

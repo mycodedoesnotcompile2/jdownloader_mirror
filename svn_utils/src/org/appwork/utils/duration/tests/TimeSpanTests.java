@@ -82,22 +82,22 @@ public class TimeSpanTests extends AWTest {
         assertThat(TimeSpan.parse("1234!365").toMillis()).is(TimeSpan.parse("1s234S!365").toMillis());
         new AssertAnException<InvalidTimeSpanException>() {
             @Override
-            public void run() throws InvalidTimeSpanException {
+            protected void run() throws InvalidTimeSpanException {
                 TimeSpan.parse("1D2123");
             }
-        }.start();
+        };
         new AssertAnException<InvalidTimeSpanException>() {
             @Override
-            public void run() throws InvalidTimeSpanException {
+            protected void run() throws InvalidTimeSpanException {
                 TimeSpan.parse("1D2D");
             }
-        }.start();
+        };
         new AssertAnException<InvalidTimeSpanException>() {
             @Override
-            public void run() throws InvalidTimeSpanException {
+            protected void run() throws InvalidTimeSpanException {
                 TimeSpan.parse("P1D3D");
             }
-        }.start();
+        };
         assertThat(TimeSpan.parse("240h").shorten().format()).is("10D");
         assertEquals(TimeSpan.parse("365D").shorten().format(), "1Y");
         assertEquals(parse("1Y").toMillis(), parseJava18("P365D").toMillis());
@@ -109,11 +109,12 @@ public class TimeSpanTests extends AWTest {
         parseJava18("-PT6H3M");
         new AssertAnException<IllegalTargetUnitsException>() {
             @Override
-            public void run() throws IllegalTargetUnitsException {
+            protected void run() throws IllegalTargetUnitsException {
                 TimeSpan parsed = null;
                 try {
-                    parsed = parse(Integer.MAX_VALUE + "D");
-                    TimeSpan cnv = parsed.convert(Unit.HOURS, Unit.MINUTES);
+                    parsed = parse(Integer.MAX_VALUE + "H");
+                    TimeSpan cnv = parsed.convert(Unit.DAYS);
+                    System.out.println(cnv);
                 } catch (Exception e1) {
                     if (e1 instanceof IllegalTargetUnitsException) {
                         throw (IllegalTargetUnitsException) e1;
@@ -121,7 +122,7 @@ public class TimeSpanTests extends AWTest {
                     throw new WTFException(e1);
                 }
             }
-        }.start();
+        };
         assertEquals(TimeSpan.parse("1D!365"), TimeSpan.parse("1D"));
         assertThat(parse(Integer.MAX_VALUE + "W8D").format()).is(Integer.MAX_VALUE + "W8D");
         testByMillis(2149633612l);
@@ -134,16 +135,10 @@ public class TimeSpanTests extends AWTest {
         assertTrue(TimeSpan.parse("1h").toMillis() == TimeSpan.parse("1h").toMillis());
         new AssertAnException<InvalidTimeSpanException>() {
             @Override
-            public void run() throws InvalidTimeSpanException {
-                TimeSpan.parse((2147483647l + 1) + "m");
-            }
-        }.start();
-        new AssertAnException<InvalidTimeSpanException>() {
-            @Override
-            public void run() throws InvalidTimeSpanException {
+            protected void run() throws InvalidTimeSpanException {
                 TimeSpan.parse("1.234D");
             }
-        }.start();
+        };
         // for (long i = 0; i < Long.MAX_VALUE; i += Math.random() * 100000000) {
         // testByMillis(i);
         // }

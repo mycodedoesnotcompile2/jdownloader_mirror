@@ -24,11 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -52,7 +47,12 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 49946 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 49957 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -269,6 +269,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                     for (int imageNumber = 1; imageNumber <= Integer.parseInt(galleryCount); imageNumber++) {
                         final String finallink = "https:" + imageBase + imageNumber + ".jpg";
                         final DownloadLink dl = this.createDownloadlink(generateUrlForHostplugin(finallink));
+                        dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
                         dl.setLinkID(this.getHost() + "://" + contentID + "_" + imageNumber);
                         final String filename = title + "_" + imageNumber + ".jpg";
                         dl.setFinalFileName(filename);
@@ -305,6 +306,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             final String type_dummy = "trailer";
             final String linkid = title + type_dummy + quality_dummy;
             final DownloadLink dl = this.createDownloadlink("http://naughtyamericadecryptedlvl3.secure.naughtycdn.com/mfhg/members/chanelvan/" + urlSlug + "_" + quality_dummy + ".mp4");
+            dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
             dl.setLinkID(linkid);
             /*
              * Do not include quality in filename here as we do not kow which quality we'll get in the end - user might only download the
@@ -336,6 +338,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                 final URL url_parsed = br.getURL(thumbnailURL);
                 thumbnailURL = url_parsed.toExternalForm();
                 final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailURL));
+                thumb.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
                 final String filename = Plugin.getFileNameFromURL(url_parsed);
                 if (filename != null) {
                     thumb.setFinalFileName(filename);

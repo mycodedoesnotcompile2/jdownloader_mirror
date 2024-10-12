@@ -113,25 +113,28 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         private final CompiledType expectedExceptionType;
 
         /**
+         * @throws Exception
          *
          */
-        public AssertAnException() {
+        public AssertAnException() throws Exception {
             this.expectedExceptionType = CompiledType.create(((ParameterizedType) this.getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
+            checkAssert();
         }
 
-        public abstract void run() throws Exception;
+        protected abstract void run() throws Exception;
 
-        public void start() throws Exception {
+        private void checkAssert() throws Exception {
             try {
                 this.run();
-                throw new Exception("Expected an Exception : " + this.expectedExceptionType);
             } catch (final Exception e) {
-                if (this.expectedExceptionType.isInstanceOf(e.getClass())) {
+                if (CompiledType.create(e.getClass()).isInstanceOf(expectedExceptionType.raw)) {
                     // fine;
+                    return;
                 } else {
                     throw e;
                 }
             }
+            throw new Exception("Expected an Exception : " + this.expectedExceptionType);
         }
     }
 
@@ -144,7 +147,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
@@ -366,7 +369,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         LogV3.setFactory(new SimpleLoggerFactory() {
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#removeSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -379,7 +382,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToConsole(org.appwork.loggingv3.simple.sink.LogToStdOutSink)
              */
             @Override
@@ -392,7 +395,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToFile(org.appwork.loggingv3.simple.sink.LogToFileSink)
              */
             @Override
@@ -405,7 +408,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#addSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -421,7 +424,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                 return new LoggerToSink(this) {
                     /*
                      * (non-Javadoc)
-                     *
+                     * 
                      * @see org.appwork.loggingv3.AbstractLogger#getThrownAt()
                      */
                     @Override
@@ -642,7 +645,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             Icon icon = org.appwork.resources.Theme.getFACTORY().urlToIcon(tmp.toURL(), -1, -1);
             tmp.delete();
             tmp.deleteOnExit();
-            if ( icon.getIconWidth()<w || icon.getIconHeight()<h) {
+            if (icon.getIconWidth() < w || icon.getIconHeight() < h) {
                 throw new Exception("Image " + zip + "!" + path + " has wrong dimensions: " + icon.getIconWidth() + "/" + icon.getIconHeight() + " (Expected: " + w + "/" + h + ")");
             }
         } finally {

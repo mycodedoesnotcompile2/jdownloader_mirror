@@ -17,6 +17,8 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -29,10 +31,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 49953 $", interfaceVersion = 2, names = { "free-loops.com" }, urls = { "https?://(www\\.)?free\\-loops\\.com/\\d+[a-z0-9\\-]+\\.html" })
 public class FreeLoopsCom extends PluginForDecrypt {
     public FreeLoopsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,8 +45,8 @@ public class FreeLoopsCom extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String parameter = param.getCryptedUrl();
         final String fileid = new Regex(parameter, "free\\-loops\\.com/(\\d+)").getMatch(0);
         final String finallink = "https://free-loops.com/force-audio.php?id=" + fileid;
         URLConnectionAdapter con = null;
@@ -58,34 +59,37 @@ public class FreeLoopsCom extends PluginForDecrypt {
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-            } else {
-                con.disconnect();
-                final DownloadLink l = createDownloadlink("directhttp://" + finallink);
-                l.setContentUrl(parameter);
+            }
+            con.disconnect();
+            final DownloadLink l = createDownloadlink(DirectHTTP.createURLForThisPlugin(finallink));
+            l.setContentUrl(parameter);
+            String fileName = null;
+            final boolean lookForFilenameInHTMLCode = false;
+            if (lookForFilenameInHTMLCode) {
                 final Browser brc = br.cloneBrowser();
                 brc.setFollowRedirects(true);
                 brc.getPage(parameter);
-                final String fileName = brc.getRegex("File:\\s*(.*?)\\s*<br/>").getMatch(0);
-                final String serverFileName = Plugin.getFileNameFromConnection(con);
-                if (fileName != null) {
-                    l.setFinalFileName(fileName + getFileNameExtensionFromString(serverFileName, ".wav"));
-                } else {
-                    l.setFinalFileName(serverFileName);
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    l.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-                decryptedLinks.add(l);
+                fileName = brc.getRegex("File:\\s*(.*?)\\s*<br/>").getMatch(0);
             }
+            final String serverFileName = Plugin.getFileNameFromConnection(con);
+            if (fileName != null) {
+                l.setFinalFileName(fileName + getFileNameExtensionFromString(serverFileName, ".wav"));
+            } else {
+                l.setFinalFileName(serverFileName);
+            }
+            if (con.getCompleteContentLength() > 0) {
+                l.setVerifiedFileSize(con.getCompleteContentLength());
+            }
+            ret.add(l);
         } finally {
             if (con != null) {
                 con.disconnect();
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

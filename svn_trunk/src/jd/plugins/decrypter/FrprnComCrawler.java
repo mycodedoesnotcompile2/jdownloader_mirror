@@ -26,7 +26,7 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 48305 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49953 $", interfaceVersion = 2, names = {}, urls = {})
 public class FrprnComCrawler extends PornEmbedParser {
     public FrprnComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class FrprnComCrawler extends PornEmbedParser {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:embed|videos)/(\\d+)/?");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:embed|videos)/(\\d+)/");
         }
         return ret.toArray(new String[0]);
     }
@@ -83,7 +83,7 @@ public class FrprnComCrawler extends PornEmbedParser {
         }
     }
 
-    public static final String TYPE_EMBED = "(?:https?://[^/]+)?/embed/(\\d+)/?";
+    public static final String TYPE_EMBED = "(?i)(?:https?://[^/]+)?/embed/(\\d+)/?";
 
     @Override
     protected boolean isSelfhosted(final Browser br) {
