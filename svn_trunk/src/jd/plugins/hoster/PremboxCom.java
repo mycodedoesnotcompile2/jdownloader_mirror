@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49959 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -402,6 +402,7 @@ public class PremboxCom extends PluginForHost {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
                 mhost.setResume(canResume);
+                supportedhosts.add(mhost);
             }
         }
         ai.setMultiHostSupportV2(this, supportedhosts);

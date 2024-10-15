@@ -23,28 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.download.DownloadLinkDownloadable;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -68,7 +46,31 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 49774 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.download.DownloadLinkDownloadable;
+
+@HostPlugin(revision = "$Revision: 49959 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -326,25 +328,18 @@ public class PremiumTo extends UseNet {
         if (real_supported_hosts_storage == null) {
             real_supported_hosts_storage = new ArrayList<String>();
         }
+        List<String> final_real_user_whitelisted_hosts_storage = null;
         whitelistedStorageHostsHandling: if (true) {
             /* Handling for Storage hosts based on users' plugin settings. */
-            List<String> user_whitelisted_hosts_storage = new ArrayList<String>();
-            List<String> final_real_user_whitelisted_hosts_storage = new ArrayList<String>();
-            List<String> real_user_whitelisted_hosts_storage = null;
-            boolean onlyAllowWhitelistedStorageHosts = false;
-            String whitelistedStorageHostsCommaSeparated = null;
-            try {
-                /* 2020-01-29: Temp. workaround for ClassCastException see also: jdlog://6337230900751/ */
-                final PremiumDotToConfigInterface config = getAccountJsonConfig(account);
-                onlyAllowWhitelistedStorageHosts = config.isEnableStorageWhiteListing();
-                whitelistedStorageHostsCommaSeparated = config.getWhitelistedStorageHosts();
-            } catch (final Throwable e) {
-                logger.warning("Error while trying to load user-settings --> Using default settings");
-            }
-            if (!onlyAllowWhitelistedStorageHosts) {
+            final PremiumDotToConfigInterface config = getAccountJsonConfig(account);
+            String whitelistedStorageHostsCommaSeparated = config.getWhitelistedStorageHosts();
+            if (!config.isEnableStorageWhiteListing()) {
                 logger.info("User disabled whitelisting of Storage hosts (= add all Storage hosts to list)");
                 break whitelistedStorageHostsHandling;
             }
+            final_real_user_whitelisted_hosts_storage = new ArrayList<String>();
+            List<String> user_whitelisted_hosts_storage = new ArrayList<String>();
+            List<String> real_user_whitelisted_hosts_storage = null;
             logger.info("User enabled whitelisting of Storage hosts");
             if (!StringUtils.isEmpty(whitelistedStorageHostsCommaSeparated)) {
                 final String[] whitelistedHosts = whitelistedStorageHostsCommaSeparated.split(",");
@@ -364,8 +359,6 @@ public class PremiumTo extends UseNet {
                     }
                 }
             }
-            /* Clear list of Storage hosts to fill it again with whitelisted entries of user */
-            real_supported_hosts_storage.clear();
             if (final_real_user_whitelisted_hosts_storage.isEmpty()) {
                 logger.info("User whitelisted nothing or entered invalid values (e.g. non-Storage hosts) --> Adding no Storage hosts at all");
                 additionalAccountStatus += " | Whitelisted Storage hosts: None [All disabled]";
@@ -375,7 +368,6 @@ public class PremiumTo extends UseNet {
                 int counter = 0;
                 for (final String final_real_user_whitelisted_storage_host : final_real_user_whitelisted_hosts_storage) {
                     logger.info("WhitelistedStorageHost: " + final_real_user_whitelisted_storage_host);
-                    real_supported_hosts_storage.add(final_real_user_whitelisted_storage_host);
                     additionalAccountStatus += final_real_user_whitelisted_storage_host;
                     if (counter < final_real_user_whitelisted_hosts_storage.size() - 1) {
                         additionalAccountStatus += ", ";
@@ -385,7 +377,23 @@ public class PremiumTo extends UseNet {
             }
         }
         /* Finally, add Storage hosts to regular host array to be able to use them and display the list of supported hosts. */
-        real_supported_hosts_regular.addAll(real_supported_hosts_storage);
+        final List<String> real_supported_hosts_all = new ArrayList<String>();
+        real_supported_hosts_all.addAll(real_supported_hosts_regular);
+        real_supported_hosts_all.addAll(real_supported_hosts_storage);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        for (final String domain : real_supported_hosts_regular) {
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            supportedhosts.add(mhost);
+        }
+        for (final String domain : real_supported_hosts_storage) {
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            mhost.setStatusText("Storage host");
+            if (final_real_user_whitelisted_hosts_storage != null && !final_real_user_whitelisted_hosts_storage.contains(domain)) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+                mhost.setStatusText("Not allowed by plugin settings' whitelist");
+            }
+            supportedhosts.add(mhost);
+        }
         /* Update cache */
         synchronized (PremiumTo.supported_hosts_storage) {
             PremiumTo.supported_hosts_storage.clear();
@@ -398,7 +406,7 @@ public class PremiumTo extends UseNet {
         while (it.hasNext()) {
             final String[] domains = it.next();
             for (final String domain : domains) {
-                if (real_supported_hosts_regular.contains(domain)) {
+                if (real_supported_hosts_all.contains(domain)) {
                     it.remove();
                     break;
                 }
@@ -407,15 +415,15 @@ public class PremiumTo extends UseNet {
         if (defaultServersideDeactivatedWebsites.size() > 0) {
             showServersideDeactivatedHostInformation(account, defaultServersideDeactivatedWebsites.get(0)[0]);
         }
-        ai.setMultiHostSupport(this, real_supported_hosts_regular);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         ai.setStatus("Premium account" + additionalAccountStatus);
         return ai;
     }
 
     /**
      * This dialog is there to make users of this multihoster aware that they can control the list of supported filehosts for this
-     * multihoster serverside in their multihoster account. </br> Some filehosts are disabled by default which is the core information this
-     * dialog is supposed to tell the user.
+     * multihoster serverside in their multihoster account. </br>
+     * Some filehosts are disabled by default which is the core information this dialog is supposed to tell the user.
      */
     private Thread showServersideDeactivatedHostInformation(final Account account, final String exampleHost) {
         final boolean userConfirmedDialogAlready = account.getBooleanProperty(PROPERTY_ACCOUNT_DEACTIVATED_FILEHOSTS_DIALOG_SHOWN_AND_CONFIRMED, false);

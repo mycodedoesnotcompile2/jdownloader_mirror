@@ -43,6 +43,7 @@ import java.util.List;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.simplejson.JSonObject;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
@@ -68,7 +69,6 @@ public class PostRequest extends HttpRequest {
     }
 
     protected class PostRequestInputStream extends FilterInputStream implements StreamValidEOF {
-
         protected PostRequestInputStream(InputStream in) {
             super(in);
         }
@@ -118,7 +118,6 @@ public class PostRequest extends HttpRequest {
                 return false;
             }
         }
-
     }
 
     protected InputStream        inputStream         = null;
@@ -225,9 +224,9 @@ public class PostRequest extends HttpRequest {
                 String charSet = null;
                 final String type = this.getRequestHeaders().getValue(HTTPConstants.HEADER_RESPONSE_CONTENT_TYPE);
                 if (type != null) {
-                    if (new Regex(type, "(application/x-www-form-urlencoded)").matches()) {
+                    if (new Regex(type, "(application/x-www-form-urlencoded)").patternFind()) {
                         content_type = CONTENT_TYPE.X_WWW_FORM_URLENCODED;
-                    } else if (new Regex(type, "(application/json)").matches()) {
+                    } else if (new Regex(type, "(application/json)").patternFind()) {
                         content_type = CONTENT_TYPE.JSON;
                     } else {
                         content_type = CONTENT_TYPE.UNKNOWN;
@@ -237,7 +236,7 @@ public class PostRequest extends HttpRequest {
                         charSet = "UTF-8";
                     }
                 }
-                readPostParameters(content_type, charSet);
+                postParameters = readPostParameters(content_type, charSet);
             } finally {
                 this.postParameterParsed = true;
             }
@@ -245,43 +244,57 @@ public class PostRequest extends HttpRequest {
         return this.postParameters;
     }
 
-    protected void readPostParameters(CONTENT_TYPE content_type, String charSet) throws IOException, UnsupportedEncodingException {
-        JSonRequest jsonRequest = null;
+    protected List<KeyValuePair> readPostParameters(final CONTENT_TYPE content_type, final String charSet) throws IOException, UnsupportedEncodingException {
         if (content_type != null) {
             switch (content_type) {
             case JSON: {
                 final byte[] jsonBytes = IO.readStream(-1, this.getInputStream());
-                String json = new String(jsonBytes, charSet);
-                json = modifyByContentType(content_type, json);
-                jsonRequest = JSonStorage.restoreFromString(json, JSonRequest.TYPE_REF);
+                String jsonString = new String(jsonBytes, charSet);
+                jsonString = modifyByContentType(content_type, jsonString);
+                // try to parse JSonRequest object
+                JSonRequest jsonRequest = JSonStorage.restoreFromString(jsonString, JSonRequest.TYPE_REF);
+                if (jsonRequest == null || jsonRequest.getParams() == null) {
+                    // fallback to raw json object
+                    final Object rawJSON = JSonStorage.restoreFromString(jsonString, TypeRef.OBJECT);
+                    if (rawJSON instanceof List) {
+                        jsonRequest = new JSonRequest();
+                        // List of Param Objects
+                        jsonRequest.setParams(((List) rawJSON).toArray(new Object[0]));
+                    } else if (rawJSON != null) {
+                        jsonRequest = new JSonRequest();
+                        // Single Param Object
+                        jsonRequest.setParams(new Object[] { rawJSON });
+                    }
+                }
+                if (jsonRequest != null && jsonRequest.getParams() != null) {
+                    final LinkedList<KeyValuePair> ret = new LinkedList<KeyValuePair>();
+                    for (final Object parameter : jsonRequest.getParams()) {
+                        if (parameter instanceof JSonObject) {
+                            /*
+                             * JSonObject has customized .toString which converts Map to Json!
+                             */
+                            ret.add(new KeyValuePair(null, parameter.toString()));
+                        } else {
+                            final String jsonParameter = JSonStorage.serializeToJson(parameter);
+                            ret.add(new KeyValuePair(null, jsonParameter));
+                        }
+                    }
+                    return ret;
+                }
             }
                 break;
             case X_WWW_FORM_URLENCODED: {
-                final byte[] jsonBytes = IO.readStream(-1, this.getInputStream());
-                String params = new String(jsonBytes, charSet);
-                params = modifyByContentType(content_type, params);
-                this.postParameters = HttpConnection.parseParameterList(params);
+                final byte[] formBytes = IO.readStream(-1, this.getInputStream());
+                String formString = new String(formBytes, charSet);
+                formString = modifyByContentType(content_type, formString);
+                return HttpConnection.parseParameterList(formString);
             }
-                break;
             case UNKNOWN:
             default:
-                break;
+                return null;
             }
         }
-        if (jsonRequest != null && jsonRequest.getParams() != null) {
-            this.postParameters = new LinkedList<KeyValuePair>();
-            for (final Object parameter : jsonRequest.getParams()) {
-                if (parameter instanceof JSonObject) {
-                    /*
-                     * JSonObject has customized .toString which converts Map to Json!
-                     */
-                    this.postParameters.add(new KeyValuePair(null, parameter.toString()));
-                } else {
-                    final String jsonParameter = JSonStorage.serializeToJson(parameter);
-                    this.postParameters.add(new KeyValuePair(null, jsonParameter));
-                }
-            }
-        }
+        return null;
     }
 
     /**

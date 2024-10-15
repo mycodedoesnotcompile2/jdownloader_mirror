@@ -26,10 +26,7 @@ import java.util.Map;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -45,7 +42,6 @@ import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.LinkStatus;
-import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
@@ -156,13 +152,11 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
         if (otherHostersLimitLeftStr == null) {
             otherHostersLimitLeftStr = br.getRegex("Pozostały limit na serwisy dodatkowe\\s*:\\s*<b>([^<]+)</b></div>").getMatch(0);
         }
-        ai.setProperty("TRAFFIC_LEFT", otherHostersLimitLeftStr == null ? getPhrase("UNKNOWN") : SizeFormatter.getSize(otherHostersLimitLeftStr));
         final String unlimited = br.getRegex("<br />(.*):\\s*<b>\\s*Bez limitu\\s*</b> \\|").getMatch(0);
-        if (unlimited != null) {
-            ai.setProperty("UNLIMITED", unlimited);
-        }
         ai.setStatus("Premium" + " (" + getPhrase("TRAFFIC_LEFT") + ": " + (otherHostersLimitLeftStr == null ? getPhrase("UNKNOWN") : otherHostersLimitLeftStr) + (unlimited == null ? "" : ", " + unlimited + ": " + getPhrase("UNLIMITED")) + ")");
-        if (otherHostersLimitLeftStr != null) {
+        if (unlimited != null) {
+            ai.setUnlimitedTraffic();
+        } else if (otherHostersLimitLeftStr != null) {
             final long hardcodedMaxTrafficDaily = SizeFormatter.getSize("30GB"); // 2024-02-15
             ai.setTrafficLeft(SizeFormatter.getSize(otherHostersLimitLeftStr));
             ai.setTrafficMax(hardcodedMaxTrafficDaily);
@@ -282,19 +276,6 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
 
     private String getDikrectlinkproperty() {
         return "directlink_" + getHost();
-    }
-
-    @Override
-    public void extendAccountSettingsPanel(final Account account, final PluginConfigPanelNG panel) {
-        final AccountInfo ai = account.getAccountInfo();
-        if (ai == null) {
-            return;
-        }
-        if (AccountType.PREMIUM.equals(account.getType())) {
-            final long otherHostersLimit = Long.parseLong(ai.getProperty("TRAFFIC_LEFT").toString(), 10);
-            final String unlimited = (String) (ai.getProperty("UNLIMITED"));
-            panel.addStringPair(_GUI.T.lit_traffic_left(), SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), otherHostersLimit) + (unlimited == null ? "" : "\n" + unlimited + ": " + getPhrase("UNLIMITED")));
-        }
     }
 
     private Map<String, String> phrasesEN = new HashMap<String, String>() {

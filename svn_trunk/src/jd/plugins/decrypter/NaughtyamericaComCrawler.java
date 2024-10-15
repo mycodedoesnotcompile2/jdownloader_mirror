@@ -24,6 +24,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
+import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -47,12 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig;
-import org.jdownloader.plugins.components.config.NaughtyamericaConfig.VideoImageGalleryCrawlMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 49957 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49960 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -354,6 +354,9 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         fp.setName(title);
         if (description != null) {
             fp.setComment(description);
+            for (final DownloadLink result : ret) {
+                result.setProperty(NaughtyamericaCom.PROPERTY_DESCRIPTION, description);
+            }
         }
         fp.addLinks(ret);
         return ret;

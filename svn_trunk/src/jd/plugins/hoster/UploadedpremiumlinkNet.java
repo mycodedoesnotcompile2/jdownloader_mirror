@@ -49,9 +49,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49959 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
-    /** Docs: https://docs.uploadedpremiumlink.net/ */
+    /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
     private static MultiHosterManagement mhm                                            = new MultiHosterManagement("uploadedpremiumlink.net");
     private static final String          PROPERTY_UPLOADEDPREMIUMLINK_PASSWORD_REQUIRED = "uploadedpremiumlink_password_required";

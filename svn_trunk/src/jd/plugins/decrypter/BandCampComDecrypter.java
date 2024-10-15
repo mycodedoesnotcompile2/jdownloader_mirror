@@ -25,14 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -52,7 +44,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BandCampCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49768 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 49958 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { BandCampCom.class })
 public class BandCampComDecrypter extends PluginForDecrypt {
     public BandCampComDecrypter(PluginWrapper wrapper) {
@@ -113,7 +113,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         return 1;
     }
 
-    private final Pattern                  TYPE_PROFILE       = Pattern.compile("(?i)https?://([\\w\\-]+)\\.[^/]+(/music)?$");
+    private final Pattern                  TYPE_PROFILE       = Pattern.compile("(?i)https?://([\\w\\-]+)\\.[^/]+(/|/music)?$");
     private final Pattern                  TYPE_EMBED         = Pattern.compile("(?i)https?://[^/]+/EmbeddedPlayer(?:\\.html)?.*?/(?:album|track)=\\d+.*");
     private final Pattern                  TYPE_SHOW          = Pattern.compile("(?i)https?://[^/]+/\\?show=(\\d+)");
     private static AtomicReference<String> videoSupportBroken = new AtomicReference<String>();
@@ -354,8 +354,8 @@ public class BandCampComDecrypter extends PluginForDecrypt {
             dateTimestamp = dateToTimestamp(dateStr);
         }
         /**
-         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br>
-         * Example-album without any streamable tracks: https://midsummerex.bandcamp.com/album/intl
+         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br> Example-album without any
+         * streamable tracks: https://midsummerex.bandcamp.com/album/intl
          */
         boolean isSingleTrack = new Regex(br.getURL(), BandCampCom.PATTERN_SINGLE_TRACK).patternFind();
         final List<Map<String, Object>> albumtracks = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(json);

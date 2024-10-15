@@ -64,7 +64,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49312 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -3006,53 +3006,55 @@ public class SaveTv extends PluginForHost {
 
     @Override
     public void extendAccountSettingsPanel(Account account, PluginConfigPanelNG panel) {
+        super.extendAccountSettingsPanel(account, panel);
         final AccountInfo ai = account.getAccountInfo();
-        if (ai != null) {
-            final String accType = account.getStringProperty(PROPERTY_acc_type, ACCOUNTTYPE_UNKNOWN);
-            final String accUsername = account.getStringProperty(PROPERTY_acc_username, "?");
-            String acc_expire = "Unbekannt";
-            final String acc_package = account.getStringProperty(PROPERTY_acc_package, "?");
-            final String acc_price = account.getStringProperty(PROPERTY_acc_price, "?");
-            final String acc_runtime = account.getStringProperty(PROPERTY_acc_runtime, "?");
-            final String acc_count_archive_entries = account.getStringProperty(PROPERTY_acc_count_archive_entries, "?");
-            final String acc_count_telecast_ids = account.getStringProperty(PROPERTY_acc_count_telecast_ids, "?");
-            final String user_lastcrawl_newlinks_date;
-            final String user_lastcrawl_date;
-            final long time_last_crawl_ended_newlinks = account.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, 0);
-            final long time_last_crawl_ended = account.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL, 0);
-            final String maxchunks;
-            if (ACCOUNT_PREMIUM_MAXCHUNKS == 0) {
-                maxchunks = "20";
-            } else if (ACCOUNT_PREMIUM_MAXCHUNKS < 1) {
-                maxchunks = Integer.toString(-ACCOUNT_PREMIUM_MAXCHUNKS);
-            } else {
-                maxchunks = Integer.toString(ACCOUNT_PREMIUM_MAXCHUNKS);
-            }
-            final SimpleDateFormat formatter = new SimpleDateFormat("dd.MM.yyyy 'um' HH:mm 'Uhr'");
-            if (time_last_crawl_ended_newlinks > 0 && time_last_crawl_ended > 0) {
-                user_lastcrawl_date = formatter.format(time_last_crawl_ended);
-                user_lastcrawl_newlinks_date = formatter.format(time_last_crawl_ended_newlinks);
-            } else {
-                user_lastcrawl_date = "Nie";
-                user_lastcrawl_newlinks_date = "Nie";
-            }
-            if (account.getAccountInfo().getValidUntil() > 0) {
-                acc_expire = formatter.format(account.getAccountInfo().getValidUntil());
-            }
-            panel.addStringPair(_GUI.T.lit_username(), accUsername);
-            panel.addStringPair(_GUI.T.lit_account_type(), accType);
-            panel.addStringPair(_GUI.T.lit_package(), acc_package);
-            panel.addStringPair(_GUI.T.lit_runtime(), acc_runtime);
-            panel.addStringPair(_GUI.T.lit_expire_date(), acc_expire);
-            panel.addStringPair(_GUI.T.lit_price(), acc_price);
-            panel.addStringPair("Sendungen im Archiv:", acc_count_archive_entries);
-            panel.addStringPair("Ladbare Sendungen im Archiv (telecast-IDs):", acc_count_telecast_ids);
-            panel.addStringPair("Datum des letzten erfolgreichen Crawlvorganges: ", user_lastcrawl_date);
-            panel.addStringPair("Zuletzt erfolgreich telecastIDs per Crawler hinzugefügt:", user_lastcrawl_newlinks_date);
-            panel.addHeader(_GUI.T.lit_download(), new AbstractIcon(IconKey.ICON_DOWNLOAD, 18));
-            panel.addStringPair(_GUI.T.lit_max_simultanous_downloads(), "20");
-            panel.addStringPair(_GUI.T.lit_max_chunks_per_link(), maxchunks);
-            panel.addStringPair(_GUI.T.lit_interrupted_downloads_are_resumable(), _JDT.T.literally_yes());
+        if (ai == null) {
+            return;
         }
+        final String accType = account.getStringProperty(PROPERTY_acc_type, ACCOUNTTYPE_UNKNOWN);
+        final String accUsername = account.getStringProperty(PROPERTY_acc_username, "?");
+        String acc_expire = "Unbekannt";
+        final String acc_package = account.getStringProperty(PROPERTY_acc_package, "?");
+        final String acc_price = account.getStringProperty(PROPERTY_acc_price, "?");
+        final String acc_runtime = account.getStringProperty(PROPERTY_acc_runtime, "?");
+        final String acc_count_archive_entries = account.getStringProperty(PROPERTY_acc_count_archive_entries, "?");
+        final String acc_count_telecast_ids = account.getStringProperty(PROPERTY_acc_count_telecast_ids, "?");
+        final String user_lastcrawl_newlinks_date;
+        final String user_lastcrawl_date;
+        final long time_last_crawl_ended_newlinks = account.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, 0);
+        final long time_last_crawl_ended = account.getLongProperty(CRAWLER_PROPERTY_LASTCRAWL, 0);
+        final String maxchunks;
+        if (ACCOUNT_PREMIUM_MAXCHUNKS == 0) {
+            maxchunks = "20";
+        } else if (ACCOUNT_PREMIUM_MAXCHUNKS < 1) {
+            maxchunks = Integer.toString(-ACCOUNT_PREMIUM_MAXCHUNKS);
+        } else {
+            maxchunks = Integer.toString(ACCOUNT_PREMIUM_MAXCHUNKS);
+        }
+        final SimpleDateFormat formatter = new SimpleDateFormat("dd.MM.yyyy 'um' HH:mm 'Uhr'");
+        if (time_last_crawl_ended_newlinks > 0 && time_last_crawl_ended > 0) {
+            user_lastcrawl_date = formatter.format(time_last_crawl_ended);
+            user_lastcrawl_newlinks_date = formatter.format(time_last_crawl_ended_newlinks);
+        } else {
+            user_lastcrawl_date = "Nie";
+            user_lastcrawl_newlinks_date = "Nie";
+        }
+        if (account.getAccountInfo().getValidUntil() > 0) {
+            acc_expire = formatter.format(account.getAccountInfo().getValidUntil());
+        }
+        panel.addStringPair(_GUI.T.lit_username(), accUsername);
+        panel.addStringPair(_GUI.T.lit_account_type(), accType);
+        panel.addStringPair(_GUI.T.lit_package(), acc_package);
+        panel.addStringPair(_GUI.T.lit_runtime(), acc_runtime);
+        panel.addStringPair(_GUI.T.lit_expire_date(), acc_expire);
+        panel.addStringPair(_GUI.T.lit_price(), acc_price);
+        panel.addStringPair("Sendungen im Archiv:", acc_count_archive_entries);
+        panel.addStringPair("Ladbare Sendungen im Archiv (telecast-IDs):", acc_count_telecast_ids);
+        panel.addStringPair("Datum des letzten erfolgreichen Crawlvorganges: ", user_lastcrawl_date);
+        panel.addStringPair("Zuletzt erfolgreich telecastIDs per Crawler hinzugefügt:", user_lastcrawl_newlinks_date);
+        panel.addHeader(_GUI.T.lit_download(), new AbstractIcon(IconKey.ICON_DOWNLOAD, 18));
+        panel.addStringPair(_GUI.T.lit_max_simultanous_downloads(), "20");
+        panel.addStringPair(_GUI.T.lit_max_chunks_per_link(), maxchunks);
+        panel.addStringPair(_GUI.T.lit_interrupted_downloads_are_resumable(), _JDT.T.literally_yes());
     }
 }

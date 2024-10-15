@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.NaughtyamericaComCrawler;
 
-@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "http://naughtyamericadecrypted.+" })
 public class NaughtyamericaCom extends PluginForHost {
     public NaughtyamericaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +76,7 @@ public class NaughtyamericaCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.naughtyamerica.com/terms-of-service.html";
+        return "https://www." + getHost() + "/terms-of-service.html";
     }
 
     /* Connection stuff */
@@ -95,6 +95,7 @@ public class NaughtyamericaCom extends PluginForHost {
     public static final String   PROPERTY_PICTURE_NUMBER   = "picnumber";
     public static final String   PROPERTY_CRAWLER_FILENAME = "crawler_filename";
     public static final String   PROPERTY_MAINLINK         = "mainlink";
+    public static final String   PROPERTY_DESCRIPTION      = "description";
 
     public void correctDownloadLink(final DownloadLink link) {
         link.setPluginPatternMatcher(link.getPluginPatternMatcher().replaceAll("(?i)https?://naughtyamericadecrypted", "https://"));

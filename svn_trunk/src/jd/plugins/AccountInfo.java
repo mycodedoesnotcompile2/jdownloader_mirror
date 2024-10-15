@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
@@ -403,7 +404,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
         final HashMap<String, Set<LazyHostPlugin>> mapping = new HashMap<String, Set<LazyHostPlugin>>();
         final HashSet<String> skippedOfflineEntries = new HashSet<String>();
         final HashSet<String> skippedInvalidEntries = new HashSet<String>();
-        final HashSet<String> skippedbyPluginAllowHandleEntries = new HashSet<String>();
+        final HashSet<String> skippedByPluginAllowHandleEntries = new HashSet<String>();
+        final HashSet<String> alternativeDomainsOfFoundHits = new HashSet<String>();
         final HashSet<String> otherIgnoreEntries = new HashSet<String>();
         // lets do some preConfiguring, and match hosts which do not contain tld
         final Pattern patternInvalid = Pattern.compile("http|directhttp|https|file|up|upload|video|torrent|ftp", Pattern.CASE_INSENSITIVE);
@@ -481,7 +483,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 final String[] siteSupportedNames = hit.getSitesSupported();
                 if (siteSupportedNames != null) {
                     for (final String siteSupportedName : siteSupportedNames) {
-                        otherIgnoreEntries.add(siteSupportedName);
+                        alternativeDomainsOfFoundHits.add(siteSupportedName);
                     }
                 }
                 Set<LazyHostPlugin> plugins = mapping.get(maindomainCleaned);
@@ -506,9 +508,21 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 finalresults2.add(mhost);
                 continue cleanListLoop;
             }
+            /* Remove dupes based on the results we already have */
+            final Iterator<LazyHostPlugin> iterator = plugins.iterator();
+            do {
+                final LazyHostPlugin plugin = iterator.next();
+                if (finalresults.contains(plugin.getHost())) {
+                    plugins.remove(plugin);
+                }
+            } while (iterator.hasNext());
+            if (plugins.size() == 0) {
+                /* All items were dupes -> Skip them */
+                continue cleanListLoop;
+            }
             /* Multiple possible results -> Evaluate what's the best */
             final List<LazyHostPlugin> best = new ArrayList<LazyHostPlugin>();
-            int numberofSkippedbyPluginAllowHandleEntries = 0;
+            final Set<LazyHostPlugin> thisSkippedByPluginAllowHandleEntries = new HashSet<LazyHostPlugin>();
             for (final LazyHostPlugin plugin : plugins) {
                 if (plugin.isOfflinePlugin()) {
                     skippedOfflineEntries.add(maindomainCleaned);
@@ -522,8 +536,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
                         final DownloadLink link = new DownloadLink(null, "", plugin.getHost(), "", false);
                         final PluginForHost plg = pluginFinder.getPlugin(plugin);
                         if (!plg.allowHandle(link, multiHostPlugin)) {
-                            skippedbyPluginAllowHandleEntries.add(plugin.getHost());
-                            numberofSkippedbyPluginAllowHandleEntries++;
+                            thisSkippedByPluginAllowHandleEntries.add(plugin);
+                            skippedByPluginAllowHandleEntries.add(plugin.getHost());
                             continue;
                         }
                     } catch (final Throwable e) {
@@ -536,25 +550,28 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 }
                 best.add(plugin);
             }
-            if (best.size() == 0) {
-                if (numberofSkippedbyPluginAllowHandleEntries == plugins.size()) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
-                    finalresults2.add(mhost);
-                }
-                unassignedMultiHostSupport.add(maindomainCleaned);
-                continue cleanListLoop;
-            } else if (best.size() > 1) {
+            if (best.size() > 1) {
                 unassignedMultiHostSupport.add(maindomainCleaned);
                 if (logger != null) {
                     logger.warning("Found more than one possible plugins for one domain: " + maindomainCleaned);
                     logger.log(new Exception("DEBUG: " + maindomainCleaned));
                 }
                 continue cleanListLoop;
+            } else if (best.size() == 0 && skippedByPluginAllowHandleEntries.size() == 0) {
+                unassignedMultiHostSupport.add(maindomainCleaned);
+                continue cleanListLoop;
             }
-            finalresults2.add(mhost);
+            final LazyHostPlugin finalplugin;
+            if (best.size() == 1) {
+                finalplugin = best.get(0);
+            } else {
+                /* Take first result of fallback list. */
+                finalplugin = plugins.iterator().next();
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
+            }
             final boolean hostIsWorkingAccordingToMultihost = mhost.getStatus() == MultihosterHostStatus.WORKING || mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE;
-            final boolean forcePrintNonWorkingHosts = true;
-            if (forcePrintNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
+            final boolean printNonWorkingHosts = true;
+            if (printNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
                 logger.info("Non working host: " + mhost);
             }
             if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !hostIsWorkingAccordingToMultihost) {
@@ -562,21 +579,22 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 logger.info("Skipping non working host in stable: " + mhost.getName());
                 continue cleanListLoop;
             }
-            final LazyHostPlugin finalplugin = best.get(0);
             final String pluginHost = finalplugin.getHost();
-            if (!finalresults.contains(pluginHost)) {
-                finalresults.add(pluginHost);
+            if (finalresults.contains(pluginHost)) {
+                continue cleanListLoop;
             }
+            finalresults.add(pluginHost);
             // TODO: Improve this
             mhost.getDomains().clear();
             mhost.setDomain(pluginHost);
+            finalresults2.add(mhost);
         }
         /**
          * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
          * If a multihost provides multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but
          * "rg.to" may remain on the list of unassigned hosts.
          */
-        for (final String item : otherIgnoreEntries) {
+        for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
         }
         if (skippedOfflineEntries.size() > 0 && logger != null) {
@@ -585,9 +603,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 logger.info("Skipped offline entry: " + host);
             }
         }
-        if (skippedbyPluginAllowHandleEntries.size() > 0 && logger != null) {
-            logger.info("Found " + skippedbyPluginAllowHandleEntries.size() + " skippedbyPluginAllowHandle entries");
-            for (final String host : skippedbyPluginAllowHandleEntries) {
+        if (skippedByPluginAllowHandleEntries.size() > 0 && logger != null) {
+            logger.info("Found " + skippedByPluginAllowHandleEntries.size() + " skippedbyPluginAllowHandle entries");
+            for (final String host : skippedByPluginAllowHandleEntries) {
                 logger.info("Skipped by allowHandle entry: " + host);
             }
         }
@@ -602,6 +620,15 @@ public class AccountInfo extends Property implements AccountTrafficView {
             logger.info("Found " + unassignedMultiHostSupport.size() + " unassigned entries");
             for (final String host : unassignedMultiHostSupport) {
                 logger.info("Could not assign any host for: " + host);
+            }
+        }
+        if (otherIgnoreEntries.size() > 0 && logger != null) {
+            /* This array should usually be empty. */
+            logger.info("Found " + otherIgnoreEntries.size() + " other skipped entries");
+            for (final String item : otherIgnoreEntries) {
+                if (logger != null) {
+                    logger.info("Skipped _other_ entry: " + item);
+                }
             }
         }
         if (finalresults.isEmpty()) {

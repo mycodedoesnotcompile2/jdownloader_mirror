@@ -10,10 +10,9 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
-import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47365 $", interfaceVersion = 3, names = { "recaptcha.google.com" }, urls = { "google://.+" })
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "recaptcha.google.com" }, urls = { "google://.+" })
 public class GooglePremium extends PluginForHost {
     @Override
     public Boolean siteTesterDisabled() {
@@ -90,10 +89,6 @@ public class GooglePremium extends PluginForHost {
     @Override
     public boolean isProxyRotationEnabledForLinkChecker() {
         return super.isProxyRotationEnabledForLinkChecker();
-    }
-
-    @Override
-    public void extendAccountSettingsPanel(Account acc, PluginConfigPanelNG panel) {
     }
 
     @Override

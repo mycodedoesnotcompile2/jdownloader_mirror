@@ -67,4 +67,8 @@ public class CountingPushbackInputStream extends PushbackInputStream implements 
     public InputStream getParentInputStream() {
         return cis.getParentInputStream();
     }
+
+    public int capacity() {
+        return buf.length;
+    }
 }

@@ -24,7 +24,13 @@ public class MultiHostHost {
         WORKING_UNSTABLE {
             @Override
             public String getLabel() {
-                return "Working but unstable/beta/testing";
+                return "Unstable";
+            }
+        },
+        DEACTIVATED_USER {
+            @Override
+            public String getLabel() {
+                return "Deactivated by user";
             }
         },
         DEACTIVATED_JDOWNLOADER {
@@ -36,7 +42,7 @@ public class MultiHostHost {
         DEACTIVATED_JDOWNLOADER_UNSUPPORTED {
             @Override
             public String getLabel() {
-                return "JD does not support this host";
+                return "JD doesn't support this host";
             }
         },
         DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN {
@@ -54,7 +60,7 @@ public class MultiHostHost {
         DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE {
             @Override
             public String getLabel() {
-                return "Cannot be used with your current type of account";
+                return "Cannot be used with your current account type";
             }
         };
     }
@@ -186,8 +192,10 @@ public class MultiHostHost {
 
     public void setUnlimitedLinks(Boolean param) {
         this.isUnlimitedLinks = param;
-        this.linksLeft = -1;
-        this.linksMax = -1;
+        if (param == null || param.equals(Boolean.TRUE)) {
+            this.linksLeft = -1;
+            this.linksMax = -1;
+        }
     }
 
     public boolean isUnlimitedTraffic() {
@@ -196,8 +204,10 @@ public class MultiHostHost {
 
     public void setUnlimitedTraffic(Boolean param) {
         this.isUnlimitedTraffic = param;
-        this.trafficLeft = -1;
-        this.trafficMax = -1;
+        if (param == null || param.equals(Boolean.TRUE)) {
+            this.trafficLeft = -1;
+            this.trafficMax = -1;
+        }
     }
 
     @Deprecated

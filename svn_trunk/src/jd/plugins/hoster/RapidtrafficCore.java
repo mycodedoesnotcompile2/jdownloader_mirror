@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -344,12 +344,14 @@ public abstract class RapidtrafficCore extends PluginForHost {
 
     @Override
     public void extendAccountSettingsPanel(final Account account, final PluginConfigPanelNG panel) {
-        AccountInfo ai = account.getAccountInfo();
-        if (ai != null) {
-            final long availableTraffic = ai.getLongProperty(PROPERTY_ACCOUNTINFO_TRAFFICLEFT, 0);
-            if (availableTraffic >= 0) {
-                panel.addStringPair(_GUI.T.lit_traffic_left(), SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), availableTraffic));
-            }
+        super.extendAccountSettingsPanel(account, panel);
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return;
+        }
+        final long availableTraffic = ai.getLongProperty(PROPERTY_ACCOUNTINFO_TRAFFICLEFT, 0);
+        if (availableTraffic >= 0) {
+            panel.addStringPair(_GUI.T.lit_traffic_left(), SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), availableTraffic));
         }
     }
 

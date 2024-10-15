@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -213,7 +213,7 @@ public class CooldebridCom extends PluginForHost {
              * 2022-02-22: Website claims to also support some hosts for free users but when this plugin was developed they did not have a
              * single free host on their list.
              */
-            // account.setType(AccountType.FREE);
+            account.setType(AccountType.FREE);
             ai.setExpired(true);
         }
         // br.getPage("/host-status.html");

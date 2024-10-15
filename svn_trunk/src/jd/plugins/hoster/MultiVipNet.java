@@ -19,8 +19,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -34,6 +36,7 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -43,10 +46,10 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49894 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
 public class MultiVipNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
-    private static final String                            APIKEY             = "amQy";
+    private static final String                            APIKEY             = "jd2";
     private static final boolean                           USE_API            = true;
     /* Default value is 10 */
     private static AtomicInteger                           maxPrem            = new AtomicInteger(10);
@@ -154,7 +157,7 @@ public class MultiVipNet extends PluginForHost {
         if (dllink == null) {
             /* request Download */
             if (USE_API) {
-                br.getPage(API_BASE + "?apipass=" + Encoding.Base64Decode(APIKEY) + "&do=addlink&vipkey=" + Encoding.urlEncode(account.getPass()) + "&ip=&link=" + Encoding.urlEncode(link.getDownloadURL()));
+                br.getPage(API_BASE + "?apipass=" + APIKEY + "&do=addlink&vipkey=" + Encoding.urlEncode(account.getPass()) + "&ip=&link=" + Encoding.urlEncode(link.getDownloadURL()));
                 /* Should never happen because size limit is set in fetchAccountInfo and handled via canHandle */
                 if ("204".equals(PluginJSonUtils.getJsonValue(br, "error"))) {
                     /*
@@ -246,14 +249,12 @@ public class MultiVipNet extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         account.setMaxSimultanDownloads(20);
         maxPrem.set(20);
-        br.getPage(API_BASE + "?apipass=" + Encoding.Base64Decode(APIKEY) + "&do=keycheck&vipkey=" + Encoding.urlEncode(account.getPass()));
-        final String error = PluginJSonUtils.getJsonValue(br, "error");
-        if (error != null) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Vip key!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid Vip key!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
+        br.getPage(API_BASE + "?apipass=" + APIKEY + "&do=keycheck&vipkey=" + Encoding.urlEncode(account.getPass()));
+        // TODO: Make use of json parser everywhere
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final String error_txt = (String) entries.get("error_txt");
+        if (error_txt != null) {
+            throw new AccountInvalidException(error_txt);
         }
         final String expire = PluginJSonUtils.getJsonValue(br, "diedate");
         final String max_downloadable_filesize = PluginJSonUtils.getJsonValue(br, "limit");
@@ -261,13 +262,13 @@ public class MultiVipNet extends PluginForHost {
         ai.setValidUntil(Long.parseLong(expire) * 1000);
         ai.setTrafficLeft(Long.parseLong(traffic_left_kb) * 1024);
         account.setProperty("max_downloadable_filesize", Long.parseLong(max_downloadable_filesize) * 1024);
-        br.getPage("/api.php?apipass=" + Encoding.Base64Decode(APIKEY) + "&do=getlist");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        br.getPage("/api.php?apipass=" + APIKEY + "&do=getlist");
+        final ArrayList<String> supportedhosts = new ArrayList<String>();
         final String[] hostDomains = br.getRegex("\"allow\":\\[(.*?)\\]").getColumn(0);
         for (final String domains : hostDomains) {
             final String[] realDomains = new Regex(domains, "\"(.*?)\"").getColumn(0);
             for (final String realDomain : realDomains) {
-                supportedHosts.add(realDomain);
+                supportedhosts.add(realDomain);
             }
         }
         if (max_downloadable_filesize.equals("0")) {
@@ -283,7 +284,7 @@ public class MultiVipNet extends PluginForHost {
             account.setType(AccountType.FREE);
             ai.setStatus("Free Vip key");
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupport(this, supportedhosts);
         return ai;
     }
 

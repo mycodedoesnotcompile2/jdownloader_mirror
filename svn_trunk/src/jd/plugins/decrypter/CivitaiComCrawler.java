@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.CivitaiComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -44,7 +43,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49684 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -273,13 +272,6 @@ public class CivitaiComCrawler extends PluginForDecrypt {
         // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         // }
         return ret;
-    }
-
-    @Override
-    public void distribute(DownloadLink... links) {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            super.distribute(links);
-        }
     }
 
     @Override
