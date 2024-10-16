@@ -16,8 +16,10 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -48,11 +50,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49969 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     private static final String          PROTOCOL       = "https://";
     /* Connection limits */
@@ -504,7 +508,7 @@ public class DailyleechCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
         long expire = 0;
-        final String expireStr = br.getRegex("(?i)Until(?:\\&nbsp;)?([^<>\"]+)<").getMatch(0);
+        final String expireStr = br.getRegex("(?i)Until(?:\\&nbsp;)?([^<\"]+)<").getMatch(0);
         if (expireStr != null) {
             expire = TimeFormatter.getMilliSeconds(expireStr, "E',' dd MMM yyyy HH:mm:ss", Locale.ENGLISH);
         }
@@ -519,11 +523,50 @@ public class DailyleechCom extends PluginForHost {
             ai.setExpired(true);
         }
         br.getPage("/hostsp/");
-        final String[] hostlist = br.getRegex("domain=([^<>\"\\'/]+)\"").getColumn(0);
-        if (hostlist == null || hostlist.length == 0) {
+        final String[] domains = br.getRegex("domain=([^<>\"\\'/]+)\"").getColumn(0);
+        if (domains == null || domains.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
-        ai.setMultiHostSupport(this, Arrays.asList(hostlist));
+        final String[] hostdetails = br.getRegex("<td>(.*?)</tr>(<tr>|\\s*</tbody>)").getColumn(0);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        for (final String domain : domains) {
+            if (domain.equalsIgnoreCase(this.getHost())) {
+                /* Skip own multihoster domain */
+                continue;
+            }
+            String html = null;
+            if (hostdetails != null && hostdetails.length > 0) {
+                for (final String thishtml : hostdetails) {
+                    if (thishtml.contains(domain)) {
+                        html = thishtml;
+                        break;
+                    }
+                }
+            }
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            /* Collect additional information if possible */
+            if (html != null) {
+                if (new Regex(html, "(?i)>\\s*Online \\(Unstable\\)").patternFind()) {
+                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+                } else if (new Regex(html, "(?i)>\\s*Online").patternFind() == false) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                }
+                final String maxLinksStr = new Regex(html, "(?i)(\\d+) links").getMatch(0);
+                if (maxLinksStr != null) {
+                    final long maxLinks = Long.parseLong(maxLinksStr);
+                    mhost.setLinksMax(maxLinks);
+                    mhost.setLinksLeft(maxLinks);
+                }
+                final String maxTrafficGigabytesStr = new Regex(html, "(\\d+\\.\\d{1,2} GB)").getMatch(0);
+                if (maxTrafficGigabytesStr != null) {
+                    final long maxTrafficBytes = SizeFormatter.getSize(maxTrafficGigabytesStr);
+                    mhost.setTrafficMax(maxTrafficBytes);
+                    mhost.setTrafficLeft(maxTrafficBytes);
+                }
+            }
+            supportedhosts.add(mhost);
+        }
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
@@ -552,6 +595,7 @@ public class DailyleechCom extends PluginForHost {
                 br.clearCookies(null);
             }
         }
+        logger.info("Performing full login");
         br.getPage(PROTOCOL + this.getHost() + "/cbox/login.php");
         final Form loginform = br.getFormbyProperty("class", "omb_loginForm");
         if (loginform == null) {
@@ -584,9 +628,8 @@ public class DailyleechCom extends PluginForHost {
         br.getPage("/cbox/cbox.php");
         if (!isLoggedIn(br)) {
             throw new AccountInvalidException();
-        } else {
-            account.saveCookies(br.getCookies(br.getHost()), "");
         }
+        account.saveCookies(br.getCookies(br.getHost()), "");
     }
 
     private boolean isLoggedIn(final Browser br) {

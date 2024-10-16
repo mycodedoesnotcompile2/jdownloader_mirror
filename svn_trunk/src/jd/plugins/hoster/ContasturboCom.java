@@ -37,14 +37,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
 public class ContasturboCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("contasturbo.com");
 
     public ContasturboCom(PluginWrapper wrapper) {
         super(wrapper);
         setStartIntervall(1 * 1000l);
-        this.enablePremium("https://www.contasturbo.com/planos/");
+        this.enablePremium("https://www." + getHost() + "/planos/");
     }
 
     @Override
@@ -54,7 +54,7 @@ public class ContasturboCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.contasturbo.com/";
+        return "https://www." + getHost();
     }
 
     private static final boolean ACCOUNT_PREMIUM_RESUME    = true;

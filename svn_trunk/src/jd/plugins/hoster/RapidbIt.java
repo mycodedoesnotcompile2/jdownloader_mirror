@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49964 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
 public class RapidbIt extends PluginForHost {
     private final String                 API_BASE                    = "https://rapidb.it/api";
     private static MultiHosterManagement mhm                         = new MultiHosterManagement("rapidb.it");
@@ -74,7 +74,7 @@ public class RapidbIt extends PluginForHost {
     @SuppressWarnings("deprecation")
     public RapidbIt(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://" + this.getHost() + "/pl/buy/level");
+        this.enablePremium("https://" + this.getHost() + "/pricing");
     }
 
     @Override
@@ -92,7 +92,7 @@ public class RapidbIt extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://" + this.getHost() + "/pl/page/tos";
+        return "https://" + this.getHost() + "/page/tos";
     }
 
     @Override
@@ -261,9 +261,14 @@ public class RapidbIt extends PluginForHost {
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> filehostings = (List<Map<String, Object>>) apiconfig.get("filehostings");
         for (final Map<String, Object> filehosting : filehostings) {
+            final String name = filehosting.get("name").toString();
             final MultiHostHost mhost = new MultiHostHost();
-            mhost.setName(filehosting.get("name").toString());
-            mhost.setDomains((List<String>) filehosting.get("domains"));
+            mhost.setName(name);
+            mhost.addDomains((List<String>) filehosting.get("domains"));
+            /*
+             * Important: Add name as domain since they got some hosts listed with domain starting with "www." which distracts our matching.
+             */
+            mhost.addDomain(name);
             if (((Number) filehosting.get("status")).intValue() != 1) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 mhost.setStatusText((String) filehosting.get("status_reason"));

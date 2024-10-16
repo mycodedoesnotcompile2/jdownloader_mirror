@@ -84,7 +84,6 @@ import jd.gui.swing.jdgui.JDGui;
 import jd.gui.swing.jdgui.interfaces.SwitchPanel;
 import jd.plugins.AddonPanel;
 import jd.utils.JDUtilities;
-import jd.utils.locale.JDL;
 import net.miginfocom.swing.MigLayout;
 
 public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation> implements ReconnecterListener, MenuExtenderHandler {
@@ -99,7 +98,6 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     private static final Pattern                CMD_PM         = Pattern.compile("(msg|query)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_SLAP       = Pattern.compile("(slap)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_TOPIC      = Pattern.compile("(topic|title)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern                CMD_TRANSLATE  = Pattern.compile("(translate)", Pattern.CASE_INSENSITIVE);
     private static final Pattern                CMD_VERSION    = Pattern.compile("(version|jdversion)", Pattern.CASE_INSENSITIVE);
     private static final java.util.List<String> COMMANDS       = new ArrayList<String>();
     public static String                        STYLE;
@@ -380,7 +378,8 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
         if (this.conn != null && this.conn.isConnected()) {
             this.addToText(null, ChatExtension.STYLE_SYSTEM_MESSAGE, "Change channel to: " + newChannel);
         }
-        if (this.conn != null && this.conn.isConnected()) {
+        // only leave if actually in a channel - fixes "No such channel" on connect
+        if (this.conn != null && this.conn.isConnected() && currentChannel != null) {
             this.conn.doPart(getCurrentChannel(), " --> " + newChannel);
         }
         setCurrentChannel(newChannel);
@@ -857,28 +856,18 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
                 }
                 this.lastCommand = "/mode ";
                 this.conn.doMode(getCurrentChannel(), rest.trim());
-            } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_TRANSLATE)) {
-                end = rest.indexOf(" ");
-                if (end < 0) {
-                    end = rest.length();
-                }
-                final String[] tofrom = rest.substring(0, end).trim().split("to");
-                if (tofrom == null || tofrom.length != 2) {
-                    this.addToText(null, ChatExtension.STYLE_ERROR, "Command /translate " + rest.substring(0, end).trim() + " is not available");
-                    return;
-                }
-                final String t;
-                t = JDL.translate(tofrom[0], tofrom[1], Utils.prepareMsg(rest.substring(end).trim()));
-                this.lastCommand = "/translate " + rest.substring(0, end).trim() + " ";
-                new EDTHelper<Object>() {
-                    @Override
-                    public Object edtRun() {
-                        ChatExtension.this.textField.setText(t);
-                        return null;
-                    }
-                }.start(true);
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_TOPIC)) {
-                this.conn.doTopic(getCurrentChannel(), this.prepareToSend(rest));
+                if (rest.equals("")) { // no params means show topic - default irc behaviour
+                    String topic = ChatExtension.this.top.getText();
+                    if (topic.isEmpty()) {
+                        topic = "No topic set";
+                    }
+                    for (String TopicLine : topic.split("! ")) {
+                        this.addToText(null, ChatExtension.STYLE_TOPIC, "Topic: " + Utils.prepareMsg(TopicLine));
+                    }
+                } else { // try to set topic
+                    this.conn.doTopic(getCurrentChannel(), this.prepareToSend(rest));
+                }
                 this.lastCommand = "/topic ";
             } else if (org.appwork.utils.Regex.matches(cmd, ChatExtension.CMD_JOIN)) {
                 this.NAMES.clear();
@@ -978,7 +967,9 @@ public class ChatExtension extends AbstractExtension<ChatConfig, ChatTranslation
     }
 
     public void setTopic(final String msg) {
-        this.addToText(null, ChatExtension.STYLE_TOPIC, "Channel Topic is: " + Utils.prepareMsg(msg));
+        for (String TopicLine : msg.split("! ")) {
+            this.addToText(null, ChatExtension.STYLE_TOPIC, "Topic: " + Utils.prepareMsg(TopicLine));
+        }
         new EDTHelper<Object>() {
             @Override
             public Object edtRun() {

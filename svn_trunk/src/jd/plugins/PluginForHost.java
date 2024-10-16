@@ -56,6 +56,8 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
+import org.appwork.swing.exttable.ExtColumn;
+import org.appwork.swing.exttable.ExtComponentRowHighlighter;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtFileSizeColumn;
 import org.appwork.swing.exttable.columns.ExtLongColumn;
@@ -3105,57 +3107,6 @@ public abstract class PluginForHost extends Plugin {
             return;
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            for (final MultiHostHost mhost : hosts) {
-                if (mhost.getDomains().isEmpty()) {
-                    /* Skip invalid items */
-                    continue;
-                }
-                final StringBuilder sb = new StringBuilder();
-                final String domain = mhost.getDomains().get(0);
-                String hostStr;
-                final MultihosterHostStatus status = mhost.getStatus();
-                if (status == MultihosterHostStatus.WORKING) {
-                    hostStr = domain;
-                } else if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
-                    hostStr = "<span style=\"background-color:#ffca28;\">" + domain + "</span>";
-                } else {
-                    // if (status == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
-                    // hostStr = "<span style=\"background-color:#ef5350;\">" + domain + "</span>";
-                    // }
-                    final String statusText;
-                    if (mhost.getStatusText() != null) {
-                        statusText = mhost.getStatusText();
-                    } else {
-                        statusText = status.toString();
-                    }
-                    hostStr = "<span style=\"background-color:#ef5350;\">" + domain + "</span> | " + statusText;
-                }
-                boolean isLimitReached = false;
-                if (mhost.isUnlimitedTraffic() && mhost.isUnlimitedLinks()) {
-                    sb.append("Unlimited");
-                } else {
-                    if (!mhost.isUnlimitedTraffic()) {
-                        sb.append("|" + SizeFormatter.formatBytes(mhost.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(mhost.getTrafficMax()));
-                        if (mhost.getTrafficLeft() <= 0) {
-                            isLimitReached = true;
-                        }
-                    }
-                    if (!mhost.isUnlimitedLinks()) {
-                        sb.append("|Links left: " + mhost.getLinksLeft() + "/" + mhost.getLinksMax());
-                        if (mhost.getLinksLeft() <= 0) {
-                            isLimitReached = true;
-                        }
-                    }
-                }
-                if (mhost.getTrafficCalculationFactorPercent() != 100) {
-                    sb.append("|Factor: x" + mhost.getTrafficCalculationFactorPercent() / 100);
-                }
-                String limitText = sb.toString();
-                if (isLimitReached) {
-                    limitText = "<span style=\"background-color:#ffca28;\">" + limitText + "</span>";
-                }
-                panel.addStringPair(hostStr, limitText);
-            }
             final Icon error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
             final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
             final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
@@ -3190,10 +3141,6 @@ public abstract class PluginForHost extends Plugin {
 
                         @Override
                         public Icon getIcon(MultiHostHost mhost) {
-                            // final LazyHostPlugin plg = HostPluginController.getInstance().get(mhost.getDomain());
-                            // if (plg == null) {
-                            // return icon_filler;
-                            // }
                             final DomainInfo di = DomainInfo.getInstance(mhost.getDomain());
                             if (di != null) {
                                 return di.getFavIcon();
@@ -3201,10 +3148,25 @@ public abstract class PluginForHost extends Plugin {
                                 return icon_filler;
                             }
                         }
+
+                        @Override
+                        protected String getTooltipText(final MultiHostHost mhost) {
+                            if (mhost.getDomains().size() == 1) {
+                                return super.getTooltipText(mhost);
+                            }
+                            final StringBuilder sb = new StringBuilder();
+                            for (final String domain : mhost.getDomains()) {
+                                if (sb.length() > 0) {
+                                    sb.append(", ");
+                                }
+                                sb.append(domain);
+                            }
+                            return sb.toString();
+                        }
                     });
                     addColumn(new ExtTextColumn<MultiHostHost>("Status") {
                         @Override
-                        public String getStringValue(MultiHostHost mhost) {
+                        public String getStringValue(final MultiHostHost mhost) {
                             return mhost.getStatus().getLabel();
                         }
 
@@ -3237,6 +3199,21 @@ public abstract class PluginForHost extends Plugin {
                             }
                         }
                     });
+                    addColumn(new ExtTextColumn<MultiHostHost>("Custom status Text") {
+                        @Override
+                        public String getStringValue(MultiHostHost mhost) {
+                            if (mhost.getStatusText() != null) {
+                                return mhost.getStatusText();
+                            } else {
+                                return "---";
+                            }
+                        }
+
+                        @Override
+                        protected String getTooltipText(MultiHostHost mhost) {
+                            return "Status text according to multihosters' API.";
+                        }
+                    });
                     addColumn(new ExtLongColumn<MultiHostHost>("Links left/max") {
                         @Override
                         protected long getLong(MultiHostHost mhost) {
@@ -3266,24 +3243,24 @@ public abstract class PluginForHost extends Plugin {
                         protected long getBytes(MultiHostHost val) {
                             return val.getTrafficMax();
                         }
-
-                        private final Color defaultColor;
-                        {
-                            renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
-                            defaultColor = rendererField.getForeground();
-                        }
-
-                        @Override
-                        public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int column) {
-                            super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                            if (value.isUnlimitedTraffic()) {
-                                rendererField.setForeground(defaultColor);
-                            } else if (value.getTrafficLeft() > 0) {
-                                rendererField.setForeground(defaultColor);
-                            } else {
-                                rendererField.setForeground(Color.ORANGE);
-                            }
-                        }
+                        // private final Color defaultColor;
+                        // {
+                        // renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
+                        // defaultColor = rendererField.getForeground();
+                        // }
+                        //
+                        // @Override
+                        // public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int
+                        // column) {
+                        // super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+                        // if (value.isUnlimitedTraffic()) {
+                        // rendererField.setForeground(defaultColor);
+                        // } else if (value.getTrafficLeft() > 0) {
+                        // rendererField.setForeground(defaultColor);
+                        // } else {
+                        // rendererField.setForeground(Color.ORANGE);
+                        // }
+                        // }
                     });
                     addColumn(new ExtLongColumn<MultiHostHost>("Links Left") {
                         @Override
@@ -3357,12 +3334,6 @@ public abstract class PluginForHost extends Plugin {
                         }
                     };
                     addColumn(trafficCalculationColumn);
-                    addColumn(new ExtTextColumn<MultiHostHost>("Custom/Detailed status Text") {
-                        @Override
-                        public String getStringValue(MultiHostHost mhost) {
-                            return mhost.getStatusText();
-                        }
-                    });
                     addColumn(new ExtLongColumn<MultiHostHost>("Unavailable for") {
                         @Override
                         protected long getLong(MultiHostHost mhost) {
@@ -3384,17 +3355,50 @@ public abstract class PluginForHost extends Plugin {
                             }
                         }
                     });
-                    if (!shouldShowTrafficCaculationColumn_final) {
-                        // TODO: Fix NPE
-                        // setColumnVisible(trafficCalculationColumn, shouldShowTrafficCaculationColumn_final);
-                    }
                 }
 
                 @Override
                 public List<MultiHostHost> getTableData() {
                     return hosts;
                 }
+
+                @Override
+                public void _fireTableStructureChanged(final List<MultiHostHost> newtableData, final boolean refreshSort) {
+                    super._fireTableStructureChanged(newtableData, refreshSort);
+                    if (!shouldShowTrafficCaculationColumn_final) {
+                        // TODO: Fix NPE
+                        setColumnVisible(trafficCalculationColumn, false);
+                    }
+                }
             };
+            tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.YELLOW, null) {
+                @Override
+                public boolean accept(ExtColumn<MultiHostHost> column, MultiHostHost mhost, boolean selected, boolean focus, int row) {
+                    if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
+                        return true;
+                    } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
+                        return true;
+                    } else if (mhost.getUnavailableUntilTimestamp() != -1) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            });
+            // tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.RED, null) {
+            // @Override
+            // public boolean accept(ExtColumn<MultiHostHost> column, MultiHostHost mhost, boolean selected, boolean focus, int row) {
+            // final MultihosterHostStatus status = mhost.getStatus();
+            // if (status == MultihosterHostStatus.WORKING) {
+            // return false;
+            // } else if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
+            // return false;
+            // } else {
+            // /* Item has error status */
+            // return true;
+            // }
+            // }
+            // });
             // tableModel.setAutoWidthEnabled(true);
             final BasicJDTable<MultiHostHost> table = new BasicJDTable<MultiHostHost>(tableModel);
             table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));

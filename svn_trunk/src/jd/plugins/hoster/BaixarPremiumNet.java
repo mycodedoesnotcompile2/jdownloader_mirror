@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
 public class BaixarPremiumNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            NICE_HOST          = "baixarpremium.net";
@@ -92,6 +92,7 @@ public class BaixarPremiumNet extends PluginForHost {
         if (br.containsHTML(">\\s*Você não possui nenhum pacote de Conta Premium\\.\\s*<") || !is_premium) {
             account.setType(AccountType.FREE);
             ac.setTrafficLeft(0);
+            ac.setExpired(true);
         } else {
             /*
              * Important: Ignore expire date as it depends on every host - we could show the expire date that lasts longest but that's too
@@ -100,7 +101,7 @@ public class BaixarPremiumNet extends PluginForHost {
             account.setType(AccountType.PREMIUM);
             ac.setUnlimitedTraffic();
         }
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final ArrayList<String> supportedhosts = new ArrayList<String>();
         String[] crippledHosts;
         if (hoststext != null) {
             crippledHosts = hoststext.split(", ");
@@ -117,20 +118,20 @@ public class BaixarPremiumNet extends PluginForHost {
             }
             if (crippledhost.equals("icerbox")) {
                 /* We support multiple hosts named "icerbox" with different TLDs! */
-                supportedHosts.add("icerbox.com");
+                supportedhosts.add("icerbox.com");
             } else if (crippledhost.equals("fileal")) {
-                supportedHosts.add("file.al");
+                supportedhosts.add("file.al");
             } else if (crippledhost.equals("1ficher")) {
                 /* Fix spelling mistake */
-                supportedHosts.add("1fichier.com");
+                supportedhosts.add("1fichier.com");
             } else if (crippledhost.equals("kee2share")) {
                 /* Fix spelling mistake */
-                supportedHosts.add("keep2share.cc");
+                supportedhosts.add("keep2share.cc");
             } else {
-                supportedHosts.add(crippledhost);
+                supportedhosts.add(crippledhost);
             }
         }
-        ac.setMultiHostSupport(plugin, supportedHosts);
+        ac.setMultiHostSupport(plugin, supportedhosts);
         return ac;
     }
 

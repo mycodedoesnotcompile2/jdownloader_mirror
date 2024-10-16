@@ -23,6 +23,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -50,13 +56,7 @@ import jd.plugins.decrypter.MediafireComFolder;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49919 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
+@HostPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = { "mediafire.com" }, urls = { "https?://(?:www\\.)?mediafire\\.com/file/([a-z0-9]+)(/([^/]+))?" })
 public class MediafireCom extends PluginForHost {
     /** Settings stuff */
     private static final String FREE_TRIGGER_RECONNECT_ON_CAPTCHA = "FREE_TRIGGER_RECONNECT_ON_CAPTCHA";
@@ -66,6 +66,11 @@ public class MediafireCom extends PluginForHost {
     @Override
     public String[] siteSupportedNames() {
         return new String[] { "mediafire.com", "mediafire" };
+    }
+
+    @Override
+    public void init() {
+        Browser.setRequestIntervalLimitGlobal(this.getHost(), 250);
     }
 
     @Override
@@ -114,6 +119,34 @@ public class MediafireCom extends PluginForHost {
             /* Free(anonymous) and unknown account type */
             return -15;
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null, false);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+        checkViaDirectlink: if (!isDownload) {
+            final String directurlproperty = getDirecturlProperty(link, account);
+            final String storedDirecturl = link.getStringProperty(directurlproperty);
+            if (storedDirecturl == null) {
+                break checkViaDirectlink;
+            }
+            try {
+                this.basicLinkCheck(br, br.createHeadRequest(storedDirecturl), link, null, null);
+                return AvailableStatus.TRUE;
+            } catch (final Throwable e) {
+                logger.log(e);
+                logger.info("direct URL failed");
+            }
+        }
+        if (!checkLinks(new DownloadLink[] { link }, account) || !link.isAvailabilityStatusChecked()) {
+            link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
+        } else if (!link.isAvailable()) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        return getAvailableStatus(link);
     }
 
     public static abstract class PasswordSolver {
@@ -259,7 +292,7 @@ public class MediafireCom extends PluginForHost {
                     }
                 }
             } else {
-                this.requestFileInformation(link, account);
+                this.requestFileInformation(link, account, true);
                 if (link.getBooleanProperty("privatefile") && account == null) {
                     throw new AccountRequiredException("Private file: Only downloadable for users with permission and owner");
                 }
@@ -435,11 +468,6 @@ public class MediafireCom extends PluginForHost {
                 }
             }.run();
         }
-    }
-
-    @Override
-    public void init() {
-        Browser.setRequestIntervalLimitGlobal(this.getHost(), 250);
     }
 
     public Map<String, Object> login(final Browser br, final Account account, boolean force) throws Exception {
@@ -738,27 +766,14 @@ public class MediafireCom extends PluginForHost {
         /* 2020-06-29: Some files will have all information given bur are deleted if delete_date exists! */
         if (delete_date != null && delete_date.matches("\\d{4}-\\d{2}-\\d{2}.*")) {
             /**
-             * For files parsed in context of a folder: </br> We can't really be sure if the file is online until we actually try to
-             * download it but also in browser all files as part of folders look to be online when viewing folders.
+             * For files parsed in context of a folder: </br>
+             * We can't really be sure if the file is online until we actually try to download it but also in browser all files as part of
+             * folders look to be online when viewing folders.
              */
             link.setAvailableStatus(AvailableStatus.FALSE);
         } else {
             link.setAvailableStatus(AvailableStatus.TRUE);
         }
-    }
-
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null);
-    }
-
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
-        if (!checkLinks(new DownloadLink[] { link }, account) || !link.isAvailabilityStatusChecked()) {
-            link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
-        } else if (!link.isAvailable()) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        return getAvailableStatus(link);
     }
 
     private void handleNonAPIErrors(final DownloadLink link, final Browser br) throws PluginException, IOException {

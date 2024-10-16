@@ -37,6 +37,7 @@ import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.EvilangelComConfig.Quality;
 import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfig.BestSelectionMethod;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -64,7 +65,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49968 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class EvilangelCore extends PluginForHost {
     public EvilangelCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -476,7 +477,7 @@ public abstract class EvilangelCore extends PluginForHost {
                         } else {
                             /* Find best quality */
                             long highestQualityValue = -1;
-                            boolean findBestByFilesize = false;
+                            final boolean findBestByFilesize = PluginJsonConfig.get(getConfigInterface()).getBestQualitySelectionMethod() == BestSelectionMethod.FILE_SIZE;
                             for (final Entry<String, Number> entry : download_file_sizes.entrySet()) {
                                 final String thisqualityLabel = entry.getKey();
                                 final long thisFilesize = entry.getValue().longValue();

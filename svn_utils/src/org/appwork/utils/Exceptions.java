@@ -38,6 +38,7 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -332,7 +333,16 @@ public class Exceptions {
      * @param e
      */
     public static void resetInterruptFlag(Throwable e) {
+        if (Thread.currentThread().isInterrupted()) {
+            return;
+        }
         if (containsInstanceOf(e, InterruptedException.class)) {
+            // This happens only, if there is no correct handling of interrupt exceptions. Fix this
+            DebugMode.debugger();
+            Thread.currentThread().interrupt();
+        } else if (containsInstanceOf(e, ClosedByInterruptException.class)) {
+            // This happens only, if there is no correct handling of interrupt exceptions. Fix this
+            DebugMode.debugger();
             Thread.currentThread().interrupt();
         }
     }

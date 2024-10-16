@@ -27,6 +27,8 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -49,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49959 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49973 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -131,7 +133,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl", 10 * 1000l);
         }
-        if (passCode != null && link.getDownloadPassword() == null) {
+        if (passCode != null && !StringUtils.equals(link.getDownloadPassword(), passCode)) {
             logger.info("User entered valid download password: " + passCode);
             link.setDownloadPassword(passCode);
         }
@@ -166,6 +168,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             account.setType(AccountType.FREE);
             ai.setExpired(true);
         }
+        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         final int daily_links_generated = ((Number) user.get("daily_links_generated")).intValue();
         final int daily_links_limit = ((Number) user.get("daily_links_limit")).intValue();
         ai.setStatus(user.get("type").toString() + " | Total traffic left: " + user.get("traffic_left") + " | Daily links generated: " + daily_links_generated + "/" + daily_links_limit);
@@ -190,17 +193,25 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             mhost.setLinksMax(((Number) hoster.get("daily_links_limit")).intValue());
             mhost.setLinksLeft(mhost.getLinksMax() - ((Number) hoster.get("daily_links_used")).intValue());
             /* Double check for reached limit */
-            if (((Number) hoster.get("percentage_used")).intValue() >= 100) {
+            final int weekly_percentage_used = ((Number) hoster.get("weekly_percentage_used")).intValue();
+            if ((((Number) hoster.get("percentage_used")).intValue() >= 100 || weekly_percentage_used >= 100) && daily_quota_left > 0) {
                 mhost.setTrafficLeft(0);
                 mhost.setLinksLeft(0);
             }
+            final String statustext;
+            if (weekly_percentage_used == 0) {
+                statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
+            } else {
+                statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
+            }
+            mhost.setStatusText(statustext);
             supportedhosts.add(mhost);
         }
         ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         if (daily_links_generated >= daily_links_limit) {
             /* Account cannot be used for downloading. */
-            throw new AccountUnavailableException("Account has reached daily max links limit of " + daily_links_limit + " links", 5 * 60 * 1000);
+            throw new AccountUnavailableException("Reached daily max limits limit: " + daily_links_generated + "/" + daily_links_limit, 5 * 60 * 1000);
         }
         return ai;
     }
@@ -284,10 +295,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         downloadErrorsFileUnavailable.add("RESOURCE_RETRIEVAL_FAILURE");
         final String message = entries.get("message").toString();
         String errorcode = (String) entries.get("category_error");
-        if (errorcode == null) {
-            /* 2024-10-10: Looks like both version of this key exist */
-            errorcode = entries.get("error_category").toString();
-        }
         if (accountErrorsPermanent.contains(errorcode)) {
             throw new AccountInvalidException(message);
         } else if (accountErrorsTemporary.contains(errorcode)) {

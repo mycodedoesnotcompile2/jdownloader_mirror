@@ -73,7 +73,6 @@ public class MultiHostHost {
     private long                  linksMax                        = -1;
     private long                  trafficLeft                     = -1;
     private long                  trafficMax                      = -1;
-    private String                unavailableMessage              = null;
     private long                  unavailableUntilTimestamp       = -1;
     private Short                 trafficCalculationFactorPercent = null;
     private int                   maxChunks                       = 0;
@@ -99,14 +98,6 @@ public class MultiHostHost {
         this.name = name;
     }
 
-    protected void setDomain(final String domain) {
-        if (domain == null) {
-            throw new IllegalArgumentException();
-        }
-        this.domains.clear();
-        this.domains.add(domain);
-    }
-
     public void addDomain(final String domain) {
         if (domain == null) {
             throw new IllegalArgumentException();
@@ -125,6 +116,16 @@ public class MultiHostHost {
         }
     }
 
+    /** Sets domain. Overwrites previously set values! */
+    protected void setDomain(final String domain) {
+        if (domain == null) {
+            throw new IllegalArgumentException();
+        }
+        this.domains.clear();
+        this.domains.add(domain);
+    }
+
+    /** Sets domains. Overwrites previously set values! */
     public void setDomains(final List<String> domains) {
         if (domains == null) {
             throw new IllegalArgumentException();
@@ -155,7 +156,6 @@ public class MultiHostHost {
     }
 
     public void setTrafficLeft(long trafficLeft) {
-        // TODO: review this
         this.trafficLeft = trafficLeft;
         this.isUnlimitedTraffic = false;
     }
@@ -165,7 +165,6 @@ public class MultiHostHost {
     }
 
     public void setTrafficMax(long bytes) {
-        // TODO: review this
         this.trafficMax = bytes;
         this.isUnlimitedTraffic = false;
     }
@@ -246,6 +245,12 @@ public class MultiHostHost {
         }
     }
 
+    public void setErrorStatus(final String text, final long waitMillis) {
+        this.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+        this.setStatusText(text);
+        this.setUnavailableTime(waitMillis);
+    }
+
     public MultihosterHostStatus getStatus() {
         // TODO: Update this to simply return status without any evaluation
         if (this.unavailableUntilTimestamp > Time.systemIndependentCurrentJVMTimeMillis()) {
@@ -305,14 +310,6 @@ public class MultiHostHost {
 
     public List<String> getDomains() {
         return this.domains;
-    }
-
-    public String getUnavailableMessage() {
-        return unavailableMessage;
-    }
-
-    public void setUnavailableMessage(String unavailableMessage) {
-        this.unavailableMessage = unavailableMessage;
     }
 
     public long getUnavailableUntilTimestamp() {

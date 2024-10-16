@@ -52,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 49960 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 49968 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -128,7 +128,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             } else if (br.containsHTML(">\\s*Add 3D Videos to")) {
                 throw new AccountRequiredException("Add 3D Videos to your Membership to unlock this video");
             }
-            final ArrayList<Integer> selectedQualities = this.getSelectedQualities();
+            final List<Integer> selectedQualities = this.getSelectedQualities();
             if (selectedQualities.isEmpty() && !ignoreQualitySelection) {
                 throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "USER_DESELECTED_ALL_QUALITIES_" + urlSlug, "You've deselected all qualities in the settings of this plugin.");
             }
@@ -166,7 +166,6 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             final Map<Integer, List<DownloadLink>> foundQualities = new HashMap<Integer, List<DownloadLink>>();
             int qualityHeightMax = -1;
             final List<DownloadLink> best = new ArrayList<DownloadLink>();
-            final NaughtyamericaConfig cfg = PluginJsonConfig.get(NaughtyamericaConfig.class);
             final boolean preferh265 = cfg.isPreferH265();
             for (final String directlink : alldirecturls) {
                 /* Skip trailers */
@@ -333,7 +332,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
             }
         }
         // TODO: Add setting and only add thumbnails if wished by the user
-        if (thumbnailURLs.size() > 0 && (ignoreQualitySelection || true)) {
+        if (thumbnailURLs.size() > 0 && (ignoreQualitySelection || cfg.isGrabThumbnail())) {
             for (String thumbnailURL : thumbnailURLs) {
                 final URL url_parsed = br.getURL(thumbnailURL);
                 thumbnailURL = url_parsed.toExternalForm();
@@ -411,7 +410,6 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
     @Deprecated
     private ArrayList<Integer> getSelectedQualities() {
         final ArrayList<Integer> selectedQualities = new ArrayList<Integer>();
-        final NaughtyamericaConfig cfg = PluginJsonConfig.get(NaughtyamericaConfig.class);
         if (cfg.isGrab8K()) {
             selectedQualities.add(4320);
         }

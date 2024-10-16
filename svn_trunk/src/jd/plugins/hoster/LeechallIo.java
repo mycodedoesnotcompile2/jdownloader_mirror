@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -235,7 +235,7 @@ public class LeechallIo extends PluginForHost {
             ai.setValidUntil(TimeFormatter.getMilliSeconds(expiredate, "yyyy-MM-dd HH:mm:ss", Locale.US), br);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-        ai.setStatus(account.getType().getLabel() + " | Total downloaded: " + SIZEUNIT.formatValue(maxSizeUnit, total_downloadedBytes) + " | Files: " + total_files);
+        ai.setStatus(account.getType().getLabel() + " | Downloaded traffic: " + SIZEUNIT.formatValue(maxSizeUnit, total_downloadedBytes) + " | Downloaded files: " + total_files);
         final Map<String, Object> respbandwidth = this.accessAPI("/user/bandwidth");
         final Map<String, Object> bandwidth = (Map<String, Object>) respbandwidth.get("bandwidth");
         final long dailytrafficmaxbytes = Long.parseLong(bandwidth.get("maximum").toString());
@@ -274,6 +274,18 @@ public class LeechallIo extends PluginForHost {
                 if (limitsfilenum != null) {
                     mhost.setLinksMax(Long.parseLong(limitsfilenum.get("total").toString()));
                     mhost.setLinksLeft(mhost.getLinksMax() - Long.parseLong(limitsfilenum.get("used").toString()));
+                }
+            } else {
+                /* Obtain values from main map. 0 = unlimited */
+                final long limit_bandwidth_daily = ((Number) hostinfo.get("limit_bandwidth_daily")).longValue();
+                if (limit_bandwidth_daily > 0) {
+                    mhost.setTrafficMax(limit_bandwidth_daily);
+                    mhost.setTrafficLeft(limit_bandwidth_daily);
+                }
+                final long limit_file_daily = ((Number) hostinfo.get("limit_file_daily")).longValue();
+                if (limit_file_daily > 0) {
+                    mhost.setLinksMax(limit_file_daily);
+                    mhost.setLinksLeft(limit_file_daily);
                 }
             }
             supportedhosts.add(mhost);

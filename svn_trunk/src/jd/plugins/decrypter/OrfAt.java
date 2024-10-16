@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 49485 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49964 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -609,11 +609,11 @@ public class OrfAt extends PluginForDecrypt {
                     videoSelectedResults.addAll(selectedVideoQualities);
                 } else {
                     logger.info("Users selection would return zero results -> Returning all instead");
-                    videoSelectedResults.addAll(videoSelectedResults);
+                    videoSelectedResults.addAll(videoresults);
                 }
             }
             final ArrayList<DownloadLink> thisFinalResults = new ArrayList<DownloadLink>();
-            /* Sollect all chosen results and add subtitle if user wants to download subtitle. */
+            /* Select all chosen results and add subtitle if user wants to download subtitle. */
             for (final DownloadLink chosenVideoResult : videoSelectedResults) {
                 thisFinalResults.add(chosenVideoResult);
                 /* Add a subtitle-result for each chosen video quality */

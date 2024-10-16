@@ -250,4 +250,17 @@ public class ParameterParser {
         this.list.add(commandSwitch);
         this.map.put(commandSwitch.getCaseInsensitiveSwitchCommand(), commandSwitch);
     }
+
+    /**
+     * @param string
+     * @param string2
+     * @param string3
+     * @param string4
+     * @param string5
+     * @return
+     */
+    public String[] getParameters(String key, String... defauilts) {
+        CommandSwitch ret = getCommandSwitch(key);
+        return ret == null ? defauilts : ret.getParameters();
+    }
 }

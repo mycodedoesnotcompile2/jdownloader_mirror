@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -39,10 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MediafireCom;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49962 $", interfaceVersion = 2, names = {}, urls = {})
 public class MediafireComFolder extends PluginForDecrypt {
     public MediafireComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,7 +93,7 @@ public class MediafireComFolder extends PluginForDecrypt {
         String directurl = null;
         final String fid = getFileIDFRomURL(parameter);
         final Regex direct = new Regex(parameter, TYPE_DIRECT);
-        if (direct.matches()) {
+        if (direct.patternFind()) {
             directurl = parameter;
         }
         final String multipleContentIDsCommaSeparated = new Regex(param.getCryptedUrl(), "https?://[^/]+/\\?([a-z0-9,]+)").getMatch(0);

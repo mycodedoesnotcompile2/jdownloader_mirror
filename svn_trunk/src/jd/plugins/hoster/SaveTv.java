@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -64,7 +65,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 49970 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -73,12 +74,12 @@ public class SaveTv extends PluginForHost {
     private static final String   API_SECRET_KEY                               = "3711128ae57644e9a6278adda57a85de457a257fc3ca4130ab5ac863940923be";
     public static final String    HOST_STATIC                                  = "save.tv";
     /* Linktypes */
-    public static final String    LINKTYPE_TELECAST_ID                         = ".+/STV/M/obj/archive/VideoArchiveDetails\\.cfm\\?TelecastID=\\d+";
+    public static final String    LINKTYPE_TELECAST_ID                         = "(?i).+/STV/M/obj/archive/VideoArchiveDetails\\.cfm\\?TelecastID=(\\d+)";
     /*
      * User has programmed something but it has not aired yet (is not downloadable yet) OR it is offline for a long time already
      */
-    public static final String    LINKTYPE_TELECAST_ID_RECORD_OVERVIEW         = ".+/STV/M/obj/TC/SendungsDetails\\.cfm\\?TelecastID=\\d+";
-    public static final String    LINKTYPE_TELECAST_ID_VIDEO_ARCHIVE_STREAMING = ".+/STV/M/obj/archive/VideoArchiveStreaming\\.cfm\\?TelecastID=\\d+";
+    public static final String    LINKTYPE_TELECAST_ID_RECORD_OVERVIEW         = "(?i).+/STV/M/obj/TC/SendungsDetails\\.cfm\\?TelecastID=\\d+";
+    public static final String    LINKTYPE_TELECAST_ID_VIDEO_ARCHIVE_STREAMING = "(?i).+/STV/M/obj/archive/VideoArchiveStreaming\\.cfm\\?TelecastID=\\d+";
     public static final String    LINKTYPE_DIRECT                              = "https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+";
     /* API static information */
     public static final String    API_BASE                                     = "https://api.save.tv/v3";
@@ -335,13 +336,13 @@ public class SaveTv extends PluginForHost {
             if (isOfflineAPI(this.br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             existsRecord = ((Boolean) entries.get("existsRecord")).booleanValue();
             if (existsRecord) {
                 /* Item downloadable --> Find quality list */
                 logger.info("Assumed not-yet-recorded telecastID is recorded and downloadable");
                 callAPIRecordsSingle(telecastID);
-                entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 /* Set current correct downloadurl so that on next linkcheck, we can request the record information right away. */
                 link.setUrlDownload(buildArchiveDownloadURL(link));
             }
@@ -355,7 +356,7 @@ public class SaveTv extends PluginForHost {
                  * Only parse json if we know that the telecastID is not offline because else we might get an Exception as we get a Map
                  * instead of the expected LinkedHashMap!
                  */
-                entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             } else {
                 /* Item not downloadable --> At least try to get general information about this ID */
                 logger.info("Failed to find record --> Checking if maybe it hasn't been recorded yet or is too old (offline)");
@@ -363,7 +364,7 @@ public class SaveTv extends PluginForHost {
                 if (isOfflineAPI(this.br)) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             }
         }
         if (existsRecord) {
@@ -1181,7 +1182,7 @@ public class SaveTv extends PluginForHost {
 
     @SuppressWarnings("unchecked")
     public void handlePremiumAPI(final DownloadLink link, final Account account) throws Exception {
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(this.br.toString());
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final boolean preferAdsFree = getPreferAdsFree(link);
         int formatIDselected = getConfiguredVideoFormatID(link);
         int formatIDFallback = getDefaultFormatID();
@@ -1211,7 +1212,7 @@ public class SaveTv extends PluginForHost {
         String dllink = checkDirectLink(link, formatIDselected, downloadAdsFreeValue);
         if (StringUtils.isEmpty(dllink)) {
             accessDownloadPageAPI(link, formatIDselected, downloadAdsFreeValue);
-            entries = JavaScriptEngineFactory.jsonToJavaMap(this.br.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             dllink = (String) entries.get("downloadUrl");
         }
         handleDownload(link, account, dllink);
@@ -1432,7 +1433,7 @@ public class SaveTv extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         String package_name = null;
         api_GET(br, "/user?fields=contract.hasxlpackage%2C%20contract.hasxxlpackage%2C%20contract.islocked%2C%20contract.isrunning%2C%20contract.packagename");
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("contract");
         final boolean isPremium = ((Boolean) entries.get("isRunning")).booleanValue();
         package_name = (String) entries.get("packageName");
@@ -1706,40 +1707,41 @@ public class SaveTv extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 401) {
             login_api(br, account, true);
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Loginproblem", 1 * 60 * 1000l);
-        } else {
-            Map<String, Object> error_map = null;
-            try {
-                final Object errorO = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-                if (errorO instanceof List) {
-                    final List<Object> errorlist = (List<Object>) JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-                    error_map = (Map<String, Object>) errorlist.get(1);
-                }
-            } catch (final Throwable e) {
+        }
+        Map<String, Object> error_map = null;
+        try {
+            final Object errorO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (errorO instanceof List) {
+                final List<Object> errorlist = (List<Object>) errorO;
+                error_map = (Map<String, Object>) errorlist.get(1);
             }
-            if (error_map != null) {
-                logger.info("An API error happened");
-                final String humanReadableErrormessage = (String) error_map.get("userMessage");
-                final String id = (String) error_map.get("id");
-                if (humanReadableErrormessage != null) {
-                    logger.info("API_error: " + humanReadableErrormessage);
-                }
-                if (id.equalsIgnoreCase("DOWNLOADSESSIONVIDEOFILESSERVICE_NOCONTENT")) {
-                    logger.info("AdFree version is empty --> Failed to start download");
-                    errorAdsFreeUnavailableWithForcedWaittime(this.currDownloadlink, 60 * 60 * 1000);
-                } else if (id.equalsIgnoreCase("NOTFOUND_TELECAST_ID")) {
-                    logger.info("Offline message inside errorhandling --> This is supposed to be handled correctly by other code");
-                    // /* Usually this goes along with a 404 response */
-                    // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                } else {
-                    /** TODO: Collect errors at this stage */
-                    if (this.getDownloadLink() == null) {
-                        /* Account error */
-                        throw new AccountUnavailableException(humanReadableErrormessage, 5 * 60 * 1000l);
-                    } else {
-                        /* Error during download */
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, humanReadableErrormessage, 5 * 60 * 1000l);
-                    }
-                }
+        } catch (final Throwable e) {
+        }
+        if (error_map == null) {
+            /* No error */
+            return;
+        }
+        logger.info("An API error happened: " + error_map);
+        final String humanReadableErrormessage = (String) error_map.get("userMessage");
+        final String id = (String) error_map.get("id");
+        if (humanReadableErrormessage != null) {
+            logger.info("API_error: " + humanReadableErrormessage);
+        }
+        if (id.equalsIgnoreCase("DOWNLOADSESSIONVIDEOFILESSERVICE_NOCONTENT")) {
+            logger.info("AdFree version is empty --> Failed to start download");
+            errorAdsFreeUnavailableWithForcedWaittime(this.currDownloadlink, 60 * 60 * 1000);
+        } else if (id.equalsIgnoreCase("NOTFOUND_TELECAST_ID")) {
+            logger.info("Offline message inside errorhandling --> This is supposed to be handled correctly by other code");
+            // /* Usually this goes along with a 404 response */
+            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else {
+            /** TODO: Collect errors at this stage */
+            if (this.getDownloadLink() == null) {
+                /* Account error */
+                throw new AccountUnavailableException(humanReadableErrormessage, 5 * 60 * 1000l);
+            } else {
+                /* Error during download */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, humanReadableErrormessage, 5 * 60 * 1000l);
             }
         }
     }

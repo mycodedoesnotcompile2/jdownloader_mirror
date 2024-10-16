@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
 public class ConexaomegaCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            COOKIE_HOST        = "https://conexaomega.com";
@@ -77,7 +77,7 @@ public class ConexaomegaCom extends PluginForHost {
                 }
                 br.setFollowRedirects(true);
                 br.getPage("https://www." + account.getHoster() + "/login");
-                br.postPage("https://www." + account.getHoster() + "/login", "email=" + Encoding.urlEncode(account.getUser()) + "&senha=" + Encoding.urlEncode(account.getPass()) + "&remember=1&x=" + new Random().nextInt(100) + "&y=" + new Random().nextInt(100));
+                br.postPage("/login", "email=" + Encoding.urlEncode(account.getUser()) + "&senha=" + Encoding.urlEncode(account.getPass()) + "&remember=1&x=" + new Random().nextInt(100) + "&y=" + new Random().nextInt(100));
                 if (br.getCookie(COOKIE_HOST, "cm_auth") == null) {
                     return false;
                 }

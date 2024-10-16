@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49937 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -313,10 +313,17 @@ public class AllDebridCom extends PluginForHost {
             /* Add all domains of host */
             if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
                 // quota is traffic in MB
+                final long trafficMaxBytes = quota.longValue() * 1024 * 1024;
                 mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
+                mhost.setTrafficMax(trafficMaxBytes);
             } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
                 // quota is number of links left to download
-                mhost.setLinksLeft(quota.intValue());
+                final long linksMax = quota.longValue();
+                // -1 = Unlimited
+                if (linksMax != -1) {
+                    mhost.setLinksLeft(linksMax);
+                    mhost.setLinksMax(linksMax);
+                }
             } else {
                 // No limit
             }
@@ -327,11 +334,19 @@ public class AllDebridCom extends PluginForHost {
                  */
                 final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
                 hitfile.setTrafficLeft(mhost.getTrafficLeft());
+                hitfile.setTrafficMax(mhost.getTrafficMax());
                 hitfile.setLinksLeft(mhost.getLinksLeft());
+                hitfile.setLinksMax(mhost.getLinksMax());
+                hitfile.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                hitfile.setUnlimitedLinks(mhost.isUnlimitedLinks());
                 supportedHosts.add(hitfile);
                 final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
                 turbobit.setTrafficLeft(mhost.getTrafficLeft());
+                turbobit.setTrafficMax(mhost.getTrafficMax());
                 turbobit.setLinksLeft(mhost.getLinksLeft());
+                turbobit.setLinksMax(mhost.getLinksMax());
+                turbobit.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                turbobit.setUnlimitedLinks(mhost.isUnlimitedLinks());
                 supportedHosts.add(turbobit);
             } else {
                 supportedHosts.add(mhost);

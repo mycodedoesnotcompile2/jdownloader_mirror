@@ -3,6 +3,10 @@ package jd.plugins.components;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Time;
+
 import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
@@ -12,12 +16,9 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Time;
 
 /**
  * Instead of duplication we create a class
@@ -88,6 +89,7 @@ public class MultiHosterManagement implements AccountControllerListener {
                     /* Host might have been removed from list of supported hosts in the meantime. */
                     break setLimitOnAccount;
                 }
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
                 mhost.setStatusText(reason);
                 mhost.setUnavailableTime(timeout);
                 ai.updateMultihostSupportedHost(mhost);

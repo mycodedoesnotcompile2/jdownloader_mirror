@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49953 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = {}, urls = {})
 public class Ez4shortCom extends PluginForDecrypt {
     public Ez4shortCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,10 +67,6 @@ public class Ez4shortCom extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2024-10-10: Plugin and/or website broken */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         /* Without this Cloudflare will kick in. */
         // br.getHeaders().put("Referer", "https://" + getHost() + "/");
@@ -78,13 +74,17 @@ public class Ez4shortCom extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* 2024-10-10: Plugin and/or website broken */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         final String adSessionInitLink = br.getRegex("fetch\\('(https?://[^']+\\?sessionId=[a-f0-9]+)'").getMatch(0);
         if (adSessionInitLink != null) {
             final Browser brc = br.cloneBrowser();
             brc.getHeaders().put("Origin", "https://" + br.getHost()); // optional
             brc.getPage(adSessionInitLink);
         }
-        String htmlRefresh = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(https?://[^\"]+)").getMatch(0);
+        final String htmlRefresh = br.getRegex("<meta http-equiv=\"refresh\" content=\"\\d+;url=(https?://[^\"]+)").getMatch(0);
         br.getPage(htmlRefresh);
         /* Redirect to the next fake blog page */
         final String nextRedirect = br.getRegex("window\\.location\\.href = \"(https?://[^\"]+)\"").getMatch(0);

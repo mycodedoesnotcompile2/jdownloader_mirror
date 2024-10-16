@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FlickrComCrawler;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49767 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -801,7 +801,7 @@ public class FlickrCom extends PluginForHost {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your IP was banned by flickr.com");
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your IP was banned by flickr.com", 5 * 60 * 1000l);
             }
             errorBrokenFile(link);
             /* This code should never be reached */

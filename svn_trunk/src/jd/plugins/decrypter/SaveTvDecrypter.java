@@ -27,6 +27,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.uio.UIOManager;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -45,12 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-import org.appwork.uio.UIOManager;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 45506 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
+@DecrypterPlugin(revision = "$Revision: 49970 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +77,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
      */
     private static final long        TELECAST_ID_EXPIRE_TIME                      = 62 * 24 * 60 * 60 * 1000l;
     /* Decrypter variables */
-    final ArrayList<DownloadLink>    decryptedLinks                               = new ArrayList<DownloadLink>();
+    final ArrayList<DownloadLink>    ret                               = new ArrayList<DownloadLink>();
     final ArrayList<String>          dupecheckList                                = new ArrayList<String>();
     private static Map<String, Long> crawledTelecastIDsMap                        = new HashMap<String, Long>();
     private long                     only_grab_entries_of_specified_timeframe     = 0;
@@ -96,9 +97,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     private boolean                  fast_linkcheck                               = false;
     private String                   parameter                                    = null;
 
-    /**
-     * JD2 CODE: DO NOIT USE OVERRIDE FOR COMPATIBILITY REASONS!!!!!
-     */
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
@@ -107,6 +106,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
      * Never run multiple crawl instances of this plugin at once - but actually because we only have one matching input-URL it is not
      * possible anyways.
      */
+    @Override
     public int getMaxConcurrentProcessingInstances() {
         return 1;
     }
@@ -124,16 +124,16 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         this.br.setLoadLimit(this.br.getLoadLimit() * 3);
         if (!cfg.getBooleanProperty(CRAWLER_ACTIVATE, false)) {
             logger.info("save.tv: Decrypting save.tv archives is disabled, doing nothing...");
-            decryptedLinks.add(this.createOfflinelink(parameter, "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert", "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert"));
-            return decryptedLinks;
+            ret.add(this.createOfflinelink(parameter, "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert", "Archiv_Crawler_in_Plugin_Einstellungen_deaktiviert"));
+            return ret;
         }
         try {
             final ArrayList<Account> all_stv_accounts = AccountController.getInstance().getValidAccounts(this.getHost());
             totalAccountsNum = all_stv_accounts != null ? all_stv_accounts.size() : 0;
             if (totalAccountsNum == 0) {
                 logger.info("At least one account needed to use this crawler");
-                decryptedLinks.add(this.createOfflinelink(parameter, "Account_fuer_save_tv_benoetigt", "Account_fuer_save_tv_benoetigt"));
-                return decryptedLinks;
+                ret.add(this.createOfflinelink(parameter, "Account_fuer_save_tv_benoetigt", "Account_fuer_save_tv_benoetigt"));
+                return ret;
             }
             for (final Account stvacc : all_stv_accounts) {
                 if (!getUserLogin(stvacc, false)) {
@@ -159,18 +159,18 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     site_decrypt_All(stvacc);
                 }
                 cleanAndSaveMapOfAddedTelecastIDs(stvacc);
-                if (decryptedLinks.size() > 0) {
+                if (ret.size() > 0) {
                     stvacc.setProperty(CRAWLER_PROPERTY_LASTCRAWL_NEWLINKS, System.currentTimeMillis());
                 }
                 stvacc.setProperty(CRAWLER_PROPERTY_LASTCRAWL, System.currentTimeMillis());
             }
-            logger.info("save.tv: total links found: " + decryptedLinks.size() + " of " + totalLinksNum);
+            logger.info("save.tv: total links found: " + ret.size() + " of " + totalLinksNum);
         } catch (final Throwable e) {
-            logger.info("save.tv: total links found: " + decryptedLinks.size() + " of " + totalLinksNum);
-            if (decryptedLinks.size() >= totalLinksNum) {
+            logger.info("save.tv: total links found: " + ret.size() + " of " + totalLinksNum);
+            if (ret.size() >= totalLinksNum) {
                 /* This can happen if the user aborts but the crawler already found all links. */
                 handleEndDialogs();
-                return decryptedLinks;
+                return ret;
             }
             if (e instanceof DecrypterException) {
                 logger.log(e);
@@ -178,7 +178,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                 if (crawler_DialogsEnabled) {
                     try {
                         String message = "Save.tv - Der Crawler wurde frühzeitig vom Benutzer beendet!\r\n";
-                        message += "Es wurden bisher " + decryptedLinks.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
+                        message += "Es wurden bisher " + ret.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
                         message += getDialogEnd();
                         UIOManager.I().showMessageDialog(message);
                     } catch (Throwable e2) {
@@ -191,7 +191,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     String message = "Save.tv - leider wurden nicht alle Links des Archives gefunden!\r\n";
                     message += "Während dem Crawlen ist es zu einem Serverfehler gekommen!\r\n";
                     message += "Wir empfehlen, es zu einem späteren Zeitpunkt nochmals zu versuchen.\r\n";
-                    message += "Es wurden nur " + decryptedLinks.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
+                    message += "Es wurden nur " + ret.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
                     message += getDialogEnd();
                     UIOManager.I().showMessageDialog(message);
                 } catch (Throwable ebr) {
@@ -203,17 +203,17 @@ public class SaveTvDecrypter extends PluginForDecrypt {
                     String message = "Save.tv - leider wurden nicht alle Links des Archives gefunden!\r\n";
                     message += "Während dem Crawlen ist es zu einem unbekannten Fehler gekommen!\r\n";
                     message += "Wir empfehlen, es zu einem späteren Zeitpunkt nochmals zu versuchen und uns den Fehler ggf. zu melden.\r\n";
-                    message += "Es wurden nur " + decryptedLinks.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
+                    message += "Es wurden nur " + ret.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!";
                     message += getDialogEnd();
                     UIOManager.I().showMessageDialog(message);
                 } catch (Throwable ebr) {
                     logger.log(ebr);
                 }
             }
-            return decryptedLinks;
+            return ret;
         }
         handleEndDialogs();
-        return decryptedLinks;
+        return ret;
     }
 
     /** This will first grab alle IDs, then their details as the 2nd used request returns more information than the first one. */
@@ -226,7 +226,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         final String api_records_parameters = getParametersRecordsAPI();
         /* First let's find the number of items to expect */
         api_GET(this.br, "/records/count" + "?" + api_records_parameters);
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         totalLinksNum += (int) JavaScriptEngineFactory.toLong(entries.get("count"), 0);
         if (totalLinksNum == 0) {
             /* Can e.g. happen for setting 'Only add new telecastIDs' or if user uses custom API parameters. */
@@ -365,7 +365,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         jd.plugins.hoster.SaveTv.parseQualityTagAPI(dl, jd.plugins.hoster.SaveTv.jsonGetFormatArrayAPI(entries));
         dl.setName(jd.plugins.hoster.SaveTv.getFilename(this, dl));
         distribute(dl);
-        decryptedLinks.add(dl);
+        ret.add(dl);
         dupecheckList.add(telecast_id);
         return dl;
     }
@@ -388,7 +388,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         if (telecastID_IS_AllowedWebsite(dl)) {
             dl.setName(jd.plugins.hoster.SaveTv.getFilename(this, dl));
             distribute(dl);
-            decryptedLinks.add(dl);
+            ret.add(dl);
         }
         /* No matter whether we added the ID or not - we need it on our dupecheck list! */
         dupecheckList.add(telecast_id);
@@ -586,7 +586,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         if (!crawler_DialogsEnabled) {
             return;
         }
-        if (only_grab_new_entries && decryptedLinks.size() == 0) {
+        if (only_grab_new_entries && ret.size() == 0) {
             /* User recently added all new entries and now there are no new entries available. */
             try {
                 String message = "Save.tv - es wurden keine neuen Aufnahmen gefunden!\r\n";
@@ -606,7 +606,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         } else if (only_grab_new_entries) {
             /* User recently added all new entries and now there are no new entries available. */
             try {
-                String message = "Save.tv - es wurden " + decryptedLinks.size() + " neue Aufnahmen gefunden!\r\n";
+                String message = "Save.tv - es wurden " + ret.size() + " neue Aufnahmen gefunden!\r\n";
                 if (timestamp_last_crawl_ended > 0) {
                     message += String.format("Das sind alle neuen Aufnahmen seitdem zuletzt neue gefunden wurden am %s\r\n", formatTimestampToGermanDate(timestamp_last_crawl_ended));
                 }
@@ -619,7 +619,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             } catch (final Throwable e) {
                 logger.log(e);
             }
-        } else if (only_grab_entries_of_specified_timeframe > 0 && decryptedLinks.size() == 0) {
+        } else if (only_grab_entries_of_specified_timeframe > 0 && ret.size() == 0) {
             try {
                 String message = "Save.tv - leider wurden keine Links gefunden!\r\n";
                 message += "Bedenke, dass du nur alle Aufnahmen der letzten " + only_grab_entries_of_specified_timeframe + " Tage wolltest.\r\n";
@@ -635,27 +635,27 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             try {
                 String message = "Save.tv Archiv-Crawler - alle Aufnahmen der letzten " + only_grab_entries_of_specified_timeframe + " Tage wurden gefunden!\r\n";
                 message += String.format("Das sind alle Aufnahmen ab dem %s.\r\n", formatTimestampToGermanDate(System.currentTimeMillis() - (only_grab_entries_of_specified_timeframe * 24 * 60 * 60 * 1000)));
-                message += "Es wurden " + decryptedLinks.size() + " Links gefunden!\r\n";
+                message += "Es wurden " + ret.size() + " Links gefunden!\r\n";
                 message += getDialogAccountsInfo();
                 message += getDialogEnd();
                 UIOManager.I().showMessageDialog(message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
-        } else if (decryptedLinks.size() >= totalLinksNum) {
+        } else if (ret.size() >= totalLinksNum) {
             try {
                 String message = "Save.tv - alle Links des Archives wurden gefunden!\r\n";
-                message += "Es wurden " + decryptedLinks.size() + " von " + totalLinksNum + " Links gefunden!\r\n";
+                message += "Es wurden " + ret.size() + " von " + totalLinksNum + " Links gefunden!\r\n";
                 message += getDialogAccountsInfo();
                 message += getDialogEnd();
                 UIOManager.I().showMessageDialog(message);
             } catch (final Throwable e) {
                 logger.log(e);
             }
-        } else if (decryptedLinks.size() < totalLinksNum) {
+        } else if (ret.size() < totalLinksNum) {
             try {
                 String message = "Save.tv - leider wurden nicht alle Links des Archives gefunden!\r\n";
-                message += "Es wurden nur " + decryptedLinks.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!\r\n";
+                message += "Es wurden nur " + ret.size() + " von " + totalLinksNum + " Links (telecastIDs) gefunden!\r\n";
                 message += getDialogAccountsInfo();
                 message += getDialogEnd();
                 UIOManager.I().showMessageDialog(message);

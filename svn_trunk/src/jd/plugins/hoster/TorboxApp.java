@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49964 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -237,10 +237,7 @@ public class TorboxApp extends PluginForHost {
          * This is also important to be able to keep the user from adding the same account multiple times.
          */
         account.setUser(user.get("email").toString());
-        final int planID = ((Number) user.get("plan")).intValue();
-        if (planID == 0) {
-            throw new AccountInvalidException("Unsupported account type (free account)");
-        }
+        // final int planID = ((Number) user.get("plan")).intValue();
         final String created_at = user.get("created_at").toString();
         final String premium_expires_at = (String) user.get("premium_expires_at");
         long premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
@@ -250,6 +247,7 @@ public class TorboxApp extends PluginForHost {
             ai.setValidUntil(premiumExpireTimestamp, br);
         } else {
             account.setType(AccountType.FREE);
+            ai.setExpired(true);
         }
         final String subscribedStr;
         if ((Boolean) user.get("is_subscribed")) {
@@ -266,7 +264,7 @@ public class TorboxApp extends PluginForHost {
         for (final Map<String, Object> hosterlistitem : hosterlist) {
             final MultiHostHost mhost = new MultiHostHost(hosterlistitem.get("domain").toString());
             mhost.setName(hosterlistitem.get("name").toString());
-            if (Boolean.FALSE.equals(hosterlistitem.get(""))) {
+            if (Boolean.FALSE.equals(hosterlistitem.get("status"))) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             supportedhosts.add(mhost);

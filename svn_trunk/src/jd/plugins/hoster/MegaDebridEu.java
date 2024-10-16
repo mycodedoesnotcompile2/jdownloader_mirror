@@ -35,12 +35,14 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
 public class MegaDebridEu extends PluginForHost {
     private final String                 mName = "www.mega-debrid.eu";
     private final String                 mProt = "https://";
@@ -76,9 +78,8 @@ public class MegaDebridEu extends PluginForHost {
         if (daysLeft != null && !"0".equals(daysLeft)) {
             ac.setValidUntil(Long.parseLong(daysLeft) * 1000l);
         } else if ("0".equals(daysLeft)) {
-            ac.setExpired(true);
             account.setType(AccountType.FREE);
-            return ac;
+            ac.setExpired(true);
         } else {
             throw new AccountInvalidException();
         }
@@ -88,15 +89,22 @@ public class MegaDebridEu extends PluginForHost {
         if (!"ok".equalsIgnoreCase((String) results.get("response_code"))) {
             throw new AccountInvalidException();
         }
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostinfo : (List<Map<String, Object>>) results.get("hosters")) {
             final List<String> domains = (List<String>) hostinfo.get("domains");
-            if (!"up".equals(hostinfo.get("status")) || domains == null) {
+            if (domains == null) {
+                /* Skip invalid entries */
                 continue;
             }
-            supportedHosts.addAll(domains);
+            final MultiHostHost mhost = new MultiHostHost();
+            mhost.setName(hostinfo.get("name").toString());
+            mhost.setDomains(domains);
+            if (!"up".equals(hostinfo.get("status"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            supportedhosts.add(mhost);
         }
-        ac.setMultiHostSupport(this, supportedHosts);
+        ac.setMultiHostSupportV2(this, supportedhosts);
         account.setType(AccountType.PREMIUM);
         return ac;
     }

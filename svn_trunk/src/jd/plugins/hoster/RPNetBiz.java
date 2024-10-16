@@ -48,7 +48,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 47521 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
 public class RPNetBiz extends PluginForHost {
     private static final String          mName                    = "rpnet.biz";
     private static final String          mProt                    = "http://";
@@ -129,10 +129,8 @@ public class RPNetBiz extends PluginForHost {
         final long expiryDate = ((Number) accountinfo.get("premiumExpiry")).longValue();
         ai.setValidUntil(expiryDate * 1000, br);
         final String hosts = br.getPage(api_base + "hostlist.php");
-        if (hosts != null) {
-            final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hosts.split(",")));
-            ai.setMultiHostSupport(this, supportedHosts);
-        }
+        final ArrayList<String> supportedHosts = new ArrayList<String>(Arrays.asList(hosts.split(",")));
+        ai.setMultiHostSupport(this, supportedHosts);
         account.setType(AccountType.PREMIUM);
         String status = "Premium Account";
         if (!StringUtils.isEmpty(currentServer)) {

@@ -48,7 +48,7 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
+@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
 public class DebridItaliaCom extends antiDDoSForHost {
     public DebridItaliaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,14 +94,16 @@ public class DebridItaliaCom extends antiDDoSForHost {
             accountInvalid();
         }
         if (br.containsHTML("(?i)<status>\\s*expired\\s*</status>")) {
+            account.setType(AccountType.FREE);
             ac.setExpired(true);
-            return ac;
+        } else {
+            final String expire = br.getRegex("<expiration>(\\d+)</expiration>").getMatch(0);
+            if (expire != null) {
+                ac.setValidUntil(Long.parseLong(expire) * 1000l, this.br);
+            } else {
+                account.setType(AccountType.FREE);
+            }
         }
-        final String expire = br.getRegex("<expiration>(\\d+)</expiration>").getMatch(0);
-        if (expire == null) {
-            accountInvalid();
-        }
-        ac.setValidUntil(Long.parseLong(expire) * 1000l, this.br);
         getPage(API_BASE + "?hosts");
         final String[] hosts = br.getRegex("\"([^\"]*?)\"").getColumn(0);
         ac.setMultiHostSupport(this, new ArrayList<String>(Arrays.asList(hosts)));

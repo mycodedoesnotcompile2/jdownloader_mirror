@@ -18,6 +18,7 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -433,7 +434,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 cleanedDomains.add(domainCleaned);
             }
             if (maindomainCleaned == null) {
-                /* List of domain contained only useless stuff -> Skip */
+                /* List of domain contained only useless stuff or an empty array of domains -> Skip */
                 continue mhostLoop;
             }
             cleanList.put(maindomainCleaned, mhost);
@@ -584,9 +585,17 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 continue cleanListLoop;
             }
             finalresults.add(pluginHost);
-            // TODO: Improve this
-            mhost.getDomains().clear();
-            mhost.setDomain(pluginHost);
+            final String[] siteSupportedNames = finalplugin.getSitesSupported();
+            if (siteSupportedNames != null && siteSupportedNames.length > 0) {
+                /* Add all domains we know to list of supported domains. */
+                for (final String siteSupportedName : siteSupportedNames) {
+                    alternativeDomainsOfFoundHits.add(siteSupportedName);
+                }
+                mhost.addDomains(Arrays.asList(siteSupportedNames));
+            }
+            /* Set plugin domain as first domain */
+            mhost.getDomains().remove(pluginHost);
+            mhost.getDomains().add(0, pluginHost);
             finalresults2.add(mhost);
         }
         /**
@@ -649,6 +658,12 @@ public class AccountInfo extends Property implements AccountTrafficView {
         /* sorting will now work properly since they are all pre-corrected to lowercase. */
         Collections.sort(finalresults, new NaturalOrderComparator());
         this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults));
+        Collections.sort(finalresults2, new Comparator<MultiHostHost>() {
+            @Override
+            public int compare(MultiHostHost o1, MultiHostHost o2) {
+                return o1.getDomain().compareToIgnoreCase(o2.getDomain());
+            }
+        });
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             this.setProperty("multiHostSupportv2", new CopyOnWriteArrayList<MultiHostHost>(finalresults2));
         }

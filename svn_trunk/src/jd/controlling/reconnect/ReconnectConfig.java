@@ -1,7 +1,5 @@
 package jd.controlling.reconnect;
 
-import jd.controlling.reconnect.ipcheck.IP;
-
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
@@ -11,9 +9,10 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.PlainStorage;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 
+import jd.controlling.reconnect.ipcheck.IP;
+
 @PlainStorage
 public interface ReconnectConfig extends ConfigInterface {
-
     @AboutConfig
     String getActivePluginID();
 
@@ -139,7 +138,7 @@ public interface ReconnectConfig extends ConfigInterface {
 
     @AboutConfig
     @DefaultIntValue(10)
-    @DescriptionForConfigEntry("Disable auto reconnect if reconnect method has failed x times in a row (-1 = disable this feature)")
+    @DescriptionForConfigEntry("Disable auto reconnect if reconnect method has failed x times in a row (-1 = never disable auto reconnect)")
     @SpinnerValidator(min = -1, max = 100)
     int getDisableAutoReconnectFails();
 
@@ -162,5 +161,4 @@ public interface ReconnectConfig extends ConfigInterface {
     boolean isIPCheckAllowLocalUpnpIpCheckEnabled();
 
     void setIPCheckAllowLocalUpnpIpCheckEnabled(boolean b);
-
 }
