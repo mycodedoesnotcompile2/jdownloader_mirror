@@ -154,6 +154,7 @@ public class MultiResIconImpl implements MultiResIcon {
                 // Inverse the scaling
                 AffineTransform inverseScale = new AffineTransform();
                 inverseScale.scale(1.0 / scaleX, 1.0 / scaleY);
+                g2d.translate(x, y);
                 g2d.transform(inverseScale); // Apply the inverse scaling
                 // Draw a larger image to compensate for the removed scaling
                 g2d.drawImage(base, 0, 0, scaledWidth, scaledHeight, c);

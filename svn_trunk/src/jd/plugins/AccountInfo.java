@@ -551,24 +551,21 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 }
                 best.add(plugin);
             }
-            if (best.size() > 1) {
+            final LazyHostPlugin finalplugin;
+            if (best.size() == 1) {
+                finalplugin = best.get(0);
+            } else if (skippedByPluginAllowHandleEntries.size() == plugins.size()) {
+                /* Take first result of fallback list. */
+                finalplugin = plugins.iterator().next();
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
+            } else {
+                /* Too many results and/or all results are for offline domains */
                 unassignedMultiHostSupport.add(maindomainCleaned);
-                if (logger != null) {
+                if (best.size() > 1 && logger != null) {
                     logger.warning("Found more than one possible plugins for one domain: " + maindomainCleaned);
                     logger.log(new Exception("DEBUG: " + maindomainCleaned));
                 }
                 continue cleanListLoop;
-            } else if (best.size() == 0 && skippedByPluginAllowHandleEntries.size() == 0) {
-                unassignedMultiHostSupport.add(maindomainCleaned);
-                continue cleanListLoop;
-            }
-            final LazyHostPlugin finalplugin;
-            if (best.size() == 1) {
-                finalplugin = best.get(0);
-            } else {
-                /* Take first result of fallback list. */
-                finalplugin = plugins.iterator().next();
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
             }
             final boolean hostIsWorkingAccordingToMultihost = mhost.getStatus() == MultihosterHostStatus.WORKING || mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE;
             final boolean printNonWorkingHosts = true;

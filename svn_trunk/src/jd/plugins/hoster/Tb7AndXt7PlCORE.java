@@ -165,11 +165,11 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
         br.getPage("/jdhostingi.txt");
         /* Every line = one domain */
         final String[] lines = br.getRequest().getHtmlCode().split("\n");
-        final List<String> supportedHosts = new ArrayList<String>();
+        final List<String> supportedhosts = new ArrayList<String>();
         for (final String line : lines) {
-            supportedHosts.add(line);
+            supportedhosts.add(line);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupport(this, supportedhosts);
         return ai;
     }
 

@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.appwork.utils.formatter.SizeFormatter;
 
@@ -25,15 +26,17 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49497 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49975 $", interfaceVersion = 3, names = {}, urls = {})
 public class GrosfichiersComFolder extends PluginForDecrypt {
     public GrosfichiersComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,6 +46,7 @@ public class GrosfichiersComFolder extends PluginForDecrypt {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        br.setCookie(getHost(), "gf_lg", "en");
         return br;
     }
 
@@ -75,6 +79,12 @@ public class GrosfichiersComFolder extends PluginForDecrypt {
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), this.getSupportedLinks());
+        final String folderID = urlinfo.getMatch(0);
+        if (folderID.toLowerCase(Locale.ENGLISH).equals(folderID)) {
+            /* Lowercase string -> Must be invalid e.g. https://www.grosfichiers.com/css */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         URLConnectionAdapter con = null;
         try {
@@ -96,9 +106,20 @@ public class GrosfichiersComFolder extends PluginForDecrypt {
         }
         final String thispath = br._getURL().getPath();
         final String[] links = br.getRegex("(/[A-Za-z0-9]+_[A-Za-z0-9]+)\"").getColumn(0);
+        /*
+         * Folders can be offline but still contain the file information so let's determine the offline status here and use it later in case
+         * the files' information is still available.
+         */
+        final boolean isOffline = br.containsHTML(">\\s*Sorry, the files are no longer available");
         if (links == null || links.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (isOffline) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(folderID);
         final List<String> pathsWithoutDupes = new ArrayList<String>();
         for (final String path : links) {
             if (!path.equals(thispath) && !pathsWithoutDupes.contains(path)) {
@@ -127,7 +148,12 @@ public class GrosfichiersComFolder extends PluginForDecrypt {
                 final String filename = filenames[i];
                 direct.setName(Encoding.htmlDecode(filename).trim());
             }
-            direct.setAvailable(true);
+            if (isOffline) {
+                direct.setAvailable(false);
+            } else {
+                direct.setAvailable(true);
+            }
+            direct._setFilePackage(fp);
             ret.add(direct);
         }
         if (ret.isEmpty()) {

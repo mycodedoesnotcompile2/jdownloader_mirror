@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
 public class RapidoxPl extends PluginForHost {
     private final String                 NICE_HOST                 = "rapidox.pl";
     private final String                 NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -298,6 +298,7 @@ public class RapidoxPl extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             } else if (!status.equalsIgnoreCase("on")) {
                 logger.info("Found unknown status (treating it same as status 'off'): " + status);
+                mhost.setStatusText("Unknown status: " + status);
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             if (trafficPercentages != null && trafficPercentages.length == 2) {

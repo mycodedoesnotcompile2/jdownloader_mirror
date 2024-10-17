@@ -64,6 +64,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -87,13 +88,19 @@ import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.net.Base64OutputStream;
 
 public class IconIO {
-    /**
-     *
-     */
     public static final String                       SVG_FACTORY_KEY = "SVG_FACTORY";
     private static final AtomicReference<SVGFactory> SVG_FACTORY     = new AtomicReference<SVGFactory>();
     private static Boolean                           ICO_SUPPORTED;
     private volatile static Method                   ICO_DECODER;
+    private volatile static List<IconExeHandler>     CUSTOM_HANDLER  = new ArrayList<IconExeHandler>();
+
+    public static void addHandler(IconExeHandler handler) {
+        ArrayList<IconExeHandler> newList = new ArrayList<IconExeHandler>();
+        // add new handler with top priority
+        newList.add(handler);
+        newList.addAll(CUSTOM_HANDLER);
+        CUSTOM_HANDLER = newList;
+    }
 
     public static SVGFactory getSvgFactory() {
         SVGFactory factory = SVG_FACTORY.get();
@@ -387,6 +394,14 @@ public class IconIO {
     }
 
     public static Icon getIcon(final URL resource, final int w, int h) {
+        if (resource != null) {
+            for (IconExeHandler ch : CUSTOM_HANDLER) {
+                Icon icon = ch.getIcon(resource, w, h);
+                if (icon != null) {
+                    return icon;
+                }
+            }
+        }
         if (resource != null && StringUtils.endsWithCaseInsensitive(resource.getPath(), ".svg")) {
             if (getSvgFactory() != null) {
                 try {

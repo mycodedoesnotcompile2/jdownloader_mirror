@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -56,7 +56,7 @@ public class CocoleechCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public CocoleechCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://members.cocoleech.com/");
+        this.enablePremium("https://members." + getHost() + "/");
         this.setStartIntervall(3000l);
     }
 
@@ -75,7 +75,7 @@ public class CocoleechCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://members.cocoleech.com/terms";
+        return "https://members." + getHost() + "/terms";
     }
 
     @Override
@@ -162,7 +162,7 @@ public class CocoleechCom extends PluginForHost {
         this.dl.startDownload();
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({ "unchecked" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final Map<String, Object> entries = login(account);

@@ -16,12 +16,12 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49981 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,7 +91,9 @@ public class AlldebridComFolder extends PluginForDecrypt {
         query.appendEncoded("agent", AllDebridCom.agent_raw);
         query.appendEncoded("apikey", AllDebridCom.getStoredApiKey(account));
         query.appendEncoded("id", magnetID);
-        br.getPage(AllDebridCom.api_base + "/magnet/status?" + query.toString());
+        /* When "jd" parameter is supplied, information which is unnecessary for JD will be excluded from json response. */
+        query.appendEncoded("jd", "");
+        br.getPage(AllDebridCom.api_base_41 + "/magnet/status?" + query.toString());
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (entries.containsKey("error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -99,67 +101,69 @@ public class AlldebridComFolder extends PluginForDecrypt {
         final Map<String, Object> magnet = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/magnets");
         final String torrentName = (String) magnet.get("filename");
         final String torrentNameEscaped = Pattern.quote(torrentName);
-        final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) magnet.get("links");
+        final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) magnet.get("files");
         if (resourcelist == null || resourcelist.isEmpty()) {
             /* Probably unfinished torrent download */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String folderRoot = torrentName;
         final FilePackage fpRoot = FilePackage.getInstance();
         fpRoot.setName(folderRoot);
-        for (final Map<String, Object> resource : resourcelist) {
-            final String url = resource.get("link").toString();
-            final String filename = resource.get("filename").toString();
-            final DownloadLink dl = this.createDownloadlink(url);
-            dl.setName(filename);
-            dl.setDownloadSize(((Number) resource.get("size")).longValue());
-            final boolean isSpecialRar = filename.matches("^" + torrentNameEscaped + "(\\.rar|\\.part\\d+\\.rar)$");
-            if (isSpecialRar) {
-                dl.setRelativeDownloadFolderPath(folderRoot);
-                dl._setFilePackage(fpRoot);
-            } else {
-                /* Check whether or not this file goes into a deeper subfolder level. */
-                String filePath = getFilePath((List<Object>) resource.get("files"), "");
-                /* Path is full path with filename at the end -> Remove that */
-                filePath = filePath.replaceAll("/" + Pattern.quote(filename) + "$", "");
-                if (!StringUtils.isEmpty(filePath)) {
-                    /* File that goes into (nested) subfolder. */
-                    dl.setRelativeDownloadFolderPath(folderRoot + filePath);
-                    final FilePackage nestedFilePackage = FilePackage.getInstance();
-                    nestedFilePackage.setName(folderRoot + filePath);
-                    dl._setFilePackage(nestedFilePackage);
-                } else {
-                    /* File that is in the root of the torrent main folder (named after torrent name). */
-                    dl.setRelativeDownloadFolderPath(folderRoot);
-                    dl._setFilePackage(fpRoot);
-                }
-            }
-            dl.setAvailable(true);
-            ret.add(dl);
-        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        crawlRecursive(ret, new HashMap<String, FilePackage>(), resourcelist, torrentNameEscaped, torrentName);
         return ret;
     }
 
-    /** Recursive function which returns the complete path to a file inside nested json arrays. */
-    private String getFilePath(final List<Object> subfolderList, String path) {
-        if (subfolderList.isEmpty()) {
+    private List<DownloadLink> crawlRecursive(final List<DownloadLink> results, final Map<String, FilePackage> fps, Object o, final String torrentNameEscaped, final String path) {
+        if (o == null) {
             return null;
         }
-        final Map<String, Object> entries = (Map<String, Object>) subfolderList.get(0);
-        final Object subfolderNameO = entries.get("n");
-        if (subfolderNameO == null) {
-            return null;
-        }
-        final String subfolderName = (String) subfolderNameO;
-        path += "/" + subfolderName;
-        final Object nextSubFolderLevel = entries.get("e");
-        if (nextSubFolderLevel == null) {
-            /* We've reached the end */
-            return path;
+        if (o instanceof List) {
+            for (final Object resourceO : (List<Object>) o) {
+                this.crawlRecursive(results, fps, resourceO, torrentNameEscaped, path);
+            }
+            return results;
         } else {
-            /* Go deeper */
-            return this.getFilePath((List<Object>) nextSubFolderLevel, path);
+            final Map<String, Object> resource = (Map<String, Object>) o;
+            final String url = (String) resource.get("l");
+            final String name = resource.get("n").toString();
+            if (url != null) {
+                /* Single file */
+                final String folderRoot = new Regex(path, "^([^/]+)").getMatch(0);
+                final DownloadLink dl = this.createDownloadlink(url);
+                dl.setName(name);
+                dl.setDownloadSize(((Number) resource.get("s")).longValue());
+                final boolean isSpecialRar = name.matches("^" + torrentNameEscaped + "(\\.rar|\\.part\\d+\\.rar)$");
+                if (isSpecialRar) {
+                    FilePackage fpRoot = fps.get(folderRoot);
+                    if (fpRoot == null) {
+                        fpRoot = FilePackage.getInstance();
+                        fpRoot.setName(folderRoot);
+                        fps.put(folderRoot, fpRoot);
+                    }
+                    dl.setRelativeDownloadFolderPath(folderRoot);
+                    dl._setFilePackage(fpRoot);
+                } else {
+                    /* Remove filename from path. */
+                    final String filePath = path.replaceAll("/" + Pattern.quote(name) + "$", "");
+                    /* File that goes into (nested) subfolder. */
+                    dl.setRelativeDownloadFolderPath(filePath);
+                    FilePackage nestedFilePackage = fps.get(filePath);
+                    if (nestedFilePackage == null) {
+                        nestedFilePackage = FilePackage.getInstance();
+                        nestedFilePackage.setName(filePath);
+                        fps.put(filePath, nestedFilePackage);
+                    }
+                    dl._setFilePackage(nestedFilePackage);
+                }
+                dl.setAvailable(true);
+                results.add(dl);
+            } else {
+                final List<Map<String, Object>> nextSubFolderLevel = (List<Map<String, Object>>) resource.get("e");
+                /* Go deeper */
+                return this.crawlRecursive(results, fps, nextSubFolderLevel, torrentNameEscaped, path + "/" + name);
+            }
         }
+        return results;
     }
 }

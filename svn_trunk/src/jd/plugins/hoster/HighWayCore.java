@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -739,6 +739,11 @@ public abstract class HighWayCore extends UseNet {
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
             final PluginFinder pluginFinder = new PluginFinder(getLogger());
+            final HashSet<String> ignoreItems = new HashSet<String>();
+            boolean supportsUsenet = false;
+            ignoreItems.add("beta");
+            ignoreItems.add("TV Recorder");
+            ignoreItems.add("WebDav");
             synchronized (getMapLock()) {
                 final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
                 final Map<String, Integer> hostTrafficCalculationMap = getMap(HighWayCore.hostTrafficCalculationMap);
@@ -748,47 +753,50 @@ public abstract class HighWayCore extends UseNet {
                 hostTrafficCalculationMap.clear();
                 hostMaxdlsMap.clear();
                 /* Available hosts are returned by API depending on users' account type e.g. free users have much less supported hosts. */
-                final List<Object> array_hoster = (List) entries.get("hoster");
-                for (final Object hoster : array_hoster) {
-                    final Map<String, Object> hostermap = (Map<String, Object>) hoster;
+                final List<Map<String, Object>> array_hoster = (List<Map<String, Object>>) entries.get("hoster");
+                for (final Map<String, Object> hostermap : array_hoster) {
                     final int activeStatus = ((Number) hostermap.get("active")).intValue();
                     final String domain = hostermap.get("name").toString();
-                    final int trafficCalcFactorPercent = ((Number) hostermap.get("berechnung")).intValue();
+                    if (ignoreItems.contains(domain)) {
+                        /* Skip hardcoded list of items which should never be displayed in GUI. */
+                        continue;
+                    }
+                    final Number trafficCalcFactorPercent = ((Number) hostermap.get("berechnung"));
                     final int chunks = ((Number) hostermap.get("chunks")).intValue();
                     final int downloads = ((Number) hostermap.get("downloads")).intValue();
                     final boolean resume = ((Number) hostermap.get("resume")).intValue() == 1 ? true : false;
-                    /* Workaround to find the real domain which we need to assign the properties to later on! */
-                    final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
-                    supportedHostsTmp.add(domain);
-                    ai.setMultiHostSupport(this, supportedHostsTmp, pluginFinder);
-                    final List<String> realDomainList = ai.getMultiHostSupport();
-                    if (realDomainList != null && realDomainList.size() > 0) {
+                    {
                         /* Legacy handling */
-                        final String realDomain = realDomainList.get(0);
-                        // final String unlimited = (String) hoster_map.get("unlimited");
-                        if (activeStatus != 1) {
-                            logger.info("Skipping serverside inactive domain: " + domain);
-                            continue;
-                        }
-                        if (supportedhosts_dupes_for_legacy_handling.add(realDomain)) {
-                            hostTrafficCalculationMap.put(realDomain, trafficCalcFactorPercent);
-                            hostMaxchunksMap.put(realDomain, correctChunks(chunks));
-                            hostMaxdlsMap.put(realDomain, downloads);
-                            hostResumeMap.put(realDomain, resume);
-                        } else {
-                            // multiple entries, eg 1fichier(resume=true) and and megadl.fr(resume=false) but with different properties!?
-                            if (((Number) hostermap.get("resume")).intValue() == 1) {
-                                hostResumeMap.put(realDomain, true);
+                        /* Workaround to find the real domain which we need to assign the properties to later on! */
+                        final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
+                        supportedHostsTmp.add(domain);
+                        final List<String> realDomainList = ai.setMultiHostSupport(this, supportedHostsTmp, pluginFinder);
+                        if (realDomainList != null && realDomainList.size() > 0) {
+                            /* Legacy handling */
+                            final String realDomain = realDomainList.get(0);
+                            // final String unlimited = (String) hoster_map.get("unlimited");
+                            if (supportedhosts_dupes_for_legacy_handling.add(realDomain)) {
+                                hostTrafficCalculationMap.put(realDomain, trafficCalcFactorPercent.intValue());
+                                hostMaxchunksMap.put(realDomain, correctChunks(chunks));
+                                hostMaxdlsMap.put(realDomain, downloads);
+                                hostResumeMap.put(realDomain, resume);
                             } else {
-                                // do not disable resume
+                                // multiple entries, eg 1fichier(resume=true) and and megadl.fr(resume=false) but with different
+                                // properties!?
+                                if (resume) {
+                                    hostResumeMap.put(realDomain, true);
+                                } else {
+                                    // do not disable resume
+                                }
                             }
                         }
                     }
+                    /* New handling */
                     final MultiHostHost mhost = new MultiHostHost(domain);
                     if (activeStatus != 1) {
                         mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                     }
-                    mhost.setTrafficCalculationFactorPercent((short) trafficCalcFactorPercent);
+                    mhost.setTrafficCalculationFactorPercent(trafficCalcFactorPercent.shortValue());
                     mhost.setMaxChunks(chunks);
                     mhost.setMaxDownloads(downloads);
                     mhost.setResume(resume);
@@ -801,11 +809,14 @@ public abstract class HighWayCore extends UseNet {
                         mhost.setTrafficLeft(remainingTrafficDaily);
                     }
                     supportedhosts.add(mhost);
+                    if (!supportsUsenet && domain.equalsIgnoreCase("usenet")) {
+                        supportsUsenet = true;
+                    }
                 }
             }
             /* Get- and store usenet logindata. These can differ from the logindata the user has added but may as well be equal to those. */
-            final Map<String, Object> usenetLogins = (Map<String, Object>) accountInfo.get("usenet");
-            if (usenetLogins != null && !usenetLogins.isEmpty()) {
+            final Map<String, Object> usenetLogins;
+            if (supportsUsenet && (usenetLogins = (Map<String, Object>) accountInfo.get("usenet")) != null && !usenetLogins.isEmpty()) {
                 final String usenetUsername = usenetLogins.get("username").toString();
                 if (this.useApikeyLogin()) {
                     /* Try to set unique username as user could enter anything in the username field in this case */

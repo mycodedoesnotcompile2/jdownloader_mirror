@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 49964 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49975 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -206,6 +206,7 @@ public class OrfAt extends PluginForDecrypt {
         final ORFMediathek hosterplugin = (ORFMediathek) this.getNewPluginForHostInstance("orf.at");
         final Map<String, Long> qualityIdentifierToFilesizeMapGLOBAL = new HashMap<String, Long>();
         final List<String> selectedQualities = new ArrayList<String>();
+        final List<String> selectedQualitiesInternal = new ArrayList<String>();
         /* Collect user desired video qualities. */
         if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_VERYLOW, ORFMediathek.Q_VERYLOW_default)) {
             selectedQualities.add("VERYLOW");
@@ -215,12 +216,15 @@ public class OrfAt extends PluginForDecrypt {
         }
         if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_MEDIUM, ORFMediathek.Q_MEDIUM_default)) {
             selectedQualities.add("MEDIUM");
+            selectedQualitiesInternal.add("Q4A");
         }
         if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_HIGH, ORFMediathek.Q_HIGH_default)) {
             selectedQualities.add("HIGH");
+            selectedQualitiesInternal.add("Q6A");
         }
         if (cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_VERYHIGH, ORFMediathek.Q_VERYHIGH_default)) {
             selectedQualities.add("VERYHIGH");
+            selectedQualitiesInternal.add("Q8C");
         }
         final int subtitleFormatSettingInt = cfg.getIntegerProperty(ORFMediathek.SETTING_SELECTED_SUBTITLE_FORMAT, ORFMediathek.SETTING_SELECTED_SUBTITLE_FORMAT_default);
         final String subtitle_ext;
@@ -510,8 +514,6 @@ public class OrfAt extends PluginForDecrypt {
         gaplessHandling: if (crawlGapless) {
             /* Gapless video handling */
             logger.info("Crawling gapless video streams");
-            // TODO: 2024-03-18: Add auto fallback to progressive video chapters if user prefers gapless && gapless is HLS split
-            // audio/video.
             /* Check if any gapless sources are available. */
             final Map<String, Object> sourcesForGaplessVideo = (Map<String, Object>) entries.get("sources");
             if (sourcesForGaplessVideo == null || sourcesForGaplessVideo.isEmpty()) {
@@ -523,32 +525,52 @@ public class OrfAt extends PluginForDecrypt {
                 logger.info("No gapless HLS sources available -> Returning items we found so far");
                 break gaplessHandling;
             }
-            final String segmentID = "gapless";
-            final List<DownloadLink> videoresults = new ArrayList<DownloadLink>();
-            DownloadLink best = null;
-            Boolean hlsWorkaroundSuccess = null;
+            final String[] possibleGaplessAudioAndVideoQualityIdentifiers = new String[] { "Q8C", "Q6A", "Q4A" };
+            final List<String> availableAudioAndVideoGaplessQualities = new ArrayList<String>();
+            final List<String> availableAndSelectedAudioAndVideoGaplessQualities = new ArrayList<String>();
+            for (final String possibleGaplessAudioAndVideoQualityIdentifier : possibleGaplessAudioAndVideoQualityIdentifiers) {
+                if (allFMTs.contains(possibleGaplessAudioAndVideoQualityIdentifier)) {
+                    availableAudioAndVideoGaplessQualities.add(possibleGaplessAudioAndVideoQualityIdentifier);
+                    if (selectedQualitiesInternal.contains(possibleGaplessAudioAndVideoQualityIdentifier)) {
+                        availableAndSelectedAudioAndVideoGaplessQualities.add(possibleGaplessAudioAndVideoQualityIdentifier);
+                    }
+                }
+            }
+            if (availableAudioAndVideoGaplessQualities.isEmpty()) {
+                logger.info("No gapless audio/video combined HLS sources available -> Returning items we found so far");
+                break gaplessHandling;
+            }
+            if (!settingPreferBestVideo && availableAndSelectedAudioAndVideoGaplessQualities.size() > 0) {
+                /* Process only the items we want && are available -> Speeds up things */
+                logger.info("Crawling only selected && available gapless items: " + availableAndSelectedAudioAndVideoGaplessQualities);
+                availableAudioAndVideoGaplessQualities.clear();
+                availableAudioAndVideoGaplessQualities.addAll(availableAndSelectedAudioAndVideoGaplessQualities);
+            }
+            final List<String> sources_hls_modified = new ArrayList<String>();
             for (final Map<String, Object> hlssource : sources_hls) {
                 final String hlsMaster = hlssource.get("src").toString();
-                boolean hlsWorkaroundSuccessThisLoop = false;
                 final String urlpart = new Regex(hlsMaster, "_QX(A|B)\\.mp4").getMatch(-1);
-                if (hlsWorkaroundSuccess != Boolean.FALSE && urlpart != null && allFMTs.contains("Q8C")) {
-                    /* 2024-08-01: Workaround to enforce special gapless HLS version where audio and video are streamed together. */
-                    final String hlsMasterVideoAudioTogether = hlsMaster.replaceFirst(Pattern.quote(urlpart), "_Q8C.mp4");
-                    br.getPage(hlsMasterVideoAudioTogether);
-                    if (br.getHttpConnection().isOK()) {
-                        logger.info("HLS workaround successful");
-                        hlsWorkaroundSuccess = Boolean.TRUE;
-                        hlsWorkaroundSuccessThisLoop = true;
-                    } else {
-                        logger.info("HLS workaround failed");
-                        hlsWorkaroundSuccess = Boolean.FALSE;
+                if (urlpart == null) {
+                    logger.info("Skipping hlsMaster which we cannot modify: " + hlsMaster);
+                    continue;
+                }
+                /* 2024-08-01: Workaround to enforce special gapless HLS version where audio and video are streamed together. */
+                for (final String availableAudioAndVideoGaplessQuality : availableAudioAndVideoGaplessQualities) {
+                    final String hlsMasterVideoAudioTogether = hlsMaster.replaceFirst(Pattern.quote(urlpart), "_" + availableAudioAndVideoGaplessQuality + ".mp4");
+                    if (!sources_hls_modified.contains(hlsMasterVideoAudioTogether)) {
+                        sources_hls_modified.add(hlsMasterVideoAudioTogether);
                     }
-                } else {
-                    logger.info("HLS workaround impossible");
                 }
-                if (!hlsWorkaroundSuccessThisLoop) {
-                    br.getPage(hlsMaster);
-                }
+            }
+            if (sources_hls_modified.isEmpty()) {
+                logger.info("No gapless audio/video combined HLS sources available because: Failed to find modifyable original links -> Returning items we found so far");
+                break gaplessHandling;
+            }
+            final List<DownloadLink> gaplessresults = new ArrayList<DownloadLink>();
+            DownloadLink best = null;
+            for (final String hlsMaster : sources_hls_modified) {
+                /* Every HLS master leads to exactly one quality. */
+                br.getPage(hlsMaster);
                 if (ORFMediathek.isGeoBlocked(br.getURL())) {
                     /* Item is GEO-blocked */
                     throw new DecrypterRetryException(RetryReason.GEO);
@@ -576,16 +598,18 @@ public class OrfAt extends PluginForDecrypt {
                     if (guessedFilesize != null) {
                         video.setDownloadSize(guessedFilesize);
                     }
-                    videoresults.add(video);
+                    gaplessresults.add(video);
                     if (best == null || hlscontainer.getHeight() > heigthMax) {
                         heigthMax = hlscontainer.getHeight();
                         best = video;
                     }
                 }
-                /* Only add first item for now as the others look to be duplicates. */
-                break;
+                if (settingPreferBestVideo) {
+                    /* First = best */
+                    break;
+                }
             }
-            if (videoresults.isEmpty()) {
+            if (gaplessresults.isEmpty()) {
                 /**
                  * All possible results were skipped? -> This should never happen / very very rare case. </br>
                  * Either all available video resolutions are unsupported resolutions or GEO-blocked detection failed or something super
@@ -593,29 +617,14 @@ public class OrfAt extends PluginForDecrypt {
                  */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            /* Now decide which qualities we want to return. */
-            final List<DownloadLink> selectedVideoQualities = new ArrayList<DownloadLink>();
-            for (final DownloadLink videoresult : videoresults) {
-                final String humanReadableQualityIdentifier = videoresult.getStringProperty(ORFMediathek.PROPERTY_QUALITY_HUMAN_READABLE);
-                if (selectedQualities.contains(humanReadableQualityIdentifier)) {
-                    selectedVideoQualities.add(videoresult);
-                }
-            }
-            final List<DownloadLink> videoSelectedResults = new ArrayList<DownloadLink>();
-            if (settingPreferBestVideo) {
-                videoSelectedResults.add(best);
-            } else {
-                if (selectedVideoQualities.size() > 0) {
-                    videoSelectedResults.addAll(selectedVideoQualities);
-                } else {
-                    logger.info("Users selection would return zero results -> Returning all instead");
-                    videoSelectedResults.addAll(videoresults);
-                }
-            }
-            final ArrayList<DownloadLink> thisFinalResults = new ArrayList<DownloadLink>();
+            /*
+             * Quality selection is already done here so now we just need to add subtitles and thumbnail depending on users' plugin
+             * settings.
+             */
+            final ArrayList<DownloadLink> gaplessFinalResults = new ArrayList<DownloadLink>();
             /* Select all chosen results and add subtitle if user wants to download subtitle. */
-            for (final DownloadLink chosenVideoResult : videoSelectedResults) {
-                thisFinalResults.add(chosenVideoResult);
+            for (final DownloadLink chosenVideoResult : gaplessresults) {
+                gaplessFinalResults.add(chosenVideoResult);
                 /* Add a subtitle-result for each chosen video quality */
                 if ((cfg == null || cfg.getBooleanProperty(ORFMediathek.Q_SUBTITLES, ORFMediathek.Q_SUBTITLES_default)) && !StringUtils.isEmpty(gapless_subtitleurl)) {
                     final DownloadLink subtitle = createDownloadlink(gapless_subtitleurl);
@@ -626,7 +635,7 @@ public class OrfAt extends PluginForDecrypt {
                     subtitle.setProperty(ORFMediathek.PROPERTY_DIRECTURL, gapless_subtitleurl);
                     subtitle.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_SUBTITLE);
                     subtitle.setProperty(ORFMediathek.CONTENT_EXT_HINT, subtitle_ext);
-                    thisFinalResults.add(subtitle);
+                    gaplessFinalResults.add(subtitle);
                 }
             }
             /* Add teaser/thumbnail image */
@@ -636,21 +645,21 @@ public class OrfAt extends PluginForDecrypt {
                 thumbnail.setHost(hosterplugin.getHost());
                 thumbnail.setProperty(ORFMediathek.PROPERTY_CONTENT_TYPE, ORFMediathek.CONTENT_TYPE_IMAGE);
                 thumbnail.setProperty(ORFMediathek.PROPERTY_DIRECTURL, thumbnailurlFromFirstSegment);
-                thisFinalResults.add(thumbnail);
+                gaplessFinalResults.add(thumbnail);
             }
             if (isCrawlGaplessOnly) {
                 /* Discard previously found results as user wants gapless items only. */
                 ret.clear();
             }
             /* Add properties and add results to final list */
-            for (final DownloadLink result : thisFinalResults) {
+            for (final DownloadLink result : gaplessFinalResults) {
                 result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
                 result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
-                result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, segmentID);
+                result.setProperty(ORFMediathek.PROPERTY_SEGMENT_ID, "gapless");
                 result.setProperty(ORFMediathek.PROPERTY_TITLE, mainVideoTitle);
                 ret.add(result);
             }
-            numberofGaplessItems = thisFinalResults.size();
+            numberofGaplessItems = gaplessFinalResults.size();
         }
         if (isCrawlGaplessOnly && numberofGaplessItems == 0) {
             logger.info("User wants gapless only but gapless is not available for this item");
@@ -1027,22 +1036,22 @@ public class OrfAt extends PluginForDecrypt {
         }
     }
 
-    public static String humanReadableQualityIdentifier(String quality) {
+    public static String humanReadableQualityIdentifier(String internal_identifier) {
         final String humanreabable;
-        if ("Q0A".equals(quality)) {
+        if ("Q0A".equals(internal_identifier)) {
             humanreabable = "VERYLOW";
-        } else if ("Q1A".equals(quality)) {
+        } else if ("Q1A".equals(internal_identifier)) {
             humanreabable = "LOW";
-        } else if ("Q4A".equals(quality)) {
+        } else if ("Q4A".equals(internal_identifier)) {
             humanreabable = "MEDIUM";
-        } else if ("Q6A".equals(quality)) {
+        } else if ("Q6A".equals(internal_identifier)) {
             humanreabable = "HIGH";
-        } else if ("Q8C".equals(quality)) {
+        } else if ("Q8C".equals(internal_identifier)) {
             humanreabable = "VERYHIGH";
-        } else if ("QXA".equals(quality) || "QXB".equals(quality)) {
+        } else if ("QXA".equals(internal_identifier) || "QXB".equals(internal_identifier)) {
             humanreabable = "ADAPTIV";
         } else {
-            humanreabable = quality;
+            humanreabable = internal_identifier;
         }
         return humanreabable;
     }

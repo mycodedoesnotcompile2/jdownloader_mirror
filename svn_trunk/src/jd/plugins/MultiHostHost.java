@@ -225,7 +225,10 @@ public class MultiHostHost {
         }
     }
 
-    /** Returns custom set status text. Typically used to describe why this host is currently not working. */
+    /**
+     * Returns custom set status text. </br>
+     * Typically used to describe why this host is currently not working but can also be used as an informative field.
+     */
     public String getStatusText() {
         return statusText;
     }

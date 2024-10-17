@@ -210,7 +210,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
                     ret = FACTORY.urlToIcon(url, size, size);
                     ret = this.modify(ret, relativePath);
                     if (url == null && doNotLogMissingIcons) {
-                        org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.getPath("images/", relativePath, ".png", false)));
+                        org.appwork.loggingv3.LogV3.log(new Exception("Icon missing: " + this.buildPath("images/", relativePath, ".png", false)));
                     }
                 }
                 if (useCache && ret != null) {
@@ -241,7 +241,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      */
     protected URL lookupImageUrl(String relativePath, int size) {
         for (boolean useFallback : new boolean[] { false, true }) {
-            URL url = this.getURL("images/", relativePath + "_" + size, ".png", useFallback);
+            URL url = this.getURL("images/", relativePath, "", useFallback);
+            if (url == null) {
+                url = this.getURL("images/", relativePath + "_" + size, ".png", useFallback);
+            }
             if (url == null && IconIO.getSvgFactory() != null) {
                 url = this.getURL("images/", relativePath, ".svg", useFallback);
             }
@@ -338,7 +341,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         return this.path;
     }
 
-    private String getPath(final String pre, final String path, final String ext, boolean fallback) {
+    protected String buildPath(final String pre, final String path, final String ext, boolean fallback) {
+        final Theme delegate = getDelegate();
+        if (delegate != null) {
+            return delegate.buildPath(pre, path, ext, fallback);
+        }
         final StringBuilder sb = new StringBuilder();
         sb.append(fallback ? defaultPath : this.path);
         sb.append(pre);
@@ -413,10 +420,13 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             url = delegate.getURL(pre, relativePath, ext, fallback);
         }
         if (url == null) {
-            final String path = this.getPath(pre, relativePath, ext, fallback);
+            final String path = this.buildPath(pre, relativePath, ext, fallback);
             try {
                 // first lookup in home dir. .jd_home or installdirectory
-                final File file = Application.getResource(path);
+                File file = new File(path);
+                if (!file.isAbsolute()) {
+                    file = Application.getResource(path);
+                }
                 if (file.exists()) {
                     url = file.toURI().toURL();
                 }
@@ -438,7 +448,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             ret = delegate.getImagesDirectory();
         }
         if (ret == null) {
-            ret = Application.getResource(getPath("images/", "image", ".file", false)).getParentFile();
+            ret = Application.getResource(buildPath("images/", "image", ".file", false)).getParentFile();
         }
         return ret;
     }

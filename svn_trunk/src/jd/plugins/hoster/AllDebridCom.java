@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49962 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49980 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,6 +135,7 @@ public class AllDebridCom extends PluginForHost {
     private static MultiHosterManagement                 mhm                                = new MultiHosterManagement("alldebrid.com");
     private static WeakHashMap<Account, HashSet<String>> RATE_LIMITED                       = new WeakHashMap<Account, HashSet<String>>();
     public static final String                           api_base                           = "https://api.alldebrid.com/v4";
+    public static final String                           api_base_41                        = "https://api.alldebrid.com/v4.1";
     // this is used by provider which calculates unique token to agent/client.
     public static final String                           agent_raw                          = "JDownloader";
     private static final String                          agent                              = "agent=" + agent_raw;
@@ -279,80 +280,91 @@ public class AllDebridCom extends PluginForHost {
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
         br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> supportedHostsInfo = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/hosts");
-        final Iterator<Entry<String, Object>> iterator = supportedHostsInfo.entrySet().iterator();
-        final List<MultiHostHost> supportedHosts = new ArrayList<MultiHostHost>();
-        while (iterator.hasNext()) {
-            final Entry<String, Object> entry = iterator.next();
-            // final String hosterKey = entry.getKey();
-            final Map<String, Object> hosterinfos = (Map<String, Object>) entry.getValue();
-            final String host_without_tld = hosterinfos.get("name").toString();
-            final Number quota = (Number) hosterinfos.get("quota");
-            final String quotaType = (String) hosterinfos.get("quotaType");
-            final List<String> domains = (List<String>) hosterinfos.get("domains");
-            final MultiHostHost mhost = new MultiHostHost();
-            mhost.setName(host_without_tld);
-            mhost.setDomains(domains);
-            /*
-             * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and JD
-             * also does not accept them but we're doing this check nevertheless.
-             */
-            final String type = (String) hosterinfos.get("type");
-            final Boolean status = (Boolean) hosterinfos.get("status"); // optional field
-            // final Number quota = (Number) entry.get("quota");
-            if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(type)) {
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-                logger.info("This host cannot be used with free accounts: " + host_without_tld);
+        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+        final String[] allowedServiceTypes = new String[] { "hosts", "streams" };
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        for (final String serviceType : allowedServiceTypes) {
+            final Object supportedHostsInfoO = data.get(serviceType);
+            if (supportedHostsInfoO == null) {
+                continue;
+            } else if (!(supportedHostsInfoO instanceof Map)) {
+                /* When "&hostsOnly=true" is used, "streams" is an empty list. */
+                continue;
             }
-            /* Skip currently disabled hosts --> 2020-03-26: Do not skip any hosts anymore, display all in JD RE: admin */
-            if (Boolean.FALSE.equals(status)) {
-                /* Log hosts which look to be non working according to API. */
-                logger.info("Host which might currently be broken: " + host_without_tld);
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-            }
-            /* Add all domains of host */
-            if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
-                // quota is traffic in MB
-                final long trafficMaxBytes = quota.longValue() * 1024 * 1024;
-                mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
-                mhost.setTrafficMax(trafficMaxBytes);
-            } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
-                // quota is number of links left to download
-                final long linksMax = quota.longValue();
-                // -1 = Unlimited
-                if (linksMax != -1) {
-                    mhost.setLinksLeft(linksMax);
-                    mhost.setLinksMax(linksMax);
-                }
-            } else {
-                // No limit
-            }
-            if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
+            final Map<String, Object> supportedHostsInfo = (Map<String, Object>) supportedHostsInfoO;
+            final Iterator<Entry<String, Object>> iterator = supportedHostsInfo.entrySet().iterator();
+            while (iterator.hasNext()) {
+                final Entry<String, Object> entry = iterator.next();
+                // final String hosterKey = entry.getKey();
+                final Map<String, Object> hosterinfos = (Map<String, Object>) entry.getValue();
+                final String host_without_tld = hosterinfos.get("name").toString();
+                final Number quota = (Number) hosterinfos.get("quota");
+                final String quotaType = (String) hosterinfos.get("quotaType");
+                final List<String> domains = (List<String>) hosterinfos.get("domains");
+                final MultiHostHost mhost = new MultiHostHost();
+                mhost.setName(host_without_tld);
+                mhost.setDomains(domains);
                 /*
-                 * Workaround for them putting turbobit.net and hitfile.net into one entry but this way upper handling would only detect one
-                 * of them.
+                 * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and
+                 * JD also does not accept them but we're doing this check nevertheless.
                  */
-                final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
-                hitfile.setTrafficLeft(mhost.getTrafficLeft());
-                hitfile.setTrafficMax(mhost.getTrafficMax());
-                hitfile.setLinksLeft(mhost.getLinksLeft());
-                hitfile.setLinksMax(mhost.getLinksMax());
-                hitfile.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
-                hitfile.setUnlimitedLinks(mhost.isUnlimitedLinks());
-                supportedHosts.add(hitfile);
-                final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
-                turbobit.setTrafficLeft(mhost.getTrafficLeft());
-                turbobit.setTrafficMax(mhost.getTrafficMax());
-                turbobit.setLinksLeft(mhost.getLinksLeft());
-                turbobit.setLinksMax(mhost.getLinksMax());
-                turbobit.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
-                turbobit.setUnlimitedLinks(mhost.isUnlimitedLinks());
-                supportedHosts.add(turbobit);
-            } else {
-                supportedHosts.add(mhost);
+                final String type = (String) hosterinfos.get("type");
+                final Boolean status = (Boolean) hosterinfos.get("status"); // optional field
+                // final Number quota = (Number) entry.get("quota");
+                if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(type)) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+                    logger.info("This host cannot be used with free accounts: " + host_without_tld);
+                }
+                /* Skip currently disabled hosts --> 2020-03-26: Do not skip any hosts anymore, display all in JD RE: admin */
+                if (Boolean.FALSE.equals(status)) {
+                    /* Log hosts which look to be non working according to API. */
+                    logger.info("Host which might currently be broken: " + host_without_tld);
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                }
+                /* Add all domains of host */
+                if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
+                    // quota is traffic in MB
+                    final long trafficMaxBytes = quota.longValue() * 1024 * 1024;
+                    mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
+                    mhost.setTrafficMax(trafficMaxBytes);
+                } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
+                    // quota is number of links left to download
+                    final long linksMax = quota.longValue();
+                    // -1 = Unlimited
+                    if (linksMax != -1) {
+                        mhost.setLinksLeft(linksMax);
+                        mhost.setLinksMax(linksMax);
+                    }
+                } else {
+                    // No limit
+                }
+                if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
+                    /*
+                     * Workaround for them putting turbobit.net and hitfile.net into one entry but this way upper handling would only detect
+                     * one of them.
+                     */
+                    final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
+                    hitfile.setTrafficLeft(mhost.getTrafficLeft());
+                    hitfile.setTrafficMax(mhost.getTrafficMax());
+                    hitfile.setLinksLeft(mhost.getLinksLeft());
+                    hitfile.setLinksMax(mhost.getLinksMax());
+                    hitfile.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                    hitfile.setUnlimitedLinks(mhost.isUnlimitedLinks());
+                    supportedhosts.add(hitfile);
+                    final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
+                    turbobit.setTrafficLeft(mhost.getTrafficLeft());
+                    turbobit.setTrafficMax(mhost.getTrafficMax());
+                    turbobit.setLinksLeft(mhost.getLinksLeft());
+                    turbobit.setLinksMax(mhost.getLinksMax());
+                    turbobit.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                    turbobit.setUnlimitedLinks(mhost.isUnlimitedLinks());
+                    supportedhosts.add(turbobit);
+                } else {
+                    supportedhosts.add(mhost);
+                }
             }
         }
-        ai.setMultiHostSupportV2(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

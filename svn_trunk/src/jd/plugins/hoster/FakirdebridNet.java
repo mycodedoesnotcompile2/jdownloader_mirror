@@ -15,18 +15,12 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.awt.Color;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-
 import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -35,13 +29,10 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
-import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
@@ -60,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://fakirdebrid.net/api";
@@ -73,19 +64,20 @@ public class FakirdebridNet extends PluginForHost {
     @SuppressWarnings("deprecation")
     public FakirdebridNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://fakirdebrid.net/showthread.php?tid=184&pid=1370#pid1370");
+        this.enablePremium("https://" + getHost() + "/showthread.php?tid=184&pid=1370#pid1370");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://fakirdebrid.net/konu-terms-of-use.html";
-    }
-
-    private Browser prepBR(final Browser br) {
-        br.setCookiesExclusive(true);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        br.setFollowRedirects(true);
-        return br;
+        return "https://" + getHost() + "/konu-terms-of-use.html";
     }
 
     @Override
@@ -105,7 +97,7 @@ public class FakirdebridNet extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN };
     }
 
     @Override
@@ -264,7 +256,7 @@ public class FakirdebridNet extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (Boolean.TRUE.equals(entries.get("banned"))) {
             throw new AccountInvalidException("Account banned");
         }
@@ -289,9 +281,9 @@ public class FakirdebridNet extends PluginForHost {
         ai.setTrafficMax(((Number) entries.get("trafficlimit")).longValue());
         ai.setValidUntil(JavaScriptEngineFactory.toLong(entries.get("premium_until"), 0) * 1000, br);
         br.getPage(API_BASE + "/supportedhosts.php?pin=" + Encoding.urlEncode(account.getPass()));
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> supportedhosts_root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> arrayHoster;
-        final Object arrayHosterO = entries.get("supportedhosts");
+        final Object arrayHosterO = supportedhosts_root.get("supportedhosts");
         /* 2021-05-27: API can return Map instead of expected Array */
         if (arrayHosterO instanceof Map) {
             final Map<String, Object> mapHoster = (Map<String, Object>) arrayHosterO;
@@ -300,7 +292,7 @@ public class FakirdebridNet extends PluginForHost {
         } else {
             arrayHoster = (List<Map<String, Object>>) arrayHosterO;
         }
-        final List<MultiHostHost> supportedHosts = new ArrayList<MultiHostHost>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostermap : arrayHoster) {
             final String domain = hostermap.get("host").toString();
             final boolean active = ((Boolean) hostermap.get("currently_working")).booleanValue();
@@ -313,18 +305,14 @@ public class FakirdebridNet extends PluginForHost {
             mhost.setMaxDownloads(((Number) hostermap.get("maxDownloads")).intValue());
             mhost.setTrafficMax(((Number) hostermap.get("traffixmax_daily")).longValue());
             mhost.setTrafficLeft(((Number) hostermap.get("trafficleft")).longValue());
-            supportedHosts.add(mhost);
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupportV2(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
     private void login(final Account account, final boolean validateToken) throws IOException, PluginException, InterruptedException {
         synchronized (account) {
-            prepBR(this.br);
-            if (!isValidAPIPIN(account.getPass())) {
-                throw new AccountInvalidException("Invalid API PIN format.\r\n Find your API PIN here: " + pinURLWithoutProtocol);
-            }
             if (!validateToken) {
                 logger.info("Trust token without login");
                 return;
@@ -334,20 +322,6 @@ public class FakirdebridNet extends PluginForHost {
                 /* Assume successful login if no error has happened! */
             }
         }
-    }
-
-    private static boolean isValidAPIPIN(final String str) {
-        if (str == null) {
-            return false;
-        } else if (str.matches("[A-Za-z0-9]{10,}")) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private static String correctPassword(final String pw) {
-        return pw.trim();
     }
 
     /**
@@ -373,54 +347,56 @@ public class FakirdebridNet extends PluginForHost {
     private void handleErrorsAPI(final Browser br, final DownloadLink link, final Account account) throws PluginException, InterruptedException {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Object errorO = entries.get("error");
-        if (errorO instanceof Boolean && errorO == Boolean.TRUE) {
-            final String message = (String) entries.get("message");
-            final Object errorCodeO = entries.get("code");
-            if (errorCodeO instanceof Number || errorCodeO.toString().matches("\\d+")) {
-                /* 2021-09-14: Seems like this is not required anymore because the "code" field is always a String. */
-                final int errorcode = Integer.parseInt(errorCodeO.toString());
-                switch (errorcode) {
-                case -1:
-                    /* No error */
-                    break;
-                case 1001:
-                    /* Invalid PIN */
-                    if (account.getLastValidTimestamp() == -1) {
-                        showPINLoginInformation();
-                    }
-                    throw new AccountInvalidException(message);
-                default:
-                    throw new AccountInvalidException(message);
+        if (!Boolean.TRUE.equals(errorO)) {
+            /* No error */
+            return;
+        }
+        final String message = (String) entries.get("message");
+        final Object errorCodeO = entries.get("code");
+        if (errorCodeO instanceof Number || errorCodeO.toString().matches("\\d+")) {
+            /* 2021-09-14: Seems like this is not required anymore because the "code" field is always a String. */
+            final int errorcode = Integer.parseInt(errorCodeO.toString());
+            switch (errorcode) {
+            case -1:
+                /* No error */
+                break;
+            case 1001:
+                /* Invalid PIN */
+                if (!account.hasEverBeenValid()) {
+                    showPINLoginInformation();
                 }
+                throw new AccountInvalidException(message);
+            default:
+                throw new AccountInvalidException(message);
+            }
+        } else {
+            /* Distinguish between temp. account errors, permanent account errors and downloadlink/host related errors. */
+            final String errorStr = errorCodeO.toString();
+            if (errorStr.equalsIgnoreCase("PIN_Invalid")) {
+                /* Only show this dialog if user has tried to add this account for the first time. */
+                if (!account.hasEverBeenValid()) {
+                    showPINLoginInformation();
+                }
+                throw new AccountInvalidException(message);
+            } else if (errorStr.equalsIgnoreCase("Banned_Account") || errorStr.equalsIgnoreCase("Free_Account")) {
+                /* Permanent account error */
+                throw new AccountInvalidException(message);
+            } else if (errorStr.equalsIgnoreCase("Limit_Error_Transfer") || errorStr.equalsIgnoreCase("Limit_Error_Premium")) {
+                /* Temp. account error */
+                throw new AccountUnavailableException(errorStr, 5 * 60 * 1000l);
+            } else if (errorStr.equalsIgnoreCase("Password_Required")) {
+                link.setPasswordProtected(true);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Password required");
+            } else if (errorStr.equalsIgnoreCase("Wrong_Password")) {
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            } else if (errorStr.equalsIgnoreCase("File_not_found")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                /* Distinguish between temp. account errors, permanent account errors and downloadlink/host related errors. */
-                final String errorStr = errorCodeO.toString();
-                if (errorStr.equalsIgnoreCase("PIN_Invalid")) {
-                    /* Only show this dialog if user has tried to add this account for the first time. */
-                    if (account.getLastValidTimestamp() == -1) {
-                        showPINLoginInformation();
-                    }
-                    throw new AccountInvalidException(message);
-                } else if (errorStr.equalsIgnoreCase("Banned_Account") || errorStr.equalsIgnoreCase("Free_Account")) {
-                    /* Permanent account error */
-                    throw new AccountInvalidException(message);
-                } else if (errorStr.equalsIgnoreCase("Limit_Error_Transfer") || errorStr.equalsIgnoreCase("Limit_Error_Premium")) {
-                    /* Temp. account error */
+                logger.info("Unknown error happened: " + errorStr);
+                if (link == null) {
                     throw new AccountUnavailableException(errorStr, 5 * 60 * 1000l);
-                } else if (errorStr.equalsIgnoreCase("Password_Required")) {
-                    link.setPasswordProtected(true);
-                    throw new PluginException(LinkStatus.ERROR_RETRY, "Password required");
-                } else if (errorStr.equalsIgnoreCase("Wrong_Password")) {
-                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                } else if (errorStr.equalsIgnoreCase("File_not_found")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
-                    logger.info("Unknown error happened: " + errorStr);
-                    if (link == null) {
-                        throw new AccountUnavailableException(errorStr, 5 * 60 * 1000l);
-                    } else {
-                        mhm.handleErrorGeneric(account, this.getDownloadLink(), errorStr, 10);
-                    }
+                    mhm.handleErrorGeneric(account, this.getDownloadLink(), errorStr, 10);
                 }
             }
         }
@@ -467,90 +443,18 @@ public class FakirdebridNet extends PluginForHost {
     }
 
     @Override
-    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        return new FakirdebridNetAccountFactory(callback);
+    protected String getAPILoginHelpURL() {
+        return "https://" + pinURLWithoutProtocol;
     }
 
-    public static class FakirdebridNetAccountFactory extends MigPanel implements AccountBuilderInterface {
-        /**
-         *
-         */
-        private static final long serialVersionUID = 1L;
-
-        private String getPassword() {
-            if (this.pass == null) {
-                return null;
-            } else {
-                return correctPassword(new String(this.pass.getPassword()));
-            }
-        }
-
-        public boolean updateAccount(Account input, Account output) {
-            boolean changed = false;
-            if (!StringUtils.equals(input.getUser(), output.getUser())) {
-                output.setUser(input.getUser());
-                changed = true;
-            }
-            if (!StringUtils.equals(input.getPass(), output.getPass())) {
-                output.setPass(input.getPass());
-                changed = true;
-            }
-            return changed;
-        }
-
-        private final ExtPasswordField pass;
-        private final JLabel           apiPINLabel;
-
-        public FakirdebridNetAccountFactory(final InputChangedCallbackInterface callback) {
-            super("ins 0, wrap 2", "[][grow,fill]", "");
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                add(new JLabel("Hier findest du deine API PIN:"));
-            } else {
-                add(new JLabel("Click here to find your API PIN:"));
-            }
-            add(new JLink("https://fakirdebrid.net/api/login.php"));
-            add(apiPINLabel = new JLabel("API PIN:"));
-            add(this.pass = new ExtPasswordField() {
-                @Override
-                public void onChanged() {
-                    callback.onChangedInput(this);
-                }
-            }, "");
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                pass.setHelpText("Gib deine API PIN ein");
-            } else {
-                pass.setHelpText("Enter your API PIN");
-            }
-        }
-
-        @Override
-        public JComponent getComponent() {
-            return this;
-        }
-
-        @Override
-        public void setAccount(Account defaultAccount) {
-            if (defaultAccount != null) {
-                // name.setText(defaultAccount.getUser());
-                pass.setText(defaultAccount.getPass());
-            }
-        }
-
-        @Override
-        public boolean validateInputs() {
-            final String pw = getPassword();
-            if (FakirdebridNet.isValidAPIPIN(pw)) {
-                apiPINLabel.setForeground(Color.BLACK);
-                return true;
-            } else {
-                apiPINLabel.setForeground(Color.RED);
-                return false;
-            }
-        }
-
-        @Override
-        public Account getAccount() {
-            return new Account(null, getPassword());
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("[A-Za-z0-9]{10,}")) {
+            return true;
+        } else {
+            return false;
         }
     }
 
