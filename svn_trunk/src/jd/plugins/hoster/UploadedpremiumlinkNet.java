@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49973 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49988 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -302,7 +302,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
             mhm.putError(account, link, 5 * 60 * 1000l, message);
         } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
-            mhm.handleErrorGeneric(account, link, message, 20);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
         } else if (errorcode.equalsIgnoreCase("FILE_NOT_FOUND")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
         } else if (errorcode.equalsIgnoreCase("LINK_PASS_PROTECTED")) {

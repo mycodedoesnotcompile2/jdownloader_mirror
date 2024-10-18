@@ -127,10 +127,10 @@ public class AWSign {
         }
     }
 
-    public static byte[] createSign(final File f, final PrivateKey publicKey, final boolean salt, final byte[] addInfo) throws SignatureViolationException {
+    public static byte[] createSign(final File f, final PrivateKey privateKey, final boolean salt, final byte[] addInfo) throws SignatureViolationException {
         try {
             final Signature sig = Signature.getInstance("Sha256WithRSA");
-            sig.initSign(publicKey);
+            sig.initSign(privateKey);
             InputStream input = null;
             try {
                 final byte[] saltBytes = AWSign.get16ByteSalt(salt);
@@ -149,7 +149,7 @@ public class AWSign {
                     }
                 }
                 final byte[] ret = sig.sign();
-                if (!salt) {
+                if (saltBytes == null) {
                     return ret;
                 }
                 final byte[] merged = new byte[ret.length + saltBytes.length];
@@ -158,7 +158,9 @@ public class AWSign {
                 return merged;
             } finally {
                 try {
-                    input.close();
+                    if (input != null) {
+                        input.close();
+                    }
                 } catch (final Exception e) {
                 }
             }
@@ -356,7 +358,7 @@ public class AWSign {
         return get16ByteSalt(salt);
     }
 
-    public static byte[] getByteSalt(final int length) throws NoSuchAlgorithmException {
+    public static byte[] getByteSalt(final int length) {
         if (length <= 0) {
             return null;
         } else {

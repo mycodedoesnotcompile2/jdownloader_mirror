@@ -46,11 +46,11 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "drtuber.com" }, urls = { "https?://(www\\.|m\\.)?drtuber\\.com/(?:embed/\\d+|video/\\d+(?:[a-z0-9\\-_]+)?)" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 2, names = { "drtuber.com" }, urls = { "https?://(www\\.|m\\.)?drtuber\\.com/(?:embed/\\d+|video/\\d+(?:[a-z0-9\\-_]+)?)" })
 public class DrTuberCom extends PluginForHost {
     public DrTuberCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.drtuber.com/signup?track=top_menu");
+        this.enablePremium("https://www." + getHost() + "/signup?track=top_menu");
     }
 
     @Override
@@ -65,7 +65,7 @@ public class DrTuberCom extends PluginForHost {
      */
     @Override
     public String getAGBLink() {
-        return "https://www.drtuber.com/static/terms";
+        return "https://www." + getHost() + "/static/terms";
     }
 
     @SuppressWarnings("deprecation")

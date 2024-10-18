@@ -3841,7 +3841,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Open Links in Browser" })
     String OpenInBrowserAction_actionPerformed_open_in_browser__multi();
 
-    @Default(lngs = { "en" }, values = { "You choose to open %s1 Links in your browser." })
+    @Default(lngs = { "en" }, values = { "You chose to open %s1 links in your browser." })
     String OpenInBrowserAction_actionPerformed_open_in_browser__multi_msg(int size);
 
     @Default(lngs = { "en" }, values = { "Unknown" })

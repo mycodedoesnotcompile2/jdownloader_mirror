@@ -33,14 +33,25 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.zip;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.ZipEntry;
@@ -48,7 +59,16 @@ import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
+import org.appwork.serializer.Deser;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Application;
 import org.appwork.utils.Files;
+import org.appwork.utils.IO;
+import org.appwork.utils.JVMVersion;
+import org.appwork.utils.JavaVersion;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.net.NullOutputStream;
 
 /**
  * @author daniel
@@ -65,7 +85,15 @@ public class ZipIOReader {
     private int        zipEntriesSize        = -1;
     private ZipEntry[] zipEntries            = null;
     private boolean    breakOnError          = true;
+    private Signature  signature;
+    private PublicKey  publicKey;
+    private byte[]     salt;
+    private File       tmpZipFile;
 
+    /**
+     * * @deprecated
+     */
+    @Deprecated
     public ZipIOReader(final byte[] byteArray) {
         this.byteArray = byteArray;
     }
@@ -94,6 +122,12 @@ public class ZipIOReader {
             if (this.zip != null) {
                 this.zip.close();
             }
+            publicKey = null;
+            signature = null;
+            if (tmpZipFile != null) {
+                tmpZipFile.delete();
+                tmpZipFile = null;
+            }
         } finally {
             this.byteArray = null;
             this.zip = null;
@@ -115,7 +149,7 @@ public class ZipIOReader {
         final java.util.List<File> ret = new ArrayList<File>();
         if (output.exists() && output.isDirectory()) {
             if (this.isOverwrite()) {
-                Files.deleteRecursiv(output);
+                Files.deleteRecursive(output);
                 if (output.exists()) {
                     if (this.isBreakOnError()) {
                         throw new IOException("Cannot extract File to Directory " + output);
@@ -162,9 +196,9 @@ public class ZipIOReader {
                 return ret;
             }
         }
-        FileOutputStream os = null;
+        OutputStream os = null;
         try {
-            os = new FileOutputStream(output);
+            os = new BufferedOutputStream(new FileOutputStream(output));
             this.extract(entry, os);
         } finally {
             if (os != null) {
@@ -181,7 +215,7 @@ public class ZipIOReader {
      * @throws ZipIOException
      * @throws IOException
      */
-    public void extract(final ZipEntry entry, final OutputStream stream) throws ZipIOException, IOException {
+    public void extract(final ZipEntry entry, final OutputStream stream) throws ZipIOException {
         if (entry.isDirectory()) {
             if (this.isBreakOnError()) {
                 throw new ZipIOException("Cannot extract a directory", entry);
@@ -189,33 +223,45 @@ public class ZipIOReader {
                 org.appwork.loggingv3.LogV3.severe("Cannot extract a directory " + entry.getName());
             }
         }
+        if (logger != null) {
+            logger.info("Extract " + entry.getName() + " -> " + stream.getClass().getSimpleName());
+        }
         CheckedInputStream in = null;
         try {
-            final InputStream is = this.getInputStream(entry);
-            in = new CheckedInputStream(is, new CRC32());
-            final byte[] buffer = new byte[32767];
-            int len = 0;
-            long total = 0;
-            while ((len = in.read(buffer)) != -1) {
-                stream.write(buffer, 0, len);
-                total += len;
-                notify(entry, len, total);
-            }
-            if (entry.getCrc() != -1 && entry.getCrc() != in.getChecksum().getValue()) {
-                if (this.isBreakOnError()) {
-                    throw new ZipIOException("CRC32 Failed", entry);
-                } else {
-                    org.appwork.loggingv3.LogV3.severe("CRC32 Failed " + entry);
+            try {
+                final InputStream is = this.getInputStream(entry);
+                in = new CheckedInputStream(is, new CRC32());
+                final byte[] buffer = new byte[32767];
+                int len = 0;
+                long total = 0;
+                while ((len = in.read(buffer)) != -1) {
+                    if (len == 0) {
+                        continue;
+                    }
+                    stream.write(buffer, 0, len);
+                    total += len;
+                    notify(entry, len, total);
+                }
+                crcCheck(entry, in);
+            } finally {
+                if (in != null) {
+                    in.close();
+                }
+                if (stream != null) {
+                    stream.close();
                 }
             }
-        } finally {
-            try {
-                in.close();
-            } catch (final Throwable e) {
-            }
-            try {
-                stream.close();
-            } catch (final Throwable e) {
+        } catch (IOException e) {
+            throw ZipIOException.wrap(e);
+        }
+    }
+
+    protected void crcCheck(final ZipEntry entry, CheckedInputStream in) throws ZipIOException {
+        if (entry.getCrc() != -1 && entry.getCrc() != in.getChecksum().getValue()) {
+            if (this.isBreakOnError()) {
+                throw new ZipIOException("CRC32 Failed", entry);
+            } else {
+                org.appwork.loggingv3.LogV3.severe("CRC32 Failed " + entry);
             }
         }
     }
@@ -301,83 +347,203 @@ public class ZipIOReader {
      * @throws ZipIOException
      * @throws IOException
      */
-    public synchronized InputStream getInputStream(final ZipEntry entry) throws ZipIOException, IOException {
+    public synchronized InputStream getInputStream(final ZipEntry entry) throws ZipIOException {
         if (entry == null) {
             throw new ZipIOException("invalid zipEntry");
         }
-        if (this.zip != null) {
-            return this.zip.getInputStream(entry);
-        } else {
-            ZipInputStream zis = null;
-            boolean close = true;
-            try {
-                zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
-                ZipEntry ze = null;
-                while ((ze = zis.getNextEntry()) != null) {
-                    /* find the entry that matches */
-                    final String name = ze.getName();
-                    if (name.equals(entry.getName())) {
-                        final ZipInputStream zis2 = zis;
-                        close = false;
-                        return new InputStream() {
-                            @Override
-                            public int available() throws IOException {
-                                return zis2.available();
-                            }
-
-                            @Override
-                            public void close() throws IOException {
-                                zis2.close();
-                            }
-
-                            @Override
-                            public synchronized void mark(final int readlimit) {
-                                zis2.mark(readlimit);
-                            }
-
-                            @Override
-                            public boolean markSupported() {
-                                return zis2.markSupported();
-                            }
-
-                            @Override
-                            public int read() throws IOException {
-                                return zis2.read();
-                            }
-
-                            @Override
-                            public int read(final byte b[]) throws IOException {
-                                return zis2.read(b);
-                            }
-
-                            @Override
-                            public int read(final byte b[], final int off, final int len) throws IOException {
-                                return zis2.read(b, off, len);
-                            }
-
-                            @Override
-                            public synchronized void reset() throws IOException {
-                                zis2.reset();
-                            }
-
-                            @Override
-                            public long skip(final long n) throws IOException {
-                                return zis2.skip(n);
-                            }
-                        };
-                    }
-                }
-            } catch (final IOException e) {
-                throw new ZipIOException(e.getMessage(), e);
-            } finally {
+        try {
+            ensureIndexIsVerified();
+        } catch (SignatureException e) {
+            throw new ZipIOException(e);
+        }
+        verifyPathSignature(entry);
+        // if (zip == null && signature != null) {
+        // ensureZipFile();
+        // }
+        InputStream ret = null;
+        try {
+            if (this.zip != null) {
+                ret = this.zip.getInputStream(entry);
+            } else {
+                ZipInputStream zis = null;
+                boolean close = true;
                 try {
-                    if (close) {
-                        zis.close();
+                    zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
+                    ZipEntry ze = null;
+                    while ((ze = zis.getNextEntry()) != null) {
+                        /* find the entry that matches */
+                        final String name = ze.getName();
+                        if (name.equals(entry.getName())) {
+                            final ZipInputStream zis2 = zis;
+                            close = false;
+                            ret = new InputStream() {
+                                @Override
+                                public int available() throws IOException {
+                                    return zis2.available();
+                                }
+
+                                @Override
+                                public void close() throws IOException {
+                                    zis2.close();
+                                }
+
+                                @Override
+                                public synchronized void mark(final int readlimit) {
+                                    zis2.mark(readlimit);
+                                }
+
+                                @Override
+                                public boolean markSupported() {
+                                    return zis2.markSupported();
+                                }
+
+                                @Override
+                                public int read() throws IOException {
+                                    return zis2.read();
+                                }
+
+                                @Override
+                                public int read(final byte b[]) throws IOException {
+                                    return zis2.read(b);
+                                }
+
+                                @Override
+                                public int read(final byte b[], final int off, final int len) throws IOException {
+                                    return zis2.read(b, off, len);
+                                }
+
+                                @Override
+                                public synchronized void reset() throws IOException {
+                                    zis2.reset();
+                                }
+
+                                @Override
+                                public long skip(final long n) throws IOException {
+                                    return zis2.skip(n);
+                                }
+                            };
+                            break;
+                        }
                     }
-                } catch (final Throwable e) {
+                } catch (final IOException e) {
+                    throw ZipIOException.wrap(e);
+                } finally {
+                    if (close) {
+                        if (zis != null) {
+                            try {
+                                zis.close();
+                            } catch (IOException e) {
+                                throw ZipIOException.wrap(e);
+                            }
+                        }
+                    }
                 }
             }
-            return null;
+            if (signature != null) {
+                try {
+                    String comment = entry.getComment();
+                    signature.initVerify(publicKey);
+                    Map<String, Object> cont = Deser.get().fromString(comment, TypeRef.MAP);
+                    final byte[] contentSignatur = Base64.decode((String) cont.get(ZipIOWriter.C_SIG));
+                    byte[] cSalt = Base64.decode((String) cont.get(ZipIOWriter.SIG_SALT));
+                    signature.update(cSalt);
+                    signature.update(salt);
+                    ret = new FilterInputStream(ret) {
+                        private boolean sigOk = false;
+
+                        /**
+                         * @see java.io.FilterInputStream#read()
+                         */
+                        @Override
+                        public int read() throws IOException {
+                            int ret = super.read();
+                            if (ret < 0) {
+                                // oef
+                                finishSignature();
+                            } else {
+                                try {
+                                    signature.update((byte) ret);
+                                } catch (SignatureException e) {
+                                    throw new IOException(e);
+                                }
+                            }
+                            return ret;
+                        }
+
+                        private void finishSignature() throws IOException {
+                            try {
+                                if (sigOk) {
+                                    return;
+                                }
+                                if (logger != null) {
+                                    logger.info("Verify Signature " + entry.getName());
+                                }
+                                if (!signature.verify(contentSignatur)) {
+                                    throw new SignatureException("Failed on " + entry.getName());
+                                }
+                                sigOk = true;
+                            } catch (SignatureException e) {
+                                throw new IOException(e);
+                            }
+                        }
+
+                        /**
+                         * @see java.io.FilterInputStream#read(byte[], int, int)
+                         */
+                        @Override
+                        public int read(byte[] b, int off, int len) throws IOException {
+                            int ret = super.read(b, off, len);
+                            if (ret > 0) {
+                                try {
+                                    signature.update(b, off, ret);
+                                } catch (SignatureException e) {
+                                    throw new IOException(e);
+                                }
+                            } else {
+                                finishSignature();
+                            }
+                            return ret;
+                        }
+
+                        /**
+                         * @see java.io.FilterInputStream#close()
+                         */
+                        @Override
+                        public void close() throws IOException {
+                            try {
+                                finishSignature();
+                            } finally {
+                                super.close();
+                            }
+                        }
+                    };
+                } catch (GeneralSecurityException e) {
+                    throw new ZipIOException(e);
+                }
+            }
+        } catch (IOException e) {
+            throw ZipIOException.wrap(e);
+        }
+        return ret;
+    }
+
+    protected void verifyPathSignature(final ZipEntry entry) throws ZipIOException {
+        if (signature != null) {
+            String comment = entry.getComment();
+            Map<String, Object> cont = Deser.get().fromString(comment, TypeRef.MAP);
+            byte[] pathSignature = Base64.decode((String) cont.get(ZipIOWriter.P_SIG));
+            byte[] cSalt = Base64.decode((String) cont.get(ZipIOWriter.SIG_SALT));
+            try {
+                signature.initVerify(publicKey);
+                signature.update(cSalt);
+                signature.update(salt);
+                signature.update(entry.getName().getBytes("UTF-8"));
+                signature.verify(pathSignature);
+            } catch (GeneralSecurityException e) {
+                throw new ZipIOException("Signature Failed ", e);
+            } catch (UnsupportedEncodingException e) {
+                throw new ZipIOException("Signature Failed ", e);
+            }
         }
     }
 
@@ -407,7 +573,7 @@ public class ZipIOReader {
                 }
                 return null;
             } catch (final IOException e) {
-                throw new ZipIOException(e.getMessage(), e);
+                throw ZipIOException.wrap(e);
             } finally {
                 try {
                     zis.close();
@@ -428,6 +594,7 @@ public class ZipIOReader {
             return this.zipEntries;
         }
         final java.util.List<ZipEntry> ret = new ArrayList<ZipEntry>();
+        ensureZipFile();
         if (this.zip != null) {
             final Enumeration<? extends ZipEntry> zipIter = this.zip.entries();
             while (zipIter.hasMoreElements()) {
@@ -442,16 +609,37 @@ public class ZipIOReader {
                     ret.add(ze);
                 }
             } catch (final IOException e) {
-                throw new ZipIOException(e.getMessage(), e);
+                throw ZipIOException.wrap(e);
             } finally {
-                try {
-                    zis.close();
-                } catch (final Throwable e) {
+                if (zis != null) {
+                    try {
+                        zis.close();
+                    } catch (IOException e) {
+                        throw ZipIOException.wrap(e);
+                    }
                 }
             }
         }
         this.zipEntries = ret.toArray(new ZipEntry[ret.size()]);
+        try {
+            ensureIndexIsVerified();
+        } catch (SignatureException e) {
+            throw new ZipIOException(e);
+        }
         return this.zipEntries;
+    }
+
+    protected void ensureZipFile() throws ZipIOException {
+        if (signature != null && zip == null) {
+            tmpZipFile = Application.getTempUniqueResource(".zip");
+            tmpZipFile.deleteOnExit();
+            try {
+                IO.secureWrite(tmpZipFile, byteArray);
+                zip = new ZipFile(tmpZipFile);
+            } catch (IOException e) {
+                throw ZipIOException.wrap(e);
+            }
+        }
     }
 
     /**
@@ -459,7 +647,9 @@ public class ZipIOReader {
      *
      * @return ZipIOFile that represents ROOT of the Filesystem
      * @throws ZipIOException
+     * @deprecated
      */
+    @Deprecated
     public synchronized ZipIOFile getZipIOFileSystem() throws ZipIOException {
         if (this.rootFS != null) {
             return this.rootFS;
@@ -596,11 +786,14 @@ public class ZipIOReader {
                     this.zipEntriesSize++;
                 }
             } catch (final IOException e) {
-                throw new ZipIOException(e.getMessage(), e);
+                throw ZipIOException.wrap(e);
             } finally {
-                try {
-                    zis.close();
-                } catch (final Throwable e) {
+                if (zis != null) {
+                    try {
+                        zis.close();
+                    } catch (IOException e) {
+                        throw ZipIOException.wrap(e);
+                    }
                 }
             }
         }
@@ -642,5 +835,174 @@ public class ZipIOReader {
         } finally {
             ziper.close();
         }
+    }
+
+    /**
+     * @return
+     */
+    public String getComment() {
+        return this.zip.getComment();
+    }
+
+    private LogInterface logger;
+    private byte[]       indexSignature;
+    private String       signatureType;
+    private Boolean      indexVerifyResult = null;
+
+    public LogInterface getLogger() {
+        return logger;
+    }
+
+    public void setLogger(LogInterface logger) {
+        this.logger = logger;
+    }
+
+    /**
+     * @param public1
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws IOException
+     * @throws SignatureException
+     */
+    public void setSignaturePublicKey(PublicKey pub) throws SignatureException, NoSuchAlgorithmException {
+        this.publicKey = pub;
+        String comment = null;
+        if (byteArray != null) {
+            byte[] tail = byteArray;
+            comment = readComment(tail);
+        } else {
+            try {
+                if (JVMVersion.getVersion().isLowerThan(JavaVersion.JVM_1_7)) {
+                    RandomAccessFile file = new RandomAccessFile(zipFile, "r");
+                    try {
+                        file.seek(Math.max(0, zipFile.length() - 65000));
+                        int read = 65000;
+                        if (zipFile.length() < read) {
+                            read = (int) zipFile.length();
+                        }
+                        byte[] tail = new byte[read];
+                        file.readFully(tail);
+                        comment = readComment(tail);
+                    } finally {
+                        file.close();
+                    }
+                } else {
+                    comment = zip.getComment();
+                }
+            } catch (IOException e) {
+                throw new SignatureException(e);
+            }
+        }
+        Map<String, Object> cont = Deser.get().fromString(comment, TypeRef.MAP);
+        indexSignature = Base64.decode((String) cont.get(ZipIOWriter.I_SIG));
+        salt = Base64.decode((String) cont.get(ZipIOWriter.SIG_SALT));
+        signatureType = (String) cont.get(ZipIOWriter.TYPE);
+        // System.out.println("Index:\r\n" + (String) cont.get("INDEX"));
+        if (!ZipIOWriter.AWZ_SIG1.equals(signatureType)) {
+            throw new SignatureException("Unsupported Signature type: " + signatureType);
+        }
+        signature = Signature.getInstance("Sha256WithRSA");
+    }
+
+    protected void ensureIndexIsVerified() throws SignatureException, ZipIOException {
+        try {
+            if (indexVerifyResult != null) {
+                if (indexVerifyResult == Boolean.TRUE) {
+                    return;
+                } else {
+                    throw new SignatureException("Index Signature Failed");
+                }
+            }
+            try {
+                signature.initVerify(publicKey);
+                signature.update(salt);
+                for (ZipEntry e : getZipFiles()) {
+                    signature.update(((e.isDirectory() ? "[D]" : "[F]") + e.getName()).getBytes("UTF-8"));
+                }
+                if (!signature.verify(indexSignature)) {
+                    throw new SignatureException("Index Signature Failed");
+                }
+                indexVerifyResult = Boolean.TRUE;
+            } finally {
+                if (indexVerifyResult == null) {
+                    indexVerifyResult = Boolean.FALSE;
+                }
+            }
+        } catch (UnsupportedEncodingException e) {
+            throw new SignatureException(e);
+        } catch (GeneralSecurityException e) {
+            if (e instanceof SignatureException) {
+                throw (SignatureException) e;
+            }
+            throw new SignatureException(e);
+        }
+    }
+
+    protected String readComment(byte[] tail) throws SignatureException {
+        try {
+            int eocdSignature = 0x06054b50;
+            int eocdSize = 22; // Minimal EOCD size without comment
+            // Search the last 64kb for a EOCD signature
+            for (int i = tail.length - eocdSize; i >= 0; i--) {
+                if ((tail[i] & 0xFF) == (eocdSignature & 0xFF) && (tail[i + 1] & 0xFF) == ((eocdSignature >> 8) & 0xFF) && (tail[i + 2] & 0xFF) == ((eocdSignature >> 16) & 0xFF) && (tail[i + 3] & 0xFF) == ((eocdSignature >> 24) & 0xFF)) {
+                    // get comment length (last 2 bytes in EOCD header)
+                    int commentLength = (tail[i + 20] & 0xFF) | ((tail[i + 21] & 0xFF) << 8);
+                    if (commentLength > 0 && i + eocdSize + commentLength <= tail.length) {
+                        return new String(tail, i + eocdSize, commentLength, "UTF-8");
+                    } else {
+                        throw new SignatureException("No comment with signature information found");
+                    }
+                }
+            }
+            throw new SignatureException("No comment with signature information found");
+        } catch (UnsupportedEncodingException e) {
+            throw new SignatureException(e);
+        }
+    }
+
+    /**
+     * @param e
+     * @throws IOException
+     * @throws UnsupportedEncodingException
+     * @throws SignatureException
+     * @throws ZipIOException
+     * @throws InvalidKeyException
+     *
+     */
+    public void verify(ZipEntry e) throws SignatureException, ZipIOException {
+        ensureIndexIsVerified();
+        verifyPathSignature(e);
+    }
+
+    public void verify() throws SignatureException, ZipIOException {
+        for (ZipEntry ze : getZipFiles()) {
+            if (ze.isDirectory()) {
+                verifyPathSignature(ze);
+            } else {
+                extract(ze, new NullOutputStream());
+            }
+        }
+    }
+
+    /**
+     * @param pub
+     * @return
+     * @throws IOException
+     * @throws SignatureException
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     */
+    public ZipIOReader publickey(PublicKey pub) throws InvalidKeyException, NoSuchAlgorithmException, SignatureException, IOException {
+        this.setSignaturePublicKey(pub);
+        return this;
+    }
+
+    /**
+     * @param defaultLogger
+     * @return
+     */
+    public ZipIOReader logger(LogInterface logger) {
+        setLogger(logger);
+        return this;
     }
 }

@@ -17,6 +17,10 @@ package jd.plugins.hoster;
 
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -28,11 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "clyp.it" }, urls = { "https?://(?:www\\.)?clyp\\.it/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "clyp.it" }, urls = { "https?://(?:www\\.)?clyp\\.it/([A-Za-z0-9]+)" })
 public class ClypIt extends PluginForHost {
     public ClypIt(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,10 +48,9 @@ public class ClypIt extends PluginForHost {
     // protocol: no https
     // other:
     /* Connection stuff */
-    private static final boolean free_resume       = true;
-    private static final int     free_maxchunks    = 0;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = true;
+    private static final int     free_maxchunks = 0;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
@@ -144,7 +143,7 @@ public class ClypIt extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

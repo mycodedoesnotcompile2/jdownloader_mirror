@@ -1194,4 +1194,19 @@ public class Application {
         }
         return manifestMap;
     }
+
+    /**
+     * returns a non-existing unique tmp file/path. This method will not return the same path twice, so it is ensured, that the application
+     * will not use it in another thread.
+     *
+     * @param string
+     * @return
+     */
+    public static File getTempUniqueResource(String postFix) {
+        File file = null;
+        while (file == null || file.exists()) {
+            file = Application.getResource("tmp/path_" + UniqueAlltimeID.next() + postFix);
+        }
+        return file;
+    }
 }

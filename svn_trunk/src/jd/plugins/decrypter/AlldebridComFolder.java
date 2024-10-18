@@ -33,14 +33,14 @@ import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 49981 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49984 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,73 +95,64 @@ public class AlldebridComFolder extends PluginForDecrypt {
         query.appendEncoded("jd", "");
         br.getPage(AllDebridCom.api_base_41 + "/magnet/status?" + query.toString());
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        if (entries.containsKey("error")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
+        if (errormap != null) {
+            /* E.g. {"status":"error","error":{"code":"MAGNET_INVALID_ID","message":"This magnet ID does not exists or is invalid"}} */
+            final String msg = errormap.get("message").toString();
+            throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, magnetID + "_" + msg, msg);
         }
         final Map<String, Object> magnet = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/magnets");
         final String torrentName = (String) magnet.get("filename");
-        final String torrentNameEscaped = Pattern.quote(torrentName);
         final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) magnet.get("files");
         if (resourcelist == null || resourcelist.isEmpty()) {
             /* Probably unfinished torrent download */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            final String status = (String) magnet.get("status");
+            throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, torrentName + "_" + status, status);
         }
         final String folderRoot = torrentName;
         final FilePackage fpRoot = FilePackage.getInstance();
         fpRoot.setName(folderRoot);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        crawlRecursive(ret, new HashMap<String, FilePackage>(), resourcelist, torrentNameEscaped, torrentName);
+        crawlRecursive(ret, new HashMap<String, FilePackage>(), resourcelist, torrentName);
         return ret;
     }
 
-    private List<DownloadLink> crawlRecursive(final List<DownloadLink> results, final Map<String, FilePackage> fps, Object o, final String torrentNameEscaped, final String path) {
-        if (o == null) {
-            return null;
-        }
+    /**
+     * Recursive function which crawls [nested] files from json structure, reconstructing the original folder structure if there are files
+     * in subfolders.s
+     */
+    private List<DownloadLink> crawlRecursive(final List<DownloadLink> results, final Map<String, FilePackage> fps, Object o, final String path) {
         if (o instanceof List) {
             for (final Object resourceO : (List<Object>) o) {
-                this.crawlRecursive(results, fps, resourceO, torrentNameEscaped, path);
+                this.crawlRecursive(results, fps, resourceO, path);
             }
-            return results;
         } else {
             final Map<String, Object> resource = (Map<String, Object>) o;
             final String url = (String) resource.get("l");
+            /* Name of file or subfolder */
             final String name = resource.get("n").toString();
             if (url != null) {
-                /* Single file */
-                final String folderRoot = new Regex(path, "^([^/]+)").getMatch(0);
+                /* Single file in folder root */
                 final DownloadLink dl = this.createDownloadlink(url);
                 dl.setName(name);
                 dl.setDownloadSize(((Number) resource.get("s")).longValue());
-                final boolean isSpecialRar = name.matches("^" + torrentNameEscaped + "(\\.rar|\\.part\\d+\\.rar)$");
-                if (isSpecialRar) {
-                    FilePackage fpRoot = fps.get(folderRoot);
-                    if (fpRoot == null) {
-                        fpRoot = FilePackage.getInstance();
-                        fpRoot.setName(folderRoot);
-                        fps.put(folderRoot, fpRoot);
-                    }
-                    dl.setRelativeDownloadFolderPath(folderRoot);
-                    dl._setFilePackage(fpRoot);
-                } else {
-                    /* Remove filename from path. */
-                    final String filePath = path.replaceAll("/" + Pattern.quote(name) + "$", "");
-                    /* File that goes into (nested) subfolder. */
-                    dl.setRelativeDownloadFolderPath(filePath);
-                    FilePackage nestedFilePackage = fps.get(filePath);
-                    if (nestedFilePackage == null) {
-                        nestedFilePackage = FilePackage.getInstance();
-                        nestedFilePackage.setName(filePath);
-                        fps.put(filePath, nestedFilePackage);
-                    }
-                    dl._setFilePackage(nestedFilePackage);
+                /* File that goes into (nested) subfolder. */
+                /* Remove filename from path. */
+                final String filePath = path.replaceAll("/" + Pattern.quote(name) + "$", "");
+                FilePackage nestedFilePackage = fps.get(filePath);
+                if (nestedFilePackage == null) {
+                    nestedFilePackage = FilePackage.getInstance();
+                    nestedFilePackage.setName(filePath);
+                    fps.put(filePath, nestedFilePackage);
                 }
+                dl.setRelativeDownloadFolderPath(filePath);
+                dl._setFilePackage(nestedFilePackage);
                 dl.setAvailable(true);
                 results.add(dl);
             } else {
                 final List<Map<String, Object>> nextSubFolderLevel = (List<Map<String, Object>>) resource.get("e");
                 /* Go deeper */
-                return this.crawlRecursive(results, fps, nextSubFolderLevel, torrentNameEscaped, path + "/" + name);
+                return this.crawlRecursive(results, fps, nextSubFolderLevel, path + "/" + name);
             }
         }
         return results;

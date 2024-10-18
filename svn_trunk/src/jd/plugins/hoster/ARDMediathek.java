@@ -51,7 +51,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49839 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 2, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "ardmediathek\\.dedecrypted://.+", "(?:mediathek\\.)?daserste\\.dedecrypted://.+", "sandmann\\.dedecrypted://.+", "wdr.dedecrypted://.+", "sportschau\\.dedecrypted://.+", "wdrmaus\\.dedecrypted://.+", "eurovision\\.dedecrypted://.+", "sputnik\\.dedecrypted://.+", "mdr\\.dedecrypted://.+", "ndr\\.dedecrypted://.+", "tagesschau\\.dedecrypted://.+" })
 public class ARDMediathek extends PluginForHost {
     private String             dllink                           = null;
     public static final String PROPERTY_CRAWLER_FORCED_FILENAME = "crawler_forced_filename";
@@ -550,6 +550,12 @@ public class ARDMediathek extends PluginForHost {
             colorCode = "FFFFFF";
         }
         return colorCode;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override

@@ -38,25 +38,6 @@ import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -113,6 +94,25 @@ import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -317,7 +317,7 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                 }
             }
         }
-        ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
+        final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
         Collections.sort(ret, new Comparator<DomainInfo>() {
             @Override
             public int compare(DomainInfo o1, DomainInfo o2) {
@@ -995,8 +995,9 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
     }
 
     public void addStringPair(String key, Object value) {
-        if (value != null) {
-            addPair(key, null, new Label(String.valueOf(value)));
+        if (value == null) {
+            return;
         }
+        addPair(key, null, new Label(String.valueOf(value)));
     }
 }

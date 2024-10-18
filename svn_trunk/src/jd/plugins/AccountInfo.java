@@ -554,7 +554,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             final LazyHostPlugin finalplugin;
             if (best.size() == 1) {
                 finalplugin = best.get(0);
-            } else if (skippedByPluginAllowHandleEntries.size() == plugins.size()) {
+            } else if (thisSkippedByPluginAllowHandleEntries.size() == plugins.size()) {
                 /* Take first result of fallback list. */
                 finalplugin = plugins.iterator().next();
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);

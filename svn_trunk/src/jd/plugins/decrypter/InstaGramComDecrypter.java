@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 49755 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49982 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -110,8 +110,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             regex += "stories/(?:[^/]+/\\d+/?|[^/]+)";
             regex += "|explore/tags/[^/]+/?";
             regex += "|(?:p|tv|reel)/[A-Za-z0-9_-]+";
-            /* 2024-09-10: New style reel links: /username/reel/<postID> */
-            regex += "|[^/]+/reel/[A-Za-z0-9_-]+";
+            /* 2024-09-10: New style single post/reel links: /username/reel/<postID> */
+            regex += "|[^/]+/(?:p|tv|reel)/[A-Za-z0-9_-]+";
             regex += "|(?!explore)[^/]+(?:/(saved|tagged|reels)/)?";
             regex += "|p/[A-Za-z0-9_-]+";
             regex += ")";

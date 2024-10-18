@@ -16,7 +16,6 @@ import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 
@@ -89,9 +88,7 @@ public class MultiHosterManagement implements AccountControllerListener {
                     /* Host might have been removed from list of supported hosts in the meantime. */
                     break setLimitOnAccount;
                 }
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
-                mhost.setStatusText(reason);
-                mhost.setUnavailableTime(timeout);
+                mhost.setErrorStatus(reason, timeout);
                 ai.updateMultihostSupportedHost(mhost);
             }
         }

@@ -33,19 +33,6 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.dialog.AddAccountDialog;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -68,6 +55,19 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.PremiumStatusBarDisplay;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.dialog.AddAccountDialog;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
+
 public class ServicePanel extends JPanel implements MouseListener, AccountTooltipOwner {
     private static final long                                serialVersionUID = 7290466989514173719L;
     private DelayedRunnable                                  redrawTimer;
@@ -78,7 +78,7 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
             throw new HeadlessException();
         }
     }
-    private AtomicBoolean                                    redrawing        = new AtomicBoolean(false);
+    private AtomicBoolean redrawing = new AtomicBoolean(false);
 
     public static ServicePanel getInstance() {
         return INSTANCE;
@@ -160,80 +160,83 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
     }
 
     public void redraw() {
-        if (SecondLevelLaunch.ACCOUNTLIST_LOADED.isReached()) {
-            if (redrawing.compareAndSet(false, true)) {
-                try {
-                    final List<ServiceCollection<?>> services = groupServices(CFG_GUI.CFG.getPremiumStatusBarDisplay(), true, null, null);
-                    new EDTHelper<Object>() {
-                        @Override
-                        public Object edtRun() {
-                            try {
-                                try {
-                                    removeAll();
-                                    // Math.min(, JsonConfig.create(GeneralSettings.class).getMaxPremiumIcons());
-                                    StringBuilder sb = new StringBuilder();
-                                    sb.append("2");
-                                    for (int i = 0; i < services.size(); i++) {
-                                        sb.append("[22!]0");
+        if (!SecondLevelLaunch.ACCOUNTLIST_LOADED.isReached()) {
+            /* Do nothing */
+            return;
+        } else if (!redrawing.compareAndSet(false, true)) {
+            /* Do nothing */
+            return;
+        }
+        try {
+            final List<ServiceCollection<?>> services = groupServices(CFG_GUI.CFG.getPremiumStatusBarDisplay(), true, null, null);
+            new EDTHelper<Object>() {
+                @Override
+                public Object edtRun() {
+                    try {
+                        try {
+                            removeAll();
+                            // Math.min(, JsonConfig.create(GeneralSettings.class).getMaxPremiumIcons());
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("2");
+                            for (int i = 0; i < services.size(); i++) {
+                                sb.append("[22!]0");
+                            }
+                            boolean hasValidAccount = false;
+                            for (ServiceCollection<?> s : services) {
+                                if (s instanceof AccountServiceCollection) {
+                                    hasValidAccount = true;
+                                    break;
+                                }
+                            }
+                            if (!hasValidAccount) {
+                                sb.append("[]0");
+                            }
+                            setLayout(new MigLayout("ins 0 2 0 0", sb.toString(), "[22!]"));
+                            for (ServiceCollection<?> s : services) {
+                                final JComponent c = s.createIconComponent(ServicePanel.this);
+                                if (c != null) {
+                                    add(c, "gapleft 0,gapright 0");
+                                }
+                            }
+                            if (!hasValidAccount && CFG_GUI.CFG.isStatusBarAddPremiumButtonVisible()) {
+                                ExtButton addPremium = new ExtButton(new AppAction() {
+                                    {
+                                        setName(_GUI.T.StatusBarImpl_add_premium());
                                     }
-                                    boolean hasValidAccount = false;
-                                    for (ServiceCollection<?> s : services) {
-                                        if (s instanceof AccountServiceCollection) {
-                                            hasValidAccount = true;
-                                            break;
-                                        }
-                                    }
-                                    if (!hasValidAccount) {
-                                        sb.append("[]0");
-                                    }
-                                    setLayout(new MigLayout("ins 0 2 0 0", sb.toString(), "[22!]"));
-                                    for (ServiceCollection<?> s : services) {
-                                        final JComponent c = s.createIconComponent(ServicePanel.this);
-                                        if (c != null) {
-                                            add(c, "gapleft 0,gapright 0");
-                                        }
-                                    }
-                                    if (!hasValidAccount && CFG_GUI.CFG.isStatusBarAddPremiumButtonVisible()) {
-                                        ExtButton addPremium = new ExtButton(new AppAction() {
-                                            {
-                                                setName(_GUI.T.StatusBarImpl_add_premium());
-                                            }
 
+                                    @Override
+                                    public void actionPerformed(ActionEvent e) {
+                                        JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
+                                        JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
+                                        ConfigurationView.getInstance().setSelectedSubPanel(AccountManagerSettings.class);
+                                        SwingUtilities.invokeLater(new Runnable() {
                                             @Override
-                                            public void actionPerformed(ActionEvent e) {
-                                                JsonConfig.create(GraphicalUserInterfaceSettings.class).setConfigViewVisible(true);
-                                                JDGui.getInstance().setContent(ConfigurationView.getInstance(), true);
-                                                ConfigurationView.getInstance().setSelectedSubPanel(AccountManagerSettings.class);
-                                                SwingUtilities.invokeLater(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        AddAccountDialog.showDialog(null, null);
-                                                    }
-                                                });
+                                            public void run() {
+                                                AddAccountDialog.showDialog(null, null);
                                             }
                                         });
-                                        addPremium.setRolloverEffectEnabled(true);
-                                        addPremium.setHorizontalAlignment(SwingConstants.LEFT);
-                                        addPremium.setIcon(new AbstractIcon(IconKey.ICON_ADD, 18));
-                                        // addPremium.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                                        add(addPremium, "height 20!,gapright 10!");
                                     }
-                                    revalidate();
-                                    repaint();
-                                } catch (final Throwable e) {
-                                    org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
-                                }
-                                invalidate();
-                            } finally {
-                                redrawing.compareAndSet(true, false);
+                                });
+                                addPremium.setRolloverEffectEnabled(true);
+                                addPremium.setHorizontalAlignment(SwingConstants.LEFT);
+                                addPremium.setIcon(new AbstractIcon(IconKey.ICON_ADD, 18));
+                                // addPremium.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                                add(addPremium, "height 20!,gapright 10!");
                             }
-                            return null;
+                            revalidate();
+                            repaint();
+                        } catch (final Throwable e) {
+                            org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().log(e);
                         }
-                    }.start();
-                } catch (final Throwable e) {
-                    redrawing.compareAndSet(true, false);
+                        invalidate();
+                    } finally {
+                        redrawing.compareAndSet(true, false);
+                    }
+                    return null;
                 }
-            }
+            }.start();
+        } catch (final Throwable e) {
+            redrawing.compareAndSet(true, false);
         }
     }
 
@@ -306,31 +309,33 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
                     }
                     final HashMap<String, DomainInfo> domainInfoCache = new HashMap<String, DomainInfo>();
                     final AccountInfo accountInfo = acc.getAccountInfo();
-                    if (accountInfo != null) {
-                        final List<String> supportedHosts = accountInfo.getMultiHostSupport();
-                        if (supportedHosts != null) {
-                            /*
-                             * synchronized on list because plugins can change the list in runtime
-                             */
-                            for (final String supportedHost : supportedHosts) {
-                                DomainInfo supportedHostDomainInfo = domainInfoCache.get(supportedHost);
-                                if (supportedHostDomainInfo == null) {
-                                    final LazyHostPlugin plg = HostPluginController.getInstance().get(supportedHost);
-                                    if (plg != null) {
-                                        supportedHostDomainInfo = DomainInfo.getInstance(plg.getHost());
-                                        domainInfoCache.put(supportedHost, supportedHostDomainInfo);
-                                    }
-                                }
-                                if (supportedHostDomainInfo != null && (hostFilter == null || StringUtils.equals(hostFilter, supportedHostDomainInfo.getTld()))) {
-                                    AccountServiceCollection asc = servicesMap.get(supportedHostDomainInfo.getTld());
-                                    if (asc == null) {
-                                        asc = new AccountServiceCollection(supportedHostDomainInfo);
-                                        servicesMap.put(supportedHostDomainInfo.getTld(), asc);
-                                        services.add(asc);
-                                    }
-                                    asc.add(acc);
-                                }
+                    if (accountInfo == null) {
+                        break;
+                    }
+                    final List<String> supportedhosts = accountInfo.getMultiHostSupport();
+                    if (supportedhosts == null) {
+                        break;
+                    }
+                    /*
+                     * synchronized on list because plugins can change the list in runtime
+                     */
+                    for (final String supportedhost : supportedhosts) {
+                        DomainInfo supportedHostDomainInfo = domainInfoCache.get(supportedhost);
+                        if (supportedHostDomainInfo == null) {
+                            final LazyHostPlugin plg = HostPluginController.getInstance().get(supportedhost);
+                            if (plg != null) {
+                                supportedHostDomainInfo = DomainInfo.getInstance(plg.getHost());
+                                domainInfoCache.put(supportedhost, supportedHostDomainInfo);
                             }
+                        }
+                        if (supportedHostDomainInfo != null && (hostFilter == null || StringUtils.equals(hostFilter, supportedHostDomainInfo.getTld()))) {
+                            AccountServiceCollection asc = servicesMap.get(supportedHostDomainInfo.getTld());
+                            if (asc == null) {
+                                asc = new AccountServiceCollection(supportedHostDomainInfo);
+                                servicesMap.put(supportedHostDomainInfo.getTld(), asc);
+                                services.add(asc);
+                            }
+                            asc.add(acc);
                         }
                     }
                     break;

@@ -34,6 +34,7 @@ import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -78,7 +79,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49980 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49988 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -278,11 +279,17 @@ public class AllDebridCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, ai, true);
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
-        br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
+        final boolean devAlsoDisplayStreamingItems = true;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && devAlsoDisplayStreamingItems) {
+            br.getPage(api_base + "/user/hosts?" + agent);
+        } else {
+            br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
+        }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final String[] allowedServiceTypes = new String[] { "hosts", "streams" };
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final HashSet<String> streamDomains = new HashSet<String>();
         for (final String serviceType : allowedServiceTypes) {
             final Object supportedHostsInfoO = data.get(serviceType);
             if (supportedHostsInfoO == null) {
@@ -299,6 +306,7 @@ public class AllDebridCom extends PluginForHost {
                 final Map<String, Object> hosterinfos = (Map<String, Object>) entry.getValue();
                 final String host_without_tld = hosterinfos.get("name").toString();
                 final Number quota = (Number) hosterinfos.get("quota");
+                final Number quotaMax = (Number) hosterinfos.get("quotaMax");
                 final String quotaType = (String) hosterinfos.get("quotaType");
                 final List<String> domains = (List<String>) hosterinfos.get("domains");
                 final MultiHostHost mhost = new MultiHostHost();
@@ -323,20 +331,24 @@ public class AllDebridCom extends PluginForHost {
                 }
                 /* Add all domains of host */
                 if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
-                    // quota is traffic in MB
-                    final long trafficMaxBytes = quota.longValue() * 1024 * 1024;
+                    /* quota is traffic in MB */
                     mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
-                    mhost.setTrafficMax(trafficMaxBytes);
+                    mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
                 } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
-                    // quota is number of links left to download
-                    final long linksMax = quota.longValue();
+                    /* quota is number of links left to download */
+                    final long linksLeft = quota.longValue();
+                    final long linksMax = quotaMax.longValue();
                     // -1 = Unlimited
-                    if (linksMax != -1) {
-                        mhost.setLinksLeft(linksMax);
+                    if (linksLeft != -1 && linksMax != -1) {
+                        mhost.setLinksLeft(linksLeft);
                         mhost.setLinksMax(linksMax);
                     }
                 } else {
-                    // No limit
+                    // No limit or unsupported type of limit
+                }
+                if (serviceType.equals("streams")) {
+                    mhost.setStatusText("Stream service");
+                    streamDomains.addAll(mhost.getDomains());
                 }
                 if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
                     /*
@@ -365,6 +377,21 @@ public class AllDebridCom extends PluginForHost {
             }
         }
         ai.setMultiHostSupportV2(this, supportedhosts);
+        final boolean filterJDownloaderUnsupportedStreamHosts = false;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
+            /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
+            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
+            final List<MultiHostHost> results = ai.getMultiHostSupportV2();
+            for (final MultiHostHost mhost : results) {
+                if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
+                    logger.info("Ignore unsupported stream domain: " + mhost.getDomain());
+                } else {
+                    filteredresults.add(mhost);
+                }
+            }
+            logger.info("Results initially: " + supportedhosts.size() + " | Filtered results: " + filteredresults.size());
+            ai.setMultiHostSupportV2(this, filteredresults);
+        }
         return ai;
     }
 
@@ -380,14 +407,16 @@ public class AllDebridCom extends PluginForHost {
                         message += "Hallo liebe(r) alldebrid NutzerIn\r\n";
                         message += "Um deinen " + host + " Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
                         message += "1. Öffne diesen Link im Browser falls das nicht automatisch passiert:\r\n\t'" + pin_url + "'\t\r\n";
-                        message += "2. Bestätige die PIN/Code im Browser.\r\n";
-                        message += "Dein Account sollte nach einigen Sekunden von JDownloader akzeptiert werden.\r\n";
+                        message += "2. Bestätige den PIN Code im Browser.\r\n";
+                        message += "3. Optional: Falls du noch nicht in deinem AD Account im Browser eingeloggt bist, logge dich ein und bestätige den PIN Code erneut.\r\n";
+                        message += "Dein Account sollte nach wenigen Sekunden von JDownloader akzeptiert werden.\r\n";
                     } else {
                         title = "Alldebrid - Login";
                         message += "Hello dear alldebrid user\r\n";
                         message += "In order to use " + host + " in JDownloader, you need to follow these steps:\r\n";
                         message += "1. Open this URL in your browser if it wasn't opened automatically:\r\n\t'" + pin_url + "'\t\r\n";
-                        message += "2. Confirm the PIN/Code you see in the browser window.\r\n";
+                        message += "2. Confirm the PIN Code you see in the browser window.\r\n";
+                        message += "3. Optional: If you haven't been logged in into your AD account in your browser already, login and confirm the PIN Code again.\r\n";
                         message += "Your account should be accepted in JDownloader within a few seconds.\r\n";
                     }
                     final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
@@ -417,8 +446,7 @@ public class AllDebridCom extends PluginForHost {
         if (StringUtils.isEmpty(msg)) {
             /* This should never happen */
             throw new IllegalArgumentException();
-        }
-        if (StringUtils.isEmpty(token)) {
+        } else if (StringUtils.isEmpty(token)) {
             /* No token given -> No way for us to refresh apikey */
             account.removeProperty(PROPERTY_apikey);
             throw new AccountInvalidException("Authorization has been denied by account owner.");
@@ -558,12 +586,8 @@ public class AllDebridCom extends PluginForHost {
         }
         final boolean isSelfhosted = this.isSelfhosted(link);
         final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
-        final String errorcode = (String) errormap.get("code");
-        String message = (String) errormap.get("message");
-        if (StringUtils.isEmpty(message)) {
-            /* We always want to have a human readable errormessage */
-            message = "Unknown error";
-        }
+        final String errorcode = errormap.get("code").toString();
+        final String message = errormap.get("message").toString();
         final HashSet<String> accountErrorsPermanent = new HashSet<String>();
         accountErrorsPermanent.add("AUTH_MISSING_APIKEY");
         accountErrorsPermanent.add("AUTH_BAD_APIKEY");
@@ -592,6 +616,7 @@ public class AllDebridCom extends PluginForHost {
         downloadErrorsFileUnavailable.add("LINK_TOO_MANY_DOWNLOADS");
         downloadErrorsFileUnavailable.add("LINK_ERROR");
         downloadErrorsFileUnavailable.add("LINK_TEMPORARY_UNAVAILABLE");
+        downloadErrorsFileUnavailable.add("LINK_NOT_SUPPORTED");
         downloadErrorsFileUnavailable.add("MUST_BE_PREMIUM");
         downloadErrorsFileUnavailable.add("DOWNLOAD_FAILED");
         downloadErrorsFileUnavailable.add("DELAYED_INVALID_ID");
@@ -616,7 +641,7 @@ public class AllDebridCom extends PluginForHost {
         } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
             mhm.putError(account, link, 5 * 60 * 1000l, message);
         } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
-            mhm.handleErrorGeneric(account, link, message, 20);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
         } else {
             /*
              * Unknown/Generic error --> Assume it is a download issue but display it as temp. account issue if no DownloadLink is given.
@@ -625,8 +650,7 @@ public class AllDebridCom extends PluginForHost {
              * E.g. LINK_ERROR, LINK_IS_MISSING, STREAM_INVALID_GEN_ID, STREAM_INVALID_STREAM_ID, DELAYED_INVALID_ID, REDIRECTOR_XXX,
              * MAGNET_XXX, USER_LINK_INVALID, MISSING_NOTIF_ENDPOINT
              */
-            logger.info("Unknown API error");
-            message = "Unknown API error: " + message;
+            logger.info("Unknown API error: " + errorcode);
             if (link != null) {
                 mhm.handleErrorGeneric(account, link, message, 50);
             } else {

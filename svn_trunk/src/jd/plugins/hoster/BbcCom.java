@@ -39,7 +39,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BbcComDecrypter;
 import jd.plugins.decrypter.BbcComiPlayerCrawler;
 
-@HostPlugin(revision = "$Revision: 48712 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "" })
 public class BbcCom extends PluginForHost {
     public BbcCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -316,5 +316,11 @@ public class BbcCom extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

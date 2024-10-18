@@ -71,7 +71,7 @@ import jd.plugins.components.gopro.Media;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.decrypter.GoProCloudDecrypter;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
 public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler */ {
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
@@ -84,7 +84,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
 
     public GoProCloud(PluginWrapper wrapper) {
         super(wrapper);
-        enablePremium("https://gopro.com/login");
+        enablePremium("https://" + getHost() + "/login/signup");
         // if (!org.appwork.utils.Application.isHeadless()) {
         // MenuManagerMainmenu.getInstance().registerExtender(this);
         // MenuManagerMainToolbar.getInstance().registerExtender(this);
@@ -219,7 +219,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
 
     @Override
     public String getAGBLink() {
-        return "https://gopro.com/login/";
+        return "https://" + getHost() + "/en/us/legal/terms";
     }
 
     @Override
@@ -637,5 +637,11 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
     public static String createVideoVariantID(Variation v, Media media) {
         final int digits = (int) (Math.log10(media.getItem_count()) + 1);
         return v.getLabel() + "_" + StringUtils.fillPre(v.getItem_number() + "", "0", digits);
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

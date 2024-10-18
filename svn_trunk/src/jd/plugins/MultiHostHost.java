@@ -42,7 +42,7 @@ public class MultiHostHost {
         DEACTIVATED_JDOWNLOADER_UNSUPPORTED {
             @Override
             public String getLabel() {
-                return "JD doesn't support this host";
+                return "Not supported by JD";
             }
         },
         DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN {
@@ -254,6 +254,12 @@ public class MultiHostHost {
         this.setUnavailableTime(waitMillis);
     }
 
+    public void clearErrorStatus() {
+        this.setStatus(MultihosterHostStatus.WORKING);
+        this.setStatusText(null);
+        this.setUnavailableTimestamp(-1);
+    }
+
     public MultihosterHostStatus getStatus() {
         // TODO: Update this to simply return status without any evaluation
         if (this.unavailableUntilTimestamp > Time.systemIndependentCurrentJVMTimeMillis()) {
@@ -319,9 +325,26 @@ public class MultiHostHost {
         return unavailableUntilTimestamp;
     }
 
-    public void setUnavailableTime(long milliseconds) {
-        milliseconds = Math.min(milliseconds, MAX_UNAVAILABLE_TIME);
-        this.unavailableUntilTimestamp = Time.systemIndependentCurrentJVMTimeMillis() + milliseconds;
+    private final void setUnavailableTimestamp(final long num) {
+        this.unavailableUntilTimestamp = num;
+    }
+
+    private final void setUnavailableTime(long milliseconds) {
+        final long timestamp = Math.min(milliseconds, MAX_UNAVAILABLE_TIME);
+        setUnavailableTimestamp(timestamp);
+    }
+
+    /**
+     * Returns time this item is unavailable for. </br>
+     * This can return negative values.
+     */
+    public long getUnavailableForMillis() {
+        final long unavailableTimestamp = this.getUnavailableUntilTimestamp();
+        if (unavailableTimestamp > 0) {
+            return this.getUnavailableUntilTimestamp() - Time.systemIndependentCurrentJVMTimeMillis();
+        } else {
+            return 0;
+        }
     }
 
     public int getMaxDownloads() {

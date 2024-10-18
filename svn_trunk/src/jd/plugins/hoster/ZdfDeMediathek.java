@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49839 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -402,6 +402,12 @@ public class ZdfDeMediathek extends PluginForHost {
     @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return ZdfmediathekConfigInterface.class;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     public static interface ZdfmediathekConfigInterface extends PluginConfigInterface {

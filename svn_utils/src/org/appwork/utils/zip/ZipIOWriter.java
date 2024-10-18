@@ -33,32 +33,83 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.zip;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.channels.ClosedChannelException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.appwork.serializer.Deser;
+import org.appwork.serializer.SC;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Hash;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.crypto.AWSign;
+import org.appwork.utils.encoding.Base64;
+import org.appwork.utils.logging2.LogInterface;
 
 /**
  * @author daniel
  *
  */
 public class ZipIOWriter {
-    protected ZipOutputStream zipStream  = null;
-    protected OutputStream    fileStream = null;
-    protected File            zipFile    = null;
-    protected final byte[]    buf        = new byte[16384];
+    /**
+     *
+     */
+    public static final String TYPE         = "type";
+    /**
+     *
+     */
+    public static final int    SALT_SIZE    = 32;
+    /**
+     *
+     */
+    public static final String I_SIG        = "iSig";
+    /**
+     *
+     */
+    public static final String AWZ_SIG1     = "AWZSig1";
+    /**
+     *
+     */
+    public static final String ORG          = "org";
+    /**
+     *
+     */
+    public static final String P_SIG        = "pSig";
+    /**
+     *
+     */
+    public static final String C_SIG        = "cSig";
+    public static final String SIG_SALT     = "salt";
+    /**
+     *
+     */
+    protected ZipOutputStream  zipStream    = null;
+    protected OutputStream     outputStream = null;
+    protected File             zipFile      = null;
+    protected final byte[]     buf          = new byte[16384];
 
     public ZipIOWriter(final ByteArrayOutputStream stream) throws FileNotFoundException, ZipIOException {
-        this.fileStream = stream;
-        this.zipStream = new ZipOutputStream(this.fileStream);
+        this.outputStream = stream;
+        this.zipStream = new ZipOutputStream(this.outputStream);
     }
 
     /**
@@ -90,8 +141,8 @@ public class ZipIOWriter {
     }
 
     public ZipIOWriter(final OutputStream stream) throws FileNotFoundException, ZipIOException {
-        this.fileStream = stream;
-        this.zipStream = new ZipOutputStream(this.fileStream);
+        this.outputStream = stream;
+        this.zipStream = new ZipOutputStream(this.outputStream);
     }
 
     /**
@@ -108,7 +159,7 @@ public class ZipIOWriter {
      */
     public synchronized void add(final File add, final boolean compress, final String path) throws ZipIOException, IOException {
         if (add == null || !add.exists()) {
-            throw new ZipIOException("add " + add.getAbsolutePath() + " invalid");
+            throw new ZipIOException("add " + add + " invalid");
         }
         if (add.isFile()) {
             this.addFileInternal(add, compress, path);
@@ -139,12 +190,23 @@ public class ZipIOWriter {
                 /* STORED must have a CRC32! */
                 zipAdd.setCrc(Hash.getCRC32(data));
             }
-            this.zipStream.putNextEntry(zipAdd);
+            HashMap<String, Object> cont = new HashMap<String, Object>();
+            if (ignore(zipAdd)) {
+                return;
+            }
+            initEntrySignature(zipAdd, cont);
+            addEntry(zipAdd);
             zipEntryAdded = true;
             this.zipStream.write(data, 0, data.length);
+            if (signature != null) {
+                signature.update(data, 0, data.length);
+            }
+            finishSignatureToEntry(zipAdd, cont);
             notify(zipAdd, data.length, data.length);
         } catch (IOException e) {
             throw new IOException("Path:" + path + "|Name:" + name, e);
+        } catch (SignatureException e) {
+            throw new IOException("Signature issue: " + "Path:" + path + "|Name:" + name, e);
         } finally {
             if (zipEntryAdded) {
                 this.zipStream.closeEntry();
@@ -179,6 +241,9 @@ public class ZipIOWriter {
         if (!addDirectory.exists() && throwExceptionOnFileGone(addDirectory)) {
             throw new ZipIOException("addDirectory " + addDirectory.getAbsolutePath() + " invalid: does not exist");
         }
+        if (path != null && StringUtils.isNotEmpty(path)) {
+            addFolder(path);
+        }
         final File[] list = addDirectory.listFiles();
         if (list != null) {
             for (final File add : list) {
@@ -212,7 +277,7 @@ public class ZipIOWriter {
      * @throws FileNotFoundException
      */
     public synchronized void addFile(final File addFile, final boolean compress, final String fullPath) throws ZipIOException, IOException, FileNotFoundException {
-        FileInputStream fin = null;
+        InputStream fin = null;
         boolean zipEntryAdded = false;
         try {
             if (addFile == null) {
@@ -221,7 +286,10 @@ public class ZipIOWriter {
             if (!dupes.add(fullPath)) {
                 throw new IOException("Cannot add the same path multiple times...");
             }
-            fin = new FileInputStream(addFile);
+            if (addFile.equals(zipFile)) {
+                throw new IOException("Tried to add the Zipfile itself.Zip-Ception?");
+            }
+            fin = new BufferedInputStream(new FileInputStream(addFile));
             final ZipEntry zipAdd = new ZipEntry(fullPath);
             final long size = addFile.length();
             zipAdd.setSize(size);
@@ -233,14 +301,24 @@ public class ZipIOWriter {
                 /* STORED must have a CRC32! */
                 zipAdd.setCrc(Hash.getCRC32(addFile));
             }
+            if (ignore(zipAdd)) {
+                return;
+            }
             long total = 0;
-            this.zipStream.putNextEntry(zipAdd);
+            HashMap<String, Object> cont = new HashMap<String, Object>();
+            initEntrySignature(zipAdd, cont);
+            addEntry(zipAdd);
             int len;
-            while ((len = fin.read(this.buf)) > 0) {
+            while ((len = fin.read(this.buf)) >= 0) {
+                if (len == 0) {
+                    continue;
+                }
                 this.zipStream.write(this.buf, 0, len);
+                updateSigner(len, buf, zipAdd);
                 total += len;
                 notify(zipAdd, len, total);
             }
+            finishSignatureToEntry(zipAdd, cont);
             zipEntryAdded = true;
         } catch (FileNotFoundException e) {
             if (addFile.exists() == false) {
@@ -252,6 +330,8 @@ public class ZipIOWriter {
             throw e;
         } catch (IOException e) {
             throw new IOException("File:" + addFile + "|Path:" + fullPath, e);
+        } catch (SignatureException e) {
+            throw new IOException("Signature issue: " + "File:" + addFile + "|Path:" + fullPath, e);
         } finally {
             try {
                 if (fin != null) {
@@ -263,6 +343,68 @@ public class ZipIOWriter {
                 this.zipStream.closeEntry();
             }
         }
+    }
+
+    protected void updateSigner(int len, byte[] buf, ZipEntry zipAdd) throws SignatureException {
+        if (signature != null) {
+            signature.update(buf, 0, len);
+        }
+    }
+
+    private LogInterface logger;
+
+    public LogInterface getLogger() {
+        return logger;
+    }
+
+    public void setLogger(LogInterface logger) {
+        this.logger = logger;
+    }
+
+    protected void initEntrySignature(final ZipEntry zipAdd, HashMap<String, Object> cont) throws SignatureException, IOException {
+        byte[] cSalt = null;
+        if (logger != null) {
+            logger.info("Add Path " + zipAdd.getName() + " " + zipAdd.getSize() + " bytes uncompressed");
+        }
+        if (signature != null) {
+            try {
+                signature.initSign(privateKey);
+                signature.update(cSalt = getSalt());
+                signature.update(salt);
+                signature.update(zipAdd.getName().getBytes("UTF-8"));
+                cont.put(SIG_SALT, Base64.encodeToString(cSalt));
+                cont.put(P_SIG, Base64.encodeToString(signature.sign()));
+                signature.initSign(privateKey);
+                signature.update(cSalt);
+                signature.update(salt);
+            } catch (final UnsupportedEncodingException e) {
+                throw new IOException("Signature error", e);
+            } catch (InvalidKeyException e) {
+                throw new IOException("Signature error", e);
+            }
+        }
+    }
+
+    protected byte[] getSalt() {
+        return AWSign.getByteSalt(SALT_SIZE);
+    }
+
+    protected void finishSignatureToEntry(final ZipEntry zipAdd, HashMap<String, Object> cont) throws SignatureException {
+        if (signature != null) {
+            cont.put(C_SIG, Base64.encodeToString(signature.sign()));
+            if (StringUtils.isNotEmpty(zipAdd.getComment())) {
+                // keep original Comment
+                cont.put(ORG, zipAdd.getComment());
+            }
+            zipAdd.setComment(Deser.get().toString(cont, SC.STORAGE));
+            this.entries.add(zipAdd);
+        }
+    }
+
+    private List<ZipEntry> entries = new ArrayList<ZipEntry>();
+
+    protected void addEntry(final ZipEntry zipAdd) throws IOException {
+        this.zipStream.putNextEntry(zipAdd);
     }
 
     private void addFileInternal(final File addFile, final boolean compress, final String path) throws ZipIOException, IOException {
@@ -287,6 +429,9 @@ public class ZipIOWriter {
     }
 
     private HashSet<String> dupes = new HashSet<String>();
+    private PrivateKey      privateKey;
+    private byte[]          salt;
+    private Signature       signature;
 
     public synchronized void addFolder(String fullPath) throws IOException {
         if (!fullPath.endsWith("/")) {
@@ -298,14 +443,30 @@ public class ZipIOWriter {
         boolean zipEntryAdded = false;
         try {
             final ZipEntry zipAdd = new ZipEntry(fullPath);
-            this.zipStream.putNextEntry(zipAdd);
+            if (ignore(zipAdd)) {
+                return;
+            }
+            HashMap<String, Object> cont = new HashMap<String, Object>();
+            initEntrySignature(zipAdd, cont);
+            addEntry(zipAdd);
+            finishSignatureToEntry(zipAdd, cont);
             notify(zipAdd, -1, -1);
             zipEntryAdded = true;
+        } catch (SignatureException e) {
+            throw new IOException(e);
         } finally {
             if (zipEntryAdded) {
                 this.zipStream.closeEntry();
             }
         }
+    }
+
+    /**
+     * @param zipAdd
+     * @return
+     */
+    public boolean ignore(ZipEntry e) {
+        return false;
     }
 
     /**
@@ -315,31 +476,59 @@ public class ZipIOWriter {
      */
     public synchronized void close() throws IOException {
         try {
-            try {
-                this.zipStream.flush();
-            } catch (final Throwable e2) {
-            }
-            try {
-                this.fileStream.flush();
-            } catch (final Throwable e2) {
-            }
-            try {
-                this.zipStream.close();
-            } catch (final Throwable e2) {
-            }
-            try {
-                if (this.fileStream instanceof FileOutputStream) {
-                    ((FileOutputStream) this.fileStream).getChannel().force(true);
+            if (signature != null) {
+                HashMap<String, Object> con = new HashMap<String, Object>();
+                con.put(TYPE, AWZ_SIG1);
+                try {
+                    signature.initSign(privateKey);
+                    signature.update(salt);
+                    for (ZipEntry e : entries) {
+                        signature.update(((e.isDirectory() ? "[D]" : "[F]") + e.getName()).getBytes("UTF-8"));
+                    }
+                    con.put(I_SIG, Base64.encodeToString(signature.sign()));
+                    con.put(SIG_SALT, Base64.encodeToString(salt));
+                    zipStream.setComment(Deser.get().toString(con, SC.STORAGE));
+                } catch (SignatureException e) {
+                    throw new IOException("Signature issue", e);
+                } catch (InvalidKeyException e) {
+                    throw new IOException("Signature issue", e);
                 }
-            } catch (final Throwable e2) {
             }
-            try {
-                this.fileStream.close();
-            } catch (final Throwable e2) {
-            }
+            flushClose(zipStream);
+            flushClose(outputStream);
         } finally {
+            privateKey = null;
+            signature = null;
             this.zipStream = null;
-            this.fileStream = null;
+            this.outputStream = null;
+        }
+    }
+
+    /**
+     * @param zipStream2
+     * @throws IOException
+     */
+    private void flushClose(OutputStream os) throws IOException {
+        if (os != null) {
+            try {
+                os.flush();
+                // ensure that data is written to disk, else the data might not be on disk after close
+                if (os instanceof FileOutputStream) {
+                    try {
+                        ((FileOutputStream) os).getChannel().force(true);
+                    } catch (ClosedChannelException e) {
+                        // ignore.
+                    }
+                }
+            } catch (IOException e) {
+                try {
+                    os.close();
+                } catch (IOException ee) {
+                    Exceptions.addSuppressed(e, ee);
+                }
+                throw e;
+            }
+            os.close();
         }
     }
 
@@ -352,7 +541,7 @@ public class ZipIOWriter {
      * @throws FileNotFoundException
      */
     private void openZip(final boolean overwrite) throws ZipIOException, FileNotFoundException {
-        if (this.fileStream != null && this.zipStream != null) {
+        if (this.outputStream != null && this.zipStream != null) {
             return;
         }
         if (this.zipFile == null || this.zipFile.isDirectory()) {
@@ -361,7 +550,19 @@ public class ZipIOWriter {
         if (this.zipFile.exists() && !overwrite) {
             throw new ZipIOException("zipFile already exists");
         }
-        this.fileStream = new FileOutputStream(this.zipFile);
-        this.zipStream = new ZipOutputStream(this.fileStream);
+        this.outputStream = new FileOutputStream(this.zipFile);
+        this.zipStream = new ZipOutputStream(this.outputStream);
+    }
+
+    /**
+     * @param priv
+     * @throws NoSuchAlgorithmException
+     * @throws InvalidKeyException
+     * @throws SignatureException
+     */
+    public void setSignaturePrivateKey(PrivateKey priv) throws NoSuchAlgorithmException {
+        privateKey = priv;
+        salt = getSalt();
+        signature = Signature.getInstance("Sha256WithRSA");
     }
 }

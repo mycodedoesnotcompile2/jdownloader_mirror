@@ -65,7 +65,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49970 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -3058,5 +3058,11 @@ public class SaveTv extends PluginForHost {
         panel.addStringPair(_GUI.T.lit_max_simultanous_downloads(), "20");
         panel.addStringPair(_GUI.T.lit_max_chunks_per_link(), maxchunks);
         panel.addStringPair(_GUI.T.lit_interrupted_downloads_are_resumable(), _JDT.T.literally_yes());
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

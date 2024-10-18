@@ -51,7 +51,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FaceBookComGallery;
 
-@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 2, names = {}, urls = {})
 public class FaceBookComVideos extends PluginForHost {
     private final boolean enforceCookieLogin = true;
 
@@ -711,8 +711,9 @@ public class FaceBookComVideos extends PluginForHost {
         return !StringUtils.isEmpty(logout_hash) && brContainsSecondaryLoggedinHint;
     }
 
+    @Override
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
-        /* No not allow multihost plugins to handle Facebook URLs! */
+        /* No not allow multihost plugins to handle items from this plugin. */
         return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 

@@ -20,6 +20,10 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -78,7 +82,6 @@ import org.appwork.utils.IO.SYNC;
 import org.appwork.utils.ProgressFeedback;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -151,6 +154,7 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
+import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
@@ -161,6 +165,7 @@ import org.jdownloader.updatev2.UpdateHandler;
 import jd.PluginWrapper;
 import jd.captcha.JACMethod;
 import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
 import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
 import jd.controlling.accountchecker.AccountCheckerThread;
 import jd.controlling.captcha.CaptchaSettings;
@@ -3127,11 +3132,10 @@ public abstract class PluginForHost extends Plugin {
                 if (!shouldShowTrafficLimitColumns && !mhost.isUnlimitedTraffic()) {
                     shouldShowTrafficLimitColumns = true;
                 }
-                final short percent = mhost.getTrafficCalculationFactorPercent();
-                if (!shouldShowTrafficCaculationColumn && percent != 100) {
+                if (!shouldShowTrafficCaculationColumn && mhost.getTrafficCalculationFactorPercent() != 100) {
                     shouldShowTrafficCaculationColumn = true;
                 }
-                if (!shouldShowUnavailableForColumn && mhost.getUnavailableUntilTimestamp() != -1) {
+                if (!shouldShowUnavailableForColumn && mhost.getUnavailableForMillis() > 0) {
                     shouldShowUnavailableForColumn = true;
                 }
                 if (shouldShowCustomTextColumn && shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn) {
@@ -3304,25 +3308,6 @@ public abstract class PluginForHost extends Plugin {
                             protected long getBytes(MultiHostHost val) {
                                 return val.getTrafficLeft();
                             }
-                            // private final Color defaultColor;
-                            // {
-                            // renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
-                            // defaultColor = rendererField.getForeground();
-                            // }
-                            //
-                            // @Override
-                            // public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row,
-                            // int
-                            // column) {
-                            // super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-                            // if (value.isUnlimitedTraffic()) {
-                            // rendererField.setForeground(defaultColor);
-                            // } else if (value.getTrafficLeft() > 0) {
-                            // rendererField.setForeground(defaultColor);
-                            // } else {
-                            // rendererField.setForeground(Color.ORANGE);
-                            // }
-                            // }
                         });
                         addColumn(new ExtFileSizeColumn<MultiHostHost>("Traffic Left") {
                             @Override
@@ -3381,12 +3366,7 @@ public abstract class PluginForHost extends Plugin {
                     addColumn(new ExtLongColumn<MultiHostHost>("Unavailable for") {
                         @Override
                         protected long getLong(MultiHostHost mhost) {
-                            final long unavailableFor = mhost.getUnavailableUntilTimestamp() - Time.systemIndependentCurrentJVMTimeMillis();
-                            if (unavailableFor < 0) {
-                                return 0;
-                            } else {
-                                return unavailableFor;
-                            }
+                            return mhost.getUnavailableForMillis();
                         }
 
                         @Override
@@ -3404,11 +3384,7 @@ public abstract class PluginForHost extends Plugin {
                             return shouldShowUnavailableForColumn_final;
                         }
                     });
-                }
-
-                @Override
-                public List<MultiHostHost> getTableData() {
-                    return hosts;
+                    this._fireTableStructureChanged(hosts, false);
                 }
             };
             tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.YELLOW, null) {
@@ -3427,7 +3403,49 @@ public abstract class PluginForHost extends Plugin {
             });
             final BasicJDTable<MultiHostHost> table = new BasicJDTable<MultiHostHost>(tableModel);
             table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
-            panel.add(new JScrollPane(table));
+            table.setSearchEnabled(true);
+            table.addMouseWheelListener(new MouseWheelListener() {
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    /*
+                     * Forward event to upper panel so that the scrolling happens in it and not in our table which is always full-size and
+                     * has no vertical scrollbar.
+                     */
+                    panel.dispatchEvent(e);
+                }
+            });
+            table.addMouseListener(new MouseAdapter() {
+                /** Opens affiliate link if browser clicks on domain in domain row. */
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    int row = table.rowAtPoint(e.getPoint());
+                    int column = table.columnAtPoint(e.getPoint());
+                    if (row == -1 || column == -1) {
+                        return;
+                    } else if (column != 0) {
+                        return;
+                    }
+                    final MultiHostHost mhost = table.getModel().getObjectbyRow(row);
+                    if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
+                        /* Host is not supported by JD -> It doesn't make sense to even try to open an affiliate link. */
+                        return;
+                    }
+                    final DomainInfo domainInfo = DomainInfo.getInstance(mhost.getDomain());
+                    if (domainInfo == null) {
+                        return;
+                    }
+                    final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(domainInfo.getTld());
+                    if (lazyHostPlugin == null) {
+                        return;
+                    } else if (!lazyHostPlugin.isPremium()) {
+                        return;
+                    }
+                    AccountController.openAfflink(lazyHostPlugin, null, "MultiHostSupportedHostsDetailTable");
+                }
+            });
+            final JScrollPane scrollPane = new JScrollPane(table);
+            // scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            panel.add(scrollPane);
         }
     }
 
