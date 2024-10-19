@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -41,14 +42,14 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48574 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((video|videoplayer)/([\\w\\-]+/)?vi\\d+|[A-Za-z]+/[a-z]{2}\\d+/mediaviewer/rm\\d+)" })
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImDbCom extends PluginForHost {
     private String              dllink         = null;
     private boolean             server_issues  = false;
     private boolean             mature_content = false;
     private static final String IDREGEX        = "(vi\\d+)$";
-    private static final String TYPE_VIDEO     = "https?://(?:www\\.)?imdb\\.com/(?:video|videoplayer)/[\\w\\-]+/(vi|screenplay/)\\d+";
-    private static final String TYPE_PHOTO     = "https?://(?:www\\.)?imdb\\.com/.+/mediaviewer/.+";
+    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/([\\w\\-]+/)?vi(\\d+)";
+    public static final String  TYPE_PHOTO     = "(?i)/[A-Za-z]+/[a-z]{2}\\d+/mediaviewer/rm\\d+";
 
     public ImDbCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -56,11 +57,43 @@ public class ImDbCom extends PluginForHost {
         this.setStartIntervall(1000l);
     }
 
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "imdb.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(";
+            regex += TYPE_VIDEO + "|";
+            regex += TYPE_PHOTO + "";
+            regex += ")";
+            ret.add(regex);
+        }
+        return ret.toArray(new String[0]);
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public void correctDownloadLink(final DownloadLink link) {
         if (link.getDownloadURL().matches(TYPE_VIDEO)) {
-            link.setUrlDownload("http://www.imdb.com/video/screenplay/" + new Regex(link.getDownloadURL(), IDREGEX).getMatch(0));
+            link.setUrlDownload("https://www." + getHost() + "/video/screenplay/" + new Regex(link.getPluginPatternMatcher(), IDREGEX).getMatch(0));
         }
     }
 
@@ -80,7 +113,7 @@ public class ImDbCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://www.imdb.com/help/show_article?conditions";
+        return "http://www." + getHost() + "/help/show_article?conditions";
     }
 
     @Override

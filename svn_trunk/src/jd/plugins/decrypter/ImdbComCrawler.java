@@ -16,11 +16,13 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -28,17 +30,18 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.ImDbCom;
 
-@DecrypterPlugin(revision = "$Revision: 48574 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((?:name|title)/(?:nm|tt)\\d+/(?:mediaindex|videogallery)|media/index/rg\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((?:name|title)/(?:nm|tt)\\d+/(?:mediaindex|videogallery)|media/index/rg\\d+)" })
 public class ImdbComCrawler extends PluginForDecrypt {
     public ImdbComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private static final String TYPE_ARTIST = "(?i)https?://(www\\.)?imdb\\.com/media/index/rg\\d+";
-    private static final String TYPE_TITLE  = "(?i)https?://(www\\.)?imdb\\.com/name|title/tt\\d+/mediaindex";
-    private static final String TYPE_NAME   = "(?i)https?://(www\\.)?imdb\\.com/name/nm\\d+/mediaindex";
-    private static final String TYPE_VIDEO  = "(?i).+/videogallery";
+    private static final String TYPE_ARTIST        = "(?i)https?://(www\\.)?imdb\\.com/media/index/rg\\d+";
+    private static final String TYPE_TITLE         = "(?i)https?://(www\\.)?imdb\\.com/name|title/tt\\d+/mediaindex";
+    private static final String TYPE_NAME          = "(?i)https?://(www\\.)?imdb\\.com/name/nm\\d+/mediaindex";
+    private static final String TYPE_VIDEO_GALLERY = "(?i).+/videogallery";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -69,38 +72,42 @@ public class ImdbComCrawler extends PluginForDecrypt {
         if (fpName == null) {
             fpName = "imdb.com - " + new Regex(contenturl, "([a-z]{2}\\d+)").getMatch(0);
         }
-        fpName = Encoding.htmlDecode(fpName.trim());
+        fpName = Encoding.htmlDecode(fpName).trim();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(fpName);
-        for (int i = 1; i <= maxpage; i++) {
-            if (this.isAbort()) {
-                logger.info("Decryption aborted by user: " + contenturl);
-                return ret;
-            }
+        final HashSet<String> dupes = new HashSet<String>();
+        pagination: for (int i = 1; i <= maxpage; i++) {
             if (i > 1) {
                 br.getPage(contenturl + "?page=" + i);
             }
-            if (contenturl.matches(TYPE_VIDEO)) {
-                final String[] links = br.getRegex("\"(/(?:video/imdb|videoplayer)/vi\\d+)").getColumn(0);
-                if (links == null || links.length == 0) {
-                    logger.warning("Decrypter broken for link: " + contenturl);
-                    return null;
-                }
-                for (final String link : links) {
-                    final DownloadLink dl = createDownloadlink("http://www.imdb.com" + link);
+            /* Small ugly hack */
+            br.getRequest().setHtmlCode(br.getRequest().getHtmlCode().replace("pro.imdb.com", "www.imdb.com"));
+            final int dupesSizeOld = dupes.size();
+            if (contenturl.matches(TYPE_VIDEO_GALLERY)) {
+                final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+                for (final String url : urls) {
+                    if (!new Regex(url, ImDbCom.TYPE_VIDEO).patternFind()) {
+                        continue;
+                    } else if (!dupes.add(url)) {
+                        continue;
+                    }
+                    final DownloadLink dl = createDownloadlink(url);
+                    dl.setAvailable(true);
                     ret.add(dl);
+                    distribute(dl);
                 }
             } else {
                 final String[][] links = br.getRegex("(/[^<>\"]+mediaviewer/rm\\d+)([^<>\"/]+)?\"([\t\n\r ]*?title=\"([^<>\"]*?)\")?").getMatches();
                 if (links == null || links.length == 0) {
-                    logger.warning("Decrypter broken for link: " + contenturl);
-                    return null;
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 for (final String linkinfo[] : links) {
-                    final String link = "http://www.imdb.com" + linkinfo[0];
-                    final DownloadLink dl = createDownloadlink(link);
-                    final String id = new Regex(link, "mediaviewer/[a-z]{2}(\\d+)").getMatch(0);
-                    fp.add(dl);
+                    final String url = br.getURL(linkinfo[0]).toExternalForm();
+                    if (!dupes.add(url)) {
+                        continue;
+                    }
+                    final DownloadLink dl = createDownloadlink(url);
+                    final String id = new Regex(url, "mediaviewer/[a-z]{2}(\\d+)").getMatch(0);
                     final String subtitle = linkinfo[3];
                     if (subtitle != null) {
                         dl.setName(fpName + "_" + id + "_" + Encoding.htmlDecode(subtitle.trim()) + ".jpg");
@@ -108,12 +115,24 @@ public class ImdbComCrawler extends PluginForDecrypt {
                         dl.setName(fpName + "_" + id + "_" + ".jpg");
                     }
                     dl.setAvailable(true);
+                    dl._setFilePackage(fp);
                     distribute(dl);
                     ret.add(dl);
                 }
             }
+            int numberofNewItemsThisPage = dupes.size() - dupesSizeOld;
+            logger.info("Crawled page " + i + "/" + maxpage + " | New items this page: " + numberofNewItemsThisPage + " | Total: " + ret.size());
+            if (this.isAbort()) {
+                logger.info("Stopping because: Decryption aborted by user: " + contenturl);
+                return ret;
+            } else if (numberofNewItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on page" + i);
+                break pagination;
+            }
         }
-        fp.addLinks(ret);
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         return ret;
     }
 }

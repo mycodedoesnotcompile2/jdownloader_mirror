@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,10 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 45507 $", interfaceVersion = 2, names = { "amazon.com" }, urls = { "https://amazondecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "amazon.com" }, urls = { "https://amazondecrypted\\.com/\\d+" })
 public class AmazonCloud extends PluginForHost {
     public AmazonCloud(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,6 @@ public class AmazonCloud extends PluginForHost {
     /* Connection stuff */
     private final boolean      FREE_RESUME        = true;
     private final int          FREE_MAXCHUNKS     = 0;
-    private final int          FREE_MAXDOWNLOADS  = -1;
     /* Don't touch this! */
     private static final int   max_items_per_page = 200;
 
@@ -350,7 +349,13 @@ public class AmazonCloud extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override

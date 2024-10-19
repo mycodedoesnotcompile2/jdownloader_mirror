@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -42,6 +42,7 @@ import java.util.Set;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.loggingv3.NullLogger;
 import org.appwork.moncompare.Condition;
 import org.appwork.moncompare.ConditionException;
 import org.appwork.moncompare.Scope;
@@ -62,7 +63,6 @@ import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.simplejson.ValueType;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.logging2.ConsoleLogImpl;
 import org.appwork.utils.logging2.LogInterface;
 
 /**
@@ -93,22 +93,23 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
          * @param lastPathElement
          * @param value
          */
-        public ResolverCondition(FlexiModifier<?, ?> flexiModifier, Object lastPathElement, FlexiJSonNode value) {
-            owner = flexiModifier;
+        public ResolverCondition(final FlexiModifier<?, ?> flexiModifier, final Object lastPathElement, final FlexiJSonNode value) {
+            this.owner = flexiModifier;
             this.lastPathElement = lastPathElement;
-            targetValue = value;
+            this.targetValue = value;
         }
 
         public void initFlexiHandler() {
-            typeHandlers = new ArrayList<TypeHandler>();
-            typeHandlers.add(new FlexiTypeHandler());
+            this.typeHandlers = new ArrayList<TypeHandler>();
+            this.typeHandlers.add(new FlexiTypeHandler());
         }
 
         public JSPath _getFailedPath() {
-            return failedPath;
+            return this.failedPath;
         }
 
-        protected void onKeyDoesNotExist(Scope scope, JSPath keyPath, Scope ret) throws ConditionException {
+        @Override
+        protected void onKeyDoesNotExist(final Scope scope, final JSPath keyPath, final Scope ret) throws ConditionException {
             super.onKeyDoesNotExist(scope, keyPath, ret);
             if (ret.getParent().getLast() == null) {
                 // correct key for null entries
@@ -118,13 +119,13 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
             }
             this.failedPath = ret.getPath();
             if (keyPath.size() > ret.getPath().size()) {
-                FlexiJSonNode autoCreated = owner.onPathDoesNotExist(ret.getParent().getLast(), ret.getPath(), keyPath.get(ret.getPath().size()), null);
+                final FlexiJSonNode autoCreated = this.owner.onPathDoesNotExist(ret.getParent().getLast(), ret.getPath(), keyPath.get(ret.getPath().size()), null);
                 if (autoCreated != null) {
                     ret.replaceLast(autoCreated);
                 }
             } else {
                 // last Element
-                FlexiJSonNode autoCreated = owner.onPathDoesNotExist(ret.getParent().getLast(), ret.getPath(), lastPathElement, targetValue);
+                final FlexiJSonNode autoCreated = this.owner.onPathDoesNotExist(ret.getParent().getLast(), ret.getPath(), this.lastPathElement, this.targetValue);
                 if (autoCreated != null) {
                     ret.replaceLast(autoCreated);
                 }
@@ -138,7 +139,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
          */
         @Override
         public Condition newInstance() {
-            return new ResolverCondition(owner, lastPathElement, targetValue);
+            return new ResolverCondition(this.owner, this.lastPathElement, this.targetValue);
         }
     }
 
@@ -330,7 +331,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
         return JSPath.fromPathString(key);
     }
 
-    private LogInterface logger = new ConsoleLogImpl();
+    private LogInterface logger = new NullLogger();
     private int          changes;
 
     protected void set(final JSPath jsPath, final Object value, final boolean onlyIfUnset) throws IllegalPathException, FlexiMapperException {
@@ -340,12 +341,12 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
             return;
         }
         // todo: für each, project etc. set value for many
-        FlexiJSonNode parent = targetNode.getParent();
+        final FlexiJSonNode parent = targetNode.getParent();
         final Object pathElement = jsPath.getLast();
         if (parent instanceof FlexiJSonArray) {
             // try {
-            int index2 = ((FlexiJSonArray) parent).indexOf(targetNode);
-            ((FlexiJSonArray) parent).set(index2, mapper.objectToJsonNode(value));
+            final int index2 = ((FlexiJSonArray) parent).indexOf(targetNode);
+            ((FlexiJSonArray) parent).set(index2, this.mapper.objectToJsonNode(value));
             if (this.logger != null) {
                 this.logger.info("Set in array " + value);
             }
@@ -385,21 +386,24 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
             // throw new IllegalPathException("Element is an array, but the path does NOT contain an int key" + jsPath.toPathString(true));
             // }
         } else if (parent instanceof FlexiJSonObject) {
-            KeyValueElement element = ((FlexiJSonObject) parent).getElementByNode(targetNode);
+            final KeyValueElement element = ((FlexiJSonObject) parent).getElementByNode(targetNode);
             if (onlyIfUnset && element != null) {
                 return;
             }
-            System.out.println(value.toString());
+            Object old = null;
+            if (this.logger != null) {
+                old = ((FlexiJSonObject) parent).getNode(String.valueOf(pathElement));
+            }
+            FlexiJSonNode node = null;
             if (element != null) {
-                FlexiJSonNode node = mapper.objectToJsonNode(value);
+                node = this.mapper.objectToJsonNode(value);
                 element.setValue(node);
                 node.setParent(parent);
                 ((FlexiJSonObject) parent).put(String.valueOf(pathElement), node);
             }
             if (this.logger != null) {
-                final Object old = ((FlexiJSonObject) parent).getNode(String.valueOf(pathElement));
-                if (!CompareUtils.equalsDeep(value, old)) {
-                    this.logger.info("Put in object " + jsPath.toPathString(true) + " = " + FlexiUtils.serializeMinimizedWithWTF(value) + "/old: " + old);
+                if (!CompareUtils.equalsDeep(node, old)) {
+                    this.logger.info("Put in object " + jsPath.toPathString(true) + " = " + FlexiUtils.serializeMinimizedWithWTF(node) + "/old: " + old);
                 }
             }
             this.changes++;
@@ -416,10 +420,10 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
      * @param keyPath
      * @return
      */
-    public FlexiJSonNode onPathDoesNotExist(Object parent, JSPath path, Object nextPathElement, FlexiJSonNode newNode) {
+    public FlexiJSonNode onPathDoesNotExist(final Object parent, final JSPath path, final Object nextPathElement, FlexiJSonNode newNode) {
         if (this.isAutoCreateStructures()) {
             if (parent instanceof FlexiJSonArray) {
-                FlexiJSonArray parentNode = (FlexiJSonArray) parent;
+                final FlexiJSonArray parentNode = (FlexiJSonArray) parent;
                 boolean autoCreate = false;
                 if (newNode == null) {
                     autoCreate = true;
@@ -429,14 +433,14 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
                         newNode = this.mapper.createFlexiJSonObject();
                     }
                 }
-                int index = JSPath.toArrayIndex(nextPathElement);
+                final int index = JSPath.toArrayIndex(nextPathElement);
                 for (int ii = parentNode.size(); ii < index; ii++) {
                     FlexiJSonValue node;
                     parentNode.add(node = this.mapper.createFlexiJSonValue());
                     if (this.logger != null) {
                         try {
                             this.logger.info("Add undefined array " + FlexiUtils.getPathString(node));
-                        } catch (InvalidPathException e) {
+                        } catch (final InvalidPathException e) {
                             LogV3.log(e);
                         }
                     }
@@ -447,7 +451,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
                 }
                 return newNode;
             } else if (parent instanceof FlexiJSonObject) {
-                FlexiJSonObject parentNode = (FlexiJSonObject) parent;
+                final FlexiJSonObject parentNode = (FlexiJSonObject) parent;
                 boolean autoCreate = false;
                 if (newNode == null) {
                     autoCreate = true;
@@ -481,7 +485,7 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
      * @throws IllegalPathException
      * @throws FlexiMapperException
      */
-    private FlexiJSonNode resolve(FlexiJSonNode parent, final JSPath jsPath, Object value) throws IllegalPathException, FlexiMapperException {
+    private FlexiJSonNode resolve(FlexiJSonNode parent, final JSPath jsPath, final Object value) throws IllegalPathException, FlexiMapperException {
         // customPathhandlers.put(null, );
         // Map<String, PathHandler> before = Condition.PATH_HANDLERS.get();
         // try {
@@ -491,10 +495,10 @@ public class FlexiModifier<T extends FlexiJSonNode, MatcherType> {
         // Condition.PATH_HANDLERS.set(before);
         // }
         try {
-            FlexiJSonNode node = mapper.objectToJsonNode(value);
-            ResolverCondition resolver = new ResolverCondition(this, jsPath.getLast(), node);
+            final FlexiJSonNode node = this.mapper.objectToJsonNode(value);
+            final ResolverCondition resolver = new ResolverCondition(this, jsPath.getLast(), node);
             resolver.initFlexiHandler();
-            Object ret = resolver.resolveKeyPath(new Scope(parent), jsPath).getLast();
+            final Object ret = resolver.resolveKeyPath(new Scope(parent), jsPath).getLast();
             if (ret == Condition.KEY_DOES_NOT_EXIST || ret == null) {
                 DebugMode.breakIf(resolver._getFailedPath() == null);
                 throw new IllegalPathException("Path does not exist: " + (resolver._getFailedPath() == null ? "unknown path" : resolver._getFailedPath().toPathString(true)));

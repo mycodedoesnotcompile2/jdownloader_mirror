@@ -58,8 +58,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DropBoxComCrawler;
+import jd.plugins.hoster.DropboxCom.DropboxAccountFactory;
 
-@HostPlugin(revision = "$Revision: 49916 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = { "dropbox.com" }, urls = { "" })
 public class DropboxCom extends PluginForHost {
     public DropboxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -1189,5 +1190,11 @@ public class DropboxCom extends PluginForHost {
         public Account getAccount() {
             return new Account(null, getPassword());
         }
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

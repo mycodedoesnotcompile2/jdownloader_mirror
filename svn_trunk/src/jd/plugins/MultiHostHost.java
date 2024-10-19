@@ -249,7 +249,8 @@ public class MultiHostHost {
     }
 
     public void setErrorStatus(final String text, final long waitMillis) {
-        this.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+        // TODO: Review this
+        // this.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
         this.setStatusText(text);
         this.setUnavailableTime(waitMillis);
     }
@@ -261,14 +262,14 @@ public class MultiHostHost {
     }
 
     public MultihosterHostStatus getStatus() {
-        // TODO: Update this to simply return status without any evaluation
-        if (this.unavailableUntilTimestamp > Time.systemIndependentCurrentJVMTimeMillis()) {
+        // TODO: Maybe update this to simply return status without any evaluation
+        if (status != null) {
+            return status;
+        } else if (this.getUnavailableTimeMillis() > 0) {
             return MultihosterHostStatus.DEACTIVATED_JDOWNLOADER;
-        } else if (status == null) {
+        } else {
             /* Default */
             return MultihosterHostStatus.WORKING;
-        } else {
-            return status;
         }
     }
 
@@ -330,15 +331,15 @@ public class MultiHostHost {
     }
 
     private final void setUnavailableTime(long milliseconds) {
-        final long timestamp = Math.min(milliseconds, MAX_UNAVAILABLE_TIME);
-        setUnavailableTimestamp(timestamp);
+        final long timestampFinal = Math.min(milliseconds, MAX_UNAVAILABLE_TIME);
+        setUnavailableTimestamp(Time.systemIndependentCurrentJVMTimeMillis() + timestampFinal);
     }
 
     /**
      * Returns time this item is unavailable for. </br>
      * This can return negative values.
      */
-    public long getUnavailableForMillis() {
+    public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();
         if (unavailableTimestamp > 0) {
             return this.getUnavailableUntilTimestamp() - Time.systemIndependentCurrentJVMTimeMillis();

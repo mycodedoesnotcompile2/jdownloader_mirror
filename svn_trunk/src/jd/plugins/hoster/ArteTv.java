@@ -30,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = { "arte.tv" }, urls = { "" })
 public class ArteTv extends PluginForHost {
     @SuppressWarnings("deprecation")
     public ArteTv(PluginWrapper wrapper) {
@@ -173,5 +173,11 @@ public class ArteTv extends PluginForHost {
     @Override
     public String getDescription() {
         return "JDownloader's ARTE Plugin helps downloading videoclips from arte.tv. Arte provides different video qualities.";
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

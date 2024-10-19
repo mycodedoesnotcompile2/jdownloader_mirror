@@ -169,21 +169,17 @@ public class BackupCreateAction extends CustomizableAppAction {
 
     protected static void create(final OutputStream fos) throws IOException {
         ZipIOWriter zipper = null;
+        ZipIOException exception = null;
         try {
             final StringBuilder backupErrors = new StringBuilder();
             zipper = new ZipIOWriter(fos) {
-                @Override
-                protected void addDirectoryInternal(File addDirectory, boolean compress, String path) throws ZipIOException, IOException {
-                    super.addDirectoryInternal(addDirectory, compress, path);
-                }
-
                 @Override
                 protected boolean throwExceptionOnFileGone(File file) {
                     return false;
                 }
 
-                private boolean isFiltered(final File file) {
-                    final String name = file.getName();
+                public boolean isFiltered(File e) {
+                    final String name = new File(e.getName()).getName();
                     if (StringUtils.startsWithCaseInsensitive(name, "RememberRelativeLocator-")) {
                         return true;
                     } else if (StringUtils.startsWithCaseInsensitive(name, "RememberLastDimensor-")) {
@@ -200,69 +196,61 @@ public class BackupCreateAction extends CustomizableAppAction {
                 final byte[] buf = new byte[32 * 1024];
 
                 @Override
-                public synchronized void addFile(final File addFile, final boolean compress, final String fullPath) throws ZipIOException, IOException, FileNotFoundException {
+                protected void addFile(File addFile, boolean compress, String fullPath) throws ZipIOException {
                     if (addFile == null) {
                         throw new ZipIOException("addFile invalid:null");
                     } else if (isFiltered(addFile)) {
                         return;
                     }
+                    ZipEntry entry = null;
+                    ZipIOException exception = null;
+                    FileInputStream fis = null;
                     try {
-                        final FileInputStream fis = new FileInputStream(addFile);
+                        fis = new FileInputStream(addFile);
                         try {
                             long remaining = addFile.length();
-                            ZipEntry entry = null;
-                            try {
-                                if (remaining == 0) {
-                                    entry = new ZipEntry(fullPath);
-                                    entry.setMethod(ZipEntry.DEFLATED);
-                                    this.zipStream.putNextEntry(entry);
-                                } else {
-                                    long written = 0;
-                                    while (remaining > 0) {
-                                        final int read;
-                                        try {
-                                            read = fis.read(buf);
-                                            // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && new Random().nextInt(100) > 20) {
-                                            // throw new IOException("Random");
-                                            // }
-                                        } catch (IOException e) {
-                                            LogV3.defaultLogger().log(e);
-                                            break;
-                                        }
-                                        if (read == -1) {
-                                            break;
-                                        } else if (read > 0) {
-                                            if (entry == null) {
-                                                entry = new ZipEntry(fullPath);
-                                                entry.setMethod(ZipEntry.DEFLATED);
-                                                this.zipStream.putNextEntry(entry);
-                                            }
-                                            this.zipStream.write(buf, 0, read);
-                                            written += read;
-                                            remaining -= read;
-                                            notify(entry, read, written);
-                                        }
+                            if (remaining == 0) {
+                                entry = new ZipEntry(fullPath);
+                                entry.setMethod(ZipEntry.DEFLATED);
+                                this.zipStream.putNextEntry(entry);
+                            } else {
+                                long written = 0;
+                                while (remaining > 0) {
+                                    final int read;
+                                    try {
+                                        read = fis.read(buf);
+                                        // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && new Random().nextInt(100) > 20) {
+                                        // throw new IOException("Random");
+                                        // }
+                                    } catch (IOException e) {
+                                        LogV3.defaultLogger().log(e);
+                                        break;
                                     }
-                                    if (written != addFile.length()) {
-                                        if (written == 0) {
-                                            backupErrors.append("Missing(Gone):" + addFile.getAbsolutePath()).append("\r\n");
-                                        } else {
-                                            backupErrors.append("Incomplete:" + addFile.getAbsolutePath()).append("\r\n");
+                                    if (read == -1) {
+                                        break;
+                                    } else if (read > 0) {
+                                        if (entry == null) {
+                                            entry = new ZipEntry(fullPath);
+                                            entry.setMethod(ZipEntry.DEFLATED);
+                                            this.zipStream.putNextEntry(entry);
                                         }
+                                        this.zipStream.write(buf, 0, read);
+                                        written += read;
+                                        remaining -= read;
+                                        notify(entry, read, written);
                                     }
                                 }
-                            } finally {
-                                if (entry != null) {
-                                    this.zipStream.closeEntry();
+                                if (written != addFile.length()) {
+                                    if (written == 0) {
+                                        backupErrors.append("Missing(Gone):" + addFile.getAbsolutePath()).append("\r\n");
+                                    } else {
+                                        backupErrors.append("Incomplete:" + addFile.getAbsolutePath()).append("\r\n");
+                                    }
                                 }
                             }
                         } finally {
-                            try {
-                                if (fis != null) {
-                                    fis.close();
-                                }
-                            } catch (IOException ignore) {
-                                LogV3.defaultLogger().log(ignore);
+                            if (entry != null) {
+                                this.zipStream.closeEntry();
                             }
                         }
                     } catch (FileNotFoundException e) {
@@ -270,27 +258,45 @@ public class BackupCreateAction extends CustomizableAppAction {
                         LogV3.defaultLogger().log(e);
                         if (addFile.exists() == false) {
                             if (throwExceptionOnFileGone(addFile)) {
-                                throw e;
+                                exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
                             } else {
                                 return;
                             }
                         } else {
-                            throw e;
+                            exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
                         }
                     } catch (IOException e) {
-                        LogV3.defaultLogger().log(e);
-                        throw e;
+                        exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
+                    } finally {
+                        try {
+                            if (fis != null) {
+                                fis.close();
+                            }
+                        } catch (IOException e) {
+                            exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
+                        }
+                        if (exception != null) {
+                            throw exception;
+                        }
                     }
                 }
             };
-            zipper.addDirectory(Application.getResource("cfg"), false, null);
+            zipper.add(Application.getResource("cfg"), false, "");
             if (backupErrors.length() > 0) {
-                zipper.addByteArry(backupErrors.toString().getBytes("UTF-8"), true, "cfg", "BackupErrors.txt");
+                zipper.add(backupErrors.toString().getBytes("UTF-8"), true, "cfg", "BackupErrors.txt");
             }
+        } catch (IOException e) {
+            exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
         } finally {
             try {
-                zipper.close();
+                if (zipper != null) {
+                    zipper.close();
+                }
             } catch (Throwable e) {
+                exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
+            }
+            if (exception != null) {
+                throw exception;
             }
         }
     }

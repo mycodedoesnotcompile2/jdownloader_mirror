@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@apppwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,6 +37,7 @@ package org.appwork.utils.zip;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -61,6 +63,7 @@ import java.util.zip.ZipInputStream;
 
 import org.appwork.serializer.Deser;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.commonInterface.SerializerException;
 import org.appwork.utils.Application;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
@@ -70,10 +73,6 @@ import org.appwork.utils.encoding.Base64;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.NullOutputStream;
 
-/**
- * @author daniel
- *
- */
 public class ZipIOReader {
     private File       zipFile               = null;
     private ZipFile    zip                   = null;
@@ -107,7 +106,7 @@ public class ZipIOReader {
      * @throws ZipException
      * @throws IOException
      */
-    public ZipIOReader(final File zipFile) throws ZipIOException, ZipException, IOException {
+    public ZipIOReader(final File zipFile) throws ZipIOException {
         this.zipFile = zipFile;
         this.openZip();
     }
@@ -145,14 +144,18 @@ public class ZipIOReader {
      * @throws ZipIOException
      * @throws IOException
      */
-    public synchronized java.util.List<File> extract(final ZipEntry entry, final File output) throws ZipIOException, IOException {
+    public synchronized java.util.List<File> extract(final ZipEntry entry, final File output) throws ZipIOException {
         final java.util.List<File> ret = new ArrayList<File>();
         if (output.exists() && output.isDirectory()) {
             if (this.isOverwrite()) {
-                Files.deleteRecursive(output);
+                try {
+                    Files.deleteRecursive(output);
+                } catch (IOException e) {
+                    throw new ZipIOException(e);
+                }
                 if (output.exists()) {
                     if (this.isBreakOnError()) {
-                        throw new IOException("Cannot extract File to Directory " + output);
+                        throw new ZipIOException("Cannot extract File to Directory " + output);
                     } else {
                         org.appwork.loggingv3.LogV3.severe("Cannot extract File to Directory " + output);
                     }
@@ -168,7 +171,7 @@ public class ZipIOReader {
                 output.delete();
                 if (output.exists()) {
                     if (this.isBreakOnError()) {
-                        throw new IOException("Cannot overwrite File " + output);
+                        throw new ZipIOException("Cannot overwrite File " + output);
                     } else {
                         org.appwork.loggingv3.LogV3.severe("Cannot overwrite File " + output);
                     }
@@ -185,7 +188,7 @@ public class ZipIOReader {
                 ret.add(output.getParentFile());
                 if (!output.getParentFile().exists()) {
                     if (this.isBreakOnError()) {
-                        throw new IOException("Cannot create folder for File " + output);
+                        throw new ZipIOException("Cannot create folder for File " + output);
                     } else {
                         org.appwork.loggingv3.LogV3.severe("Cannot create folder for File " + output);
                     }
@@ -197,12 +200,22 @@ public class ZipIOReader {
             }
         }
         OutputStream os = null;
+        ZipIOException exception = null;
         try {
             os = new BufferedOutputStream(new FileOutputStream(output));
             this.extract(entry, os);
+        } catch (FileNotFoundException e) {
+            exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
         } finally {
             if (os != null) {
-                os.close();
+                try {
+                    os.close();
+                } catch (IOException e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
+                }
+            }
+            if (exception != null) {
+                throw exception;
             }
         }
         ret.add(output);
@@ -227,32 +240,42 @@ public class ZipIOReader {
             logger.info("Extract " + entry.getName() + " -> " + stream.getClass().getSimpleName());
         }
         CheckedInputStream in = null;
+        ZipIOException exception = null;
         try {
-            try {
-                final InputStream is = this.getInputStream(entry);
-                in = new CheckedInputStream(is, new CRC32());
-                final byte[] buffer = new byte[32767];
-                int len = 0;
-                long total = 0;
-                while ((len = in.read(buffer)) != -1) {
-                    if (len == 0) {
-                        continue;
-                    }
-                    stream.write(buffer, 0, len);
-                    total += len;
-                    notify(entry, len, total);
+            final InputStream is = this.getInputStream(entry);
+            in = new CheckedInputStream(is, new CRC32());
+            final byte[] buffer = new byte[32767];
+            int len = 0;
+            long total = 0;
+            while ((len = in.read(buffer)) != -1) {
+                if (len == 0) {
+                    continue;
                 }
-                crcCheck(entry, in);
-            } finally {
-                if (in != null) {
+                stream.write(buffer, 0, len);
+                total += len;
+                notify(entry, len, total);
+            }
+            crcCheck(entry, in);
+        } catch (IOException e) {
+            exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
+        } finally {
+            if (in != null) {
+                try {
                     in.close();
-                }
-                if (stream != null) {
-                    stream.close();
+                } catch (IOException e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
                 }
             }
-        } catch (IOException e) {
-            throw ZipIOException.wrap(e);
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (IOException e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
+                }
+            }
+            if (exception != null) {
+                throw exception;
+            }
         }
     }
 
@@ -269,17 +292,17 @@ public class ZipIOReader {
     protected void notify(final ZipEntry entry, final long bytesWrite, final long bytesProcessed) {
     }
 
-    public synchronized java.util.List<File> extractTo(final File outputDirectory) throws ZipIOException, IOException {
+    public synchronized java.util.List<File> extractTo(final File outputDirectory) throws ZipIOException {
         if (outputDirectory.exists() && outputDirectory.isFile()) {
             if (this.isBreakOnError()) {
-                throw new IOException("cannot extract to a file " + outputDirectory);
+                throw new ZipIOException("cannot extract to a file " + outputDirectory);
             } else {
                 org.appwork.loggingv3.LogV3.severe("cannot extract to a file " + outputDirectory);
             }
         }
         if (!outputDirectory.exists() && !(this.autoCreateExtractPath && outputDirectory.mkdirs())) {
             if (this.isBreakOnError()) {
-                throw new IOException("could not create outputDirectory " + outputDirectory);
+                throw new ZipIOException("could not create outputDirectory " + outputDirectory);
             } else {
                 org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + outputDirectory);
             }
@@ -292,7 +315,7 @@ public class ZipIOReader {
                     if (this.isAutoCreateSubDirs()) {
                         if (!out.mkdir()) {
                             if (this.isBreakOnError()) {
-                                throw new IOException("could not create outputDirectory " + out);
+                                throw new ZipIOException("could not create outputDirectory " + out);
                             } else {
                                 org.appwork.loggingv3.LogV3.severe("could not create outputDirectory " + out);
                             }
@@ -351,11 +374,7 @@ public class ZipIOReader {
         if (entry == null) {
             throw new ZipIOException("invalid zipEntry");
         }
-        try {
-            ensureIndexIsVerified();
-        } catch (SignatureException e) {
-            throw new ZipIOException(e);
-        }
+        ensureIndexIsVerified();
         verifyPathSignature(entry);
         // if (zip == null && signature != null) {
         // ensureZipFile();
@@ -367,6 +386,7 @@ public class ZipIOReader {
             } else {
                 ZipInputStream zis = null;
                 boolean close = true;
+                ZipIOException exception = null;
                 try {
                     zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
                     ZipEntry ze = null;
@@ -426,17 +446,20 @@ public class ZipIOReader {
                         }
                     }
                 } catch (final IOException e) {
-                    throw ZipIOException.wrap(e);
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
                 } finally {
                     if (close) {
                         if (zis != null) {
                             try {
                                 zis.close();
                             } catch (IOException e) {
-                                throw ZipIOException.wrap(e);
+                                exception = ZipIOException.wrapOrAddSurpressed(exception, e, entry);
                             }
                         }
                     }
+                }
+                if (exception != null) {
+                    throw exception;
                 }
             }
             if (signature != null) {
@@ -518,11 +541,11 @@ public class ZipIOReader {
                         }
                     };
                 } catch (GeneralSecurityException e) {
-                    throw new ZipIOException(e);
+                    throw ZipIOException.wrapOrAddSurpressed(null, e, entry);
                 }
             }
         } catch (IOException e) {
-            throw ZipIOException.wrap(e);
+            throw ZipIOException.wrapOrAddSurpressed(null, e, entry);
         }
         return ret;
     }
@@ -563,24 +586,31 @@ public class ZipIOReader {
             return this.zip.getEntry(fileName);
         } else {
             ZipInputStream zis = null;
+            ZipIOException exception = null;
+            ZipEntry ze = null;
             try {
                 zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
-                ZipEntry ze = null;
                 while ((ze = zis.getNextEntry()) != null) {
                     if (ze.getName().equals(fileName)) {
                         return ze;
                     }
                 }
-                return null;
             } catch (final IOException e) {
-                throw ZipIOException.wrap(e);
+                exception = ZipIOException.wrapOrAddSurpressed(exception, e, ze);
             } finally {
                 try {
-                    zis.close();
+                    if (zis != null) {
+                        zis.close();
+                    }
                 } catch (final Throwable e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, ze);
+                }
+                if (exception != null) {
+                    throw exception;
                 }
             }
         }
+        return null;
     }
 
     /**
@@ -590,6 +620,11 @@ public class ZipIOReader {
      * @throws ZipIOException
      */
     public synchronized ZipEntry[] getZipFiles() throws ZipIOException {
+        ensureIndexIsVerified();
+        return getZipEntriesInternal();
+    }
+
+    protected ZipEntry[] getZipEntriesInternal() throws ZipIOException {
         if (this.zipEntries != null) {
             return this.zipEntries;
         }
@@ -602,6 +637,7 @@ public class ZipIOReader {
             }
         } else {
             ZipInputStream zis = null;
+            ZipIOException exception = null;
             try {
                 zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
                 ZipEntry ze = null;
@@ -609,23 +645,21 @@ public class ZipIOReader {
                     ret.add(ze);
                 }
             } catch (final IOException e) {
-                throw ZipIOException.wrap(e);
+                exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
             } finally {
                 if (zis != null) {
                     try {
                         zis.close();
                     } catch (IOException e) {
-                        throw ZipIOException.wrap(e);
+                        exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
                     }
+                }
+                if (exception != null) {
+                    throw exception;
                 }
             }
         }
         this.zipEntries = ret.toArray(new ZipEntry[ret.size()]);
-        try {
-            ensureIndexIsVerified();
-        } catch (SignatureException e) {
-            throw new ZipIOException(e);
-        }
         return this.zipEntries;
     }
 
@@ -637,7 +671,7 @@ public class ZipIOReader {
                 IO.secureWrite(tmpZipFile, byteArray);
                 zip = new ZipFile(tmpZipFile);
             } catch (IOException e) {
-                throw ZipIOException.wrap(e);
+                throw ZipIOException.wrapOrAddSurpressed(null, e, null);
             }
         }
     }
@@ -732,14 +766,20 @@ public class ZipIOReader {
      * @throws ZipException
      * @throws IOException
      */
-    private synchronized void openZip() throws ZipIOException, ZipException, IOException {
+    private synchronized void openZip() throws ZipIOException {
         if (this.zip != null) {
             return;
         }
         if (this.zipFile == null || this.zipFile.isDirectory() || !this.zipFile.exists()) {
             throw new ZipIOException("invalid zipFile");
         }
-        this.zip = new ZipFile(this.zipFile);
+        try {
+            this.zip = new ZipFile(this.zipFile);
+        } catch (ZipException e) {
+            throw new ZipIOException(e);
+        } catch (IOException e) {
+            throw new ZipIOException(e);
+        }
     }
 
     public void setAutoCreateExtractPath(final boolean autoCreateExtractPath) {
@@ -778,24 +818,7 @@ public class ZipIOReader {
         if (this.zip != null) {
             this.zipEntriesSize = this.zip.size();
         } else {
-            ZipInputStream zis = null;
-            try {
-                this.zipEntriesSize = 0;
-                zis = new ZipInputStream(new ByteArrayInputStream(this.byteArray));
-                while (zis.getNextEntry() != null) {
-                    this.zipEntriesSize++;
-                }
-            } catch (final IOException e) {
-                throw ZipIOException.wrap(e);
-            } finally {
-                if (zis != null) {
-                    try {
-                        zis.close();
-                    } catch (IOException e) {
-                        throw ZipIOException.wrap(e);
-                    }
-                }
-            }
+            this.zipEntriesSize = getZipFiles().length;
         }
         return this.zipEntriesSize;
     }
@@ -825,15 +848,25 @@ public class ZipIOReader {
      * @throws ZipException
      * @throws ZipIOException
      */
-    public static void extractTo(File zipFile, File targetFolder) throws ZipIOException, ZipException, IOException {
+    public static void extractTo(File zipFile, File targetFolder) throws ZipIOException {
         ZipIOReader ziper = new ZipIOReader(zipFile);
+        ZipIOException exception = null;
         try {
             if (!targetFolder.exists()) {
                 targetFolder.mkdirs();
             }
             ziper.extractTo(targetFolder);
+        } catch (ZipIOException e) {
+            exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
         } finally {
-            ziper.close();
+            try {
+                ziper.close();
+            } catch (IOException e) {
+                exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
+            }
+            if (exception != null) {
+                throw exception;
+            }
         }
     }
 
@@ -863,78 +896,132 @@ public class ZipIOReader {
      * @throws InvalidKeyException
      * @throws IOException
      * @throws SignatureException
+     * @throws ZipIOException
      */
-    public void setSignaturePublicKey(PublicKey pub) throws SignatureException, NoSuchAlgorithmException {
+    public void setSignaturePublicKey(PublicKey pub) throws ZipIOException {
         this.publicKey = pub;
+        ensureSignatureDetails();
+        try {
+            signature = Signature.getInstance("Sha256WithRSA");
+        } catch (NoSuchAlgorithmException e) {
+            throw ZipIOException.wrapOrAddSurpressed(null, e, null);
+        }
+    }
+
+    protected void ensureSignatureDetails() throws ZipIOException {
+        if (signatureType != null) {
+            return;
+        }
         String comment = null;
         if (byteArray != null) {
             byte[] tail = byteArray;
-            comment = readComment(tail);
-        } else {
             try {
-                if (JVMVersion.getVersion().isLowerThan(JavaVersion.JVM_1_7)) {
-                    RandomAccessFile file = new RandomAccessFile(zipFile, "r");
-                    try {
-                        file.seek(Math.max(0, zipFile.length() - 65000));
-                        int read = 65000;
-                        if (zipFile.length() < read) {
-                            read = (int) zipFile.length();
-                        }
-                        byte[] tail = new byte[read];
-                        file.readFully(tail);
-                        comment = readComment(tail);
-                    } finally {
-                        file.close();
+                comment = readComment(tail);
+            } catch (SignatureException e) {
+                throw ZipIOException.wrapOrAddSurpressed(null, e, null);
+            }
+        } else {
+            if (JVMVersion.getVersion().isLowerThan(JavaVersion.JVM_1_7)) {
+                ZipIOException exception = null;
+                RandomAccessFile file = null;
+                try {
+                    file = new RandomAccessFile(zipFile, "r");
+                    ;
+                    file.seek(Math.max(0, zipFile.length() - 65000));
+                    int read = 65000;
+                    if (zipFile.length() < read) {
+                        read = (int) zipFile.length();
                     }
-                } else {
-                    comment = zip.getComment();
+                    byte[] tail = new byte[read];
+                    file.readFully(tail);
+                    comment = readComment(tail);
+                } catch (IOException e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
+                } catch (SignatureException e) {
+                    exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
+                } finally {
+                    try {
+                        if (file != null) {
+                            file.close();
+                        }
+                    } catch (IOException e) {
+                        exception = ZipIOException.wrapOrAddSurpressed(exception, e, null);
+                    }
+                    if (exception != null) {
+                        throw exception;
+                    }
                 }
-            } catch (IOException e) {
-                throw new SignatureException(e);
+            } else {
+                comment = zip.getComment();
             }
         }
-        Map<String, Object> cont = Deser.get().fromString(comment, TypeRef.MAP);
-        indexSignature = Base64.decode((String) cont.get(ZipIOWriter.I_SIG));
-        salt = Base64.decode((String) cont.get(ZipIOWriter.SIG_SALT));
-        signatureType = (String) cont.get(ZipIOWriter.TYPE);
-        // System.out.println("Index:\r\n" + (String) cont.get("INDEX"));
-        if (!ZipIOWriter.AWZ_SIG1.equals(signatureType)) {
-            throw new SignatureException("Unsupported Signature type: " + signatureType);
+        try {
+            Map<String, Object> cont = Deser.get().fromString(comment, TypeRef.MAP);
+            indexSignature = Base64.decode((String) cont.get(ZipIOWriter.I_SIG));
+            salt = Base64.decode((String) cont.get(ZipIOWriter.SIG_SALT));
+            signatureType = (String) cont.get(ZipIOWriter.TYPE);
+            // System.out.println("Index:\r\n" + (String) cont.get("INDEX"));
+            if (!ZipIOWriter.AWZ_SIG1.equals(signatureType)) {
+                throw ZipIOException.wrapOrAddSurpressed(null, new SignatureException("Unsupported Signature type: " + signatureType), null);
+            }
+        } catch (SerializerException e) {
+            throw ZipIOException.wrapOrAddSurpressed(null, e, null);
         }
-        signature = Signature.getInstance("Sha256WithRSA");
     }
 
-    protected void ensureIndexIsVerified() throws SignatureException, ZipIOException {
+    public String getSignatureType() {
         try {
-            if (indexVerifyResult != null) {
-                if (indexVerifyResult == Boolean.TRUE) {
-                    return;
-                } else {
-                    throw new SignatureException("Index Signature Failed");
-                }
-            }
+            ensureSignatureDetails();
+        } catch (ZipIOException e) {
+        }
+        return signatureType;
+    }
+
+    public boolean isSigned() {
+        try {
+            ensureSignatureDetails();
+        } catch (ZipIOException e) {
+        }
+        if (signatureType != null) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    protected void ensureIndexIsVerified() throws ZipIOException {
+        if (signature != null) {
             try {
-                signature.initVerify(publicKey);
-                signature.update(salt);
-                for (ZipEntry e : getZipFiles()) {
-                    signature.update(((e.isDirectory() ? "[D]" : "[F]") + e.getName()).getBytes("UTF-8"));
+                if (indexVerifyResult != null) {
+                    if (indexVerifyResult == Boolean.TRUE) {
+                        return;
+                    } else {
+                        throw new SignatureException("Index Signature Failed");
+                    }
                 }
-                if (!signature.verify(indexSignature)) {
-                    throw new SignatureException("Index Signature Failed");
+                try {
+                    signature.initVerify(publicKey);
+                    signature.update(salt);
+                    for (ZipEntry e : getZipEntriesInternal()) {
+                        signature.update(((e.isDirectory() ? "[D]" : "[F]") + e.getName()).getBytes("UTF-8"));
+                    }
+                    if (!signature.verify(indexSignature)) {
+                        zipEntries = null;
+                        throw new SignatureException("Index Signature Failed");
+                    }
+                    indexVerifyResult = Boolean.TRUE;
+                } finally {
+                    if (indexVerifyResult == null) {
+                        indexVerifyResult = Boolean.FALSE;
+                    }
                 }
-                indexVerifyResult = Boolean.TRUE;
-            } finally {
-                if (indexVerifyResult == null) {
-                    indexVerifyResult = Boolean.FALSE;
-                }
+            } catch (UnsupportedEncodingException e) {
+                zipEntries = null;
+                throw ZipIOException.wrapOrAddSurpressed(null, e, null);
+            } catch (GeneralSecurityException e) {
+                zipEntries = null;
+                throw ZipIOException.wrapOrAddSurpressed(null, e, null);
             }
-        } catch (UnsupportedEncodingException e) {
-            throw new SignatureException(e);
-        } catch (GeneralSecurityException e) {
-            if (e instanceof SignatureException) {
-                throw (SignatureException) e;
-            }
-            throw new SignatureException(e);
         }
     }
 

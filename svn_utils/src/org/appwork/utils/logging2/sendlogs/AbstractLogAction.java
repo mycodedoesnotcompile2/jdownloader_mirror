@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -35,7 +35,6 @@ package org.appwork.utils.logging2.sendlogs;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,6 +48,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
@@ -207,31 +207,44 @@ public abstract class AbstractLogAction extends BasicAction {
             ZipIOWriter writer = null;
             final String name = lf.getFolder().getName() + "-" + this.format(lf.getCreated()) + " to " + this.format(lf.getLastModified());
             final File folder = Application.getTempResource("logs/" + name);
+            Exception primary = null;
             try {
                 if (lf.isNeedsFlush()) {
                     this.flushLogs();
                 }
                 writer = new ZipIOWriter(zip) {
+                    /**
+                     * @see org.appwork.utils.zip.ZipIOWriter#add(java.io.File, boolean, java.lang.String[])
+                     */
                     @Override
-                    public void addFile(final File addFile, final boolean compress, final String fullPath) throws FileNotFoundException, ZipIOException, IOException {
-                        if (addFile.getName().endsWith(".lck") || addFile.isFile() && addFile.length() == 0) {
+                    public void add(File add, boolean compress, String... pathElements) throws ZipIOException {
+                        if (add.getName().endsWith(".lck") || add.isFile() && add.length() == 0) {
                             return;
                         }
                         if (Thread.currentThread().isInterrupted()) {
                             throw new WTFException("INterrupted");
                         }
-                        super.addFile(addFile, compress, fullPath);
+                        super.add(add, compress, pathElements);
                     }
                 };
                 if (folder.exists()) {
-                    Files.deleteRecursiv(folder);
+                    Files.deleteRecursive(folder);
                 }
                 IO.copyFolderRecursive(lf.getFolder(), folder, true);
-                writer.addDirectory(folder, true, null);
+                writer.add(folder, true);
+            } catch (Exception e) {
+                primary = e;
             } finally {
                 try {
-                    writer.close();
-                } catch (final Throwable e) {
+                    if (writer != null) {
+                        writer.close();
+                    }
+                } catch (final Exception e) {
+                    if (primary != null) {
+                        throw Exceptions.addSuppressed(primary, e);
+                    } else {
+                        throw e;
+                    }
                 }
             }
             this.onNewPackage(zip, this.format(lf.getCreated()) + "-" + this.format(lf.getLastModified()));

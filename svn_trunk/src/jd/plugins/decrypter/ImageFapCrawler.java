@@ -41,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.ImageFap;
 
-@DecrypterPlugin(revision = "$Revision: 48951 $", interfaceVersion = 2, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap\\.com/(gallery\\.php\\?p?gid=.+|gallery/.+|pictures/\\d+/.*|photo/\\d+|organizer/\\d+|(usergallery|showfavorites)\\.php\\?userid=\\d+(&folderid=-?\\d+)?)" })
+@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "imagefap.com" }, urls = { "https?://(?:www\\.)?imagefap\\.com/(gallery\\.php\\?p?gid=.+|gallery/.+|pictures/\\d+/.*|photo/\\d+|organizer/\\d+|(usergallery|showfavorites)\\.php\\?userid=\\d+(&folderid=-?\\d+)?)" })
 public class ImageFapCrawler extends PluginForDecrypt {
     public ImageFapCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,6 +111,15 @@ public class ImageFapCrawler extends PluginForDecrypt {
             } while (!this.isAbort());
             return ret;
         }
+        final Regex singlephoto = new Regex(contenturl, "(?i)https?://[^/]+/photo/(\\d+)");
+        if (singlephoto.patternFind()) {
+            /* Single photo */
+            final String photoID = singlephoto.getMatch(0);
+            final DownloadLink link = new DownloadLink(hosterplugin, this.getHost(), contenturl + "/");
+            link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
+            ret.add(link);
+            return ret;
+        }
         final String userID = new Regex(contenturl, "(?i)userid=(\\d+)").getMatch(0);
         final String folderID = new Regex(contenturl, "(?i)folderid=(-?\\d+)").getMatch(0);
         if (userID != null && folderID != null) {
@@ -166,15 +175,6 @@ public class ImageFapCrawler extends PluginForDecrypt {
         if (contenturl.matches(type_invalid)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex singlephoto = new Regex(contenturl, "(?i)https?://[^/]+/photo/(\\d+)");
-        if (singlephoto.patternFind()) {
-            /* Single photo */
-            final String photoID = singlephoto.getMatch(0);
-            final DownloadLink link = new DownloadLink(hosterplugin, this.getHost(), contenturl + "/");
-            link.setProperty(ImageFap.PROPERTY_PHOTO_ID, photoID);
-            ret.add(link);
-            return ret;
-        }
         /* Gallery */
         /* view=2 -> "One page" view -> More images on each page */
         final UrlQuery query = UrlQuery.parse(contenturl);
@@ -201,19 +201,24 @@ public class ImageFapCrawler extends PluginForDecrypt {
         }
         // First find all the information we need (name of the gallery, name of
         // the galleries author)
-        String galleryName = ImageFap.getGalleryName(br, null, false);
-        if (galleryName == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         String authorsName = ImageFap.getUserName(br, null, false);
-        galleryName = Encoding.htmlDecode(galleryName).trim();
         authorsName = Encoding.htmlDecode(authorsName).trim();
         if (galleryIDStr == null) {
+            /* Look for galleryID in html code */
             galleryIDStr = br.getRegex("\"galleryid_input\"\\s*value\\s*=\\s*\"(\\d+)").getMatch(0);
         }
         if (galleryIDStr == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        if (!br.getURL().contains(galleryIDStr)) {
+            /* Redirect to to other page e.g. "/gallery.php". */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String galleryName = ImageFap.getGalleryName(br, null, false);
+        if (galleryName == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        galleryName = Encoding.htmlDecode(galleryName).trim();
         query.addAndReplace("gid", galleryIDStr);
         int counter = 1;
         final DecimalFormat df = new DecimalFormat("0000");

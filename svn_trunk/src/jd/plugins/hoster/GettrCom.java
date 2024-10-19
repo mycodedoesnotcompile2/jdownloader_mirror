@@ -22,7 +22,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.downloader.hls.HLSDownloader;
@@ -38,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
 public class GettrCom extends PluginForHost {
     public GettrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,7 +73,6 @@ public class GettrCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final int    FREE_MAXDOWNLOADS  = 20;
     private static final String PROPERTY_DIRECTURL = "directlink";
     private static final String PROPERTY_TITLE     = "title";
     private static final String PROPERTY_DATE      = "date";
@@ -165,7 +163,7 @@ public class GettrCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

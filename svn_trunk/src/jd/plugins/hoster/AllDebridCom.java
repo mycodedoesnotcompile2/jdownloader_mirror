@@ -79,7 +79,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49988 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 49993 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -201,7 +201,7 @@ public class AllDebridCom extends PluginForHost {
                         break;
                     } else if (this.isAbort()) {
                         logger.info("Stopping because: Aborted by user");
-                        break;
+                        throw new InterruptedException();
                     }
                 }
             } finally {
@@ -316,26 +316,19 @@ public class AllDebridCom extends PluginForHost {
                  * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and
                  * JD also does not accept them but we're doing this check nevertheless.
                  */
-                final String type = (String) hosterinfos.get("type");
-                final Boolean status = (Boolean) hosterinfos.get("status"); // optional field
-                // final Number quota = (Number) entry.get("quota");
-                if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(type)) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-                    logger.info("This host cannot be used with free accounts: " + host_without_tld);
-                }
-                /* Skip currently disabled hosts --> 2020-03-26: Do not skip any hosts anymore, display all in JD RE: admin */
-                if (Boolean.FALSE.equals(status)) {
-                    /* Log hosts which look to be non working according to API. */
-                    logger.info("Host which might currently be broken: " + host_without_tld);
+                if (Boolean.FALSE.equals(hosterinfos.get("status"))) {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                } else if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(hosterinfos.get("type").toString())) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+                    logger.info("This host cannot be used with current account type: " + host_without_tld);
                 }
-                /* Add all domains of host */
+                /* Set individual host limits */
                 if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
-                    /* quota is traffic in MB */
+                    /* traffic means traffic in MB */
                     mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
                     mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
                 } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
-                    /* quota is number of links left to download */
+                    /* nb_download means number of links left to download */
                     final long linksLeft = quota.longValue();
                     final long linksMax = quotaMax.longValue();
                     // -1 = Unlimited
@@ -348,6 +341,7 @@ public class AllDebridCom extends PluginForHost {
                 }
                 if (serviceType.equals("streams")) {
                     mhost.setStatusText("Stream service");
+                    /* Collect stream domains for filtering later on. */
                     streamDomains.addAll(mhost.getDomains());
                 }
                 if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
@@ -376,12 +370,12 @@ public class AllDebridCom extends PluginForHost {
                 }
             }
         }
-        ai.setMultiHostSupportV2(this, supportedhosts);
         final boolean filterJDownloaderUnsupportedStreamHosts = false;
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
             /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
-            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
+            ai.setMultiHostSupportV2(this, supportedhosts);
             final List<MultiHostHost> results = ai.getMultiHostSupportV2();
+            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
             for (final MultiHostHost mhost : results) {
                 if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
                     logger.info("Ignore unsupported stream domain: " + mhost.getDomain());
@@ -391,6 +385,8 @@ public class AllDebridCom extends PluginForHost {
             }
             logger.info("Results initially: " + supportedhosts.size() + " | Filtered results: " + filteredresults.size());
             ai.setMultiHostSupportV2(this, filteredresults);
+        } else {
+            ai.setMultiHostSupportV2(this, supportedhosts);
         }
         return ai;
     }

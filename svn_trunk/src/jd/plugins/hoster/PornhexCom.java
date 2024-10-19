@@ -37,10 +37,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornhexCom extends PluginForHost {
     public PornhexCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -75,8 +82,8 @@ public class PornhexCom extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern TYPE_NORMAL = Pattern.compile("/video/(?!embed)([\\w-]+)");
-    private static final Pattern TYPE_EMBED  = Pattern.compile("/video/embed/([A-Za-z0-9]+)");
+    private static final Pattern TYPE_NORMAL = Pattern.compile("/video/(?!embed)([\\w-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_EMBED  = Pattern.compile("/video/embed/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
@@ -261,6 +268,8 @@ public class PornhexCom extends PluginForHost {
         }
         if (!StringUtils.isEmpty(dllink) && !isDownload) {
             this.basicLinkCheck(br, br.createHeadRequest(this.dllink), link, filename, null);
+        } else {
+            link.setFinalFileName(filename);
         }
         return AvailableStatus.TRUE;
     }

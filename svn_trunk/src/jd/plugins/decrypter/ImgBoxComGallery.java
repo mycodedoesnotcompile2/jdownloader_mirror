@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49602 $", interfaceVersion = 2, names = { "imgbox.com" }, urls = { "https?://(www\\.)?imgbox\\.com/(g/)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "imgbox.com" }, urls = { "https?://(www\\.)?imgbox\\.com/(g/)?[A-Za-z0-9]+" })
 public class ImgBoxComGallery extends PluginForDecrypt {
     public ImgBoxComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -47,16 +47,14 @@ public class ImgBoxComGallery extends PluginForDecrypt {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY };
     }
 
-    private static final String GALLERYLINK    = "(?i)https?://(www\\.)?imgbox\\.com/g/([A-Za-z0-9]+)";
-    private static final String PICTUREOFFLINE = "The image in question does not exist|The image has been deleted due to a DMCA complaint";
-    private static final String INVALIDLINKS   = "(?i)https?://(www\\.)?imgbox\\.com/(help|login|privacy|register|tos|images|dmca|gallery|assets)";
+    private static final String GALLERYLINK  = "(?i)https?://(www\\.)?imgbox\\.com/g/([A-Za-z0-9]+)";
+    private static final String INVALIDLINKS = "(?i)https?://(www\\.)?imgbox\\.com/(help|login|privacy|register|tos|images|dmca|gallery|assets)";
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
         if (contenturl.matches(INVALIDLINKS)) {
-            logger.info("Link invalid: " + contenturl);
-            return ret;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
         }
         br.setFollowRedirects(true);
         br.getPage(contenturl);
@@ -86,7 +84,7 @@ public class ImgBoxComGallery extends PluginForDecrypt {
             FilePackage fp = null;
             if (fpName != null) {
                 fp = FilePackage.getInstance();
-                fp.setName(Encoding.htmlDecode(fpName.trim()));
+                fp.setName(Encoding.htmlDecode(fpName).trim());
             }
             for (final String uid : uids) {
                 final DownloadLink dl = createDownloadlink("http://imgbox.com/" + uid);
@@ -96,9 +94,8 @@ public class ImgBoxComGallery extends PluginForDecrypt {
                 ret.add(dl);
             }
         } else {
-            if (br.containsHTML(PICTUREOFFLINE)) {
-                logger.info("Link offline: " + contenturl);
-                return ret;
+            if (br.containsHTML("The image in question does not exist|The image has been deleted due to a DMCA complaint")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final DownloadLink dl = crawlSingle(br);
             ret.add(dl);

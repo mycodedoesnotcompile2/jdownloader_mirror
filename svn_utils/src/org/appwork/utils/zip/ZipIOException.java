@@ -79,13 +79,20 @@ public class ZipIOException extends IOException {
 
     /**
      * @param e
+     * @param zipAdd
      * @return
-     * @throws IOException
      */
-    public static ZipIOException wrap(IOException e) {
-        if (e instanceof ZipIOException) {
-            return (ZipIOException) e;
+    public static ZipIOException wrapOrAddSurpressed(ZipIOException primary, Throwable e, ZipEntry zipAdd) {
+        if (primary == null) {
+            if (e instanceof ZipIOException) {
+                primary = (ZipIOException) e;
+            } else {
+                primary = new ZipIOException(e, zipAdd);
+            }
+            return primary;
+        } else {
+            primary.addSuppressed(e);
+            return primary;
         }
-        return new ZipIOException(e.getMessage(), e);
     }
 }

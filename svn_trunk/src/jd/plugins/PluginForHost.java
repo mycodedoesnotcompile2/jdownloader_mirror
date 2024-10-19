@@ -20,6 +20,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
@@ -53,6 +54,7 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
+import javax.swing.Timer;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -3135,7 +3137,7 @@ public abstract class PluginForHost extends Plugin {
                 if (!shouldShowTrafficCaculationColumn && mhost.getTrafficCalculationFactorPercent() != 100) {
                     shouldShowTrafficCaculationColumn = true;
                 }
-                if (!shouldShowUnavailableForColumn && mhost.getUnavailableForMillis() > 0) {
+                if (!shouldShowUnavailableForColumn && mhost.getUnavailableTimeMillis() > 0) {
                     shouldShowUnavailableForColumn = true;
                 }
                 if (shouldShowCustomTextColumn && shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn) {
@@ -3366,7 +3368,7 @@ public abstract class PluginForHost extends Plugin {
                     addColumn(new ExtLongColumn<MultiHostHost>("Unavailable for") {
                         @Override
                         protected long getLong(MultiHostHost mhost) {
-                            return mhost.getUnavailableForMillis();
+                            return mhost.getUnavailableTimeMillis();
                         }
 
                         @Override
@@ -3387,20 +3389,38 @@ public abstract class PluginForHost extends Plugin {
                     this._fireTableStructureChanged(hosts, false);
                 }
             };
-            tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.YELLOW, null) {
-                @Override
-                public boolean accept(ExtColumn<MultiHostHost> column, MultiHostHost mhost, boolean selected, boolean focus, int row) {
-                    if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                        return true;
-                    } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
-                        return true;
-                    } else if (mhost.getUnavailableUntilTimestamp() != -1) {
-                        return true;
-                    } else {
-                        return false;
+            if (shouldShowLinkLimitColumns_final || shouldShowTrafficLimitColumns_final || shouldShowUnavailableForColumn_final) {
+                /* Add highlighter if needed */
+                tableModel.addExtComponentRowHighlighter(new ExtComponentRowHighlighter<MultiHostHost>(null, Color.YELLOW, null) {
+                    @Override
+                    public boolean accept(ExtColumn<MultiHostHost> column, MultiHostHost mhost, boolean selected, boolean focus, int row) {
+                        if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
+                            return true;
+                        } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
+                            return true;
+                        } else if (mhost.getUnavailableTimeMillis() > 0) {
+                            return true;
+                        } else {
+                            return false;
+                        }
                     }
-                }
-            });
+                });
+            }
+            if (shouldShowUnavailableForColumn) {
+                /* Add wait time countdown if needed. */
+                final Timer countdownTimer = new Timer(1000, new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        for (int i = 0; i < tableModel.getRowCount(); i++) {
+                            final MultiHostHost mhost = tableModel.getObjectbyRow(i);
+                            if (mhost.getUnavailableUntilTimestamp() > 0) {
+                                tableModel.fireTableRowsUpdated(i, i);
+                            }
+                        }
+                    }
+                });
+                countdownTimer.start();
+            }
             final BasicJDTable<MultiHostHost> table = new BasicJDTable<MultiHostHost>(tableModel);
             table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
             table.setSearchEnabled(true);

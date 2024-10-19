@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.IwaraTvCrawler;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { IwaraTvCrawler.class })
 public class IwaraTv extends PluginForHost {
     public IwaraTv(PluginWrapper wrapper) {
@@ -550,5 +550,11 @@ public class IwaraTv extends PluginForHost {
     @Override
     public Class<? extends IwaraTvConfig> getConfigInterface() {
         return IwaraTvConfig.class;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

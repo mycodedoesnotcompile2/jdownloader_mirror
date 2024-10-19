@@ -1,8 +1,6 @@
 package org.jdownloader.api.logs;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -122,14 +120,14 @@ public class LogAPIImpl implements LogAPI {
         try {
             writer = new ZipIOWriter(zip) {
                 @Override
-                public void addFile(final File addFile, final boolean compress, final String fullPath) throws FileNotFoundException, ZipIOException, IOException {
+                public void add(final File addFile, final boolean compress, final String... elements) throws ZipIOException {
                     if (addFile.getName().endsWith(".lck") || addFile.isFile() && addFile.length() == 0) {
                         return;
                     }
                     if (Thread.currentThread().isInterrupted()) {
                         throw new WTFException("INterrupted");
                     }
-                    super.addFile(addFile, compress, fullPath);
+                    super.add(addFile, compress, elements);
                 }
             };
             final String name = lf.getFolder().getName() + "-" + DATE_FORMAT.format(lf.getCreated()) + " to " + DATE_FORMAT.format(lf.getLastModified());
@@ -138,13 +136,15 @@ public class LogAPIImpl implements LogAPI {
                 LogController.getInstance().flushSinks(FLUSH.FORCE);
             }
             if (folder.exists()) {
-                Files.deleteRecursiv(folder);
+                Files.deleteRecursive(folder);
             }
             IO.copyFolderRecursive(lf.getFolder(), folder, true);
-            writer.addDirectory(folder, true, null);
+            writer.add(folder, true);
         } finally {
             try {
-                writer.close();
+                if (writer != null) {
+                    writer.close();
+                }
             } catch (final Throwable e) {
             }
         }

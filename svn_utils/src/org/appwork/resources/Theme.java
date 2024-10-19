@@ -344,7 +344,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     protected String buildPath(final String pre, final String path, final String ext, boolean fallback) {
         final Theme delegate = getDelegate();
         if (delegate != null) {
-            return delegate.buildPath(pre, path, ext, fallback);
+            String ret = delegate.buildPath(pre, path, ext, fallback);
+            if (ret != null) {
+                return ret;
+            }
         }
         final StringBuilder sb = new StringBuilder();
         sb.append(fallback ? defaultPath : this.path);
@@ -422,12 +425,11 @@ public class Theme implements MinTimeWeakReferenceCleanup {
         if (url == null) {
             final String path = this.buildPath(pre, relativePath, ext, fallback);
             try {
-                // first lookup in home dir. .jd_home or installdirectory
                 File file = new File(path);
                 if (!file.isAbsolute()) {
                     file = Application.getResource(path);
                 }
-                if (file.exists()) {
+                if (file.isFile()) {
                     url = file.toURI().toURL();
                 }
             } catch (final MalformedURLException e) {
@@ -435,7 +437,7 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             }
             if (url == null) {
                 // afterwards, we lookup in classpath. jar or bin folders
-                url = Theme.class.getResource(path);
+                url = Theme.class.getResource((path.startsWith("/") ? "" : "/") + path);
             }
         }
         return url;
@@ -506,8 +508,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
      *
      */
     private void updatePath() {
-        this.path = "/themes/" + this.getTheme() + "/" + this.getNameSpace();
-        this.defaultPath = "/themes/" + "standard" + "/" + this.getNameSpace();
+        this.path = "themes/" + this.getTheme() + "/" + this.getNameSpace();
+        this.defaultPath = "themes/" + "standard" + "/" + this.getNameSpace();
     }
 
     /**

@@ -22,21 +22,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.TypeRef;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 45910 $", interfaceVersion = 3, names = { "icloud.com" }, urls = { "https?://(?:www\\.)?icloud\\.com/sharedalbum/(?:[A-Za-z\\-]+/)?#[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = { "icloud.com" }, urls = { "https?://(?:www\\.)?icloud\\.com/sharedalbum/(?:[A-Za-z\\-]+/)?#[A-Za-z0-9]+" })
 public class IcloudCom extends PluginForDecrypt {
     public IcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,7 +54,7 @@ public class IcloudCom extends PluginForDecrypt {
      */
     @SuppressWarnings({ "unchecked", "deprecation" })
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         LinkedHashMap<String, DownloadLink> hashmap_checksum = new LinkedHashMap<String, DownloadLink>();
         String jsonphotoGuids = "{\"photoGuids\":[";
         String jsonderivatives = "\"derivatives\":{";
@@ -60,46 +63,48 @@ public class IcloudCom extends PluginForDecrypt {
         final String folderid = new Regex(parameter, "([A-Za-z0-9]+)$").getMatch(0);
         /* Not necessarily needed! */
         br.getHeaders().put("Referer", "https://www.icloud.com/sharedalbum/");
-        String host = "p43-sharedstreams.icloud.com";
-        Map<String, Object> entries = null;
+        String host = "p121-sharedstreams.icloud.com";
+        Map<String, Object> root = null;
         boolean triedSecondHost = false;
-        do {
+        secondHostLoop: do {
             br.postPageRaw("https://" + host + "/" + folderid + "/sharedstreams/webstream", "{\"streamCtag\":null}");
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-            if (entries.containsKey("X-Apple-MMe-Host")) {
+            root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String newHost = (String) root.get("X-Apple-MMe-Host");
+            if (newHost != null) {
                 if (triedSecondHost) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                host = (String) entries.get("X-Apple-MMe-Host");
+                host = newHost;
                 triedSecondHost = true;
-                continue;
+                continue secondHostLoop;
             } else {
-                break;
+                break secondHostLoop;
             }
         } while (true);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         Map<String, Object> entries_tmp = null;
-        List<Object> ressourcelist = (List<Object>) entries.get("photos");
-        final String userFirstName = (String) entries.get("userFirstName");
-        final String userLastName = (String) entries.get("userLastName");
-        final String streamName = (String) entries.get("streamName");
+        final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) root.get("photos");
+        if (ressourcelist.isEmpty()) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+        }
+        final String userFirstName = (String) root.get("userFirstName");
+        final String userLastName = (String) root.get("userLastName");
+        final String streamName = (String) root.get("streamName");
         if (userFirstName == null || userLastName == null || streamName == null) {
             return null;
         }
         final String contributorFullName = userFirstName + " " + userLastName;
         String fpName = contributorFullName + " - " + streamName;
         int counter = 0;
-        for (final Object photoo : ressourcelist) {
-            entries = (Map<String, Object>) photoo;
-            final String photoGuid = (String) entries.get("photoGuid");
-            final String batchGuid = (String) entries.get("batchGuid");
-            final String mediaAssetType = (String) entries.get("mediaAssetType");
+        for (final Map<String, Object> photo : ressourcelist) {
+            final String photoGuid = (String) photo.get("photoGuid");
+            final String batchGuid = (String) photo.get("batchGuid");
+            final String mediaAssetType = (String) photo.get("mediaAssetType");
             final String ext_temp;
-            entries = (Map<String, Object>) entries.get("derivatives");
-            if (photoGuid == null || batchGuid == null || entries == null) {
+            final Map<String, Object> derivatives = (Map<String, Object>) photo.get("derivatives");
+            if (photoGuid == null || batchGuid == null || derivatives == null) {
                 continue;
             }
             String checksum = null;
@@ -112,7 +117,7 @@ public class IcloudCom extends PluginForDecrypt {
             /* Find highest quality photo/video */
             long filesizeMax = 0;
             long filesizeTemp;
-            final Iterator<Entry<String, Object>> it = entries.entrySet().iterator();
+            final Iterator<Entry<String, Object>> it = derivatives.entrySet().iterator();
             Entry<String, Object> entrytemp = null;
             while (it.hasNext()) {
                 entrytemp = it.next();
@@ -146,7 +151,7 @@ public class IcloudCom extends PluginForDecrypt {
             jsonderivatives += String.format("\"%s\":[\"%s\"]", photoGuid, checksum);
             if (!extendedMode) {
                 /* Only add links to List here, if we're not in extended mode!! */
-                decryptedLinks.add(dl);
+                ret.add(dl);
             }
             hashmap_checksum.put(checksum, dl);
             counter++;
@@ -156,9 +161,9 @@ public class IcloudCom extends PluginForDecrypt {
         jsonAll = jsonphotoGuids + jsonderivatives;
         if (extendedMode) {
             /* Try to find final 'nice' filenames right away! */
-            this.br.postPageRaw("/" + folderid + "/sharedstreams/webasseturls", jsonAll);
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-            entries = (Map<String, Object>) entries.get("items");
+            br.postPageRaw("/" + folderid + "/sharedstreams/webasseturls", jsonAll);
+            final Map<String, Object> root_extended = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
+            final Map<String, Object> items = (Map<String, Object>) root_extended.get("items");
             DownloadLink dl = null;
             final Iterator<Entry<String, DownloadLink>> it = hashmap_checksum.entrySet().iterator();
             Entry<String, DownloadLink> entrytemp = null;
@@ -170,7 +175,7 @@ public class IcloudCom extends PluginForDecrypt {
                 entrytemp = it.next();
                 checksum_tmp = entrytemp.getKey();
                 dl = entrytemp.getValue();
-                entries_tmp = (Map<String, Object>) entries.get(checksum_tmp);
+                entries_tmp = (Map<String, Object>) items.get(checksum_tmp);
                 /* Usually 'entries_tmp' should be != null, containing the filename information we want! */
                 if (entries_tmp != null) {
                     finallink_tmp = jd.plugins.hoster.IcloudCom.getDirectlink(entries_tmp);
@@ -182,12 +187,12 @@ public class IcloudCom extends PluginForDecrypt {
                         dl.setFinalFileName(final_filename_tmp);
                     }
                 }
-                decryptedLinks.add(dl);
+                ret.add(dl);
             }
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(Encoding.htmlDecode(fpName.trim()));
-        fp.addLinks(decryptedLinks);
-        return decryptedLinks;
+        fp.addLinks(ret);
+        return ret;
     }
 }
