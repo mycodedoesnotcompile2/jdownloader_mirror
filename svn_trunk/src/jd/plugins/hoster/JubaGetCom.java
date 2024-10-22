@@ -24,6 +24,7 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -48,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49890 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 49998 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -67,14 +68,14 @@ public class JubaGetCom extends PluginForHost {
 
     public JubaGetCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://juba-get.com/plans");
+        this.enablePremium("https://" + getHost() + "/plans");
     }
 
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.getHeaders().put("User-Agent", "JDownloader");
-        br.setCookie(this.getHost(), "locale", "en");
+        br.setCookie(getHost(), "locale", "en");
         br.setFollowRedirects(true);
         return br;
     }
@@ -128,7 +129,7 @@ public class JubaGetCom extends PluginForHost {
                 br.getHeaders().put("x-csrf-token", csrftoken);
             }
             br.postPage("/api/generate", query);
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             String dllink = (String) entries.get("download");
             if (StringUtils.isEmpty(dllink)) {
                 /* E.g. {"error":true,"error_message":"Error generate"} */
@@ -184,7 +185,9 @@ public class JubaGetCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         login(account, true, "https://" + this.getHost() + "/generator");
-        final String expireDate = br.getRegex("(?i)Expires in\\s*:\\s*([^<>\n\r\t]+)").getMatch(0);
+        final String trafficUsedToday = br.getRegex("<b>\\s*Total today:([^<]+)</b><br>").getMatch(0);
+        final String trafficUsedEver = br.getRegex("<b>\\s*Total generated:([^<]+)<").getMatch(0);
+        final String expireDate = br.getRegex("Expires in\\s*:\\s*([^<>\n\r\t]+)").getMatch(0);
         if (expireDate != null) {
             ai.setValidUntil(TimeFormatter.getMilliSeconds(expireDate, "MMMM dd, yyyy", Locale.ENGLISH), br);
             account.setType(AccountType.PREMIUM);
@@ -192,15 +195,14 @@ public class JubaGetCom extends PluginForHost {
         } else {
             /* No expire date found --> Assume it's a free account. */
             account.setType(AccountType.FREE);
-            /* 2022-08-12: Free accounts are not supported and/or have no traffic at all. */
-            ai.setExpired(true);
-            return ai;
+            // ai.setExpired(true);
+            /* Free accounts can be used to download from some specific hosts, see: https://juba-get.com/hosts */
         }
-        final String hostsHTML = br.getRegex("class=\"fas fa-cloud-download-alt\"></i> Hosts</div>\\s*<div class=\"card-body\">(.*?)</div>").getMatch(0);
-        if (hostsHTML == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #1");
+        if (trafficUsedToday != null && trafficUsedEver != null) {
+            ai.setStatus(account.getType().getLabel() + " | Used today: " + trafficUsedToday.trim() + " | Total: " + trafficUsedEver.trim());
         }
-        final String[] htmls = hostsHTML.split("<img");
+        /* They do not have an API so we need to extract the host limit information from HTML. */
+        final String[] htmls = br.getRequest().getHtmlCode().split("<img");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final String html : htmls) {
             String hostWithoutTLD = new Regex(html, "data-original-title=\"([^\" \\(]+)\"").getMatch(0);
@@ -208,19 +210,47 @@ public class JubaGetCom extends PluginForHost {
                 // data-original-title="forum.com (hoster.com)">
                 hostWithoutTLD = new Regex(html, "data-original-title=\"[^\"]*\\(([^\"\\)]+)\\)").getMatch(0);
             }
-            if (hostWithoutTLD == null) {
+            final String serverStatus = new Regex(html, "(servidor_offline|servidor_online)").getMatch(0);
+            if (hostWithoutTLD == null || serverStatus == null) {
                 /* Skip invalid items */
+                // logger.info("Skipping invalid supported host html snippet: " + html);
                 continue;
             }
-            final MultiHostHost mhost = new MultiHostHost(hostWithoutTLD);
-            if (!html.contains("servidor_online")) {
+            final MultiHostHost mhost;
+            /* Some small corrections */
+            if (hostWithoutTLD.equalsIgnoreCase("DropDownload")) {
+                mhost = new MultiHostHost("drop.download");
+            } else if (hostWithoutTLD.equalsIgnoreCase("FreeDLink")) {
+                mhost = new MultiHostHost("freedl.ink");
+            } else if (hostWithoutTLD.equalsIgnoreCase("Fast-Down")) {
+                mhost = new MultiHostHost("down.fast-down.com");
+            } else {
+                mhost = new MultiHostHost(hostWithoutTLD);
+            }
+            if (serverStatus.equalsIgnoreCase("servidor_offline")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            final String hostValueForTrafficRegex;
+            if (hostWithoutTLD.equalsIgnoreCase("DropDownload")) {
+                hostValueForTrafficRegex = "DropAPK \\(DropDownload\\)";
+            } else {
+                hostValueForTrafficRegex = hostWithoutTLD;
+            }
+            final Regex dailyLimitRegex = br.getRegex("data-original-title=\"" + hostValueForTrafficRegex + "\">[^<]+<b>\\((\\d+[^/]+)/([^<]+)\\)</b><br>");
+            if (dailyLimitRegex.patternFind()) {
+                final long trafficUsed = SizeFormatter.getSize(dailyLimitRegex.getMatch(0));
+                final long trafficMax = SizeFormatter.getSize(dailyLimitRegex.getMatch(1));
+                mhost.setTrafficMax(trafficMax);
+                mhost.setTrafficLeft(trafficMax - trafficUsed);
+            } else {
+                logger.info("Failed to find detailed limits for host: " + hostWithoutTLD);
             }
             supportedhosts.add(mhost);
         }
         if (supportedhosts.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts #2");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find list of supported hosts");
         }
+        /* Other source for supported hosts down below but it is not a good source because the entries are spread over multiple pages. */
         // br.getPage("/hosts");
         // final String[] htmls = br.getRegex("<tr>(.*?)</tr>").getColumn(0);
         // final ArrayList<String> supportedHosts = new ArrayList<String>();

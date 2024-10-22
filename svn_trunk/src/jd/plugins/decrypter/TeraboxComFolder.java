@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 49840 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49998 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(web/share/(?:init|link|filelist)\\?surl=[A-Za-z0-9\\-_]+.*|web/share/videoPlay\\?surl=[A-Za-z0-9\\-_]+\\&dir=[^\\&]+|s/[A-Za-z0-9\\-_]+|(?:[a-z0-9]+/)?sharing/link\\?surl=[A-Za-z0-9\\-_]+.*)");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(web/share/(?:init|link|filelist)\\?surl=[A-Za-z0-9\\-_]+.*|web/share/videoPlay\\?surl=[A-Za-z0-9\\-_]+\\&dir=[^\\&]+|s/[A-Za-z0-9\\-_]+|(?:[a-z0-9]+/)?sharing/.*)");
         }
         return ret.toArray(new String[0]);
     }

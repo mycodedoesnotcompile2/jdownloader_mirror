@@ -496,7 +496,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
         }
         final List<String> finalresults = new ArrayList<String>();
-        /* TODO: Make use of this */
+        /* TODO: Return this once refactoring is done. */
         final List<MultiHostHost> finalresults2 = new ArrayList<MultiHostHost>();
         final HashSet<String> unassignedMultiHostSupport = new HashSet<String>();
         cleanListLoop: for (final Entry<String, MultiHostHost> entry : cleanList.entrySet()) {
@@ -578,7 +578,13 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 continue cleanListLoop;
             }
             final String pluginHost = finalplugin.getHost();
-            if (finalresults.contains(pluginHost)) {
+            if (multiHostPlugin != null && pluginHost.equals(multiHostPlugin.getHost())) {
+                /*
+                 * Some mmultihosts put their own domain in the list of supported hosts. However, this is nowhere needed so let's not add it
+                 * to the final list.
+                 */
+                continue cleanListLoop;
+            } else if (finalresults.contains(pluginHost)) {
                 continue cleanListLoop;
             }
             finalresults.add(pluginHost);
@@ -655,16 +661,26 @@ public class AccountInfo extends Property implements AccountTrafficView {
         /* sorting will now work properly since they are all pre-corrected to lowercase. */
         Collections.sort(finalresults, new NaturalOrderComparator());
         this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults));
-        Collections.sort(finalresults2, new Comparator<MultiHostHost>() {
-            @Override
-            public int compare(MultiHostHost o1, MultiHostHost o2) {
-                return o1.getDomain().compareToIgnoreCase(o2.getDomain());
-            }
-        });
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.setProperty("multiHostSupportv2", new CopyOnWriteArrayList<MultiHostHost>(finalresults2));
+            Collections.sort(finalresults2, new Comparator<MultiHostHost>() {
+                @Override
+                public int compare(MultiHostHost o1, MultiHostHost o2) {
+                    return o1.getDomain().compareToIgnoreCase(o2.getDomain());
+                }
+            });
+            multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(finalresults2);
         }
         return finalresults;
+    }
+
+    protected List<MultiHostHost> multihostSupportV2 = null;
+
+    @Override
+    public boolean removeProperty(String key) {
+        if (PROPERTY_MULTIHOST_SUPPORT.equals(key)) {
+            multihostSupportV2 = null;
+        }
+        return super.removeProperty(key);
     }
 
     public List<String> getMultiHostSupport() {
@@ -685,9 +701,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
     public List<MultiHostHost> getMultiHostSupportV2() {
         final boolean allowUseNewHandling = true;
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowUseNewHandling) {
-            final Object prop = this.getProperty("multiHostSupportv2");
-            if (prop != null && prop instanceof List) {
-                return (List<MultiHostHost>) prop;
+            final List<MultiHostHost> ret = this.multihostSupportV2;
+            if (ret != null) {
+                return ret;
             }
         }
         final List<String> domains = getMultiHostSupport();
@@ -696,11 +712,12 @@ public class AccountInfo extends Property implements AccountTrafficView {
         } else if (domains.isEmpty()) {
             return null;
         }
-        final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
+        final List<MultiHostHost> mhosts = new CopyOnWriteArrayList<MultiHostHost>();
         for (final String domain : domains) {
             final MultiHostHost mhost = new MultiHostHost(domain);
             mhosts.add(mhost);
         }
+        this.multihostSupportV2 = mhosts;
         return mhosts;
     }
 
@@ -723,8 +740,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
         if (mhosts == null || mhosts.size() == 0) {
             return;
         }
-        mhosts.remove(mhost);
-        mhosts.add(mhost);
+        if (!mhosts.contains(mhost)) {
+            mhosts.add(mhost);
+        }
         // this.setProperty(PROPERTY_MULTIHOST_SUPPORT, Property.NULL);
     }
 

@@ -6,6 +6,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.DomainInfo;
+import org.jdownloader.controlling.hosterrule.AccountGroup.Rules;
+import org.jdownloader.controlling.hosterrule.CachedAccountGroup;
+
 import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
@@ -13,12 +19,6 @@ import jd.plugins.DownloadLink;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginForHost;
-
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.DomainInfo;
-import org.jdownloader.controlling.hosterrule.AccountGroup.Rules;
-import org.jdownloader.controlling.hosterrule.CachedAccountGroup;
 
 public class AccountCache implements Iterable<CachedAccount> {
     public static enum ACCOUNTTYPE {
@@ -79,16 +79,23 @@ public class AccountCache implements Iterable<CachedAccount> {
             if (plugin == null) {
                 return false;
             }
-            final PluginForHost linkPlugin = link.getDefaultPlugin();
-            boolean canHandle = linkPlugin == null ? true : linkPlugin.allowHandle(link, plugin);
-            if (!canHandle) {
+            if (link.getDefaultPlugin() != null && !link.getDefaultPlugin().allowHandle(link, plugin)) {
+                return false;
+            } else if (!plugin.canHandle(link, account)) {
+                return false;
+            } else if (!plugin.enoughTrafficFor(link, account)) {
                 return false;
             }
-            canHandle = plugin.canHandle(link, account) && plugin.enoughTrafficFor(link, account);
-            if (canHandle && ACCOUNTTYPE.MULTI.equals(getType()) && getAccount() != null) {
+            if (ACCOUNTTYPE.MULTI.equals(getType()) && getAccount() != null) {
+                /* Check for multihost specific things */
                 final AccountInfo ai = getAccount().getAccountInfo();
                 if (ai == null) {
                     /* Multihoster account without accountInfo -> That should never happen */
+                    return false;
+                }
+                final List<String> supported = ai.getMultiHostSupport();
+                if (supported == null || !supported.contains(link.getHost())) {
+                    /* Host is not supported (anymore) */
                     return false;
                 }
                 /* Verify again because plugins can modify list on runtime */
@@ -96,44 +103,48 @@ public class AccountCache implements Iterable<CachedAccount> {
                     /* Check for domain specific limits of multihost items. */
                     final MultiHostHost hostinfo = ai.getMultihostSupportedHost(link.getHost());
                     if (hostinfo == null) {
-                        /* Not supported */
+                        /* Host is not supported (anymore) */
                         return false;
                     }
                     final MultihosterHostStatus status = hostinfo.getStatus();
-                    final long totalBytes = link.getView().getBytesTotal();
                     if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
                         /* Download of that host is currently not possible. */
                         return false;
                     } else if (!hostinfo.isUnlimitedLinks() && hostinfo.getLinksLeft() <= 0) {
                         /* Max limits link is reached -> Cannot download */
                         return false;
-                    } else if (!hostinfo.isUnlimitedTraffic() && totalBytes != -1 && hostinfo.getTrafficLeft() < totalBytes) {
-                        /* Not enough traffic to download this link */
-                        return false;
                     }
                     // TODO: Refactor this
-                    final long trafficCalcFactor = hostinfo.getTrafficCalculationFactorPercent();
-                    if (trafficCalcFactor != 100) {
-                        final long neededTraffic = (link.getView().getBytesTotal() * trafficCalcFactor) / 100;
-                        final long downloadSize = link.getView().getBytesTotalEstimated();
-                        final long minimum = 1024;
-                        final long downloadLeft;
-                        if (downloadSize >= 0) {
-                            downloadLeft = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
-                        } else {
-                            downloadLeft = minimum;
-                        }
-                        if (downloadLeft > neededTraffic) {
+                    if (!hostinfo.isUnlimitedTraffic()) {
+                        /* Traffic limit exists -> Check if enough traffic is left. */
+                        if (hostinfo.getTrafficLeft() <= 0) {
+                            /* No traffic left at all. */
                             return false;
+                        }
+                        if (link.isSizeSet()) {
+                            /* File size is known so we can check if we have enough traffic left to download that link. */
+                            final long trafficCalcFactor = hostinfo.getTrafficCalculationFactorPercent();
+                            final long downloadSize = link.getView().getBytesTotalEstimated();
+                            final long minimum = 1024;
+                            final long downloadLeft;
+                            if (downloadSize >= 0) {
+                                downloadLeft = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
+                            } else {
+                                downloadLeft = minimum;
+                            }
+                            final long neededTraffic = (downloadLeft * trafficCalcFactor) / 100;
+                            if (!ai.isUnlimitedTraffic() && neededTraffic > ai.getTrafficLeft()) {
+                                /* Not enough account traffic */
+                                return false;
+                            } else if (neededTraffic > hostinfo.getTrafficLeft()) {
+                                /* Not enough individual file host traffic */
+                                return false;
+                            }
                         }
                     }
                 }
-                final List<String> supported = ai.getMultiHostSupport();
-                if (supported != null) {
-                    canHandle = supported.contains(link.getHost());
-                }
             }
-            return canHandle;
+            return true;
         }
 
         @Override
@@ -181,25 +192,25 @@ public class AccountCache implements Iterable<CachedAccount> {
     }
 
     protected final static AccountCache      NA = new AccountCache(null) {
-        public java.util.Iterator<CachedAccount> iterator() {
-            return new Iterator<AccountCache.CachedAccount>() {
-                                                            @Override
-                                                            public boolean hasNext() {
-                                                                return false;
-                                                            }
+                                                    public java.util.Iterator<CachedAccount> iterator() {
+                                                        return new Iterator<AccountCache.CachedAccount>() {
+                                                                                                        @Override
+                                                                                                        public boolean hasNext() {
+                                                                                                            return false;
+                                                                                                        }
 
-                                                            @Override
-                                                            public CachedAccount next() {
-                                                                return null;
-                                                            }
+                                                                                                        @Override
+                                                                                                        public CachedAccount next() {
+                                                                                                            return null;
+                                                                                                        }
 
-                                                            @Override
-                                                            public void remove() {
-                                                                throw new UnsupportedOperationException();
-                                                            }
-                                                        };
-        };
-    };
+                                                                                                        @Override
+                                                                                                        public void remove() {
+                                                                                                            throw new UnsupportedOperationException();
+                                                                                                        }
+                                                                                                    };
+                                                    };
+                                                };
     protected final List<CachedAccountGroup> cache;
 
     public boolean isCustomizedCache() {

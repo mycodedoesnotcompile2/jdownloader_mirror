@@ -25,6 +25,7 @@ import org.fourthline.cling.model.meta.Service;
 import org.fourthline.cling.model.types.UDAServiceType;
 import org.fourthline.cling.registry.Registry;
 import org.fourthline.cling.registry.RegistryListener;
+import org.fourthline.cling.transport.RouterException;
 import org.fourthline.cling.transport.impl.StreamClientConfigurationImpl;
 import org.jdownloader.logging.LogController;
 
@@ -199,21 +200,40 @@ public class UPNPDeviceScanner {
             }
             return devices;
         } finally {
-            for (int i = 0; i < 4; i++) {
-                // SEVERE: Router error on shutdown: org.fourthline.cling.transport.RouterException: Router wasn't available exclusively
-                // after waiting 6000ms, lock failed: WriteLock
-                // org.fourthline.cling.transport.RouterException: Router wasn't available exclusively after waiting 6000ms, lock failed:
-                // WriteLock
-                try {
-                    logger.info("Stopping Cling...");
-                    upnpService.shutdown();
-                    break;
-                } catch (Throwable e) {
-                    logger.log(e);
-                }
+            shutdown(upnpService);
+        }
+    }
+
+    public static void shutdown(final UpnpServiceImpl upnpService) {
+        if (upnpService == null) {
+            return;
+        }
+        new Thread("UpnpService:shutting down") {
+            {
+                setDaemon(true);
             }
 
-        }
+            public void run() {
+                while (true) {
+                    // SEVERE: Router error on shutdown: org.fourthline.cling.transport.RouterException: Router wasn't available exclusively
+                    // after waiting 6000ms, lock failed: WriteLock
+                    // org.fourthline.cling.transport.RouterException: Router wasn't available exclusively after waiting 6000ms, lock
+                    // failed:
+                    // WriteLock
+                    try {
+                        upnpService.getRegistry().shutdown();
+                        upnpService.getRouter().shutdown();
+                        upnpService.getConfiguration().shutdown();
+                        upnpService.shutdown();
+                        break;
+                    } catch (RouterException ignore) {
+                    } catch (Throwable ignore) {
+                    }
+                }
+            };
+
+        }.start();
+
     }
 
     public static void main(String[] args) throws InterruptedException {

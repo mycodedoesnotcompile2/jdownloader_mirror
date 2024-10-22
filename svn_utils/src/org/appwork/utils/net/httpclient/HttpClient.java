@@ -4,8 +4,8 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Spaltestraße 58
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Straße 58
  *         91183 Abenberg
  *         Germany
  * === Preamble ===
@@ -91,16 +91,31 @@ public class HttpClient {
         private DownloadProgress    downloadProgress;
         private CountingInputStream inputStream;
         private RequestMethod       method;
-        private OutputStream        target         = new ByteArrayOutputStream();
+        private OutputStream        target          = new ByteArrayOutputStream();
         private int                 postDataLength;
         private InputStream         postDataStream;
-        private int                 readTimeout    = 0;
+        private int                 readTimeout     = 0;
         public URL                  redirectTo;
-        private long                resumePosition = -1;
+        private long                resumePosition  = -1;
         private DownloadProgress    uploadProgress;
         private String              url;
         public long                 redirectsStarted;
-        private volatile boolean    executed       = false;
+        private volatile boolean    executed        = false;
+        private int                 redirectCounter = 0;
+
+        public int getRedirectCounter() {
+            return this.redirectCounter;
+        }
+
+        private int maxRedirects = 5;
+
+        public int getMaxRedirects() {
+            return this.maxRedirects;
+        }
+
+        public void setMaxRedirects(final int maxRedirects) {
+            this.maxRedirects = maxRedirects;
+        }
 
         /**
          * @param delete
@@ -370,6 +385,11 @@ public class HttpClient {
 
         public RequestContext setPostDataStream(final InputStream postDataStream) {
             this.postDataStream = postDataStream;
+            if (postDataStream instanceof ByteArrayInputStream) {
+                if (this.postDataLength <= 0) {
+                    this.postDataLength = ((ByteArrayInputStream) postDataStream).available();
+                }
+            }
             return this;
         }
 
@@ -647,6 +667,7 @@ public class HttpClient {
                 if (context.redirectsStarted <= 0) {
                     context.redirectsStarted = Time.systemIndependentCurrentJVMTimeMillis();
                 }
+                context.redirectCounter++;
                 return true;
             } else {
                 throw new InvalidRedirectException(context);
@@ -680,7 +701,7 @@ public class HttpClient {
         return this.readTimeout;
     }
 
-    protected long getRedirectTimeout(final URL url) {
+    protected long getRedirectTimeout(final RequestContext context) {
         return (60 * 60 * 1000l);
     }
 
@@ -738,7 +759,7 @@ public class HttpClient {
      * instead
      */
     public RequestContext post(final String url, final byte[] data) throws IOException, InterruptedException {
-        return this.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(data)));
+        return this.execute(new RequestContext().setMethod(RequestMethod.POST).setUrl(url).setPostDataStream(new ByteArrayInputStream(data)).setPostDataLength(data.length));
     }
 
     /**
@@ -988,8 +1009,11 @@ public class HttpClient {
             context.unlinkInterrupt();
         }
         if (followRedirect) {
-            if (context.redirectsStarted > 0 && Time.systemIndependentCurrentJVMTimeMillis() >= context.redirectsStarted) {
+            if (context.redirectsStarted > 0 && Time.systemIndependentCurrentJVMTimeMillis() - context.redirectsStarted >= this.getRedirectTimeout(context)) {
                 throw new RedirectTimeoutException(context, null);
+            }
+            if (context.redirectCounter > context.getMaxRedirects()) {
+                throw new TooManyRedirectsException(context, null);
             }
             // the redirect will not be a POST again
             context.setPostDataStream(null);

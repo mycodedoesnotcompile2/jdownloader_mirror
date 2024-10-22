@@ -67,10 +67,12 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         return tld;
     }
 
-    protected Icon hosterIcon = null;
+    protected Icon    hosterIcon                 = null;
+    protected boolean hosterIconUpdatePermission = false;
 
-    protected void setHosterIcon(Icon icon) {
+    protected void setHosterIcon(Icon icon, boolean updatePermission) {
         this.hosterIcon = icon;
+        this.hosterIconUpdatePermission = icon != null && (hosterIconUpdatePermission || updatePermission);
     }
 
     protected Icon getHosterIcon() {
@@ -95,7 +97,8 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
 
     protected Icon getFavIcon(final FavIconRequestor requestor, int width, int height, final boolean updatePermission) {
         Icon ret = getHosterIcon();
-        if (ret == null) {
+        final boolean hasHosterIcon = ret != null;
+        if (ret == null || (!hosterIconUpdatePermission && updatePermission)) {
             final String hardcodedFavIcon = HARDCODEDFAVICONS.get(domain);
             if (hardcodedFavIcon != null) {
                 ret = NewTheme.I().getIcon(hardcodedFavIcon, -1);
@@ -112,8 +115,8 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         if (ret != null) {
             ret = IconIO.getScaledInstance(ret, width, height);
         }
-        if (updatePermission) {
-            setHosterIcon(ret);
+        if (updatePermission || !hasHosterIcon) {
+            setHosterIcon(ret, updatePermission);
         }
         return ret;
     }
@@ -130,7 +133,7 @@ public class DomainInfo implements FavIconRequestor, Comparable<DomainInfo>, Ico
         if (icon == null) {
             icon = getFavIcon(true);
         }
-        setHosterIcon(icon);
+        setHosterIcon(icon, true);
         return icon;
     }
 

@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49909 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 49998 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class VidhideCom extends XFileSharingProBasic {
     }
 
     public static final String getDefaultAnnotationPatternPartVidhideCom() {
-        return "/(?:d/[A-Za-z0-9]+|(?:embed-|e/|f/|v/)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?)";
+        return "/(?:d/[A-Za-z0-9]+|(?:embed-|e/|f/|file/|v/)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?)";
     }
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -141,6 +141,7 @@ public class VidhideCom extends XFileSharingProBasic {
 
     private final String PATTERN_SPECIAL   = "(?i)^https?://[^/]+/f/([a-z0-9]{12}).*";
     private final String PATTERN_SPECIAL_2 = "(?i)^https?://[^/]+/v/([a-z0-9]{12}).*";
+    private final String PATTERN_SPECIAL_3 = "(?i)^https?://[^/]+/file/([a-z0-9]{12}).*";
 
     @Override
     protected URL_TYPE getURLType(final String url) {
@@ -150,6 +151,8 @@ public class VidhideCom extends XFileSharingProBasic {
         if (url.matches(PATTERN_SPECIAL)) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
         } else if (url.matches(PATTERN_SPECIAL_2)) {
+            return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
+        } else if (url.matches(PATTERN_SPECIAL_3)) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
         } else {
             return super.getURLType(url);
@@ -161,10 +164,13 @@ public class VidhideCom extends XFileSharingProBasic {
         if (link != null && link.getPluginPatternMatcher() != null) {
             final Regex special1 = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL);
             final Regex special2;
+            final Regex special3;
             if (special1.patternFind()) {
                 return special1.getMatch(0);
             } else if ((special2 = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL_2)).patternFind()) {
                 return special2.getMatch(0);
+            } else if ((special3 = new Regex(link.getPluginPatternMatcher(), PATTERN_SPECIAL_3)).patternFind()) {
+                return special3.getMatch(0);
             }
         }
         return super.getFUIDFromURL(link);

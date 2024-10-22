@@ -53,7 +53,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 49858 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 49995 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -187,9 +187,8 @@ public class BunkrAlbum extends PluginForDecrypt {
                     }
                 }
             }
-            final String[] htmls = br.getRegex("<div class=\"grid-images_box rounded-lg[^\"]+\"(.*?)</div>\\s+</div>").getColumn(0);
+            final String[] htmls = br.getRegex("<div class=\"grid-images_box(?: rounded-lg)?[^\"]+\"(.*?)</div>\\s+</div>").getColumn(0);
             for (final String html : htmls) {
-                String filename = new Regex(html, "<div\\s*class\\s*=\\s*\"[^\"]*details\"\\s*>\\s*<p\\s*class[^>]*>\\s*(.*?)\\s*<").getMatch(0);
                 String directurl = new Regex(html, "href\\s*=\\s*\"(https?://[^\"]+)\"").getMatch(0);
                 if (directurl == null) {
                     final String[] urls = HTMLParser.getHttpLinks(html, br.getURL());
@@ -201,7 +200,14 @@ public class BunkrAlbum extends PluginForDecrypt {
                     }
                 }
                 if (directurl != null) {
-                    final String filesizeStr = new Regex(html, "<p class=\"mt-0 dark:text-white-900\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                    String filesizeStr = new Regex(html, "<p class=\"mt-0 dark:text-white-900\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                    if (filesizeStr == null) {
+                        filesizeStr = new Regex(html, "<p class=\"[^\"]*theSize[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                    }
+                    String filename = new Regex(html, "<div\\s*class\\s*=\\s*\"[^\"]*details\"\\s*>\\s*<p\\s*class[^>]*>\\s*(.*?)\\s*<").getMatch(0);
+                    if (filename == null) {
+                        filename = new Regex(html, "<p class=\"[^\"]*theName[^\"]*\"[^>]*>\\s*([^<]*?)\\s*</p>").getMatch(0);
+                    }
                     add(ret, dups, directurl, filename, null, filesizeStr, true);
                 } else {
                     logger.warning("html Parser broken? HTML: " + html);

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -605,37 +605,17 @@ public class ReflectionUtils {
 
     public static <T extends Object> Collection<T> wrapCollection(final Object object, final boolean unmodifiableCollection, final Class<T> elementType) {
         final Class<?> raw = object != null ? getRaw(object.getClass()) : null;
-        final Collection<T> ret;
         if (raw == null) {
             return null;
         } else if (Collection.class.isAssignableFrom(raw)) {
-            ret = (Collection<T>) object;
-        } else if (raw.isArray()) {
-            ret = new AbstractList<T>() {
-                @Override
-                public T get(int index) {
-                    return (T) Array.get(object, index);
-                }
-
-                @Override
-                public T set(int index, T element) {
-                    final T ret = (T) Array.get(object, index);
-                    Array.set(object, index, element);
-                    return ret;
-                }
-
-                @Override
-                public int size() {
-                    return Array.getLength(object);
-                }
-            };
+            final Collection<T> ret = (Collection<T>) object;
+            if (unmodifiableCollection) {
+                return Collections.unmodifiableCollection(ret);
+            } else {
+                return ret;
+            }
         } else {
-            return null;
-        }
-        if (unmodifiableCollection) {
-            return Collections.unmodifiableCollection(ret);
-        } else {
-            return ret;
+            return wrapList(object, unmodifiableCollection, elementType);
         }
     }
 
@@ -652,7 +632,8 @@ public class ReflectionUtils {
             ret = (List<T>) object;
         } else if (Collection.class.isAssignableFrom(raw)) {
             // slow because of Collection.toArray
-            ret = (List<T>) Arrays.asList(((Collection<Object>) object).toArray(new Object[0]));
+            // unmodifiableList = true because we work on copy (Collection.toArray)
+            return wrapList(((Collection<Object>) object).toArray(new Object[0]), true, elementType);
         } else if (raw.isArray()) {
             ret = new AbstractList<T>() {
                 @Override

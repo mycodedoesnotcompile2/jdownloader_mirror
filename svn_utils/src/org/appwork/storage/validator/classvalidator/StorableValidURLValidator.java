@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -43,6 +43,7 @@ import org.appwork.storage.StorableValidator;
 import org.appwork.storage.StorableValidator.ValidatorException;
 import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.JSPath;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.reflection.CompiledType;
@@ -68,26 +69,35 @@ public class StorableValidURLValidator extends StorableAbstractValidator {
      */
     @Override
     public List<? extends ValidatorException> validate(StorableValidator validator, Object root, Object value, FlexiJSonNode node, JSPath path, CompiledType type, String parameter, FailLevel level, String message) {
-        ArrayList<InvalidHTTPURLException> ret = new ArrayList<InvalidHTTPURLException>();
-        if (!(value instanceof String)) {
-            ret.add(new InvalidHTTPURLException(validator, null, path, node, type, StringUtils.isEmpty(message) ? ("The value must be a valid URL string") : message, level));
+        final ArrayList<InvalidHTTPURLException> ret = new ArrayList<InvalidHTTPURLException>();
+        final List<String> urls = new ArrayList<String>();
+        if (value instanceof String) {
+            urls.add((String) value);
+        } else {
+            final List<Object> list = ReflectionUtils.wrapList(value, false, Object.class);
+            if (list != null) {
+                for (Object entry : list) {
+                    if (entry instanceof String) {
+                        urls.add((String) entry);
+                    }
+                }
+            }
         }
-        try {
-            URL url = new URL((String) value);
-            URLHelper.verifyURL(url);
-        } catch (MalformedURLException e) {
-            ret.add(new InvalidHTTPURLException(validator, e, path, node, type, StringUtils.isEmpty(message) ? ("Malformed URL") : message, level));
+        if (urls.size() == 0) {
+            ret.add(new InvalidHTTPURLException(validator, null, path, node, type, StringUtils.isEmpty(message) ? getDocsDescription(parameter, this) : message, level));
+        }
+        for (final String url : urls) {
+            try {
+                URLHelper.verifyURL(new URL(url));
+            } catch (MalformedURLException e) {
+                ret.add(new InvalidHTTPURLException(validator, e, path, node, type, StringUtils.isEmpty(message) ? ("Malformed URL") : message, level));
+            }
         }
         return ret;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.storage.StorableAbstractValidator#getDocsDescription(java.lang.String, java.lang.Object)
-     */
     @Override
     public String getDocsDescription(String parameter, Object anno) {
-        return "The value must be a valid URL string";
+        return "The value must be a single or multiple valid URL (String,Array,Set,List,Collection)";
     }
 }

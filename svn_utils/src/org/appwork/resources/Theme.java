@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -343,18 +343,19 @@ public class Theme implements MinTimeWeakReferenceCleanup {
 
     protected String buildPath(final String pre, final String path, final String ext, boolean fallback) {
         final Theme delegate = getDelegate();
+        String ret = null;
         if (delegate != null) {
-            String ret = delegate.buildPath(pre, path, ext, fallback);
-            if (ret != null) {
-                return ret;
-            }
+            ret = delegate.buildPath(pre, path, ext, fallback);
         }
-        final StringBuilder sb = new StringBuilder();
-        sb.append(fallback ? defaultPath : this.path);
-        sb.append(pre);
-        sb.append(path);
-        sb.append(ext);
-        return sb.toString();
+        if (ret == null) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append(fallback ? defaultPath : this.path);
+            sb.append(pre);
+            sb.append(path);
+            sb.append(ext);
+            ret = sb.toString();
+        }
+        return ret;
     }
 
     public Icon getScaledInstance(final Icon imageIcon, final int size) {

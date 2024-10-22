@@ -273,7 +273,7 @@ public class ZipIOWriter {
         boolean zipEntryAdded = false;
         ZipIOException exception = null;
         final ZipEntry zipAdd = new ZipEntry(fullPath);
-        if (StringUtils.isEmpty(fullPath)) {
+        if (StringUtils.isEmpty(new File(fullPath).getName())) {
             throw new EmptyPathZipIOException(zipAdd);
         }
         if (!dupes.add(fullPath)) {

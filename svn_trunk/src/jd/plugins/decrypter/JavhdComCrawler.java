@@ -34,7 +34,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48344 $", interfaceVersion = 3, names = { "javhd.com" }, urls = { "https?://(?:www\\.)?javhd\\.com/[a-z]{2}/(id/\\d+(/[a-z0-9\\-]+)?|studio/room/\\d+/video/\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = { "javhd.com" }, urls = { "https?://(?:www\\.)?javhd\\.com/[a-z]{2}/(id/\\d+(/[a-z0-9\\-]+)?|studio/room/[^/]+/video/[\\w\\-]+)" })
 public class JavhdComCrawler extends PluginForDecrypt {
     public JavhdComCrawler(PluginWrapper wrapper) {
         super(wrapper);

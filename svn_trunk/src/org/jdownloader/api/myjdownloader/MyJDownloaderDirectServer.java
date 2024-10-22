@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import jd.controlling.reconnect.pluginsinc.upnp.cling.StreamClientImpl;
+import jd.controlling.reconnect.pluginsinc.upnp.cling.UPNPDeviceScanner;
 
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
@@ -267,9 +268,7 @@ public class MyJDownloaderDirectServer extends Thread implements ShutdownVetoLis
         } catch (final Throwable e) {
             logger.log(e);
         } finally {
-            if (upnpService != null) {
-                upnpService.shutdown();
-            }
+            UPNPDeviceScanner.shutdown(upnpService);
         }
     }
 
@@ -386,9 +385,7 @@ public class MyJDownloaderDirectServer extends Thread implements ShutdownVetoLis
                         }).get(5, TimeUnit.SECONDS);
                     } catch (final Exception e) {
                     } finally {
-                        if (upnpService != null) {
-                            upnpService.shutdown();
-                        }
+                        UPNPDeviceScanner.shutdown(upnpService);
                     }
                 }
             }

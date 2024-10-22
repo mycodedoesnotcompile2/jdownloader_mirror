@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Locale;
 
 import org.appwork.storage.config.annotations.LabelInterface;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.DomainInfo;
 
 public class MultiHostHost {
     /** How long shall we block this host if a limit gets reached? Until the next day/hour? */
@@ -107,6 +109,15 @@ public class MultiHostHost {
         }
     }
 
+    private DomainInfo domainInfo = null;
+
+    public DomainInfo getDomainInfo() {
+        if (domainInfo == null || !StringUtils.equalsIgnoreCase(getDomain(), domainInfo.getDomain())) {
+            domainInfo = DomainInfo.getInstance(getDomain());
+        }
+        return domainInfo;
+    }
+
     public void addDomains(final List<String> domains) {
         if (domains == null) {
             throw new IllegalArgumentException();
@@ -117,7 +128,7 @@ public class MultiHostHost {
     }
 
     /** Sets domain. Overwrites previously set values! */
-    protected void setDomain(final String domain) {
+    public void setDomain(final String domain) {
         if (domain == null) {
             throw new IllegalArgumentException();
         }

@@ -542,14 +542,13 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         final long validUntil = ai.getValidUntil();
         if (validUntil <= 0) {
             return null;
+        }
+        final Date date = new Date(validUntil);
+        final long left = validUntil - System.currentTimeMillis();
+        if (left <= 0) {
+            return formatDate(date) + " (" + _GUI.T.PremiumAccountTableModel_getStringValue_status_expired() + ")";
         } else {
-            final Date date = new Date(validUntil);
-            final long left = validUntil - System.currentTimeMillis();
-            if (left <= 0) {
-                return formatDate(date) + " (" + _GUI.T.PremiumAccountTableModel_getStringValue_status_expired() + ")";
-            } else {
-                return formatDate(date) + " (" + TimeFormatter.formatMilliSeconds(left, TimeFormatter.HIDE_SECONDS) + ")";
-            }
+            return formatDate(date) + " (" + TimeFormatter.formatMilliSeconds(left, TimeFormatter.HIDE_SECONDS) + ")";
         }
     }
 
@@ -610,10 +609,14 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             list.addMouseListener(new MouseAdapter() {
                 public void mouseClicked(MouseEvent e) {
                     final DomainInfo domainInfo = (DomainInfo) list.getSelectedValue();
-                    if (domainInfo != null) {
-                        final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(domainInfo.getTld());
-                        AccountController.openAfflink(lazyHostPlugin, null, "MultiHostPanel");
+                    if (domainInfo == null) {
+                        return;
                     }
+                    final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(domainInfo.getTld());
+                    if (!lazyHostPlugin.isPremium()) {
+                        return;
+                    }
+                    AccountController.openAfflink(lazyHostPlugin, null, "MultiHostPanel");
                 };
             });
             add(list, "gapleft " + gapleft + ",gapright " + gapleft + ",pushx,growx,spanx" + getRightGap());
@@ -626,18 +629,19 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
 
     protected void initPluginSettings(Plugin plugin) {
         final Class<? extends PluginConfigInterface> inf = plugin.getConfigInterface();
-        if (inf != null) {
-            final PluginConfigInterface config;
-            if (plugin instanceof PluginForHost) {
-                config = PluginJsonConfig.get(((PluginForHost) plugin).getLazyP(), inf);
-            } else if (plugin instanceof PluginForDecrypt) {
-                config = PluginJsonConfig.get(((PluginForDecrypt) plugin).getLazyC(), inf);
-            } else {
-                config = null;
-            }
-            if (config != null) {
-                build(config);
-            }
+        if (inf == null) {
+            return;
+        }
+        final PluginConfigInterface config;
+        if (plugin instanceof PluginForHost) {
+            config = PluginJsonConfig.get(((PluginForHost) plugin).getLazyP(), inf);
+        } else if (plugin instanceof PluginForDecrypt) {
+            config = PluginJsonConfig.get(((PluginForDecrypt) plugin).getLazyC(), inf);
+        } else {
+            config = null;
+        }
+        if (config != null) {
+            build(config);
         }
     }
 

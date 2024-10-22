@@ -99,6 +99,10 @@ public enum JavaVersion implements JavaVersionInterface {
         }
     }
 
+    public static JavaVersionInterface getVersion() {
+        return JVMVersion.getVersion();
+    }
+
     public boolean isMinimum(final JavaVersionInterface v) {
         if (getBase() == UNKNOWN) {
             return false;

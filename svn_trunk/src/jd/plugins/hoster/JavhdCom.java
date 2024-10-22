@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48643 $", interfaceVersion = 3, names = { "javhd.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = { "javhd.com" }, urls = { "" })
 public class JavhdCom extends PluginForHost {
     public JavhdCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,7 +77,10 @@ public class JavhdCom extends PluginForHost {
     private String getFID(final DownloadLink link) {
         String fid = new Regex(link.getPluginPatternMatcher(), TYPE_OLD).getMatch(0);
         if (fid == null) {
-            fid = new Regex(link.getPluginPatternMatcher(), "(\\d+)$").getMatch(0);
+            fid = new Regex(link.getPluginPatternMatcher(), "/video/(\\d+)").getMatch(0);
+            if (fid == null) {
+                fid = new Regex(link.getPluginPatternMatcher(), "(\\d+)$").getMatch(0);
+            }
         }
         return fid;
     }
@@ -93,11 +96,11 @@ public class JavhdCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        final String videoid = this.getFID(link);
-        if (!link.isNameSet()) {
-            link.setName(videoid + default_extension);
-        }
         dllink = null;
+        final String videoidFromURL = this.getFID(link);
+        if (!link.isNameSet() && videoidFromURL != null) {
+            link.setName(videoidFromURL + default_extension);
+        }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
@@ -106,17 +109,24 @@ public class JavhdCom extends PluginForHost {
         }
         final String videoID1 = new Regex(br.getURL(), "(?i)/video/(\\d+)").getMatch(0);
         final String videoID2 = new Regex(br.getURL(), "(?i)/id/(\\d+)").getMatch(0);
-        if (videoID1 == null && videoID2 == null) {
+        /* Link may redirect to other ID */
+        String videoID3 = br.getRegex("player_api\\?videoId=(\\d+)").getMatch(0);
+        if (videoID3 == null) {
+            videoID3 = new Regex(br.getURL(), "(\\d+)$").getMatch(0);
+        }
+        if (videoID1 == null && videoID2 == null && videoID3 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (videoID1 != null) {
+        if (videoID3 != null) {
+            br.getPage("/en/player_api?videoId=" + videoID3 + "&is_trailer=1");
+        } else if (videoID1 != null) {
             br.getPage("/en/player_api?videoId=" + videoID1 + "&is_trailer=1");
         } else {
             br.getPage("/en/player/" + videoID2 + "?is_trailer=1");
         }
         final Map<String, Object> jsonroot = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String id = jsonroot.get("id").toString();
-        if (!StringUtils.equals(id, videoID1) && !StringUtils.equals(id, videoID2)) {
+        if (!StringUtils.equals(id, videoID1) && !StringUtils.equals(id, videoID2) && !StringUtils.equals(id, videoID3)) {
             /* Offline = all values will be null */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

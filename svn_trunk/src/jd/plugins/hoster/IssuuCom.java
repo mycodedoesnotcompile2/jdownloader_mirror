@@ -43,11 +43,11 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48373 $", interfaceVersion = 3, names = { "issuu.com" }, urls = { "https?://issuu\\.com/([a-z0-9\\-_\\.]+)/docs/([a-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = { "issuu.com" }, urls = { "https?://issuu\\.com/([a-z0-9\\-_\\.]+)/docs/([a-z0-9\\-_]+)" })
 public class IssuuCom extends PluginForHost {
     public IssuuCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://issuu.com/signup");
+        this.enablePremium("https://" + getHost() + "/signup");
     }
 
     @Override
@@ -57,7 +57,7 @@ public class IssuuCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://issuu.com/acceptterms";
+        return "https://" + getHost() + "/acceptterms";
     }
 
     private String             documentID           = null;
@@ -88,7 +88,7 @@ public class IssuuCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (filename == null) {
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             link.setFinalFileName(entries.get("title") + ".pdf");
         }
         return AvailableStatus.TRUE;
@@ -101,36 +101,29 @@ public class IssuuCom extends PluginForHost {
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies userCookies = account.loadUserCookies();
-                if (userCookies == null) {
-                    showCookieLoginInfo();
-                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
-                }
-                this.br.setCookies(this.getHost(), userCookies);
-                if (!force) {
-                    /* Do not check cookies */
-                    return;
-                }
-                br.setFollowRedirects(true);
-                br.getPage("https://" + this.getHost() + "/home/publisher");
-                if (isLoggedIn(br)) {
-                    logger.info("User cookie login successful");
-                    return;
+            br.setCookiesExclusive(true);
+            final Cookies userCookies = account.loadUserCookies();
+            if (userCookies == null) {
+                showCookieLoginInfo();
+                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
+            }
+            br.setCookies(this.getHost(), userCookies);
+            if (!force) {
+                /* Do not check cookies */
+                return;
+            }
+            br.setFollowRedirects(true);
+            br.getPage("https://" + this.getHost() + "/home/publisher");
+            if (isLoggedIn(br)) {
+                logger.info("User cookie login successful");
+                return;
+            } else {
+                logger.info("User cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    logger.info("User cookie login failed");
-                    if (account.hasEverBeenValid()) {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                    } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
             }
         }
     }
@@ -145,8 +138,8 @@ public class IssuuCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        AccountInfo ai = new AccountInfo();
         login(account, true);
+        final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
         return ai;
@@ -161,14 +154,18 @@ public class IssuuCom extends PluginForHost {
         requestFileInformation(link);
         documentID = this.br.getRegex("\"thumbnail_url\":\"https?://image\\.issuu\\.com/([^<>\"/]*?)/").getMatch(0);
         if (documentID == null) {
-            this.br.getPage(link.getPluginPatternMatcher());
-            if (br.containsHTML(">We can\\'t find what you\\'re looking for") || this.br.getHttpConnection().getResponseCode() == 404) {
+            br.getPage(link.getPluginPatternMatcher());
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML(">\\s*We can\\'t find what you\\'re looking for")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             documentID = PluginJSonUtils.getJsonValue(br, "documentId");
         }
         if (documentID == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* Assume that this document is not downloadable. */
+            /* Example: https://issuu.com/popcornposters/docs/cars_fccb2b4de13534 */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Document is not downloadable");
         }
         if (account != null) {
             login(account, true);
@@ -195,8 +192,7 @@ public class IssuuCom extends PluginForHost {
         final String message = (String) entries.get("message");
         if ("Download limit reached".equals(message) || (code != null && code.intValue() == 15)) {
             throw new AccountUnavailableException("Downloadlimit reached", 5 * 60 * 1000);
-        }
-        if ("Document access denied".equals(message)) {
+        } else if ("Document access denied".equals(message)) {
             /* TODO: Find errorcode for this */
             throw new PluginException(LinkStatus.ERROR_FATAL, "This document is not downloadable");
         }
@@ -217,7 +213,7 @@ public class IssuuCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -226,7 +222,7 @@ public class IssuuCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

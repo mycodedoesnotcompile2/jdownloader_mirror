@@ -907,7 +907,7 @@ public class AccountController implements AccountControllerListener, AccountProp
         } catch (MalformedURLException e) {
             ret = null;
         }
-        if (StringUtils.isEmpty(ret) && lazyHostPlugin != null) {
+        if (StringUtils.isEmpty(ret) && lazyHostPlugin != null && lazyHostPlugin.getHost().contains(".")) {
             ret = "https://" + lazyHostPlugin.getHost();
         }
         if (StringUtils.isEmpty(ret)) {

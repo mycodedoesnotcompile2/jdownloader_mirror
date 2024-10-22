@@ -238,7 +238,7 @@ public abstract class PluginForHost extends Plugin {
         return lazyP;
     }
 
-    public void runCaptchaDDosProtection(String id) throws InterruptedException {
+    public void runCaptchaDDosProtection(final String id) throws InterruptedException {
         final TimeTracker tracker = ChallengeResponseController.getInstance().getTracker(id);
         final Thread thread = Thread.currentThread();
         final TrackerJob trackerJob;
@@ -628,6 +628,7 @@ public abstract class PluginForHost extends Plugin {
         return handleCaptchaChallenge(link, c);
     }
 
+    /** Returns browser instance for image captchas. */
     protected Browser getCaptchaBrowser(Browser br) {
         final Browser ret = br.cloneBrowser();
         ret.getHeaders().put("Accept", "image/png,image/*;q=0.8,*/*;q=0.5");
@@ -3114,10 +3115,6 @@ public abstract class PluginForHost extends Plugin {
             return;
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            final Icon error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
-            final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
-            final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
-            final Icon icon_filler = NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
             /* Determine default visibility states for some columns */
             boolean shouldShowCustomTextColumn = false;
             boolean shouldShowLinkLimitColumns = false;
@@ -3149,6 +3146,10 @@ public abstract class PluginForHost extends Plugin {
             final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
             final boolean shouldShowTrafficCaculationColumn_final = shouldShowTrafficCaculationColumn;
             final boolean shouldShowUnavailableForColumn_final = shouldShowUnavailableForColumn;
+            final Icon error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
+            final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
+            final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
+            final Icon icon_filler = NewTheme.I().getIcon(IconKey.ICON_BEER, 16);
             final ExtTableModel<MultiHostHost> tableModel = new ExtTableModel<MultiHostHost>("MultiHostHostTable_" + acc.getHoster()) {
                 @Override
                 protected void initColumns() {
@@ -3218,26 +3219,41 @@ public abstract class PluginForHost extends Plugin {
                             }
                         }
                     });
-                    addColumn(new ExtTextColumn<MultiHostHost>("Custom status Text") {
-                        @Override
-                        public String getStringValue(MultiHostHost mhost) {
-                            if (mhost.getStatusText() != null) {
-                                return mhost.getStatusText();
-                            } else {
-                                return "---";
+                    if (shouldShowCustomTextColumn_final) {
+                        addColumn(new ExtTextColumn<MultiHostHost>("Custom status Text") {
+                            @Override
+                            public String getStringValue(MultiHostHost mhost) {
+                                if (mhost.getStatusText() != null) {
+                                    return mhost.getStatusText();
+                                } else {
+                                    return "---";
+                                }
                             }
-                        }
 
-                        @Override
-                        protected String getTooltipText(MultiHostHost mhost) {
-                            return "Status text according to multihosters' API.";
-                        }
+                            @Override
+                            protected String getTooltipText(MultiHostHost mhost) {
+                                return "Status text according to multihosters' API.";
+                            }
+                        });
+                    }
+                    if (shouldShowUnavailableForColumn_final) {
+                        addColumn(new ExtLongColumn<MultiHostHost>("Unavailable for") {
+                            @Override
+                            protected long getLong(MultiHostHost mhost) {
+                                return mhost.getUnavailableTimeMillis();
+                            }
 
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return shouldShowCustomTextColumn_final;
-                        }
-                    });
+                            @Override
+                            protected String getLongFormatted(MultiHostHost mhost) {
+                                final long unavailableFor = getLong(mhost);
+                                if (unavailableFor > 0) {
+                                    return TimeFormatter.formatMilliSeconds(unavailableFor, 0);
+                                } else {
+                                    return "---";
+                                }
+                            }
+                        });
+                    }
                     if (shouldShowLinkLimitColumns_final) {
                         addColumn(new ExtLongColumn<MultiHostHost>("Links left/max") {
                             @Override
@@ -3365,27 +3381,6 @@ public abstract class PluginForHost extends Plugin {
                             }
                         });
                     }
-                    addColumn(new ExtLongColumn<MultiHostHost>("Unavailable for") {
-                        @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getUnavailableTimeMillis();
-                        }
-
-                        @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
-                            final long unavailableFor = getLong(mhost);
-                            if (unavailableFor > 0) {
-                                return TimeFormatter.formatMilliSeconds(unavailableFor, 0);
-                            } else {
-                                return "---";
-                            }
-                        }
-
-                        @Override
-                        public boolean isDefaultVisible() {
-                            return shouldShowUnavailableForColumn_final;
-                        }
-                    });
                     this._fireTableStructureChanged(hosts, false);
                 }
             };

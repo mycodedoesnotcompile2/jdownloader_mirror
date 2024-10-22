@@ -176,8 +176,11 @@ org.am
 // http://www.dns.ao/REGISTR.DOC
 ao
 ed.ao
+edu.ao
+gov.ao
 gv.ao
 og.ao
+org.ao
 co.ao
 pb.ao
 it.ao
@@ -5604,6 +5607,7 @@ sr
 // Submitted by registry <technical@nic.ss>
 ss
 biz.ss
+co.ss
 com.ss
 edu.ss
 gov.ss
@@ -6713,7 +6717,7 @@ org.zw
 
 // newGTLDs
 
-// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2024-09-26T15:17:07Z
+// List of new gTLDs imported from https://www.icann.org/resources/registries/gtlds/v2/gtlds.json on 2024-10-17T15:16:23Z
 // This list is auto-generated, don't edit it manually.
 // aaa : American Automobile Association, Inc.
 // https://www.iana.org/domains/root/db/aaa.html
@@ -8391,11 +8395,11 @@ haus
 // https://www.iana.org/domains/root/db/hbo.html
 hbo
 
-// hdfc : HOUSING DEVELOPMENT FINANCE CORPORATION LIMITED
+// hdfc : HDFC BANK LIMITED
 // https://www.iana.org/domains/root/db/hdfc.html
 hdfc
 
-// hdfcbank : HDFC Bank Limited
+// hdfcbank : HDFC BANK LIMITED
 // https://www.iana.org/domains/root/db/hdfcbank.html
 hdfcbank
 
@@ -9319,7 +9323,7 @@ nissay
 // https://www.iana.org/domains/root/db/nokia.html
 nokia
 
-// norton : NortonLifeLock Inc.
+// norton : Gen Digital Inc.
 // https://www.iana.org/domains/root/db/norton.html
 norton
 
@@ -12375,6 +12379,7 @@ clickrising.net
 // Submitted by Aleksander Hristov <noc@cloudns.net> & Boyan Peychev <boyan@cloudns.net>
 cloudns.asia
 cloudns.be
+cloud-ip.biz
 cloudns.biz
 cloudns.cc
 cloudns.ch
@@ -12389,6 +12394,7 @@ dns-cloud.net
 dns-dynamic.net
 cloudns.nz
 cloudns.org
+ip-dynamic.org
 cloudns.ph
 cloudns.pro
 cloudns.pw
@@ -12567,10 +12573,6 @@ dattoweb.com
 mydatto.com
 dattolocal.net
 mydatto.net
-
-// DDNS5 : https://ddns5.com
-// Submitted by Cameron Elliott <cameron@cameronelliott.com>
-ddns5.com
 
 // ddnss.de : https://www.ddnss.de/
 // Submitted by Robert Niedziela <webmaster@ddnss.de>
@@ -13901,8 +13903,8 @@ ir.md
 // Submitted by William Harrison <webmaster@is-a-good.dev>
 is-a-good.dev
 
-// is-a.dev : https://www.is-a.dev
-// Submitted by William Harrison <admin@m.is-a.dev>
+// is-a.dev : https://is-a.dev
+// Submitted by William Harrison <psl@is-a.dev>
 is-a.dev
 
 // IServ GmbH : https://iserv.de
@@ -15362,8 +15364,7 @@ tabitorder.co.il
 taifun-dns.de
 
 // Tailscale Inc. : https://www.tailscale.com
-// Submitted by David Anderson <danderson@tailscale.com>
-beta.tailscale.net
+// Submitted by David Anderson <infra+public-suffix-list@tailscale.com>
 ts.net
 *.c.ts.net
 
@@ -15425,7 +15426,6 @@ pages.torproject.net
 
 // TownNews.com : http://www.townnews.com
 // Submitted by Dustin Ward <dward@townnews.com>
-bloxcms.com
 townnews-staging.com
 
 // TrafficPlex GmbH : https://www.trafficplex.de/

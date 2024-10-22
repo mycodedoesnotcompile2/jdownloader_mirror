@@ -21,9 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.TimeFormatter;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -39,12 +36,16 @@ import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.AdultempireComCrawler;
 
-@HostPlugin(revision = "$Revision: 48760 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.TimeFormatter;
+
+@HostPlugin(revision = "$Revision: 49997 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { AdultempireComCrawler.class })
 public class AdultempireCom extends PluginForHost {
     public AdultempireCom(PluginWrapper wrapper) {
@@ -56,6 +57,7 @@ public class AdultempireCom extends PluginForHost {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
+        prepareBrowser(this, br);
         br.setFollowRedirects(true);
         return br;
     }
@@ -67,6 +69,10 @@ public class AdultempireCom extends PluginForHost {
 
     private static List<String[]> getPluginDomains() {
         return AdultempireComCrawler.getPluginDomains();
+    }
+
+    public static void prepareBrowser(Plugin plugin, final Browser br) {
+        br.setCookie(plugin.getHost(), "ageConfirmed", "true");
     }
 
     public static String[] getAnnotationNames() {
@@ -143,6 +149,10 @@ public class AdultempireCom extends PluginForHost {
             }
             logger.info("Performing full login");
             br.getPage("https://www." + this.getHost() + "/unlimited/account/signin");
+            if (br.containsHTML(">\\s*Confirm You Are Over 18\\s*<") || br.containsHTML("id\\s*=\\s*\"ageConfirmationButton\"")) {
+                br.getPage("/Account/AgeConfirmation?ageConfirmationClicked=true&_=" + System.currentTimeMillis());
+                br.getPage("/unlimited/account/signin");
+            }
             final Browser brc = br.cloneBrowser();
             final Form loginform = new Form();
             loginform.setAction("/Subscription/SubscriptionSignIn");

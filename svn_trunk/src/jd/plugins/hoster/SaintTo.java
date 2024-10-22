@@ -21,7 +21,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49887 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = {}, urls = {})
 public class SaintTo extends PluginForHost {
     public SaintTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,13 +66,14 @@ public class SaintTo extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
-    private static final Pattern TYPE_EMBED      = Pattern.compile("/embed/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TYPE_API_DIRECT = Pattern.compile("/api/download\\.php\\?file=([a-zA-Z0-9_/\\+\\=\\-%]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_EMBED        = Pattern.compile("/embed/([A-Za-z0-9\\-_]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_API_DIRECT   = Pattern.compile("/api/download\\.php\\?file=([a-zA-Z0-9_/\\+\\=\\-%]+)/?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_API_INDIRECT = Pattern.compile("/d/([a-zA-Z0-9_/\\+\\=\\-%]+)", Pattern.CASE_INSENSITIVE);
 
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_EMBED.pattern() + "|" + TYPE_API_DIRECT.pattern() + ")");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_EMBED.pattern() + "|" + TYPE_API_DIRECT.pattern() + "|" + TYPE_API_INDIRECT.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -110,6 +111,7 @@ public class SaintTo extends PluginForHost {
     }
 
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
+        final Regex type_api_indirect;
         if (new Regex(link.getPluginPatternMatcher(), TYPE_EMBED).patternFind()) {
             if (!link.isNameSet()) {
                 /* Fallback */
@@ -126,6 +128,17 @@ public class SaintTo extends PluginForHost {
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
+            }
+        } else if ((type_api_indirect = new Regex(link.getPluginPatternMatcher(), TYPE_API_INDIRECT)).patternFind()) {
+            /* TYPE_API_INDIRECT */
+            final String filenameBase64 = type_api_indirect.getMatch(0);
+            final String filename = Encoding.Base64Decode(filenameBase64);
+            link.setName(filename);
+            br.getPage(link.getPluginPatternMatcher());
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (br.containsHTML("File not found in the database")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         } else {
             /* TYPE_API_DIRECT */
@@ -147,7 +160,7 @@ public class SaintTo extends PluginForHost {
 
     private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
-        final String dllink;
+        String dllink = null;
         final boolean storeDirecturl;
         if (new Regex(link.getPluginPatternMatcher(), TYPE_API_DIRECT).patternFind()) {
             dllink = link.getPluginPatternMatcher();
@@ -157,9 +170,13 @@ public class SaintTo extends PluginForHost {
             dllink = storedDirecturl;
             storeDirecturl = false;
         } else {
-            /* TYPE_EMBED */
+            /* TYPE_EMBED and TYPE_API_INDIRECT */
             requestFileInformation(link, true);
             dllink = br.getRegex("<source src\\s*=\\s*\"(https?://[^\"]+)\" type=\"video/mp4\">").getMatch(0);
+            if (StringUtils.isEmpty(dllink)) {
+                // TYPE_API_INDIRECT
+                dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download Video").getMatch(0);
+            }
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl");
             }

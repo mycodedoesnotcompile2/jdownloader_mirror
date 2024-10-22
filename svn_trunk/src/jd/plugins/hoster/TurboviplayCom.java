@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2013  JD-Team support@jdownloader.org
+//Copyright (C) 2017  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -15,31 +15,38 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49699 $", interfaceVersion = 3, names = {}, urls = {})
-public class TurboviplayCom extends XFileSharingProBasic {
-    public TurboviplayCom(final PluginWrapper wrapper) {
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50002 $", interfaceVersion = 3, names = {}, urls = {})
+public class TurboviplayCom extends PluginForHost {
+    public TurboviplayCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(super.getPurchasePremiumURL());
     }
 
-    /**
-     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
-     * mods: See overridden functions<br />
-     * limit-info:<br />
-     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
-     * other:<br />
-     */
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
+    }
+
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
@@ -57,51 +64,100 @@ public class TurboviplayCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/t/([a-z0-9]{10,})");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
-    public boolean isResumeable(final DownloadLink link, final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
-            /* Free Account */
-            return true;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
-            /* Premium account */
-            return true;
+    public String getAGBLink() {
+        return "https://" + getHost() + "/support/FAQ";
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String linkid = getFID(link);
+        if (linkid != null) {
+            return this.getHost() + "://" + linkid;
         } else {
-            /* Free(anonymous) and unknown account type */
-            return true;
+            return super.getLinkID(link);
+        }
+    }
+
+    private String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        final String extDefault = ".mp4";
+        if (!link.isNameSet()) {
+            link.setName(this.getFID(link) + extDefault);
+        }
+        this.setBrowserExclusive();
+        br.getPage(link.getPluginPatternMatcher());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*Video Unavailable|>\\s*This video has been remove")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            link.setFinalFileName(this.correctOrApplyFileNameExtension(title, extDefault, null));
+        }
+        return AvailableStatus.TRUE;
+    }
+
+    @Override
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        final String hlsMaster = br.getRegex("data-hash=\"(https?://[^\"]+\\.m3u8)").getMatch(0);
+        if (StringUtils.isEmpty(hlsMaster)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Browser brc = br.cloneBrowser();
+        // site checks referer, so we load m3u8 in own browser
+        brc.getPage(hlsMaster);
+        final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(brc));
+        if (hlsbest == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String url_hls = hlsbest.getDownloadurl();
+        dl = new HLSDownloader(link, this.br, url_hls);
+        dl.startDownload();
+    }
+
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (!this.looksLikeDownloadableContent(con)) {
+            br.followConnection(true);
+            if (con.getResponseCode() == 403) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+            } else if (con.getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Video broken?");
+            }
         }
     }
 
     @Override
-    public int getMaxChunks(final Account account) {
-        final AccountType type = account != null ? account.getType() : null;
-        if (AccountType.FREE.equals(type)) {
-            /* Free Account */
-            return 0;
-        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
-            /* Premium account */
-            return 0;
-        } else {
-            /* Free(anonymous) and unknown account type */
-            return 0;
-        }
+    public int getMaxSimultanFreeDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 
     @Override
-    public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return -1;
+    public void reset() {
     }
 
     @Override
-    public int getMaxSimultaneousFreeAccountDownloads() {
-        return -1;
+    public void resetPluginGlobals() {
     }
 
     @Override
-    public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+    public void resetDownloadlink(DownloadLink link) {
     }
 }
