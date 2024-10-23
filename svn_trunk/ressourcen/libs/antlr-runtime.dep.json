@@ -58,7 +58,7 @@
   "renames":null,
   "requiredBy":[{
     "artefact":"org.tmatesoft.sqljet/sqljet",
-    "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\sqljet.dep.json",
+    "file":"JDownloader\\ressourcen\\libs\\sqljet.dep.json",
     "provider":"maven",
     "version":"3.4"
   }],

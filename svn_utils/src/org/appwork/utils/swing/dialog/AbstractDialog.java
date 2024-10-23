@@ -5,9 +5,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -50,8 +50,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.awt.event.HierarchyEvent;
 import java.awt.event.HierarchyListener;
 import java.awt.event.MouseAdapter;
@@ -300,7 +298,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
     protected JButton            cancelButton;
     private final String         cancelButtonText;
     private boolean              countdownPausable      = true;
-    protected FocusListener      defaultButtonFocusListener;
     protected DefaultButtonPanel defaultButtons;
     protected InternDialog<T>    dialog;
     private DialogDimensor       dimensor;
@@ -413,28 +410,11 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
             // Dispose dialog on close
             this.getDialog().setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             this.getDialog().addWindowListener(this);
-            this.defaultButtonFocusListener = new FocusListener() {
-                @Override
-                public void focusGained(final FocusEvent e) {
-                    final JRootPane root = SwingUtilities.getRootPane(e.getComponent());
-                    if (root != null && e.getComponent() instanceof JButton) {
-                        root.setDefaultButton((JButton) e.getComponent());
-                    }
-                }
-
-                @Override
-                public void focusLost(final FocusEvent e) {
-                    final JRootPane root = SwingUtilities.getRootPane(e.getComponent());
-                    if (root != null) {
-                        root.setDefaultButton(null);
-                    }
-                }
-            };
             // create panel for the dialog's buttons
             this.okButton = this.createOkButton();
             this.cancelButton = new JButton(this.cancelButtonText);
-            this.cancelButton.addFocusListener(this.defaultButtonFocusListener);
-            this.okButton.addFocusListener(this.defaultButtonFocusListener);
+            // this.cancelButton.addFocusListener(this.defaultButtonFocusListener);
+            // this.okButton.addFocusListener(this.defaultButtonFocusListener);
             this.defaultButtons = this.getDefaultButtonPanel();
             /*
              * We set the focus on the ok button. if no ok button is shown, we set the focus on cancel button
@@ -1009,11 +989,6 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      */
     protected DefaultButtonPanel getDefaultButtonPanel() {
         final DefaultButtonPanel ret = this.createBottomButtonPanel();
-        if (this.actions != null) {
-            for (final AbstractAction a : this.actions) {
-                ret.addAction(a).addFocusListener(this.defaultButtonFocusListener);
-            }
-        }
         return ret;
     }
 

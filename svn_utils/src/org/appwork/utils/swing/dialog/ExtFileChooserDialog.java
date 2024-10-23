@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -79,6 +79,7 @@ import javax.swing.plaf.basic.BasicFileChooserUI;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.resources.AWUTheme;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.sunwrapper.sun.awt.shell.ShellFolderWrapper;
@@ -92,6 +93,8 @@ import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
+
+import sun.swing.FilePane;
 
 public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     /**
@@ -325,14 +328,19 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
             getLogger().fine("Answer: Button<OK:" + okButton.getText() + ">");
             if (fcUI != null) {
                 fcUI.getApproveSelectionAction().actionPerformed(e);
-            } else {
+            }
+            if (fc.getReturnValueExt() != JFileChooser.ERROR_OPTION) {
                 setReturnmask(true);
+                dispose();
+            } else {
+                getLogger().fine("No approval - Filechooser internal state change only");
+                // the filechooser got not approved, but change an internal state - like switched the current folder..
             }
         } else if (e.getSource() == cancelButton) {
             getLogger().fine("Answer: Button<CANCEL:" + cancelButton.getText() + ">");
             setReturnmask(false);
+            dispose();
         }
-        dispose();
     }
 
     @Override
@@ -723,10 +731,12 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                     ExtFileChooserDialog.super.setReturnmask(false);
                     //
                     ExtFileChooserDialog.this.dispose();
-                } else if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand())) {
+                } else if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand()) || FilePane.ACTION_APPROVE_SELECTION.equals(e.getActionCommand())) {
                     getLogger().fine("Answer: FC APPROVE>");
                     ExtFileChooserDialog.this.setReturnmask(true);
                     ExtFileChooserDialog.this.dispose();
+                } else {
+                    LogV3.info("Unknown Action Command: " + e.getActionCommand());
                 }
             }
         });
@@ -851,6 +861,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
         final JComponent fcContainer = getFileChooserContainer(fc);
         if (fcContainer != null) {
             if (fileSelectionMode.getId() == FileChooserSelectionMode.DIRECTORIES_ONLY.getId() && fcContainer.getComponentCount() >= 4) {
+                // TODO:please doc... what does this hide?
                 ((JComponent) fcContainer.getComponent(3)).getComponent(1).setVisible(false);
                 ((JComponent) fcContainer.getComponent(3)).getComponent(2).setVisible(false);
             }

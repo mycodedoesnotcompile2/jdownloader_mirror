@@ -6968,4 +6968,37 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en" }, values = { "Do not set - use global/auto settings" })
     String do_not_change_use_global_settings();
+
+    @Default(lngs = { "en" }, values = { "Domain" })
+    String multihost_detailed_host_info_table_column_domain();
+
+    @Default(lngs = { "en", "de" }, values = { "Detailed status", "Detailierter Status" })
+    String multihost_detailed_host_info_table_column_detailed_status_text();
+
+    @Default(lngs = { "en", "de" }, values = { "Status text according to multihosters' API.", "Status text laut Multihoster Schnittstelle" })
+    String multihost_detailed_host_info_table_column_detailed_status_text_tooltip();
+
+    @Default(lngs = { "en", "de" }, values = { "Not available for", "Nicht verfügbar für" })
+    String multihost_detailed_host_info_table_column_unavailable_for();
+
+    @Default(lngs = { "en", "de" }, values = { "Links left/max", "Links übrig/max" })
+    String multihost_detailed_host_info_table_column_links_left_max();
+
+    @Default(lngs = { "en", "de" }, values = { "Links left", "Links übrig" })
+    String multihost_detailed_host_info_table_column_links_left();
+
+    @Default(lngs = { "en", "de" }, values = { "Links max", "Links max" })
+    String multihost_detailed_host_info_table_column_links_max();
+
+    @Default(lngs = { "en", "de" }, values = { "Traffic left/max", "Traffic übrig/max" })
+    String multihost_detailed_host_info_table_column_traffic_left_max();
+
+    @Default(lngs = { "en", "de" }, values = { "Traffic left", "Traffic übrig" })
+    String multihost_detailed_host_info_table_column_traffic_left();
+
+    @Default(lngs = { "en", "de" }, values = { "Traffic max", "Traffic max" })
+    String multihost_detailed_host_info_table_column_traffic_max();
+
+    @Default(lngs = { "en", "de" }, values = { "Traffic calculation", "Traffic Berechnungsfaktor" })
+    String multihost_detailed_host_info_table_column_traffic_calculation_factor_percent();
 }

@@ -133,9 +133,7 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
         if (br.containsHTML("Brak ważnego dostępu Premium")) {
             /* Not a premium account or expired premium account */
             ai.setExpired(true);
-            ai.setStatus(getPhrase("EXPIRED"));
             account.setType(AccountType.FREE);
-            return ai;
         } else if (br.containsHTML(">\\s*Brak ważnego dostępu Premium\\s*<")) {
             throw new AccountInvalidException(getPhrase("UNSUPPORTED_ACCOUNT_TYPE_NOT_PREMIUM"));
         }
@@ -295,7 +293,6 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
                                                   put("UNKNOWN", "Unknown");
                                                   put("UNLIMITED", "Unlimited");
                                                   put("FREE", "free");
-                                                  put("EXPIRED", "Account expired/free");
                                               }
                                           };
     private Map<String, String> phrasesPL = new HashMap<String, String>() {
@@ -315,7 +312,6 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
                                                   put("UNKNOWN", "Nieznany");
                                                   put("UNLIMITED", "Bez limitu");
                                                   put("FREE", "darmowe");
-                                                  put("EXPIRED", "Konto wygasło/darmowe");
                                               }
                                           };
 

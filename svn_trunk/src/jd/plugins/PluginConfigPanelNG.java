@@ -7,8 +7,6 @@ import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -32,11 +30,27 @@ import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JSeparator;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
@@ -94,25 +108,6 @@ import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -187,7 +182,7 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
 
     @Override
     public Header addHeader(String name, Icon icon) {
-        Header header;
+        final Header header;
         add(header = new Header(name, icon), "gapleft " + getLeftGap() + ",spanx,newline,growx,pushx" + getRightGap());
         header.setLayout(new MigLayout("ins 0", "[35!,align left]5[]10[grow,fill]"));
         return header;
@@ -197,27 +192,28 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         if (!description.toLowerCase().startsWith("<html>")) {
             description = "<html>" + description.replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>") + "</html>";
         }
-        JLabel txt = new JLabel();
+        final JLabel txt = new JLabel();
         SwingUtils.setOpaque(txt, false);
         // txt.setEnabled(false);
         txt.setText(description);
         add(txt, "gaptop 0,spanx,growx,pushx,gapleft 0,gapbottom 5,wmin 10");
-        add(new JSeparator(), "gapleft 0,spanx,growx,pushx,gapbottom 5");
+        addSeperator();
         return txt;
+    }
+
+    public JSeparator addSeperator() {
+        if (getComponent(getComponentCount() - 1) instanceof JSeparator) {
+            return null;
+        }
+        final JSeparator sep;
+        add(sep = new JSeparator(), "gapleft " + getLeftGap() + ",spanx,growx,pushx,gapbottom 5" + getRightGap());
+        return sep;
     }
 
     @Override
     public JLabel addDescription(String description) {
-        if (!description.toLowerCase().startsWith("<html>")) {
-            description = "<html>" + description.replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>") + "</html>";
-        }
-        JLabel txt = new JLabel();
-        SwingUtils.setOpaque(txt, false);
-        txt.setEnabled(false);
-        // txt.setEnabled(false);
-        txt.setText(description);
-        add(txt, "gaptop 0,spanx,growx,pushx,gapleft " + getLeftGap() + ",gapbottom 5,wmin 10" + getRightGap());
-        add(new JSeparator(), "gapleft " + getLeftGap() + ",spanx,growx,pushx,gapbottom 5");
+        final JLabel txt = addDescriptionPlain(description);
+        addSeperator();
         return txt;
     }
 
@@ -228,7 +224,7 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         if (!description.toLowerCase().startsWith("<html>")) {
             description = "<html>" + description.replace("\r\n", "<br>").replace("\r", "<br>").replace("\n", "<br>") + "</html>";
         }
-        JLabel txt = new JLabel();
+        final JLabel txt = new JLabel();
         SwingUtils.setOpaque(txt, false);
         txt.setEnabled(false);
         // txt.setEnabled(false);
@@ -520,14 +516,14 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                                     addPair(_GUI.T.lit_premium_points(), null, new Label(ai.getPremiumPoints() + ""));
                                 }
                             }
-                            if (acc.isMultiHost() && acc.getPlugin().getLazyP().hasFeature(LazyPlugin.FEATURE.MULTIHOST)) {
-                                initMultiHosterInfo(acc);
-                            }
                             final Class<? extends AccountConfigInterface> accountConfig = plgh.getAccountConfigInterface(acc);
                             if (accountConfig != null) {
                                 initAccountConfig(plgh, acc, accountConfig);
                             }
                             plgh.extendAccountSettingsPanel(acc, this);
+                            if (acc.isMultiHost() && acc.getPlugin().getLazyP().hasFeature(LazyPlugin.FEATURE.MULTIHOST)) {
+                                initMultiHosterInfo(plgh, acc);
+                            }
                         }
                     }
                 }
@@ -576,51 +572,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
         }
     }
 
-    protected void initMultiHosterInfo(final Account acc) {
-        String gapbefore = gapleft;
+    protected void initMultiHosterInfo(final PluginForHost plugin, final Account acc) {
+        String gapbefore = getLeftGap();
         String gapbeforeright = getRightGap();
         try {
             gapleft = "5";
             gapright = ",gapright 5";
-            // JLabel label = new JLabel(_GUI.T.AccountTooltip_AccountTooltip_supported_hosters());
-            // add(label, "gapleft " + gapleft + ",gapright 3,pushx,growx,spanx" + getRightGap());
             addHeader(_GUI.T.multihoster_account_settings_header(), new AbstractIcon(IconKey.ICON_LIST, 18));
-            addDescription(_GUI.T.multihoster_account_settings_description());
-            List<DomainInfo> dis = getDomainInfos(acc);
-            final JList list = new JList(dis.toArray(new DomainInfo[] {}));
-            list.setLayoutOrientation(JList.VERTICAL_WRAP);
-            final ListCellRenderer org = list.getCellRenderer();
-            list.setCellRenderer(new ListCellRenderer() {
-                public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                    DomainInfo di = (DomainInfo) value;
-                    JLabel ret = (JLabel) org.getListCellRendererComponent(list, "", index, false, cellHasFocus);
-                    ret.setText(di.getTld());
-                    ret.setIcon(di.getFavIcon());
-                    ret.setOpaque(false);
-                    ret.setBackground(null);
-                    return ret;
-                }
-            });
-            list.setVisibleRowCount(dis.size() / 5);
-            // list.setFixedCellHeight(22);
-            // list.setFixedCellWidth(22);
-            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            list.setOpaque(false);
-            list.addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
-                    final DomainInfo domainInfo = (DomainInfo) list.getSelectedValue();
-                    if (domainInfo == null) {
-                        return;
-                    }
-                    final LazyHostPlugin lazyHostPlugin = HostPluginController.getInstance().get(domainInfo.getTld());
-                    if (!lazyHostPlugin.isPremium()) {
-                        return;
-                    }
-                    AccountController.openAfflink(lazyHostPlugin, null, "MultiHostPanel");
-                };
-            });
-            add(list, "gapleft " + gapleft + ",gapright " + gapleft + ",pushx,growx,spanx" + getRightGap());
-            add(Box.createGlue(), "gapbottom 5,pushx,growx,spanx" + getRightGap());
+            addDescriptionPlain(_GUI.T.multihoster_account_settings_description());
+            plugin.extendMultiHostAccountSettingsPanel(acc, this);
         } finally {
             gapleft = gapbefore;
             gapright = gapbeforeright;
@@ -660,12 +620,11 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
     }
 
     protected Map<String, Boolean> newMapInstance(KeyHandler m) throws InstantiationException, IllegalAccessException {
-        Map<String, Boolean> value;
         Class raw = ReflectionUtils.getRaw(m.getTypeRef().getType());
         if (raw.isInterface()) {
             raw = HashMap.class;
         }
-        value = (Map<String, Boolean>) raw.newInstance();
+        final Map<String, Boolean> value = (Map<String, Boolean>) raw.newInstance();
         value.clear();
         return value;
     }
@@ -890,15 +849,6 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             LoggerFactory.getDefaultLogger().log(e);
         }
         return null;
-    }
-
-    public JSeparator addSeperator() {
-        if (getComponent(getComponentCount() - 1) instanceof JSeparator) {
-            return null;
-        }
-        JSeparator sep;
-        add(sep = new JSeparator(), "gapleft " + getLeftGap() + ",spanx,growx,pushx,gapbottom 5" + getRightGap());
-        return sep;
     }
 
     private final CopyOnWriteArraySet<ConfigInterface> interfaces = new CopyOnWriteArraySet<ConfigInterface>();

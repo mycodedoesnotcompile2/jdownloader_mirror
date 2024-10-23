@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50016 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -56,6 +56,16 @@ public abstract class RapidtrafficCore extends PluginForHost {
     public RapidtrafficCore(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(getBaseURL() + "konto");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setConnectTimeout(60 * 1000);
+        br.setReadTimeout(60 * 1000);
+        br.setCustomCharset("utf-8");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -70,19 +80,10 @@ public abstract class RapidtrafficCore extends PluginForHost {
     public void init() {
     }
 
-    private Browser prepBR(final Browser br) {
-        br.setConnectTimeout(60 * 1000);
-        br.setReadTimeout(60 * 1000);
-        br.setCustomCharset("utf-8");
-        br.setFollowRedirects(true);
-        return br;
-    }
-
     private void login(final Account account, final boolean validateCookies) throws PluginException, IOException {
         synchronized (account) {
             try {
                 br.setCookiesExclusive(true);
-                prepBR(br);
                 final Cookies cookies = account.loadCookies("");
                 if (cookies != null) {
                     br.setCookies(cookies);
@@ -297,7 +298,6 @@ public abstract class RapidtrafficCore extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     if (con.getCompleteContentLength() > 0) {

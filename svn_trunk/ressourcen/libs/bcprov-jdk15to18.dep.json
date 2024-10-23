@@ -65,20 +65,20 @@
   "renames":{"jdk15to18":"jdk15on"},
   "requiredBy":[
     {
-      "artefact":"org.bouncycastle/bcpkix-jdk15to18",
-      "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\bcpkix-jdk15to18.dep.json",
+      "artefact":"org.bouncycastle/bcutil-jdk15to18",
+      "file":"JDownloader\\ressourcen\\libs\\bcutil-jdk15to18.dep.json",
       "provider":"maven",
       "version":"1.77"
     },
     {
       "artefact":"org.bouncycastle/bctls-jdk15to18",
-      "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\bctls-jdk15to18.dep.json",
+      "file":"JDownloader\\ressourcen\\libs\\bctls-jdk15to18.dep.json",
       "provider":"maven",
       "version":"1.77"
     },
     {
-      "artefact":"org.bouncycastle/bcutil-jdk15to18",
-      "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\bcutil-jdk15to18.dep.json",
+      "artefact":"org.bouncycastle/bcpkix-jdk15to18",
+      "file":"JDownloader\\ressourcen\\libs\\bcpkix-jdk15to18.dep.json",
       "provider":"maven",
       "version":"1.77"
     }

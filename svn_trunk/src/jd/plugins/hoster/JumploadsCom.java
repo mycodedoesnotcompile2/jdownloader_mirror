@@ -24,7 +24,6 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -43,13 +42,21 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
-public class JumploadsCom extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = {}, urls = {})
+public class JumploadsCom extends PluginForHost {
     public JumploadsCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.jumploads.com/premium");
+        this.enablePremium("https://www." + getHost() + "/premium");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -59,7 +66,7 @@ public class JumploadsCom extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.jumploads.com/help/privacy";
+        return "https://www." + getHost() + "/help/privacy";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -93,9 +100,19 @@ public class JumploadsCom extends antiDDoSForHost {
     }
 
     private String getFallbackFilename(final DownloadLink link) {
-        final String filenameURL = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-        if (filenameURL != null) {
-            return Encoding.htmlDecode(filenameURL);
+        final String urlSlug = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
+        if (urlSlug != null) {
+            final String[] segments = urlSlug.split("-");
+            String weakFilename;
+            if (segments.length >= 2) {
+                /* Assume that file extension is last part of slug. */
+                weakFilename = urlSlug.substring(0, urlSlug.lastIndexOf("-")) + "." + segments[segments.length - 1];
+            } else {
+                weakFilename = urlSlug;
+            }
+            weakFilename = weakFilename.replace("-", " ").trim();
+            link.setName(weakFilename);
+            return Encoding.htmlDecode(urlSlug);
         } else {
             /* Last chance fallback */
             return this.getFID(link);
@@ -104,15 +121,12 @@ public class JumploadsCom extends antiDDoSForHost {
 
     /* Connection stuff */
     /* 2019-08-13: Account untested, set FREE limits */
-    private final boolean FREE_RESUME                  = false;
-    private final int     FREE_MAXCHUNKS               = 1;
-    private final int     FREE_MAXDOWNLOADS            = 20;
-    private final boolean ACCOUNT_FREE_RESUME          = false;
-    private final int     ACCOUNT_FREE_MAXCHUNKS       = 1;
-    private final int     ACCOUNT_FREE_MAXDOWNLOADS    = 20;
-    private final boolean ACCOUNT_PREMIUM_RESUME       = true;
-    private final int     ACCOUNT_PREMIUM_MAXCHUNKS    = -5;
-    private final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
+    private final boolean FREE_RESUME               = false;
+    private final int     FREE_MAXCHUNKS            = 1;
+    private final boolean ACCOUNT_FREE_RESUME       = false;
+    private final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
+    private final boolean ACCOUNT_PREMIUM_RESUME    = true;
+    private final int     ACCOUNT_PREMIUM_MAXCHUNKS = -5;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -141,22 +155,16 @@ public class JumploadsCom extends antiDDoSForHost {
             link.setName(this.getFallbackFilename(link));
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        getPage(link.getPluginPatternMatcher());
+        br.getPage(link.getPluginPatternMatcher());
         if (this.br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("(?i)>\\s*?The file you are trying to download is no longer available|>\\s*?This could be due to the following reasons>\\s*?The file has been removed because of")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Regex finfo = br.getRegex("class=\"downloadfileinfo[^\"]*?\">([^<>\"]+) \\((\\d+(?:\\.\\d{1,2})? [A-Za-z]{1,5})\\)</div>");
-        String filename = finfo.getMatch(0);
-        final String filename_url = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/[^/]+/(.+)$").getMatch(0);
-        if (filename == null) {
-            filename = filename_url;
-        }
-        String filesize = finfo.getMatch(1);
+        String filename = br.getRegex("filename[^\"]+\"[^>]*>([^<]+)</h2>").getMatch(0);
+        String filesize = br.getRegex("filesize[^\"]*\"[^>]*>([^<]+)</h2>").getMatch(0);
         if (filename != null) {
-            link.setName(Encoding.htmlDecode(filename.trim()));
+            link.setName(Encoding.htmlDecode(filename).trim());
         }
         if (!StringUtils.isEmpty(filesize)) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
@@ -193,12 +201,16 @@ public class JumploadsCom extends antiDDoSForHost {
         boolean directDownloadEnabled = true;
         if (dllink == null) {
             /* 2019-08-13: E.g. premium download or free account download of self-uploaded files */
-            dllink = br.getRedirectLocation();
-            if (dllink == null) {
-                /* 2020-04-07: E.g. premium account with disabled direct download */
-                dllink = br.getRegex("(/download\\.php[^<>\"\\']+)").getMatch(0);
-                directDownloadEnabled = false;
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), resumable, maxchunks);
+            if (this.looksLikeDownloadableContent(dl.getConnection())) {
+                /* Direct link */
+                dl.startDownload();
+                return;
             }
+            directDownloadEnabled = false;
+            br.followConnection(true);
+            /* 2020-04-07: E.g. premium account with disabled direct download */
+            dllink = br.getRegex("(/download\\.php[^<>\"\\']+)").getMatch(0);
             if (dllink == null) {
                 br.getHeaders().put("x-requested-with", "XMLHttpRequest");
                 if (isPasswordProtectedContent(br)) {
@@ -220,7 +232,7 @@ public class JumploadsCom extends antiDDoSForHost {
                     if (passCode == null) {
                         passCode = getUserInput("Password?", link);
                     }
-                    postPage("/api/0/verifyfiledownloadpasscode?useraccess=&access_token=" + "br68ufmo5ej45ue1q10w68781069v666l2oh1j2ijt94", "owner=" + owner + "&file=" + fileID_internal + "&pass_code=" + Encoding.urlEncode(passCode));
+                    br.postPage("/api/0/verifyfiledownloadpasscode?useraccess=&access_token=" + "br68ufmo5ej45ue1q10w68781069v666l2oh1j2ijt94", "owner=" + owner + "&file=" + fileID_internal + "&pass_code=" + Encoding.urlEncode(passCode));
                     final String result = PluginJSonUtils.getJson(br, "result");
                     if (StringUtils.isEmpty(result) || result.equalsIgnoreCase("failed")) {
                         link.setDownloadPassword(null);
@@ -232,7 +244,7 @@ public class JumploadsCom extends antiDDoSForHost {
                 String free_server = br.getRegex("freeaccess=\"([^\"]+)\"").getMatch(0);
                 final String freetoken = br.getRegex("freetoken=\"([^\"]+)\"").getMatch(0);
                 if (freetoken == null || free_server == null) {
-                    handleErrors();
+                    handleErrors(br);
                     if (account != null && account.getType() == AccountType.PREMIUM) {
                         errorEnableDirectDownload();
                     }
@@ -251,7 +263,7 @@ public class JumploadsCom extends antiDDoSForHost {
                             /* Wait only for first attempt */
                             waitTime(link, timeBefore);
                         }
-                        postPage("/captcha/php/check_captcha.php", "captcha_code=" + Encoding.urlEncode(code) + "&token=" + freetoken);
+                        br.postPage("/captcha/php/check_captcha.php", "captcha_code=" + Encoding.urlEncode(code) + "&token=" + freetoken);
                         if (br.toString().trim().equalsIgnoreCase("not_match")) {
                             continue;
                         }
@@ -269,7 +281,7 @@ public class JumploadsCom extends antiDDoSForHost {
                 dllink = free_server + "download.php?accesstoken=" + freetoken;
             }
             if (dllink == null) {
-                handleErrors();
+                handleErrors(br);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -284,7 +296,7 @@ public class JumploadsCom extends antiDDoSForHost {
             } else if (dl.getConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
             } else {
-                handleErrors();
+                handleErrors(br);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -339,9 +351,14 @@ public class JumploadsCom extends antiDDoSForHost {
         }
     }
 
-    private void handleErrors() throws PluginException {
-        if (br.containsHTML(">\\s*?This link only for premium user")) {
+    private void handleErrors(final Browser br) throws PluginException {
+        final String premiumonlyText = br.getRegex(">\\s*(As a Free user you can download file up[^<]+)</h2>").getMatch(0);
+        if (premiumonlyText != null) {
+            throw new AccountRequiredException(premiumonlyText);
+        } else if (br.containsHTML(">\\s*?This link only for premium user")) {
             /* 2019-08-13: It seems like basically all files are premiumonly(?) */
+            throw new AccountRequiredException();
+        } else if (br.containsHTML(">\\s*This link is for premium only user")) {
             throw new AccountRequiredException();
         } else if (isPrivateContent(br)) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Private content, only downloadable by owner");
@@ -354,7 +371,6 @@ public class JumploadsCom extends antiDDoSForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (!looksLikeDownloadableContent(con)) {
                     throw new IOException();
@@ -377,18 +393,17 @@ public class JumploadsCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             try {
-                br.setFollowRedirects(true);
                 br.setCookiesExclusive(true);
                 final Cookies cookies = account.loadCookies("");
                 if (cookies != null) {
                     this.br.setCookies(this.getHost(), cookies);
-                    getPage("https://www." + this.getHost() + "/me");
+                    br.getPage("https://www." + this.getHost() + "/me");
                     /* 2020-04-07: Seems like their cookies are only valid for a very short time */
                     if (this.isLoggedin(br)) {
                         logger.info("Successfully loggedin via cookies");
@@ -399,14 +414,14 @@ public class JumploadsCom extends antiDDoSForHost {
                     }
                 }
                 logger.info("Performing full login");
-                getPage("https://www." + this.getHost() + "/user/login");
+                br.getPage("https://www." + this.getHost() + "/user/login");
                 final String js = br.getRegex("(/java/mycloud\\.js\\?\\d+)").getMatch(0);
                 if (js == null) {
                     logger.warning("Failed to find js");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final Browser brc = br.cloneBrowser();
-                getPage(brc, js);
+                brc.getPage(js);
                 final String access_token = brc.getRegex("app\\s*:\\s*'([a-z0-9]+)'").getMatch(0);
                 if (access_token == null) {
                     logger.warning("Failed to find access_token");
@@ -437,7 +452,7 @@ public class JumploadsCom extends antiDDoSForHost {
                 query.append("keep", "1", false);
                 query.append("email", account.getUser(), true);
                 query.append("password", account.getPass(), true);
-                postPage("/api/0/signmein?useraccess=&access_token=" + access_token, query.toString());
+                br.postPage("/api/0/signmein?useraccess=&access_token=" + access_token, query.toString());
                 final String result = PluginJSonUtils.getJson(br, "result");
                 String logincookie = PluginJSonUtils.getJson(br, "doz");
                 if ("error".equalsIgnoreCase(result) || StringUtils.isEmpty(logincookie)) {
@@ -452,7 +467,7 @@ public class JumploadsCom extends antiDDoSForHost {
                 /* 2020-04-07: This string is already urlencoded but needs to be urlencoded twice! */
                 logincookie = Encoding.urlEncode(logincookie);
                 br.setCookie(br.getURL(), "userdata", logincookie);
-                getPage("/me");
+                br.getPage("/me");
                 /* Double-check */
                 if (!this.isLoggedin(br)) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -480,7 +495,7 @@ public class JumploadsCom extends antiDDoSForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
         if (br.getURL() == null || !br.getURL().contains("/me")) {
-            getPage("/me");
+            br.getPage("/me");
         }
         final Regex trafficRegex = br.getRegex("(?i)>\\s*Used Bandwidth\\s*</div>\\s*?<div class =\\s*?\"usedspace_percentage\"[^>]*?>([^<>\"]+) / ([^<>\"]+)</div>");
         final String traffic_usedStr = trafficRegex.getMatch(0);
@@ -494,13 +509,11 @@ public class JumploadsCom extends antiDDoSForHost {
             /* Free & expired premium */
             account.setType(AccountType.FREE);
             /* free accounts can still have captcha */
-            account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
             account.setConcurrentUsePossible(false);
         } else {
             /* Premium */
             ai.setValidUntil(expireTimestamp, br);
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
             account.setConcurrentUsePossible(true);
         }
         long traffic_left = 0;
@@ -527,8 +540,6 @@ public class JumploadsCom extends antiDDoSForHost {
         /* 2019-08-13: Important: Do NOT login before availablecheck!! */
         requestFileInformation(link);
         login(account, false);
-        br.setFollowRedirects(false);
-        getPage(link.getPluginPatternMatcher());
         if (account.getType() == AccountType.FREE) {
             handleDownload(link, account, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS, "account_free_directlink");
         } else {
@@ -538,7 +549,7 @@ public class JumploadsCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

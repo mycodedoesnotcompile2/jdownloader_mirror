@@ -51,12 +51,20 @@
   "minJRE":"1.6",
   "provider":"maven",
   "renames":null,
-  "requiredBy":[{
-    "artefact":"org.tmatesoft.svnkit/svnkit",
-    "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\svnkit.dep.json",
-    "provider":"maven",
-    "version":"1.0.3"
-  }],
+  "requiredBy":[
+    {
+      "artefact":"org.tmatesoft.svnkit/svnkit",
+      "file":"JDownloader/ressourcen/libs/svnkit.dep.json",
+      "provider":"maven",
+      "version":"1.0.3"
+    },
+    {
+      "artefact":"org.tmatesoft.svnkit/svnkit",
+      "file":"JDownloader\\ressourcen\\libs\\svnkit.dep.json",
+      "provider":"maven",
+      "version":"1.0.3"
+    }
+  ],
   "version":"1.0.2",
   "autoRenameEnabled":true,
   "confirm":true

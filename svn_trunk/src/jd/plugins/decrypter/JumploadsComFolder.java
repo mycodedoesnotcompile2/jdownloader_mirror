@@ -33,10 +33,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48306 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsComFolder extends PluginForDecrypt {
     public JumploadsComFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     private static List<String[]> getPluginDomains() {
@@ -73,31 +80,22 @@ public class JumploadsComFolder extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String titleFromURL = Encoding.htmlDecode(new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1)).trim();
-        final String[] htmls = br.getRegex("<li>.*?</li>").getColumn(-1);
+        final String[] htmls = br.getRegex("<a [^>]+ data-isd[^>]+>.*?</div>\\s+</a>").getColumn(-1);
         if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final String singleHTML : htmls) {
-            String url = new Regex(singleHTML, "href=\"(https?://(?:www\\.)?[^/]+/(?:file|folder)/[^\"]+)").getMatch(0);
-            final String title = new Regex(singleHTML, "class=\"inlineblock\">([^<>\"]+)<div").getMatch(0);
-            String filesize = new Regex(singleHTML, "class=\"[^\"]+color777\">([^<>\"]+)</div>").getMatch(0);
-            if (url == null || filesize == null) {
+            String url = new Regex(singleHTML, "(?i)href=\"(https?://(?:www\\.)?[^/]+/(?:file|folder)/[^\"]+)").getMatch(0);
+            final String filename = new Regex(singleHTML, "file-name-\\d+\"[^>]*>([^<]+)</h2>").getMatch(0);
+            String filesize = new Regex(singleHTML, "<h2 class=\"s14 c777 font\"[^>]*>([^<]+)</h2>").getMatch(0);
+            if (url == null) {
                 /* Skip invalid objects */
                 continue;
             }
-            filesize = Encoding.htmlDecode(filesize);
-            if (filesize.equals("--")) {
-                /*
-                 * 2019-08-14: Workaround for website bug: folders are also listed as '/file/' URLs but folders have no filesize displayed
-                 * this is how we can recognize them!
-                 */
-                url = url.replace("/file/", "/folder/");
-                filesize = null;
-            }
             final DownloadLink dl = createDownloadlink(url);
             dl.setAvailable(true);
-            if (title != null) {
-                dl.setName(Encoding.htmlDecode(title));
+            if (filename != null) {
+                dl.setName(Encoding.htmlDecode(filename).trim());
             }
             if (filesize != null) {
                 dl.setDownloadSize(SizeFormatter.getSize(filesize));

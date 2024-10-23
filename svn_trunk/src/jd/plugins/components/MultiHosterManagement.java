@@ -3,10 +3,6 @@ package jd.plugins.components;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Time;
-
 import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
@@ -18,6 +14,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.Time;
 
 /**
  * Instead of duplication we create a class
@@ -122,7 +121,7 @@ public class MultiHosterManagement implements AccountControllerListener {
                 }
                 String errorReason = nue.getErrorReason();
                 Long lastUnavailable = nue.getErrorTimeout();
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && mhost != null) {
+                if (mhost != null) {
                     if (mhost.getStatusText() != null) {
                         errorReason = mhost.getStatusText();
                     }
@@ -204,7 +203,10 @@ public class MultiHosterManagement implements AccountControllerListener {
             if (event.getAccount().isValid()) {
                 final Map<Object, Map<String, UnavailableHost>> db = getDB();
                 synchronized (db) {
-                    db.remove(event.getAccount());
+                    final Account account = event.getAccount();
+                    db.remove(account);// remove account
+                    db.remove(null);// remove host wide block
+                    db.remove(account.getType()); // remove account type
                 }
             }
             break;

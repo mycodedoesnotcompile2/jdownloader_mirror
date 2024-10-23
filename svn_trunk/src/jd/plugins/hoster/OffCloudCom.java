@@ -23,24 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.TakeValueFromSubconfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -62,7 +44,25 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49945 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.TakeValueFromSubconfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 50019 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -930,7 +930,7 @@ public class OffCloudCom extends UseNet {
             case 15:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 *
+                 * 
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This cann be considered as a small workaround.
                  */
@@ -940,7 +940,7 @@ public class OffCloudCom extends UseNet {
             case 16:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 *
+                 * 
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This extra errorhandling can be considered as a small workaround.
                  */
@@ -1158,36 +1158,6 @@ public class OffCloudCom extends UseNet {
         if (ai == null) {
             return;
         }
-        // put("SETTING_CLEAR_DOWNLOAD_HISTORY", "Delete downloaded link entry from the offcloud 'Instant' & 'Cloud' download history after
-        // successful download?\r\n<html><b>Note that this does NOT delete the complete download history but only the entry of the
-        // SUCCESSFULLY downloaded link!</b></hml>");
-        // put("SETTING_CLEAR_DOWNLOAD_HISTORY_COMPLETE_INSTANT", "Delete complete 'Instant' download history each 60 minutes
-        // when?\r\n<html><p style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a
-        // lot of links, the first time can take over 10 minutes!</p></html>");
-        // put("SETTING_CLEAR_DOWNLOAD_HISTORY_COMPLETE_CLOUD", "Delete complete 'Cloud' download history each 60 minutes when?\r\n<html><p
-        // style=\"color:#F62817\">Note that this process happens during the account check.\r\nEspecially if you have a lot of links, the
-        // first time can take over 10 minutes!\r\nOnly failed- and completed entries will be deleted - entries which are still downloading
-        // will NOT be deleted!</p></html>");
-        // put("SETTING_CLEAR_ALLOWED_IP_ADDRESSES", "Activate 'Confirm IP' workaround?\r\nIn case you often get E-Mails from offcloud to
-        // confirm your current IP address, this setting may help.\r\nThis will always delete all of your allowed IPs except your current IP
-        // from your offcloud account.\r\n<html><p style=\"color:#F62817\">WARNING: Do NOT use this function in case you\r\n-Use multiple
-        // internet connections (IPs) at the same time\r\n-Share your offcloud account with friends\r\n-Use one or more proxies (or
-        // VPNs)</p></html>");
-        // put("ACCOUNT_USERNAME", "Username:");
-        // put("ACCOUNT_LINKSLEFT", "Instant download inputs left:");
-        // put("ACCOUNT_TYPE", "Account type:");
-        // put("ACCOUNT_SIMULTANDLS", "Max. simultaneous downloads:");
-        // put("ACCOUNT_CHUNKS", "Max number of chunks per file:");
-        // put("ACCOUNT_CHUNKS_VALUE", "Depends on the host, see: offcloud.com/api/sites/chunks");
-        // put("ACCOUNT_RESUME", "Resume of stopped downloads:");
-        // put("ACCOUNT_YES", "Yes");
-        // put("ACCOUNT_NO", "No");
-        // put("ACCOUNT_HISTORYDELETED", "Last deletion of the complete download history before:");
-        // put("ACCOUNT_HISTORYDELETED_COUNT", "Number of deleted entries:");
-        // put("DETAILS_TITEL", "Account information");
-        // put("LANG_GENERAL_UNLIMITED", "Unlimited");
-        // put("LANG_GENERAL_CLOSE", "Close");
-        // put("LANG_GENERAL_NEVER", "Never");
         final long last_deleted_complete_download_history_time_ago = getLast_deleted_complete_download_history_time_ago(account);
         final long last_deleted_links_count = account.getLongProperty("req_ids_size", -1);
         final String deleted_links_user_display;
@@ -1203,6 +1173,7 @@ public class OffCloudCom extends UseNet {
         if (linksleft.equals("-1")) {
             linksleft = _GUI.T.lit_unlimited();
         }
+        panel.addSeperator();
         panel.addStringPair(_GUI.T.plugins_offcloudcom_linksleft(), linksleft);
         panel.addStringPair(_GUI.T.plugins_offcloudcom_historydeleted(), lastDeletedCompleteDownloadlistUserDisplay);
         panel.addStringPair(_GUI.T.plugins_offcloudcom_ACCOUNT_HISTORYDELETED_COUNT(), deleted_links_user_display);

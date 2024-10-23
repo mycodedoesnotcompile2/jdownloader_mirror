@@ -4213,45 +4213,44 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     case SKIP_FILE:
                         switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
                         case SET_FILE_TO_SUCCESSFUL_MIRROR:
-                            if (fileInProgress == null) {
-                                throw new DeferredRunnableException(new ExceptionRunnable() {
-                                    @Override
-                                    public void run() throws Exception {
-                                        final PluginForHost plugin = controller.getProcessingPlugin();
-                                        if (plugin != null) {
-                                            final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
-                                            if (downloadable != null) {
-                                                switch (mirrorDetectionDecision) {
-                                                case AUTO:
-                                                    final HashInfo hashInfo = downloadable.getHashInfo();
-                                                    if (hashInfo != null) {
-                                                        final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
-                                                        if (hashResult != null && hashResult.match()) {
-                                                            downloadable.setHashResult(hashResult);
-                                                            downloadLink.setDownloadCurrent(fileOutput.length());
-                                                            throw new PluginException(LinkStatus.FINISHED);
-                                                        }
-                                                    }
-                                                case FILENAME_FILESIZE:
-                                                    final long fileSize = downloadable.getVerifiedFileSize();
-                                                    if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                            if (fileInProgress != null) {
+                                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                            }
+                            throw new DeferredRunnableException(new ExceptionRunnable() {
+                                @Override
+                                public void run() throws Exception {
+                                    final PluginForHost plugin = controller.getProcessingPlugin();
+                                    if (plugin != null) {
+                                        final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
+                                        if (downloadable != null) {
+                                            switch (mirrorDetectionDecision) {
+                                            case AUTO:
+                                                final HashInfo hashInfo = downloadable.getHashInfo();
+                                                if (hashInfo != null) {
+                                                    final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
+                                                    if (hashResult != null && hashResult.match()) {
+                                                        downloadable.setHashResult(hashResult);
                                                         downloadLink.setDownloadCurrent(fileOutput.length());
                                                         throw new PluginException(LinkStatus.FINISHED);
                                                     }
-                                                    break;
-                                                case FILENAME:
-                                                case DISABLED:
-                                                default:
-                                                    // nothing
                                                 }
+                                            case FILENAME_FILESIZE:
+                                                final long fileSize = downloadable.getVerifiedFileSize();
+                                                if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                                                    downloadLink.setDownloadCurrent(fileOutput.length());
+                                                    throw new PluginException(LinkStatus.FINISHED);
+                                                }
+                                                break;
+                                            case FILENAME:
+                                            case DISABLED:
+                                            default:
+                                                // nothing
                                             }
                                         }
-                                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                                     }
-                                });
-                            } else {
-                                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                            }
+                                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                                }
+                            });
                         case SET_FILE_TO_SUCCESSFUL:
                             throw new PluginException(LinkStatus.FINISHED);
                         default:

@@ -421,7 +421,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 }
                 final String domainCleaned = domain.toLowerCase(Locale.ENGLISH).replaceAll("\\s+", "");
                 if (StringUtils.isEmpty(domainCleaned)) {
-                    /* Skip null/empty values */
+                    /* Skip (silently ignore) null/empty values */
                     continue cleanDomains;
                 } else if (new Regex(domainCleaned, patternInvalid).patternMatches()) {
                     /* ignore/blacklist/skip common phrases, else we get too many false positives */
@@ -431,12 +431,16 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 if (maindomainCleaned == null) {
                     maindomainCleaned = domainCleaned;
                 }
-                cleanedDomains.add(domainCleaned);
+                if (!cleanedDomains.contains(domainCleaned)) {
+                    cleanedDomains.add(domainCleaned);
+                }
             }
             if (maindomainCleaned == null) {
                 /* List of domain contained only useless stuff or an empty array of domains -> Skip */
                 continue mhostLoop;
             }
+            /* Set list of cleaned domains on source item. */
+            mhost.setDomains(cleanedDomains);
             cleanList.put(maindomainCleaned, mhost);
             LazyHostPlugin safeHit = null;
             final List<LazyHostPlugin> hits = new ArrayList<LazyHostPlugin>();

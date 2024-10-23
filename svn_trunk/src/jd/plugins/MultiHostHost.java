@@ -75,6 +75,7 @@ public class MultiHostHost {
     private long                  linksMax                        = -1;
     private long                  trafficLeft                     = -1;
     private long                  trafficMax                      = -1;
+    private String                unavailableStatusText           = null;
     private long                  unavailableUntilTimestamp       = -1;
     private Short                 trafficCalculationFactorPercent = null;
     private int                   maxChunks                       = 0;
@@ -331,6 +332,14 @@ public class MultiHostHost {
 
     public List<String> getDomains() {
         return this.domains;
+    }
+
+    public String getUnavailableStatusText() {
+        return unavailableStatusText;
+    }
+
+    public void setUnavailableStatusText(String unavailableStatusText) {
+        this.unavailableStatusText = unavailableStatusText;
     }
 
     public long getUnavailableUntilTimestamp() {

@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
+@HostPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = { "boyfriendtv.com", "ashemaletube.com", "pornoxo.com", "worldsex.com", "bigcamtube.com", "porneq.com" }, urls = { "https?://(?:\\w+\\.)?boyfriendtv\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?ashemaletube\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?pornoxo\\.com/videos/\\d+/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?worldsex\\.com/videos/[a-z0-9\\-_]+\\-\\d+(?:\\.html|/)?", "https?://(?:\\w+\\.)?bigcamtube\\.com/videos/[a-z0-9\\-_]+/", "https?://(?:\\w+\\.)?porneq\\.com/(?:video/\\d+/[a-z0-9\\-_]+/?|wporn/porn-videos/[a-z0-9\\-_]+/\\d+/)" })
 public class UnknownPornScript5 extends PluginForHost {
     public UnknownPornScript5(PluginWrapper wrapper) {
         super(wrapper);
@@ -157,7 +157,7 @@ public class UnknownPornScript5 extends PluginForHost {
         getDllink();
         if (!inValidateDllink(dllink)) {
             logger.info("dllink: " + dllink);
-            if (dllink.contains(".m3u8")) { // bigcamtube.com
+            if (dllink.contains(".m3u8")) {
                 br.getPage(dllink);
                 // Get file size with checkFFProbe and StreamInfo fails with HTTP error 501 Not Implemented
                 return AvailableStatus.TRUE;
@@ -165,10 +165,22 @@ public class UnknownPornScript5 extends PluginForHost {
         }
         /* 2022-11-21: Disabled this as their servers will return wrong results when checking multiple items in a short time. */
         final boolean checkFilesize = true;
-        if (!inValidateDllink(dllink) && checkFilesize && !isDownload) {
+        if (!inValidateDllink(dllink) && !isHLS(this.dllink) && checkFilesize && !isDownload) {
             basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, link.getFinalFileName(), default_Extension);
         }
         return AvailableStatus.TRUE;
+    }
+
+    private boolean isHLS(final String str) {
+        /* 2024-10-22: pornoxo.com */
+        if (StringUtils.contains(str, "media=hls")) {
+            return true;
+        } else if (StringUtils.contains(str, ".m3u8")) {
+            /* HLS master e.g. bigcamtube.com */
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private void getDllink() throws Exception {
@@ -367,21 +379,27 @@ public class UnknownPornScript5 extends PluginForHost {
         } else if (inValidateDllink(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (dllink.contains(".m3u8")) { // bigcamtube.com
+        if (this.isHLS(this.dllink)) { // bigcamtube.com
             /* hls download */
-            /* Access hls master. */
-            br.getPage(dllink);
-            if (br.getHttpConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            }
-            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
-            if (hlsbest == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            final String hlsurl;
+            if (this.dllink.contains(".m3u8")) {
+                /* Access hls master. */
+                br.getPage(dllink);
+                if (br.getHttpConnection().getResponseCode() == 403) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+                }
+                final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
+                if (hlsbest == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                hlsurl = hlsbest.getDownloadurl();
+            } else {
+                hlsurl = this.dllink;
             }
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, hlsbest.getDownloadurl());
+            dl = new HLSDownloader(link, br, hlsurl);
             dl.startDownload();
         } else {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resumes, chunks);

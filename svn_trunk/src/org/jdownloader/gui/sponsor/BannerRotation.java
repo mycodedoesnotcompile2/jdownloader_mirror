@@ -48,7 +48,6 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.DownloadLinkProperty;
 import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
-import jd.plugins.PluginForHost;
 
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
@@ -822,13 +821,6 @@ public class BannerRotation implements Sponsor, AccountControllerListener {
 
     private void notify(final Account account, String title, String msg) {
         if (account != null) {
-            final PluginForHost plugin = account.getPlugin();
-            final String customURL;
-            if (plugin == null) {
-                customURL = "http://" + account.getHoster();
-            } else {
-                customURL = null;
-            }
             final Icon fav = account.getDomainInfo().getFavIcon(false);
             final ExtMergedIcon hosterIcon = new ExtMergedIcon(new AbstractIcon(IconKey.ICON_REFRESH, 32)).add(fav, 32 - fav.getIconWidth(), 32 - fav.getIconHeight());
             final ConfirmDialog d = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, title, msg, hosterIcon, _GUI.T.lit_continue(), _GUI.T.lit_close()) {

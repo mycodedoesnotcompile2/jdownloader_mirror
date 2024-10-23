@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49964 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -272,7 +272,10 @@ public class TorboxApp extends PluginForHost {
         ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         /* Handle notifications */
-        if (Boolean.TRUE.equals(user_settings.get("jdownloader_notifications"))) {
+        notificationHandling: if (true) {
+            if (Boolean.FALSE.equals(user_settings.get("jdownloader_notifications"))) {
+                break notificationHandling;
+            }
             long highestNotificationTimestamp = 0;
             List<Map<String, Object>> notifications = null;
             try {
@@ -321,8 +324,6 @@ public class TorboxApp extends PluginForHost {
                     }
                 }
             }
-        } else {
-            logger.info("User has turned off JDownloader bubble notifications in website settings of " + this.getHost());
         }
         return ai;
     }

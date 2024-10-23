@@ -64,7 +64,7 @@
   "renames":null,
   "requiredBy":[{
     "artefact":"net.java.dev.jna/jna-platform",
-    "file":"C:\\Users\\thomas\\eclipse-workspace - 07_10_2022\\JDownloader\\ressourcen\\libs\\jna-platform.dep.json",
+    "file":"JDownloader\\ressourcen\\libs\\jna-platform.dep.json",
     "provider":"maven",
     "version":"5.13.0"
   }],

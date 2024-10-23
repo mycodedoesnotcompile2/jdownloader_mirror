@@ -116,20 +116,19 @@ public class LogAPIImpl implements LogAPI {
         final File zip = Application.getTempResource("logs/logPackage" + System.currentTimeMillis() + ".zip");
         zip.delete();
         zip.getParentFile().mkdirs();
-        ZipIOWriter writer = null;
-        try {
-            writer = new ZipIOWriter(zip) {
-                @Override
-                public void add(final File addFile, final boolean compress, final String... elements) throws ZipIOException {
-                    if (addFile.getName().endsWith(".lck") || addFile.isFile() && addFile.length() == 0) {
-                        return;
-                    }
-                    if (Thread.currentThread().isInterrupted()) {
-                        throw new WTFException("INterrupted");
-                    }
-                    super.add(addFile, compress, elements);
+        final ZipIOWriter writer = new ZipIOWriter(zip) {
+            @Override
+            protected void addFile(File addFile, boolean compress, String fullPath) throws ZipIOException {
+                if (addFile.getName().endsWith(".lck") || addFile.isFile() && addFile.length() == 0) {
+                    return;
+                } else if (Thread.currentThread().isInterrupted()) {
+                    throw new WTFException("INterrupted");
+                } else {
+                    super.addFile(addFile, compress, fullPath);
                 }
-            };
+            }
+        };
+        try {
             final String name = lf.getFolder().getName() + "-" + DATE_FORMAT.format(lf.getCreated()) + " to " + DATE_FORMAT.format(lf.getLastModified());
             final File folder = Application.getTempResource("logs/" + name);
             if (lf.isNeedsFlush()) {
@@ -141,12 +140,7 @@ public class LogAPIImpl implements LogAPI {
             IO.copyFolderRecursive(lf.getFolder(), folder, true);
             writer.add(folder, true);
         } finally {
-            try {
-                if (writer != null) {
-                    writer.close();
-                }
-            } catch (final Throwable e) {
-            }
+            writer.close();
         }
         return zip;
     }
