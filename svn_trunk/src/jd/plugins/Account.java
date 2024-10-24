@@ -24,12 +24,6 @@ import java.util.TimeZone;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
 import org.appwork.storage.TypeRef;
@@ -42,6 +36,12 @@ import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -220,12 +220,10 @@ public class Account extends Property {
     }
 
     /**
-     * @since JD2
-     *
-     *        true = Multiple accounts of this host can be used at the same time <br/>
-     *        false = Multiple accounts of this host can NOT be used at the same time. <br/>
-     *        For most hosts, this should be set to false for free accounts as the traffic limit of those sits on current IP + account which
-     *        means that if a traffic-limit of one free account is reached, all accounts will be out of traffic!
+     * true = Multiple accounts of this host can be used at the same time <br/>
+     * false = Multiple accounts of this host can NOT be used at the same time. <br/>
+     * For most hosts, this should be set to false for free accounts as the traffic limit of those sits on current IP + account which means
+     * that if a traffic-limit of one free account is reached, all accounts will be out of traffic!
      */
     public void setConcurrentUsePossible(boolean concurrentUsePossible) {
         this.concurrentUsePossible = concurrentUsePossible;
@@ -268,7 +266,7 @@ public class Account extends Property {
         return plugin;
     }
 
-    public void setPlugin(PluginForHost plugin) {
+    public void setPlugin(final PluginForHost plugin) {
         this.plugin = plugin;
         if (plugin != null) {
             isMultiPlugin = plugin.isHandlingMultipleHosts();
@@ -282,9 +280,9 @@ public class Account extends Property {
     }
 
     /**
-     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br> Most of all services will
-     * store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account limits by changing their
-     * IP.
+     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br>
+     * Most of all services will store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account
+     * limits by changing their IP.
      */
     public void setAllowReconnectToResetLimits(final boolean b) {
         /* 2022-07-19: TODO: Dummy function, see: https://svn.jdownloader.org/issues/87351 */
@@ -658,17 +656,31 @@ public class Account extends Property {
         }
     }
 
+    private static final long DEFAULT_REFRESH_TIMEOUT = 30 * 60 * 1000l;
+    private static final long MIN_REFRESH_TIMEOUT     = 5 * 60 * 1000l;
+
     /** In which interval (milliseconds) will this account get checked? Min. = 5 minutes, default = 30 minutes. */
     public long getRefreshTimeout() {
-        /* default refresh timeout is 30 mins */
-        long defaultRefreshTimeout = 30 * 60 * 1000l;
-        /* TODO: Also maybe check if e.g. timeout > time until account expires. */
-        final long minRefreshTimeout = 5 * 60 * 1000l;
-        Long timeout = this.getLongProperty(PROPERTY_REFRESH_TIMEOUT, defaultRefreshTimeout);
+        Long timeout = this.getLongProperty(PROPERTY_REFRESH_TIMEOUT, DEFAULT_REFRESH_TIMEOUT);
         if (timeout == null || timeout <= 0) {
-            timeout = defaultRefreshTimeout;
-        } else if (timeout < minRefreshTimeout) {
-            timeout = minRefreshTimeout;
+            timeout = DEFAULT_REFRESH_TIMEOUT;
+        } else if (timeout < MIN_REFRESH_TIMEOUT) {
+            timeout = MIN_REFRESH_TIMEOUT;
+        }
+        final AccountInfo ai = this.getAccountInfo();
+        if (ai != null) {
+            /*
+             * Check if account is is about to expire. If that happens earlier than our next planned check, return time until account
+             * expires.
+             */
+            final long validUntil = ai.getValidUntil();
+            if (validUntil == -1) {
+                return timeout;
+            }
+            final long timeValid = validUntil - System.currentTimeMillis();
+            if (timeValid > 0 && timeValid < timeout) {
+                return timeValid;
+            }
         }
         return timeout;
     }
@@ -680,6 +692,7 @@ public class Account extends Property {
 
     public boolean refreshTimeoutReached() {
         if (updatetime <= 0) {
+            /* Account has never been checked so far. */
             return true;
         }
         return System.currentTimeMillis() - updatetime >= getRefreshTimeout();

@@ -15,9 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -27,17 +31,13 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.YetiShareCore;
-
-@HostPlugin(revision = "$Revision: 49275 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -200,7 +200,7 @@ public class SharingWtf extends YetiShareCore {
     @Override
     public void checkErrors(final Browser br, final DownloadLink link, final Account account) throws PluginException {
         /* 2020-02-17: Special */
-        if (br.containsHTML("(?i)you need to be a registered user to download any files")) {
+        if (br.containsHTML("you need to be a registered user to download any files")) {
             throw new AccountRequiredException();
         } else if (br.containsHTML(">\\s*You must be a registered member account to download files more than")) {
             /* 2024-02-09 */
@@ -209,25 +209,27 @@ public class SharingWtf extends YetiShareCore {
             /* 2024-02-09 */
             throw new AccountRequiredException();
         }
-        String errorMsg = null;
-        try {
-            final UrlQuery query = UrlQuery.parse(br.getURL());
-            errorMsg = query.get("e");
-            if (errorMsg != null) {
-                errorMsg = URLDecoder.decode(errorMsg, "UTF-8");
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
+        final String dailyLimitReachedText = br.getRegex(">\\s*(You have reached the daily download limit of \\d+ files)").getMatch(0);
+        if (dailyLimitReachedText != null) {
+            // ipBlockedOrAccountLimit(link, account, dailyLimitReachedText, 30 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, dailyLimitReachedText);
         }
+        super.checkErrors(br, link, account);
+        final String errorMsg = getErrorMsgURL(br);
         if (errorMsg != null) {
             if (errorMsg.matches("(?i)You must be a registered member account to download files more than.+")) {
                 throw new AccountRequiredException(errorMsg);
             } else if (errorMsg.matches("(?i)You need to be a member to download.*")) {
                 /* 2020-08-05: Different premiumonly error */
                 throw new AccountRequiredException(errorMsg);
+            } else {
+                if (link != null) {
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorMsg);
+                } else {
+                    throw new AccountUnavailableException(errorMsg, 1 * 60 * 1000l);
+                }
             }
         }
-        super.checkErrors(br, link, account);
     }
 
     @Override

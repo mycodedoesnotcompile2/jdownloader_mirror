@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49959 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -341,8 +341,9 @@ public class PremboxCom extends PluginForHost {
         } else {
             expireTimestamp = expireTimestampDaily;
         }
-        final AccountInfo ai = new AccountInfo();
         expireTimestamp = expireTimestamp * 1000;
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         if ("premium".equals(accounttype) && expireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
             statustext = "Premium" + statustext;
@@ -377,7 +378,8 @@ public class PremboxCom extends PluginForHost {
                  * 2017-03-03: Admin asked why we do not show all hosts so we told them that we skip offline hosts. This is a possibility
                  * for them to easily force JD to display certain hosts. So far it has not been used (not present in json).
                  */
-                final boolean force_display = Boolean.TRUE.equals(domaininfo.get("force_display"));
+                /* 2024-10-23: Not needed anymore, see mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST); */
+                // final boolean force_display = Boolean.TRUE.equals(domaininfo.get("force_display"));
                 final boolean canResume = ((Boolean) domaininfo.get("resumable")).booleanValue();
                 final long isoffline = JavaScriptEngineFactory.toLong(domaininfo.get("tmpTurnedOff"), 0);
                 final int maxChunks = ((Number) domaininfo.get("maxChunks")).intValue();
@@ -398,7 +400,7 @@ public class PremboxCom extends PluginForHost {
                     hostResumeMap.put(domain, canResume);
                 }
                 final MultiHostHost mhost = new MultiHostHost(domain);
-                if (isoffline == 1 && !force_display) {
+                if (isoffline == 1) {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 }
                 mhost.setResume(canResume);

@@ -33,21 +33,20 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49073 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = {}, urls = {})
 public class LusciousNet extends PluginForHost {
     public LusciousNet(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     /* Connection stuff */
-    private static final boolean free_resume       = false;
-    private static final int     free_maxchunks    = 1;
-    private static final int     free_maxdownloads = -1;
-    private String               dllink            = null;
+    private static final boolean free_resume    = false;
+    private static final int     free_maxchunks = 1;
+    private String               dllink         = null;
 
     @Override
     public String getAGBLink() {
-        return "https://luscious.net/terms/";
+        return "https://" + getHost() + "/terms/";
     }
 
     @Override
@@ -236,7 +235,7 @@ public class LusciousNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

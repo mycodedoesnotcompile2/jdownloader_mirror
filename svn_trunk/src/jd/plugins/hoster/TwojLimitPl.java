@@ -20,7 +20,6 @@ import java.util.HashMap;
 
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -36,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 45814 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
 public class TwojLimitPl extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private String                                         Info               = null;
@@ -45,7 +44,7 @@ public class TwojLimitPl extends PluginForHost {
 
     public TwojLimitPl(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://www.twojlimit.pl/");
+        this.enablePremium("https://www." + getHost());
     }
 
     @Override
@@ -71,12 +70,12 @@ public class TwojLimitPl extends PluginForHost {
         } else {
             expired = false;
         }
-        if (GetTrasferLeft(br.toString()) > 10) {
+        if (getTransferLeft(br.toString()) > 10) {
             expired = false;
         }
     }
 
-    private void handleErrors(Browser br) throws PluginException {
+    private void handleErrors(final Browser br) throws PluginException {
         // do not use numbers only, you will get false postivies from balance figure.
         if (br.containsHTML("Access from your country is not allowed")) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nAccess from your country is not allowed", PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -95,7 +94,7 @@ public class TwojLimitPl extends PluginForHost {
     }
 
     /* function returns transfer left */
-    private long GetTrasferLeft(String wynik) {
+    private long getTransferLeft(String wynik) {
         final String cleanup = wynik.trim();
         String[] temp = cleanup.split(" ");
         String[] tab = temp[0].split("=");
@@ -106,13 +105,14 @@ public class TwojLimitPl extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
-        AccountInfo ac = new AccountInfo();
         br.setConnectTimeout(60 * 1000);
         br.setReadTimeout(60 * 1000);
         String hosts;
         login(account);
-        ac.setTrafficLeft(GetTrasferLeft(Info));
-        ArrayList<String> supportedHosts = new ArrayList<String>();
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
+        ai.setTrafficLeft(getTransferLeft(Info));
+        final ArrayList<String> supportedhosts = new ArrayList<String>();
         hosts = br.getPage("https://www.twojlimit.pl/clipboard.php");
         if (hosts != null) {
             String hoster[] = new Regex(hosts, "(.*?)(<br />|$)").getColumn(0);
@@ -121,33 +121,30 @@ public class TwojLimitPl extends PluginForHost {
                     if (hosts == null || host.length() == 0) {
                         continue;
                     }
-                    supportedHosts.add(host.trim());
+                    supportedhosts.add(host.trim());
                 }
             }
         }
         if (expired) {
-            ac.setExpired(true);
-            ac.setStatus("Account expired");
-            ac.setValidUntil(0);
-            return ac;
+            ai.setExpired(true);
+            ai.setValidUntil(0);
         } else {
-            ac.setExpired(false);
+            ai.setExpired(false);
             if (validUntil != null) {
                 if (validUntil.trim().equals("expire=00")) {
-                    ac.setValidUntil(-1);
+                    ai.setValidUntil(-1);
                 } else {
-                    ac.setValidUntil(TimeFormatter.getMilliSeconds(validUntil));
+                    ai.setValidUntil(TimeFormatter.getMilliSeconds(validUntil));
                 }
             }
         }
-        ac.setMultiHostSupport(this, supportedHosts);
-        ac.setStatus("Account valid");
-        return ac;
+        ai.setMultiHostSupport(this, supportedhosts);
+        return ai;
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.twojlimit.pl/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     @Override

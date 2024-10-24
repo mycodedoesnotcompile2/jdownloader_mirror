@@ -9,60 +9,56 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.gui.translate._GUI;
 
 public class MultiHostHost {
-    /** How long shall we block this host if a limit gets reached? Until the next day/hour? */
-    // public enum LimitResetMode {
-    // DAILY;
-    // }
-    /** Why was this host blocked? Because of too many errored out tries via JD or because of the multihost/multihost limits? */
     public enum MultihosterHostStatus implements LabelInterface {
         WORKING {
             @Override
             public String getLabel() {
-                return "Working";
+                return _GUI.T.multihost_single_host_object_status_working();
             }
         },
         WORKING_UNSTABLE {
             @Override
             public String getLabel() {
-                return "Unstable";
+                return _GUI.T.multihost_single_host_object_status_working_unstable();
             }
         },
         DEACTIVATED_USER {
             @Override
             public String getLabel() {
-                return "Deactivated by user";
+                return _GUI.T.multihost_single_host_object_status_deactivated_user();
             }
         },
         DEACTIVATED_JDOWNLOADER {
             @Override
             public String getLabel() {
-                return "Temporarily deactivated by JD";
+                return _GUI.T.multihost_single_host_object_status_deactivated_jdownloader();
             }
         },
         DEACTIVATED_JDOWNLOADER_UNSUPPORTED {
             @Override
             public String getLabel() {
-                return "Not supported by JD";
+                return _GUI.T.multihost_single_host_object_status_deactivated_jdownloader_unsupported();
             }
         },
         DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN {
             @Override
             public String getLabel() {
-                return "MOCH usage not allowed by original plugin";
+                return _GUI.T.multihost_single_host_object_status_deactivated_jdownloader_not_allowed_by_original_plugin();
             }
         },
         DEACTIVATED_MULTIHOST {
             @Override
             public String getLabel() {
-                return "Flagged as not working by MOCH";
+                return _GUI.T.multihost_single_host_object_status_deactivated_multihost();
             }
         },
         DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE {
             @Override
             public String getLabel() {
-                return "Cannot be used with your current account type";
+                return _GUI.T.multihost_single_host_object_status_deactivated_multihost_not_for_this_account_type();
             }
         };
     }
@@ -93,8 +89,16 @@ public class MultiHostHost {
         this.setDomain(domain);
     }
 
+    /**
+     * Returns the name of this item e.g. "Rapidgator". If no name was explicitely set, this will return the first domain in the list of
+     * domains.
+     */
     public String getName() {
-        return name;
+        if (name != null) {
+            return name;
+        } else {
+            return this.getDomain();
+        }
     }
 
     public void setName(String name) {
@@ -221,22 +225,6 @@ public class MultiHostHost {
         }
     }
 
-    @Deprecated
-    public boolean canDownload(final DownloadLink link) {
-        if (isUnlimitedTraffic || isUnlimitedLinks) {
-            return true;
-        } else if (this.linksLeft <= 0) {
-            return false;
-        } else if (this.trafficLeft <= 0) {
-            return false;
-        } else if (link.getView().getBytesTotal() != -1 && this.trafficLeft < link.getView().getBytesTotal()) {
-            /* Not enough traffic to download this link */
-            return false;
-        } else {
-            return true;
-        }
-    }
-
     /**
      * Returns custom set status text. </br>
      * Typically used to describe why this host is currently not working but can also be used as an informative field.
@@ -275,10 +263,10 @@ public class MultiHostHost {
 
     public MultihosterHostStatus getStatus() {
         // TODO: Maybe update this to simply return status without any evaluation
-        if (status != null) {
-            return status;
-        } else if (this.getUnavailableTimeMillis() > 0) {
+        if (this.getUnavailableTimeMillis() > 0) {
             return MultihosterHostStatus.DEACTIVATED_JDOWNLOADER;
+        } else if (status != null) {
+            return status;
         } else {
             /* Default */
             return MultihosterHostStatus.WORKING;
@@ -379,6 +367,6 @@ public class MultiHostHost {
     @Override
     public String toString() {
         final String title = getTitle();
-        return title + " | Status: " + this.getStatus() + " | StatusText: " + this.getStatusText() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
+        return title + " | Status: " + this.getStatus() + " | StatusText: " + this.getStatusText() + " | UnavailableStatusText: " + this.getUnavailableStatusText() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
     }
 }

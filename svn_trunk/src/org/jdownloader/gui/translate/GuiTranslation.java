@@ -6969,6 +6969,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Do not set - use global/auto settings" })
     String do_not_change_use_global_settings();
 
+    @Default(lngs = { "en", "de" }, values = { "No traffic left", "Kein Traffic übrig" })
+    String account_error_no_traffic_left();
+
     @Default(lngs = { "en" }, values = { "Domain" })
     String multihost_detailed_host_info_table_column_domain();
 
@@ -7001,4 +7004,28 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Traffic calculation", "Traffic Berechnungsfaktor" })
     String multihost_detailed_host_info_table_column_traffic_calculation_factor_percent();
+
+    @Default(lngs = { "en", "de" }, values = { "Working", "Funktioniert" })
+    String multihost_single_host_object_status_working();
+
+    @Default(lngs = { "en", "de" }, values = { "Unstable", "Instabil" })
+    String multihost_single_host_object_status_working_unstable();
+
+    @Default(lngs = { "en", "de" }, values = { "Deactivated by user", "Vom Benutzer deaktiviert" })
+    String multihost_single_host_object_status_deactivated_user();
+
+    @Default(lngs = { "en", "de" }, values = { "Temporarily deactivated by JD", "Temporär von JD deaktiviert" })
+    String multihost_single_host_object_status_deactivated_jdownloader();
+
+    @Default(lngs = { "en", "de" }, values = { "Not supported by JD", "Wird nicht von JD unterstützt" })
+    String multihost_single_host_object_status_deactivated_jdownloader_unsupported();
+
+    @Default(lngs = { "en", "de" }, values = { "MOCH usage not allowed by original plugin", "MOCH Verwendung von originalem Plugin nicht zugelassen" })
+    String multihost_single_host_object_status_deactivated_jdownloader_not_allowed_by_original_plugin();
+
+    @Default(lngs = { "en", "de" }, values = { "Flagged as not working by MOCH", "Funktioniert laut Multihoster nicht" })
+    String multihost_single_host_object_status_deactivated_multihost();
+
+    @Default(lngs = { "en", "de" }, values = { "Cannot be used with your current account type", "Nicht verwendbar mit deinem aktuellen Account Typ" })
+    String multihost_single_host_object_status_deactivated_multihost_not_for_this_account_type();
 }

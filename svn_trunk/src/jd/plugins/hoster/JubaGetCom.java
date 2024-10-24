@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49998 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -210,6 +210,10 @@ public class JubaGetCom extends PluginForHost {
                 // data-original-title="forum.com (hoster.com)">
                 hostWithoutTLD = new Regex(html, "data-original-title=\"[^\"]*\\(([^\"\\)]+)\\)").getMatch(0);
             }
+            if (hostWithoutTLD != null && hostWithoutTLD.contains(",")) {
+                /* Workaround e.g. for entry "Tezfiles" */
+                hostWithoutTLD = new Regex(html, "alt=\"([^\"]+)\"").getMatch(0);
+            }
             final String serverStatus = new Regex(html, "(servidor_offline|servidor_online)").getMatch(0);
             if (hostWithoutTLD == null || serverStatus == null) {
                 /* Skip invalid items */
@@ -271,19 +275,19 @@ public class JubaGetCom extends PluginForHost {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
-                this.br.setCookies(this.getHost(), cookies);
+                this.br.setCookies(getHost(), cookies);
                 if (!force) {
                     return;
                 }
                 br.getPage(loginCheckURL);
-                if (this.isLoggedIN(br)) {
-                    account.saveCookies(this.br.getCookies(br.getHost()), "");
+                if (isLoggedIN(br)) {
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return;
                 }
                 account.clearCookies("");
                 br.clearCookies(br.getHost());
             }
-            br.getPage("https://" + this.getHost() + "/locale/en");
+            br.getPage("https://" + getHost() + "/locale/en");
             br.getPage("/login");
             final Form loginform = br.getFormbyActionRegex(".*/login.*");
             if (loginform == null) {
@@ -299,17 +303,17 @@ public class JubaGetCom extends PluginForHost {
              * 2022-08-10: Sometimes even after successful login website will redirect us to /generator and display error 500 this we'll try
              * this small workaround.
              */
-            if (!this.isLoggedIN(br)) {
+            if (!isLoggedIN(br)) {
                 br.getPage("/");
             }
-            if (!this.isLoggedIN(br)) {
+            if (!isLoggedIN(br)) {
                 if (errorMsg != null) {
                     throw new AccountInvalidException(Encoding.htmlDecode(errorMsg));
                 } else {
                     throw new AccountInvalidException();
                 }
             }
-            account.saveCookies(this.br.getCookies(br.getHost()), "");
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 

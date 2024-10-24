@@ -68,6 +68,11 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return account_trafficRefill;
     }
 
+    /**
+     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br>
+     * Set this to false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account
+     * stays empty.
+     */
     public void setTrafficRefill(boolean account_trafficRefill) {
         this.account_trafficRefill = account_trafficRefill;
     }
@@ -499,9 +504,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 plugins.add(hit);
             }
         }
-        final List<String> finalresults = new ArrayList<String>();
+        final List<String> finalresults_old = new ArrayList<String>();
         /* TODO: Return this once refactoring is done. */
-        final List<MultiHostHost> finalresults2 = new ArrayList<MultiHostHost>();
+        final List<MultiHostHost> finalresults_new = new ArrayList<MultiHostHost>();
         final HashSet<String> unassignedMultiHostSupport = new HashSet<String>();
         cleanListLoop: for (final Entry<String, MultiHostHost> entry : cleanList.entrySet()) {
             final String maindomainCleaned = entry.getKey();
@@ -510,14 +515,14 @@ public class AccountInfo extends Property implements AccountTrafficView {
             if (plugins == null) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED);
                 unassignedMultiHostSupport.add(maindomainCleaned);
-                finalresults2.add(mhost);
+                finalresults_new.add(mhost);
                 continue cleanListLoop;
             }
             /* Remove dupes based on the results we already have */
             final Iterator<LazyHostPlugin> iterator = plugins.iterator();
             do {
                 final LazyHostPlugin plugin = iterator.next();
-                if (finalresults.contains(plugin.getHost())) {
+                if (finalresults_old.contains(plugin.getHost())) {
                     plugins.remove(plugin);
                 }
             } while (iterator.hasNext());
@@ -576,22 +581,22 @@ public class AccountInfo extends Property implements AccountTrafficView {
             if (printNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
                 logger.info("Non working host: " + mhost);
             }
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !hostIsWorkingAccordingToMultihost) {
-                // TODO: Remove this check
-                logger.info("Skipping non working host in stable: " + mhost.getName());
-                continue cleanListLoop;
-            }
             final String pluginHost = finalplugin.getHost();
             if (multiHostPlugin != null && pluginHost.equals(multiHostPlugin.getHost())) {
                 /*
-                 * Some mmultihosts put their own domain in the list of supported hosts. However, this is nowhere needed so let's not add it
+                 * Some multihosts put their own domain in the list of supported hosts. However, this is nowhere needed so let's not add it
                  * to the final list.
                  */
                 continue cleanListLoop;
-            } else if (finalresults.contains(pluginHost)) {
+            } else if (finalresults_old.contains(pluginHost)) {
                 continue cleanListLoop;
             }
-            finalresults.add(pluginHost);
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && !hostIsWorkingAccordingToMultihost) {
+                // TODO: Remove this check
+                logger.info("Skipping non working host in stable: " + mhost.getName());
+            } else {
+                finalresults_old.add(pluginHost);
+            }
             final String[] siteSupportedNames = finalplugin.getSitesSupported();
             if (siteSupportedNames != null && siteSupportedNames.length > 0) {
                 /* Add all domains we know to list of supported domains. */
@@ -603,7 +608,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             /* Set plugin domain as first domain */
             mhost.getDomains().remove(pluginHost);
             mhost.getDomains().add(0, pluginHost);
-            finalresults2.add(mhost);
+            finalresults_new.add(mhost);
         }
         /**
          * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
@@ -647,7 +652,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 }
             }
         }
-        if (finalresults.isEmpty()) {
+        if (finalresults_old.isEmpty()) {
             if (logger != null) {
                 logger.info("Failed to find ANY usable results");
             }
@@ -657,24 +662,24 @@ public class AccountInfo extends Property implements AccountTrafficView {
         /* Log final results if wanted. */
         final boolean logValidResults = false;
         if (logger != null && logValidResults) {
-            logger.info("Found real hosts: " + finalresults.size());
-            for (final String host : finalresults) {
+            logger.info("Found real hosts: " + finalresults_old.size());
+            for (final String host : finalresults_old) {
                 logger.finest("Found host: " + host);
             }
         }
         /* sorting will now work properly since they are all pre-corrected to lowercase. */
-        Collections.sort(finalresults, new NaturalOrderComparator());
-        this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults));
+        Collections.sort(finalresults_old, new NaturalOrderComparator());
+        this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults_old));
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            Collections.sort(finalresults2, new Comparator<MultiHostHost>() {
+            Collections.sort(finalresults_new, new Comparator<MultiHostHost>() {
                 @Override
                 public int compare(MultiHostHost o1, MultiHostHost o2) {
                     return o1.getDomain().compareToIgnoreCase(o2.getDomain());
                 }
             });
-            multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(finalresults2);
+            multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(finalresults_new);
         }
-        return finalresults;
+        return finalresults_old;
     }
 
     protected List<MultiHostHost> multihostSupportV2 = null;

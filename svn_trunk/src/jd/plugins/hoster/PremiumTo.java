@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.DownloadLinkDownloadable;
 
-@HostPlugin(revision = "$Revision: 49964 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = { "premium.to" }, urls = { "https?://torrent(?:\\d+)?\\.premium\\.to/(?:t/[a-z0-9]+/\\d+|z/[a-z0-9]+|r/\\d+/[A-F0-9]{32}/[a-z0-9]+/\\d+/[^/]+)|https?://storage\\.premium\\.to/(?:file/[A-Z0-9]+|remote/[A-Z0-9]+/[A-Z0-9]+/[A-Z0-9]+/[^/]+)" })
 public class PremiumTo extends UseNet {
     private final String PROPERTY_normalTraffic                                            = "normalTraffic";
     private final String PROPERTY_specialTraffic                                           = "specialTraffic";
@@ -276,6 +276,7 @@ public class PremiumTo extends UseNet {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final Map<String, Object> userinfo = login(account, true);
         final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         /* Normal traffic */
         final long nT = ((Number) userinfo.get("traffic")).longValue();
         /* Special traffic */

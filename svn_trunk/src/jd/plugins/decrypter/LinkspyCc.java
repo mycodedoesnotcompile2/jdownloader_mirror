@@ -22,6 +22,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -29,7 +30,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48577 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkspyCc extends PluginForDecrypt {
     public LinkspyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,6 +74,14 @@ public class LinkspyCc extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        final String b64String = new Regex(contenturl, "(aHR0[^/]+)/?$").getMatch(0);
+        if (b64String != null) {
+            /* Early return without the need to do a http request. */
+            final String finallink = Encoding.Base64Decode(b64String);
+            logger.info("base64 decoded result from inside added URL: " + finallink);
+            ret.add(this.createDownloadlink(finallink));
+            return ret;
+        }
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

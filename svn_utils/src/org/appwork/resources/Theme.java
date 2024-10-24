@@ -439,6 +439,10 @@ public class Theme implements MinTimeWeakReferenceCleanup {
             if (url == null) {
                 // afterwards, we lookup in classpath. jar or bin folders
                 url = Theme.class.getResource((path.startsWith("/") ? "" : "/") + path);
+                if (url != null && url.getPath().endsWith("/")) {
+                    // the resource targets a folder not a file.
+                    url = null;
+                }
             }
         }
         return url;

@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48652 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
 public class LiteapksComCrawler extends PluginForDecrypt {
     public LiteapksComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class LiteapksComCrawler extends PluginForDecrypt {
         for (final String singleLink : links) {
             final DownloadLink link = createDownloadlink(br.getURL(singleLink).toString());
             /* Set temporary filename */
-            link.setName(br._getURL().getPath() + "_ " + (index + 1) + ".apk");
+            link.setName(title + "_" + (index + 1) + ".apk");
             link.setAvailable(true);
             if (filesizes != null && links.length == filesizes.length) {
                 final String filesizeStr = filesizes[index];

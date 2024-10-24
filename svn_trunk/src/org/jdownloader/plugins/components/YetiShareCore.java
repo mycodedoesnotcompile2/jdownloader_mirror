@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 49330 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -1317,7 +1317,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     }
 
     /** Throws appropriate Exception depending on whether or not an account is given. */
-    private void ipBlockedOrAccountLimit(final DownloadLink link, final Account account, final String errorMsg, final long waitMillis) throws PluginException {
+    protected void ipBlockedOrAccountLimit(final DownloadLink link, final Account account, final String errorMsg, final long waitMillis) throws PluginException {
         if (account != null) {
             throw new AccountUnavailableException(errorMsg, waitMillis);
         } else {

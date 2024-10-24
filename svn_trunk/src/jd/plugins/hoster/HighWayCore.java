@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -690,42 +690,41 @@ public abstract class HighWayCore extends UseNet {
         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({ "unchecked" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
             this.login(account, true);
             br.getPage(this.getAPIBase() + "?hoster&user");
             final AccountInfo ai = new AccountInfo();
+            ai.setTrafficRefill(false);
             final Map<String, Object> entries = this.checkErrors(this.br, null, account);
             final Map<String, Object> accountInfo = (Map<String, Object>) entries.get("user");
             final int accountResume = ((Number) accountInfo.get("resume")).intValue();
             final long premiumUntil = ((Number) accountInfo.get("premium_bis")).longValue();
-            // final long premiumTraffic = ((Number) accountInfo.get("premium_traffic")).longValue();
+            final long premiumTraffic = ((Number) accountInfo.get("premium_traffic")).longValue();
             final long trafficLeftToday = ((Number) accountInfo.get("traffic_remain_today")).longValue();
             ai.setTrafficLeft(trafficLeftToday);
             /* Set account type and account information */
             if (Boolean.TRUE.equals(entries.get("premium"))) {
+                /* Premium account */
+                account.setType(AccountType.PREMIUM);
+                ai.setTrafficLeft(premiumTraffic);
                 ai.setTrafficMax(((Number) accountInfo.get("premium_max")).longValue());
                 ai.setValidUntil(premiumUntil * 1000, this.br);
-                account.setType(AccountType.PREMIUM);
             } else {
+                /* Free account */
+                account.setType(AccountType.FREE);
                 final long free_traffic_max_daily = ((Number) accountInfo.get("free_traffic")).longValue();
                 final long free_traffic_left = ((Number) accountInfo.get("remain_free_traffic")).longValue();
-                if (free_traffic_left > free_traffic_max_daily) {
-                    /* User has more traffic than downloadable daily for free users --> Show max daily traffic. */
-                    ai.setTrafficLeft(free_traffic_max_daily);
+                ai.setTrafficMax(free_traffic_max_daily);
+                ai.setTrafficLeft(free_traffic_left);
+                /* Only free accounts have a daily download limit -> Display that in GUI. */
+                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Heute übrig: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
                 } else {
-                    /* User has less traffic (or equal) than downloadable daily for free users --> Show real traffic left. */
-                    ai.setTrafficLeft(free_traffic_left);
-                    ai.setTrafficMax(free_traffic_max_daily);
+                    ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Remaining today: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
                 }
-                account.setType(AccountType.FREE);
-            }
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Heute übrig: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
-            } else {
-                ai.setStatus(StringUtils.valueOfOrNull(accountInfo.get("type")) + " | Remaining today: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), trafficLeftToday));
             }
             account.setConcurrentUsePossible(true);
             /* Set supported hosts, host specific limits and account limits. */
@@ -740,10 +739,10 @@ public abstract class HighWayCore extends UseNet {
             final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
             final PluginFinder pluginFinder = new PluginFinder(getLogger());
             final HashSet<String> ignoreItems = new HashSet<String>();
-            boolean supportsUsenet = false;
             ignoreItems.add("beta");
             ignoreItems.add("TV Recorder");
             ignoreItems.add("WebDav");
+            boolean supportsUsenet = false;
             synchronized (getMapLock()) {
                 final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
                 final Map<String, Integer> hostTrafficCalculationMap = getMap(HighWayCore.hostTrafficCalculationMap);

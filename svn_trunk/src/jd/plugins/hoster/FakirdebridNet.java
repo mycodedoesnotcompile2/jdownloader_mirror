@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49976 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://fakirdebrid.net/api";
@@ -254,12 +254,13 @@ public class FakirdebridNet extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (Boolean.TRUE.equals(entries.get("banned"))) {
             throw new AccountInvalidException("Account banned");
         }
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         /*
          * User only enters apikey as password and could enter anything into the username field --> Make sure it contains an unique value.
          */

@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,57 +53,10 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
-
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
+import javax.swing.table.JTableHeader;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -112,9 +66,12 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtComponentRowHighlighter;
+import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.swing.exttable.columns.ExtCheckColumn;
 import org.appwork.swing.exttable.columns.ExtFileSizeColumn;
 import org.appwork.swing.exttable.columns.ExtLongColumn;
+import org.appwork.swing.exttable.columns.ExtProgressColumn;
 import org.appwork.swing.exttable.columns.ExtTextColumn;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TrackerJob;
@@ -207,10 +164,61 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
+
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
@@ -220,11 +228,10 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-                                                  /**
-                                                   * these patterns should split filename and fileextension (extension must include the
-                                                   * point)
-                                                   */
-                                                  // multipart rar archives
+            /**
+             * these patterns should split filename and fileextension (extension must include the point)
+             */
+            // multipart rar archives
             Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
             // normal files with extension
             Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
@@ -786,7 +793,6 @@ public abstract class PluginForHost extends Plugin {
     private static final String          AUTO_FILE_NAME_CORRECTION_NAME_SPLIT_PATTERN = "AUTO_FILE_NAME_CORRECTION_NAME_SPLIT_PATTERN";
     private long                         WAIT_BETWEEN_STARTS                          = 0;
     private boolean                      enablePremium                                = false;
-    private boolean                      accountWithoutUsername                       = false;
     private String                       premiumurl                                   = null;
     private DownloadLink                 link                                         = null;
     protected DownloadInterfaceFactory   customizedDownloadFactory                    = null;
@@ -1095,7 +1101,6 @@ public abstract class PluginForHost extends Plugin {
      * @param link
      * @param account
      * @param includeSubdomain
-     *            TODO
      * @return
      */
     public String getHost(DownloadLink link, Account account, boolean includeSubdomain) {
@@ -1115,7 +1120,6 @@ public abstract class PluginForHost extends Plugin {
      * @param account
      * @return
      * @throws Exception
-     *             TODO
      */
     public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
         return true;
@@ -1145,64 +1149,60 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
-        final AccountTrafficView accountTrafficView = getAccountTrafficView(account);
-        if (accountTrafficView == null) {
+        if (account == null) {
             return true;
         }
-        final long trafficLeft = accountTrafficView.getTrafficLeft();
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return true;
+        }
+        final long trafficLeft = ai.getTrafficLeft();
         final long minimum = 1024;
         final long downloadSize = link.getView().getBytesTotalEstimated();
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && account != null && !StringUtils.equalsIgnoreCase(link.getHost(), account.getHoster()) && downloadSize != -1) {
-            final AccountInfo ai = account.getAccountInfo();
-            if (ai == null) {
-                /* Multihoster account without accountInfo -> That should never happen */
-                return false;
-            }
-            /* Verify again because plugins can modify list on runtime */
+        long trafficNeeded = 0;
+        if (downloadSize > 0) {
+            trafficNeeded = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
+        } else {
+            trafficNeeded = minimum;
+        }
+        if (account.isMultiHost() && !account.getHoster().equals(link.getHost())) {
             /* Check for domain specific limits of multihost items. */
-            final MultiHostHost hostinfo = ai.getMultihostSupportedHost(link.getHost());
-            if (hostinfo == null) {
-                /* Not supported */
+            /* Verify again if host is still supported because plugins can modify list on runtime */
+            final MultiHostHost mhost = ai.getMultihostSupportedHost(link.getHost());
+            if (mhost == null) {
+                /* Host is not supported (anymore) */
                 return false;
             }
-            final long trafficCalcFactor = hostinfo.getTrafficCalculationFactorPercent();
-            long neededTraffic = downloadSize;
-            if (trafficCalcFactor != 100) {
-                neededTraffic = (downloadSize * trafficCalcFactor) / 100;
-                if (neededTraffic > trafficLeft) {
+            final MultihosterHostStatus status = mhost.getStatus();
+            if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
+                /* Download of that host is currently not possible. */
+                return false;
+            } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
+                /* Max limits link is reached -> Cannot download */
+                return false;
+            }
+            if (!mhost.isUnlimitedTraffic()) {
+                /* Traffic limit exists -> Check if enough traffic is left. */
+                final long host_TrafficLeft = mhost.getTrafficLeft();
+                if (mhost.getTrafficLeft() <= 0) {
+                    /* No traffic left at all. */
+                    return false;
+                }
+                /* In some cases, individual hosts can have different traffic calculation values than 100%. */
+                trafficNeeded = (trafficNeeded * mhost.getTrafficCalculationFactorPercent()) / 100;
+                if (trafficNeeded > host_TrafficLeft) {
+                    /* Not enough individual file host traffic */
+                    // TODO: Implement ConditionalSkipReasonException handling
                     return false;
                 }
             }
-            /* Account itself has enough traffic but does it have enough traffic for the host we are trying to download from? */
-            if (!hostinfo.isUnlimitedTraffic() && neededTraffic > hostinfo.getTrafficLeft()) {
-                /* Not enough traffic to download this file */
-                return false;
-            }
         }
-        if (accountTrafficView.isUnlimitedTraffic() || accountTrafficView.isSpecialTraffic()) {
-            return true;
-        } else if (trafficLeft == 0) {
-            if (accountTrafficView.isTrafficRefill()) {
-                final long downloadLeft;
-                if (downloadSize >= 0) {
-                    downloadLeft = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
-                } else {
-                    downloadLeft = minimum;
-                }
-                throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, downloadLeft));
-            } else {
-                return false;
-            }
-        } else {
-            if (downloadSize <= 0) {
-                /* File size is unknown */
-                return true;
-            }
-            final long downloadLeft = Math.max(0, downloadSize - link.getView().getBytesLoaded());
-            if (trafficLeft - downloadLeft <= 0) {
-                if (accountTrafficView.isTrafficRefill()) {
-                    final long required = Math.max(minimum, downloadLeft - trafficLeft);
-                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, required));
+        if (!ai.isUnlimitedTraffic() && !ai.isSpecialTraffic()) {
+            /* Check if enough traffic is left */
+            if (trafficLeft < trafficNeeded) {
+                if (ai.isTrafficRefill()) {
+                    final long howMuchTrafficWeNeed = trafficNeeded - trafficLeft;
+                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, howMuchTrafficWeNeed));
                 } else {
                     return false;
                 }
@@ -1344,7 +1344,22 @@ public abstract class PluginForHost extends Plugin {
     protected void finalHandle(DownloadLink downloadLink, Account account, PluginForHost pluginForHost) {
     }
 
-    public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) throws PluginException {
+    public long getTrafficRequired(final DownloadLink downloadLink, final Account account, long bytes) throws PluginException {
+        if (account == null) {
+            return bytes;
+        }
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return bytes;
+        }
+        final MultiHostHost mhost = ai.getMultihostSupportedHost(downloadLink.getHost());
+        if (mhost == null) {
+            return bytes;
+        }
+        return (bytes * mhost.getTrafficCalculationFactorPercent()) / 100;
+    }
+
+    public void update(final DownloadLink downloadLink, final Account account, final long bytesTransfered) throws PluginException {
         if (account == null) {
             return;
         } else if (bytesTransfered == 0) {
@@ -1355,15 +1370,14 @@ public abstract class PluginForHost extends Plugin {
         if (ai == null) {
             return;
         } else if (ai.isUnlimitedTraffic()) {
-            /* Unlimited traffic -> Do not deduct trraffic. */
+            /* Unlimited traffic -> Do not deduct traffic. */
             return;
         }
-        final long left = Math.max(0, ai.getTrafficLeft() - bytesTransfered);
-        ai.setTrafficLeft(left);
-        if (left == 0) {
-            if (!ai.isSpecialTraffic()) {
-                throw new AccountUnavailableException("No traffic left", 5 * 60 * 1000);
-            }
+        final long trafficToDeduct = getTrafficRequired(downloadLink, account, bytesTransfered);
+        final long trafficLeft = Math.max(0, ai.getTrafficLeft() - trafficToDeduct);
+        ai.setTrafficLeft(trafficLeft);
+        if (!ai.isSpecialTraffic() && trafficLeft == 0) {
+            throw new AccountUnavailableException(_GUI.T.account_error_no_traffic_left(), 5 * 60 * 1000);
         }
     }
 
@@ -1402,16 +1416,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         * 
+         *
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         * 
+         *
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         * 
+         *
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         * 
-         * 
-         * 
+         *
+         *
+         *
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3042,12 +3056,16 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public boolean hasFeature(final LazyPlugin.FEATURE feature) {
+        if (feature == null) {
+            return false;
+        }
         final LazyPlugin.FEATURE[] features = getFeatures();
-        if (features != null && features.length > 0 && feature != null) {
-            for (int i = 0; i < features.length; i++) {
-                if (features[i] == feature) {
-                    return true;
-                }
+        if (features == null) {
+            return false;
+        }
+        for (int i = 0; i < features.length; i++) {
+            if (features[i] == feature) {
+                return true;
             }
         }
         return false;
@@ -3145,7 +3163,7 @@ public abstract class PluginForHost extends Plugin {
         final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
         final boolean shouldShowTrafficCaculationColumn_final = shouldShowTrafficCaculationColumn;
         final boolean shouldShowUnavailableForColumn_final = shouldShowUnavailableForColumn;
-        final Icon error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
+        final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
         final Icon icon_wait = NewTheme.I().getIcon(IconKey.ICON_WAIT, 16);
@@ -3153,6 +3171,47 @@ public abstract class PluginForHost extends Plugin {
         final ExtTableModel<MultiHostHost> tableModel = new ExtTableModel<MultiHostHost>("MultiHostHostTable_" + acc.getHoster()) {
             @Override
             protected void initColumns() {
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    // TODO: Add functionality
+                    addColumn(new ExtCheckColumn<MultiHostHost>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
+                        public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
+                            final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
+                                private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
+
+                                @Override
+                                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                                    super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                                    setIcon(ok);
+                                    setHorizontalAlignment(CENTER);
+                                    setText(null);
+                                    return this;
+                                }
+                            };
+                            return ret;
+                        }
+
+                        @Override
+                        public int getMaxWidth() {
+                            return 30;
+                        }
+
+                        @Override
+                        protected boolean getBooleanValue(MultiHostHost mhost) {
+                            return true;
+                        }
+
+                        @Override
+                        public boolean isEditable(MultiHostHost mhost) {
+                            return true;
+                        }
+
+                        @Override
+                        protected void setBooleanValue(boolean value, final MultiHostHost mhost) {
+                            // object.getAccount().setEnabled(value);
+                            fireTableStructureChanged();
+                        }
+                    });
+                }
                 addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
                     @Override
                     public String getStringValue(final MultiHostHost mhost) {
@@ -3230,7 +3289,7 @@ public abstract class PluginForHost extends Plugin {
                         } else if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
                             return icon_warning;
                         } else {
-                            return error;
+                            return icon_error;
                         }
                     }
                 });
@@ -3273,18 +3332,41 @@ public abstract class PluginForHost extends Plugin {
                     });
                 }
                 if (shouldShowLinkLimitColumns_final) {
-                    addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left_max()) {
+                    addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left_max()) {
                         @Override
-                        protected long getLong(MultiHostHost mhost) {
-                            return mhost.getLinksLeft();
+                        public int getMinWidth() {
+                            return 50;
                         }
 
                         @Override
-                        protected String getLongFormatted(MultiHostHost mhost) {
+                        protected boolean isIndeterminated(final MultiHostHost value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                            return false;
+                        }
+
+                        @Override
+                        protected String getString(MultiHostHost mhost, long current, long total) {
                             if (mhost.isUnlimitedLinks()) {
                                 return _GUI.T.lit_unlimited();
                             } else {
                                 return mhost.getLinksLeft() + "/" + mhost.getLinksMax();
+                            }
+                        }
+
+                        @Override
+                        protected long getMax(MultiHostHost mhost) {
+                            if (mhost.isUnlimitedLinks()) {
+                                return Long.MAX_VALUE;
+                            } else {
+                                return mhost.getLinksMax();
+                            }
+                        }
+
+                        @Override
+                        protected long getValue(MultiHostHost mhost) {
+                            if (mhost.isUnlimitedLinks()) {
+                                return Long.MAX_VALUE;
+                            } else {
+                                return mhost.getLinksLeft();
                             }
                         }
                     });
@@ -3330,19 +3412,49 @@ public abstract class PluginForHost extends Plugin {
                     });
                 }
                 if (shouldShowTrafficLimitColumns_final) {
-                    addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left_max()) {
+                    addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left_max()) {
+                        private final SIZEUNIT      maxSizeUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
+                        private final DecimalFormat formatter   = new DecimalFormat();
+
                         @Override
-                        public String getStringValue(MultiHostHost mhost) {
+                        public int getMinWidth() {
+                            return 140;
+                        }
+
+                        @Override
+                        protected boolean isIndeterminated(final MultiHostHost value, final boolean isSelected, final boolean hasFocus, final int row, final int column) {
+                            return false;
+                        }
+
+                        @Override
+                        protected String getString(MultiHostHost mhost, long current, long total) {
                             if (mhost.isUnlimitedTraffic()) {
-                                return _GUI.T.lit_unlimited();
+                                return _GUI.T.premiumaccounttablemodel_column_trafficleft_unlimited();
                             } else {
                                 return getSizeString(mhost.getTrafficLeft()) + "/" + getSizeString(mhost.getTrafficMax());
                             }
                         }
 
+                        private final String getSizeString(final long fileSize) {
+                            return SIZEUNIT.formatValue(maxSizeUnit, formatter, fileSize);
+                        }
+
                         @Override
-                        protected long getBytes(MultiHostHost val) {
-                            return val.getTrafficLeft();
+                        protected long getMax(MultiHostHost mhost) {
+                            if (mhost.isUnlimitedTraffic()) {
+                                return Long.MAX_VALUE;
+                            } else {
+                                return mhost.getTrafficMax();
+                            }
+                        }
+
+                        @Override
+                        protected long getValue(MultiHostHost mhost) {
+                            if (mhost.isUnlimitedTraffic()) {
+                                return Long.MAX_VALUE;
+                            } else {
+                                return mhost.getTrafficLeft();
+                            }
                         }
                     });
                     addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left()) {
@@ -3399,7 +3511,6 @@ public abstract class PluginForHost extends Plugin {
                         }
                     });
                 }
-
             }
         };
         if (shouldShowLinkLimitColumns_final || shouldShowTrafficLimitColumns_final || shouldShowUnavailableForColumn_final) {
@@ -3454,7 +3565,6 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public void extendAccountSettingsPanel(final Account acc, final PluginConfigPanelNG panel) {
-
     }
 
     /**

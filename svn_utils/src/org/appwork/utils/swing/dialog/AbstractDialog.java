@@ -989,6 +989,11 @@ public abstract class AbstractDialog<T> implements ActionListener, WindowListene
      */
     protected DefaultButtonPanel getDefaultButtonPanel() {
         final DefaultButtonPanel ret = this.createBottomButtonPanel();
+        if (this.actions != null) {
+            for (final AbstractAction a : this.actions) {
+                ret.addAction(a);
+            }
+        }
         return ret;
     }
 

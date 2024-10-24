@@ -27,13 +27,15 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50013 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
 public class JumploadsComFolder extends PluginForDecrypt {
     public JumploadsComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,6 +80,8 @@ public class JumploadsComFolder extends PluginForDecrypt {
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"tc empty-dir\"")) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         final String titleFromURL = Encoding.htmlDecode(new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1)).trim();
         final String[] htmls = br.getRegex("<a [^>]+ data-isd[^>]+>.*?</div>\\s+</a>").getColumn(-1);

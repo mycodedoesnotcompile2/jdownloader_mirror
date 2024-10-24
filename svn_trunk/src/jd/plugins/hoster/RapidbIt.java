@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49964 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
 public class RapidbIt extends PluginForHost {
     private final String                 API_BASE                    = "https://rapidb.it/api";
     private static MultiHosterManagement mhm                         = new MultiHosterManagement("rapidb.it");
@@ -234,11 +234,12 @@ public class RapidbIt extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
         final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         br.getPage(API_BASE + "/system/config");
         final Map<String, Object> apiconfig = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         ai.setCreateTime(((Number) user.get("created")).longValue());
         final int level_id = ((Number) user.get("level_id")).intValue();
         final List<Map<String, Object>> levels = (List<Map<String, Object>>) apiconfig.get("levels");

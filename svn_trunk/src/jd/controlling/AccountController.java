@@ -31,22 +31,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-import jd.http.Browser;
-import jd.http.BrowserSettingsThread;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.Account.AccountPropertyChangeHandler;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountProperty;
-import jd.plugins.PluginForHost;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -79,17 +63,34 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.AccountData;
 import org.jdownloader.settings.AccountSettings;
 
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+import jd.http.Browser;
+import jd.http.BrowserSettingsThread;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.Account.AccountPropertyChangeHandler;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountProperty;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.PluginForHost;
+
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
     private final HashMap<String, List<Account>>                                 MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
-        @Override
-        protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
-            listener.onAccountControllerEvent(event);
-        }
-    };
+                                                                                                      @Override
+                                                                                                      protected void fireEvent(final AccountControllerListener listener, final AccountControllerEvent event) {
+                                                                                                          listener.onAccountControllerEvent(event);
+                                                                                                      }
+                                                                                                  };
 
     public Eventsender<AccountControllerListener, AccountControllerEvent> getEventSender() {
         return broadcaster;
@@ -263,8 +264,7 @@ public class AccountController implements AccountControllerListener, AccountProp
                         account.setError(AccountError.EXPIRED, -1, null);
                         /* account is expired, no need to update */
                         return ai;
-                    }
-                    if (!account.isValid()) {
+                    } else if (!account.isValid()) {
                         account.setError(AccountError.INVALID, -1, null);
                         /* account is invalid, no need to update */
                         return ai;
@@ -345,6 +345,8 @@ public class AccountController implements AccountControllerListener, AccountProp
                     logger.info("Account:" + whoAmI + "|Expired!");
                     account.setError(AccountError.EXPIRED, -1, null);
                     return ai;
+                } else if (ai != null && !ai.isUnlimitedTraffic() && !ai.isSpecialTraffic() && ai.getTrafficLeft() == 0) {
+                    throw new AccountUnavailableException(_GUI.T.account_error_no_traffic_left(), 5 * 60 * 1000);
                 }
                 if (tempDisabledCounterBefore > 0 && account.getTmpDisabledTimeout() == tempDisabledCounterBefore) {
                     /* Reset temp disabled information */
@@ -400,81 +402,88 @@ public class AccountController implements AccountControllerListener, AccountProp
     private final long   minimumExtendTime                    = 24 * 60 * 60 * 1000l;
 
     private void checkAccountUpOrDowngrade(final Account account) {
-        final AccountInfo accountInfo = account.getAccountInfo();
-        if (accountInfo != null && account.getError() == null && account.getLastValidTimestamp() > 0 && account.getPlugin() != null) {
-            final String lastKnownAccountType;
-            final AccountType currentAccountType = account.getType();
-            if (currentAccountType != null) {
-                lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, currentAccountType.name());
-                account.setProperty(lastKnownAccountTypeProperty, currentAccountType.name());
+        final AccountInfo ai = account.getAccountInfo();
+        if (ai == null) {
+            return;
+        } else if (account.getError() != null) {
+            return;
+        } else if (account.getLastValidTimestamp() <= 0) {
+            return;
+        } else if (account.getPlugin() == null) {
+            return;
+        }
+        final String lastKnownAccountType;
+        final AccountType currentAccountType = account.getType();
+        if (currentAccountType != null) {
+            lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, currentAccountType.name());
+            account.setProperty(lastKnownAccountTypeProperty, currentAccountType.name());
+        } else {
+            lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
+            account.setProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
+        }
+        final long currentValidUntilTimeStamp = account.getValidPremiumUntil();
+        final boolean hasLastKnownPremiumValidUntilTimeStamp = account.hasProperty(lastKnownValidUntilTimeStampProperty);
+        final long lastKnownPremiumValidUntilTimeStamp = account.getLongProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
+        final boolean isPremiumAccount = AccountType.PREMIUM.equals(currentAccountType) || AccountType.LIFETIME.equals(currentAccountType);
+        final boolean wasPremiumAccount = AccountType.PREMIUM.name().equals(lastKnownAccountType) || AccountType.LIFETIME.name().equals(lastKnownAccountType);
+        final boolean isPremiumUpgraded = isPremiumAccount && !wasPremiumAccount;
+        final boolean isPremiumDowngraded = !isPremiumAccount && wasPremiumAccount;
+        final boolean isLimitedRenewal = (currentValidUntilTimeStamp > lastKnownPremiumValidUntilTimeStamp && (currentValidUntilTimeStamp - lastKnownPremiumValidUntilTimeStamp) > minimumExtendTime);
+        final boolean isPremiumLimitedRenewal = isPremiumAccount && isLimitedRenewal;
+        final boolean isUnlimitedRenewal = currentValidUntilTimeStamp != lastKnownPremiumValidUntilTimeStamp && currentValidUntilTimeStamp == -1;
+        final boolean isPremiumUnlimitedRenewal = isPremiumAccount && isUnlimitedRenewal;
+        if (isPremiumLimitedRenewal || isPremiumUnlimitedRenewal) {
+            account.setProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
+        } else if (isPremiumAccount && !hasLastKnownPremiumValidUntilTimeStamp) {
+            account.setProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
+        }
+        final long renewalDuration;
+        if (currentValidUntilTimeStamp > 0) {
+            if (lastKnownPremiumValidUntilTimeStamp > 0 && (lastKnownPremiumValidUntilTimeStamp - System.currentTimeMillis() > 0)) {
+                renewalDuration = currentValidUntilTimeStamp - lastKnownPremiumValidUntilTimeStamp;
             } else {
-                lastKnownAccountType = account.getStringProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
-                account.setProperty(lastKnownAccountTypeProperty, AccountType.UNKNOWN.name());
+                renewalDuration = currentValidUntilTimeStamp - System.currentTimeMillis();
             }
-            final long currentValidUntilTimeStamp = account.getValidPremiumUntil();
-            final boolean hasLastKnownPremiumValidUntilTimeStamp = account.hasProperty(lastKnownValidUntilTimeStampProperty);
-            final long lastKnownPremiumValidUntilTimeStamp = account.getLongProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
-            final boolean isPremiumAccount = AccountType.PREMIUM.equals(currentAccountType) || AccountType.LIFETIME.equals(currentAccountType);
-            final boolean wasPremiumAccount = AccountType.PREMIUM.name().equals(lastKnownAccountType) || AccountType.LIFETIME.name().equals(lastKnownAccountType);
-            final boolean isPremiumUpgraded = isPremiumAccount && !wasPremiumAccount;
-            final boolean isPremiumDowngraded = !isPremiumAccount && wasPremiumAccount;
-            final boolean isLimitedRenewal = (currentValidUntilTimeStamp > lastKnownPremiumValidUntilTimeStamp && (currentValidUntilTimeStamp - lastKnownPremiumValidUntilTimeStamp) > minimumExtendTime);
-            final boolean isPremiumLimitedRenewal = isPremiumAccount && isLimitedRenewal;
-            final boolean isUnlimitedRenewal = currentValidUntilTimeStamp != lastKnownPremiumValidUntilTimeStamp && currentValidUntilTimeStamp == -1;
-            final boolean isPremiumUnlimitedRenewal = isPremiumAccount && isUnlimitedRenewal;
-            if (isPremiumLimitedRenewal || isPremiumUnlimitedRenewal) {
-                account.setProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
-            } else if (isPremiumAccount && !hasLastKnownPremiumValidUntilTimeStamp) {
-                account.setProperty(lastKnownValidUntilTimeStampProperty, currentValidUntilTimeStamp);
-            }
-            final long renewalDuration;
-            if (currentValidUntilTimeStamp > 0) {
-                if (lastKnownPremiumValidUntilTimeStamp > 0 && (lastKnownPremiumValidUntilTimeStamp - System.currentTimeMillis() > 0)) {
-                    renewalDuration = currentValidUntilTimeStamp - lastKnownPremiumValidUntilTimeStamp;
-                } else {
-                    renewalDuration = currentValidUntilTimeStamp - System.currentTimeMillis();
+        } else {
+            renewalDuration = 0;
+        }
+        if (isPremiumDowngraded || isPremiumUpgraded || isPremiumLimitedRenewal || isPremiumUnlimitedRenewal) {
+            getEventSender().fireEvent(new AccountUpOrDowngradeEvent(this, account) {
+                @Override
+                public boolean isPremiumAccount() {
+                    return isPremiumAccount;
                 }
-            } else {
-                renewalDuration = 0;
-            }
-            if (isPremiumDowngraded || isPremiumUpgraded || isPremiumLimitedRenewal || isPremiumUnlimitedRenewal) {
-                getEventSender().fireEvent(new AccountUpOrDowngradeEvent(this, account) {
-                    @Override
-                    public boolean isPremiumAccount() {
-                        return isPremiumAccount;
-                    }
 
-                    @Override
-                    public boolean isPremiumUpgraded() {
-                        return isPremiumUpgraded;
-                    }
+                @Override
+                public boolean isPremiumUpgraded() {
+                    return isPremiumUpgraded;
+                }
 
-                    @Override
-                    public boolean isPremiumDowngraded() {
-                        return isPremiumDowngraded;
-                    }
+                @Override
+                public boolean isPremiumDowngraded() {
+                    return isPremiumDowngraded;
+                }
 
-                    @Override
-                    public boolean isPremiumLimitedRenewal() {
-                        return isPremiumLimitedRenewal;
-                    }
+                @Override
+                public boolean isPremiumLimitedRenewal() {
+                    return isPremiumLimitedRenewal;
+                }
 
-                    @Override
-                    public boolean isPremiumUnlimitedRenewal() {
-                        return isPremiumUnlimitedRenewal;
-                    }
+                @Override
+                public boolean isPremiumUnlimitedRenewal() {
+                    return isPremiumUnlimitedRenewal;
+                }
 
-                    @Override
-                    public long getPremiumRenewalDuration() {
-                        return renewalDuration;
-                    }
+                @Override
+                public long getPremiumRenewalDuration() {
+                    return renewalDuration;
+                }
 
-                    @Override
-                    public long getExpireTimeStamp() {
-                        return currentValidUntilTimeStamp;
-                    }
-                });
-            }
+                @Override
+                public long getExpireTimeStamp() {
+                    return currentValidUntilTimeStamp;
+                }
+            });
         }
     }
 
@@ -587,16 +596,16 @@ public class AccountController implements AccountControllerListener, AccountProp
     }
 
     public int getAccountsSize(final String host) {
-        if (host != null) {
-            synchronized (AccountController.this) {
-                final List<Account> ret = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-                if (ret != null && ret.size() > 0) {
-                    return ret.size();
-                }
-                return 0;
-            }
+        if (host == null) {
+            return 0;
         }
-        return 0;
+        synchronized (AccountController.this) {
+            final List<Account> ret = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
+            if (ret != null && ret.size() > 0) {
+                return ret.size();
+            }
+            return 0;
+        }
     }
 
     public void addAccount(final Account account) {
@@ -760,14 +769,15 @@ public class AccountController implements AccountControllerListener, AccountProp
     private void refreshAccountStats() {
         synchronized (AccountController.this) {
             for (final List<Account> accounts : ACCOUNTS.values()) {
-                if (accounts != null) {
-                    for (final Account acc : accounts) {
-                        if (acc.getPlugin() != null && acc.isEnabled() && acc.isValid() && acc.refreshTimeoutReached()) {
-                            /*
-                             * we do not force update here, the internal timeout will make sure accounts get fresh checked from time to time
-                             */
-                            AccountChecker.getInstance().check(acc, false);
-                        }
+                if (accounts == null) {
+                    return;
+                }
+                for (final Account acc : accounts) {
+                    if (acc.getPlugin() != null && acc.isEnabled() && acc.isValid() && acc.refreshTimeoutReached()) {
+                        /*
+                         * we do not force update here, the internal timeout will make sure accounts get fresh checked from time to time
+                         */
+                        AccountChecker.getInstance().check(acc, false);
                     }
                 }
             }
@@ -790,38 +800,37 @@ public class AccountController implements AccountControllerListener, AccountProp
     public ArrayList<Account> getValidAccounts(final String host) {
         if (StringUtils.isEmpty(host)) {
             return null;
-        } else {
-            final ArrayList<Account> ret;
-            final Thread currentThread = Thread.currentThread();
-            if (currentThread instanceof SingleDownloadController) {
-                // requestFileInformation must use the account from DownloadLinkCandidate of SingleDownloadController
-                final SingleDownloadController controller = (SingleDownloadController) currentThread;
-                final Account acc = controller.getAccount();
-                if (acc == null) {
-                    return null;
-                } else if (StringUtils.equals(acc.getHosterByPlugin(), host)) {
-                    ret = new ArrayList<Account>();
-                    ret.add(acc);
-                    return ret;
-                }
-            }
-            synchronized (AccountController.this) {
-                final List<Account> accounts = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-                if (accounts == null || accounts.size() == 0) {
-                    return null;
-                }
-                ret = new ArrayList<Account>(accounts);
-            }
-            final ListIterator<Account> it = ret.listIterator(ret.size());
-            while (it.hasPrevious()) {
-                final Account next = it.previous();
-                if (!next.isEnabled() || !next.isValid() || next.isTempDisabled() || next.getPlugin() == null) {
-                    /* we remove every invalid/disabled/tempdisabled/blocked account */
-                    it.remove();
-                }
-            }
-            return ret;
         }
+        final ArrayList<Account> ret;
+        final Thread currentThread = Thread.currentThread();
+        if (currentThread instanceof SingleDownloadController) {
+            // requestFileInformation must use the account from DownloadLinkCandidate of SingleDownloadController
+            final SingleDownloadController controller = (SingleDownloadController) currentThread;
+            final Account acc = controller.getAccount();
+            if (acc == null) {
+                return null;
+            } else if (StringUtils.equals(acc.getHosterByPlugin(), host)) {
+                ret = new ArrayList<Account>();
+                ret.add(acc);
+                return ret;
+            }
+        }
+        synchronized (AccountController.this) {
+            final List<Account> accounts = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
+            if (accounts == null || accounts.size() == 0) {
+                return null;
+            }
+            ret = new ArrayList<Account>(accounts);
+        }
+        final ListIterator<Account> it = ret.listIterator(ret.size());
+        while (it.hasPrevious()) {
+            final Account next = it.previous();
+            if (!next.isEnabled() || !next.isValid() || next.isTempDisabled() || next.getPlugin() == null) {
+                /* we remove every invalid/disabled/tempdisabled/blocked account */
+                it.remove();
+            }
+        }
+        return ret;
     }
 
     /** Checks if account with expected properties exists. */
@@ -831,52 +840,55 @@ public class AccountController implements AccountControllerListener, AccountProp
         }
         synchronized (AccountController.this) {
             final List<Account> accounts = ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-            if (accounts != null) {
-                for (final Account account : accounts) {
-                    if (account.getPlugin() != null) {
-                        if (isEnabled != null && isEnabled != account.isEnabled()) {
+            if (accounts == null) {
+                return false;
+            }
+            for (final Account account : accounts) {
+                if (account.getPlugin() == null) {
+                    continue;
+                }
+                if (isEnabled != null && isEnabled != account.isEnabled()) {
+                    continue;
+                } else if (isValid != null && isValid != (account.getError() == null)) {
+                    continue;
+                } else if (isPremium != null && isPremium != AccountType.PREMIUM.equals(account.getType())) {
+                    continue;
+                } else if (isExpired != null) {
+                    final AccountInfo ai = account.getAccountInfo();
+                    if (ai != null) {
+                        final long validUntilTimeStamp = ai.getValidUntil();
+                        final boolean expired = validUntilTimeStamp > 0 && validUntilTimeStamp - System.currentTimeMillis() < 0;
+                        if (isExpired != expired) {
                             continue;
-                        } else if (isValid != null && isValid != (account.getError() == null)) {
-                            continue;
-                        } else if (isPremium != null && isPremium != AccountType.PREMIUM.equals(account.getType())) {
-                            continue;
-                        } else if (isExpired != null) {
-                            final AccountInfo ai = account.getAccountInfo();
-                            if (ai != null) {
-                                final long validUntilTimeStamp = ai.getValidUntil();
-                                final boolean expired = validUntilTimeStamp > 0 && validUntilTimeStamp - System.currentTimeMillis() < 0;
-                                if (isExpired != expired) {
-                                    continue;
-                                }
-                            }
                         }
-                        return true;
                     }
                 }
+                return true;
             }
         }
         return false;
     }
 
     public List<Account> getMultiHostAccounts(final String host) {
-        if (host != null) {
-            synchronized (AccountController.this) {
-                final List<Account> list = MULTIHOSTER_ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
-                if (list != null && list.size() > 0) {
-                    return new ArrayList<Account>(list);
-                }
+        if (host == null) {
+            return null;
+        }
+        synchronized (AccountController.this) {
+            final List<Account> list = MULTIHOSTER_ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
+            if (list != null && list.size() > 0) {
+                return new ArrayList<Account>(list);
             }
         }
         return null;
     }
 
     public boolean hasMultiHostAccounts(final String host) {
-        if (host != null) {
-            synchronized (AccountController.this) {
-                return MULTIHOSTER_ACCOUNTS.containsKey(host.toLowerCase(Locale.ENGLISH));
-            }
+        if (host == null) {
+            return false;
         }
-        return false;
+        synchronized (AccountController.this) {
+            return MULTIHOSTER_ACCOUNTS.containsKey(host.toLowerCase(Locale.ENGLISH));
+        }
     }
 
     @Deprecated
@@ -918,9 +930,10 @@ public class AccountController implements AccountControllerListener, AccountProp
 
     public static void openAfflink(final LazyHostPlugin lazyHostPlugin, final PluginForHost plugin, final String source) {
         final String refURL = buildAfflink(lazyHostPlugin, plugin, source);
-        if (refURL != null) {
-            CrossSystem.openURL(refURL);
+        if (refURL == null) {
+            return;
         }
+        CrossSystem.openURL(refURL);
     }
 
     @Override

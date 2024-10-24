@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,10 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 47483 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = {}, urls = {})
 public class NinecloudUs extends PluginForHost {
     public NinecloudUs(PluginWrapper wrapper) {
         super(wrapper);
@@ -42,7 +42,7 @@ public class NinecloudUs extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.9cloud.us/terms/";
+        return "https://www." + getHost() + "/terms/";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -70,9 +70,8 @@ public class NinecloudUs extends PluginForHost {
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 1;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
     // private static final boolean ACCOUNT_FREE_RESUME = true;
     // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
@@ -102,18 +101,23 @@ public class NinecloudUs extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex(">Filename\\s*:\\s*([^<>\"]+)<").getMatch(0);
-        String filesize = br.getRegex(">Size\\s*:\\s*([^<>\"]+)<").getMatch(0);
+        String filename = br.getRegex(">\\s*Filename\\s*:\\s*([^<>\"]+)<").getMatch(0);
+        String filesize = br.getRegex(">\\s*Size\\s*:\\s*([^<>\"]+)<").getMatch(0);
         /* 2021-02-17: Filename is not visible e.g. when limit is currently reached. */
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
-        } else if (!link.isNameSet()) {
-            /* Fallback */
-            link.setName(this.getFID(link));
+        } else {
+            logger.warning("Failed to find filename");
+            if (!link.isNameSet()) {
+                /* Fallback */
+                link.setName(this.getFID(link));
+            }
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -131,12 +135,11 @@ public class NinecloudUs extends PluginForHost {
             if (waitMinutesStr != null) {
                 throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Long.parseLong(waitMinutesStr) * 60 * 1001l);
             }
-            dllink = br.getRegex("\"(https?://downloads.[^/]+/[^<>\"]+)\"").getMatch(0);
+            dllink = br.getRegex("\"(https?://(downloads|slow).[^/]+/[^\"]+)\"").getMatch(0);
             if (dllink == null) {
-                dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download<").getMatch(0);
+                dllink = br.getRegex("<a href=\"(https?://[^\"]+)\"[^>]*>\\s*Download").getMatch(0);
             }
             if (StringUtils.isEmpty(dllink)) {
-                logger.warning("Failed to find final downloadurl");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -151,7 +154,7 @@ public class NinecloudUs extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -186,7 +189,7 @@ public class NinecloudUs extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     @Override

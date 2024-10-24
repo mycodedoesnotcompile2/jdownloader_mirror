@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49019 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
 public class File4GoCom extends antiDDoSForHost {
     public File4GoCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,6 +75,21 @@ public class File4GoCom extends antiDDoSForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         this.setBrowserExclusive();
+        if (!link.isNameSet()) {
+            final String contentStringB64 = this.getFID(link);
+            final String relativeURL = Encoding.Base64Decode(contentStringB64);
+            String weakFilename;
+            if (relativeURL.contains("/")) {
+                /* E.g. hd/123456/bla-bla-bla-mp4 */
+                final String[] urlparts = relativeURL.split("/");
+                weakFilename = urlparts[urlparts.length - 1];
+            } else {
+                weakFilename = relativeURL;
+            }
+            /* Fix file extension */
+            weakFilename = weakFilename.replaceFirst("-mp4$", ".mp4");
+            link.setName(weakFilename);
+        }
         br.setCookie(getHost(), "animesonline", "1");
         br.setCookie(getHost(), "musicasab", "1");
         br.setCookie(getHost(), "poup", "1");
@@ -88,7 +103,7 @@ public class File4GoCom extends antiDDoSForHost {
         } else if (br.containsHTML(">\\s*404 ARQUIVO N�O ENCOTRADO<|Arquivo Temporariamente Indisponivel|ARQUIVO DELATADO PELO USUARIO OU REMOVIDO POR <|ARQUIVO DELATADO POR <b>INATIVIDADE|O arquivo Não foi encotrado em nossos servidores")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        String filename = br.getRegex(">Nome:</b>\\s*(.*?)\\s*(?:</p>)?</span>").getMatch(0);
+        String filename = br.getRegex(">\\s*Nome:</b>\\s*(.*?)\\s*(?:</p>)?</span>").getMatch(0);
         if (filename == null) {
             filename = br.getRegex("<div id=\"titulo_a\">\\s*(.*?)\\s*</div>").getMatch(0);
         }

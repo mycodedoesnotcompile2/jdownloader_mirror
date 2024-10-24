@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.hosterrule.AccountGroup.Rules;
@@ -16,8 +15,6 @@ import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginForHost;
 
 public class AccountCache implements Iterable<CachedAccount> {
@@ -97,51 +94,6 @@ public class AccountCache implements Iterable<CachedAccount> {
                 if (supported == null || !supported.contains(link.getHost())) {
                     /* Host is not supported (anymore) */
                     return false;
-                }
-                /* Verify again because plugins can modify list on runtime */
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    /* Check for domain specific limits of multihost items. */
-                    final MultiHostHost hostinfo = ai.getMultihostSupportedHost(link.getHost());
-                    if (hostinfo == null) {
-                        /* Host is not supported (anymore) */
-                        return false;
-                    }
-                    final MultihosterHostStatus status = hostinfo.getStatus();
-                    if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
-                        /* Download of that host is currently not possible. */
-                        return false;
-                    } else if (!hostinfo.isUnlimitedLinks() && hostinfo.getLinksLeft() <= 0) {
-                        /* Max limits link is reached -> Cannot download */
-                        return false;
-                    }
-                    // TODO: Refactor this
-                    if (!hostinfo.isUnlimitedTraffic()) {
-                        /* Traffic limit exists -> Check if enough traffic is left. */
-                        if (hostinfo.getTrafficLeft() <= 0) {
-                            /* No traffic left at all. */
-                            return false;
-                        }
-                        if (link.isSizeSet()) {
-                            /* File size is known so we can check if we have enough traffic left to download that link. */
-                            final long trafficCalcFactor = hostinfo.getTrafficCalculationFactorPercent();
-                            final long downloadSize = link.getView().getBytesTotalEstimated();
-                            final long minimum = 1024;
-                            final long downloadLeft;
-                            if (downloadSize >= 0) {
-                                downloadLeft = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
-                            } else {
-                                downloadLeft = minimum;
-                            }
-                            final long neededTraffic = (downloadLeft * trafficCalcFactor) / 100;
-                            if (!ai.isUnlimitedTraffic() && neededTraffic > ai.getTrafficLeft()) {
-                                /* Not enough account traffic */
-                                return false;
-                            } else if (neededTraffic > hostinfo.getTrafficLeft()) {
-                                /* Not enough individual file host traffic */
-                                return false;
-                            }
-                        }
-                    }
                 }
             }
             return true;

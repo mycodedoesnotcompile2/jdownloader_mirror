@@ -47,11 +47,11 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
+@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
 public class EsouboryCz extends PluginForHost {
     public EsouboryCz(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.esoubory.cz/credits/buy/");
+        this.enablePremium("https://www." + getHost() + "/credits/buy/");
     }
 
     @Override
@@ -62,7 +62,7 @@ public class EsouboryCz extends PluginForHost {
     /* Using similar API (and same owner): esoubory.cz, filesloop.com */
     @Override
     public String getAGBLink() {
-        return "http://www.esoubory.cz/";
+        return "https://www." + getHost();
     }
 
     private static final String          API_BASE                       = "https://www.esoubory.cz/api";
@@ -296,7 +296,9 @@ public class EsouboryCz extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        AccountInfo ai = new AccountInfo();
+        final AccountInfo ai = new AccountInfo();
+        /* Their entire system is credit based. Once the bought traffic is empty, the account cannot be used anymore. */
+        ai.setTrafficRefill(false);
         account.setConcurrentUsePossible(true);
         account.setMaxSimultanDownloads(-1);
         prepBr();
@@ -305,7 +307,7 @@ public class EsouboryCz extends PluginForHost {
         if (!br.getURL().contains("/accountinfo?token=")) {
             br.getPage(API_BASE + "/accountinfo?token=" + token);
         }
-        Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final long trafficLeftMB = ((Number) data.get("credit")).longValue();
         ai.setTrafficLeft(trafficLeftMB * 1024 * 1024);
@@ -323,12 +325,13 @@ public class EsouboryCz extends PluginForHost {
         data = (Map<String, Object>) entries.get("data");
         final String hostsStr = (String) data.get("list");
         final String[] hosts = hostsStr.split(";");
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
+        final ArrayList<String> supportedhosts = new ArrayList<String>();
         for (final String hostAsURL : hosts) {
-            final String host = Browser.getHost(hostAsURL);
-            supportedHosts.add(host);
+            String host = Browser.getHost(hostAsURL, true);
+            host = host.replaceFirst("www.", "");
+            supportedhosts.add(host);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupport(this, supportedhosts);
         return ai;
     }
 
@@ -378,13 +381,15 @@ public class EsouboryCz extends PluginForHost {
         final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
         final String error = (String) entries.get("error");
         /* "error":"" == default! */
-        if (!StringUtils.isEmpty(error)) {
-            if (error.equalsIgnoreCase("invalid-email")) {
-                throw new AccountInvalidException();
-            } else {
-                /* Undefined error --> Treat as account-error */
-                throw new AccountUnavailableException(error, 5 * 60 * 1000l);
-            }
+        if (StringUtils.isEmpty(error)) {
+            /* No error */
+            return;
+        }
+        if (error.equalsIgnoreCase("invalid-email")) {
+            throw new AccountInvalidException();
+        } else {
+            /* Undefined error --> Treat as account-error */
+            throw new AccountUnavailableException(error, 5 * 60 * 1000l);
         }
     }
 

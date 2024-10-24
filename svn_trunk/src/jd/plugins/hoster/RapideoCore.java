@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49905 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapideoCore extends PluginForHost {
     public RapideoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -222,26 +222,27 @@ public abstract class RapideoCore extends PluginForHost {
 
     private AccountInfo fetchAccountInfoAPIv1(final Account account) throws Exception {
         final Map<String, Object> root = loginAPIV1(br.cloneBrowser(), account);
-        final AccountInfo ac = new AccountInfo();
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         final Object trafficLeftO = root.get("balance");
         if (trafficLeftO != null && trafficLeftO.toString().matches("\\d+")) {
-            ac.setTrafficLeft(Long.parseLong(trafficLeftO.toString()) * 1024 * 1024);
+            ai.setTrafficLeft(Long.parseLong(trafficLeftO.toString()) * 1024 * 1024);
         } else {
-            ac.setTrafficLeft(0);
+            ai.setTrafficLeft(0);
         }
         /*
          * They only have accounts with traffic, no free/premium difference (other than no traffic) - we treat no-traffic as FREE --> Cannot
          * download anything
          */
-        if (trafficLeftO != null && ac.getTrafficLeft() > 0) {
+        if (trafficLeftO != null && ai.getTrafficLeft() > 0) {
             account.setType(AccountType.PREMIUM);
         } else {
             account.setType(AccountType.FREE);
         }
         account.setConcurrentUsePossible(true);
         final List<MultiHostHost> supportedhosts = getSupportedHostsAPIv1(account);
-        ac.setMultiHostSupportV2(this, supportedhosts);
-        return ac;
+        ai.setMultiHostSupportV2(this, supportedhosts);
+        return ai;
     }
 
     private AccountInfo fetchAccountInfoAPIv2(final Account account) throws Exception {
@@ -253,7 +254,8 @@ public abstract class RapideoCore extends PluginForHost {
         final Map<String, Object> root = this.checkErrorsAPIv2(br, null, account);
         final Map<String, Object> accountmap = (Map<String, Object>) root.get("account");
         final Object premium_expire_dateO = accountmap.get("premium_expire_date");
-        final AccountInfo ac = new AccountInfo();
+        final AccountInfo ai = new AccountInfo();
+        ai.setTrafficRefill(false);
         final Object transfer_left_gb = accountmap.get("transfer_left_gb");
         final Object bonus_left_gb = accountmap.get("bonus_left_gb");
         double trafficLeft_gb = 0;
@@ -263,7 +265,7 @@ public abstract class RapideoCore extends PluginForHost {
         if (bonus_left_gb != null && bonus_left_gb.toString().matches("\\d+(\\.\\d+)?")) {
             trafficLeft_gb += Double.parseDouble(bonus_left_gb.toString());
         }
-        ac.setTrafficLeft((long) (trafficLeft_gb * 1024 * 1024 * 1024));
+        ai.setTrafficLeft((long) (trafficLeft_gb * 1024 * 1024 * 1024));
         /**
          * 2024-08-29: TODO: I've never seen an account with expire-date so for now I'll only set it for accounts with zero traffic left.
          */
@@ -282,8 +284,8 @@ public abstract class RapideoCore extends PluginForHost {
         account.setConcurrentUsePossible(true);
         /* There is no v2 endpoint available to fetch list of supported hosts -> Use v1 endpoint. */
         final List<MultiHostHost> supportedhosts = getSupportedHostsAPIv1(account);
-        ac.setMultiHostSupportV2(this, supportedhosts);
-        return ac;
+        ai.setMultiHostSupportV2(this, supportedhosts);
+        return ai;
     }
 
     private List<MultiHostHost> getSupportedHostsAPIv1(final Account account) throws IOException {
