@@ -2,17 +2,17 @@ package org.jdownloader.plugins;
 
 import javax.swing.Icon;
 
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.plugins.Account;
-import jd.plugins.AccountTrafficView;
-import jd.plugins.DownloadLink;
-
 import org.appwork.storage.config.JsonConfig;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.Account;
+import jd.plugins.AccountTrafficView;
+import jd.plugins.DownloadLink;
 
 public class WaitForAccountTrafficSkipReason implements ConditionalSkipReason, IgnorableConditionalSkipReason {
     private final static SIZEUNIT MAXSIZEUNIT = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
@@ -46,15 +46,14 @@ public class WaitForAccountTrafficSkipReason implements ConditionalSkipReason, I
 
     private final boolean hasEnoughTraffic() {
         final AccountTrafficView accountTrafficView = getAccount().getAccountTrafficView();
-        if (accountTrafficView != null) {
-            if (accountTrafficView.isSpecialTraffic() || accountTrafficView.isUnlimitedTraffic() || !accountTrafficView.isTrafficRefill()) {
-                return true;
-            } else {
-                final long trafficLeft = accountTrafficView.getTrafficLeft();
-                return trafficLeft > 0 && trafficLeft >= getTrafficRequired();
-            }
-        } else {
+        if (accountTrafficView == null) {
             return true;
+        }
+        if (accountTrafficView.isSpecialTraffic() || accountTrafficView.isUnlimitedTraffic() || !accountTrafficView.isTrafficRefill()) {
+            return true;
+        } else {
+            final long trafficLeft = accountTrafficView.getTrafficLeft();
+            return trafficLeft > 0 && trafficLeft >= getTrafficRequired();
         }
     }
 

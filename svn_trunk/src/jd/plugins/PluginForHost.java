@@ -1183,14 +1183,10 @@ public abstract class PluginForHost extends Plugin {
             }
             if (!mhost.isUnlimitedTraffic()) {
                 /* Traffic limit exists -> Check if enough traffic is left. */
-                final long host_TrafficLeft = mhost.getTrafficLeft();
-                if (mhost.getTrafficLeft() <= 0) {
-                    /* No traffic left at all. */
-                    return false;
-                }
+                final long host_TrafficLeft = Math.max(0, mhost.getTrafficLeft());
                 /* In some cases, individual hosts can have different traffic calculation values than 100%. */
                 trafficNeeded = (trafficNeeded * mhost.getTrafficCalculationFactorPercent()) / 100;
-                if (trafficNeeded > host_TrafficLeft) {
+                if (host_TrafficLeft < trafficNeeded) {
                     /* Not enough individual file host traffic */
                     // TODO: Implement ConditionalSkipReasonException handling
                     return false;

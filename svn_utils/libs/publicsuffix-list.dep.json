@@ -2,8 +2,27 @@
   "artefact":"publicsuffix/list",
   "dependencies":null,
   "filter":["public_suffix_list.dat"],
+  "history":[{
+    "changes":null,
+    "date":"2024-10-24T08:58:19.617+02:00",
+    "dependencies":null,
+    "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+    "files":null,
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"416dce8089ac5f46356c27875d40d268417cc8cf698444dfd1678a8f305728b4"},
+    "licenses":[{
+      "name":"Mozilla Public License 2.0",
+      "spdx_id":"MPL-2.0",
+      "key":"mpl-2.0",
+      "url":"https://api.github.com/licenses/mpl-2.0",
+      "node_id":"MDc6TGljZW5zZTE0"
+    }],
+    "minJRE":null,
+    "name":"\"Public Suffix List Library\"",
+    "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
+  }],
   "installed":{
-    "date":"2024-10-23T09:03:54.288+02:00",
+    "changes":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de\t: Remove `gov.cu` (#2233)",
+    "date":"2024-10-24T10:04:04.124+02:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -107,7 +126,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"416dce8089ac5f46356c27875d40d268417cc8cf698444dfd1678a8f305728b4"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e27eae9a1648152e88978142cbd7987c188b80c53fbb583fa557b0e4312e6bb8"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -117,7 +136,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
+    "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de"
   },
   "minJRE":null,
   "provider":"github-clone",
@@ -125,5 +144,5 @@
   "requiredBy":[],
   "version":null,
   "autoRenameEnabled":true,
-  "confirm":true
+  "confirm":false
 }

@@ -251,7 +251,7 @@ public class MultiHostHost {
     public void setErrorStatus(final String text, final long waitMillis) {
         // TODO: Review this
         // this.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
-        this.setStatusText(text);
+        this.setUnavailableStatusText(text);
         this.setUnavailableTime(waitMillis);
     }
 
@@ -326,7 +326,7 @@ public class MultiHostHost {
         return unavailableStatusText;
     }
 
-    public void setUnavailableStatusText(String unavailableStatusText) {
+    private void setUnavailableStatusText(String unavailableStatusText) {
         this.unavailableStatusText = unavailableStatusText;
     }
 
