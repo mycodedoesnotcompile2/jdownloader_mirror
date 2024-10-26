@@ -45,19 +45,19 @@ public class MultiHostHostData implements Storable {
         this.domains = domains;
     }
 
-    public Boolean getIsUnlimitedTraffic() {
+    public Boolean isUnlimitedTraffic() {
         return isUnlimitedTraffic;
     }
 
-    public void setIsUnlimitedTraffic(Boolean isUnlimitedTraffic) {
+    public void setUnlimitedTraffic(Boolean isUnlimitedTraffic) {
         this.isUnlimitedTraffic = isUnlimitedTraffic;
     }
 
-    public Boolean getIsUnlimitedLinks() {
+    public Boolean isUnlimitedLinks() {
         return isUnlimitedLinks;
     }
 
-    public void setIsUnlimitedLinks(Boolean isUnlimitedLinks) {
+    public void setUnlimitedLinks(Boolean isUnlimitedLinks) {
         this.isUnlimitedLinks = isUnlimitedLinks;
     }
 
@@ -157,12 +157,20 @@ public class MultiHostHostData implements Storable {
         this.unavailableUntilTimestamp = unavailableUntilTimestamp;
     }
 
+    public static List<MultiHostHostData> createFromMultiHostHostList(final List<MultiHostHost> sourcelist) {
+        final List<MultiHostHostData> ret = new ArrayList<MultiHostHostData>();
+        for (final MultiHostHost mhost : sourcelist) {
+            ret.add(createFromMultiHostHost(mhost));
+        }
+        return ret;
+    }
+
     public static MultiHostHostData createFromMultiHostHost(MultiHostHost source) {
         MultiHostHostData hostData = new MultiHostHostData();
         hostData.setName(source.getName());
         hostData.setDomains(source.getDomains());
-        hostData.setIsUnlimitedTraffic(source.isUnlimitedTraffic());
-        hostData.setIsUnlimitedLinks(source.isUnlimitedLinks());
+        hostData.setUnlimitedTraffic(source.isUnlimitedTraffic());
+        hostData.setUnlimitedLinks(source.isUnlimitedLinks());
         hostData.setLinksLeft(source.getLinksLeft());
         hostData.setLinksMax(source.getLinksMax());
         hostData.setTrafficLeft(source.getTrafficLeft());
@@ -187,8 +195,8 @@ public class MultiHostHostData implements Storable {
         host.setLinksMax(this.getLinksMax());
         host.setTrafficLeft(this.getTrafficLeft());
         host.setTrafficMax(this.getTrafficMax());
-        host.setUnlimitedTraffic(this.getIsUnlimitedTraffic());
-        host.setUnlimitedLinks(this.getIsUnlimitedLinks());
+        host.setUnlimitedTraffic(this.isUnlimitedTraffic());
+        host.setUnlimitedLinks(this.isUnlimitedLinks());
         host.setTrafficCalculationFactorPercent(this.getTrafficCalculationFactorPercent());
         host.setMaxChunks(this.getMaxChunks());
         host.setMaxDownloads(this.getMaxDownloads());

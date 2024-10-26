@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49988 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -147,8 +147,8 @@ public class UploadedpremiumlinkNet extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account);
+        final AccountInfo ai = new AccountInfo();
         /*
          * User only enters API Key so he can put anything into the username field -> Let's make sure that that value is correct by using
          * the one the API is returning.
@@ -181,8 +181,10 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             final String primary_domain = hoster.get("primary_domain").toString();
             final MultiHostHost mhost = new MultiHostHost(primary_domain);
             mhost.addDomains(domains);
-            if ("offline".equals(hoster.get("status"))) {
+            if (hoster.get("status").toString().equalsIgnoreCase("offline")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            } else if (account.getType() == AccountType.FREE && !hoster.get("type").toString().equalsIgnoreCase("free")) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
             }
             final long daily_quota_total = ((Number) hoster.get("daily_quota_total")).longValue();
             final long daily_quota_left = ((Number) hoster.get("daily_quota_left")).longValue();

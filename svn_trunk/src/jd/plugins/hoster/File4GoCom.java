@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
+@HostPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = { "file4go.net" }, urls = { "https?://(?:www\\.)?file4go\\.(?:net|com)/[^/]+/([a-zA-Z0-9_=]+)" })
 public class File4GoCom extends antiDDoSForHost {
     public File4GoCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +88,7 @@ public class File4GoCom extends antiDDoSForHost {
             }
             /* Fix file extension */
             weakFilename = weakFilename.replaceFirst("-mp4$", ".mp4");
+            weakFilename = this.correctOrApplyFileNameExtension(weakFilename, ".mp4", null);
             link.setName(weakFilename);
         }
         br.setCookie(getHost(), "animesonline", "1");
@@ -107,9 +108,9 @@ public class File4GoCom extends antiDDoSForHost {
         if (filename == null) {
             filename = br.getRegex("<div id=\"titulo_a\">\\s*(.*?)\\s*</div>").getMatch(0);
         }
-        String filesize = br.getRegex("(?i)>\\s*Tamanho\\s*:\\s*</b>\\s*(.*?)\\s*</span>").getMatch(0);
+        String filesize = br.getRegex(">\\s*Tamanho\\s*:\\s*</b>\\s*(.*?)\\s*</span>").getMatch(0);
         if (filesize == null) {
-            filesize = br.getRegex("(?i)<b>File size\\s*:\\s*</b>\\s*([^<>\"]+)\\s*</").getMatch(0);
+            filesize = br.getRegex("<b>File size\\s*:\\s*</b>\\s*([^<>\"]+)\\s*</").getMatch(0);
         }
         if (filename == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -143,7 +144,7 @@ public class File4GoCom extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             submitForm(form);
-            if (br.containsHTML("(?i)REMOVED DMCA\\!")) {
+            if (br.containsHTML("REMOVED DMCA\\!")) {
                 /* 2023-01-24 */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -267,7 +268,7 @@ public class File4GoCom extends antiDDoSForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, true);
         ai.setUnlimitedTraffic();
-        final String expire = br.getRegex("(?i)>\\s*Premium Stop: (\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}) </b>").getMatch(0);
+        final String expire = br.getRegex(">\\s*Premium Stop: (\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}:\\d{2}) </b>").getMatch(0);
         if (expire == null) {
             final String lang = System.getProperty("user.language");
             if ("de".equalsIgnoreCase(lang)) {
@@ -302,9 +303,9 @@ public class File4GoCom extends antiDDoSForHost {
     }
 
     private String getDllink(final Browser br) {
-        String dllink = br.getRegex("(?i)href=\"(https?://[^\"]+)\">\\s*Download").getMatch(0);
+        String dllink = br.getRegex("href=\"(https?://[^\"]+)\">\\s*Download").getMatch(0);
         if (dllink == null) {
-            dllink = br.getRegex("(?i)class\\s*=\\s*\"novobotao download\"[^>]*href\\s*=\\s*\"([^\"]+)\">").getMatch(0);
+            dllink = br.getRegex("class\\s*=\\s*\"novobotao download\"[^>]*href\\s*=\\s*\"([^\"]+)\">").getMatch(0);
         }
         return dllink;
     }

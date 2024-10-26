@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50034 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -345,32 +345,31 @@ public abstract class HighWayCore extends UseNet {
         } else if (account == null) {
             /* without account its not possible to download the link. */
             return false;
-        } else {
-            /* Make sure that we do not start more than the allowed number of max simultaneous downloads for the current host. */
-            synchronized (getMapLock()) {
-                final Map<String, AtomicInteger> hostRunningDlsNumMap = getMap(HighWayCore.hostRunningDlsNumMap);
-                final Map<String, Integer> hostMaxdlsMap = getMap(HighWayCore.hostMaxdlsMap);
-                if (hostRunningDlsNumMap.containsKey(link.getHost()) && hostMaxdlsMap.containsKey(link.getHost())) {
-                    final int maxDlsForCurrentHost = hostMaxdlsMap.get(link.getHost());
-                    final AtomicInteger currentRunningDlsForCurrentHost = hostRunningDlsNumMap.get(link.getHost());
-                    if (currentRunningDlsForCurrentHost.get() >= maxDlsForCurrentHost) {
-                        /*
-                         * Max downloads for specific host for this MOCH reached --> Avoid irritating/wrong 'Account missing' errormessage
-                         * for this case - wait and retry!
-                         */
-                        final String msg;
-                        if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                            msg = "Download von diesem Hoster aktuell nicht möglich: Zu viele gleichzeitige Downloads (max " + maxDlsForCurrentHost + ")";
-                        } else {
-                            msg = "Downloads of this host are currently not possible: Too many simultaneous downloads (max " + maxDlsForCurrentHost + ")";
-                        }
-                        throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 15 * 1000, msg));
+        }
+        /* Make sure that we do not start more than the allowed number of max simultaneous downloads for the current host. */
+        synchronized (getMapLock()) {
+            final Map<String, AtomicInteger> hostRunningDlsNumMap = getMap(HighWayCore.hostRunningDlsNumMap);
+            final Map<String, Integer> hostMaxdlsMap = getMap(HighWayCore.hostMaxdlsMap);
+            if (hostRunningDlsNumMap.containsKey(link.getHost()) && hostMaxdlsMap.containsKey(link.getHost())) {
+                final int maxDlsForCurrentHost = hostMaxdlsMap.get(link.getHost());
+                final AtomicInteger currentRunningDlsForCurrentHost = hostRunningDlsNumMap.get(link.getHost());
+                if (currentRunningDlsForCurrentHost.get() >= maxDlsForCurrentHost) {
+                    /*
+                     * Max downloads for specific host for this MOCH reached --> Avoid irritating/wrong 'Account missing' errormessage for
+                     * this case - wait and retry!
+                     */
+                    final String msg;
+                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                        msg = "Download von diesem Hoster aktuell nicht möglich: Zu viele gleichzeitige Downloads (max " + maxDlsForCurrentHost + ")";
+                    } else {
+                        msg = "Downloads of this host are currently not possible: Too many simultaneous downloads (max " + maxDlsForCurrentHost + ")";
                     }
+                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 15 * 1000, msg));
                 }
             }
-            getMultiHosterManagement().runCheck(account, link);
-            return true;
         }
+        getMultiHosterManagement().runCheck(account, link);
+        return true;
     }
 
     @Override

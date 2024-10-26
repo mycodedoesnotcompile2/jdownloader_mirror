@@ -18,6 +18,15 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Map;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -38,20 +47,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "http://suicidegirlsdecrypted/\\d+|https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "http://suicidegirlsdecrypted/\\d+|https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
 public class SuicidegirlsCom extends PluginForHost {
     public SuicidegirlsCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.suicidegirls.com/shop/");
+        this.enablePremium("https://www." + getHost() + "/shop/");
     }
 
     @Override
@@ -61,9 +62,16 @@ public class SuicidegirlsCom extends PluginForHost {
         return br;
     }
 
+    public Browser prepBR(final Browser br) {
+        br.setFollowRedirects(true);
+        br.setCookie(getHost(), "burlesque_ad_closed", "True");
+        br.setCookie(getHost(), "django_language", "en");
+        return br;
+    }
+
     @Override
     public String getAGBLink() {
-        return "https://www.suicidegirls.com/legal/";
+        return "https://www." + getHost() + "/legal/";
     }
 
     /* Linktypes */
@@ -196,7 +204,7 @@ public class SuicidegirlsCom extends PluginForHost {
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            // login can require recaptchav2
+            /* login can require recaptchav2 */
             if (loginform.containsHTML("g-recaptcha") && loginform.containsHTML("data-sitekey")) {
                 final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br) {
                     @Override
@@ -208,13 +216,21 @@ public class SuicidegirlsCom extends PluginForHost {
             }
             loginform.put("username", Encoding.urlEncode(account.getUser()));
             loginform.put("password", Encoding.urlEncode(account.getPass()));
-            br.submitForm(loginform);
-            final String msg = PluginJSonUtils.getJsonValue(br, "message");
-            /* 2020-10-19: E.g. {"message":"Invalid username or password.","code":"invalid_credentials"} */
-            // br.postPage("", "username=" + Encoding.urlEncode(account.getUser()) + "&password=" +
-            // Encoding.urlEncode(account.getPass()));
-            if (!StringUtils.isEmpty(msg)) {
-                throw new AccountInvalidException(msg);
+            final Browser brc = br.cloneBrowser();
+            /* 400 = invalid credentials, 429 = too many bad login attempts in a short time */
+            brc.setAllowedResponseCodes(400, 429);
+            brc.getHeaders().put("Accept", "*/*");
+            brc.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            brc.getHeaders().put("Origin", "https://www." + br.getHost());
+            final String specialToken = br.getCookie(br.getHost(), "sgcsrftoken", Cookies.NOTDELETEDPATTERN);
+            if (specialToken != null) {
+                brc.getHeaders().put("X-Csrftoken", specialToken);
+            }
+            brc.submitForm(loginform);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String errormessage = (String) entries.get("message");
+            if (!StringUtils.isEmpty(errormessage)) {
+                throw new AccountInvalidException(errormessage);
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
@@ -313,13 +329,6 @@ public class SuicidegirlsCom extends PluginForHost {
             }
         }
         return null;
-    }
-
-    public Browser prepBR(final Browser br) {
-        br.setFollowRedirects(true);
-        br.setCookie(this.getHost(), "burlesque_ad_closed", "True");
-        br.setCookie(this.getHost(), "django_language", "en");
-        return br;
     }
 
     @Override

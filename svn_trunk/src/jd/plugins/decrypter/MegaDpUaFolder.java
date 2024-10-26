@@ -38,7 +38,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.MegaDpUa;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 47516 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaDpUa.class })
 public class MegaDpUaFolder extends PluginForDecrypt {
     public MegaDpUaFolder(PluginWrapper wrapper) {
@@ -78,7 +78,7 @@ public class MegaDpUaFolder extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Regex video = new Regex(param.getCryptedUrl(), TYPE_VIDEO);
-        if (video.matches()) {
+        if (video.patternFind()) {
             final String videoID = video.getMatch(0);
             ret.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
         } else {

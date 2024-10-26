@@ -153,6 +153,9 @@ import org.jdownloader.plugins.SkipReasonException;
 import org.jdownloader.plugins.SleepPluginProgress;
 import org.jdownloader.plugins.UserIOProgress;
 import org.jdownloader.plugins.WaitForAccountTrafficSkipReason;
+import org.jdownloader.plugins.WaitForAccountTrafficSkipReasonMultihostLinksRequired;
+import org.jdownloader.plugins.WaitForAccountTrafficSkipReasonMultihostTrafficRequired;
+import org.jdownloader.plugins.WaitingSkipReasonMultihostHostUnavailable;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.AccountJsonConfig;
@@ -1174,31 +1177,41 @@ public abstract class PluginForHost extends Plugin {
                 return false;
             }
             final MultihosterHostStatus status = mhost.getStatus();
-            if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
-                /* Download of that host is currently not possible. */
+            if (mhost.getUnavailableTimeMillis() > 0) {
+                throw new ConditionalSkipReasonException(new WaitingSkipReasonMultihostHostUnavailable(account, link.getHost(), mhost.getUnavailableStatusText(), mhost.getUnavailableUntilTimestamp()));
+            } else if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
+                /* Download of that host is permanently not possible. */
                 return false;
             } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
                 /* Max limits link is reached -> Cannot download */
-                return false;
+                if (ai.isTrafficRefill()) {
+                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReasonMultihostLinksRequired(account, link.getHost(), mhost.getLinksMax()));
+                } else {
+                    return false;
+                }
             }
             if (!mhost.isUnlimitedTraffic()) {
                 /* Traffic limit exists -> Check if enough traffic is left. */
                 final long host_TrafficLeft = Math.max(0, mhost.getTrafficLeft());
                 /* In some cases, individual hosts can have different traffic calculation values than 100%. */
                 trafficNeeded = (trafficNeeded * mhost.getTrafficCalculationFactorPercent()) / 100;
-                if (host_TrafficLeft < trafficNeeded) {
+                if (trafficNeeded > host_TrafficLeft) {
                     /* Not enough individual file host traffic */
-                    // TODO: Implement ConditionalSkipReasonException handling
-                    return false;
+                    if (ai.isTrafficRefill()) {
+                        final long howMuchTrafficIsMissing = trafficNeeded - host_TrafficLeft;
+                        throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReasonMultihostTrafficRequired(account, link.getHost(), howMuchTrafficIsMissing));
+                    } else {
+                        return false;
+                    }
                 }
             }
         }
         if (!ai.isUnlimitedTraffic() && !ai.isSpecialTraffic()) {
             /* Check if enough traffic is left */
-            if (trafficLeft < trafficNeeded) {
+            if (trafficNeeded > trafficLeft) {
                 if (ai.isTrafficRefill()) {
-                    final long howMuchTrafficWeNeed = trafficNeeded - trafficLeft;
-                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, howMuchTrafficWeNeed));
+                    final long howMuchTrafficIsMissing = trafficNeeded - trafficLeft;
+                    throw new ConditionalSkipReasonException(new WaitForAccountTrafficSkipReason(account, howMuchTrafficIsMissing));
                 } else {
                     return false;
                 }

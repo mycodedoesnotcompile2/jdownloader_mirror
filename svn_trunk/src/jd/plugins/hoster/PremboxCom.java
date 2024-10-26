@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -121,25 +121,24 @@ public class PremboxCom extends PluginForHost {
         if (account == null) {
             /* without account its not possible to download the link */
             return false;
-        } else {
-            /* Make sure that we do not start more than the allowed number of max simultan downloads for the current host. */
-            synchronized (hostRunningDlsNumMap) {
-                final String currentHost = link.getHost();
-                if (hostRunningDlsNumMap.containsKey(currentHost) && hostMaxdlsMap.containsKey(currentHost)) {
-                    final int maxDlsForCurrentHost = hostMaxdlsMap.get(currentHost);
-                    final AtomicInteger currentRunningDlsForCurrentHost = hostRunningDlsNumMap.get(currentHost);
-                    if (currentRunningDlsForCurrentHost.get() >= maxDlsForCurrentHost) {
-                        /*
-                         * Max downloads for specific host for this MOCH reached --> Avoid irritating/wrong 'Account missing' errormessage
-                         * for this case - wait and retry!
-                         */
-                        throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 15 * 1000, null));
-                    }
+        }
+        /* Make sure that we do not start more than the allowed number of max simultan downloads for the current host. */
+        synchronized (hostRunningDlsNumMap) {
+            final String currentHost = link.getHost();
+            if (hostRunningDlsNumMap.containsKey(currentHost) && hostMaxdlsMap.containsKey(currentHost)) {
+                final int maxDlsForCurrentHost = hostMaxdlsMap.get(currentHost);
+                final AtomicInteger currentRunningDlsForCurrentHost = hostRunningDlsNumMap.get(currentHost);
+                if (currentRunningDlsForCurrentHost.get() >= maxDlsForCurrentHost) {
+                    /*
+                     * Max downloads for specific host for this MOCH reached --> Avoid irritating/wrong 'Account missing' errormessage for
+                     * this case - wait and retry!
+                     */
+                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 15 * 1000, null));
                 }
             }
-            mhm.runCheck(account, link);
-            return true;
         }
+        mhm.runCheck(account, link);
+        return true;
     }
 
     @Override

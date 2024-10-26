@@ -2,7 +2,9 @@
   "artefact":"com.miglayout/miglayout-swing",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:31+02:00",
     "dependencies":[],
     "description":"MiGLayout - Java Layout Manager for Swing",

@@ -37,8 +37,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
 public class LusciousNetAlbum extends PluginForDecrypt {
     public LusciousNetAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,23 +118,63 @@ public class LusciousNetAlbum extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
+            final String title = albumSlug.replace("-", " ");
+            String[] thumbnails = br.getRegex("src=\"(https?://[^\"]+)\" class=\"\" loading=\"lazy\"").getColumn(0);
+            if (thumbnails == null || thumbnails.length == 0) {
+                thumbnails = br.getRegex("alt=\"\\d+\" src=\"(https?://[^\"]+)\"").getColumn(0);
+            }
+            final FilePackage fpFullsize = FilePackage.getInstance();
+            fpFullsize.setName(title);
+            final FilePackage fpThumbnails = FilePackage.getInstance();
+            fpThumbnails.setName(title + " - thumbnails");
+            for (final String urlThumbnail : thumbnails) {
+                /* Change thumbnail URL to a full size URL */
+                final String fullsizeUrl = urlThumbnail.replaceFirst("\\.315x0\\.jpg$", ".640x0.jpg");
+                /* This link may not always be available thus we will also add the original thumbnail link later. */
+                final DownloadLink directFullsize = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+                /* We know that this link is online. */
+                directFullsize.setAvailable(true);
+                directFullsize._setFilePackage(fpFullsize);
+                ret.add(directFullsize);
+                if (fullsizeUrl.equals(urlThumbnail)) {
+                    /* Both links are the same -> No reason to add thumbnail separately. */
+                    continue;
+                }
+                final DownloadLink directThumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+                /* We know that this link is online. */
+                directThumbnail.setAvailable(true);
+                directThumbnail._setFilePackage(fpThumbnails);
+                ret.add(directThumbnail);
+            }
             final String redirectURL = br.getRegex("\"(/download/r/\\d+/\\d+/?)\"").getMatch(0);
-            if (redirectURL == null) {
+            if (redirectURL != null) {
+                final Browser brc = br.cloneBrowser();
+                brc.setFollowRedirects(false);
+                brc.getPage(redirectURL);
+                /* Typically redirects to external file hoster 9cloud.us. */
+                final String redirect = brc.getRedirectLocation();
+                if (redirect == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                final PluginForHost plg = this.getNewPluginForHostInstance("9cloud.us");
+                final DownloadLink link = this.createDownloadlink(redirect);
+                if (plg.canHandle(redirect)) {
+                    link.setHost(plg.getHost());
+                    link.setDefaultPlugin(plg);
+                    /**
+                     * For 9cloud.us we cannot find any filenames as long as any free download limit is reached which is often the case.
+                     * </br>
+                     * To counter that, we'll just set a filename here including the available status as we know that that file is online.
+                     */
+                    link.setName(title + ".zip");
+                    link.setAvailable(true);
+                }
+                link._setFilePackage(fpFullsize);
+                ret.add(link);
+            }
+            if (ret.isEmpty()) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            final Browser brc = br.cloneBrowser();
-            brc.setFollowRedirects(false);
-            brc.getPage(redirectURL);
-            /* Typically redirects to external file hoster 9cloud.us. */
-            final String redirect = brc.getRedirectLocation();
-            if (redirect == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            final DownloadLink link = this.createDownloadlink(redirect);
-            /* Set temporary filename */
-            link.setName(albumSlug + ".zip");
-            // link.setAvailable(true);
-            ret.add(link);
         }
         return ret;
     }

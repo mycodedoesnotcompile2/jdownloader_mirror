@@ -11,12 +11,40 @@ import org.appwork.utils.StringUtils;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHostData;
 
 public class AccountData implements Storable {
-    private Map<String, Object> properties;
-    private String              hoster;
+    // Variables
+    private Map<String, Object>     properties;
+    private Map<String, Object>     infoProperties;
+    private String                  hoster;
+    private String                  password;
+    private String                  user;
+    private String                  errorType;
+    private String                  errorString;
+    private String                  statusString;
+    private List<String>            hosterHistory         = null;
+    private List<MultiHostHostData> supportedhostlist     = null;
+    private int                     maxSimultanDownloads;
+    private long                    createTime;
+    private long                    trafficLeft;
+    private long                    trafficMax;
+    private long                    validUntil;
+    private long                    id                    = -1;
+    private volatile long           tmpDisabledTimeout    = -1;
+    private boolean                 active;
+    private boolean                 enabled;
+    private boolean                 trafficUnlimited;
+    private boolean                 specialtraffic;
+    private boolean                 concurrentUsePossible = true;
+    private boolean                 trafficRefill         = true;
 
-    @AllowNonStorableObjects
+    // Constructor
+    public AccountData(/* Storable */) {
+        // required by Storable
+    }
+
+    // Getter and Setter methods
     public Map<String, Object> getProperties() {
         return properties;
     }
@@ -49,17 +77,6 @@ public class AccountData implements Storable {
         this.password = password;
     }
 
-    private int                 maxSimultanDownloads;
-    private String              password;
-    private Map<String, Object> infoProperties;
-    private long                createTime;
-    private long                trafficLeft;
-    private long                trafficMax;
-    private long                validUntil;
-    private boolean             active;
-    private boolean             enabled;
-    private volatile long       tmpDisabledTimeout = -1;
-
     public long getTmpDisabledTimeout() {
         return tmpDisabledTimeout;
     }
@@ -67,17 +84,6 @@ public class AccountData implements Storable {
     public void setTmpDisabledTimeout(long tmpDisabledTimeout) {
         this.tmpDisabledTimeout = tmpDisabledTimeout;
     }
-
-    private List<String> hosterHistory         = null;
-    private boolean      trafficUnlimited;
-    private boolean      specialtraffic;
-    private String       user;
-    private boolean      concurrentUsePossible = true;
-    private long         id                    = -1;
-    private String       errorType;
-    private String       errorString;
-    private String       statusString;
-    private boolean      trafficRefill         = true;
 
     public boolean isTrafficRefill() {
         return trafficRefill;
@@ -111,47 +117,6 @@ public class AccountData implements Storable {
         this.concurrentUsePossible = concurrentUsePossible;
     }
 
-    public AccountData(/* Storable */) {
-        // reuqired by Storable
-    }
-
-    public static AccountData create(Account a) {
-        AccountData ret = new AccountData();
-        // WARNING: only storable or primitives should be used here
-        ret.properties = a.getProperties();
-        ret.id = a.getId().getID();
-        ret.errorType = enumToString(a.getError());
-        ret.tmpDisabledTimeout = a.getTmpDisabledTimeout();
-        ret.errorString = a.getErrorString();
-        ret.hosterHistory = a.getHosterHistory();
-        final AccountInfo ai = a.getAccountInfo();
-        if (ai != null) {
-            ret.infoProperties = ai.getProperties();
-            if (ret.infoProperties == null) {
-                /*
-                 * we need at least an empty hashmap, so account restore also restores account info
-                 */
-                ret.infoProperties = new HashMap<String, Object>();
-            }
-            ret.trafficRefill = ai.isTrafficRefill();
-            ret.createTime = ai.getCreateTime();
-            ret.trafficLeft = ai.getTrafficLeft();
-            ret.trafficMax = ai.getTrafficMax();
-            ret.validUntil = ai.getValidUntil();
-            ret.trafficUnlimited = ai.isUnlimitedTraffic();
-            // whatever??
-            ret.specialtraffic = ai.isSpecialTraffic();
-            ret.statusString = ai.getStatus();
-        }
-        ret.concurrentUsePossible = a.isConcurrentUsePossible();
-        ret.enabled = a.isEnabled();
-        ret.hoster = a.getHoster();
-        ret.maxSimultanDownloads = a.getMaxSimultanDownloads();
-        ret.password = a.getPass();
-        ret.user = a.getUser();
-        return ret;
-    }
-
     public String getErrorType() {
         return errorType;
     }
@@ -166,10 +131,6 @@ public class AccountData implements Storable {
 
     public void setErrorString(String errorString) {
         this.errorString = errorString;
-    }
-
-    private static String enumToString(AccountError error) {
-        return error == null ? null : error.name();
     }
 
     @AllowNonStorableObjects
@@ -253,6 +214,68 @@ public class AccountData implements Storable {
         this.user = user;
     }
 
+    /**
+     * @return the hosterHistory
+     */
+    public List<String> getHosterHistory() {
+        return hosterHistory;
+    }
+
+    /**
+     * @param hosterHistory
+     *            the hosterHistory to set
+     */
+    public void setHosterHistory(List<String> hosterHistory) {
+        this.hosterHistory = hosterHistory;
+    }
+
+    public List<MultiHostHostData> getSupportedhostlist() {
+        return supportedhostlist;
+    }
+
+    public void setSupportedhostlist(List<MultiHostHostData> supportedhostlist) {
+        this.supportedhostlist = supportedhostlist;
+    }
+
+    // Static Methods
+    private static String enumToString(AccountError error) {
+        return error == null ? null : error.name();
+    }
+
+    // Instance Methods
+    public static AccountData create(Account a) {
+        AccountData ret = new AccountData();
+        ret.properties = a.getProperties();
+        ret.id = a.getId().getID();
+        ret.errorType = enumToString(a.getError());
+        ret.tmpDisabledTimeout = a.getTmpDisabledTimeout();
+        ret.errorString = a.getErrorString();
+        ret.hosterHistory = a.getHosterHistory();
+        final AccountInfo ai = a.getAccountInfo();
+        if (ai != null) {
+            ret.infoProperties = ai.getProperties();
+            if (ret.infoProperties == null) {
+                ret.infoProperties = new HashMap<String, Object>();
+            }
+            ret.trafficRefill = ai.isTrafficRefill();
+            ret.createTime = ai.getCreateTime();
+            ret.trafficLeft = ai.getTrafficLeft();
+            ret.trafficMax = ai.getTrafficMax();
+            ret.validUntil = ai.getValidUntil();
+            ret.trafficUnlimited = ai.isUnlimitedTraffic();
+            ret.specialtraffic = ai.isSpecialTraffic();
+            ret.statusString = ai.getStatus();
+            ret.supportedhostlist = MultiHostHostData.createFromMultiHostHostList(ai.getMultiHostSupportV2());
+        }
+        ret.concurrentUsePossible = a.isConcurrentUsePossible();
+        ret.enabled = a.isEnabled();
+        ret.hoster = a.getHoster();
+        ret.maxSimultanDownloads = a.getMaxSimultanDownloads();
+        ret.password = a.getPass();
+        ret.user = a.getUser();
+        return ret;
+    }
+
     public Account toAccount() {
         Account ret = new Account(user, password);
         ret.setProperties(properties);
@@ -287,20 +310,5 @@ public class AccountData implements Storable {
         }
         ret.setTmpDisabledTimeout(getTmpDisabledTimeout());
         return ret;
-    }
-
-    /**
-     * @return the hosterHistory
-     */
-    public List<String> getHosterHistory() {
-        return hosterHistory;
-    }
-
-    /**
-     * @param hosterHistory
-     *            the hosterHistory to set
-     */
-    public void setHosterHistory(List<String> hosterHistory) {
-        this.hosterHistory = hosterHistory;
     }
 }

@@ -2,7 +2,9 @@
   "artefact":"com.kitfox.svg/svg-salamander",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:31+02:00",
     "dependencies":null,
     "description":"https://github.com/blackears/svgSalamander/tree/ecd1092927971a9e02a9062fdd1a95dd610d7309, compiled by AppWork for java 1.6 compatibility\r\nSVG Salamander - tools and components for SVG rendering, manipulation and animation",

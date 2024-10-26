@@ -33,16 +33,24 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.FilesFmFolder;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/(?:down\\.php\\?i=[a-z0-9]+(\\&n=[^/]+)?|f/[a-z0-9]+)" })
 public class FilesFm extends PluginForHost {
     public FilesFm(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        FilesFmFolder.prepBR(br);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "http://files.fm/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     /* Connection stuff */
@@ -78,7 +86,6 @@ public class FilesFm extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         dllink = null;
         this.setBrowserExclusive();
-        this.br.setFollowRedirects(true);
         final String mainlink = link.getStringProperty("mainlink");
         if (mainlink != null) {
             /* Referer needed to download. Not always given as users can also add directlinks without going over the decrypter. */

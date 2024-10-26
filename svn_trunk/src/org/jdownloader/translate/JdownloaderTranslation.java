@@ -165,6 +165,15 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Not enough traffic available" })
     String gui_download_waittime_notenoughtraffic2();
 
+    @Default(lngs = { "en", "de" }, values = { "Multihost %s1: Not enough host traffic available (%s2 required)", "Multihoster %s1: Nicht genug Traffic für diesen Hoster verfügbar (%s2 benötigt)" })
+    String gui_download_waittime_notenoughtraffic_multihost(String multihostDomain, String trafficRequired);
+
+    @Default(lngs = { "en", "de" }, values = { "Multihoster: %s1: Not enough link-generations left: %s2", "Multihoster: %s1: Nicht genug Link-Generierungen verfügbar: %s2" })
+    String gui_download_waittime_notenoughtraffic_links_multihost(String multihostDomain, String linksleftMaxString);
+
+    @Default(lngs = { "en", "de" }, values = { "Multihoster: %s1: Wait %s2 Reason: %s3", "Multihoster: %s1: Warte %s2 Grund: %s3" })
+    String gui_download_waittime_notenoughtraffic_multihost_host_temporarily_unavailable(String multihostDomain, String waitTimeFormatted, String unavailableReasonText);
+
     @Default(lngs = { "en" }, values = { "Wrong captcha code" })
     String decrypter_wrongcaptcha();
 

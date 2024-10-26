@@ -180,12 +180,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return expired;
     }
 
-    public void setAccountBalance(final long parseInt) {
-        this.account_accountBalance = Math.max(0, parseInt);
-    }
-
-    public void setAccountBalance(final String string) {
-        this.setAccountBalance((long) (Double.parseDouble(string) * 100));
+    public void setAccountBalance(final long num) {
+        this.account_accountBalance = Math.max(0, num);
     }
 
     public void setExpired(final boolean b) {

@@ -4,6 +4,7 @@ import javax.swing.Icon;
 
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.translate._JDT;
 
 import jd.controlling.packagecontroller.AbstractNode;
 import jd.plugins.Account;
@@ -14,14 +15,14 @@ import jd.plugins.MultiHostHost;
 public class WaitForAccountTrafficSkipReasonMultihostLinksRequired implements ConditionalSkipReason, IgnorableConditionalSkipReason {
     private final Account account;
     private final String  host;
-    private int           linksMax;
+    private long          linksMax;
     private final Icon    icon;
 
     public Icon getIcon() {
         return icon;
     }
 
-    public WaitForAccountTrafficSkipReasonMultihostLinksRequired(final Account account, final String host, final int linksMax) {
+    public WaitForAccountTrafficSkipReasonMultihostLinksRequired(final Account account, final String host, final long linksMax) {
         this.account = account;
         this.host = host;
         this.linksMax = linksMax;
@@ -34,7 +35,7 @@ public class WaitForAccountTrafficSkipReasonMultihostLinksRequired implements Co
 
     @Override
     public boolean canIgnore() {
-        return true;
+        return false;
     }
 
     private final boolean hasEnoughTraffic() {
@@ -69,7 +70,7 @@ public class WaitForAccountTrafficSkipReasonMultihostLinksRequired implements Co
         if (requestor instanceof CustomConditionalSkipReasonMessageIcon) {
             return ((CustomConditionalSkipReasonMessageIcon) requestor).getMessage(this, node);
         } else {
-            return "Not enough links left: 0/" + this.linksMax;
+            return _JDT.T.gui_download_waittime_notenoughtraffic_links_multihost(this.getAccount().getHoster(), "0/" + this.linksMax);
         }
     }
 

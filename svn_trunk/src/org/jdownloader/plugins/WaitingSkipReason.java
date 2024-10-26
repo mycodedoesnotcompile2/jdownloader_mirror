@@ -108,8 +108,11 @@ public class WaitingSkipReason implements ConditionalSkipReason, TimeOutConditio
 
     @Override
     public boolean isConditionReached() {
-        final long left = getTimeOutLeft();
-        return left == 0;
+        if (getTimeOutLeft() == 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
@@ -120,27 +123,27 @@ public class WaitingSkipReason implements ConditionalSkipReason, TimeOutConditio
     public String getMessage(Object requestor, AbstractNode node) {
         if (requestor instanceof CustomConditionalSkipReasonMessageIcon) {
             return ((CustomConditionalSkipReasonMessageIcon) requestor).getMessage(this, node);
+        }
+        final long left = getTimeOutLeft();
+        if (left <= 0) {
+            return null;
+        } else if (requestor == this) {
+            return getMessage();
+        } else if (requestor instanceof HistoryEntry) {
+            return getMessage();
+        } else if (requestor instanceof TaskColumn) {
+            return getMessage();
+        } else if (requestor instanceof DownloadControllerEventPublisher) {
+            return getMessage();
+        } else if (requestor instanceof ChannelCollector) {
+            return getMessage();
+        } else if (requestor instanceof DownloadsAPIV2Impl) {
+            return getMessage();
+        } else if (requestor instanceof FilePackageView) {
+            return getMessage();
+        } else if (requestor instanceof ETAColumn) {
+            return Formatter.formatSeconds(left / 1000);
         } else {
-            final long left = getTimeOutLeft();
-            if (left > 0) {
-                if (requestor == this) {
-                    return getMessage();
-                } else if (requestor instanceof HistoryEntry) {
-                    return getMessage();
-                } else if (requestor instanceof TaskColumn) {
-                    return getMessage();
-                } else if (requestor instanceof DownloadControllerEventPublisher) {
-                    return getMessage();
-                } else if (requestor instanceof ChannelCollector) {
-                    return getMessage();
-                } else if (requestor instanceof DownloadsAPIV2Impl) {
-                    return getMessage();
-                } else if (requestor instanceof FilePackageView) {
-                    return getMessage();
-                } else if (requestor instanceof ETAColumn) {
-                    return Formatter.formatSeconds(left / 1000);
-                }
-            }
             return null;
         }
     }

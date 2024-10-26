@@ -156,6 +156,7 @@ public interface UpdateSettings extends ConfigInterface {
     }
 
     @AboutConfig
+    @DescriptionForConfigEntry("This is not a setting but a dummy field that allows for easy access of build information [in headless installations].")
     @StorableValidatorIgnoresMissingSetter
     @CustomValueGetter(GetBuildCustomValueGetter.class)
     String getBuild();

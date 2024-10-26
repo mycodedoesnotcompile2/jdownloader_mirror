@@ -2,7 +2,9 @@
   "artefact":"com.github.weisj/jsvg",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2024-08-16T17:31:45.247+02:00",
     "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",

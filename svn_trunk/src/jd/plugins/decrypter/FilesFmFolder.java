@@ -21,6 +21,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -34,10 +35,23 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 48599 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        prepBR(br);
+        return br;
+    }
+
+    public static void prepBR(final Browser br) {
+        br.setFollowRedirects(true);
+        /* Their html responses can be pretty big. */
+        br.setLoadLimit(br.getLoadLimit() * 10);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -45,7 +59,6 @@ public class FilesFmFolder extends PluginForDecrypt {
         final PluginForHost hostplg = this.getNewPluginForHostInstance(this.getHost());
         /* 2016-03-10: They enforce https */
         final String folderID = new Regex(param.getCryptedUrl(), "([a-z0-9]+)$").getMatch(0);
-        br.setFollowRedirects(true);
         br.getPage("https://files.fm/u/" + folderID + "?view=gallery&items_only=true&index=0&count=10000");
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">This link does not contain any files|These files are deleted by the owner<|The expiry date of these files is over<|class=\"deleted_wrapper\"")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

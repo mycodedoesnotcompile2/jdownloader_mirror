@@ -49,7 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -403,7 +403,11 @@ public class SendCm extends XFileSharingProBasic {
             /* Now set less relevant account information */
             final Object balanceO = result.get("balance");
             if (balanceO != null) {
-                ai.setAccountBalance(SizeFormatter.getSize(balanceO.toString()));
+                final String balanceStr = balanceO.toString();
+                if (balanceStr.matches("\\d+\\.\\d+")) {
+                    final double balance = Double.parseDouble(balanceStr);
+                    ai.setAccountBalance((int) balance * 100);
+                }
             }
             /* 2019-07-26: values can also be "inf" for "Unlimited": "storage_left":"inf" */
             // final long storage_left = JavaScriptEngineFactory.toLong(entries.get("storage_left"), 0);
