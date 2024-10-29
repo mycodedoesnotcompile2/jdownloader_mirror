@@ -51,7 +51,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FaceBookComGallery;
 
-@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50037 $", interfaceVersion = 2, names = {}, urls = {})
 public class FaceBookComVideos extends PluginForHost {
     private final boolean enforceCookieLogin = true;
 
@@ -377,9 +377,8 @@ public class FaceBookComVideos extends PluginForHost {
     public static String getUploaderNameFromVideoURL(final String videourl) {
         if (videourl == null) {
             return null;
-        } else {
-            return new Regex(videourl, "(?i)https?://[^/]+/([^/]+)/videos/.*").getMatch(0);
         }
+        return new Regex(videourl, "(?i)https?://[^/]+/([^/]+)/videos/.*").getMatch(0);
     }
 
     private void checkErrors(final DownloadLink link) throws PluginException {
@@ -728,6 +727,9 @@ public class FaceBookComVideos extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+        if (link == null) {
+            return;
+        }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             link.removeProperty(PROPERTY_DIRECTURL_LAST);
             link.removeProperty(PROPERTY_DIRECTURL_OLD);

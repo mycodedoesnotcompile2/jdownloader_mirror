@@ -25,7 +25,7 @@ import jd.PluginWrapper;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 49326 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50038 $", interfaceVersion = 3, names = {}, urls = {})
 public class MightyScriptAdLinkFlyDefault extends MightyScriptAdLinkFly {
     public MightyScriptAdLinkFlyDefault(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,8 +105,6 @@ public class MightyScriptAdLinkFlyDefault extends MightyScriptAdLinkFly {
             "shrinkearn.com", "shortearn.eu",
             /** clk.sh domains */
             "clk.sh", "oko.sh", "iir.ai", "iir.la",
-            /** bt4link.com domains */
-            "bt4link.com", "btc4link.com", "ur4link.com",
             /** shorted4us.com domains */
             "shorted4us.com", "thefreech.com", "sewrn.com",
             /** asrar-alrb7.com domains */

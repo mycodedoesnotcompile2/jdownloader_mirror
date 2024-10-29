@@ -38,7 +38,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SuicidegirlsCom;
 
-@DecrypterPlugin(revision = "$Revision: 48879 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
+@DecrypterPlugin(revision = "$Revision: 50038 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
 public class SuicidegirlsComCrawler extends PluginForDecrypt {
     public SuicidegirlsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,6 +57,7 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
         plugin.setBrowser(this.br);
+        /* Login into any available account. */
         final boolean loggedin = ((jd.plugins.hoster.SuicidegirlsCom) plugin).login(br) != null;
         ((jd.plugins.hoster.SuicidegirlsCom) plugin).prepBR(br);
         br.setFollowRedirects(true);

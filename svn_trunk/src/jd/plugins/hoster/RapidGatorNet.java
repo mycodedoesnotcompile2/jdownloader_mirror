@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -467,7 +467,7 @@ public class RapidGatorNet extends PluginForHost {
                     final String waitSecondsStr = br.getRegex("var secs = (\\d+);").getMatch(0);
                     if (startTimerUrl == null || fid == null || waitSecondsStr == null) {
                         /* Check for reasons why download may be impossible. */
-                        handleErrorsWebsite(this.br, link, account, currentIP, true);
+                        handleErrorsWebsite(br, link, account, currentIP, true);
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     if (isPremiumAccount && errormessageSubscribersOnlyDownload != null) {
@@ -522,15 +522,7 @@ public class RapidGatorNet extends PluginForHost {
                     if (!"done".equalsIgnoreCase(state)) {
                         throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Error in pre download step #2 | state: " + state + " | code: " + respgetdownloadlink.get("code"));
                     }
-                    /*
-                     * Work with URLConnection adapter so we can easily access this URL without Exception on non-allowed http response-code.
-                     */
-                    final URLConnectionAdapter con1 = br.openGetConnection("/download/captcha");
-                    br.followConnection(true);
-                    if (con1.getResponseCode() == 500) {
-                        /* This should be a very very rare case. */
-                        throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Downloading is not possible at the moment", FREE_RECONNECTWAIT_OTHERS_MILLIS);
-                    }
+                    br.getPage("/download/captcha");
                     handleErrorsWebsite(br, link, account, currentIP);
                     final Form captchaform = br.getFormbyProperty("id", "captchaform");
                     if (captchaform != null) {
@@ -589,7 +581,7 @@ public class RapidGatorNet extends PluginForHost {
                                 if (failedBecauseWeSentCaptchaResponseTooLate) {
                                     /* This should never happen! */
                                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Captcha timeout");
-                                } else if (br.containsHTML("(?i)(>\\s*Please fix the following input errors|>\\s*The verification code is incorrect|api\\.recaptcha\\.net/|google\\.com/recaptcha/api/|//api\\.adscaptcha\\.com)")) {
+                                } else if (br.containsHTML("(>\\s*Please fix the following input errors|>\\s*The verification code is incorrect|api\\.recaptcha\\.net/|google\\.com/recaptcha/api/|//api\\.adscaptcha\\.com)")) {
                                     invalidateLastChallengeResponse();
                                     continue;
                                 } else {
@@ -627,48 +619,17 @@ public class RapidGatorNet extends PluginForHost {
                 logger.info("Enforcing https on final downloadurl");
                 finalDownloadURL = finalDownloadURL.replaceFirst("(?i)^http://", "https://");
             }
-            final boolean resumeable = isResumeable(link, account);
             try {
                 if (this.dl == null) {
-                    dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finalDownloadURL, resumeable, getMaxChunks(link, account));
+                    dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finalDownloadURL, isResumeable(link, account), getMaxChunks(link, account));
                 }
+                /* Save directurl (yes, even though we don't yet know if it works) */
+                link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
                 /* 2020-03-17: Content-Disposition should always be given */
                 if (!looksLikeDownloadableContent(dl.getConnection())) {
                     br.followConnection(true);
-                    final URLConnectionAdapter con = dl.getConnection();
-                    final int responsecode = con.getResponseCode();
-                    if (responsecode == 404) {
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 30 * 60 * 1000l);
-                    } else if (responsecode == 416) {
-                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 416", 10 * 60 * 1000l);
-                    }
-                    /* 2020-07-28: Resume can now also fail with error 500 and json: {"error":"Unexpected range request","success":false} */
-                    String errorMsg = PluginJSonUtils.getJson(br, "error");
-                    final String errorMsgHeader = con.getRequest().getResponseHeader("X-Error");
-                    if (StringUtils.equalsIgnoreCase("Unexpected range request", errorMsgHeader) || StringUtils.equalsIgnoreCase("Unexpected range request", errorMsg)) {
-                        /* Resume impossible */
-                        if (!resumeable) {
-                            /* Resume was already disabled? Then we cannot do anything about it --> Wait and retry later */
-                            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown resume related server error");
-                        } else {
-                            /* Resume was attempted but failed. */
-                            logger.info("Resume impossible, disabling it for the next try");
-                            /*
-                             * Special: Save directurl although we have an error --> It should be 're-usable' because this failed attempt
-                             * does not count as download attempt serverside.
-                             */
-                            link.setProperty(directlinkproperty, finalDownloadURL);
-                            /* Disable resume on next attempt */
-                            link.setResumeable(false);
-                            throw new PluginException(LinkStatus.ERROR_RETRY, "Resume failed");
-                        }
-                    }
-                    handleErrorsWebsite(this.br, link, account, currentIP);
-                    logger.info("Unknown error happened");
-                    if (StringUtils.isEmpty(errorMsg)) {
-                        errorMsg = "Unknown server error";
-                    }
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorMsg);
+                    handleErrorsWebsite(br, link, account, currentIP);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
                 }
             } catch (final Exception e) {
                 if (storedDirecturl != null && finalDownloadURL.equals(storedDirecturl)) {
@@ -683,7 +644,6 @@ public class RapidGatorNet extends PluginForHost {
                 logger.info("Resume disabled: missing Accept-Ranges response!");
                 link.setResumeable(false);
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
             /**
              * Save timestamp when download was started. </br>
              * Serverside wait time until next download can be started counts from beginning of first/last download.
@@ -1159,7 +1119,7 @@ public class RapidGatorNet extends PluginForHost {
     }
 
     private boolean isLoggedINWebsite(final Browser br) {
-        if (br.getCookie(br.getHost(), "user__", Cookies.NOTDELETEDPATTERN) != null || br.containsHTML("(?i)auth/logout\"")) {
+        if (br.getCookie(br.getHost(), "user__", Cookies.NOTDELETEDPATTERN) != null || br.containsHTML("auth/logout\"")) {
             return true;
         } else {
             return false;
@@ -1167,7 +1127,7 @@ public class RapidGatorNet extends PluginForHost {
     }
 
     private void setAccountTypeWebsite(final Account account, final Browser br) {
-        if (br.containsHTML("(?i)Account\\s*:\\&nbsp;<a href=\"/article/premium\">\\s*Free\\s*</a>")) {
+        if (br.containsHTML("Account\\s*:\\&nbsp;<a href=\"/article/premium\">\\s*Free\\s*</a>")) {
             this.setAccountLimitsByType(account, AccountType.FREE);
         } else {
             this.setAccountLimitsByType(account, AccountType.PREMIUM);
@@ -1587,6 +1547,34 @@ public class RapidGatorNet extends PluginForHost {
     }
 
     private void handleErrorsWebsite(final Browser br, final DownloadLink link, final Account account, final String currentIP, final boolean doExtendedOfflineCheck) throws PluginException {
+        /* 2020-07-28: Resume can now also fail with error 500 and json: {"error":"Unexpected range request","success":false} */
+        String errorMsgFromJson = PluginJSonUtils.getJson(br, "error");
+        if (br.getRequest().getHtmlCode().startsWith("{")) {
+            /* Check for json response and parse it to extract error message from json. */
+            try {
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                if (Boolean.FALSE.equals(entries.get("success"))) {
+                    errorMsgFromJson = entries.get("error").toString();
+                }
+            } catch (final Exception ignore) {
+            }
+        }
+        final String errorMsgHeader = br.getHttpConnection().getRequest().getResponseHeader("X-Error");
+        if (StringUtils.equalsIgnoreCase("Unexpected range request", errorMsgHeader) || StringUtils.equalsIgnoreCase(errorMsgFromJson, "Unexpected range request")) {
+            /* Resume impossible */
+            if (isResumeable(link, account)) {
+                /* Resume was attempted but failed. */
+                logger.info("Resume impossible, disabling it for the next try");
+                /* Disable resume on next attempt */
+                link.setResumeable(false);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Resume failed");
+            } else {
+                /* Resume was already disabled? Then we cannot do anything about it --> Wait and retry later */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown resume related server error");
+            }
+        } else if (errorMsgFromJson != null) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, errorMsgFromJson);
+        }
         if (account != null) {
             /* Errors which should only happen in account mode */
             if (br.containsHTML("You have reached quota|You have reached daily quota of downloaded information for premium accounts")) {
@@ -1614,7 +1602,7 @@ public class RapidGatorNet extends PluginForHost {
             } else {
                 throw new AccountRequiredException(errormsgFreeFilesizeLimit);
             }
-        } else if (br.containsHTML("(?is)This file can be downloaded by premium only\\s*</div>")) {
+        } else if (br.containsHTML("This file can be downloaded by premium only\\s*</div>")) {
             if (isPremiumAccount(account)) {
                 throw new AccountUnavailableException("Expired premium account!?", 30 * 60 * 1000);
             } else {
@@ -1649,24 +1637,24 @@ public class RapidGatorNet extends PluginForHost {
              */
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Math.min(maxReconnectWait, Long.parseLong(reconnectWaitMinutesStr) * 60 * 1000));
         }
-        if (br.containsHTML("(?i)>\\s*Error\\. Link expired\\. You have reached your daily limit of downloads\\.")) {
+        if (br.containsHTML(">\\s*Error\\. Link expired\\. You have reached your daily limit of downloads\\.")) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Link expired, or You've reached your daily limit ", Math.min(maxReconnectWait, FREE_RECONNECTWAIT_DAILYLIMIT_MILLIS));
-        } else if (br.containsHTML("(?i)>\\s*File is already downloading\\s*<")) {
+        } else if (br.containsHTML(">\\s*File is already downloading\\s*<")) {
             /*
              * 2020-03-11: Do not throw ERROR_IP_BLOCKED error here as this error will usually only show up for 30-60 seconds between
              * downloads or upon instant retry of an e.g. interrupted free download --> Reconnect is not required
              */
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Wait before starting new downloads", 1 * 60 * 1000l);
-        } else if (br.containsHTML("(?i)File is temporarily not available, please try again later")) {
+        } else if (br.containsHTML("File is temporarily not available, please try again later")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is temporarily not available, please try again later");
-        } else if (br.containsHTML("(?i)>\\s*File is temporarily unavailable, please try again later\\.\\s*Maintenance in data center")) {
+        } else if (br.containsHTML(">\\s*File is temporarily unavailable, please try again later\\.\\s*Maintenance in data center")) {
             // maybe also a shadow ban?
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "File is temporarily unavailable, please try again later. Maintenance in data center");
-        } else if (br.containsHTML("(?i)>\\s*You have reached your hourly downloads limit\\.")) {
+        } else if (br.containsHTML(">\\s*You have reached your hourly downloads limit\\.")) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You've reached your hourly downloads limit", Math.min(maxReconnectWait, FREE_RECONNECTWAIT_GENERAL_MILLIS));
-        } else if (br.containsHTML("(?i)>\\s*You have reached your daily downloads limit")) {
+        } else if (br.containsHTML(">\\s*You have reached your daily downloads limit")) {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "You've reached your daily downloads limit", Math.min(maxReconnectWait, FREE_RECONNECTWAIT_GENERAL_MILLIS));
-        } else if (br.containsHTML("(?i)You can`t download not more than 1 file at a time in free mode\\.\\s*<|>\\s*Wish to remove the restrictions\\?")) {
+        } else if (br.containsHTML("You can`t download not more than 1 file at a time in free mode\\.\\s*<|>\\s*Wish to remove the restrictions\\?")) {
             /*
              * 2020-03-11: Do not throw ERROR_IP_BLOCKED error here as this error will usually only show up for 30-60 seconds between
              * downloads or upon instant retry of an e.g. interrupted free download --> Reconnect is not required
@@ -1676,13 +1664,16 @@ public class RapidGatorNet extends PluginForHost {
             /* 2022-11-07: Files that need to be purchased separately in order to be able to download them. */
             throw new AccountRequiredException("The files of this publisher can be downloaded only by subscribers.");
         }
-        /* Check for some generic errors */
+        if (br.containsHTML(">\\s*An unexpected error occurred\\s*\\.?\\s*<")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "An unexpected error occurred", 15 * 60 * 1000l);
+        }
+        /* Check for some generic http error response codes */
         if (br.getHttpConnection().getResponseCode() == 403) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 5 * 60 * 1000l);
         } else if (br.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404 (session expired?)", 5 * 60 * 1000l);
-        } else if (br.containsHTML(">\\s*An unexpected error occurred\\s*\\.?\\s*<")) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "An unexpected error occurred", 15 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 5 * 60 * 1000l);
+        } else if (br.getHttpConnection().getResponseCode() == 416) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 416", 10 * 60 * 1000l);
         }
     }
 

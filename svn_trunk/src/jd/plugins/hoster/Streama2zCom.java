@@ -21,12 +21,16 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48082 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = {}, urls = {})
 public class Streama2zCom extends XFileSharingProBasic {
     public Streama2zCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -103,5 +107,35 @@ public class Streama2zCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
+        if (br.containsHTML(">\\s*Download disabled!")) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
+        }
+        super.checkErrors(br, html, link, account, checkAll);
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filename_abuse() {
+        // 2024-10-28
+        return false;
+    }
+
+    @Override
+    protected String getDllinkVideohost(final DownloadLink link, final Account account, final Browser br, final String src) {
+        String dllink = new Regex(src, "\\('mp4link'\\)\\.value='(https?://[^'\"]+)'").getMatch(0);
+        if (dllink != null) {
+            /* Progressive */
+            return dllink;
+        }
+        /* HLS */
+        dllink = new Regex(src, "\\('sources'\\)\\.value='(https?://[^'\"]+)'").getMatch(0);
+        if (dllink != null) {
+            return dllink;
+        }
+        /* Fallback */
+        return super.getDllinkVideohost(link, account, br, src);
     }
 }

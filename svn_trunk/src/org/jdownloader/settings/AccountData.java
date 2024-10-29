@@ -24,7 +24,7 @@ public class AccountData implements Storable {
     private String                  errorString;
     private String                  statusString;
     private List<String>            hosterHistory         = null;
-    private List<MultiHostHostData> supportedhostlist     = null;
+    private List<MultiHostHostData> infoSupportedhostlist     = null;
     private int                     maxSimultanDownloads;
     private long                    createTime;
     private long                    trafficLeft;
@@ -230,11 +230,11 @@ public class AccountData implements Storable {
     }
 
     public List<MultiHostHostData> getSupportedhostlist() {
-        return supportedhostlist;
+        return infoSupportedhostlist;
     }
 
     public void setSupportedhostlist(List<MultiHostHostData> supportedhostlist) {
-        this.supportedhostlist = supportedhostlist;
+        this.infoSupportedhostlist = supportedhostlist;
     }
 
     // Static Methods
@@ -265,7 +265,7 @@ public class AccountData implements Storable {
             ret.trafficUnlimited = ai.isUnlimitedTraffic();
             ret.specialtraffic = ai.isSpecialTraffic();
             ret.statusString = ai.getStatus();
-            ret.supportedhostlist = MultiHostHostData.createFromMultiHostHostList(ai.getMultiHostSupportV2());
+            ret.infoSupportedhostlist = MultiHostHostData.createFromMultiHostHostList(ai.getMultiHostSupportV2());
         }
         ret.concurrentUsePossible = a.isConcurrentUsePossible();
         ret.enabled = a.isEnabled();

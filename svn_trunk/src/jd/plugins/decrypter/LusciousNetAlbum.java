@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = { "luscious.net" }, urls = { "https?://(?:(?:www|members)\\.)?luscious\\.net/albums/([a-z0-9\\-_]+)_(\\d+)/?" })
 public class LusciousNetAlbum extends PluginForDecrypt {
     public LusciousNetAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -119,32 +119,39 @@ public class LusciousNetAlbum extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final String title = albumSlug.replace("-", " ");
-            String[] thumbnails = br.getRegex("src=\"(https?://[^\"]+)\" class=\"\" loading=\"lazy\"").getColumn(0);
-            if (thumbnails == null || thumbnails.length == 0) {
-                thumbnails = br.getRegex("alt=\"\\d+\" src=\"(https?://[^\"]+)\"").getColumn(0);
-            }
             final FilePackage fpFullsize = FilePackage.getInstance();
             fpFullsize.setName(title);
-            final FilePackage fpThumbnails = FilePackage.getInstance();
-            fpThumbnails.setName(title + " - thumbnails");
-            for (final String urlThumbnail : thumbnails) {
-                /* Change thumbnail URL to a full size URL */
-                final String fullsizeUrl = urlThumbnail.replaceFirst("\\.315x0\\.jpg$", ".640x0.jpg");
-                /* This link may not always be available thus we will also add the original thumbnail link later. */
-                final DownloadLink directFullsize = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
-                /* We know that this link is online. */
-                directFullsize.setAvailable(true);
-                directFullsize._setFilePackage(fpFullsize);
-                ret.add(directFullsize);
-                if (fullsizeUrl.equals(urlThumbnail)) {
-                    /* Both links are the same -> No reason to add thumbnail separately. */
-                    continue;
+            /*
+             * 2024-10-28: Disabled single image crawling as it doesn't work: It looks to be impossible to reliably generate full size URLs
+             * just by using their thumbnail URLs as a base.
+             */
+            final boolean crawlSingleImages = false;
+            if (crawlSingleImages) {
+                String[] thumbnails = br.getRegex("src=\"(https?://[^\"]+)\" class=\"\" loading=\"lazy\"").getColumn(0);
+                if (thumbnails == null || thumbnails.length == 0) {
+                    thumbnails = br.getRegex("alt=\"\\d+\" src=\"(https?://[^\"]+)\"").getColumn(0);
                 }
-                final DownloadLink directThumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
-                /* We know that this link is online. */
-                directThumbnail.setAvailable(true);
-                directThumbnail._setFilePackage(fpThumbnails);
-                ret.add(directThumbnail);
+                final FilePackage fpThumbnails = FilePackage.getInstance();
+                fpThumbnails.setName(title + " - thumbnails");
+                for (final String urlThumbnail : thumbnails) {
+                    /* Change thumbnail URL to a full size URL */
+                    final String fullsizeUrl = urlThumbnail.replaceFirst("\\.315x0\\.jpg$", ".640x0.jpg");
+                    /* This link may not always be available thus we will also add the original thumbnail link later. */
+                    final DownloadLink directFullsize = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+                    /* We know that this link is online. */
+                    directFullsize.setAvailable(true);
+                    directFullsize._setFilePackage(fpFullsize);
+                    ret.add(directFullsize);
+                    if (fullsizeUrl.equals(urlThumbnail)) {
+                        /* Both links are the same -> No reason to add thumbnail separately. */
+                        continue;
+                    }
+                    final DownloadLink directThumbnail = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(urlThumbnail));
+                    /* We know that this link is online. */
+                    directThumbnail.setAvailable(true);
+                    directThumbnail._setFilePackage(fpThumbnails);
+                    ret.add(directThumbnail);
+                }
             }
             final String redirectURL = br.getRegex("\"(/download/r/\\d+/\\d+/?)\"").getMatch(0);
             if (redirectURL != null) {

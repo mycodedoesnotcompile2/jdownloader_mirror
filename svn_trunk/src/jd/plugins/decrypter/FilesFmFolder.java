@@ -30,12 +30,13 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,6 +97,16 @@ public class FilesFmFolder extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
+        final FilePackage fp = FilePackage.getInstance();
+        String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            title = title.replaceFirst(" \\| files\\.fm", "");
+            fp.setName(title);
+        } else {
+            /* Fallback */
+            fp.setName(br._getURL().getPath());
+        }
         for (final String singleLink : links) {
             String filename = new Regex(singleLink, "class=\"full-file-name\">([^<>\"]+)<").getMatch(0);
             final String ext = new Regex(singleLink, "class=\"filename-extension\"[^>]*>([^<>\"]+)<").getMatch(0);
@@ -121,6 +132,7 @@ public class FilesFmFolder extends PluginForDecrypt {
             dl.setName(Encoding.htmlDecode(filename));
             dl.setDownloadSize(SizeFormatter.getSize(Encoding.htmlDecode(filesize)));
             dl.setProperty("originalname", filename);
+            dl._setFilePackage(fp);
             ret.add(dl);
         }
         return ret;

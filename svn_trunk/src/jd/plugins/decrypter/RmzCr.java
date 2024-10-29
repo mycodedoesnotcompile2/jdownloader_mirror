@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
@@ -32,7 +31,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 49742 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = {}, urls = {})
 public class RmzCr extends antiDDoSForDecrypt {
     public RmzCr(PluginWrapper wrapper) {
         super(wrapper);
@@ -79,6 +78,15 @@ public class RmzCr extends antiDDoSForDecrypt {
         if (fpName == null) {
             fpName = br.getRegex("<title>RapidMoviez\\s+-\\s+([^<]+)</title>").getMatch(0);
         }
+        final String[] links = br.getRegex("<!--sse-->(https?://[^<]+)<!--/sse-->").getColumn(0);
+        if (links != null && links.length > 0) {
+            for (final String link : links) {
+                ret.add(createDownloadlink(link));
+            }
+        }
+        if (ret.isEmpty()) {
+            logger.warning("Failed to find any file host downloadlinks");
+        }
         final String[] covers = br.getRegex("(https?://[^/]+/data/images/movies/[^<>\"]+)\"").getColumn(0);
         if (covers.length > 0) {
             logger.info("Found covers");
@@ -102,24 +110,6 @@ public class RmzCr extends antiDDoSForDecrypt {
                 }
             } else {
                 logger.info("Failed to find screencaps");
-            }
-        }
-        String linkBlock = br.getRegex("(<div id=\"(?:title_release_after_download_title|title_release_after_imdb)\">[^$]+<div id=\"title_release_after_links\">)").getMatch(0);
-        if (linkBlock != null) {
-            /* 2020-01-22 */
-            linkBlock = linkBlock.replaceAll("(<![^<>]+>)", "");
-            String[] links = new Regex(linkBlock, "id=\"l\\d+\">([^<>\"]+)</pre>").getColumn(0);
-            for (String link : links) {
-                if (link.startsWith("/")) {
-                    // link = br.getURL(link).toString();
-                    /* 2020-01-22: Skip URLs which would lead to this crawler again */
-                    continue;
-                }
-                /* Sometimes this may contain multiple objects newline separated. */
-                final String[] links2 = HTMLParser.getHttpLinks(link, null);
-                for (final String link2 : links2) {
-                    ret.add(createDownloadlink(link2));
-                }
             }
         }
         if (ret.isEmpty()) {

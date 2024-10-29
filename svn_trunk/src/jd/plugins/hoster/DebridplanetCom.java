@@ -26,13 +26,13 @@ import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.nutils.JDHash;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -42,11 +42,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
 public class DebridplanetCom extends PluginForHost {
     private static final String          API_BASE               = "https://debridplanet.com/v1";
     private static MultiHosterManagement mhm                    = new MultiHosterManagement("debridplanet.com");
@@ -170,8 +172,7 @@ public class DebridplanetCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        login(account, true);
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        Map<String, Object> entries = login(account, true);
         entries = (Map<String, Object>) entries.get("user");
         final String accountType = (String) entries.get("account_type");
         if (accountType.equalsIgnoreCase("free")) {
@@ -188,65 +189,58 @@ public class DebridplanetCom extends PluginForHost {
             ai.setUnlimitedTraffic();
         }
         br.getPage(API_BASE + "/supportedhosts.php");
-        entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final ArrayList<String> supportedHosts = new ArrayList<String>();
-        final List<Object> supportedHostsO = (List<Object>) entries.get("supportedhosts");
-        for (final Object supportedHostO : supportedHostsO) {
-            entries = (Map<String, Object>) supportedHostO;
-            final String domain = entries.get("host").toString();
-            if (!((Boolean) entries.get("currently_working")).booleanValue()) {
-                logger.info("Skipping offline host: " + domain);
-                continue;
-            } else {
-                supportedHosts.add(domain);
+        final Map<String, Object> resp_supportedhosts = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final List<Map<String, Object>> supportedHostsO = (List<Map<String, Object>>) resp_supportedhosts.get("supportedhosts");
+        for (final Map<String, Object> supportedhostinfo : supportedHostsO) {
+            final String domain = supportedhostinfo.get("host").toString();
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            if (Boolean.FALSE.equals(supportedhostinfo.get("currently_working"))) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupport(this, supportedHosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         account.setConcurrentUsePossible(true);
         return ai;
     }
 
-    private void login(final Account account, final boolean validateLogins) throws IOException, PluginException, InterruptedException {
+    private Map<String, Object> login(final Account account, final boolean validateLogins) throws IOException, PluginException, InterruptedException {
         synchronized (account) {
-            try {
-                prepBR(this.br);
-                if (account.getStringProperty(PROPERTY_ACCOUNT_TOKEN) != null) {
-                    logger.info("Trying to login via token");
-                    br.getHeaders().put("Authorization", "Bearer " + account.getStringProperty(PROPERTY_ACCOUNT_TOKEN));
-                    if (!validateLogins) {
-                        logger.info("Trust token without check");
-                        return;
-                    } else {
-                        logger.info("Validating login token...");
-                        br.postPage(API_BASE + "/user-info.php", "");
-                        try {
-                            checkErrors(account, null);
-                            logger.info("Token login successful");
-                            return;
-                        } catch (final PluginException e) {
-                            logger.exception("Token login failed", e);
-                        }
+            prepBR(this.br);
+            if (account.getStringProperty(PROPERTY_ACCOUNT_TOKEN) != null) {
+                logger.info("Trying to login via token");
+                br.getHeaders().put("Authorization", "Bearer " + account.getStringProperty(PROPERTY_ACCOUNT_TOKEN));
+                if (!validateLogins) {
+                    logger.info("Trust token without check");
+                    return null;
+                } else {
+                    logger.info("Validating login token...");
+                    br.postPage(API_BASE + "/user-info.php", "");
+                    try {
+                        final Map<String, Object> entries = (Map<String, Object>) checkErrors(account, null);
+                        logger.info("Token login successful");
+                        return entries;
+                    } catch (final PluginException e) {
+                        logger.exception("Token login failed", e);
+                        account.removeProperty(PROPERTY_ACCOUNT_TOKEN);
+                        account.clearCookies("");
                     }
                 }
-                logger.info("Performing full login");
-                final Map<String, Object> postdata = new HashMap<String, Object>();
-                postdata.put("username", account.getUser());
-                postdata.put("password", JDHash.getSHA256(account.getPass()));
-                br.postPageRaw(API_BASE + "/login.php", JSonStorage.serializeToJson(postdata));
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String token = (String) entries.get("token");
-                if (StringUtils.isEmpty(token)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                br.getHeaders().put("Authorization", "Bearer " + token);
-                account.setProperty(PROPERTY_ACCOUNT_TOKEN, token);
-            } catch (PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.removeProperty(PROPERTY_ACCOUNT_TOKEN);
-                    account.clearCookies("");
-                }
-                throw e;
             }
+            logger.info("Performing full login");
+            final Map<String, Object> postdata = new HashMap<String, Object>();
+            postdata.put("username", account.getUser());
+            postdata.put("password", Hash.getSHA256(account.getPass()));
+            br.postPageRaw(API_BASE + "/login.php", JSonStorage.serializeToJson(postdata));
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String token = (String) entries.get("token");
+            if (StringUtils.isEmpty(token)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            br.getHeaders().put("Authorization", "Bearer " + token);
+            account.setProperty(PROPERTY_ACCOUNT_TOKEN, token);
+            return entries;
         }
     }
 

@@ -42,7 +42,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49838 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
 public class NexusmodsComCrawler extends PluginForDecrypt {
     public NexusmodsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -134,7 +134,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlWebsite(final CryptedLink param, final Account account, final String game_domain_name, final String mod_id) throws Exception {
-        final String parameter = param.toString();
+        final String parameter = param.getCryptedUrl();
         final PluginForHost plugin = JDUtilities.getPluginForHost(this.getHost());
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (account != null) {
@@ -144,8 +144,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         br.setFollowRedirects(true);
         ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br, parameter);
         if (jd.plugins.hoster.NexusmodsCom.isOfflineWebsite(br)) {
-            ret.add(this.createOfflinelink(parameter));
-            return ret;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (((jd.plugins.hoster.NexusmodsCom) plugin).isLoginRequired(br)) {
             throw new AccountRequiredException();
         } else if (br.containsHTML(">\\s*This mod contains adult content")) {
@@ -163,24 +162,28 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find game_id");
         }
         final Browser br2 = br.cloneBrowser();
-        ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br2, "/Core/Libs/Common/Widgets/ModFilesTab?id=" + mod_id + "&game_id=" + game_id);
-        final String[] downloadTypesHTMLs = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>[^<>]+</h2>\\s*<div>.*?</dd>\\s*</dl>\\s*</div>").getColumn(-1);
-        if (downloadTypesHTMLs == null || downloadTypesHTMLs.length == 0) {
+        ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br2, "/" + game_domain_name + "/mods/" + mod_id + "?tab=files");
+        final String[] categoryNames = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>([^>]+)</h2>").getColumn(0);
+        final String[] downloadCategoriesHTMLs = br2.getRegex("<dd[^>]* data-id=\"\\d+\"[^>]*>.*?</div>\\s*</dt>").getColumn(-1);
+        if (downloadCategoriesHTMLs == null || downloadCategoriesHTMLs.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        int counter = 0;
-        for (final String downnloadTypeHTML : downloadTypesHTMLs) {
-            counter++;
-            String category_name = new Regex(downnloadTypeHTML, "<h2>([^<>\"]+)</h2>").getMatch(0);
+        int index = -1;
+        for (final String downnloadTypeHTML : downloadCategoriesHTMLs) {
+            index++;
+            String category_name = null;
+            if (categoryNames != null && categoryNames.length == downloadCategoriesHTMLs.length) {
+                category_name = categoryNames[index];
+            }
             if (category_name == null) {
                 /* Fallback */
-                category_name = "Unknown_category_" + counter;
+                category_name = "Unknown_category_" + (index + 1);
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(game_domain_name + " - " + mod_name + " - " + category_name);
             category_name = Encoding.htmlDecode(category_name).trim();
             final String currentPath = game_domain_name + "/" + mod_name + "/" + category_name;
-            final String[] htmls = new Regex(downnloadTypeHTML, "<dt id=\"file-expander-header-\\d+\".*?</div>\\s*</dd>").getColumn(-1);
+            final String[] htmls = new Regex(downnloadTypeHTML, "<dt id=\"file-expander-header-\\d+\".*?/use>\\s*</svg>\\s*</div>").getColumn(-1);
             if (htmls == null || htmls.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

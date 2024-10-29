@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.EHentaiOrg;
 
-@DecrypterPlugin(revision = "$Revision: 49021 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
+@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
 public class EHentaiOrgCrawler extends PluginForDecrypt {
     public EHentaiOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +96,11 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
         br.getPage(contenturl);
         if (EHentaiOrg.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("Key missing, or incorrect key provided") || br.containsHTML("class=\"d\"") || br.toString().matches("Your IP address has been temporarily banned for excessive pageloads.+")) {
+        } else if (br.containsHTML("Key missing, or incorrect key provided")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("class=\"d\"")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.toString().matches("Your IP address has been temporarily banned for excessive pageloads.+")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.getRequest().getHttpConnection().getCompleteContentLength() == 0) {
             /* 2020-11-10: Rare case */
@@ -247,7 +251,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: mpv URLs have all objects on the first page");
                 break;
             } else {
-                final String[][] links = br.getRegex("\"(https?://(?:(?:g\\.)?e-hentai|exhentai)\\.org/s/[a-z0-9]+/" + galleryid + "-\\d+)\">\\s*<img[^<>]*title\\s*=\\s*\"(.*?)\"[^<>]*src\\s*=\\s*\"(.*?)\"").getMatches();
+                final String[][] links = br.getRegex("\"(https?://(?:e-hentai|exhentai)\\.org/s/[a-z0-9]+/" + galleryid + "-\\d+)\">\\s*<(?:div|img)[^<]*title\\s*=\\s*\"([^\"]+)").getMatches();
                 if (links == null || links.length == 0 || title == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
