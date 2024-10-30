@@ -51,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49820 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
+@HostPlugin(revision = "$Revision: 50041 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/watch/(?:sm|so|nm)?(\\d+)" })
 public class NicoVideoJp extends PluginForHost {
     private static final String  CUSTOM_DATE               = "CUSTOM_DATE";
     private static final String  CUSTOM_FILENAME           = "CUSTOM_FILENAME";
@@ -147,7 +147,7 @@ public class NicoVideoJp extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* This title is e.g. useful when a video is GEO-blocked. Example: https://www.nicovideo.jp/watch/so39439590 */
-        String fallbackTitle = br.getRegex("<title>([^<]+)</title>").getMatch(0);
+        String fallbackTitle = br.getRegex("<title[^>]*>([^<]+)</title>").getMatch(0);
         if (fallbackTitle != null) {
             fallbackTitle = Encoding.htmlDecode(fallbackTitle).trim();
             fallbackTitle = fallbackTitle.replaceFirst("(?i)\\s*Niconico Video$", "");

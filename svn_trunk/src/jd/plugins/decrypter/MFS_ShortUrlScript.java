@@ -39,7 +39,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
  *
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = { "gourl.us" }, urls = { "https?://(?:www\\.)?gourl\\.us/([a-zA-Z0-9_\\-]+)$" })
+@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "gourl.us" }, urls = { "https?://(?:www\\.)?gourl\\.us/([a-zA-Z0-9_\\-]+)$" })
 public class MFS_ShortUrlScript extends PluginForDecrypt {
     public MFS_ShortUrlScript(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,14 +48,25 @@ public class MFS_ShortUrlScript extends PluginForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
-        br.setFollowRedirects(true);
+        br.setFollowRedirects(false);
         return br;
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String parameter = param.getCryptedUrl().replaceFirst("^http://", "https://");
         // final String fuid = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
         br.getPage(parameter);
+        final String redirect = br.getRedirectLocation();
+        if (redirect != null && !this.canHandle(redirect) && !redirect.contains(this.getHost() + "/")) {
+            logger.info("Found direct redirect to final link: " + redirect);
+            ret.add(createDownloadlink(redirect));
+            return ret;
+        }
+        br.setFollowRedirects(true);
+        if (redirect != null) {
+            br.followRedirect(true);
+        }
         final String errorFromURL = UrlQuery.parse(br.getURL()).get("e");
         if (errorFromURL != null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -82,7 +93,6 @@ public class MFS_ShortUrlScript extends PluginForDecrypt {
                 continue;
             }
         }
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String frame = br.getRegex("<frame [^>]*src=\"(interstitualAdTop\\.php\\?url=\\d+)\"").getMatch(0);
         if (frame == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

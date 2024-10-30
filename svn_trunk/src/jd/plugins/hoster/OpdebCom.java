@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50041 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -104,20 +104,44 @@ public class OpdebCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
-        this.login(account, false);
-        final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
-        final UrlQuery query = new UrlQuery();
-        query.appendEncoded("link", url);
-        // TODO: Implement this
-        final Map<String, Object> entries = (Map<String, Object>) this.callAPI("/generator", link, account, query);
-        String dllink = null;
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to file", 10, 5 * 60 * 1000l);
+        final String directlinkproperty = this.getHost() + "directlink";
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Re-using stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
+            mhm.runCheck(account, link);
+            this.login(account, false);
+            /**
+             * TODO: Remove the need of this. This is f*cking stupid API design! </br>
+             * Without this parameter, error "ERROR: Issue with your IP or IPSET " will happen.
+             */
+            final String ip = br.getPage("https://ipcheck0.jdownloader.org/");
+            final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("link", url);
+            query.appendEncoded("ip", ip);
+            final Map<String, Object> resp_generator = (Map<String, Object>) this.callAPI("/generator", link, account, query);
+            dllink = JavaScriptEngineFactory.walkJson(resp_generator, "generator/{0}/link").toString();
         }
-        link.setProperty(this.getHost() + "directlink", dl.getConnection().getURL().toString());
+        try {
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to file", 10, 5 * 60 * 1000l);
+            }
+        } catch (final Exception e) {
+            if (storedDirecturl != null) {
+                link.removeProperty(directlinkproperty);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
+            } else {
+                throw e;
+            }
+        }
+        if (storedDirecturl == null) {
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+        }
         this.dl.startDownload();
     }
 
@@ -164,7 +188,7 @@ public class OpdebCom extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 final String downsincedate = (String) hostermap.get("downsincedate");
                 if (!StringUtils.isEmpty(downsincedate)) {
-                    mhost.setStatusText("Down since " + downsincedate);
+                    mhost.setStatusText("Broken/Down since " + downsincedate);
                 }
             }
             final Map<String, Object> limitmap;
@@ -230,10 +254,18 @@ public class OpdebCom extends PluginForHost {
             return entries;
         }
         if (link == null) {
+            /* Account related error */
             throw new AccountInvalidException(message);
-        } else {
-            mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 50);
         }
+        /* Decide if error is link/download related or account related. */
+        final List<String> patternsLoginInvalid = new ArrayList<String>();
+        patternsLoginInvalid.add("The Api Key .+ does not exists or is not authorized");
+        for (final String patternLoginInvalid : patternsLoginInvalid) {
+            if (message.matches(patternLoginInvalid)) {
+                throw new AccountInvalidException(message);
+            }
+        }
+        mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 50);
         return entries;
     }
 

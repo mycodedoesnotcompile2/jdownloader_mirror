@@ -48,7 +48,6 @@ import jd.controlling.AccountController;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -63,9 +62,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
+@HostPlugin(revision = "$Revision: 50041 $", interfaceVersion = 2, names = { "soundcloud.com" }, urls = { "https://(?:www\\.)?soundclouddecrypted\\.com/[A-Za-z\\-_0-9]+/[A-Za-z\\-_0-9]+(/[A-Za-z\\-_0-9]+)?" })
 public class SoundcloudCom extends PluginForHost {
     public SoundcloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,11 +73,7 @@ public class SoundcloudCom extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        if (cookieLoginOnly) {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.AUDIO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
-        } else {
-            return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.AUDIO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
-        }
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.AUDIO_STREAMING, LazyPlugin.FEATURE.COOKIE_LOGIN_ONLY };
     }
 
     /*
@@ -129,8 +123,6 @@ public class SoundcloudCom extends PluginForHost {
     public static final boolean  ACCOUNT_NEEDED_FOR_OFFICIAL_DOWNLOADS                                 = true;
     /* API base URLs */
     public static final String   API_BASEv2                                                            = "https://api-v2.soundcloud.com";
-    /* 2020-12-15: Website/API login is broken thus only cookie login is possible */
-    private static final boolean cookieLoginOnly                                                       = true;
 
     public void correctDownloadLink(final DownloadLink link) {
         link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("soundclouddecrypted", "soundcloud"));
@@ -375,7 +367,7 @@ public class SoundcloudCom extends PluginForHost {
              * files.
              */
             final String contentDispositionFilename = Plugin.getFileNameFromDispositionHeader(dl.getConnection());
-            if (contentDispositionFilename != null) {
+            if (!StringUtils.isEmpty(contentDispositionFilename)) {
                 link.setFinalFileName(contentDispositionFilename);
             }
             dl.startDownload();
@@ -401,7 +393,7 @@ public class SoundcloudCom extends PluginForHost {
         final String id = track.get("id").toString();
         try {
             final String description = (String) track.get("description");
-            if (!StringUtils.isEmpty(description)) {
+            if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
                 link.setComment(description);
             }
         } catch (final Throwable ignore) {
@@ -652,103 +644,33 @@ public class SoundcloudCom extends PluginForHost {
             String oauthtoken = account.getStringProperty(PROPERTY_ACCOUNT_oauthtoken);
             br.setCookiesExclusive(true);
             try {
-                final Cookies cookies = account.loadCookies("");
                 final Cookies userCookies = account.loadUserCookies();
-                if (cookieLoginOnly && userCookies == null) {
+                if (userCookies == null || userCookies.isEmpty()) {
                     showCookieLoginInfo();
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
                 }
-                if (userCookies != null) {
-                    logger.info("Attempting user cookie login");
-                    if (userCookies.get("oauth_token") == null) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Cookie login failed: Oauth token missing", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                    br.setCookies(this.getHost(), userCookies);
-                    oauthtoken = userCookies.get("oauth_token").getValue(); // Exception will occur if this cookie is not given!
-                    br.getHeaders().put("Authorization", "OAuth " + oauthtoken);
-                    if (this.checkLogin(br)) {
-                        account.setProperty(PROPERTY_ACCOUNT_oauthtoken, oauthtoken);
-                        return;
-                    } else {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
-                    }
+                logger.info("Attempting user cookie login");
+                if (userCookies.get("oauth_token") == null) {
+                    throw new AccountInvalidException("Cookie login failed: Oauth token missing");
                 }
-                if (cookies != null && oauthtoken != null) {
-                    br.setCookies(this.getHost(), cookies);
-                    br.getHeaders().put("Authorization", "OAuth " + oauthtoken);
-                    if (!force) {
-                        logger.info("Trust cookies without checking");
-                        return;
-                    } else if (this.checkLogin(br)) {
-                        return;
-                    }
-                }
-                logger.info("Full login required");
-                br.clearAuthentications();
-                br.clearCookies(this.getHost());
-                br.getPage("https://soundcloud.com/");
-                br.getPage("https://secure.soundcloud.com/web-auth?client_id=" + getClientIdV2() + "&device_id=TODO");
-                final String loginbase = "https://api-auth.soundcloud.com";
-                /* TODO: Add cookie/oauth check for v2 to prevent full login attempts! */
-                br.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.1");
-                br.getHeaders().put("Content-Type", "application/json");
-                /* TODO */
-                br.getHeaders().put("sec-ch-ua", "\"Google Chrome\";v=\"87\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"87\"");
-                /* This one is stored in a JD file - URL is available after "secure.soundcloud.com/web-auth/" ... */
-                br.getHeaders().put("X-Csrf-Token", "TODO");
-                br.getHeaders().put("sec-ch-ua-mobile", "?0");
-                br.getHeaders().put("Origin", "https://secure.soundcloud.com");
-                br.getPage(loginbase + "/web-auth/identifier?" + Encoding.urlEncode(account.getUser()) + "&client_id=" + getClientIdV2());
-                /* First check if users' E-Mail address exists */
-                // final String identifier = PluginJSonUtils.getJson(br, "identifier");
-                final String status = PluginJSonUtils.getJson(br, "status");
-                if (!"in_use".equalsIgnoreCase(status)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                final String requesturl = loginbase + "/web-auth/sign-in/password?client_id=" + getClientIdV2();
-                final Map<String, Object> data_credentials = new HashMap<String, Object>();
-                data_credentials.put("identifier", account.getUser());
-                data_credentials.put("password", account.getPass());
-                final Map<String, Object> data = new HashMap<String, Object>();
-                data.put("device_id", "TODO");
-                data.put("client_id", getClientIdV2());
-                /* Date: 2020-12-15 */
-                data.put("recaptcha_pubkey", "6Ld72JcUAAAAAItDloUGqg6H38KK5j08VuQlegV1");
-                data.put("recaptcha_response", null);
-                data.put("signature", "TODO");
-                data.put("user_agent", testUserAgent);
-                data.put("credentials", data_credentials);
-                final PostRequest loginReq = br.createJSonPostRequest(requesturl, JSonStorage.serializeToJson(data));
-                br.openRequestConnection(loginReq);
-                br.followConnection();
-                // br.loadConnection(null);
-                final String error = PluginJSonUtils.getJson(br, "error");
-                if (!StringUtils.isEmpty(error)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                oauthtoken = PluginJSonUtils.getJson(br, "access_token");
-                if (StringUtils.isEmpty(oauthtoken)) {
-                    logger.info("Could not find oauth token -> Wrong password?");
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+                br.setCookies(this.getHost(), userCookies);
+                oauthtoken = userCookies.get("oauth_token").getValue(); // Exception will occur if this cookie is not given!
                 br.getHeaders().put("Authorization", "OAuth " + oauthtoken);
-                account.setProperty(PROPERTY_ACCOUNT_oauthtoken, oauthtoken);
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                    account.removeProperty(PROPERTY_ACCOUNT_oauthtoken);
+                if (this.checkLogin(br)) {
+                    account.setProperty(PROPERTY_ACCOUNT_oauthtoken, oauthtoken);
+                    return;
+                } else {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
                 }
-                throw e;
             } finally {
                 /* Store userID separately as we might need it later. */
                 if (oauthtoken != null) {
                     final Regex oauthInfo = new Regex(oauthtoken, "(\\d+)-(\\d+)-(\\d+)-([A-Za-z0-9]+)");
-                    if (oauthInfo.matches()) {
+                    if (oauthInfo.patternFind()) {
                         account.setProperty(PROPERTY_ACCOUNT_userid, oauthInfo.getMatch(2));
                     } else {
                         logger.warning("Unexpected oauthtoken format");

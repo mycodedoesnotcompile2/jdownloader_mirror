@@ -16,14 +16,14 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.hls.HlsContainer;
@@ -41,14 +41,16 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.CryptedLink;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.SuicidegirlsComCrawler;
 
-@HostPlugin(revision = "$Revision: 50034 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "http://suicidegirlsdecrypted/\\d+|https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
+@HostPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/videos/\\d+/[A-Za-z0-9\\-_]+/" })
 public class SuicidegirlsCom extends PluginForHost {
     public SuicidegirlsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -74,13 +76,14 @@ public class SuicidegirlsCom extends PluginForHost {
         return "https://www." + getHost() + "/legal/";
     }
 
-    /* Linktypes */
-    private static final String TYPE_DECRYPTED      = "http://suicidegirlsdecrypted/\\d+";
-    private static final String TYPE_VIDEO          = "(?i)https?://(?:www\\.)?suicidegirls\\.com/videos/(\\d+)/[A-Za-z0-9\\-_]+/";
+    private static final Pattern TYPE_VIDEO                      = Pattern.compile("https?://(?:www\\.)?suicidegirls\\.com/videos/(\\d+)/[A-Za-z0-9\\-_]+/", Pattern.CASE_INSENSITIVE);
     /* Properties */
-    public static final String  PROPERTY_DIRECTURL  = "directlink";
-    public static final String  PROPERTY_IMAGE_NAME = "imageName";
-    private String              dllink              = null;
+    public static final String   PROPERTY_DIRECTURL              = "directlink";
+    public static final String   PROPERTY_IMAGE_NAME             = "imageName";
+    public static final String   PROPERTY_IMAGE_INDEX            = "image_index";
+    public static final String   PROPERTY_MAIN_LINK              = "mainlink";
+    private static final String  PROPERTY_FRESH_DIRECTURL_NEEDED = "fresh_directurl_needed";
+    private String               dllink                          = null;
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -105,11 +108,19 @@ public class SuicidegirlsCom extends PluginForHost {
     private String getFID(final DownloadLink link) {
         if (link == null || link.getPluginPatternMatcher() == null) {
             return null;
-        } else if (link.getPluginPatternMatcher().matches(TYPE_VIDEO)) {
-            return new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO).getMatch(0);
+        }
+        final Regex regex_video = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO);
+        if (regex_video.patternFind()) {
+            return regex_video.getMatch(0);
         } else {
-            // TYPE_DECRYPTED
-            return link.getStringProperty(PROPERTY_IMAGE_NAME);
+            /* Image */
+            final String mainlink = link.getStringProperty(PROPERTY_DIRECTURL);
+            if (mainlink != null) {
+                return mainlink + "_" + link.getStringProperty(PROPERTY_IMAGE_INDEX);
+            } else {
+                /* Legacy / older items */
+                return link.getStringProperty(PROPERTY_IMAGE_NAME);
+            }
         }
     }
 
@@ -124,7 +135,9 @@ public class SuicidegirlsCom extends PluginForHost {
         }
         String filename = null;
         final Regex videourl = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO);
+        String extDefault = null;
         if (videourl.patternFind()) {
+            extDefault = ".mp4";
             br.getPage(link.getPluginPatternMatcher());
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -135,30 +148,59 @@ public class SuicidegirlsCom extends PluginForHost {
             }
             filename = br.getRegex("<h2 class=\"title\">(?:SuicideGirls:\\s*)?([^<>\"]*?)</h2>").getMatch(0);
             if (filename == null) {
-                /* Fallback to url-filename */
+                /* Fallback: Take file name from URL */
                 filename = new Regex(link.getPluginPatternMatcher(), "(?i)/videos/\\d+/([A-Za-z0-9\\-_]+)/").getMatch(0);
             }
             filename = Encoding.htmlDecode(filename).trim();
-            filename += ".mp4";
+            filename += extDefault;
         } else {
+            extDefault = ".jpg";
             filename = link.getStringProperty(PROPERTY_IMAGE_NAME);
+            if (link.hasProperty(PROPERTY_FRESH_DIRECTURL_NEEDED)) {
+                /* Direct url expired -> Find fresh one */
+                final String contenturl = link.getStringProperty(PROPERTY_MAIN_LINK);
+                if (contenturl == null) {
+                    /* Older links */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final SuicidegirlsComCrawler crawler = (SuicidegirlsComCrawler) this.getNewPluginForDecryptInstance(this.getHost());
+                final CryptedLink cl = new CryptedLink(contenturl);
+                final List<DownloadLink> results = crawler.crawl(cl, account);
+                DownloadLink fresh = null;
+                final String thisLinkID = this.getLinkID(link);
+                for (final DownloadLink result : results) {
+                    if (StringUtils.equals(thisLinkID, this.getLinkID(result))) {
+                        fresh = result;
+                        break;
+                    }
+                }
+                if (fresh == null) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "Failed to refresh directurl");
+                }
+                link.removeProperty(PROPERTY_FRESH_DIRECTURL_NEEDED);
+                link.setProperty(PROPERTY_DIRECTURL, fresh.getStringProperty(PROPERTY_DIRECTURL));
+            }
             dllink = getStoredDirecturl(link);
         }
         link.setName(filename);
-        if (!StringUtils.containsIgnoreCase(dllink, ".m3u8") && !isDownload) {
-            basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, filename, videourl.patternFind() ? ".mp4" : null);
+        if (!isHLS(dllink)) {
+            final Browser brc = br.cloneBrowser();
+            basicLinkCheck(brc, br.createHeadRequest(dllink), link, filename, extDefault);
+            this.handleConnectionErrors(link, brc, brc.getHttpConnection());
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
         if (link.getFinalFileName() == null && filename != null) {
-            link.setFinalFileName(correctOrApplyFileNameExtension(filename, videourl.patternFind() ? ".mp4" : null, null));
+            link.setFinalFileName(correctOrApplyFileNameExtension(filename, extDefault, null));
         }
         return AvailableStatus.TRUE;
     }
 
-    @Override
-    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+    protected void handleConnectionErrors(final DownloadLink link, final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
         super.handleConnectionErrors(br, con);
-        if (StringUtils.containsIgnoreCase(con.getURL().toExternalForm(), "ph-join-sg.jpg")) {
+        if (StringUtils.containsIgnoreCase(con.getURL().toExternalForm(), "signature-expired")) {
+            this.getDownloadLink().setProperty(PROPERTY_FRESH_DIRECTURL_NEEDED, true);
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Expired directurl", 5 * 60 * 1000l);
+        } else if (StringUtils.containsIgnoreCase(con.getURL().toExternalForm(), "ph-join-sg.jpg")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid media: Got advertising image instead of expected file content");
         }
     }
@@ -176,7 +218,6 @@ public class SuicidegirlsCom extends PluginForHost {
 
     public void login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
-            prepBR(br);
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             if (cookies != null) {
@@ -227,10 +268,17 @@ public class SuicidegirlsCom extends PluginForHost {
                 brc.getHeaders().put("X-Csrftoken", specialToken);
             }
             brc.submitForm(loginform);
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final String errormessage = (String) entries.get("message");
-            if (!StringUtils.isEmpty(errormessage)) {
-                throw new AccountInvalidException(errormessage);
+            /* We only get a json response if there was a problem. */
+            Map<String, Object> entries = null;
+            try {
+                entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            } catch (final Throwable ignore) {
+            }
+            if (entries != null) {
+                final String errormessage = (String) entries.get("message");
+                if (!StringUtils.isEmpty(errormessage)) {
+                    throw new AccountInvalidException(errormessage);
+                }
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
@@ -242,27 +290,28 @@ public class SuicidegirlsCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true);
+        final AccountInfo ai = new AccountInfo();
         if (!br.getURL().contains("/member/account")) {
             br.getPage("/member/account/");
         }
         ai.setUnlimitedTraffic();
-        String expire = br.getRegex("YOUR ACCOUNT IS CLOSING IN\\s*<a>(\\d+ weeks?, \\d+ days?)<").getMatch(0);
+        final Regex info = br.getRegex("YOUR ACCOUNT IS CLOSING IN\\s*<a>(\\d+)\\s*weeks?\\s*,\\s*(\\d+) days?");
         long expire_long = -1;
-        if (expire != null) {
-            final Regex info = new Regex(expire, "(\\d+) weeks?, (\\d+) days?");
+        if (info.patternFind()) {
             final String weeks = info.getMatch(0);
             final String days = info.getMatch(1);
             final long days_total = Long.parseLong(weeks) * 7 * +Long.parseLong(days);
             expire_long = System.currentTimeMillis() + days_total * 24 * 60 * 60 * 1000l;
         }
-        if (expire == null && expire_long == -1) {
-            expire = br.getRegex("Your account will be cancelled on (\\w+ \\d+, \\d{4})").getMatch(0);
-            expire_long = TimeFormatter.getMilliSeconds(expire, "MMMM dd, yyyy", Locale.ENGLISH);
+        if (expire_long == -1) {
+            final String expireStr = br.getRegex("Your account will be cancelled on (\\w+ \\d+, \\d{4})").getMatch(0);
+            if (expireStr != null) {
+                expire_long = TimeFormatter.getMilliSeconds(expireStr, "MMMM dd, yyyy", Locale.ENGLISH);
+            }
         }
         if (expire_long > -1) {
-            ai.setValidUntil(expire_long);
+            ai.setValidUntil(expire_long, br);
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
@@ -282,7 +331,7 @@ public class SuicidegirlsCom extends PluginForHost {
             logger.warning("Failed to find final downloadurl");
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        if (dllink.contains(".m3u8")) {
+        if (isHLS(dllink)) {
             /* 2020-03-02: New: HLS streams */
             br.getPage(dllink);
             final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
@@ -295,9 +344,17 @@ public class SuicidegirlsCom extends PluginForHost {
             dl.startDownload();
         } else {
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), 0);
-            handleConnectionErrors(br, dl.getConnection());
+            handleConnectionErrors(link, br, dl.getConnection());
             link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toExternalForm());
             dl.startDownload();
+        }
+    }
+
+    private boolean isHLS(final String url) {
+        if (StringUtils.containsIgnoreCase(".m3u8", url)) {
+            return true;
+        } else {
+            return false;
         }
     }
 
@@ -307,26 +364,6 @@ public class SuicidegirlsCom extends PluginForHost {
             /* 2024-03-12: Fix older items which were stored with html entities. */
             url = Encoding.htmlOnlyDecode(url);
             return url;
-        }
-        return null;
-    }
-
-    @SuppressWarnings("deprecation")
-    public Account login(final Browser br) {
-        final ArrayList<Account> accounts = AccountController.getInstance().list(this.getHost());
-        if (accounts != null && accounts.size() != 0) {
-            final LogInterface logger = br.getLogger();
-            for (final Account account : accounts) {
-                try {
-                    login(account, false);
-                    return account;
-                } catch (final PluginException e) {
-                    logger.log(e);
-                    account.setValid(false);
-                } catch (final Exception e) {
-                    logger.log(e);
-                }
-            }
         }
         return null;
     }

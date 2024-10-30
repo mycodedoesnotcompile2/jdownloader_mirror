@@ -20,48 +20,48 @@ import java.util.ArrayList;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 43195 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/(?:user/\\d+/)?mylist/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 50041 $", interfaceVersion = 2, names = { "nicovideo.jp" }, urls = { "https?://(?:www\\.)?nicovideo\\.jp/(?:user/\\d+/)?mylist/\\d+" })
 public class NicoVideoJpPlaylist extends PluginForDecrypt {
     public NicoVideoJpPlaylist(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String parameter = param.toString();
         br.setFollowRedirects(true);
         br.getPage(parameter);
-        if (br.containsHTML(">This My List is set as private")) {
-            logger.info("Private playlist, cannot decrypt: " + parameter);
-            return decryptedLinks;
+        if (br.containsHTML(">\\s*This My List is set as private")) {
+            throw new AccountRequiredException();
         } else if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String fpName = br.getRegex("MylistGroup\\.preloadSingle\\(\\d+, \\{.*?name: \"([^<>\"]*?)\"").getMatch(0);
         final String[] videoids = br.getRegex("nicovideo\\.jp..watch..(([a-z]{2})?\\d+)").getColumn(0);
         if (videoids == null || videoids.length == 0) {
-            logger.warning("Decrypter broken for link: " + parameter);
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (String singleLink : videoids) {
-            decryptedLinks.add(createDownloadlink("https://www.nicovideo.jp/watch/" + singleLink));
+            ret.add(createDownloadlink("https://www.nicovideo.jp/watch/" + singleLink));
         }
         if (fpName != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName.trim()));
-            fp.addLinks(decryptedLinks);
+            fp.setName(Encoding.htmlDecode(fpName).trim());
+            fp.addLinks(ret);
         }
-        return decryptedLinks;
+        return ret;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

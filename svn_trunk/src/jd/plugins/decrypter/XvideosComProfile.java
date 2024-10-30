@@ -24,6 +24,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -47,13 +53,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.XvideosCom;
 import jd.plugins.hoster.XvideosCore;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 48980 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50041 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -288,7 +288,7 @@ public class XvideosComProfile extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlChannel(final String url) throws IOException, PluginException, DecrypterRetryException {
+    private ArrayList<DownloadLink> crawlChannel(final String url) throws IOException, PluginException, DecrypterRetryException, InterruptedException {
         String username = new Regex(url, TYPE_USER).getMatch(0);
         if (username == null) {
             username = new Regex(url, "/([A-Za-z0-9\\-_]+)$").getMatch(0);
@@ -314,54 +314,74 @@ public class XvideosComProfile extends PluginForDecrypt {
                 logger.warning("Quickies crawler failed because: Failed to find userID");
                 break crawlQuickies;
             }
+            short page = 0;
             final Browser brc = br.cloneBrowser();
-            brc.postPage("/quickies-api/profilevideos/all/none/B/" + userID + "/0", "");
-            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final List<Map<String, Object>> videos = (List<Map<String, Object>>) entries.get("videos");
-            for (final Map<String, Object> video : videos) {
-                final String singleLink = video.get("url").toString();
-                final String videoID = video.get("id").toString();
-                final String title = (String) video.get("title");
-                if (!dupes.add(videoID)) {
-                    /* Skip dupes */
-                    continue;
-                }
-                String videourl = brc.getURL(singleLink).toExternalForm();
-                final String correctVideoID[] = new Regex(videourl, "/([a-z0-9]+)/([^/\\?]+)$").getRow(0);
-                if (plg != null && !plg.canHandle(videourl)) {
-                    if (correctVideoID != null) {
-                        // rewrite into supported URL format
-                        videourl = br.getURL("/video." + correctVideoID[0] + "/" + correctVideoID[1]).toExternalForm();
-                    } else {
-                        logger.warning("Detected URL goes into nirvana: " + videourl);
+            quickiesPagination: while (true) {
+                brc.postPage("/quickies-api/profilevideos/all/none/B/" + userID + "/" + page, "");
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final List<Map<String, Object>> videos = (List<Map<String, Object>>) entries.get("videos");
+                int numberofNewItemsThisPage = 0;
+                for (final Map<String, Object> video : videos) {
+                    final String singleLink = video.get("url").toString();
+                    final String videoID = video.get("id").toString();
+                    final String title = (String) video.get("title");
+                    if (!dupes.add(videoID)) {
+                        /* Skip dupes */
+                        continue;
                     }
+                    String videourl = brc.getURL(singleLink).toExternalForm();
+                    final String correctVideoID[] = new Regex(videourl, "/([a-z0-9]+)/([^/\\?]+)$").getRow(0);
+                    if (plg != null && !plg.canHandle(videourl)) {
+                        if (correctVideoID != null) {
+                            // rewrite into supported URL format
+                            videourl = br.getURL("/video." + correctVideoID[0] + "/" + correctVideoID[1]).toExternalForm();
+                        } else {
+                            logger.warning("Detected URL goes into nirvana: " + videourl);
+                        }
+                    }
+                    final DownloadLink dl = createDownloadlink(videourl);
+                    /* Usually we will crawl a lot of URLs at this stage --> Set onlinestatus right away! */
+                    dl.setAvailable(true);
+                    fp.add(dl);
+                    final String nameTemp;
+                    if (!StringUtils.isEmpty(title)) {
+                        nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID) + "_" + title;
+                    } else {
+                        nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID);
+                    }
+                    dl.setName(nameTemp + ".mp4");
+                    /* Packagizer properties */
+                    if (correctVideoID != null) {
+                        dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
+                    }
+                    dl.setProperty(XvideosCore.PROPERTY_USERNAME, username);
+                    dl._setFilePackage(fp);
+                    ret.add(dl);
+                    distribute(dl);
+                    numberofNewItemsThisPage++;
                 }
-                final DownloadLink dl = createDownloadlink(videourl);
-                /* Usually we will crawl a lot of URLs at this stage --> Set onlinestatus right away! */
-                dl.setAvailable(true);
-                fp.add(dl);
-                final String nameTemp;
-                if (!StringUtils.isEmpty(title)) {
-                    nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID) + "_" + title;
+                logger.info("Crawled quickies page " + page + " | New items this page: " + numberofNewItemsThisPage + " | Total: " + ret.size());
+                if (this.isAbort()) {
+                    /* Aborted by user */
+                    throw new InterruptedException();
+                } else if (!Boolean.TRUE.equals(entries.get("hasMoreVideos"))) {
+                    logger.info("Stopping quickies crawler because: Reached end");
+                    break quickiesPagination;
+                } else if (numberofNewItemsThisPage == 0) {
+                    logger.info("Stopping quickies crawler because: Failed to find any new items on current page: " + page);
+                    break quickiesPagination;
                 } else {
-                    nameTemp = (correctVideoID != null ? correctVideoID[0] : videoID);
+                    /* Continue to next page */
+                    page++;
+                    continue quickiesPagination;
                 }
-                dl.setName(nameTemp + ".mp4");
-                /* Packagizer properties */
-                if (correctVideoID != null) {
-                    dl.setProperty(XvideosCore.PROPERTY_VIDEOID, correctVideoID[0]);
-                }
-                dl.setProperty(XvideosCore.PROPERTY_USERNAME, username);
-                dl._setFilePackage(fp);
-                ret.add(dl);
-                distribute(dl);
             }
-            logger.info("Crawled quickies: " + videos.size());
         }
         final String url_base = br.getURL("/channels/" + username + "/videos/new").toExternalForm();
         short pageNum = 0;
         final short maxItemsPerPage = 36;
         final Browser brc = br.cloneBrowser();
+        int numberofVideosCrawledTotal = 0;
         do {
             if (pageNum == 0) {
                 // br.postPage("https://www.xvideos.com/channels/" + username + "/videos/best", "is_first=true&main_cats=false");
@@ -381,8 +401,8 @@ public class XvideosComProfile extends PluginForDecrypt {
                 }
             }
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
-            final int totalNumberofItems = ((Number) entries.get("nb_videos")).intValue();
-            if (totalNumberofItems == 0) {
+            final int totalNumberofVideoItems = ((Number) entries.get("nb_videos")).intValue();
+            if (totalNumberofVideoItems == 0) {
                 logger.info("Stopping because: User doesn't have any videos");
                 throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
             }
@@ -428,11 +448,12 @@ public class XvideosComProfile extends PluginForDecrypt {
                 distribute(dl);
                 numberofNewItemsOnCurrentPage++;
             }
-            logger.info("Crawled page: " + pageNum + " | Crawled items on current page: " + numberofNewItemsOnCurrentPage + " | Progress overall: " + ret.size() + "/" + totalNumberofItems);
+            numberofVideosCrawledTotal += numberofNewItemsOnCurrentPage;
+            logger.info("Crawled page: " + pageNum + " | Crawled items on current page: " + numberofNewItemsOnCurrentPage + " | Progress overall: " + ret.size() + "/" + totalNumberofVideoItems);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;
-            } else if (ret.size() >= totalNumberofItems) {
+            } else if (numberofVideosCrawledTotal >= totalNumberofVideoItems) {
                 /* We found all items */
                 logger.info("Stopping because: Reached the end");
                 break;

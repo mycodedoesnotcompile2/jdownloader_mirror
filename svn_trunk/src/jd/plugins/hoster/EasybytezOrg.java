@@ -17,16 +17,21 @@ package jd.plugins.hoster;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jdownloader.plugins.components.XFileSharingProBasic;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50043 $", interfaceVersion = 3, names = {}, urls = {})
 public class EasybytezOrg extends XFileSharingProBasic {
     public EasybytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -91,6 +96,22 @@ public class EasybytezOrg extends XFileSharingProBasic {
     }
 
     @Override
+    protected Long findExpireTimestamp(final Account account, final Browser br, AtomicBoolean isPreciseTimestampFlag) throws Exception {
+        Long ret = super.findExpireTimestamp(account, br, isPreciseTimestampFlag);
+        if (ret == null || ret.longValue() < 0) {
+            final String expireStr = new Regex(getCorrectBR(br), "(?:>\\s*|<span[^>]*)Premium\\s*(?:account expire|until):?\\s*</span>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+            if (expireStr != null) {
+                ret = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+                if (ret > 0) {
+                    isPreciseTimestampFlag.set(true);
+                    return ret;
+                }
+            }
+        }
+        return ret;
+    }
+
+    @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
     }
@@ -105,9 +126,4 @@ public class EasybytezOrg extends XFileSharingProBasic {
         return -1;
     }
 
-    @Override
-    protected boolean websiteSupportsHTTPS() {
-        // 2024-10-23
-        return false;
-    }
 }

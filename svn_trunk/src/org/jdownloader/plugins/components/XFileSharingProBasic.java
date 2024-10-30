@@ -98,7 +98,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 49956 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50043 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4507,7 +4507,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             expireStr += " 23:59:59";
             return TimeFormatter.getMilliSeconds(expireStr, "dd MMMM yyyy HH:mm:ss", Locale.ENGLISH);
         }
-        expireStr = new Regex(getCorrectBR(br), ">\\s*Premium\\s*(?:account expire|until):\\s*</span>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
+        expireStr = new Regex(getCorrectBR(br), ">\\s*Premium\\s*(?:account expire|until)\\s*:?\\s*</span>\\s*[^>]*>([\\d]+-[\\w{2}]+-[\\d]+\\s[\\d:]+)</").getMatch(0);
         if (expireStr != null) {
             /**
              * e.g. kenfiles.com

@@ -17,16 +17,16 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.Random;
 
 import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -35,10 +35,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SuicidegirlsCom;
 
-@DecrypterPlugin(revision = "$Revision: 50038 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
+@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "suicidegirls.com" }, urls = { "https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/(?:album/\\d+/[A-Za-z0-9\\-_]+/)?" })
 public class SuicidegirlsComCrawler extends PluginForDecrypt {
     public SuicidegirlsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,11 +54,18 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
     private static final String TYPE_USER  = "(?i)https?://(?:www\\.)?suicidegirls\\.com/(?:girls|members)/[A-Za-z0-9\\-_]+/";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        return crawl(param, account);
+    }
+
+    public ArrayList<DownloadLink> crawl(final CryptedLink param, final Account account) throws Exception {
+        final SuicidegirlsCom plugin = (SuicidegirlsCom) this.getNewPluginForHostInstance(this.getHost());
         plugin.setBrowser(this.br);
         /* Login into any available account. */
-        final boolean loggedin = ((jd.plugins.hoster.SuicidegirlsCom) plugin).login(br) != null;
-        ((jd.plugins.hoster.SuicidegirlsCom) plugin).prepBR(br);
+        if (account != null) {
+            plugin.login(account, false);
+        }
+        plugin.prepBR(br);
         br.setFollowRedirects(true);
         final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.getPage(contenturl);
@@ -71,41 +77,45 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
         if (br.containsHTML("class=\"album-join-message\"")) {
             throw new AccountRequiredException();
         }
-        final Regex urlinfo = new Regex(param.getCryptedUrl(), "(girls|members)/([A-Za-z0-9\\-_]+)/");
+        final Regex urlinfo = new Regex(param.getCryptedUrl(), "(?i)(girls|members)/([A-Za-z0-9\\-_]+)/");
         final String member_type = urlinfo.getMatch(0);
         final String username = urlinfo.getMatch(1);
-        String fpName = null;
+        String title = null;
         if (param.getCryptedUrl().matches(TYPE_ALBUM)) {
-            fpName = br.getRegex("<h2 class=\"title\">([^<>\"]*?)</h2>").getMatch(0);
-            if (fpName == null) {
+            title = br.getRegex("<h2 class=\"title\">([^<>\"]*?)</h2>").getMatch(0);
+            if (title == null) {
                 /* Fallback to url-packagename */
-                fpName = br._getURL().toExternalForm();
+                title = br._getURL().toExternalForm();
             }
-            fpName = username + " - " + fpName;
+            title = Encoding.htmlDecode(title).trim();
+            title = username + " - " + title;
             final String[] links = br.getRegex("<li class=\"photo-container\" id=\"thumb-\\d+\" data-index=\"\\d+\"[^>]*>\\s*<a href=\"(http[^<>\"]*?)\"").getColumn(0);
             if (links == null || links.length == 0) {
-                if (!loggedin) {
+                if (account == null) {
                     /* Assume that account is needed to view content */
                     throw new AccountRequiredException();
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            int imageIndex = 1;
+            int imageIndex = 0;
             for (String directlink : links) {
-                directlink = Encoding.htmlOnlyDecode(directlink);
-                final DownloadLink dl = this.createDownloadlink("http://suicidegirlsdecrypted/" + System.currentTimeMillis() + new Random().nextInt(1000000000));
+                directlink = Encoding.htmlOnlyDecode(directlink).trim();
+                final DownloadLink dl = this.createDownloadlink(directlink);
+                dl.setDefaultPlugin(plugin);
+                dl.setHost(plugin.getHost());
                 final String extension = getFileNameExtensionFromURL(directlink, ".jpg");
                 final int padLength = StringUtils.getPadLength(links.length);
-                final String imageName = String.format(Locale.US, "%0" + padLength + "d", imageIndex++) + "_" + fpName + extension;
-                dl.setProperty(SuicidegirlsCom.PROPERTY_DIRECTURL, directlink);
-                dl.setProperty(SuicidegirlsCom.PROPERTY_IMAGE_NAME, imageName);
+                final String imageName = String.format(Locale.US, "%0" + padLength + "d", imageIndex + 1) + "_" + title + extension;
                 dl.setFinalFileName(imageName);
-                dl.setLinkID(directlink);
                 dl.setAvailable(true);
                 dl.setContentUrl(directlink);
-                dl.setMimeHint(CompiledFiletypeFilter.ImageExtensions.BMP);
+                dl.setProperty(SuicidegirlsCom.PROPERTY_DIRECTURL, directlink);
+                dl.setProperty(SuicidegirlsCom.PROPERTY_IMAGE_NAME, imageName);
+                dl.setProperty(SuicidegirlsCom.PROPERTY_IMAGE_INDEX, imageIndex);
+                dl.setProperty(SuicidegirlsCom.PROPERTY_MAIN_LINK, contenturl);
                 ret.add(dl);
+                imageIndex++;
             }
         } else {
             /* TYPE_USER */
@@ -124,7 +134,7 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
                     br.getPage("/" + member_type + "/" + username + "/photos/?partial=true&offset=" + addedlinks_total);
                 }
                 final String[] links = br.getRegex("\"(/(?:girls|members)/[^/]+/album/\\d+/[A-Za-z0-9\\-_]+/)[^<>\"]*?\"").getColumn(0);
-                if ((links == null || links.length == 0) && addedlinks_total == 0 && !loggedin) {
+                if ((links == null || links.length == 0) && addedlinks_total == 0 && account == null) {
                     /* Account is needed most times */
                     throw new AccountRequiredException();
                 }
@@ -133,21 +143,22 @@ public class SuicidegirlsComCrawler extends PluginForDecrypt {
                 }
                 for (final String singleLink : links) {
                     final String final_album_url = "https://www." + this.getHost() + singleLink;
-                    if (!dupecheck.contains(final_album_url)) {
-                        dupecheck.add(final_album_url);
-                        ret.add(createDownloadlink(final_album_url));
-                        addedlinks++;
-                        addedlinks_total++;
+                    if (dupecheck.contains(final_album_url)) {
+                        continue;
                     }
+                    dupecheck.add(final_album_url);
+                    ret.add(createDownloadlink(final_album_url));
+                    addedlinks++;
+                    addedlinks_total++;
                 }
             } while (addedlinks >= max_entries_per_page);
             if (ret.size() == 0) {
-                return null;
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        if (fpName != null) {
+        if (title != null) {
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName.trim()));
+            fp.setName(title);
             fp.addLinks(ret);
         }
         return ret;

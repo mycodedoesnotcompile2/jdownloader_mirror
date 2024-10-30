@@ -3,9 +3,9 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.Storable;
-
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
+
+import org.appwork.storage.Storable;
 
 public class MultiHostHostData implements Storable {
     private String                name;
@@ -158,6 +158,9 @@ public class MultiHostHostData implements Storable {
     }
 
     public static List<MultiHostHostData> createFromMultiHostHostList(final List<MultiHostHost> sourcelist) {
+        if (sourcelist == null || sourcelist.size() == 0) {
+            return null;
+        }
         final List<MultiHostHostData> ret = new ArrayList<MultiHostHostData>();
         for (final MultiHostHost mhost : sourcelist) {
             ret.add(createFromMultiHostHost(mhost));

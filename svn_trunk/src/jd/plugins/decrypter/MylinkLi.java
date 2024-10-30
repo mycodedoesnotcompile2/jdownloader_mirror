@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
@@ -30,6 +31,7 @@ import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.parser.html.InputField;
 import jd.plugins.CryptedLink;
@@ -39,7 +41,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48378 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = {}, urls = {})
 public class MylinkLi extends PluginForDecrypt {
     public MylinkLi(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +65,7 @@ public class MylinkLi extends PluginForDecrypt {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/[A-Za-z0-9]+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -71,6 +73,11 @@ public class MylinkLi extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         /** 2023-10-19: The usage of getAndSetSpecialCookie is not needed anymore but it doesn't hurt either so I've left it in. */
         // final String contentID = new Regex(param.getCryptedUrl(), "/([A-Za-z0-9]+)$").getMatch(0);
+        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        if (StringUtils.equals(contentID.toLowerCase(Locale.ENGLISH), contentID)) {
+            /* Lowercase contentID -> Invalid -> E.g. https://mylink.vc/api */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid contentID");
+        }
         br.setFollowRedirects(true);
         br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
         br.getPage(param.getCryptedUrl());

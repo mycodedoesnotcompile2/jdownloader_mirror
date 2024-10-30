@@ -42,7 +42,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
 public class NexusmodsComCrawler extends PluginForDecrypt {
     public NexusmodsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +65,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         if (apikey != null) {
             ret = crawlAPI(param, account, game_domain_name, mod_id);
         } else {
-            ret = crawlWebsite(param, account, game_domain_name, mod_id);
+            ret = crawlWebsite(param, game_domain_name, mod_id);
         }
         return ret;
     }
@@ -133,14 +133,10 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private ArrayList<DownloadLink> crawlWebsite(final CryptedLink param, final Account account, final String game_domain_name, final String mod_id) throws Exception {
+    /** Crawls items from website (without account). */
+    private ArrayList<DownloadLink> crawlWebsite(final CryptedLink param, final String game_domain_name, final String mod_id) throws Exception {
         final String parameter = param.getCryptedUrl();
         final PluginForHost plugin = JDUtilities.getPluginForHost(this.getHost());
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        if (account != null) {
-            /* Login via website */
-            ((jd.plugins.hoster.NexusmodsCom) plugin).loginWebsite(account);
-        }
         br.setFollowRedirects(true);
         ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br, parameter);
         if (jd.plugins.hoster.NexusmodsCom.isOfflineWebsite(br)) {
@@ -152,6 +148,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             logger.info("Adult content: Enable it in your account settings to be able to download such files via JD: Profile --> Settings --> Content blocking --> Show adult content");
             throw new AccountRequiredException("Adult content: Enable it in your account settings to be able to download such files via JD: Profile --> Settings --> Content blocking --> Show adult content");
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String mod_name = br.getRegex("<meta property=\"og:title\" content=\"([^<>\"]+)\"").getMatch(0);
         if (mod_name == null) {
             /* This should never happen */
@@ -164,61 +161,91 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         final Browser br2 = br.cloneBrowser();
         ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br2, "/" + game_domain_name + "/mods/" + mod_id + "?tab=files");
         final String[] categoryNames = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>([^>]+)</h2>").getColumn(0);
-        final String[] downloadCategoriesHTMLs = br2.getRegex("<dd[^>]* data-id=\"\\d+\"[^>]*>.*?</div>\\s*</dt>").getColumn(-1);
-        if (downloadCategoriesHTMLs == null || downloadCategoriesHTMLs.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        int index = -1;
-        for (final String downnloadTypeHTML : downloadCategoriesHTMLs) {
-            index++;
-            String category_name = null;
-            if (categoryNames != null && categoryNames.length == downloadCategoriesHTMLs.length) {
-                category_name = categoryNames[index];
-            }
-            if (category_name == null) {
-                /* Fallback */
-                category_name = "Unknown_category_" + (index + 1);
-            }
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(game_domain_name + " - " + mod_name + " - " + category_name);
-            category_name = Encoding.htmlDecode(category_name).trim();
-            final String currentPath = game_domain_name + "/" + mod_name + "/" + category_name;
-            final String[] htmls = new Regex(downnloadTypeHTML, "<dt id=\"file-expander-header-\\d+\".*?/use>\\s*</svg>\\s*</div>").getColumn(-1);
-            if (htmls == null || htmls.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            for (final String html : htmls) {
-                String file_id = new Regex(html, "\\?id=(\\d+)").getMatch(0);
-                if (file_id == null) {
-                    file_id = new Regex(html, "data-id=\"(\\d+)\"").getMatch(0);
+        final String[] downloadCategoriesHTMLs = br2.getRegex("<dd[^>]*data-id=\"\\d+\"[^>]*>.*?</div>\\s*</dt>").getColumn(-1);
+        String description = br2.getRegex("<meta name=\"description\" content=\"([^\"]+)").getMatch(0);
+        if (downloadCategoriesHTMLs != null && downloadCategoriesHTMLs.length > 0) {
+            int index = -1;
+            for (final String downnloadTypeHTML : downloadCategoriesHTMLs) {
+                index++;
+                String category_name = null;
+                if (categoryNames != null && categoryNames.length == downloadCategoriesHTMLs.length) {
+                    category_name = categoryNames[index];
                 }
-                if (file_id == null) {
-                    logger.info("file_id is null");
+                category_name = Encoding.htmlDecode(category_name).trim();
+                ret.addAll(websiteCrawlFiles(downnloadTypeHTML, category_name, index, mod_id, game_id, game_domain_name, mod_name));
+            }
+        } else {
+            /* Fallback: Don't care about the categories, just find the files */
+            logger.warning("Failed to find categories");
+            ret.addAll(websiteCrawlFiles(br2.getRequest().getHtmlCode(), null, 0, mod_id, game_id, game_domain_name, mod_name));
+        }
+        if (ret.isEmpty()) {
+            /*
+             * Effectively, items are only downloadable via (paid) account so if the crawler fails, let's suppress that and instead ask the
+             * user to retry again with account -> User can then use the API so then the crawler will work fine.
+             */
+            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find game_id");
+            throw new AccountRequiredException();
+        }
+        if (description != null) {
+            /* Set description as package comment. */
+            description = Encoding.htmlDecode(description).trim();
+            for (final DownloadLink link : ret) {
+                if (link.getFilePackage() == null) {
                     continue;
                 }
-                final String filename = new Regex(html, "data-url=\"([^<>\"]+)\"").getMatch(0);
-                final DownloadLink link = createDownloadlink(generatePluginPatternMatcher(file_id, game_id));
-                link.setContentUrl(generateContentURL(game_domain_name, mod_id, file_id));
-                final String filesizeStr = new Regex(html, ">\\s*File\\s*size\\s*</div>.*?\"stat\"\\s*>\\s*([0-9\\.TKGMB]+)").getMatch(0);
-                if (filesizeStr != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
-                }
-                if (filename != null) {
-                    link.setName(file_id + "_" + Encoding.htmlOnlyDecode(filename));
-                } else {
-                    link.setName(file_id);
-                }
-                link.setAvailable(true);
-                link.setMimeHint(CompiledFiletypeFilter.ArchiveExtensions.ZIP);
-                link.setRelativeDownloadFolderPath(currentPath);
-                link._setFilePackage(fp);
-                /* Important! These properties are especially required for all API requests! */
-                link.setProperty("game_domain_name", game_domain_name);
-                link.setProperty("mod_id", mod_id);
+                link.getFilePackage().setComment(description);
+            }
+        }
+        return ret;
+    }
+
+    private List<DownloadLink> websiteCrawlFiles(final String html_source, final String category_name, final int categoryIndex, final String mod_id, final String game_id, final String game_domain_name, final String mod_name) throws PluginException {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final FilePackage fp = FilePackage.getInstance();
+        if (category_name != null) {
+            fp.setName(game_domain_name + " - " + mod_name + " - " + category_name);
+        } else {
+            fp.setName(game_domain_name + " - " + mod_name);
+        }
+        final String currentPath = game_domain_name + "/" + mod_name + "/" + category_name;
+        final String[] htmls = new Regex(html_source, "<dt id=\"file-expander-header-\\d+\".*?/use>\\s*</svg>\\s*</div>").getColumn(-1);
+        if (htmls == null || htmls.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        for (final String html : htmls) {
+            String file_id = new Regex(html, "\\?id=(\\d+)").getMatch(0);
+            if (file_id == null) {
+                file_id = new Regex(html, "data-id=\"(\\d+)\"").getMatch(0);
+            }
+            if (file_id == null) {
+                logger.info("file_id is null");
+                continue;
+            }
+            final String filename = new Regex(html, "data-url=\"([^<>\"]+)\"").getMatch(0);
+            final DownloadLink link = createDownloadlink(generatePluginPatternMatcher(file_id, game_id));
+            link.setContentUrl(generateContentURL(game_domain_name, mod_id, file_id));
+            final String filesizeStr = new Regex(html, ">\\s*File\\s*size\\s*</div>.*?\"stat\"\\s*>\\s*([0-9\\.TKGMB]+)").getMatch(0);
+            if (filesizeStr != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            }
+            if (filename != null) {
+                link.setName(file_id + "_" + Encoding.htmlOnlyDecode(filename));
+            } else {
+                link.setName(file_id);
+            }
+            link.setAvailable(true);
+            link.setMimeHint(CompiledFiletypeFilter.ArchiveExtensions.ZIP);
+            link.setRelativeDownloadFolderPath(currentPath);
+            link._setFilePackage(fp);
+            /* Important! These properties are especially required for all API requests! */
+            link.setProperty("game_domain_name", game_domain_name);
+            link.setProperty("mod_id", mod_id);
+            if (category_name != null) {
                 /* Every category goes into a subfolder */
                 link.setRelativeDownloadFolderPath(game_domain_name + "/" + category_name);
-                ret.add(link);
             }
+            ret.add(link);
         }
         return ret;
     }
