@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49326 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwojplikPl extends PluginForHost {
     public TwojplikPl(PluginWrapper wrapper) {
         super(wrapper);
@@ -610,10 +610,10 @@ public class TwojplikPl extends PluginForHost {
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         /* 2024-02-29: Only premium users can download */
-        if (account != null) {
-            return true;
-        } else {
+        if (account == null) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

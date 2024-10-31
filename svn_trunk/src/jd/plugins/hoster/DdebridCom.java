@@ -43,7 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49866 $", interfaceVersion = 3, names = { "ddebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "ddebrid.com" }, urls = { "" })
 public class DdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://ddebrid.com/api";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("ddebrid.com");
@@ -82,7 +82,7 @@ public class DdebridCom extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

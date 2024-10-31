@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
 public class ZapiszSe extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://zapisz.se";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("zapisz.se");
@@ -94,7 +94,7 @@ public class ZapiszSe extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

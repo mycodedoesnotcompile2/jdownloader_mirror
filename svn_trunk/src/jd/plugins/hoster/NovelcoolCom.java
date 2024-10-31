@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49379 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolCom extends PluginForHost {
     public NovelcoolCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +72,7 @@ public class NovelcoolCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/chapter/[a-z\\-]+(\\d+(-\\d+)?)/(\\d+)-(\\d+)\\.html");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/chapter/[A-Za-z\\-]+(\\d+(-\\d+)?)/(\\d+)-(\\d+)\\.html");
         }
         return ret.toArray(new String[0]);
     }

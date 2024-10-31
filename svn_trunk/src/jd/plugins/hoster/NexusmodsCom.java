@@ -29,6 +29,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
@@ -57,7 +58,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
 public class NexusmodsCom extends antiDDoSForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -229,19 +230,18 @@ public class NexusmodsCom extends antiDDoSForHost {
                     }
                 }
             }
-            String filename = br.getRegex("filedelivery\\.nexusmods\\.com/\\d+/([^<>\"]+)\\?fid=").getMatch(0);
-            if (filename == null) {
-                filename = br.getRegex("data-link\\s*=\\s*\"https?://[^<>\"]+/files/\\d+/([^<>\"/]+)\\?").getMatch(0);
-                if (filename == null) {
-                    filename = br.getRegex("data-link\\s*=\\s*\"https?://[^<>\"]+/\\d+/\\d+/([^<>\"/]+)\\?").getMatch(0);
-                    if (filename == null && dllink != null) {
-                        filename = getFileNameFromURL(new URL(dllink));
-                    }
-                }
-            }
+            String filename = br.getRegex("<div class=\"header\"[^>]*>([^<]+)<").getMatch(0);
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
+            } else if (dllink != null) {
+                filename = getFileNameFromURL(new URL(dllink));
+            }
+            final String filesize = br.getRegex(">\\s*folder\\s*</i>\\s*<span>([^<]+)</span>").getMatch(0);
+            if (filesize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesize));
+            } else {
+                logger.warning("Failed to find filesize");
             }
             return AvailableStatus.TRUE;
         }
@@ -752,7 +752,7 @@ public class NexusmodsCom extends antiDDoSForHost {
             /* E.g. older URLs or in case important properties got lost somehow, a download (via API) is not possible at all! */
             return false;
         }
-        return true;
+        return super.canHandle(link, account);
     }
 
     @Override

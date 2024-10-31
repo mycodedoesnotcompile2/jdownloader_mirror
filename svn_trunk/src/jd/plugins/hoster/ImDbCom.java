@@ -32,9 +32,10 @@ import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -42,19 +43,26 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50049 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImDbCom extends PluginForHost {
     private String              dllink         = null;
-    private boolean             server_issues  = false;
     private boolean             mature_content = false;
     private static final String IDREGEX        = "(vi\\d+)$";
-    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/([\\w\\-]+/)?vi(\\d+)";
-    public static final String  TYPE_PHOTO     = "(?i)/[A-Za-z]+/[a-z]{2}\\d+/mediaviewer/rm\\d+";
+    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/(([\\w\\-]+)/)?vi(\\d+)";
+    public static final String  TYPE_PHOTO     = "(?i)/[A-Za-z]+/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)";
 
     public ImDbCom(final PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
         this.setStartIntervall(1000l);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setLoadLimit(br.getLoadLimit() * 3);
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -89,11 +97,12 @@ public class ImDbCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        if (link.getDownloadURL().matches(TYPE_VIDEO)) {
-            link.setUrlDownload("https://www." + getHost() + "/video/screenplay/" + new Regex(link.getPluginPatternMatcher(), IDREGEX).getMatch(0));
+    private String getContentURL(final DownloadLink link) {
+        final Regex regex_video = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO);
+        if (regex_video.patternFind()) {
+            return "https://www." + getHost() + "/video/screenplay/vi" + regex_video.getMatch(0);
+        } else {
+            return link.getPluginPatternMatcher();
         }
     }
 
@@ -118,31 +127,46 @@ public class ImDbCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        if (new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO).patternFind()) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, false);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         this.dllink = null;
-        this.server_issues = false;
         this.mature_content = false;
         setBrowserExclusive();
-        br.setFollowRedirects(true);
-        this.br.setLoadLimit(this.br.getLoadLimit() * 3);
-        br.getPage(link.getPluginPatternMatcher());
+        br.getPage(getContentURL(link));
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         String ending = null;
         String filename = null;
-        if (link.getPluginPatternMatcher().matches(TYPE_PHOTO)) {
-            if (this.br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+        final Regex regex_photo = new Regex(link.getPluginPatternMatcher(), TYPE_PHOTO);
+        if (regex_photo.patternFind()) {
             /* 2020-11-03 */
             final String json = br.getRegex("__NEXT_DATA__\"\\s*type\\s*=\\s*\"application/json\"\\s*>\\s*(\\{.*?\\});?\\s*</script").getMatch(0);
             // final String id_main = new Regex(link.getDownloadURL(), "([a-z]{2}\\d+)/mediaviewer").getMatch(0);
             Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             /* Now let's find the specific object ... */
-            final String idright = new Regex(link.getDownloadURL(), "(rm\\d+)").getMatch(0);
-            final Map<String, Object> targetMap = this.findPictureMap(entries, idright);
+            final String idright = regex_photo.getMatch(1);
+            final Map<String, Object> targetMap = this.findPictureMap(entries, "rm" + idright);
             filename = (String) JavaScriptEngineFactory.walkJson(targetMap, "titles/{0}/titleText/text");
             dllink = (String) targetMap.get("url");
             if (StringUtils.isEmpty(filename)) {
@@ -248,33 +272,15 @@ public class ImDbCom extends PluginForHost {
             final HLSDownloader downloader = new HLSDownloader(link, br, dllink);
             final StreamInfo streamInfo = downloader.getProbe();
             if (streamInfo == null) {
-                server_issues = true;
-            } else {
-                final long estimatedSize = downloader.getEstimatedSize();
-                if (estimatedSize > 0) {
-                    link.setDownloadSize(estimatedSize);
-                }
+                throw new PluginException(LinkStatus.ERROR_FATAL, "Broken stream?");
             }
-        } else if (this.dllink != null) {
+            final long estimatedSize = downloader.getEstimatedSize();
+            if (estimatedSize > 0) {
+                link.setDownloadSize(estimatedSize);
+            }
+        } else if (this.dllink != null && !isDownload) {
             /* http */
-            URLConnectionAdapter con = null;
-            try {
-                final Browser brc = br.cloneBrowser();
-                brc.setFollowRedirects(true);
-                con = brc.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                    }
-                } else {
-                    server_issues = true;
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (final Throwable e) {
-                }
-            }
+            this.basicLinkCheck(br, br.createHeadRequest(dllink), link, filename, ending);
         }
         return AvailableStatus.TRUE;
     }
@@ -311,16 +317,12 @@ public class ImDbCom extends PluginForHost {
         return null;
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link);
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 1 * 60 * 1000l);
-        } else if (this.mature_content) {
+        requestFileInformation(link, true);
+        if (this.mature_content) {
             /* Mature content --> Only viewable for registered users */
-            logger.info("Video with mature content --> Only downloadable for registered users");
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+            throw new AccountRequiredException("Account needed to download mature content");
         } else if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -328,11 +330,7 @@ public class ImDbCom extends PluginForHost {
             checkFFmpeg(link, "Download a HLS Stream");
             dl = new HLSDownloader(link, br, dllink);
         } else {
-            int maxChunks = 0;
-            if (link.getDownloadURL().matches(TYPE_VIDEO)) {
-                maxChunks = 1;
-            }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, maxChunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -366,7 +364,7 @@ public class ImDbCom extends PluginForHost {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SELECTED_VIDEO_FORMAT, FORMATS, "Select preferred quality:").setDefaultValue(0));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SELECTED_VIDEO_FORMAT, FORMATS, "Preferred video quality:").setDefaultValue(0));
     }
 
     /* The list of qualities displayed to the user */

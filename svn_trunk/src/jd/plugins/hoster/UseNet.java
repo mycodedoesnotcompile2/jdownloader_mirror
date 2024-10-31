@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends PluginForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,12 +169,10 @@ public class UseNet extends PluginForHost {
     public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
         if ("usenet".equals(getHost())) {
             return false;
+        } else if (account == null) {
+            return false;
         } else {
-            if (account == null) {
-                return false;
-            } else {
-                return super.canHandle(downloadLink, account);
-            }
+            return super.canHandle(downloadLink, account);
         }
     }
 

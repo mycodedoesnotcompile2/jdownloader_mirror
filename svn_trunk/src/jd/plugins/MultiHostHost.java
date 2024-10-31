@@ -63,6 +63,7 @@ public class MultiHostHost {
         };
     }
 
+    private boolean               enabled                         = true;
     private String                name                            = null;
     private List<String>          domains                         = new ArrayList<String>();
     private Boolean               isUnlimitedTraffic              = null;
@@ -87,6 +88,14 @@ public class MultiHostHost {
     public MultiHostHost(final String domain) {
         this.name = domain;
         this.setDomain(domain);
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     /**

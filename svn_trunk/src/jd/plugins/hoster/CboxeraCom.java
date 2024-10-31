@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50051 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
     private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
@@ -62,7 +62,7 @@ public class CboxeraCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public CboxeraCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.cboxera.com/premium");
+        this.enablePremium("https://www." + getHost() + "/premium");
     }
 
     @Override
@@ -73,7 +73,7 @@ public class CboxeraCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.cboxera.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     private Browser prepBR(final Browser br) {
@@ -96,7 +96,7 @@ public class CboxeraCom extends PluginForHost {
             return false;
         }
         mhm.runCheck(account, link);
-        return true;
+        return super.canHandle(link, account);
     }
 
     @Override

@@ -257,7 +257,7 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         if (account != null) {
             getMultiHosterManagement().runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         } else {
             /* Download without account is not possible */
             return false;

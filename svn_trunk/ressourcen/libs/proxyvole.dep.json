@@ -2,7 +2,9 @@
   "artefact":"com.github.markusbernhardt/proxyvole",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:34+02:00",
     "dependencies":null,
     "description":"Proxy Vole is a Java library to auto detect the platform network proxy settings. Modifications by AppWork GmbH (http://appwork.org) - Build Date: 08.10.2015  15:16:57",

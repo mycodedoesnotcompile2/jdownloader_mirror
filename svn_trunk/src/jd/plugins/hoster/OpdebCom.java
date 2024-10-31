@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50041 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -98,7 +98,7 @@ public class OpdebCom extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 
@@ -153,13 +153,21 @@ public class OpdebCom extends PluginForHost {
          * User only enters apikey as password and could enter anything into the username field --> Make sure it contains an unique value.
          */
         account.setUser(entries.get("username").toString());
-        final long plan_expire_timestamp = ((Number) entries.get("plan_expire_timestamp")).longValue() * 1000;
+        final long plan_expire_timestamp = ((Number) entries.get("plan_expire")).longValue() * 1000;
         if (plan_expire_timestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
-            ai.setValidUntil(plan_expire_timestamp);
+            ai.setValidUntil(plan_expire_timestamp, br);
         } else {
             account.setType(AccountType.FREE);
             ai.setExpired(true);
+        }
+        final String plan_name = (String) entries.get("plan_name");
+        if (!StringUtils.isEmpty(plan_name)) {
+            ai.setStatus(plan_name);
+        }
+        final Number account_create = (Number) entries.get("account_create");
+        if (account_create != null) {
+            ai.setCreateTime(account_create.longValue() * 1000);
         }
         ai.setUnlimitedTraffic();
         final Map<String, Map<String, Object>> freehostmapping = new HashMap<String, Map<String, Object>>();
@@ -168,15 +176,13 @@ public class OpdebCom extends PluginForHost {
             final Map<String, Object> freehosters_root = (Map<String, Object>) this.callAPI("/freehosters", null, account);
             final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) freehosters_root.get("freehosters");
             for (final Map<String, Object> hostermap : arrayHoster) {
-                final String domain = hostermap.get("hoster").toString();
-                freehostmapping.put(domain, hostermap);
+                freehostmapping.put(hostermap.get("hoster").toString(), hostermap);
             }
         }
         final Map<String, Object> limithosters_root = (Map<String, Object>) this.callAPI("/limithosters", null, account);
         final List<Map<String, Object>> limithosters_array = (List<Map<String, Object>>) limithosters_root.get("limithosters");
         for (final Map<String, Object> hostermap : limithosters_array) {
-            final String domain = hostermap.get("hoster").toString();
-            limithostermapping.put(domain, hostermap);
+            limithostermapping.put(hostermap.get("hoster").toString(), hostermap);
         }
         final Map<String, Object> supportedhosts_root = (Map<String, Object>) this.callAPI("/hosters", null, account);
         final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) supportedhosts_root.get("hosters_list");
@@ -200,6 +206,7 @@ public class OpdebCom extends PluginForHost {
             } else {
                 limitmap = limithostermapping.get(domain);
             }
+            /* Set host-specific limits if any exist. */
             if (limitmap != null) {
                 final Number maxlinksO = (Number) limitmap.get("maxlinks");
                 if (maxlinksO != null) {
@@ -271,7 +278,7 @@ public class OpdebCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/TODO_ADD_API_KEY_HELP_URL";
+        return "https://" + getHost() + "/api";
     }
 
     @Override

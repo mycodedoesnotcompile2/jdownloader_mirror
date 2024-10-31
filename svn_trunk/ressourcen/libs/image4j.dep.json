@@ -2,7 +2,9 @@
   "artefact":"net.sf.image4j/image4j",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:34+02:00",
     "dependencies":null,
     "description":"The image4j library allows you to read and write certain image formats in 100% pure Java.",

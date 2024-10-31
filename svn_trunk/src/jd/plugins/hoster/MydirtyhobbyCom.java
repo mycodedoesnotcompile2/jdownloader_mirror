@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48855 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydirtyhobbyCom extends PluginForHost {
     public MydirtyhobbyCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -372,12 +372,12 @@ public class MydirtyhobbyCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         if (account == null) {
             /* Without account its not possible to download any link for this host. */
             return false;
         } else {
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49419 $", interfaceVersion = 2, names = { "worldclips.ru" }, urls = { "https?://(?:(www|dev)\\.)?worldclips\\.ru/clips/[^<>\"/]*?/[^<>\"/]+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "worldclips.ru" }, urls = { "https?://(?:(www|dev)\\.)?worldclips\\.ru/clips/[^<>\"/]*?/[^<>\"/]+" })
 public class WorldClipsRu extends PluginForHost {
     public WorldClipsRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -189,12 +189,12 @@ public class WorldClipsRu extends PluginForHost {
         return clipID;
     }
 
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
         /* Account required for downloading */
-        if (account != null) {
-            return true;
-        } else {
+        if (account == null) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

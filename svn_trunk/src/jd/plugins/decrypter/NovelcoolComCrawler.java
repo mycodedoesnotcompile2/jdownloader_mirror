@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 48389 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
             final String bookID = br.getRegex("cur_book_id = \"(\\d+)").getMatch(0);
             final String chapterID = br.getRegex("cur_chapter_id = \"(\\d+)").getMatch(0);
             final String seriesTitle = NovelcoolCom.findSeriesTitle(br);
-            final String[] links = br.getRegex("<option value=\"(https?://[^\"]+)\"[^>]*>\\d+/\\d+</option>").getColumn(0);
+            final String[] links = br.getRegex("<option[^>]*value=\"(https[^\"]+)\"[^>]*>\\d+/\\d+</option>").getColumn(0);
             if (links == null || links.length == 0) {
                 if (br.containsHTML("chapter-start-mark")) {
                     /* Download chapter as html page */
@@ -97,7 +97,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                 }
             }
             final HashSet<String> dupes = new HashSet<String>();
-            int index = 0;
+            int position = 1;
             for (final String singleLink : links) {
                 if (!dupes.add(singleLink)) {
                     continue;
@@ -109,12 +109,12 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                     image.setProperty(NovelcoolCom.PROPERTY_SERIES_TITLE, seriesTitle);
                 }
                 image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_NUMBER, chapterNumber);
-                image.setProperty(NovelcoolCom.PROPERTY_PAGE_NUMBER, index + 1);
+                image.setProperty(NovelcoolCom.PROPERTY_PAGE_NUMBER, position);
                 image.setProperty(NovelcoolCom.PROPERTY_PAGE_MAX, links.length);
                 image.setName(NovelcoolCom.formatFilename(image));
                 image.setAvailable(true);
                 ret.add(image);
-                index++;
+                position++;
             }
             final FilePackage fp = FilePackage.getInstance();
             if (seriesTitle != null) {

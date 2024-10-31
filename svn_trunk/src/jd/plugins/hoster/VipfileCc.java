@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46516 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipfileCc extends XFileSharingProBasic {
     public VipfileCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,10 +117,10 @@ public class VipfileCc extends XFileSharingProBasic {
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         /* 2022-08-01: Seems like all of their files are premium-only */
-        if (account != null && account.getType() == AccountType.PREMIUM) {
-            return true;
-        } else {
+        if (account == null || account.getType() != AccountType.PREMIUM) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 }

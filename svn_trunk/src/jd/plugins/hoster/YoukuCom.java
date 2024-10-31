@@ -35,14 +35,13 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
-import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "youku.com" }, urls = { "https?://k\\.youku\\.com/player/getFlvPath/.*?fileid/[A-F0-9\\-]+.+|https?://[A-Za-z0-9\\-]+\\.youku\\.com/playlist/m3u8.*?psid=[a-f0-9]{32}.+" })
 public class YoukuCom extends antiDDoSForHost {
     public YoukuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -275,12 +274,6 @@ public class YoukuCom extends antiDDoSForHost {
             /* Undefined error */
             throw new PluginException(LinkStatus.ERROR_FATAL, errormessage);
         }
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        // return account != null;
-        return true;
     }
 
     public static String getURLName(final String inputurl) {

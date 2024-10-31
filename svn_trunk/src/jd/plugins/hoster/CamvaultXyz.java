@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.CamvaultXyzCrawler;
 
-@HostPlugin(revision = "$Revision: 49624 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50051 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamvaultXyz extends PluginForHost {
     public CamvaultXyz(PluginWrapper wrapper) {
         super(wrapper);
@@ -412,11 +412,10 @@ public class CamvaultXyz extends PluginForHost {
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         /* 2022-11-18: Only premium users can download files. */
-        if (account != null && account.getType() == AccountType.PREMIUM) {
-            return true;
-        } else {
+        if (account == null || account.getType() != AccountType.PREMIUM) {
             return false;
         }
+        return super.canHandle(link, account);
     }
 
     @Override

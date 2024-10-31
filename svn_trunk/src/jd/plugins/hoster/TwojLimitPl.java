@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50028 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "twojlimit.pl" }, urls = { "" })
 public class TwojLimitPl extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private String                                         Info               = null;
@@ -276,11 +276,6 @@ public class TwojLimitPl extends PluginForHost {
             unavailableMap.put(downloadLink.getHost(), (System.currentTimeMillis() + timeout));
         }
         throw new PluginException(LinkStatus.ERROR_RETRY);
-    }
-
-    @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        return true;
     }
 
     @Override

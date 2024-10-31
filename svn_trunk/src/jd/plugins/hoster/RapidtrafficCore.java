@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50016 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -330,7 +330,7 @@ public abstract class RapidtrafficCore extends PluginForHost {
             return false;
         } else {
             getMultiHosterManagement().runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

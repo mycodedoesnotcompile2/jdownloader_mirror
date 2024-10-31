@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -34,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 45814 $", interfaceVersion = 3, names = { "comprarpremium.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "comprarpremium.com" }, urls = { "" })
 public class BaixarPremiumNetComprarpremiumCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static AtomicInteger                           maxPrem            = new AtomicInteger(20);
@@ -164,11 +163,6 @@ public class BaixarPremiumNetComprarpremiumCom extends PluginForHost {
             logger.info(NICE_HOST + ": " + error + " -> Disabling current host");
             tempUnavailableHoster(disableTime);
         }
-    }
-
-    @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        return true;
     }
 
     @Override

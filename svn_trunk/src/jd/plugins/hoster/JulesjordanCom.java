@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "julesjordan.com" }, urls = { "https?://dl\\d+\\.julesjordan\\.com/dl/.+|https?://(?:www\\.)?julesjordan\\.com/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "julesjordan.com" }, urls = { "https?://dl\\d+\\.julesjordan\\.com/dl/.+|https?://(?:www\\.)?julesjordan\\.com/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html" })
 public class JulesjordanCom extends antiDDoSForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -214,11 +214,6 @@ public class JulesjordanCom extends antiDDoSForHost {
 
     private void handleGeneralErrors() throws PluginException {
         /* Fill me up */
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        return true;
     }
 
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {

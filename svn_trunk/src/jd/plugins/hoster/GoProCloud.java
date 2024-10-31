@@ -40,6 +40,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.controlling.linkcrawler.LinkVariant;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
 import jd.PluginWrapper;
@@ -71,7 +72,7 @@ import jd.plugins.components.gopro.Media;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.decrypter.GoProCloudDecrypter;
 
-@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+@HostPlugin(revision = "$Revision: 50045 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
 public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler */ {
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
@@ -92,13 +93,18 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
     }
 
     @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
+    }
+
+    @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(br, account);
-        ai.setUnlimitedTraffic();
         account.setType(AccountType.PREMIUM);
         account.setConcurrentUsePossible(true);
-        account.setMaxSimultanDownloads(20);
+        account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
+        final AccountInfo ai = new AccountInfo();
+        ai.setUnlimitedTraffic();
         return ai;
     }
 
@@ -133,8 +139,6 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
     public String login(Browser br, Account account) throws IOException, PluginException {
         if (account == null) {
             throw new AccountRequiredException();
-        } else if (account.getUser() == null || !account.getUser().matches(".+@.+")) {
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Please enter your E-Mail in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
         }
         synchronized (account) {
             try {
@@ -261,13 +265,16 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
         final String id = reg.getMatch(0);
         final String variant = reg.getMatch(1);
         try {
-            final boolean isPremium = isPremium(link);
-            if (isPremium) {
+            final boolean isAccountRequired = isAccountRequired(link);
+            if (isAccountRequired && account == null) {
+                throw new AccountRequiredException();
+            }
+            if (isAccountRequired) {
                 login(br, account);
             }
             final FlexiJSonMapper mapper = new FlexiJSonMapper();
-            final Media media = mapper.jsonToObject(getMediaResponse(this, isPremium ? account : null, br, id, link).jsonNode, Media.TYPEREF);
-            final Download resp = mapper.jsonToObject(getDownloadResponse(this, isPremium ? account : null, br, id, link).jsonNode, Download.TYPEREF);
+            final Media media = mapper.jsonToObject(getMediaResponse(this, isAccountRequired ? account : null, br, id, link).jsonNode, Media.TYPEREF);
+            final Download resp = mapper.jsonToObject(getDownloadResponse(this, isAccountRequired ? account : null, br, id, link).jsonNode, Download.TYPEREF);
             Variation source = null;
             if (link.hasVariantSupport() && !link.hasGenericVariantSupport()) {
                 final GoProVariant activeVariant = (GoProVariant) getActiveVariantByLink(link);
@@ -466,7 +473,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
         }
     }
 
-    private boolean isPremium(DownloadLink link) {
+    private boolean isAccountRequired(final DownloadLink link) {
         return link.getPluginPatternMatcher().matches("(?i).*/downloadpremium/.*");
     }
 
@@ -500,17 +507,20 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
         }
     }
 
-    public static boolean hasDownloadCache(DownloadLink link) {
+    /** Returns true if direct downloadable URL is available. */
+    public static boolean hasDownloadCache(final DownloadLink link) {
         return StringUtils.isNotEmpty(link.getStringProperty(MEDIA_DOWNLOAD));
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (downloadLink.getPluginPatternMatcher().matches("(?i)(https?://)?[^/]*gopro\\.com/v/.+")) {
-            // is a shared gopro link that is downloadable without an account
+    public boolean canHandle(final DownloadLink link, Account account) throws Exception {
+        if (hasDownloadCache(link)) {
+            /* Direct downloadable link is available -> Always works without login. */
             return true;
+        } else if (this.isAccountRequired(link) && account == null) {
+            return false;
         } else {
-            return account != null && super.canHandle(downloadLink, account);
+            return super.canHandle(link, account);
         }
     }
 
@@ -538,6 +548,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
         br.getPage(request);
         // 15.02.24: bad access token: Api response with 500 internal server error
         if (account != null) {
+            /* Do/check login */
             if (br.getHttpConnection().getResponseCode() == 401 || br.getHttpConnection().getResponseCode() == 500) {
                 synchronized (account) {
                     account.removeProperty(ACCESS_JSON);

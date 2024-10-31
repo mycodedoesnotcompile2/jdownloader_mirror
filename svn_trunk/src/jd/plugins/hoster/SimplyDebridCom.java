@@ -39,7 +39,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "simply-debrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "simply-debrid.com" }, urls = { "" })
 public class SimplyDebridCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
 
@@ -315,11 +315,6 @@ public class SimplyDebridCom extends PluginForHost {
             unavailableMap.put(downloadLink.getHost(), (System.currentTimeMillis() + timeout));
         }
         throw new PluginException(LinkStatus.ERROR_RETRY);
-    }
-
-    @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        return true;
     }
 
     @Override

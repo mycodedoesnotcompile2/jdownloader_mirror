@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49869 $", interfaceVersion = 3, names = { "mobilism.org" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "mobilism.org" }, urls = { "" })
 public class MobilismOrg extends antiDDoSForHost {
     /* Tags: Script vinaget.us */
     private static final String          WEBSITE_BASE        = "https://mblservices.org";
@@ -88,7 +88,7 @@ public class MobilismOrg extends antiDDoSForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

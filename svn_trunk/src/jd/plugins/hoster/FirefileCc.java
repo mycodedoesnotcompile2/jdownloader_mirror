@@ -73,7 +73,7 @@ import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49371 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
 public class FirefileCc extends PluginForHost {
     private static Object         DECRYPTLOCK                = new Object();
     /** Settings stuff */
@@ -97,13 +97,13 @@ public class FirefileCc extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (downloadLink != null) {
-            if (!StringUtils.equals((String) downloadLink.getProperty(USED_PLUGIN, getHost()), getHost())) {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
+        if (link != null) {
+            if (!StringUtils.equals((String) link.getProperty(USED_PLUGIN, getHost()), getHost())) {
                 return false;
             }
         }
-        return super.canHandle(downloadLink, account);
+        return super.canHandle(link, account);
     }
 
     private byte[] cipherData(PaddedBufferedBlockCipher cipher, byte[] data) throws DataLengthException, IllegalStateException, InvalidCipherTextException {

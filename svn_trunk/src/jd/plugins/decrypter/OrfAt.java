@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 49975 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50051 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -487,7 +487,7 @@ public class OrfAt extends PluginForDecrypt {
             }
         }
         final boolean isCrawlGaplessAndVideoChapters;
-        final boolean isCrawlGaplessOnly;
+        boolean isCrawlGaplessOnly;
         if (cfg == null) {
             isCrawlGaplessAndVideoChapters = true;
             isCrawlGaplessOnly = false;
@@ -499,7 +499,12 @@ public class OrfAt extends PluginForDecrypt {
         final boolean alreadyFoundGaplessProgressive = segments.size() == 1 && isProgressiveStreamAvailable;
         final boolean gaplessNeeded = isCrawlGaplessAndVideoChapters || isCrawlGaplessOnly;
         final boolean crawlGapless;
-        if (ret.isEmpty()) {
+        if (has_active_youth_protection) {
+            /* With a bit of luck, this can skip age protection */
+            crawlGapless = true;
+            /* Non-gapless items remain youth-blocked so let's discard them if we find gapless items. */
+            isCrawlGaplessOnly = true;
+        } else if (ret.isEmpty()) {
             /* Found nothing -> Try to crawl gapless items */
             logger.info("Found nothing -> Trying to crawl gapless version as fallback");
             crawlGapless = true;

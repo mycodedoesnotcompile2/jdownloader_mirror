@@ -18,24 +18,24 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.config.XvideosComXnxxGoldConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.config.XvideosComXnxxGoldConfig;
-
-@HostPlugin(revision = "$Revision: 48784 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50049 $", interfaceVersion = 2, names = {}, urls = {})
 public class XnxxGold extends XvideosCore {
     public XnxxGold(PluginWrapper wrapper) {
         super(wrapper);
         /* Slightly modified version of xvideos.com */
-        this.enablePremium("https://www.xnxx.gold/account/create/");
+        this.enablePremium("https://www." + getHost() + "/account/create/");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://info.xnxx.gold/legal/tos";
+        return "https://info." + getHost() + "/legal/tos";
     }
 
     private static List<String[]> getPluginDomains() {

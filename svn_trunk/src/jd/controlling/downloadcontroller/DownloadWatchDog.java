@@ -771,90 +771,91 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         }
     }
 
-    private DownloadLinkCandidate next(DownloadLinkCandidateSelector selector) {
+    private DownloadLinkCandidate next(final DownloadLinkCandidateSelector selector) {
         final DownloadSession currentSession = selector.getSession();
         final HashMap<String, Boolean> destinationValidationCache = new HashMap<String, Boolean>();
         while (newDLStartAllowed(currentSession)) {
             final List<DownloadLinkCandidate> nextCandidates = nextDownloadLinkCandidates(selector);
-            if (nextCandidates != null && nextCandidates.size() > 0) {
-                DownloadLinkCandidate nextCandidate = findFinalCandidate(selector, nextCandidates);
-                if (nextCandidate != null) {
-                    final String destination = nextCandidate.getLink().getFilePackage().getDownloadDirectory();
-                    boolean validationOk = false;
-                    try {
-                        final Boolean cachedValidationResult = destinationValidationCache.get(destination);
-                        if (cachedValidationResult == null) {
-                            validateDestination(new File(destination));
-                            validationOk = true;
-                        } else {
-                            if (cachedValidationResult.booleanValue() == true) {
-                                validationOk = true;
-                            } else {
-                                for (final DownloadLinkCandidate candidate : nextCandidates) {
-                                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
-                                }
-                            }
-                        }
-                    } catch (PathTooLongException e) {
-                        for (final DownloadLinkCandidate candidate : nextCandidates) {
-                            selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION_TOO_LONG_PATH, null, null));
-                        }
-                    } catch (BadDestinationException e) {
+            if (nextCandidates == null || nextCandidates.size() == 0) {
+                break;
+            }
+            DownloadLinkCandidate nextCandidate = findFinalCandidate(selector, nextCandidates);
+            if (nextCandidate == null) {
+                continue;
+            }
+            final String destination = nextCandidate.getLink().getFilePackage().getDownloadDirectory();
+            boolean validationOk = false;
+            try {
+                final Boolean cachedValidationResult = destinationValidationCache.get(destination);
+                if (cachedValidationResult == null) {
+                    validateDestination(new File(destination));
+                    validationOk = true;
+                } else {
+                    if (cachedValidationResult.booleanValue() == true) {
+                        validationOk = true;
+                    } else {
                         for (final DownloadLinkCandidate candidate : nextCandidates) {
                             selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
                         }
-                    } finally {
-                        destinationValidationCache.put(destination, Boolean.valueOf(validationOk));
-                    }
-                    if (validationOk) {
-                        if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextCandidates))) {
-                            for (final DownloadLinkCandidate candidate : nextCandidates) {
-                                selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.DISK_FULL, null, null));
-                            }
-                        } else {
-                            try {
-                                if (PluginForHost.implementsSortDownloadLink(nextCandidate.getCachedAccount().getPlugin())) {
-                                    final ArrayList<DownloadLink> mirrors = new ArrayList<DownloadLink>();
-                                    mirrors.add(0, nextCandidate.getLink());
-                                    for (final DownloadLink mirror : findDownloadLinkMirrors(nextCandidate.getLink(), MirrorDetectionDecision.SAFE, false)) {
-                                        if (nextCandidate.getCachedAccount().canHandle(mirror) && (mirror.getFinalLinkState() == null || !FinalLinkState.OFFLINE.equals(mirror.getFinalLinkState()))) {
-                                            final DownloadLinkCandidate candidate = new DownloadLinkCandidate(nextCandidate.getLink(), nextCandidate.isForced(), nextCandidate.getCachedAccount(), nextCandidate.getProxySelector(), nextCandidate.isCustomizedAccount());
-                                            final DownloadLinkCandidatePermission permission = selector.getDownloadLinkCandidatePermission(candidate);
-                                            switch (permission) {
-                                            case OK:
-                                            case OK_FORCED:
-                                            case OK_SPEED_EXTENSION:
-                                                if (selector.validateDownloadLinkCandidate(candidate)) {
-                                                    mirrors.add(mirror);
-                                                }
-                                                break;
-                                            default:
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    final List<DownloadLink> sortedMirrors = nextCandidate.getCachedAccount().getPlugin().sortDownloadLinks(nextCandidate.getCachedAccount().getAccount(), mirrors);
-                                    if (sortedMirrors != null && sortedMirrors.size() > 0 && sortedMirrors.get(0) != nextCandidate.getLink()) {
-                                        nextCandidate = new DownloadLinkCandidate(sortedMirrors.get(0), nextCandidate.isForced(), nextCandidate.getCachedAccount(), nextCandidate.getProxySelector(), nextCandidate.isCustomizedAccount());
-                                    }
-                                }
-                            } catch (final Throwable e) {
-                                logger.log(e);
-                            }
-                            selector.setExcluded(nextCandidate.getLink());
-                            final MirrorLoading condition = new MirrorLoading(nextCandidate.getLink());
-                            for (DownloadLink mirror : findDownloadLinkMirrors(nextCandidate.getLink(), config.getMirrorDetectionDecision(), true)) {
-                                selector.setExcluded(mirror);
-                                if (mirror.getFinalLinkState() == null || FinalLinkState.CheckFailed(mirror.getFinalLinkState())) {
-                                    mirror.setConditionalSkipReason(condition);
-                                }
-                            }
-                            return nextCandidate;
-                        }
                     }
                 }
+            } catch (PathTooLongException e) {
+                for (final DownloadLinkCandidate candidate : nextCandidates) {
+                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION_TOO_LONG_PATH, null, null));
+                }
+            } catch (BadDestinationException e) {
+                for (final DownloadLinkCandidate candidate : nextCandidates) {
+                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.INVALID_DESTINATION, null, null));
+                }
+            } finally {
+                destinationValidationCache.put(destination, Boolean.valueOf(validationOk));
+            }
+            if (!validationOk) {
+                continue;
+            }
+            if (DISKSPACERESERVATIONRESULT.FAILED.equals(validateDiskFree(nextCandidates))) {
+                for (final DownloadLinkCandidate candidate : nextCandidates) {
+                    selector.addExcluded(candidate, new DownloadLinkCandidateResult(SkipReason.DISK_FULL, null, null));
+                }
             } else {
-                break;
+                try {
+                    if (PluginForHost.implementsSortDownloadLink(nextCandidate.getCachedAccount().getPlugin())) {
+                        final ArrayList<DownloadLink> mirrors = new ArrayList<DownloadLink>();
+                        mirrors.add(0, nextCandidate.getLink());
+                        for (final DownloadLink mirror : findDownloadLinkMirrors(nextCandidate.getLink(), MirrorDetectionDecision.SAFE, false)) {
+                            if (nextCandidate.getCachedAccount().canHandle(mirror) && (mirror.getFinalLinkState() == null || !FinalLinkState.OFFLINE.equals(mirror.getFinalLinkState()))) {
+                                final DownloadLinkCandidate candidate = new DownloadLinkCandidate(nextCandidate.getLink(), nextCandidate.isForced(), nextCandidate.getCachedAccount(), nextCandidate.getProxySelector(), nextCandidate.isCustomizedAccount());
+                                final DownloadLinkCandidatePermission permission = selector.getDownloadLinkCandidatePermission(candidate);
+                                switch (permission) {
+                                case OK:
+                                case OK_FORCED:
+                                case OK_SPEED_EXTENSION:
+                                    if (selector.validateDownloadLinkCandidate(candidate)) {
+                                        mirrors.add(mirror);
+                                    }
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                        }
+                        final List<DownloadLink> sortedMirrors = nextCandidate.getCachedAccount().getPlugin().sortDownloadLinks(nextCandidate.getCachedAccount().getAccount(), mirrors);
+                        if (sortedMirrors != null && sortedMirrors.size() > 0 && sortedMirrors.get(0) != nextCandidate.getLink()) {
+                            nextCandidate = new DownloadLinkCandidate(sortedMirrors.get(0), nextCandidate.isForced(), nextCandidate.getCachedAccount(), nextCandidate.getProxySelector(), nextCandidate.isCustomizedAccount());
+                        }
+                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
+                selector.setExcluded(nextCandidate.getLink());
+                final MirrorLoading condition = new MirrorLoading(nextCandidate.getLink());
+                for (DownloadLink mirror : findDownloadLinkMirrors(nextCandidate.getLink(), config.getMirrorDetectionDecision(), true)) {
+                    selector.setExcluded(mirror);
+                    if (mirror.getFinalLinkState() == null || FinalLinkState.CheckFailed(mirror.getFinalLinkState())) {
+                        mirror.setConditionalSkipReason(condition);
+                    }
+                }
+                return nextCandidate;
             }
         }
         return null;

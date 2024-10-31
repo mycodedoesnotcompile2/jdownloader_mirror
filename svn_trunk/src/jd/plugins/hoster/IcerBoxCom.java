@@ -22,6 +22,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.http.Browser;
@@ -40,19 +47,12 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 /**
  *
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 47482 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50051 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends antiDDoSForHost {
     private final String language = System.getProperty("user.language");
     private final String baseURL  = "https://icerbox.com";
@@ -120,14 +120,12 @@ public class IcerBoxCom extends antiDDoSForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        if (downloadLink != null) {
-            // at this given time only premium acn be downloaded
-            if (account != null && account.getType() == AccountType.PREMIUM) {
-                return true;
-            }
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
+        /* at this given time only premium can be downloaded */
+        if (account == null || account.getType() != AccountType.PREMIUM) {
+            return false;
         }
-        return false;
+        return super.canHandle(link, account);
     }
 
     @Override

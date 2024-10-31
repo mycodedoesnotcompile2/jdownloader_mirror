@@ -1162,7 +1162,7 @@ public abstract class PluginForHost extends Plugin {
         final long trafficLeft = ai.getTrafficLeft();
         final long minimum = 1024;
         final long downloadSize = link.getView().getBytesTotalEstimated();
-        long trafficNeeded = 0;
+        long trafficNeeded;
         if (downloadSize > 0) {
             trafficNeeded = Math.max(minimum, downloadSize - link.getView().getBytesLoaded());
         } else {
@@ -1174,6 +1174,9 @@ public abstract class PluginForHost extends Plugin {
             final MultiHostHost mhost = ai.getMultihostSupportedHost(link.getHost());
             if (mhost == null) {
                 /* Host is not supported (anymore) */
+                return false;
+            } else if (!mhost.isEnabled()) {
+                /* Disabled by user */
                 return false;
             }
             final MultihosterHostStatus status = mhost.getStatus();
@@ -3205,8 +3208,8 @@ public abstract class PluginForHost extends Plugin {
                         }
 
                         @Override
-                        protected boolean getBooleanValue(MultiHostHost mhost) {
-                            return true;
+                        protected boolean getBooleanValue(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
                         }
 
                         @Override
@@ -3216,7 +3219,7 @@ public abstract class PluginForHost extends Plugin {
 
                         @Override
                         protected void setBooleanValue(boolean value, final MultiHostHost mhost) {
-                            // object.getAccount().setEnabled(value);
+                            mhost.setEnabled(value);
                             fireTableStructureChanged();
                         }
                     });

@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
 public class DebridplanetCom extends PluginForHost {
     private static final String          API_BASE               = "https://debridplanet.com/v1";
     private static MultiHosterManagement mhm                    = new MultiHosterManagement("debridplanet.com");
@@ -85,7 +85,7 @@ public class DebridplanetCom extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

@@ -46,7 +46,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49609 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public class OboomIo extends PluginForHost {
     public OboomIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -275,12 +275,12 @@ public class OboomIo extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        if (account != null) {
-            return true;
-        } else {
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
+        if (account == null) {
             /* without account its not possible to download any link for this host */
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

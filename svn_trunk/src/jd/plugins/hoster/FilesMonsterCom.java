@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49280 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://[\\w\\.\\d]*?filesmonsterdecrypted\\.com/(download\\.php\\?id=|dl/.*?/free/2/).+" })
 public class FilesMonsterCom extends PluginForHost {
     private static final String POSTTHATREGEX            = "\"((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.*?)\"";
     private static final String POSTTHATREGEX2           = "((?:https?://(?:www\\.)?filesmonster\\.com)?/dl/.*?/free/.+)";
@@ -86,16 +86,15 @@ public class FilesMonsterCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        if (downloadLink.getBooleanProperty("PREMIUMONLY", false) && account == null) {
+    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
+        if (link.getBooleanProperty("PREMIUMONLY", false) && account == null) {
             /* premium only */
             return false;
-        }
-        if (downloadLink.getDownloadURL().contains("/free/2/") && account != null) {
+        } else if (link.getDownloadURL().contains("/free/2/") && account != null) {
             /* free only */
             return false;
         }
-        return true;
+        return super.canHandle(link, account);
     }
 
     public static String getFileName(Browser br) throws PluginException {

@@ -2,7 +2,9 @@
   "artefact":"com.formdev/flatlaf",
   "dependencies":null,
   "filter":["flatlaf.jar"],
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2024-10-18T20:28:27.206+02:00",
     "dependencies":null,
     "description":"Flat Look and Feel",

@@ -18,12 +18,9 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -60,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -69,9 +66,6 @@ public class DebridLinkCom extends PluginForHost {
     private static final String          PROPERTY_ACCOUNT_ACCESS_TOKEN_TIMESTAMP_CREATED     = "refresh_token_timestamp_created";
     private static final String          PROPERTY_ACCOUNT_ACCESS_TOKEN_TIMESTAMP_VALID_UNTIL = "access_token_timestamp_valid_until";
     private static final String          PROPERTY_ACCOUNT_REFRESH_TOKEN                      = "refresh_token";
-    private static final Set<String>     quotaReachedHostsList                               = new HashSet<String>();
-    /** Contains timestamp when quotas of all quota limited hosts will be reset. */
-    private static final AtomicLong      nextQuotaReachedResetTimestamp                      = new AtomicLong(0l);
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -232,6 +226,13 @@ public class DebridLinkCom extends PluginForHost {
                 final Map<String, Object> downloadsNumberLimit = (Map<String, Object>) limit_info_map.get("dayCount");
                 mhost.setLinksMax(((Number) downloadsNumberLimit.get("value")).longValue());
                 mhost.setLinksLeft(mhost.getLinksMax() - ((Number) downloadsNumberLimit.get("current")).longValue());
+                /* Log items with currently reached limits. */
+                if (mhost.getLinksLeft() <= 0) {
+                    logger.info("Currently traffic quota limited host: " + hostname);
+                }
+                if (mhost.getTrafficLeft() <= 0) {
+                    logger.info("Currently link quota limited host: " + hostname);
+                }
             }
             /* Workaround: Find our "real host" which we internally use -> We need this later! */
             final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(null, domains);
@@ -254,34 +255,9 @@ public class DebridLinkCom extends PluginForHost {
         ac.setMultiHostSupportV2(this, supportedhosts);
         /** How much percent of the (daily?) quota is used up so far? */
         final Map<String, Object> usagePercentMap = (Map<String, Object>) resp_downloader_limits_all_value.get("usagePercent");
-        final Map<String, Object> nextResetSecondsMap = (Map<String, Object>) resp_downloader_limits_all_value.get("nextResetSeconds");
         final int usedPercent = ((Number) usagePercentMap.get("current")).intValue();
-        if (usedPercent >= 100) {
-            throw new AccountUnavailableException("Reached daily download limit", 5 * 60 * 1000l);
-        }
         if (!StringUtils.isEmpty(ac.getStatus())) {
             ac.setStatus(ac.getStatus() + " | " + usedPercent + "% used");
-        }
-        final int nextResetSeconds = ((Number) nextResetSecondsMap.get("value")).intValue();
-        synchronized (quotaReachedHostsList) {
-            quotaReachedHostsList.clear();
-            nextQuotaReachedResetTimestamp.set(System.currentTimeMillis() + nextResetSeconds * 1001l);
-            for (final Map<String, Object> this_hoster_limit_info : resp_downloader_limits_all_value_hosters) {
-                final String hostname = this_hoster_limit_info.get("name").toString();
-                final Map<String, Object> trafficLimit = (Map<String, Object>) this_hoster_limit_info.get("daySize");
-                final Map<String, Object> downloadsNumberLimit = (Map<String, Object>) this_hoster_limit_info.get("dayCount");
-                /* Check if user has exceeded any of the current host limits -> Then we won't allow this user to download. */
-                boolean userHasReachedLimit = ((Number) trafficLimit.get("current")).longValue() >= ((Number) trafficLimit.get("value")).longValue() || ((Number) downloadsNumberLimit.get("current")).longValue() >= ((Number) downloadsNumberLimit.get("value")).longValue();
-                if (userHasReachedLimit) {
-                    logger.info("Currently quota limited host: " + hostname);
-                    final String realHost = name2RealHostMap.get(hostname);
-                    if (realHost == null) {
-                        logger.warning("WTF inconsistent map is missing entry for: " + hostname);
-                    } else {
-                        quotaReachedHostsList.add(realHost);
-                    }
-                }
-            }
         }
         /**
          * 2021-02-23: This service doesn't allow users to use it whenever they use a VPN/Proxy. </br>
@@ -289,20 +265,10 @@ public class DebridLinkCom extends PluginForHost {
          */
         if (serverDetected != null && serverDetected instanceof Boolean && ((Boolean) serverDetected).booleanValue()) {
             throw new AccountUnavailableException("VPN/Proxy detected: Turn it off to be able to use this account", 5 * 60 * 1000l);
+        } else if (usedPercent >= 100) {
+            throw new AccountUnavailableException("Reached daily download limit", 5 * 60 * 1000l);
         }
         return ac;
-    }
-
-    private boolean hostHasReachedQuotaLimit(final String host, final boolean removeFlag) {
-        synchronized (quotaReachedHostsList) {
-            if (quotaReachedHostsList.contains(host) && nextQuotaReachedResetTimestamp.get() > System.currentTimeMillis()) {
-                return false;
-            } else if ((removeFlag && quotaReachedHostsList.remove(host)) || quotaReachedHostsList.contains(host)) {
-                return true;
-            } else {
-                return false;
-            }
-        }
     }
 
     private boolean accountAccessTokenExpired(final Account account) {
@@ -357,7 +323,7 @@ public class DebridLinkCom extends PluginForHost {
                 query.add("grant_type", "refresh_token");
                 prepBR(this.br);
                 br.postPage(this.getApiBaseOauth() + "/token", query);
-                final TokenResponse tokenResponse = restoreFromString(this.br.toString(), new TypeRef<TokenResponse>(TokenResponse.class) {
+                final TokenResponse tokenResponse = restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<TokenResponse>(TokenResponse.class) {
                 });
                 if (!StringUtils.isEmpty(tokenResponse.getAccess_token())) {
                     logger.info("Refresh token successful");
@@ -384,7 +350,7 @@ public class DebridLinkCom extends PluginForHost {
                 queryDevicecode.add("scopes", "get.account,get.post.downloader");
                 prepBR(this.br);
                 br.postPage(this.getApiBaseOauth() + "/device/code", queryDevicecode);
-                final CodeResponse code = restoreFromString(this.br.toString(), new TypeRef<CodeResponse>(CodeResponse.class) {
+                final CodeResponse code = restoreFromString(this.br.getRequest().getHtmlCode(), new TypeRef<CodeResponse>(CodeResponse.class) {
                 });
                 final Thread dialog = showPINLoginInformation(code.getVerification_url(), code.getUser_code());
                 final UrlQuery queryPollingLogin = new UrlQuery();
@@ -483,12 +449,13 @@ public class DebridLinkCom extends PluginForHost {
     }
 
     /** List of errors: https://debrid-link.com/api_doc/v2/errors */
-    private void errHandling(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
+    private Map<String, Object> errHandling(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
         try {
-            final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final boolean success = ((Boolean) entries.get("success")).booleanValue();
             if (success) {
-                return;
+                /* No error */
+                return entries;
             }
             String error = (String) entries.get("error");
             if (error == null) {
@@ -527,15 +494,9 @@ public class DebridLinkCom extends PluginForHost {
                 /* Some generic "Host currently doesn't work" traits! */
                 mhm.putError(account, link, 2 * 60 * 1000l, error);
             } else if ("maxLinkHost".equals(error)) {
-                synchronized (quotaReachedHostsList) {
-                    quotaReachedHostsList.add(link.getHost());
-                }
-                mhm.putError(account, link, 2 * 60 * 1000l, "Max links per day limit reached for this host");
+                mhm.putError(account, link, 2 * 60 * 1000l, "Daily max links limit reached for this host");
             } else if ("maxDataHost".equals(error)) {
-                synchronized (quotaReachedHostsList) {
-                    quotaReachedHostsList.add(link.getHost());
-                }
-                mhm.putError(account, link, 2 * 60 * 1000l, "Max data per day limit reached for this host");
+                mhm.putError(account, link, 2 * 60 * 1000l, "Daily traffic limit reached for this host");
             } else if ("maxLink".equals(error)) {
                 throw new AccountUnavailableException("Download limit reached: Max links per day", 10 * 60 * 1001l);
             } else if ("maxData".equals(error)) {
@@ -559,6 +520,8 @@ public class DebridLinkCom extends PluginForHost {
             logger.exception("Json parsing failed -> Probably HTML response", parserFailure);
             throw parserFailure;
         }
+        /* This code should never be reached. */
+        return null;
     }
 
     private boolean isErrorPasswordRequiredOrWrong(final String str) {
@@ -587,20 +550,12 @@ public class DebridLinkCom extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        /* Extra check for pre-stored "quota reached" state -> Saves a few http requests */
-        if (hostHasReachedQuotaLimit(link.getHost(), false)) {
-            try {
-                mhm.putError(account, link, 5 * 60 * 1000l, "Quota reached");
-            } finally {
-                hostHasReachedQuotaLimit(link.getHost(), true);
-            }
-        }
         mhm.runCheck(account, link);
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
@@ -613,7 +568,7 @@ public class DebridLinkCom extends PluginForHost {
                     query.appendEncoded("password", passCode);
                 }
                 br.postPage(this.getApiBase() + "/downloader/add", query);
-                final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 if (this.isErrorPasswordRequiredOrWrong((String) entries.get("error"))) {
                     wrongPasswordAttempts += 1;
                     passCode = getUserInput("Password?", link);
@@ -634,8 +589,7 @@ public class DebridLinkCom extends PluginForHost {
             } else if (passCode != null) {
                 link.setDownloadPassword(passCode);
             }
-            this.errHandling(account, link);
-            Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            Map<String, Object> entries = this.errHandling(account, link);
             entries = (Map<String, Object>) entries.get("value");
             link.setProperty(PROPERTY_MAXCHUNKS, entries.get("chunk"));
             final String dllink = (String) entries.get("downloadUrl");

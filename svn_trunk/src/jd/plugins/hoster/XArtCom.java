@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49470 $", interfaceVersion = 2, names = { "x-art.com" }, urls = { "https?://(?:www\\.)?(x\\-art(decrypted)?\\.com/(members/)?(videos|galleries)/.+|([a-z0-9]+\\.)?x-art(decrypted)?\\.com/.+\\.(mov|mp4|wmv|zip).*)" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "x-art.com" }, urls = { "https?://(?:www\\.)?(x\\-art(decrypted)?\\.com/(members/)?(videos|galleries)/.+|([a-z0-9]+\\.)?x-art(decrypted)?\\.com/.+\\.(mov|mp4|wmv|zip).*)" })
 public class XArtCom extends PluginForHost {
     public static interface XArtConfigInterface extends PluginConfigInterface {
         @DefaultBooleanValue(false)
@@ -246,11 +246,12 @@ public class XArtCom extends PluginForHost {
     public void resetDownloadlink(DownloadLink link) {
     }
 
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (account != null) {
-            return true;
-        } else {
+    @Override
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
+        if (account == null) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

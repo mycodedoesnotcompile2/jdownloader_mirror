@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47629 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = {}, urls = {})
 public class BrfilesCom extends YetiShareCore {
     public BrfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -270,7 +270,7 @@ public class BrfilesCom extends YetiShareCore {
             /* Without account its not possible to download any link for this host */
             return false;
         } else {
-            return true;
+            return super.canHandle(link, account);
         }
     }
 }

@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48607 $", interfaceVersion = 3, names = { "epubbooks.com" }, urls = { "https?://(?:www\\.)?epubbooks\\.com/downloads/(\\d+)" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "epubbooks.com" }, urls = { "https?://(?:www\\.)?epubbooks\\.com/downloads/(\\d+)" })
 public class EpubbooksCom extends PluginForHost {
     public EpubbooksCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -210,7 +210,7 @@ public class EpubbooksCom extends PluginForHost {
         if (link != null && requiresAccount(link) && account == null) {
             return false;
         } else {
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

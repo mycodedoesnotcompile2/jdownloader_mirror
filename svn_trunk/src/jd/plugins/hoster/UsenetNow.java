@@ -3,23 +3,30 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
-import org.appwork.utils.StringUtils;
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
 import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "usenetnow.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = { "usenetnow.net" }, urls = { "" })
 public class UsenetNow extends UseNet {
     public UsenetNow(PluginWrapper wrapper) {
         super(wrapper);
@@ -27,14 +34,26 @@ public class UsenetNow extends UseNet {
     }
 
     @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
-        return "http://usenetnow.net/dmca.html";
+        return "https://" + getHost() + "/dmca.html";
     }
 
     private final String USENET_USERNAME = "USENET_USERNAME";
 
     @Override
-    protected String getUseNetUsername(Account account) {
+    protected String getUseNetUsername(final Account account) {
         return account.getStringProperty(USENET_USERNAME, account.getUser());
     }
 
@@ -45,88 +64,133 @@ public class UsenetNow extends UseNet {
     public AccountInfo fetchAccountInfo(Account account) throws Exception {
         setBrowserExclusive();
         final AccountInfo ai = new AccountInfo();
-        br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
-        try {
-            Form login = null;
-            if (cookies != null) {
-                br.setCookies(getHost(), cookies);
-                br.getPage("https://billing.usenetnow.net/login");
-                login = br.getFormbyActionRegex("/login/form/");
-                if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
-                    br.getCookies(getHost()).clear();
-                } else if (br.getCookie(getHost(), "PHPSESSID") == null || br.getCookie(getHost(), "amember_nr") == null) {
-                    br.getCookies(getHost()).clear();
-                } else if (br.containsHTML("<li>The user name or password is incorrect</li>")) {
-                    br.getCookies(getHost()).clear();
+        final Cookies cookiesUser = account.loadUserCookies();
+        boolean loginSuccess = false;
+        final String page_login = "https://billing.usenetnow.net/login";
+        final String page_member = "https://billing.usenetnow.net/member";
+        br.getPage(page_login);
+        if (cookiesUser != null) {
+            br.setCookies(cookiesUser);
+            br.getPage(page_member);
+            if (isLoggedin(br)) {
+                logger.info("User cookie login successful");
+                loginSuccess = true;
+            } else {
+                logger.info("User cookie login failed");
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    if (!StringUtils.containsIgnoreCase(br.getURL(), "/member")) {
-                        // switch to english
-                        br.getPage("https://billing.usenetnow.net/member");
-                    }
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
-            if (br.getCookie(getHost(), "PHPSESSID") == null || br.getCookie(getHost(), "amember_nr") == null) {
+        } else if (cookies != null) {
+            br.setCookies(cookies);
+            br.getPage(page_member);
+            if (isLoggedin(br)) {
+                logger.info("Cookie login successful");
+                loginSuccess = true;
+            } else {
+                logger.info("Cookie login failed");
                 account.clearCookies("");
-                final String userName = account.getUser();
-                br.getPage("https://billing.usenetnow.net/login");
-                login = br.getFormbyActionRegex("/login");
-                login.put("amember_login", Encoding.urlEncode(userName));
-                login.put("amember_pass", Encoding.urlEncode(account.getPass()));
-                br.submitForm(login);
-                login = br.getFormbyActionRegex("/login/form/");
-                if (login != null && login.containsHTML("amember_login") && login.containsHTML("amember_pass")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.containsHTML("<li>The user name or password is incorrect</li>")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                } else if (br.getCookie(getHost(), "PHPSESSID") == null || br.getCookie(getHost(), "amember_nr") == null) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
+                br.clearCookies(null);
             }
-            if (!StringUtils.containsIgnoreCase(br.getURL(), "/member")) {
-                // switch to english
-                br.getPage("https://billing.usenetnow.net/member");
-            }
-            account.saveCookies(br.getCookies(getHost()), "");
-            final String userName = br.getRegex("<div class=\"am-user-identity-block\">(.*?)<a").getMatch(0);
-            if (StringUtils.isEmpty(userName)) {
+        }
+        final String account_userName = account.getUser();
+        if (!loginSuccess) {
+            logger.info("Performing full login");
+            br.getPage(page_login);
+            final Form loginform = br.getFormbyActionRegex("/login");
+            if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                account.setProperty(USENET_USERNAME, userName.trim());
             }
-            account.setMaxSimultanDownloads(50);
-            final String validUntil = br.getRegex("member-subscriptions\">.*?<li><strong>.*?</strong>.*?expires (\\d+/\\d+/\\d+)").getMatch(0);
-            final String bucketType = br.getRegex("member-subscriptions\">.*?<li><strong>(.*?)</").getMatch(0);
-            if (bucketType != null) {
-                ai.setStatus(bucketType);
-            } else {
-                ai.setStatus("Unknown Bucket");
+            final boolean captchaAlwaysNeeded = true;
+            if (loginform.hasInputFieldByName("g-recaptcha-response") || loginform.containsHTML("recaptcha") || captchaAlwaysNeeded) {
+                final String rcKey = br.getRegex("\"recaptchaPublicKey\":\"([^\"]+)").getMatch(0);
+                final String recaptchaV2Response;
+                if (rcKey != null) {
+                    recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcKey).getToken();
+                } else {
+                    /* Try to auto find reCaptcha key */
+                    recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                }
+                loginform.put("g-recaptcha-response: ", Encoding.urlEncode(recaptchaV2Response));
             }
-            if (validUntil != null) {
-                final long date = TimeFormatter.getMilliSeconds(validUntil, "MM/dd/yy", null);
-                if (date > 0) {
-                    ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
+            loginform.put("amember_login", Encoding.urlEncode(account_userName));
+            loginform.put("amember_pass", Encoding.urlEncode(account.getPass()));
+            loginform.put("_referer", Encoding.urlEncode("https://" + br.getHost() + "/"));
+            final Browser brc = br.cloneBrowser();
+            brc.getHeaders().put("Accept", "application/json");
+            brc.getHeaders().put("Origin", "https://billing." + br.getHost());
+            brc.submitForm(loginform);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+            if (Boolean.FALSE.equals(entries.get("ok"))) {
+                final List<String> errorlist = (List<String>) entries.get("error");
+                if (errorlist != null) {
+                    /*
+                     * 2024-10-30: I'am running into problem "Anti Spam check failed" but dunno why and didn't invest more time into
+                     * checking. User can use cookie login.
+                     */
+                    throw new AccountInvalidException(errorlist.get(0));
+                } else {
+                    throw new AccountInvalidException();
                 }
             }
-        } catch (final PluginException e) {
-            if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                account.clearCookies("");
+            /* Login state looks good -> Double-check */
+            br.getPage(page_member);
+            if (!this.isLoggedin(br)) {
+                throw new AccountInvalidException();
             }
-            throw e;
+        }
+        br.getPage("https://billing.usenetnow.net/member");
+        account.saveCookies(br.getCookies(br.getHost()), "");
+        final String userName = br.getRegex("<div class=\"am-user-identity-block\">(.*?)<a").getMatch(0);
+        if (userName != null) {
+            account.setProperty(USENET_USERNAME, Encoding.htmlDecode(userName).trim());
+        } else if (!account_userName.contains("@")) {
+            /* Information which user has entered in username field is not e-mail address -> We can use it as Usenet login credential. */
+            account.setProperty(USENET_USERNAME, account_userName);
+        } else {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find UseNet username");
+        }
+        account.setProperty(USENET_USERNAME, Encoding.htmlDecode(userName).trim());
+        /**
+         * https://billing.usenetnow.net/page/newsreader </br>
+         * "You May Use Up To 100 Total Connections To Access These Servers - Average Users Should Use Between 40-50 Connections For Optimal
+         * Speeds."
+         */
+        account.setMaxSimultanDownloads(50);
+        final String validUntil = br.getRegex("expires\\s*<[^>]*>(\\d+/\\d+/\\d+)").getMatch(0);
+        final String bucketType = br.getRegex("member-subscriptions\">.*?<li><strong>(.*?)</").getMatch(0);
+        if (bucketType != null) {
+            ai.setStatus("Bucket: " + Encoding.htmlDecode(bucketType).trim());
+        }
+        if (validUntil != null) {
+            final long date = TimeFormatter.getMilliSeconds(validUntil, "MM/dd/yy", Locale.ENGLISH);
+            ai.setValidUntil(date + (24 * 60 * 60 * 1000l));
+        } else {
+            ai.setExpired(true);
         }
         ai.setMultiHostSupport(this, Arrays.asList(new String[] { "usenet" }));
         return ai;
     }
 
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("logout\"");
+    }
+
     @Override
     public List<UsenetServer> getAvailableUsenetServer() {
+        /* See: https://billing.usenetnow.net/page/newsreader */
         final List<UsenetServer> ret = new ArrayList<UsenetServer>();
-        ret.addAll(UsenetServer.createServerList("usnews.usenetnow.net", false, 23, 119, 2000, 8080, 9000));
-        ret.addAll(UsenetServer.createServerList("usnews.usenetnow.net", true, 443, 563, 5563));
-        ret.addAll(UsenetServer.createServerList("eunews.usenetnow.net", false, 23, 119, 2000, 8080, 9000));
-        ret.addAll(UsenetServer.createServerList("eunews.usenetnow.net", true, 443, 563, 5563));
-        ret.addAll(UsenetServer.createServerList("eunews2.usenetnow.net", false, 23, 119, 2000, 8080, 9000));
-        ret.addAll(UsenetServer.createServerList("eunews2.usenetnow.net", true, 443, 563, 5563));
+        final int[] ports_noSSL = new int[] { 20, 23, 53, 119, 2000, 8080, 9000, 9001, 9002 };
+        final int[] ports_SSL = new int[] { 443, 563, 5563 };
+        ret.addAll(UsenetServer.createServerList("usnews.usenetnow.net", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("usnews.usenetnow.net", true, ports_SSL));
+        ret.addAll(UsenetServer.createServerList("eunews.usenetnow.net", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("eunews.usenetnow.net", true, ports_SSL));
+        ret.addAll(UsenetServer.createServerList("eunews2.usenetnow.net", false, ports_noSSL));
+        ret.addAll(UsenetServer.createServerList("eunews2.usenetnow.net", true, ports_SSL));
         return ret;
     }
 }

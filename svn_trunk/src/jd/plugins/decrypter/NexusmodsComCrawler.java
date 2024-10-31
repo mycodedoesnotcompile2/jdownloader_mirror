@@ -21,7 +21,6 @@ import java.util.Map;
 
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -42,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50040 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
 public class NexusmodsComCrawler extends PluginForDecrypt {
     public NexusmodsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -50,8 +49,8 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String url = param.toString().replaceFirst("^http://", "https://");
-        final PluginForHost plugin = JDUtilities.getPluginForHost(this.getHost());
+        final String url = param.getCryptedUrl().replaceFirst("^http://", "https://");
+        final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
         ((jd.plugins.hoster.NexusmodsCom) plugin).setLogger(getLogger());
         ((jd.plugins.hoster.NexusmodsCom) plugin).setBrowser(br);
         final String game_domain_name = new Regex(url, this.getSupportedLinks()).getMatch(0);
@@ -135,10 +134,10 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
 
     /** Crawls items from website (without account). */
     private ArrayList<DownloadLink> crawlWebsite(final CryptedLink param, final String game_domain_name, final String mod_id) throws Exception {
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         final PluginForHost plugin = JDUtilities.getPluginForHost(this.getHost());
         br.setFollowRedirects(true);
-        ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br, parameter);
+        ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br, contenturl);
         if (jd.plugins.hoster.NexusmodsCom.isOfflineWebsite(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (((jd.plugins.hoster.NexusmodsCom) plugin).isLoginRequired(br)) {
@@ -213,6 +212,8 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         if (htmls == null || htmls.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        final String extDefault = ".zip";
+        int position = 0;
         for (final String html : htmls) {
             String file_id = new Regex(html, "\\?id=(\\d+)").getMatch(0);
             if (file_id == null) {
@@ -222,20 +223,22 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
                 logger.info("file_id is null");
                 continue;
             }
-            final String filename = new Regex(html, "data-url=\"([^<>\"]+)\"").getMatch(0);
+            position++;
+            final String filename = new Regex(html, "data-url=\"([^\"]+)\"").getMatch(0);
             final DownloadLink link = createDownloadlink(generatePluginPatternMatcher(file_id, game_id));
             link.setContentUrl(generateContentURL(game_domain_name, mod_id, file_id));
             final String filesizeStr = new Regex(html, ">\\s*File\\s*size\\s*</div>.*?\"stat\"\\s*>\\s*([0-9\\.TKGMB]+)").getMatch(0);
             if (filesizeStr != null) {
                 link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+            } else {
+                logger.warning("Failed to find filesize");
             }
             if (filename != null) {
-                link.setName(file_id + "_" + Encoding.htmlOnlyDecode(filename));
+                link.setName(file_id + "_" + Encoding.htmlOnlyDecode(filename) + extDefault);
             } else {
-                link.setName(file_id);
+                link.setName(fp.getName() + "_" + file_id + "_" + position + extDefault);
             }
             link.setAvailable(true);
-            link.setMimeHint(CompiledFiletypeFilter.ArchiveExtensions.ZIP);
             link.setRelativeDownloadFolderPath(currentPath);
             link._setFilePackage(fp);
             /* Important! These properties are especially required for all API requests! */

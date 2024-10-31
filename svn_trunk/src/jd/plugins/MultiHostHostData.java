@@ -3,11 +3,12 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-
 import org.appwork.storage.Storable;
 
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+
 public class MultiHostHostData implements Storable {
+    boolean                       enabled;
     private String                name;
     private List<String>          domains;
     private Boolean               isUnlimitedTraffic;
@@ -27,6 +28,14 @@ public class MultiHostHostData implements Storable {
 
     public MultiHostHostData() {
         this.domains = new ArrayList<String>();
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public String getName() {
@@ -170,6 +179,7 @@ public class MultiHostHostData implements Storable {
 
     public static MultiHostHostData createFromMultiHostHost(MultiHostHost source) {
         MultiHostHostData hostData = new MultiHostHostData();
+        hostData.setEnabled(source.isEnabled());
         hostData.setName(source.getName());
         hostData.setDomains(source.getDomains());
         hostData.setUnlimitedTraffic(source.isUnlimitedTraffic());
@@ -191,23 +201,24 @@ public class MultiHostHostData implements Storable {
     }
 
     public MultiHostHost toMultiHostHost() {
-        MultiHostHost host = new MultiHostHost();
-        host.setName(this.getName());
-        host.setDomains(this.getDomains());
-        host.setLinksLeft(this.getLinksLeft());
-        host.setLinksMax(this.getLinksMax());
-        host.setTrafficLeft(this.getTrafficLeft());
-        host.setTrafficMax(this.getTrafficMax());
-        host.setUnlimitedTraffic(this.isUnlimitedTraffic());
-        host.setUnlimitedLinks(this.isUnlimitedLinks());
-        host.setTrafficCalculationFactorPercent(this.getTrafficCalculationFactorPercent());
-        host.setMaxChunks(this.getMaxChunks());
-        host.setMaxDownloads(this.getMaxDownloads());
-        host.setResume(this.getResume());
-        host.setStatusText(this.getStatusText());
-        host.setStatus(this.getStatus());
+        final MultiHostHost mhost = new MultiHostHost();
+        mhost.setEnabled(this.isEnabled());
+        mhost.setName(this.getName());
+        mhost.setDomains(this.getDomains());
+        mhost.setLinksLeft(this.getLinksLeft());
+        mhost.setLinksMax(this.getLinksMax());
+        mhost.setTrafficLeft(this.getTrafficLeft());
+        mhost.setTrafficMax(this.getTrafficMax());
+        mhost.setUnlimitedTraffic(this.isUnlimitedTraffic());
+        mhost.setUnlimitedLinks(this.isUnlimitedLinks());
+        mhost.setTrafficCalculationFactorPercent(this.getTrafficCalculationFactorPercent());
+        mhost.setMaxChunks(this.getMaxChunks());
+        mhost.setMaxDownloads(this.getMaxDownloads());
+        mhost.setResume(this.getResume());
+        mhost.setStatusText(this.getStatusText());
+        mhost.setStatus(this.getStatus());
         // host.setUnavailableStatusText(this.getUnavailableStatusText());
         // host.setUnavailableTimestamp(this.getUnavailableUntilTimestamp());
-        return host;
+        return mhost;
     }
 }

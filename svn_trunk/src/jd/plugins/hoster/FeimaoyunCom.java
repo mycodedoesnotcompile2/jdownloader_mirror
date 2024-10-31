@@ -20,6 +20,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -39,11 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 47477 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = {}, urls = {})
 public class FeimaoyunCom extends PluginForHost {
     public FeimaoyunCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -250,10 +250,11 @@ public class FeimaoyunCom extends PluginForHost {
 
     /**
      * @param validateCookies
-     *            true = check cookies for validity, perform full login if necessary </br> false = Just set cookies and return false if
-     *            cookies are younger than 300000l
+     *            true = check cookies for validity, perform full login if necessary </br>
+     *            false = Just set cookies and return false if cookies are younger than 300000l
      *
-     * @return true = Cookies are validated </br> false = Cookies are not validated (only set on current Browser instance)
+     * @return true = Cookies are validated </br>
+     *         false = Cookies are not validated (only set on current Browser instance)
      */
     @SuppressWarnings("deprecation")
     private boolean login(final Account account, final boolean validateCookies) throws Exception {
@@ -392,10 +393,10 @@ public class FeimaoyunCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account != null && account.getType() == AccountType.PREMIUM) {
-            return true;
-        } else {
+        if (account == null || account.getType() != AccountType.PREMIUM) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49943 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
 public class RapidsPl extends PluginForHost {
     /* API documentation: https://new.rapids.pl/api */
     private static final String  API_BASE            = "https://api.rapids.pl/api";
@@ -95,7 +95,7 @@ public class RapidsPl extends PluginForHost {
             /* Without account its not possible to download the link */
             return false;
         }
-        return true;
+        return super.canHandle(link, account);
     }
 
     @Override

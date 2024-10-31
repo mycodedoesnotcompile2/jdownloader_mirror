@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.VscoCoCrawler;
 
-@HostPlugin(revision = "$Revision: 49190 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCo extends PluginForHost {
     public VscoCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -280,7 +280,9 @@ public class VscoCo extends PluginForHost {
                     logger.info("Cookie login failed");
                     br.clearCookies(null);
                     if (userCookies != null) {
-                        if (account.hasEverBeenValid()) {
+                        if (useragent == null) {
+                            throw new AccountInvalidException("Cookies invalid?\r\nTry this: Put the current User-Agent value of your browser in Settings - Plugins - vsco.co, then try cookie login again.");
+                        } else if (account.hasEverBeenValid()) {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired() + "\r\nUse FlagCookies browser addon for cookie import!");
                         } else {
                             throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());

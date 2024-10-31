@@ -2,7 +2,9 @@
   "artefact":"de.regnis.q.sequence/sequence-library",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:34+02:00",
     "dependencies":[{
       "groupId":"junit",

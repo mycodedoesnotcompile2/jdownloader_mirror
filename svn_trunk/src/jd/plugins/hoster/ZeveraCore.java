@@ -220,24 +220,14 @@ abstract public class ZeveraCore extends UseNet {
 
     @Override
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (account != null) {
-            /*
-             * Either only premium accounts are allowed or, if configured by users, free accounts are allowed to be used for downloading too
-             * in some cases.
-             */
-            if (account.getType() == AccountType.PREMIUM) {
-                getMultiHosterManagement().runCheck(account, link);
-                return true;
-            } else if (this.supportsFreeAccountDownloadMode(account)) {
-                getMultiHosterManagement().runCheck(account, link);
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            /* Download without account is not possible */
+        if (account == null) {
+            return false;
+        } else if (account.getType() != AccountType.PREMIUM && !this.supportsFreeAccountDownloadMode(account)) {
+            /* Free account but downloading via free account is not possible. */
             return false;
         }
+        getMultiHosterManagement().runCheck(account, link);
+        return super.canHandle(link, account);
     }
 
     private boolean isSelfhostedContent(final DownloadLink link) {

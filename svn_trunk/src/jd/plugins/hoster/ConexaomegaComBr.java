@@ -21,7 +21,6 @@ import java.util.HashMap;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 
 import jd.PluginWrapper;
 import jd.config.Property;
@@ -39,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 45814 $", interfaceVersion = 3, names = { "conexaomega.com.br" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "conexaomega.com.br" }, urls = { "" })
 public class ConexaomegaComBr extends antiDDoSForHost {
     /* Tags: conexaomega.com.br, megarapido.net, superdown.com.br */
     private static final String                            DOMAIN                       = "http://conexaomega.com.br/";
@@ -90,12 +89,12 @@ public class ConexaomegaComBr extends antiDDoSForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
             /* without account its not possible to download the link */
             return false;
         }
-        return true;
+        return super.canHandle(link, account);
     }
 
     @Override

@@ -48,7 +48,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "premium.rpnet.biz" }, urls = { "" })
 public class RPNetBiz extends PluginForHost {
     private static final String          mName                    = "rpnet.biz";
     private static final String          mProt                    = "http://";
@@ -149,12 +149,12 @@ public class RPNetBiz extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
             /* without account its not possible to download the link */
             return false;
         } else {
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

@@ -13,7 +13,6 @@ import org.jdownloader.controlling.hosterrule.CachedAccountGroup;
 
 import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.plugins.Account;
-import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.PluginForHost;
 
@@ -82,19 +81,6 @@ public class AccountCache implements Iterable<CachedAccount> {
                 return false;
             } else if (!plugin.enoughTrafficFor(link, account)) {
                 return false;
-            }
-            if (ACCOUNTTYPE.MULTI.equals(getType()) && getAccount() != null) {
-                /* Check for multihost specific things */
-                final AccountInfo ai = getAccount().getAccountInfo();
-                if (ai == null) {
-                    /* Multihoster account without accountInfo -> That should never happen */
-                    return false;
-                }
-                final List<String> supported = ai.getMultiHostSupport();
-                if (supported == null || !supported.contains(link.getHost())) {
-                    /* Host is not supported (anymore) */
-                    return false;
-                }
             }
             return true;
         }

@@ -2,7 +2,9 @@
   "artefact":"org.mozilla/rhino",
   "dependencies":null,
   "filter":null,
+  "history":[],
   "installed":{
+    "changes":null,
     "date":"2023-09-04T11:08:34+02:00",
     "dependencies":null,
     "description":"Rhino is an open-source implementation of JavaScript written entirely in Java. It is typically\n      embedded into Java applications to provide scripting to end users.",

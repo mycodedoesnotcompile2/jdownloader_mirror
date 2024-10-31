@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 48621 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "multiup.io" }, urls = { "" })
 public class MultiupOrg extends PluginForHost {
     private static final String          API_BASE                   = "https://multiup.io/api";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("multiup.io");
@@ -92,7 +92,7 @@ public class MultiupOrg extends PluginForHost {
             return false;
         } else {
             mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

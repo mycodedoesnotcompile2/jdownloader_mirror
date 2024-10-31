@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
 public class MultiVipNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            APIKEY             = "jd2";
@@ -84,17 +84,17 @@ public class MultiVipNet extends PluginForHost {
 
     @SuppressWarnings("deprecation")
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
         if (account == null) {
             /* without account its not possible to download the link */
             return false;
         } else {
             /* First check if the file is too big */
             final long max_downloadable_filesize = account.getLongProperty("max_downloadable_filesize", 0);
-            if (max_downloadable_filesize > 0 && downloadLink.getDownloadSize() > max_downloadable_filesize) {
+            if (max_downloadable_filesize > 0 && link.getDownloadSize() > max_downloadable_filesize) {
                 return false;
             }
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

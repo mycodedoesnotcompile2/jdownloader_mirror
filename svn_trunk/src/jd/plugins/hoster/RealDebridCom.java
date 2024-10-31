@@ -90,7 +90,7 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -268,16 +268,16 @@ public class RealDebridCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink downloadLink, Account account) throws Exception {
-        if (isDirectRealDebridDirectUrl(downloadLink)) {
+    public boolean canHandle(DownloadLink link, Account account) throws Exception {
+        if (isDirectRealDebridDirectUrl(link)) {
             // generated links do not require an account to download
             return true;
         } else if (account == null) {
             // no non account handleMultiHost support.
             return false;
         } else {
-            mhm.runCheck(account, downloadLink);
-            return true;
+            mhm.runCheck(account, link);
+            return super.canHandle(link, account);
         }
     }
 

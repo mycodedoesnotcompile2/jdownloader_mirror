@@ -50,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
 public class YoutvDe extends PluginForHost {
     public YoutvDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -293,11 +293,11 @@ public class YoutvDe extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account != null) {
+        if (account == null) {
             /* Account is always needed to download items of this host. */
-            return true;
-        } else {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 

@@ -44,7 +44,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.CzechavComCrawler;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "czechav.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "czechav.com" }, urls = { "" })
 public class CzechavCom extends PluginForHost {
     public CzechavCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -234,10 +234,10 @@ public class CzechavCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account != null && account.getType() == AccountType.PREMIUM) {
-            return true;
-        } else {
+        if (account == null || account.getType() != AccountType.PREMIUM) {
             return false;
+        } else {
+            return super.canHandle(link, account);
         }
     }
 
