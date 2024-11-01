@@ -51,7 +51,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49182 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50061 $", interfaceVersion = 2, names = {}, urls = {})
 public class TurbobitCore extends antiDDoSForHost {
     /**
      * TODO: Check if we already got errorhandling for this kind of error http://turbobit.net/error/download/dcount/xxxtesst --> "
@@ -468,27 +468,18 @@ public class TurbobitCore extends antiDDoSForHost {
         getPage(br, "/download/free/" + this.getFUID(link));
         if (isFileOfflineWebsite(this.br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (isPremiumOnly(link, account, br, false)) {
-            throw new AccountRequiredException();
         }
+        checkPremiumOnly(link, account, br);
         partTwo(link, account, true);
     }
 
-    protected boolean isPremiumOnly(final DownloadLink link, final Account account, final Browser br, final boolean throwException) throws PluginException {
-        if (br.containsHTML("(?i)<div class=\"free-limit-note\">\\s*Limit reached for free download of this file\\.")) {
-            if (throwException) {
-                throw new AccountRequiredException();
-            } else {
-                return true;
-            }
+    protected void checkPremiumOnly(final DownloadLink link, final Account account, final Browser br) throws PluginException {
+        String msg = br.getRegex("<div class=\"free-limit-note\"[^>]*>\\s*(Limit reached for free download of this file\\.)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            throw new AccountRequiredException(msg);
         } else if (br.containsHTML("<a\\s*data-premium-only-download") || br.containsHTML("href\\s*=\\s*\"/download/free/[^>]*?data-premium-only-download")) {
-            if (throwException) {
-                throw new AccountRequiredException();
-            } else {
-                return true;
-            }
-        } else {
-            return false;
+            throw new AccountRequiredException();
         }
     }
 

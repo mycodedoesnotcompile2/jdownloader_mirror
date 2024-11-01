@@ -67,20 +67,21 @@ public class DateMapperTest extends AWTest {
     @Override
     public void runTest() throws Exception {
         // Get the current timezone offset in ISO 8601 format
+        TimeZone restore = TimeZone.getDefault();
+        TimeZone p2 = TimeZone.getTimeZone("GMT+02:00");
+        // set default timezone without daylight savings...
+        TimeZone.setDefault(p2);
         TimeZone timeZone = TimeZone.getDefault();
         Calendar calendar = Calendar.getInstance(timeZone);
         int offsetInMillis = timeZone.getOffset(calendar.getTimeInMillis());
         int offsetHours = offsetInMillis / (1000 * 60 * 60);
         int offsetMinutes = Math.abs((offsetInMillis / (1000 * 60)) % 60);
         final String currentTimezoneOffset = String.format("%+03d:%02d", offsetHours, offsetMinutes);
-        TimeZone restore = TimeZone.getDefault();
-        TimeZone p2 = TimeZone.getTimeZone("GMT+02:00");
         try {
-            TimeZone.setDefault(p2);
             Map<String, String> testDates = new LinkedHashMap<String, String>() {
                 {
-                    put("03:00 PM", "1970-01-01T15:00+02:00");
-                    put("01.04.2024+02:00", "2024-04-01" + currentTimezoneOffset);
+                    put("03:00 PM", "1970-01-01T15:00" + currentTimezoneOffset);
+                    put("01.04.2024+02:00", "2024-04-01+02:00");
                     put("2024-04-01T15:01:02Z", "2024-04-01T17:01:02+02:00");
                     put("2024-04-01T15:01:02.123Z", "2024-04-01T17:01:02.123+02:00");
                     put("04/01/2024", "2024-04-01" + currentTimezoneOffset);
@@ -94,7 +95,7 @@ public class DateMapperTest extends AWTest {
                     put("01.04.2024 00:00", "2024-04-01" + currentTimezoneOffset);
                     put("01-04-2024", "2024-04-01" + currentTimezoneOffset);
                     put("2024-04-01CEST", "2024-04-01" + currentTimezoneOffset);
-                    put("2024/04/01+02:00", "2024-04-01" + currentTimezoneOffset);
+                    put("2024/04/01+02:00", "2024-04-01+02:00");
                     put("2024-04-01 15:00:00+0200", "2024-04-01T15:00+02:00");
                     put("2024-04-01 15:00:00+02:00", "2024-04-01T15:00+02:00");
                     put("2024/04/01 15:00:00+0200", "2024-04-01T15:00+02:00");

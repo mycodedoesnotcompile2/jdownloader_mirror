@@ -21,11 +21,14 @@ import java.util.Map;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
+import jd.parser.html.Form.MethodType;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -33,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48644 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
+@HostPlugin(revision = "$Revision: 50059 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
 public class KrakenfilesCom extends PluginForHost {
     public KrakenfilesCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,7 +51,7 @@ public class KrakenfilesCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://krakenfiles.com/";
+        return "https://" + getHost();
     }
 
     @Override
@@ -69,15 +72,6 @@ public class KrakenfilesCom extends PluginForHost {
     private static final boolean FREE_RESUME    = true;
     private static final int     FREE_MAXCHUNKS = 1;
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
-    //
-    // /* don't touch the following! */
-    // private static AtomicInteger maxPrem = new AtomicInteger(1);
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         if (!link.isNameSet()) {
@@ -86,7 +80,7 @@ public class KrakenfilesCom extends PluginForHost {
         }
         this.setBrowserExclusive();
         /* This json is part of their embed functions :) */
-        br.getPage("https://" + this.getHost() + "/json/" + this.getFID(link));
+        br.getPage("https://" + getHost() + "/json/" + this.getFID(link));
         final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         if (!(jsonO instanceof Map)) {
             /* 2023-11-21: Returns empty array when given fileID is invalid. */
@@ -96,13 +90,11 @@ public class KrakenfilesCom extends PluginForHost {
         final String hash = (String) entries.get("hash");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (StringUtils.isEmpty(hash) || !StringUtils.equalsIgnoreCase(hash, this.getFID(link))) {
+        } else if (!StringUtils.equalsIgnoreCase(hash, this.getFID(link))) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String filename = entries.get("title").toString();
-        final String filesize = entries.get("size").toString();
-        link.setFinalFileName(filename);
-        link.setDownloadSize(SizeFormatter.getSize(filesize));
+        link.setFinalFileName(entries.get("title").toString());
+        link.setDownloadSize(SizeFormatter.getSize(entries.get("size").toString()));
         return AvailableStatus.TRUE;
     }
 
@@ -119,9 +111,25 @@ public class KrakenfilesCom extends PluginForHost {
             if (dlform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            br.getHeaders().put("hash", this.getFID(link));
+            dlform.setMethod(MethodType.POST);
+            boolean captchaNeeded = false;
+            if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(dlform)) {
+                captchaNeeded = true;
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                dlform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+            }
             br.submitForm(dlform);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String status = (String) entries.get("status");
+            if ("error".equalsIgnoreCase(status)) {
+                final String msg = entries.get("msg").toString();
+                if (captchaNeeded && msg.equalsIgnoreCase("captcha not valid")) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                } else {
+                    /* Unknown error */
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
+                }
+            }
             final String dllink = entries.get("url").toString();
             if (StringUtils.isEmpty(dllink) && dllink.startsWith("http")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -140,10 +148,10 @@ public class KrakenfilesCom extends PluginForHost {
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 405 'Method not allowed'", 60 * 60 * 1000l);
                 } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unexpected response: Expected file, got html");
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
     }
@@ -174,8 +182,7 @@ public class KrakenfilesCom extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
-        /** 2021-02-16: No captchas at all */
-        return false;
+        return true;
     }
 
     @Override

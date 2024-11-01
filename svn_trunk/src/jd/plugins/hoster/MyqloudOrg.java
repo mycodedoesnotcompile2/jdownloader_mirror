@@ -34,7 +34,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class MyqloudOrg extends XFileSharingProBasic {
     public MyqloudOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -297,14 +297,12 @@ public class MyqloudOrg extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        if (br.containsHTML(">\\s*Only Premium users can download files")) {
-            return true;
-        } else if (br.containsHTML(">\\s*Only Premium user can download this file")) {
-            /* 2024-02-23 */
-            return true;
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">\\s*(Only Premium users can download files)").getMatch(0);
+        if (msg != null) {
+            return msg;
         } else {
-            return super.isPremiumOnly(br);
+            return super.getPremiumOnlyErrorMessage(br);
         }
     }
 

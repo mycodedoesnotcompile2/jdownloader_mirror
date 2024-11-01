@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
@@ -46,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50059 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -54,9 +53,7 @@ public class OpdebCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public OpdebCom(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/purchase");
-        }
+        this.enablePremium("https://" + getHost() + "/purchase");
     }
 
     @Override
@@ -113,15 +110,17 @@ public class OpdebCom extends PluginForHost {
         } else {
             mhm.runCheck(account, link);
             this.login(account, false);
-            /**
-             * TODO: Remove the need of this. This is f*cking stupid API design! </br>
-             * Without this parameter, error "ERROR: Issue with your IP or IPSET " will happen.
-             */
-            final String ip = br.getPage("https://ipcheck0.jdownloader.org/");
+            final String ipValueFromAccount = account.getStringProperty("ip_linked");
             final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("link", url);
-            query.appendEncoded("ip", ip);
+            if (ipValueFromAccount != null) {
+                /*
+                 * 2024-10-31: This parameter is mandatory but completely useless. I've asked the admin to remove it since it does not
+                 * contribute to "API security" at all.
+                 */
+                query.appendEncoded("ip", ipValueFromAccount);
+            }
             final Map<String, Object> resp_generator = (Map<String, Object>) this.callAPI("/generator", link, account, query);
             dllink = JavaScriptEngineFactory.walkJson(resp_generator, "generator/{0}/link").toString();
         }
@@ -129,7 +128,7 @@ public class OpdebCom extends PluginForHost {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
-                mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to file", 10, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, "Final downloadurl did not lead to file", 50, 5 * 60 * 1000l);
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
@@ -147,13 +146,14 @@ public class OpdebCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final Map<String, Object> entries = login(account, true);
+        final Map<String, Object> user = login(account, true);
+        account.setProperty("ip_linked", user.get("ip_linked"));
         final AccountInfo ai = new AccountInfo();
         /*
          * User only enters apikey as password and could enter anything into the username field --> Make sure it contains an unique value.
          */
-        account.setUser(entries.get("username").toString());
-        final long plan_expire_timestamp = ((Number) entries.get("plan_expire")).longValue() * 1000;
+        account.setUser(user.get("username").toString());
+        final long plan_expire_timestamp = ((Number) user.get("plan_expire")).longValue() * 1000;
         if (plan_expire_timestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
             ai.setValidUntil(plan_expire_timestamp, br);
@@ -161,18 +161,18 @@ public class OpdebCom extends PluginForHost {
             account.setType(AccountType.FREE);
             ai.setExpired(true);
         }
-        final String plan_name = (String) entries.get("plan_name");
+        final String plan_name = (String) user.get("plan_name");
         if (!StringUtils.isEmpty(plan_name)) {
             ai.setStatus(plan_name);
         }
-        final Number account_create = (Number) entries.get("account_create");
+        final Number account_create = (Number) user.get("account_create");
         if (account_create != null) {
             ai.setCreateTime(account_create.longValue() * 1000);
         }
         ai.setUnlimitedTraffic();
         final Map<String, Map<String, Object>> freehostmapping = new HashMap<String, Map<String, Object>>();
         final Map<String, Map<String, Object>> limithostermapping = new HashMap<String, Map<String, Object>>();
-        if (account.getType() == AccountType.FREE || true) {
+        if (account.getType() == AccountType.FREE) {
             final Map<String, Object> freehosters_root = (Map<String, Object>) this.callAPI("/freehosters", null, account);
             final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) freehosters_root.get("freehosters");
             for (final Map<String, Object> hostermap : arrayHoster) {
@@ -272,7 +272,7 @@ public class OpdebCom extends PluginForHost {
                 throw new AccountInvalidException(message);
             }
         }
-        mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 50);
+        mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 5);
         return entries;
     }
 

@@ -39,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49284 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -258,25 +258,22 @@ public class HotlinkCc extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        /*
-         * 2020-01-30: Special because template code matches also on ">\\s*Available Only for Premium Members" which is always present in
-         * their html
-         */
-        boolean premiumonly_filehost = br.containsHTML("( can download files up to |>\\s*Upgrade your account to download (?:larger|bigger) files|>\\s*The file you requested reached max downloads limit for Free Users|Please Buy Premium To download this file\\s*<|This file reached max downloads limit|>\\s*This file is available for Premium Users only|>File is available only for Premium users|>\\s*This file can be downloaded by)");
-        if (!premiumonly_filehost) {
-            /** 2021-01-28 */
-            premiumonly_filehost = br.containsHTML("This video.{1,6}is available for viewing and downloading.{1,6}only for premium users");
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex("(This video.{1,6}is available for viewing and downloading.{1,6}only for premium users)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            return msg;
         }
-        if (!premiumonly_filehost) {
-            /** 2021-01-28 */
-            final Form officialVideoDownloadForm = this.getOfficialVideoDownloadForm(getDownloadLink(), null, br);
-            final boolean fullStreamOnlyForPremium = br.containsHTML(">\\s*This is video preview, full video is available only for Premium");
-            premiumonly_filehost = fullStreamOnlyForPremium && officialVideoDownloadForm == null;
+        msg = br.getRegex(">\\s*(This video is available for Premium users only)").getMatch(0);
+        if (msg != null) {
+            return msg;
         }
-        /* 2019-05-30: Example: xvideosharing.com */
-        final boolean premiumonly_videohost = br.containsHTML(">\\s*This video is available for Premium users only");
-        return premiumonly_filehost || premiumonly_videohost;
+        final Form officialVideoDownloadForm = this.getOfficialVideoDownloadForm(getDownloadLink(), null, br);
+        msg = br.getRegex(">\\s*(This is video preview, full video is available only for Premium)").getMatch(0);
+        if (msg != null && officialVideoDownloadForm == null) {
+            return msg;
+        }
+        return super.getPremiumOnlyErrorMessage(br);
     }
 
     @Override

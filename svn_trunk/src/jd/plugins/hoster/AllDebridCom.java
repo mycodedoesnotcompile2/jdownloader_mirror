@@ -79,7 +79,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -323,21 +323,24 @@ public class AllDebridCom extends PluginForHost {
                     logger.info("This host cannot be used with current account type: " + host_without_tld);
                 }
                 /* Set individual host limits */
-                if (StringUtils.equalsIgnoreCase(quotaType, "traffic")) {
-                    /* traffic means traffic in MB */
-                    mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
-                    mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
-                } else if (StringUtils.equalsIgnoreCase(quotaType, "nb_download")) {
-                    /* nb_download means number of links left to download */
-                    final long linksLeft = quota.longValue();
-                    final long linksMax = quotaMax.longValue();
-                    // -1 = Unlimited
-                    if (linksLeft != -1 && linksMax != -1) {
-                        mhost.setLinksLeft(linksLeft);
-                        mhost.setLinksMax(linksMax);
+                if (quotaType != null && quota != null && quotaMax != null) {
+                    if (quotaType.equalsIgnoreCase("traffic")) {
+                        /* traffic means traffic in MB */
+                        mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
+                        mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
+                    } else if (quotaType.equalsIgnoreCase("nb_download")) {
+                        /* nb_download means number of links left to download */
+                        final long linksLeft = quota.longValue();
+                        final long linksMax = quotaMax.longValue();
+                        // -1 = Unlimited
+                        if (linksLeft != -1 && linksMax != -1) {
+                            mhost.setLinksLeft(linksLeft);
+                            mhost.setLinksMax(linksMax);
+                        }
+                    } else {
+                        // No limit or unsupported type of limit
+                        logger.warning("Got unknown limit type: " + quotaType);
                     }
-                } else {
-                    // No limit or unsupported type of limit
                 }
                 if (serviceType.equals("streams")) {
                     mhost.setStatusText("Stream service");

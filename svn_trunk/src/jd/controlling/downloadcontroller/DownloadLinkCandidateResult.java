@@ -61,7 +61,14 @@ public class DownloadLinkCandidateResult {
     }
 
     public String getMessage() {
-        return message;
+        String ret = message;
+        if (ret != null) {
+            return ret;
+        }
+        if (throwable instanceof PluginException) {
+            return ((PluginException) throwable).getLocalizedMessage();
+        }
+        return null;
     }
 
     protected void setMessage(String message) {

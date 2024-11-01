@@ -4,6 +4,15 @@ import java.lang.ref.WeakReference;
 
 import javax.swing.Icon;
 
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.proxy.NoProxySelector;
+import jd.controlling.proxy.SingleDirectGatewaySelector;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.DownloadLink;
+
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
@@ -15,15 +24,6 @@ import org.jdownloader.plugins.FinalLinkState;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.proxy.NoProxySelector;
-import jd.controlling.proxy.SingleDirectGatewaySelector;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
 
 public class HistoryEntry {
     private ACCOUNTTYPE accountType;
@@ -75,9 +75,24 @@ public class HistoryEntry {
     private DownloadLink                   link;
     private WeakReference<DownloadSession> session;
     private Account                        account;
+    private String                         customMessage = null;
 
     public DownloadLinkCandidate getCandidate() {
         return candidate.get();
+    }
+
+    public String getCustomMessage(final SkipReason skipReason) {
+        if (skipReason != null && resultSkipReason == skipReason) {
+            return customMessage;
+        }
+        return null;
+    }
+
+    public String getCustomMessage(final FinalLinkState finalLinkState) {
+        if (finalLinkState != null && resultFinalStatus == finalLinkState) {
+            return customMessage;
+        }
+        return null;
     }
 
     public Icon getResultIcon(int size) {
@@ -243,7 +258,11 @@ public class HistoryEntry {
 
     public static void updateResult(HistoryEntry history, DownloadLinkCandidate candidate, DownloadLinkCandidateResult result) {
         history.resultStatus = null;
+        history.customMessage = null;
         history.resultIconKey = null;
+        history.resultConditionalSkipReason = null;
+        history.resultFinalStatus = null;
+        history.resultSkipReason = null;
         if (result == null || result.getResult() == null) {
             history.resultIconKey = IconKey.ICON_PLAY;
             history.resultStatus = _GUI.T.CandidateTooltipTableModel_initColumns_running_();
@@ -316,16 +335,17 @@ public class HistoryEntry {
             case ACCOUNT_REQUIRED:
                 history.resultStatus = _GUI.T.CandidateTooltipTableModel_configureRendererComponent_account_required();
                 history.resultIconKey = IconKey.ICON_FALSE;
+                history.resultSkipReason = SkipReason.NO_ACCOUNT;
+                history.customMessage = result.getMessage();
                 break;
             case CAPTCHA:
                 history.resultSkipReason = SkipReason.CAPTCHA;
                 break;
             case FATAL_ERROR:
                 history.resultFinalStatus = FinalLinkState.FAILED_FATAL;
-                if (StringUtils.isNotEmpty(result.getMessage())) {
-                    history.resultStatus = result.getMessage();
-                }
+                history.resultStatus = result.getMessage();
                 history.resultIconKey = IconKey.ICON_FALSE;
+                history.customMessage = result.getMessage();
                 break;
             default:
                 history.resultStatus = result.getResult() + "";

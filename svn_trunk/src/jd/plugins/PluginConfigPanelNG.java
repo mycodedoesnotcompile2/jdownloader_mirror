@@ -101,8 +101,6 @@ import org.jdownloader.plugins.config.PluginConfigPanelEventSenderEventSender;
 import org.jdownloader.plugins.config.PluginConfigPanelEventSenderListener;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.premium.BuyAndAddPremiumAccount;
 import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
@@ -294,33 +292,6 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
             accountSettingsComponents.add(comp);
         }
         super.addImpl(comp, constraints, index);
-    }
-
-    private List<DomainInfo> getDomainInfos(Account acc) {
-        HashSet<DomainInfo> domains = new HashSet<DomainInfo>();
-        AccountInfo ai = acc.getAccountInfo();
-        if (ai != null) {
-            final List<String> supported = ai.getMultiHostSupport();
-            if (supported != null) {
-                /*
-                 * synchronized on list because plugins can change the list in runtime
-                 */
-                for (String sup : supported) {
-                    final LazyHostPlugin plg = HostPluginController.getInstance().get(sup);
-                    if (plg != null) {
-                        domains.add(plg.getDomainInfo());
-                    }
-                }
-            }
-        }
-        final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
-        Collections.sort(ret, new Comparator<DomainInfo>() {
-            @Override
-            public int compare(DomainInfo o1, DomainInfo o2) {
-                return o1.getTld().compareToIgnoreCase(o2.getTld());
-            }
-        });
-        return ret;
     }
 
     @Override
@@ -669,15 +640,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             final Map<String, Boolean> finalValue = value;
                             final MultiComboBox<String> comp = new MultiComboBox<String>(new ArrayList<String>(value.keySet())) {
                                 private final GenericConfigEventListener<Map<String, Boolean>> listener = new GenericConfigEventListener<Map<String, Boolean>>() {
-                                    @Override
-                                    public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
-                                    }
+                                                                                                            @Override
+                                                                                                            public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
+                                                                                                            }
 
-                                    @Override
-                                    public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
-                                        updateModel(newValue);
-                                    }
-                                };
+                                                                                                            @Override
+                                                                                                            public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
+                                                                                                                updateModel(newValue);
+                                                                                                            }
+                                                                                                        };
                                 {
                                     m.getEventSender().addListener(listener, true);
                                     updateModel(finalValue);
@@ -739,15 +710,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                         try {
                             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                    @Override
-                                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                    }
+                                                                                                 @Override
+                                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                                                                                 }
 
-                                    @Override
-                                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                        updateModel(newValue);
-                                    }
-                                };
+                                                                                                 @Override
+                                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                                                                                     updateModel(newValue);
+                                                                                                 }
+                                                                                             };
                                 {
                                     Set<Enum> value = (Set<Enum>) m.getValue();
                                     if (value == null) {

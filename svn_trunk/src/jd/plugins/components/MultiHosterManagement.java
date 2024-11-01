@@ -3,6 +3,9 @@ package jd.plugins.components;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.utils.Time;
+
 import jd.config.Property;
 import jd.controlling.AccountController;
 import jd.controlling.AccountControllerEvent;
@@ -14,9 +17,6 @@ import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.Time;
 
 /**
  * Instead of duplication we create a class
@@ -187,11 +187,16 @@ public class MultiHosterManagement implements AccountControllerListener {
                 Thread.sleep(1000l);
             } while (--waitPeriod > 0);
             downloadLink.getLinkStatus().setStatusText("");
-            throw new PluginException(LinkStatus.ERROR_RETRY, error);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Retry " + timesFailed + "/" + maxRetries + ": " + error);
         } else {
             downloadLink.setProperty(errorID, Property.NULL);
-            // default of 1 hour wait.
-            this.putError(account, downloadLink, errorWait, "Exhausted retry count: " + error);
+            final String errorPrefix;
+            if (maxRetries <= 1) {
+                errorPrefix = "";
+            } else {
+                errorPrefix = "Too many failed attempts: >= " + maxRetries + ": ";
+            }
+            this.putError(account, downloadLink, errorWait, errorPrefix + error);
         }
     }
 

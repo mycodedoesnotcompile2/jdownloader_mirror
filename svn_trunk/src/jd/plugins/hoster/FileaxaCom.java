@@ -22,12 +22,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileaxaCom extends XFileSharingProBasic {
     public FileaxaCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -137,11 +138,13 @@ public class FileaxaCom extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        if (br.containsHTML("(?i)This file is\\s*available for.*Premium Users only")) {
-            return true;
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">\\s*(This file is\\s*available for[^<]*Premium Users only[^<]*)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg);
+            return msg;
         } else {
-            return super.isPremiumOnly(br);
+            return super.getPremiumOnlyErrorMessage(br);
         }
     }
 }

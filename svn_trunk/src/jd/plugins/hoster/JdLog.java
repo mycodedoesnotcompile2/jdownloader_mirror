@@ -48,7 +48,7 @@ import jd.utils.locale.JDL;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 49452 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
+@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = { "jdlog" }, urls = { "jdlog://(\\d+)" })
 public class JdLog extends PluginForHost {
     @Override
     public String getAGBLink() {
@@ -113,7 +113,7 @@ public class JdLog extends PluginForHost {
                 if (StringUtils.equals(out, "LogID: " + uid + "\r\n\r\n")) {
                     // set as offline
                     link.setProperty("offlineByRegexConfirmation", true);
-                    // delete method
+                    // delete unusable file
                     link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
                         @Override
                         public void interrupt() {
@@ -135,7 +135,7 @@ public class JdLog extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } else if (dlsize < 125) {
-                // delete method
+                // delete unusable file
                 link.getDownloadLinkController().getJobsAfterDetach().add(new DownloadWatchDogJob() {
                     @Override
                     public void interrupt() {

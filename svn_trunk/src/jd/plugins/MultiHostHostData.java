@@ -3,16 +3,33 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.Storable;
-
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
+import org.appwork.storage.Storable;
+
 public class MultiHostHostData implements Storable {
-    boolean                       enabled;
-    private String                name;
-    private List<String>          domains;
-    private Boolean               isUnlimitedTraffic;
-    private Boolean               isUnlimitedLinks;
+    boolean              enabled;
+    private String       name;
+    private List<String> domains;
+    private Boolean      unlimitedTraffic;
+
+    public Boolean isUnlimitedTraffic() {
+        return unlimitedTraffic;
+    }
+
+    public void setUnlimitedTraffic(Boolean unlimitedTraffic) {
+        this.unlimitedTraffic = unlimitedTraffic;
+    }
+
+    public Boolean isUnlimitedLinks() {
+        return unlimitedLinks;
+    }
+
+    public void setUnlimitedLinks(Boolean unlimitedLinks) {
+        this.unlimitedLinks = unlimitedLinks;
+    }
+
+    private Boolean               unlimitedLinks;
     private long                  linksLeft;
     private long                  linksMax;
     private long                  trafficLeft;
@@ -52,22 +69,6 @@ public class MultiHostHostData implements Storable {
 
     public void setDomains(List<String> domains) {
         this.domains = domains;
-    }
-
-    public Boolean isUnlimitedTraffic() {
-        return isUnlimitedTraffic;
-    }
-
-    public void setUnlimitedTraffic(Boolean isUnlimitedTraffic) {
-        this.isUnlimitedTraffic = isUnlimitedTraffic;
-    }
-
-    public Boolean isUnlimitedLinks() {
-        return isUnlimitedLinks;
-    }
-
-    public void setUnlimitedLinks(Boolean isUnlimitedLinks) {
-        this.isUnlimitedLinks = isUnlimitedLinks;
     }
 
     public long getLinksLeft() {

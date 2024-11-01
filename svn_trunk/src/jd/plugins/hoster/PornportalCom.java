@@ -62,11 +62,11 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 50013 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50053 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.pornportal.com/");
+        this.enablePremium("https://www." + getHost());
     }
 
     @Override
@@ -84,7 +84,7 @@ public class PornportalCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.pornportal.com/legal/tos";
+        return "https://www." + getHost() + "/legal/tos";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -862,235 +862,228 @@ public class PornportalCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         synchronized (account) {
-            try {
-                login(this.br, account, this.getHost(), true);
-                final AccountInfo ai = new AccountInfo();
-                account.setConcurrentUsePossible(true);
-                ai.setUnlimitedTraffic();
-                if (br.getURL() == null || !br.getURL().contains("/v1/self")) {
-                    getPage(br, getAPIBase() + "/self");
-                }
-                final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final String joinDate = (String) user.get("joinDate");
-                if (!StringUtils.isEmpty(joinDate)) {
-                    ai.setCreateTime(TimeFormatter.getMilliSeconds(joinDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null));
-                }
-                if (Boolean.TRUE.equals(user.get("isBanned"))) {
-                    /*
-                     * 2021-11-08: This may randomly be "true" (also via website) although the account is definitely not banned! Tested with
-                     * a brazzers.com account. --> Ignore this for now!
-                     */
-                    final boolean trustBannedFlag = false;
-                    if (trustBannedFlag) {
-                        throw new AccountInvalidException("Account banned for reason: " + user.get("banReason"));
-                    } else {
-                        logger.info("Account might be banned??");
-                    }
-                }
-                final Boolean isExpired = (Boolean) user.get("isExpired");
-                final Boolean isTrial = (Boolean) user.get("isTrial");
-                final Boolean isCanceled = (Boolean) user.get("isCanceled");
-                final Boolean hasAccess = (Boolean) user.get("hasAccess");
-                final Number initialAmount = (Number) user.get("initialAmount");
-                long expireTimestamp = -1;
-                final String expiryDate = (String) user.get("expiryDate");
-                if (!StringUtils.isEmpty(expiryDate)) {
-                    expireTimestamp = TimeFormatter.getMilliSeconds(expiryDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
-                }
-                final ArrayList<String> packageFeatures = new ArrayList<String>();
-                if (Boolean.TRUE.equals(isExpired)) {
-                    account.setType(AccountType.FREE);
-                    /* Free accounts can be used to download trailers */
-                    packageFeatures.add("expired premium");
-                } else if (Boolean.TRUE.equals(isTrial)) {
-                    /* Free trial -> Free Account with premium capability */
-                    account.setType(AccountType.PREMIUM);
-                    packageFeatures.add("Trial");
-                } else if (expireTimestamp > System.currentTimeMillis()) {
-                    /* Premium user with running contract */
-                    ai.setValidUntil(expireTimestamp, br);
-                    account.setType(AccountType.PREMIUM);
-                } else if (Boolean.TRUE.equals(hasAccess)) {
-                    /* Premium account without expire-date */
-                    account.setType(AccountType.PREMIUM);
-                } else if (initialAmount == null || initialAmount.longValue() <= 0) {
-                    /* Free user who never (?) had a premium subscription. */
-                    account.setType(AccountType.FREE);
-                } else {
-                    /* Assume that we got a premium account */
-                    account.setType(AccountType.PREMIUM);
-                }
-                if (isCanceled != null) {
-                    if (Boolean.TRUE.equals(isCanceled)) {
-                        packageFeatures.add("subscription cancelled");
-                    } else {
-                        packageFeatures.add("subscription running");
-                    }
-                }
-                String packageFeaturesCommaSeparated = "";
-                for (final String packageFeature : packageFeatures) {
-                    if (packageFeaturesCommaSeparated.length() > 0) {
-                        packageFeaturesCommaSeparated += ", ";
-                    }
-                    packageFeaturesCommaSeparated += packageFeature;
-                }
-                ai.setStatus(account.getType().getLabel() + " (" + packageFeaturesCommaSeparated + ")");
-                if (account.getType() == AccountType.PREMIUM) {
-                    /* TODO: 2024-10-04: Check if this is still needed. It has failed for me in all of my tests. */
-                    final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
-                    if (bundles != null) {
-                        /**
-                         * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
-                         * Each bundle can have different expire-dates and also separate pricing and so on.
-                         */
-                        logger.info("Looking for alternative expiredate");
-                        long highestExpireTimestamp = -1;
-                        String titleOfBundleWithHighestExpireDate = null;
-                        for (final Map<String, Object> bundle : bundles) {
-                            if (!(Boolean) bundle.get("isActive")) {
-                                continue;
-                            }
-                            final String expireDateStrTmp = (String) bundle.get("expirationDate");
-                            final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
-                            if (expireTimestampTmp > highestExpireTimestamp) {
-                                highestExpireTimestamp = expireTimestampTmp;
-                                titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
-                            }
-                        }
-                        if (highestExpireTimestamp > System.currentTimeMillis()) {
-                            logger.info("Successfully found alternative expiredate");
-                            ai.setValidUntil(highestExpireTimestamp, br);
-                            if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
-                                ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
-                            }
-                        } else {
-                            logger.info("Failed to find alternative expiredate");
-                        }
-                    }
-                    /* Now check which other websites we can now use as well and add them via multihoster handling. */
-                    try {
-                        /* TODO: 2024-01-10: Review this. Looks like this is either broken and/or was disabled by Pornportal. */
-                        getPage(br, "https://site-ma." + this.getHost() + "/");
-                        final Map<String, Object> initialState = getJsonJuanInitialState(br);
-                        final Map<String, Object> client = (Map<String, Object>) initialState.get("client");
-                        final String userAgent = (String) client.get("userAgent");
-                        final String domain = (String) client.get("domain");
-                        final String ip = (String) client.get("ip");
-                        final String baseUrl = (String) client.get("baseUrl");
-                        if (StringUtils.isEmpty(userAgent) || StringUtils.isEmpty(domain) || StringUtils.isEmpty(ip) || StringUtils.isEmpty(baseUrl)) {
-                            /* Failure */
-                            logger.warning("Some important values are missing");
-                        }
-                        final Map<String, Object> portalmap = new HashMap<String, Object>();
-                        portalmap.put("accountUrlPath", "/account");
-                        portalmap.put("baseUri", "/");
-                        portalmap.put("baseUrl", baseUrl);
-                        portalmap.put("domain", domain);
-                        portalmap.put("homeUrlPath", "/");
-                        portalmap.put("logoutUrlPath", "/logout");
-                        portalmap.put("postLoginUrlPath", "/postlogin");
-                        portalmap.put("resetPpMember", true);
-                        portalmap.put("userBrowserId", userAgent);
-                        portalmap.put("userIp", ip);
-                        // final PostRequest postRequest = br.createPostRequest(getAPIBase() + "/pornportal",
-                        // JSonStorage.serializeToJson(portalmap));
-                        // br.getPage(postRequest);
-                        br.postPageRaw(getAPIBase() + "/pornportal", JSonStorage.serializeToJson(portalmap));
-                        final Map<String, Object> pornportalresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                        final String data = pornportalresponse.get("data").toString();
-                        getPage(br, "https://ppp.contentdef.com/postlogin?data=" + Encoding.urlEncode(data));
-                        /*
-                         * We can authorize ourselves to these other portals through these URLs. Sadly we do not get the full domains before
-                         * accessing these URLs but this would take a lot of time which is why we will try to find the full domains here
-                         * without accessing these URLs.
-                         */
-                        final String[] autologinURLs = br.getRegex("(/autologin/[a-z0-9]+\\?sid=[^\"]+)\"").getColumn(0);
-                        final String sid = UrlQuery.parse("https://" + this.getHost() + autologinURLs[0]).get("sid");
-                        final Browser brContentdef = br.cloneBrowser();
-                        getPage(brContentdef, String.format("https://ppp.contentdef.com/notification/list?page=1&type=1&network=1&archived=0&ajaxCounter=1&sid=%s&data=%s&_=%d", sid, Encoding.urlEncode(data), System.currentTimeMillis()));
-                        final Map<String, Object> entries = restoreFromString(brContentdef.getRequest().getHtmlCode(), TypeRef.MAP);
-                        final List<Object> notificationNetworks = (List<Object>) entries.get("notificationNetworks");
-                        final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
-                        final ArrayList<String> allowedHosts = getAllSupportedPluginDomainsFlat();
-                        final ArrayList<String> blacklistedHosts = getAllBlacklistedDomains();
-                        final ArrayList<String> supportedHostsFinal = new ArrayList<String>();
-                        for (final String autologinURL : autologinURLs) {
-                            String domainWithoutTLD = null;
-                            final String domainShortcode = new Regex(autologinURL, "autologin/([a-z0-9]+)").getMatch(0);
-                            if (domainShortcode == null) {
-                                logger.warning("WTF failed to find domainShortcode for autologinURL: " + autologinURL);
-                                continue;
-                            }
-                            final String fullHTML = br.getRegex("<li class=\"pp-menu-list-item-active " + domainShortcode + "\">(.*?)</li>").getMatch(0);
-                            if (fullHTML != null) {
-                                domainWithoutTLD = new Regex(fullHTML, "ContinueToProduct-(.*?)\">").getMatch(0);
-                                if (domainWithoutTLD != null) {
-                                    domainWithoutTLD = Encoding.htmlDecode(domainWithoutTLD);
-                                    /* E.g. Hentai Pros --> HentaiPros */
-                                    domainWithoutTLD = domainWithoutTLD.replaceAll("( |\\')", "");
-                                }
-                            }
-                            /* Find full domain for shortcode */
-                            String domainFull = null;
-                            for (final Object notificationNetworkO : notificationNetworks) {
-                                final Map<String, Object> notificationNetwork = (Map<String, Object>) notificationNetworkO;
-                                final String domainShortcodeTmp = (String) notificationNetwork.get("short_name");
-                                final String site_url = (String) notificationNetwork.get("site_url");
-                                if (StringUtils.isEmpty(domainShortcodeTmp) || StringUtils.isEmpty(site_url)) {
-                                    /* Skip invalid items */
-                                    continue;
-                                } else if (domainShortcodeTmp.equals(domainShortcode)) {
-                                    domainFull = site_url;
-                                    break;
-                                }
-                            }
-                            final String domainToAdd;
-                            if (domainFull != null) {
-                                domainToAdd = Browser.getHost(domainFull, false);
-                            } else {
-                                domainToAdd = domainWithoutTLD;
-                            }
-                            if (domainToAdd == null) {
-                                logger.warning("Failed to find any usable domain for domain: " + domainShortcode);
-                                continue;
-                            }
-                            supportedHostsTmp.clear();
-                            supportedHostsTmp.add(domainToAdd);
-                            ai.setMultiHostSupport(this, supportedHostsTmp);
-                            final List<String> supportedHostsTmpReal = ai.getMultiHostSupport();
-                            if (supportedHostsTmpReal == null || supportedHostsTmpReal.isEmpty()) {
-                                logger.info("Failed to find any real host for: " + domainToAdd);
-                                continue;
-                            }
-                            final String final_domain = supportedHostsTmpReal.get(0);
-                            if (blacklistedHosts.contains(final_domain)) {
-                                /* Skip blacklisted entries */
-                                continue;
-                            } else if (supportedHostsFinal.contains(final_domain)) {
-                                /* Avoid duplicates */
-                                continue;
-                            }
-                            supportedHostsFinal.add(final_domain);
-                            this.setPropertyAccount(account, final_domain, PROPERTY_url_external_login, autologinURL);
-                        }
-                        /* Remove current host - we do not want that in our list of supported hosts! */
-                        supportedHostsFinal.remove(this.getHost());
-                        ai.setMultiHostSupport(this, supportedHostsFinal);
-                    } catch (final Throwable ignore) {
-                        // logger.log(ignore);
-                        logger.warning("Internal Multihoster handling failed");
-                    }
-                }
-                if (account.getType() == AccountType.FREE) {
-                    ai.setExpired(true);
-                }
-                return ai;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
+            login(this.br, account, this.getHost(), true);
+            final AccountInfo ai = new AccountInfo();
+            account.setConcurrentUsePossible(true);
+            ai.setUnlimitedTraffic();
+            if (br.getURL() == null || !br.getURL().contains("/v1/self")) {
+                getPage(br, getAPIBase() + "/self");
             }
+            final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final String joinDate = (String) user.get("joinDate");
+            if (!StringUtils.isEmpty(joinDate)) {
+                ai.setCreateTime(TimeFormatter.getMilliSeconds(joinDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null));
+            }
+            if (Boolean.TRUE.equals(user.get("isBanned"))) {
+                /*
+                 * 2021-11-08: This may randomly be "true" (also via website) although the account is definitely not banned! Tested with a
+                 * brazzers.com account. --> Ignore this for now!
+                 */
+                final boolean trustBannedFlag = false;
+                if (trustBannedFlag) {
+                    throw new AccountInvalidException("Account banned for reason: " + user.get("banReason"));
+                } else {
+                    logger.info("Account might be banned??");
+                }
+            }
+            final Boolean isExpired = (Boolean) user.get("isExpired");
+            final Boolean isTrial = (Boolean) user.get("isTrial");
+            final Boolean isCanceled = (Boolean) user.get("isCanceled");
+            final Boolean hasAccess = (Boolean) user.get("hasAccess");
+            final Number initialAmount = (Number) user.get("initialAmount");
+            long expireTimestamp = -1;
+            final String expiryDate = (String) user.get("expiryDate");
+            if (!StringUtils.isEmpty(expiryDate)) {
+                expireTimestamp = TimeFormatter.getMilliSeconds(expiryDate, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
+            }
+            final ArrayList<String> packageFeatures = new ArrayList<String>();
+            if (Boolean.TRUE.equals(isExpired)) {
+                account.setType(AccountType.FREE);
+                /* Free accounts can be used to download trailers */
+                packageFeatures.add("expired premium");
+            } else if (Boolean.TRUE.equals(isTrial)) {
+                /* Free trial -> Free Account with premium capability */
+                account.setType(AccountType.PREMIUM);
+                packageFeatures.add("Trial");
+            } else if (expireTimestamp > System.currentTimeMillis()) {
+                /* Premium user with running contract */
+                ai.setValidUntil(expireTimestamp, br);
+                account.setType(AccountType.PREMIUM);
+            } else if (Boolean.TRUE.equals(hasAccess)) {
+                /* Premium account without expire-date */
+                account.setType(AccountType.PREMIUM);
+            } else if (initialAmount == null || initialAmount.longValue() <= 0) {
+                /* Free user who never (?) had a premium subscription. */
+                account.setType(AccountType.FREE);
+            } else {
+                /* Assume that we got a premium account */
+                account.setType(AccountType.PREMIUM);
+            }
+            if (isCanceled != null) {
+                if (Boolean.TRUE.equals(isCanceled)) {
+                    packageFeatures.add("subscription cancelled");
+                } else {
+                    packageFeatures.add("subscription running");
+                }
+            }
+            String packageFeaturesCommaSeparated = "";
+            for (final String packageFeature : packageFeatures) {
+                if (packageFeaturesCommaSeparated.length() > 0) {
+                    packageFeaturesCommaSeparated += ", ";
+                }
+                packageFeaturesCommaSeparated += packageFeature;
+            }
+            ai.setStatus(account.getType().getLabel() + " (" + packageFeaturesCommaSeparated + ")");
+            if (account.getType() == AccountType.PREMIUM) {
+                /* TODO: 2024-10-04: Check if this is still needed. It has failed for me in all of my tests. */
+                final List<Map<String, Object>> bundles = (List<Map<String, Object>>) user.get("addons");
+                if (bundles != null) {
+                    /**
+                     * Try to find alternative expire-date inside users' additional purchased "bundles". </br>
+                     * Each bundle can have different expire-dates and also separate pricing and so on.
+                     */
+                    logger.info("Looking for alternative expiredate");
+                    long highestExpireTimestamp = -1;
+                    String titleOfBundleWithHighestExpireDate = null;
+                    for (final Map<String, Object> bundle : bundles) {
+                        if (!(Boolean) bundle.get("isActive")) {
+                            continue;
+                        }
+                        final String expireDateStrTmp = (String) bundle.get("expirationDate");
+                        final long expireTimestampTmp = TimeFormatter.getMilliSeconds(expireDateStrTmp, "yyyy'-'MM'-'dd'T'HH':'mm':'ss", null);
+                        if (expireTimestampTmp > highestExpireTimestamp) {
+                            highestExpireTimestamp = expireTimestampTmp;
+                            titleOfBundleWithHighestExpireDate = (String) bundle.get("title");
+                        }
+                    }
+                    if (highestExpireTimestamp > System.currentTimeMillis()) {
+                        logger.info("Successfully found alternative expiredate");
+                        ai.setValidUntil(highestExpireTimestamp, br);
+                        if (!StringUtils.isEmpty(titleOfBundleWithHighestExpireDate)) {
+                            ai.setStatus(ai.getStatus() + " [" + titleOfBundleWithHighestExpireDate + "]");
+                        }
+                    } else {
+                        logger.info("Failed to find alternative expiredate");
+                    }
+                }
+                /* Now check which other websites we can now use as well and add them via multihoster handling. */
+                try {
+                    /* TODO: 2024-01-10: Review this. Looks like this is either broken and/or was disabled by Pornportal. */
+                    getPage(br, "https://site-ma." + this.getHost() + "/");
+                    final Map<String, Object> initialState = getJsonJuanInitialState(br);
+                    final Map<String, Object> client = (Map<String, Object>) initialState.get("client");
+                    final String userAgent = (String) client.get("userAgent");
+                    final String domain = (String) client.get("domain");
+                    final String ip = (String) client.get("ip");
+                    final String baseUrl = (String) client.get("baseUrl");
+                    if (StringUtils.isEmpty(userAgent) || StringUtils.isEmpty(domain) || StringUtils.isEmpty(ip) || StringUtils.isEmpty(baseUrl)) {
+                        /* Failure */
+                        logger.warning("Some important values are missing");
+                    }
+                    final Map<String, Object> portalmap = new HashMap<String, Object>();
+                    portalmap.put("accountUrlPath", "/account");
+                    portalmap.put("baseUri", "/");
+                    portalmap.put("baseUrl", baseUrl);
+                    portalmap.put("domain", domain);
+                    portalmap.put("homeUrlPath", "/");
+                    portalmap.put("logoutUrlPath", "/logout");
+                    portalmap.put("postLoginUrlPath", "/postlogin");
+                    portalmap.put("resetPpMember", true);
+                    portalmap.put("userBrowserId", userAgent);
+                    portalmap.put("userIp", ip);
+                    // final PostRequest postRequest = br.createPostRequest(getAPIBase() + "/pornportal",
+                    // JSonStorage.serializeToJson(portalmap));
+                    // br.getPage(postRequest);
+                    br.postPageRaw(getAPIBase() + "/pornportal", JSonStorage.serializeToJson(portalmap));
+                    final Map<String, Object> pornportalresponse = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final String data = pornportalresponse.get("data").toString();
+                    getPage(br, "https://ppp.contentdef.com/postlogin?data=" + Encoding.urlEncode(data));
+                    /*
+                     * We can authorize ourselves to these other portals through these URLs. Sadly we do not get the full domains before
+                     * accessing these URLs but this would take a lot of time which is why we will try to find the full domains here without
+                     * accessing these URLs.
+                     */
+                    final String[] autologinURLs = br.getRegex("(/autologin/[a-z0-9]+\\?sid=[^\"]+)\"").getColumn(0);
+                    final String sid = UrlQuery.parse("https://" + this.getHost() + autologinURLs[0]).get("sid");
+                    final Browser brContentdef = br.cloneBrowser();
+                    getPage(brContentdef, String.format("https://ppp.contentdef.com/notification/list?page=1&type=1&network=1&archived=0&ajaxCounter=1&sid=%s&data=%s&_=%d", sid, Encoding.urlEncode(data), System.currentTimeMillis()));
+                    final Map<String, Object> entries = restoreFromString(brContentdef.getRequest().getHtmlCode(), TypeRef.MAP);
+                    final List<Object> notificationNetworks = (List<Object>) entries.get("notificationNetworks");
+                    final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
+                    final ArrayList<String> allowedHosts = getAllSupportedPluginDomainsFlat();
+                    final ArrayList<String> blacklistedHosts = getAllBlacklistedDomains();
+                    final ArrayList<String> supportedHostsFinal = new ArrayList<String>();
+                    for (final String autologinURL : autologinURLs) {
+                        String domainWithoutTLD = null;
+                        final String domainShortcode = new Regex(autologinURL, "autologin/([a-z0-9]+)").getMatch(0);
+                        if (domainShortcode == null) {
+                            logger.warning("WTF failed to find domainShortcode for autologinURL: " + autologinURL);
+                            continue;
+                        }
+                        final String fullHTML = br.getRegex("<li class=\"pp-menu-list-item-active " + domainShortcode + "\">(.*?)</li>").getMatch(0);
+                        if (fullHTML != null) {
+                            domainWithoutTLD = new Regex(fullHTML, "ContinueToProduct-(.*?)\">").getMatch(0);
+                            if (domainWithoutTLD != null) {
+                                domainWithoutTLD = Encoding.htmlDecode(domainWithoutTLD);
+                                /* E.g. Hentai Pros --> HentaiPros */
+                                domainWithoutTLD = domainWithoutTLD.replaceAll("( |\\')", "");
+                            }
+                        }
+                        /* Find full domain for shortcode */
+                        String domainFull = null;
+                        for (final Object notificationNetworkO : notificationNetworks) {
+                            final Map<String, Object> notificationNetwork = (Map<String, Object>) notificationNetworkO;
+                            final String domainShortcodeTmp = (String) notificationNetwork.get("short_name");
+                            final String site_url = (String) notificationNetwork.get("site_url");
+                            if (StringUtils.isEmpty(domainShortcodeTmp) || StringUtils.isEmpty(site_url)) {
+                                /* Skip invalid items */
+                                continue;
+                            } else if (domainShortcodeTmp.equals(domainShortcode)) {
+                                domainFull = site_url;
+                                break;
+                            }
+                        }
+                        final String domainToAdd;
+                        if (domainFull != null) {
+                            domainToAdd = Browser.getHost(domainFull, false);
+                        } else {
+                            domainToAdd = domainWithoutTLD;
+                        }
+                        if (domainToAdd == null) {
+                            logger.warning("Failed to find any usable domain for domain: " + domainShortcode);
+                            continue;
+                        }
+                        supportedHostsTmp.clear();
+                        supportedHostsTmp.add(domainToAdd);
+                        ai.setMultiHostSupport(this, supportedHostsTmp);
+                        final List<String> supportedHostsTmpReal = ai.getMultiHostSupport();
+                        if (supportedHostsTmpReal == null || supportedHostsTmpReal.isEmpty()) {
+                            logger.info("Failed to find any real host for: " + domainToAdd);
+                            continue;
+                        }
+                        final String final_domain = supportedHostsTmpReal.get(0);
+                        if (blacklistedHosts.contains(final_domain)) {
+                            /* Skip blacklisted entries */
+                            continue;
+                        } else if (supportedHostsFinal.contains(final_domain)) {
+                            /* Avoid duplicates */
+                            continue;
+                        }
+                        supportedHostsFinal.add(final_domain);
+                        this.setPropertyAccount(account, final_domain, PROPERTY_url_external_login, autologinURL);
+                    }
+                    /* Remove current host - we do not want that in our list of supported hosts! */
+                    supportedHostsFinal.remove(this.getHost());
+                    ai.setMultiHostSupport(this, supportedHostsFinal);
+                } catch (final Throwable ignore) {
+                    // logger.log(ignore);
+                    logger.warning("Internal Multihoster handling failed");
+                }
+            }
+            if (account.getType() == AccountType.FREE) {
+                ai.setExpired(true);
+            }
+            return ai;
         }
     }
 

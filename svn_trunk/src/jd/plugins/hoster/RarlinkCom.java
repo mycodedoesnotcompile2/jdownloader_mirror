@@ -18,17 +18,17 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 44769 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class RarlinkCom extends XFileSharingProBasic {
     public RarlinkCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -106,21 +106,13 @@ public class RarlinkCom extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        /*
-         * 2019-10-01: Special: According to website, free users can download files smaller than 1 MB but for those, they will just display
-         * another errormessage.
-         */
-        boolean isPremiumonlyHTML = super.isPremiumOnly(br);
-        /*
-         * 2021-03-04: Website always contains: "<center><strong>Upgrade Premium to Download this File Immediately!:</strong></center>" -->
-         */
-        if (!isPremiumonlyHTML) {
-            isPremiumonlyHTML = br.containsHTML(">\\s*This file is available for .*Premium Users.* only");
-            if (!isPremiumonlyHTML) {
-                isPremiumonlyHTML = new Regex(getCorrectBR(br), ">\\s*This file is available for .*Premium Users.* only").matches();
-            }
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">\\s*(This file is available for[^<]*Premium Users only[^<]*)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            return msg;
+        } else {
+            return super.getPremiumOnlyErrorMessage(br);
         }
-        return isPremiumonlyHTML;
     }
 }

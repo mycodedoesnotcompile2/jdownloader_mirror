@@ -25,6 +25,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Browser.BlockedByException;
 import jd.http.Cookies;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
@@ -36,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@HostPlugin(revision = "$Revision: 49172 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class PreFilesCom extends XFileSharingProBasic {
     public PreFilesCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -183,14 +184,13 @@ public class PreFilesCom extends XFileSharingProBasic {
     }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        if (br == null) {
-            return false;
-        }
-        if (br.containsHTML(">\\s*The file owner does not allow FREE")) {
-            return true;
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">\\s*(The file owner does not allow FREE[^<]+)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            return msg;
         } else {
-            return super.isPremiumOnly(br);
+            return super.getPremiumOnlyErrorMessage(br);
         }
     }
 

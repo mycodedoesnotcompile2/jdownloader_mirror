@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.OrfAt;
 
-@HostPlugin(revision = "$Revision: 49975 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50052 $", interfaceVersion = 3, names = { "orf.at" }, urls = { "" })
 public class ORFMediathek extends PluginForHost {
     private static final String TYPE_AUDIO                                     = "(?i)https?://ooe\\.orf\\.at/radio/stories/(\\d+)/";
     /* Variables related to plugin settings */
@@ -225,6 +225,10 @@ public class ORFMediathek extends PluginForHost {
             if (dllink == null) {
                 /* Invalid item (this should never happen!). */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            if (!isDownload) {
+                /* Do not check directurl */
+                return AvailableStatus.TRUE;
             }
             checkUrlForAgeProtection(link, dllink);
             URLConnectionAdapter con = null;

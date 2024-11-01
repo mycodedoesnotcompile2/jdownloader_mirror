@@ -1329,12 +1329,20 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
 
     /** Returns custom error/status message set on this item if there is any. */
     public String getCustomMessage(SkipReason skipReason) {
-        return this.getStringProperty(PROPERTY_CUSTOM_MESSAGE);
+        final HistoryEntry entry = getLatestHistoryEntry();
+        if (entry != null) {
+            return entry.getCustomMessage(skipReason);
+        }
+        return null;
     }
 
     /** Returns custom error/status message set on this item if there is any. */
     public String getCustomMessage(FinalLinkState finalLinkState) {
-        return this.getStringProperty(PROPERTY_CUSTOM_MESSAGE);
+        final HistoryEntry entry = getLatestHistoryEntry();
+        if (entry != null) {
+            return entry.getCustomMessage(finalLinkState);
+        }
+        return null;
     }
 
     /**
@@ -1368,9 +1376,6 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             }
             if (finalLinkState == FinalLinkState.OFFLINE) {
                 setAvailable(false);
-            }
-            if (finalLinkState != FinalLinkState.FAILED_FATAL) {
-                removeProperty(PROPERTY_CUSTOM_MESSAGE);
             }
             if (finalLinkState != null && JsonConfig.create(GeneralSettings.class).isHashRetryEnabled() && finalLinkState.isFailedHash()) {
                 final List<DownloadLink> link = Arrays.asList(this);

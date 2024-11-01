@@ -24,13 +24,14 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49947 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -180,23 +181,15 @@ public class UbiqfileCom extends XFileSharingProBasic {
         /* 2019-06-27: Special */
         return false;
     }
-    // @Override
-    // protected String getPremiumOnlyErrorMessage(final Browser br) {
-    // String msg = br.getRegex(">\\s*(This file is not available for free download[^<]*)").getMatch(0);
-    // if (msg != null) {
-    // msg = Encoding.htmlDecode(msg).trim();
-    // return msg;
-    // } else {
-    // return super.getPremiumOnlyErrorMessage(br);
-    // }
-    // }
 
     @Override
-    public boolean isPremiumOnly(final Browser br) {
-        if (br.containsHTML(">\\s*This file is not available for free download")) {
-            return true;
+    protected String getPremiumOnlyErrorMessage(final Browser br) {
+        String msg = br.getRegex(">\\s*(This file is not available for free download[^<]*)").getMatch(0);
+        if (msg != null) {
+            msg = Encoding.htmlDecode(msg).trim();
+            return msg;
         } else {
-            return super.isPremiumOnly(br);
+            return super.getPremiumOnlyErrorMessage(br);
         }
     }
 }

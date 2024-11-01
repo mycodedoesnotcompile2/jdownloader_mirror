@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1609,6 +1609,17 @@ public class RapidGatorNet extends PluginForHost {
                 throw new AccountRequiredException("This file can be downloaded by premium only");
             }
         }
+        if (br.containsHTML("id=\"exceeded_storage\"")) {
+            /**
+             * 2024-10-31: <br>
+             * Your storage space is full. Delete some files or upgrade to the new
+             * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
+             * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
+             * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
+             *
+             */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
+        }
         /* Determine max wait time if a limit related error would happen in free download mode. */
         long passedTimeSinceLastDlMilliseconds = 0;
         if (currentIP != null) {
@@ -1629,7 +1640,7 @@ public class RapidGatorNet extends PluginForHost {
         } else {
             maxReconnectWait = 2 * 60 * 60 * 1000;
         }
-        final String reconnectWaitMinutesStr = br.getRegex("Delay between downloads must be not less than (\\d+) min\\.<br>Don`t want to wait\\? <a style=\"").getMatch(0);
+        final String reconnectWaitMinutesStr = br.getRegex("Delay between downloads must be not less than (\\d+) min\\.<br>Don.t want to wait\\?").getMatch(0);
         if (reconnectWaitMinutesStr != null) {
             /*
              * Mostly 120 minutes. They do not provide the real time to wait but if we know when the last free download was started with the

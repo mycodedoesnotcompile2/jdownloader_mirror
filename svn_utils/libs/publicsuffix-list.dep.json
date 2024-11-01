@@ -2,27 +2,101 @@
   "artefact":"publicsuffix/list",
   "dependencies":null,
   "filter":["public_suffix_list.dat"],
-  "history":[{
-    "changes":null,
-    "date":"2024-10-24T08:58:19.617+02:00",
-    "dependencies":null,
-    "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
-    "files":null,
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"416dce8089ac5f46356c27875d40d268417cc8cf698444dfd1678a8f305728b4"},
-    "licenses":[{
-      "name":"Mozilla Public License 2.0",
-      "spdx_id":"MPL-2.0",
-      "key":"mpl-2.0",
-      "url":"https://api.github.com/licenses/mpl-2.0",
-      "node_id":"MDc6TGljZW5zZTE0"
-    }],
-    "minJRE":null,
-    "name":"\"Public Suffix List Library\"",
-    "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
-  }],
+  "history":[
+    {
+      "changes":null,
+      "date":"2024-10-24T08:58:19.617+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"416dce8089ac5f46356c27875d40d268417cc8cf698444dfd1678a8f305728b4"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2024.296.1 e637219b8158f9c85fe1cd0ad355b85637c411dd"
+    },
+    {
+      "changes":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de\t: Remove `gov.cu` (#2233)",
+      "date":"2024-10-24T10:04:04.124+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e27eae9a1648152e88978142cbd7987c188b80c53fbb583fa557b0e4312e6bb8"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de"
+    },
+    {
+      "changes":"2024.299.0 74e7b32304f2ea2b5fc261a90f01544be267be12\t: update `.io` section (#2236)\r\n2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa\t: Remove `presse.ci` and `md.ci`, other ccTLD stubs not associated w respective registry (#2198)",
+      "date":"2024-10-26T10:41:56.574+02:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"16240a20e813570db0d95e0230871e1495cf1f1c49339ca1049963b0aaf7ff6f"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2024.299.1 435e07efb28973ea116592dc2291b1f8c27080aa"
+    },
+    {
+      "changes":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5\t: chore: remove 2nd level comment for `.sk` (#2238)\n\nCo-authored-by: William Harrison <william@williamdavidharrison.com.au>",
+      "date":"2024-10-28T14:31:17.462+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"83c227f297b2ec9334a8eb24bede568d529b5b90a58334d70af107766fe2a707"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2024.302.0 0f886194a02364074128feb63536a73a86bf1ec5"
+    },
+    {
+      "changes":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556\t: Add grafana-dev.net to public suffix list (#2188)",
+      "date":"2024-10-29T10:48:07.798+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"40c185e992dfd7c637892133cfc1ecdbeff50a73a66743dd2068aae670c644a1"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2024.302.1 783da2456c94cfd5bcb7f977ae229b8205d58556"
+    }
+  ],
   "installed":{
-    "changes":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de\t: Remove `gov.cu` (#2233)",
-    "date":"2024-10-24T10:04:04.124+02:00",
+    "changes":"2024.305.0 a4f696ccb433ab81c5a75d93a8d08a68279f1154\t: Add ip-ddns.com and ddns-ip.net (#2234)\r\n2024.305.1 9d7148986e82f2da0d99cb79fae34303f604d1f7\t: Add `taveusercontent.com` (#2239)\r\n2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc\t: Add home.arpa (#2220)",
+    "date":"2024-10-31T10:58:48.10+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -126,7 +200,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"e27eae9a1648152e88978142cbd7987c188b80c53fbb583fa557b0e4312e6bb8"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"b8893aa380bbc9f26e29feb1e7f2848284a18a8ca4fe251c9f3f114f8607c9d1"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -136,7 +210,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2024.298.0 7ab637729e5ef0ed4812194598402ff58e9829de"
+    "version":"2024.305.2 2ce479abccc0add531578c706cbd3388a00f58bc"
   },
   "minJRE":null,
   "provider":"github-clone",

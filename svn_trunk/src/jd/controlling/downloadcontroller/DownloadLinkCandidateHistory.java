@@ -48,11 +48,7 @@ public class DownloadLinkCandidateHistory {
                     final HistoryEntry history = link.getLatestHistoryEntry();
                     if (history != null && history.getCandidate() == candidate) {
                         HistoryEntry.updateResult(history, candidate, result);
-                    } else {
-                        System.out.println("Candidate Misnach");
                     }
-                } else {
-                    System.out.println("No LInk");
                 }
             } catch (Throwable e) {
                 LogController.CL().log(e);

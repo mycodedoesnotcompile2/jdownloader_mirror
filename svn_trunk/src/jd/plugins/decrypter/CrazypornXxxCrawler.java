@@ -26,7 +26,7 @@ import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 
-@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50052 $", interfaceVersion = 2, names = {}, urls = {})
 public class CrazypornXxxCrawler extends PornEmbedParser {
     public CrazypornXxxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class CrazypornXxxCrawler extends PornEmbedParser {
 
     @Override
     protected String getFileTitle(final CryptedLink param, final Browser br) {
-        return new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
     }
 
     @Override
@@ -93,5 +93,10 @@ public class CrazypornXxxCrawler extends PornEmbedParser {
         } else {
             return false;
         }
+    }
+
+    @Override
+    protected boolean assumeSelfhostedContentOnNoResults() {
+        return true;
     }
 }

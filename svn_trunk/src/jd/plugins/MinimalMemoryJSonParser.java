@@ -1,7 +1,6 @@
 package jd.plugins;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
@@ -15,15 +14,6 @@ public class MinimalMemoryJSonParser extends JSonParser {
     @Override
     protected Map<String, ? extends Object> createJSonObject() {
         return new org.appwork.storage.simplejson.MinimalMemoryMap<String, Object>();
-    }
-
-    @Override
-    protected Number parseFixedNumber(CharSequence charSequence) {
-        try {
-            return super.parseFixedNumber(charSequence);
-        } catch (NumberFormatException e) {
-            return new BigInteger(charSequence.toString());
-        }
     }
 
     @Override

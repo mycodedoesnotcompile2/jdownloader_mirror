@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Files;
@@ -50,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.EHentaiOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
+@DecrypterPlugin(revision = "$Revision: 50052 $", interfaceVersion = 3, names = { "e-hentai.org" }, urls = { "https?://(?:[a-z0-9\\-]+\\.)?(?:e-hentai\\.org|exhentai\\.org)/(g|mpv)/(\\d+)/([a-z0-9]+).*" })
 public class EHentaiOrgCrawler extends PluginForDecrypt {
     public EHentaiOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -250,13 +251,25 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: mpv URLs have all objects on the first page");
                 break;
             } else {
-                final String[][] links = br.getRegex("\"(https?://(?:e-hentai|exhentai)\\.org/s/[a-z0-9]+/" + galleryid + "-\\d+)\">\\s*<(?:div|img)[^<]*title\\s*=\\s*\"([^\"]+)").getMatches();
-                if (links == null || links.length == 0 || title == null) {
+                final String[] urls = br.getRegex("\"(https?://(?:e-hentai|exhentai)\\.org/s/[a-z0-9]+/" + galleryid + "-\\d+)\"").getColumn(0);
+                if (urls == null || urls.length == 0) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                for (final String link[] : links) {
-                    final String singleLink = link[0];
-                    final String originalFilename = new Regex(link[1], "\\s*(?:Page\\s*\\d+\\s*:?)?\\s+(.*?\\.(jpe?g|png|gif))").getMatch(0);
+                final HashSet<String> dupes = new HashSet<String>();
+                for (final String singleLink : urls) {
+                    if (!dupes.add(singleLink)) {
+                        /* Skip duplicates */
+                        continue;
+                    }
+                    final String quoted_singleLink = Pattern.quote(singleLink);
+                    String this_title = br.getRegex(quoted_singleLink + "\">\\s*<div>\\s*<div title=\"([^\"]+)").getMatch(0);
+                    if (this_title == null) {
+                        this_title = br.getRegex(quoted_singleLink + "\">\\s*<div title=\"([^\"]+)").getMatch(0);
+                    }
+                    String originalFilename = null;
+                    if (this_title != null) {
+                        originalFilename = new Regex(this_title, "\\s*(?:Page\\s*\\d+\\s*:?)?\\s+(.*?\\.(jpe?g|png|gif))").getMatch(0);
+                    }
                     final DownloadLink dl = getDownloadlink(singleLink, galleryid, uploaderName, tagsCommaSeparated, title, originalFilename, numberofImages, imagecounter);
                     if (setEstimatedFilesize) {
                         dl.setDownloadSize(estimatedBytesPerImage);
@@ -292,7 +305,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
 
     final Set<String> dupes = new HashSet<String>();
 
-    private DownloadLink getDownloadlink(final String url, final String galleryID, final String uploaderName, final String tagsCommaSeparated, final String fpName, final String originalFilename, final int numberofItems, final int imagePos) {
+    private DownloadLink getDownloadlink(final String url, final String galleryID, final String uploaderName, final String tagsCommaSeparated, final String packageName, final String originalFilename, final int numberofItems, final int imagePos) {
         final DownloadLink dl = createDownloadlink(url);
         final int padLength;
         if (numberofItems == -1) {
@@ -302,7 +315,7 @@ public class EHentaiOrgCrawler extends PluginForDecrypt {
             padLength = StringUtils.getPadLength(numberofItems);
         }
         final String imgposition = StringUtils.formatByPadLength(padLength, imagePos);
-        final String namepart = fpName + "_" + galleryID + "-" + imgposition;
+        final String namepart = packageName + "_" + galleryID + "-" + imgposition;
         final String extension;
         if (StringUtils.isNotEmpty(originalFilename) && Files.getExtension(originalFilename) != null) {
             extension = Plugin.getFileNameExtensionFromString(originalFilename);
