@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -34,6 +34,7 @@
 package org.appwork.storage.tests;
 
 import org.appwork.storage.SimpleMapper;
+import org.appwork.storage.simplejson.JSonFactory;
 
 /**
  * @author thomas
@@ -47,13 +48,31 @@ public class BasicMapperSimpleMapper extends AbstractMapperTest {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
     public void runTest() throws Exception {
-        runWith(new SimpleMapper());
+        runWith(new SimpleMapper() {
+            @Override
+            protected JSonFactory newJsonFactory(String jsonString) {
+                return new JSonFactory(jsonString) {
+                    @Override
+                    protected boolean isImplicitOctalAllowed() {
+                        return BasicMapperSimpleMapper.this.isImplicitOctalSupported();
+                    }
 
+                    @Override
+                    protected boolean isBigIntegerAllowed() {
+                        return BasicMapperSimpleMapper.this.isBigIntegerSupported();
+                    }
+
+                    @Override
+                    protected boolean isNaNAllowed() {
+                        return BasicMapperSimpleMapper.this.isNaNSupported();
+                    }
+                };
+            }
+        });
     }
-
 }

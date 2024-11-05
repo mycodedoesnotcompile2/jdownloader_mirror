@@ -105,7 +105,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 49928 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50072 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -977,18 +977,20 @@ public class TbCmV2 extends PluginForDecrypt {
                             List<String> extras = CFG_YOUTUBE.CFG.getExtraSubtitles();
                             if (extras != null) {
                                 for (String s : extras) {
-                                    if (s != null) {
-                                        for (VariantInfo vi : linkVariants) {
-                                            if (vi.getVariant() instanceof SubtitleVariant) {
-                                                if ("*".equals(s)) {
-                                                    lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
-                                                    ret.add(lnk);
-                                                } else if (StringUtils.equalsIgnoreCase(((SubtitleVariant) vi.getVariant()).getGenericInfo().getLanguage(), s)) {
-                                                    lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
-                                                    ret.add(lnk);
-                                                    break;
-                                                }
-                                            }
+                                    if (s == null) {
+                                        continue;
+                                    }
+                                    for (VariantInfo vi : linkVariants) {
+                                        if (!(vi.getVariant() instanceof SubtitleVariant)) {
+                                            continue;
+                                        }
+                                        if ("*".equals(s)) {
+                                            lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
+                                            ret.add(lnk);
+                                        } else if (StringUtils.equalsIgnoreCase(((SubtitleVariant) vi.getVariant()).getGenericInfo().getLanguage(), s)) {
+                                            lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
+                                            ret.add(lnk);
+                                            break;
                                         }
                                     }
                                 }
@@ -1304,7 +1306,11 @@ public class TbCmV2 extends PluginForDecrypt {
                 Map<String, Object> playlisttab = null;
                 Map<String, Object> selectedtab = null;
                 final List<Map<String, Object>> tabs = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(rootMap, "contents/twoColumnBrowseResultsRenderer/tabs");
-                if (tabs != null) {
+                handleTabs: if (true) {
+                    if (tabs == null) {
+                        logger.warning("Failed to find any tabs");
+                        break handleTabs;
+                    }
                     for (final Map<String, Object> tab : tabs) {
                         /* We will get this one if a real playlist is our currently opened tab. */
                         final Map<String, Object> tabRenderer = (Map<String, Object>) tab.get("tabRenderer");
@@ -1386,8 +1392,6 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                         continue;
                     }
-                } else {
-                    logger.warning("Failed to find any tabs");
                 }
             }
             /**
@@ -1521,6 +1525,10 @@ public class TbCmV2 extends PluginForDecrypt {
                             if (id == null) {
                                 /* Video of radio/mix auto generated playlist */
                                 id = (String) JavaScriptEngineFactory.walkJson(vid, "playlistPanelVideoRenderer/videoId");
+                                if (id == null) {
+                                    /* Shorts playlist */
+                                    id = (String) JavaScriptEngineFactory.walkJson(vid, "richItemRenderer/content/shortsLockupViewModel/onTap/innertubeCommand/reelWatchEndpoint/videoId");
+                                }
                             }
                         }
                     }
@@ -1530,7 +1538,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     }
                     if (vidPlayListID != null && id == null) {
                         /**
-                         * eg on /releases or /playlists -> inner playlists
+                         * E.g. on /releases or /playlists -> inner playlists
                          *
                          * TODO: decide which solution to go
                          */
@@ -1603,6 +1611,16 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
                 if (internalGuessedPaginationSize == -1) {
                     internalGuessedPaginationSize = numberOfVideoItemsOnThisPage;
+                }
+                if (nextPageToken == null) {
+                    /* Last chance */
+                    final Set<String> continuationTokens = new HashSet<String>();
+                    this.findContinuationTokens(continuationTokens, rootMap);
+                    if (continuationTokens.size() == 1) {
+                        nextPageToken = continuationTokens.iterator().next();
+                    } else if (continuationTokens.size() > 1) {
+                        logger.warning("Found multiple possible continuationTokens: " + continuationTokens);
+                    }
                 }
                 /* Check for some abort conditions */
                 final int numberofNewItemsThisRun = playListDupes.size() - crawledItemsSizeOld;
@@ -1726,18 +1744,18 @@ public class TbCmV2 extends PluginForDecrypt {
      */
     private Object findSortToken(final Object o, final String sortText) {
         if (o instanceof Map) {
-            final Map<String, Object> entrymap = (Map<String, Object>) o;
-            final String thisSortText = (String) JavaScriptEngineFactory.walkJson(entrymap, "chipCloudChipRenderer/text/simpleText");
-            final String thisContinuationCommand = (String) JavaScriptEngineFactory.walkJson(entrymap, "chipCloudChipRenderer/navigationEndpoint/continuationCommand/token");
+            final Map<String, Object> map = (Map<String, Object>) o;
+            final String thisSortText = (String) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/text/simpleText");
+            final String thisContinuationCommand = (String) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/navigationEndpoint/continuationCommand/token");
             /*
              * If isSelected is true, that is our current sort -> In that case we do not want to return anything if that is the sort we want
              * as we already have it and we do not want the upper handling to just reload the list in the order we already have.
              */
-            final Boolean isSelected = (Boolean) JavaScriptEngineFactory.walkJson(entrymap, "chipCloudChipRenderer/isSelected");
+            final Boolean isSelected = (Boolean) JavaScriptEngineFactory.walkJson(map, "chipCloudChipRenderer/isSelected");
             if (sortText.equalsIgnoreCase(thisSortText) && thisContinuationCommand != null && !Boolean.TRUE.equals(isSelected)) {
                 return thisContinuationCommand;
             }
-            for (final Map.Entry<String, Object> entry : entrymap.entrySet()) {
+            for (final Map.Entry<String, Object> entry : map.entrySet()) {
                 // final String key = entry.getKey();
                 final Object value = entry.getValue();
                 if (value instanceof List || value instanceof Map) {
@@ -1761,6 +1779,33 @@ public class TbCmV2 extends PluginForDecrypt {
             return null;
         } else {
             return o;
+        }
+    }
+
+    /** Recursive function that finds all continuationTokens in given json item. */
+    private void findContinuationTokens(final Set<String> results, final Object o) {
+        if (o instanceof Map) {
+            final Map<String, Object> map = (Map<String, Object>) o;
+            final String continuationTrigger = (String) map.get("trigger");
+            final String thisContinuationToken = (String) JavaScriptEngineFactory.walkJson(map, "continuationEndpoint/continuationCommand/token");
+            if (continuationTrigger != null && thisContinuationToken != null) {
+                results.add(thisContinuationToken);
+            }
+            for (final Map.Entry<String, Object> entry : map.entrySet()) {
+                // final String key = entry.getKey();
+                final Object value = entry.getValue();
+                if (value instanceof List || value instanceof Map) {
+                    findContinuationTokens(results, value);
+                }
+            }
+            return;
+        } else if (o instanceof List) {
+            final List<Object> array = (List) o;
+            for (final Object arrayo : array) {
+                if (arrayo instanceof List || arrayo instanceof Map) {
+                    findContinuationTokens(results, arrayo);
+                }
+            }
         }
     }
 

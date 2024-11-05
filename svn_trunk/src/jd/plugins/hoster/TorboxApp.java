@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50070 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -67,7 +67,7 @@ public class TorboxApp extends PluginForHost {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
-        br.getHeaders().put("User-Agent", "JDownloader");
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         return br;
     }
 
@@ -211,17 +211,22 @@ public class TorboxApp extends PluginForHost {
     }
 
     /** Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. */
-    private String fixTimeStampString(final String timeStamp) {
+    private String fixDateString(final String dateStr) {
         /* 2024-07-10: They sometimes even return timestamps with 5 digits milli/nanosecs e.g.: 2024-07-05T13:57:33.76273+00:00 */
         // timestamps also have nano seconds?! SimpleDateFormat lenien=true will then parse xxxxxx ms and convert to secs/minutes...
-        return timeStamp.replaceFirst("(\\.\\d{4,6})", ".000");
+        return dateStr.replaceFirst("(\\.\\d{4,6})", ".000");
     }
 
-    private long parseTimeStamp(final String timeStamp) {
-        if (timeStamp == null) {
+    private long parseTimeStamp(final String dateStr) {
+        if (dateStr == null) {
             return -1;
         } else {
-            return TimeFormatter.getMilliSeconds(fixTimeStampString(timeStamp), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+            final String dateStrFixed = fixDateString(dateStr);
+            if (dateStr.matches(".+\\+\\d{2}:\\d{2}$")) {
+                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH);
+            } else {
+                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+            }
         }
     }
 
@@ -240,7 +245,7 @@ public class TorboxApp extends PluginForHost {
         // final int planID = ((Number) user.get("plan")).intValue();
         final String created_at = user.get("created_at").toString();
         final String premium_expires_at = (String) user.get("premium_expires_at");
-        long premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
+        final long premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
         ai.setCreateTime(parseTimeStamp(created_at));
         if (premiumExpireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);

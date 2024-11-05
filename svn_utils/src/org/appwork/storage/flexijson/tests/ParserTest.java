@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -173,7 +173,9 @@ public class ParserTest extends AWTest {
         expectError("{\"key\r\nunescaped newlineandquotes\": 0}", "{\"key\\r\\nunescaped newlineandquotes\":0}", "{\"key\\r\\nunescaped newlineandquotes\":0}", ERROR_NEWLINE_IN_TOKEN);
         expectError("{\"key\\r\\nunescaped newlineandquotes\": 0}", "{\"key\\r\\nunescaped newlineandquotes\":0}", "{\"key\\r\\nunescaped newlineandquotes\":0}");
         expectError("{\r\n\"dec\": 0\r\n\r\n\t\t\t}", "{\"dec\":0}", "{\"dec\":0}");
+        expectError("{\r\n\"dec\": 0o1\r\n\r\n\t\t\t}", "{\"dec\":1}", "{\"dec\":1}", ERROR_NUMBERFORMAT_OCTAL);
         expectError("{\r\n\"dec\": 01\r\n\r\n\t\t\t}", "{\"dec\":1}", "{\"dec\":1}", ERROR_NUMBERFORMAT_OCTAL);
+        expectError("{\r\n\"dec\": 0o10\r\n\r\n\t\t\t}", "{\"dec\":8}", "{\"dec\":8}", ERROR_NUMBERFORMAT_OCTAL);
         expectError("{\r\n\"dec\": 010\r\n\r\n\t\t\t}", "{\"dec\":8}", "{\"dec\":8}", ERROR_NUMBERFORMAT_OCTAL);
         expectError(" /* comment start */ [1,2,3] /* comment end*/", "/*comment start*/[1,2,3]/*comment end*/", "/* comment start */\r\n[\r\n  1,\r\n  2,\r\n  3\r\n]\r\n/* comment end */", ERROR_INLINE_COMMENT);
         expectError("{\"a\":1}/*com*/\u0000", "[{\"a\":1}/*com*/,\"\\u0000\"]", "[\r\n  {\"a\":1}\r\n  /* com */,\r\n  \"\\u0000\"\r\n]", ERROR_INLINE_COMMENT, ERROR_UNEXPECTED_CONTENT_AFTER_END_OF_JSON, ERROR_STRING_VALUE_WITHOUT_QUOTES, ERROR_STRING_TOKEN_WITHOUT_QUOTES, ERROR_MULTIPLE_ELEMENTS_IN_JSON_STRING);
@@ -314,12 +316,15 @@ public class ParserTest extends AWTest {
         expectError("{bin:-0b1101}", "{\"bin\":-13}", "{\"bin\":-13}", STWQ, KWQ, ERROR_NUMBERFORMAT_BINARY);
         // parse as a string. binary format does not allow 3
         expectError("{bin:+   0b3101}", "{\"bin\":\"+   0b3101\"}", "{\"bin\":\"+   0b3101\"}", STWQ, KWQ, SVWQ);
+        expectError("{oct:0o71}", "{\"oct\":57}", "{\"oct\":57}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
         expectError("{oct:071}", "{\"oct\":57}", "{\"oct\":57}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
+        expectError("{oct:-0o01}", "{\"oct\":-1}", "{\"oct\":-1}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
         expectError("{oct:-001}", "{\"oct\":-1}", "{\"oct\":-1}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
+        expectError("{oct:+   0o201}", "{\"oct\":129}", "{\"oct\":129}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL, ERROR_NUMBERFORMAT_LEADING_PLUS);
         expectError("{oct:+   0201}", "{\"oct\":129}", "{\"oct\":129}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL, ERROR_NUMBERFORMAT_LEADING_PLUS);
         expectError("{trailingCOmmaInArray: [1,2,]}", "{\"trailingCOmmaInArray\":[1,2]}", "{\r\n  \"trailingCOmmaInArray\":[1, 2]\r\n}", STWQ, KWQ, ERROR_TRAILING_COMMA_IN_ARRAY);
         expectError("{singleQuotes: 'I can use \"double quotes\" here'}", "{\"singleQuotes\":\"I can use \\\"double quotes\\\" here\"}", "{\"singleQuotes\":\"I can use \\\"double quotes\\\" here\"}", STWQ, KWQ, ERROR_STRING_VALUE_WITH_SINGLE_QUOTES, ERROR_STRING_TOKEN_WITH_SINGLE_QUOTES);
-        expectError("{oct:001}", "{\"oct\":1}", "{\"oct\":1}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
+        expectError("{oct:0o01}", "{\"oct\":1}", "{\"oct\":1}", STWQ, KWQ, ERROR_NUMBERFORMAT_OCTAL);
         expectError("{plus:+1}", "{\"plus\":1}", "{\"plus\":1}", STWQ, KWQ, ERROR_NUMBERFORMAT_LEADING_PLUS);
         expectError("{trailingPoint:1.}", "{\"trailingPoint\":1.0}", "{\"trailingPoint\":1.0}", STWQ, KWQ, ERROR_TRAILING_DECIMAL_POINT);
         expectError("{1:^\\.\\%\\S+$}", "{\"1\":\"^\\\\.\\\\%\\\\S+$\"}", "{\"1\":\"^\\\\.\\\\%\\\\S+$\"}", EXPECTED_VALID_ESCAPE_CHARACTER, ERROR_KEY_IS_NUMBER, STWQ, KWQ, ERROR_STRING_VALUE_WITHOUT_QUOTES);
@@ -420,11 +425,15 @@ public class ParserTest extends AWTest {
         try {
             parsed = new FlexiJSONParser(new StringReader(json)) {
                 public boolean isParseInlineCommentEnabled() {
-                    return Arrays.asList(errors).contains(ERROR_INLINE_COMMENT);
+                    return expectedErrors.contains(ERROR_INLINE_COMMENT);
                 };
 
                 public boolean isParseLineCommentEnabled() {
-                    return Arrays.asList(errors).contains(ERROR_LINE_COMMENT);
+                    return expectedErrors.contains(ERROR_LINE_COMMENT);
+                };
+
+                protected boolean isImplicitOctalAllowed() {
+                    return expectedErrors.contains(ERROR_NUMBERFORMAT_OCTAL);
                 };
 
                 protected void throwParserException(ParsingError string, Object path, Throwable cause, FlexiJSonNode parent, FlexiJSonNode value) throws FlexiParserException {
@@ -520,7 +529,11 @@ public class ParserTest extends AWTest {
         }
         if (expectedErrors.size() > 0) {
             try {
-                new FlexiJSONParser(new StringReader(json)).setDebug(new StringBuilder()).parse();
+                new FlexiJSONParser(new StringReader(json)) {
+                    protected boolean isImplicitOctalAllowed() {
+                        return expectedErrors.contains(ERROR_NUMBERFORMAT_OCTAL);
+                    };
+                }.setDebug(new StringBuilder()).parse();
                 throw new WTFException("Exception expected");
             } catch (FlexiParserException e) {
                 // if (expect.equals(e.toString())) {

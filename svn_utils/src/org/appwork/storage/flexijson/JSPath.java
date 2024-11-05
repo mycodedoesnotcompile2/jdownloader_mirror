@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -128,11 +128,9 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                     }.setDebug(new StringBuilder());
                     parser.setBreakAtEndOfObject(true);
                     parser.setIgnoreIssues(FlexiJSONParser.IGNORE_LIST_JS);
-                    FlexiJSonNode parsed = ((FlexiJSonArray) parser.parse()).get(0);
-                    if (parsed instanceof FlexiJSonValue) {
-                        // escaped primitive value
-                        FlexiJSonValue token = (FlexiJSonValue) parsed;
-                        ret.add(token.getValue());
+                    FlexiJSonArray parsedArray = ((FlexiJSonArray) parser.parse());
+                    if (parsedArray.size() == 0) {
+                        ret.add("");
                         if (parser.isEndOfStreamReached()) {
                             path = path.substring(parser.index);
                         } else {
@@ -142,23 +140,39 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
                             path = path.substring(1);
                         }
                         continue main;
-                    } else if (parsed instanceof FlexiJSonObject) {
-                        // conditional Property list[{a:true}] << all list entries with this.a:true
-                        try {
-                            ret.add(new FlexiConditionMapper<Condition>(Condition.class).jsonToObject(parsed, Condition.TYPE));
-                        } catch (FlexiMapperException e) {
-                            throw new InvalidPathException(e);
-                        }
-                        if (parser.isEndOfStreamReached()) {
-                            path = path.substring(parser.index);
-                        } else {
-                            path = path.substring(parser.index - 1);
-                        }
-                        if (path.startsWith(".")) {
-                            path = path.substring(1);
-                        }
                     } else {
-                        throw new InvalidPathException("Invalid []-escaping");
+                        FlexiJSonNode parsed = parsedArray.get(0);
+                        if (parsed instanceof FlexiJSonValue) {
+                            // escaped primitive value
+                            FlexiJSonValue token = (FlexiJSonValue) parsed;
+                            ret.add(token.getValue());
+                            if (parser.isEndOfStreamReached()) {
+                                path = path.substring(parser.index);
+                            } else {
+                                path = path.substring(parser.index - 1);
+                            }
+                            if (path.startsWith(".")) {
+                                path = path.substring(1);
+                            }
+                            continue main;
+                        } else if (parsed instanceof FlexiJSonObject) {
+                            // conditional Property list[{a:true}] << all list entries with this.a:true
+                            try {
+                                ret.add(new FlexiConditionMapper<Condition>(Condition.class).jsonToObject(parsed, Condition.TYPE));
+                            } catch (FlexiMapperException e) {
+                                throw new InvalidPathException(e);
+                            }
+                            if (parser.isEndOfStreamReached()) {
+                                path = path.substring(parser.index);
+                            } else {
+                                path = path.substring(parser.index - 1);
+                            }
+                            if (path.startsWith(".")) {
+                                path = path.substring(1);
+                            }
+                        } else {
+                            throw new InvalidPathException("Invalid []-escaping");
+                        }
                     }
                 } catch (FlexiParserException e) {
                     throw new InvalidPathException(e);

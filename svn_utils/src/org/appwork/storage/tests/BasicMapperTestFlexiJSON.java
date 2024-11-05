@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -35,6 +35,8 @@ package org.appwork.storage.tests;
 
 import org.appwork.storage.FlexiJSonBridge;
 import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.ParsingError;
 
 /**
  * @author thomas
@@ -55,14 +57,29 @@ public class BasicMapperTestFlexiJSON extends AbstractMapperTest {
     public void runTest() throws Exception {
         FlexiJSonBridge mapper = new FlexiJSonBridge() {
             protected org.appwork.storage.flexijson.FlexiJSONParser createParser(String jsonString) {
-                FlexiJSONParser ret = new FlexiJSONParser(jsonString);
+                final FlexiJSONParser ret = new FlexiJSONParser(jsonString) {
+                    @Override
+                    protected boolean isIgnored(ParsingError error, Object path, Throwable cause, FlexiJSonNode parent, FlexiJSonNode value) {
+                        if (ParsingError.ERROR_NUMBER_NAN.equals(error) && BasicMapperTestFlexiJSON.this.isNaNSupported()) {
+                            return true;
+                        } else {
+                            return super.isIgnored(error, path, cause, parent, value);
+                        }
+                    }
+
+                    @Override
+                    protected boolean isImplicitOctalAllowed() {
+                        return BasicMapperTestFlexiJSON.this.isImplicitOctalSupported();
+                    }
+                };
+                ret.addIgnoreIssues(ParsingError.ERROR_NUMBERFORMAT_LEADING_PLUS);
+                ret.addIgnoreIssues(ParsingError.ERROR_NUMBERFORMAT_BINARY);
+                ret.addIgnoreIssues(ParsingError.ERROR_NUMBERFORMAT_OCTAL);
+                ret.addIgnoreIssues(ParsingError.ERROR_NUMBERFORMAT_HEXADECIMAL);
                 ret.setDebug(new StringBuilder());
                 return ret;
             };
         };
-
         runWith(mapper);
-
     }
-
 }

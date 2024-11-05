@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,6 +33,7 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.simplejson;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -59,7 +60,6 @@ public class JSonParser {
     private static final char[] CHAR_ARRAY_NULL  = "null".toCharArray();
     public static boolean       DEBUG            = false;
     protected int               global           = 0;
-    protected char              c;
     public final String         str;
     final StringBuilder         sb;
     private final StringBuilder sb2;
@@ -85,13 +85,14 @@ public class JSonParser {
     }
 
     protected ParserException bam(final String expected, final Object path, final Throwable cause) {
-        String pre = str.substring(Math.max(global - 20, 0), global);
+        final int lastX = Math.min(str.length(), 20);
+        String pre = str.substring(Math.max(global - lastX, 0), lastX);
         pre = pre.replace("\r", "\\r").replace("\n", "\\n");
         final StringBuilder sb = new StringBuilder();
         sb.append(expected);
         sb.append("\r\n\t");
         sb.append(pre);
-        sb.append(str.substring(global, Math.min(str.length(), global + 20)));
+        sb.append(str.substring(Math.min(str.length(), global), Math.min(str.length(), global + lastX)));
         sb.append("\r\n\t");
         for (int i = 1; i < pre.length(); i++) {
             sb.append("-");
@@ -104,7 +105,7 @@ public class JSonParser {
         // string
         try {
             sb.setLength(0);
-            c = charAt(path, global++);
+            char c = charAt(path, global++);
             if (c != '\"') {
                 throwParserException("'\"' expected", path);
                 return null;
@@ -190,10 +191,11 @@ public class JSonParser {
             debug += '\u2934';
             System.err.println(debug);
         }
-        if (global >= str.length()) {
-            throwParserException("Ended unexpected", path);
+        try {
+            return charAt(path, global);
+        } catch (IndexOutOfBoundsException e) {
+            throw throwParserException("Ended unexpected", path, e);
         }
-        return charAt(path, global);
     }
 
     /**
@@ -232,7 +234,7 @@ public class JSonParser {
         while (true) {
             // skip whitespace
             parseArrayValue((List<Object>) ret, path);
-            c = getChar(path);
+            final char c = getChar(path);
             switch (c) {
             case ',':
                 setToken(path, Token.COMMA);
@@ -253,7 +255,7 @@ public class JSonParser {
     protected Object parseArrayValue(final List<Object> ret, Object path) throws ParserException {
         setToken(path, Token.WS_BEFORE_VALUE);
         skipWhiteSpace(path);
-        c = getChar(path);
+        final char c = getChar(path);
         Object newPath = path;
         switch (c) {
         case ']':
@@ -274,7 +276,7 @@ public class JSonParser {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#toString()
      */
     @Override
@@ -282,22 +284,132 @@ public class JSonParser {
         return global + ". " + str.charAt(global);
     }
 
+    protected static enum NumberFormat {
+        FIXED,
+        EXPLICIT_HEX,
+        EXPLICIT_BINARY,
+        EXPLICIT_OCTAL,
+        FLOAT,
+        NaN,
+        FLOAT_EXP
+    }
+
+    protected boolean isValidNumberCharacter(final NumberFormat numberFormat, final CharSequence numberCharSequence, char nextChar) {
+        if (numberFormat == null) {
+            if (getNumberFormat(null, numberCharSequence, nextChar) != null) {
+                // switch to NumberFormat
+                return true;
+            } else if (nextChar >= '0' && nextChar <= '9') {
+                return true;
+            } else if (nextChar == '+' || nextChar == '-') {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            switch (numberFormat) {
+            case NaN:
+                return (numberCharSequence.length() == 1 && nextChar == 'a') || (numberCharSequence.length() == 2 && nextChar == 'N');
+            case EXPLICIT_BINARY:
+                return nextChar == '0' || nextChar == '1';
+            case EXPLICIT_OCTAL:
+                return nextChar >= '0' && nextChar <= '7';
+            case EXPLICIT_HEX:
+                if (nextChar >= 'a' && nextChar <= 'f') {
+                    return true;
+                } else if (nextChar >= 'A' && nextChar <= 'F') {
+                    return true;
+                } else if (nextChar >= '0' && nextChar <= '9') {
+                    return true;
+                } else {
+                    return false;
+                }
+            case FLOAT:
+                if (nextChar == 'e' || nextChar == 'E') {
+                    return true;
+                } else if (nextChar >= '0' && nextChar <= '9') {
+                    return true;
+                } else {
+                    return false;
+                }
+            case FLOAT_EXP:
+                if (nextChar == '+' || nextChar == '-') {
+                    return true;
+                } else {
+                    if (nextChar >= '0' && nextChar <= '9') {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            default:
+                return false;
+            }
+        }
+    }
+
+    protected NumberFormat getNumberFormat(NumberFormat numberFormat, CharSequence numberCharSequence, char nextChar) {
+        if (numberFormat != null) {
+            switch (numberFormat) {
+            case FLOAT:
+                if (nextChar == 'e' || nextChar == 'E') {
+                    return NumberFormat.FLOAT_EXP;
+                }
+                break;
+            default:
+                break;
+            }
+            return numberFormat;
+        }
+        if (nextChar == '.') {
+            return NumberFormat.FLOAT;
+        }
+        if ((nextChar == 'e' || nextChar == 'E') && numberCharSequence.length() > 0) {
+            final char last = numberCharSequence.charAt(numberCharSequence.length() - 1);
+            if (Character.isDigit(last)) {
+                return NumberFormat.FLOAT_EXP;
+            }
+        }
+        if (CharSequenceUtils.endsWith(numberCharSequence, "0")) {
+            if (nextChar == 'x') {
+                return NumberFormat.EXPLICIT_HEX;
+            } else if (nextChar == 'b') {
+                return NumberFormat.EXPLICIT_BINARY;
+            } else if (nextChar == 'o') {
+                return NumberFormat.EXPLICIT_OCTAL;
+            }
+        }
+        if (isNaNAllowed() && nextChar == 'N' && numberCharSequence.length() == 0) {
+            return NumberFormat.NaN;
+        }
+        return null;
+    }
+
+    protected boolean isNaNAllowed() {
+        return naNAllowed;
+    }
+
+    protected boolean isImplicitOctalAllowed() {
+        return false;
+    }
+
+    protected boolean isBigIntegerAllowed() {
+        return false;
+    }
+
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Numbers_and_dates
     protected Object parseNumber(Object path) throws ParserException, NoNumberException {
         sb.setLength(0);
-        boolean pointFound = false;
-        boolean potFound = false;
-        c = getChar(path);
-        if (c == '+' || c == '-' || Character.isDigit(c) || (naNAllowed && (c == 'N' || c == 'a'))) {
+        NumberFormat numberFormat = null;
+        char c = getChar(path);
+        if (isValidNumberCharacter(numberFormat, sb, c)) {
+            numberFormat = getNumberFormat(numberFormat, sb, c);
             sb.append(c);
             while (global + 1 < str.length()) {
                 global++;
                 c = getChar(path);
-                if (Character.isDigit(c) || !pointFound && c == '.' || pointFound && c == 'e' || pointFound && c == 'E' || potFound && c == '+' || potFound && c == '-' || (naNAllowed && (c == 'N' || c == 'a'))) {
-                    if (c == '.') {
-                        pointFound = true;
-                    } else if (pointFound && (c == 'e' || c == 'E')) {
-                        potFound = true;
-                    }
+                if (isValidNumberCharacter(numberFormat, sb, c)) {
+                    numberFormat = getNumberFormat(numberFormat, sb, c);
                     sb.append(c);
                 } else {
                     global--;
@@ -305,14 +417,12 @@ public class JSonParser {
                 }
             }
             global++;
-            if (pointFound) {
+            if (NumberFormat.NaN.equals(numberFormat)) {
+                return createJSonValue(Double.NaN);
+            } else if (NumberFormat.FLOAT.equals(numberFormat) || NumberFormat.FLOAT_EXP.equals(numberFormat)) {
                 return createJSonValue(parseFloatNumber(sb));
             } else {
-                if (naNAllowed && CharSequenceUtils.contentEquals("NaN", sb)) {
-                    return createJSonValue(Double.NaN);
-                } else {
-                    return createJSonValue(parseFixedNumber(sb));
-                }
+                return createJSonValue(parseFixedNumber(sb));
             }
         } else {
             throw new NoNumberException();
@@ -320,8 +430,9 @@ public class JSonParser {
     }
 
     protected Number parseFloatNumber(final CharSequence charSequence) {
-        String string = charSequence.toString();
-        double num = Double.parseDouble(string);
+        final String string = charSequence.toString();
+        final double num = Double.parseDouble(string);
+        // doesn't throw NumberFormatException when no longer *fit* into double but simply looses precision
         final Number ret;
         final float check = (float) num;
         if (check == num && Float.toString(check).length() >= string.length()) {
@@ -333,8 +444,31 @@ public class JSonParser {
     }
 
     protected Number parseFixedNumber(final CharSequence charSequence) {
-        final String string = charSequence.toString();
-        final Long ret = Long.valueOf(string);
+        String string = charSequence.toString();
+        int radix = 10;// decimal
+        if (string.matches("^(-|\\+)?0(x|X).+")) {
+            radix = 16;// explicit hex
+            string = string.replaceFirst("0(x|X)", "");
+        } else if (string.matches("^(-|\\+)?0(o|O).+")) {
+            radix = 8;// explicit octal
+            string = string.replaceFirst("0(o|O)", "");
+        } else if (string.matches("^(-|\\+)?0(b|B).+")) {
+            radix = 2;// explicit binary
+            string = string.replaceFirst("0(b|B)", "");
+        } else if (string.matches("^(-|\\+)?0[0-7]+") && isImplicitOctalAllowed()) {
+            radix = 8;// implicit octal
+        }
+        final Long ret;
+        try {
+            ret = Long.valueOf(string, radix);
+        } catch (NumberFormatException e) {
+            // is thrown when number doesn't fit into Long
+            if (isBigIntegerAllowed()) {
+                return new BigInteger(string, radix);
+            } else {
+                throw e;
+            }
+        }
         if (ret.longValue() <= Integer.MAX_VALUE && ret.longValue() >= Integer.MIN_VALUE) {
             if (ret.longValue() <= Short.MAX_VALUE && ret.longValue() >= Short.MIN_VALUE) {
                 if (ret.longValue() <= Byte.MAX_VALUE && ret.longValue() >= Byte.MIN_VALUE) {
@@ -388,7 +522,7 @@ public class JSonParser {
             if (global >= str.length()) {
                 throwParserException("} or , expected", path);
             }
-            c = getChar(path);
+            final char c = getChar(path);
             switch (c) {
             case ',':
                 setToken(path, Token.COMMA);
@@ -433,7 +567,7 @@ public class JSonParser {
     protected Object parseKeyValuePair(Object newPath, final Map<String, Object> ret) throws ParserException {
         setToken(newPath, Token.WS_BEFORE_KEY);
         skipWhiteSpace(newPath);
-        c = getChar(newPath);
+        char c = getChar(newPath);
         if (c == '"') {
             setToken(newPath, Token.KEY);
             String key = findString(newPath);

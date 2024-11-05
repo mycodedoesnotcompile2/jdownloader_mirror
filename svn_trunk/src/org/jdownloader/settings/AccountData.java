@@ -1,5 +1,6 @@
 package org.jdownloader.settings;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,7 @@ import org.appwork.utils.StringUtils;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHostData;
 
 public class AccountData implements Storable {
@@ -24,7 +26,7 @@ public class AccountData implements Storable {
     private String                  errorString;
     private String                  statusString;
     private List<String>            hosterHistory         = null;
-    private List<MultiHostHostData> infoSupportedhostlist     = null;
+    private List<MultiHostHostData> infoSupportedhostlist = null;
     private int                     maxSimultanDownloads;
     private long                    createTime;
     private long                    trafficLeft;
@@ -293,6 +295,13 @@ public class AccountData implements Storable {
                 ai.setUnlimitedTraffic();
             }
             ai.setSpecialTraffic(specialtraffic);
+            if (this.infoSupportedhostlist != null) {
+                final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+                for (final MultiHostHostData mhostdata : this.infoSupportedhostlist) {
+                    supportedhosts.add(mhostdata.toMultiHostHost());
+                }
+                ai.setMultiHostSupport_internal(supportedhosts);
+            }
         }
         ret.setHosterHistory(getHosterHistory());
         ret.setId(getId());

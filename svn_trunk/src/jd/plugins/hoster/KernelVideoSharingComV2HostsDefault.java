@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -111,8 +111,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "fapcat.com" });
         /* 2022-07-12 */
         ret.add(new String[] { "hoes.tube" });
-        /* 2022-07-12 */
-        ret.add(new String[] { "crazyporn.xxx" });
         /* 2022-07-12 */
         ret.add(new String[] { "fapnado.xxx" });
         /* 2022-07-12 */

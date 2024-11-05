@@ -49,7 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -443,8 +443,7 @@ public class SendCm extends XFileSharingProBasic {
         final String apikey = getAPIKeyFromAccount(account);
         if (StringUtils.isEmpty(apikey)) {
             /* This should never happen */
-            logger.warning("Cannot do this without apikey");
-            return null;
+            throw new IllegalArgumentException("apikey is null");
         }
         final String fuid = this.getFUIDFromURL(link);
         final String fileid_to_download;
@@ -458,14 +457,11 @@ public class SendCm extends XFileSharingProBasic {
         final Map<String, Object> entries = this.checkErrorsAPI(this.br, link, account);
         final Map<String, Object> result = (Map<String, Object>) entries.get("result");
         final String dllink = result.get("url").toString();
-        if (!StringUtils.isEmpty(dllink)) {
-            logger.info("Successfully found dllink via API");
-            return dllink;
-        } else {
-            logger.warning("Failed to find dllink via API");
-            /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        if (StringUtils.isEmpty(dllink)) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find dllink via API");
         }
+        logger.info("Successfully found dllink via API");
+        return dllink;
     }
 
     @Override

@@ -726,6 +726,10 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return mhosts;
     }
 
+    public void setMultiHostSupport_internal(final List<MultiHostHost> mhosts) {
+        this.multihostSupportV2 = mhosts;
+    }
+
     /** Returns information about specific host if it is supported. */
     public MultiHostHost getMultihostSupportedHost(final String domain) {
         final List<MultiHostHost> mhosts = getMultiHostSupportV2();

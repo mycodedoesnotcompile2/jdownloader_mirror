@@ -3,8 +3,8 @@ package jd.plugins.download.raf;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import jd.plugins.download.SparseFile;
 
@@ -20,7 +20,7 @@ public class BytesMappedFile implements FileBytesCacheFlusher {
     protected final FileBytesMap                                  bytesMap;
     protected volatile RandomAccessFile                           raf         = null;
     protected final CopyOnWriteArrayList<BytesMappedFileCallback> callBacks   = new CopyOnWriteArrayList<BytesMappedFileCallback>();
-    protected final AtomicInteger                                 locks       = new AtomicInteger();
+    protected final WeakHashMap<Thread, Object>                   locks       = new WeakHashMap<Thread, Object>();
     protected volatile IOException                                ioException = null;
     protected volatile boolean                                    flushFlag   = false;
     private final boolean                                         trySparse;
@@ -40,22 +40,18 @@ public class BytesMappedFile implements FileBytesCacheFlusher {
         final long fileSize = file.length();
         final long finalFileSize = fileBytesMap.getFinalSize();
         final long markedBytes = fileBytesMap.getMarkedBytes();
-        if (fileSize < markedBytes || finalFileSize >= 0 && fileSize > finalFileSize) {
+        if (fileSize < markedBytes || (finalFileSize >= 0 && fileSize > finalFileSize)) {
             //
             throw new IllegalStateException("File:" + file + "|Length:" + file.length() + "|FileBytesMap:" + fileBytesMap);
         }
     }
 
-    public synchronized void lock() {
-        locks.incrementAndGet();
+    public synchronized boolean lock() {
+        return locks.put(Thread.currentThread(), this) == null;
     }
 
     public synchronized boolean unlock() {
-        if (locks.get() > 0) {
-            locks.decrementAndGet();
-            return true;
-        }
-        return false;
+        return locks.remove(Thread.currentThread()) != null;
     }
 
     public synchronized boolean open(BytesMappedFileCallback callback) throws IOException {
@@ -80,7 +76,7 @@ public class BytesMappedFile implements FileBytesCacheFlusher {
     }
 
     public synchronized boolean isLocked() {
-        return locks.get() > 0;
+        return locks.size() > 0;
     }
 
     public File getFile() {

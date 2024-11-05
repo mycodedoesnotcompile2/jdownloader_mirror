@@ -79,7 +79,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -279,8 +279,8 @@ public class AllDebridCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, ai, true);
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
-        final boolean devAlsoDisplayStreamingItems = true;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && devAlsoDisplayStreamingItems) {
+        final boolean includeStreamingItems = true;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && includeStreamingItems) {
             br.getPage(api_base + "/user/hosts?" + agent);
         } else {
             br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
@@ -317,7 +317,9 @@ public class AllDebridCom extends PluginForHost {
                  * JD also does not accept them but we're doing this check nevertheless.
                  */
                 if (Boolean.FALSE.equals(hosterinfos.get("status"))) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                    /* Hosts flaggedas not working may still be working thus we will just flag them as unstable. */
+                    // mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
                 } else if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(hosterinfos.get("type").toString())) {
                     mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
                     logger.info("This host cannot be used with current account type: " + host_without_tld);
@@ -373,8 +375,8 @@ public class AllDebridCom extends PluginForHost {
                 }
             }
         }
-        final boolean filterJDownloaderUnsupportedStreamHosts = false;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
+        final boolean filterJDownloaderUnsupportedStreamHosts = true;
+        if (filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
             /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
             ai.setMultiHostSupportV2(this, supportedhosts);
             final List<MultiHostHost> results = ai.getMultiHostSupportV2();

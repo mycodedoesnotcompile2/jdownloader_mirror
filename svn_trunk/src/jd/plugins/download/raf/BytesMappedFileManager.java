@@ -95,7 +95,7 @@ public class BytesMappedFileManager {
             final long fileSize = file.length();
             final long finalFileSize = fileBytesMap.getFinalSize();
             final long markedBytes = fileBytesMap.getMarkedBytes();
-            if (fileSize < markedBytes || finalFileSize >= 0 && fileSize > finalFileSize) {
+            if (fileSize < markedBytes || (finalFileSize >= 0 && fileSize > finalFileSize)) {
                 LogController.CL(true).severe("PartFileReset:File:" + file + "|Length:" + file.length() + "|FileBytesMap:" + fileBytesMap);
                 fileBytesMap.reset();
             }
@@ -146,7 +146,7 @@ public class BytesMappedFileManager {
             final long fileSize = file.length();
             final long finalFileSize = fileBytesMap.getFinalSize();
             final long markedBytes = fileBytesMap.getMarkedBytes();
-            if (fileSize < markedBytes || finalFileSize >= 0 && fileSize > finalFileSize) {
+            if (fileSize < markedBytes || (finalFileSize >= 0 && fileSize > finalFileSize)) {
                 LogController.CL(true).severe("PartFileReset:File:" + file + "|Length:" + file.length() + "|FileBytesMap:" + fileBytesMap);
                 fileBytesMap.reset();
             }

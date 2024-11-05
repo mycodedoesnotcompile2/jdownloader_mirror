@@ -63,11 +63,19 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 50070 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/account/login.createaccount.php");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -111,9 +119,9 @@ public class ArchiveOrg extends PluginForHost {
     /* For officially downloadable files */
     public static final String                            PROPERTY_IS_ACCOUNT_REQUIRED                    = "is_account_required";
     /**
-     * For files which are not downloadable at all - still such items can be added to JD.
+     * For files which are [temporarily] not downloadable at all.
      */
-    public static final String                            PROPERTY_IS_NOT_DOWNLOADABLE                    = "is_not_downloadable";
+    public static final String                            PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP          = "is_not_downloadable_timestamp";
     /* For book page downloads */
     public static final String                            PROPERTY_IS_LENDING_REQUIRED                    = "is_lending_required";
     public static final String                            PROPERTY_IS_FREE_DOWNLOADABLE_BOOK_PREVIEW_PAGE = "is_free_downloadable_book_preview_page";
@@ -143,7 +151,15 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        if (link.hasProperty(PROPERTY_IS_NOT_DOWNLOADABLE)) {
+        String filename = link.getStringProperty(PROPERTY_FILENAME);
+        if (filename != null) {
+            /*
+             * Set cached filename otherwise resetted links will get the Content-Disposition filename which is not our desired file name for
+             * archive.org items.
+             */
+            setFinalFilename(link, filename);
+        }
+        if (getFileNotDownloadableTime(link) > 0) {
             /* Such items can neither be checked nor downloaded. */
             return AvailableStatus.UNCHECKABLE;
         }
@@ -151,7 +167,6 @@ public class ArchiveOrg extends PluginForHost {
         if (account != null) {
             login(account, false);
         }
-        br.setFollowRedirects(true);
         if (!isDownload) {
             if (this.requiresAccount(link) && account == null) {
                 return AvailableStatus.UNCHECKABLE;
@@ -165,7 +180,7 @@ public class ArchiveOrg extends PluginForHost {
                 prepDownloadHeaders(br, link);
                 con = br.openGetConnection(getDirectURL(link, account));
                 connectionErrorhandling(con, link, account, null);
-                String filename = link.getStringProperty(PROPERTY_FILENAME, null);
+                filename = link.getStringProperty(PROPERTY_FILENAME, null);
                 if (filename == null) {
                     filename = getFileNameFromConnection(con);
                     if (filename != null) {
@@ -314,20 +329,19 @@ public class ArchiveOrg extends PluginForHost {
         final int internalBookPageIndex = link.getIntegerProperty(PROPERTY_BOOK_PAGE_INTERNAL_INDEX, -1);
         if (internalBookPageIndex != -1) {
             return internalBookPageIndex;
+        }
+        /* All of this is legacy. TODO: Remove in 01-2023 */
+        final int archiveOrgBookPageNumber = link.getIntegerProperty(PROPERTY_BOOK_PAGE, -1);
+        if (archiveOrgBookPageNumber != -1) {
+            return archiveOrgBookPageNumber;
         } else {
-            /* All of this is legacy. TODO: Remove in 01-2023 */
-            final int archiveOrgBookPageNumber = link.getIntegerProperty(PROPERTY_BOOK_PAGE, -1);
-            if (archiveOrgBookPageNumber != -1) {
-                return archiveOrgBookPageNumber;
+            /* Legacy handling for older items */
+            final String pageStr = new Regex(link.getContentUrl(), "(?i).*/page/n?(\\d+)").getMatch(0);
+            if (pageStr != null) {
+                return Integer.parseInt(pageStr) - 1;
             } else {
-                /* Legacy handling for older items */
-                final String pageStr = new Regex(link.getContentUrl(), "(?i).*/page/n?(\\d+)").getMatch(0);
-                if (pageStr != null) {
-                    return Integer.parseInt(pageStr) - 1;
-                } else {
-                    /* Fallback: This should never happen */
-                    return 1;
-                }
+                /* Fallback: This should never happen */
+                return 1;
             }
         }
     }
@@ -391,13 +405,11 @@ public class ArchiveOrg extends PluginForHost {
             }
             if (ArchiveOrg.isItemUnavailable(br)) {
                 if (ArchiveOrg.isAccountRequired(br)) {
-                    /* First check for this flag */
-                    if (link.hasProperty(PROPERTY_IS_NOT_DOWNLOADABLE)) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMSG_FILE_NOT_DOWNLOADABLE);
-                    } else if (account != null) {
-                        /* Error happened while we're logged in -> Dead end --> Also set this flag to ensure that */
-                        link.setProperty(PROPERTY_IS_NOT_DOWNLOADABLE, true);
-                        throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMSG_FILE_NOT_DOWNLOADABLE);
+                    checkFileNotDownloadable(link);
+                    if (account != null) {
+                        /* Error happened while we're logged in -> Dead end --> File isn't even downloadable via account at this moment. */
+                        link.setProperty(PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP, System.currentTimeMillis());
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMSG_FILE_NOT_DOWNLOADABLE, 5 * 60 * 1000l);
                     } else {
                         /* Make user try again with account */
                         throw new AccountRequiredException("Item is not downloadable or only for logged in users");
@@ -438,6 +450,26 @@ public class ArchiveOrg extends PluginForHost {
         }
     }
 
+    /**
+     * Throws exception if file is currently not downloadable according to cached value.
+     *
+     * @throws PluginException
+     */
+    private void checkFileNotDownloadable(final DownloadLink link) throws PluginException {
+        final long fileNotDownloadableTime = getFileNotDownloadableTime(link);
+        if (fileNotDownloadableTime > 0) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, ERRORMSG_FILE_NOT_DOWNLOADABLE, fileNotDownloadableTime);
+        }
+    }
+
+    /**
+     * Returns time in milliseconds that indicates how long that link is not downloadable (= not even downloadable when user is logged in).
+     */
+    private long getFileNotDownloadableTime(final DownloadLink link) {
+        final int waitMillis = 3 * 60 * 60 * 1000;
+        return (link.getLongProperty(PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP, 0) + waitMillis) - System.currentTimeMillis();
+    }
+
     public static boolean isItemUnavailable(final Browser br) {
         if (br.containsHTML(">\\s*Item not available")) {
             return true;
@@ -461,10 +493,7 @@ public class ArchiveOrg extends PluginForHost {
 
     private void handleDownload(final Account account, final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link, account, true);
-        if (link.hasProperty(PROPERTY_IS_NOT_DOWNLOADABLE)) {
-            /* Such items can neither be checked nor downloaded. */
-            throw new PluginException(LinkStatus.ERROR_FATAL, ERRORMSG_FILE_NOT_DOWNLOADABLE);
-        }
+        checkFileNotDownloadable(link);
         ArchiveOrgLendingInfo lendingInfoForBeforeDownload = null;
         if (account != null) {
             this.login(account, false);
@@ -617,7 +646,6 @@ public class ArchiveOrg extends PluginForHost {
 
     public void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             /* 2021-08-09: Added this as alternative method e.g. for users that have registered on archive.org via Google login. */
             final Cookies userCookies = account.loadUserCookies();
@@ -901,20 +929,21 @@ public class ArchiveOrg extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-        if (link != null) {
-            /*
-             * Remove this property otherwise there is the possibility that the user gets a permanent error for certain files while they
-             * might just be temporarily unavailable (this should never happen...)!
-             */
-            link.removeProperty(PROPERTY_IS_NOT_DOWNLOADABLE);
-            /* If this is a book page: Reset downloaded-flag for book page to prevent returning the book too early. */
-            final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-            if (account != null) {
-                synchronized (bookBorrowSessions) {
-                    final ArchiveOrgLendingInfo lendingInfo = this.getLendingInfo(link, account);
-                    if (lendingInfo != null) {
-                        lendingInfo.setBookPageDownloadStatus(this.getBookPageIndexNumber(link), false);
-                    }
+        if (link == null) {
+            return;
+        }
+        /*
+         * Remove this property otherwise there is the possibility that the user gets a permanent error for certain files while they might
+         * just be temporarily unavailable (this should never happen...)!
+         */
+        link.removeProperty(PROPERTY_IS_NOT_DOWNLOADABLE_TIMESTAMP);
+        /* If this is a book page: Reset downloaded-flag for book page to prevent returning the book too early. */
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            synchronized (bookBorrowSessions) {
+                final ArchiveOrgLendingInfo lendingInfo = this.getLendingInfo(link, account);
+                if (lendingInfo != null) {
+                    lendingInfo.setBookPageDownloadStatus(this.getBookPageIndexNumber(link), false);
                 }
             }
         }

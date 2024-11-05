@@ -1,10 +1,10 @@
 package jd.plugins;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.simplejson.JSonParser;
+import org.appwork.storage.simplejson.MinimalMemoryMap;
 
 public class MinimalMemoryJSonParser extends JSonParser {
     public MinimalMemoryJSonParser(String json) {
@@ -12,17 +12,13 @@ public class MinimalMemoryJSonParser extends JSonParser {
     }
 
     @Override
-    protected Map<String, ? extends Object> createJSonObject() {
-        return new org.appwork.storage.simplejson.MinimalMemoryMap<String, Object>();
+    protected boolean isBigIntegerAllowed() {
+        return true;
     }
 
     @Override
-    protected Number parseFloatNumber(CharSequence charSequence) {
-        try {
-            return super.parseFloatNumber(charSequence);
-        } catch (NumberFormatException e) {
-            return new BigDecimal(charSequence.toString());
-        }
+    protected Map<String, ? extends Object> createJSonObject() {
+        return new MinimalMemoryMap<String, Object>();
     }
 
     @Override

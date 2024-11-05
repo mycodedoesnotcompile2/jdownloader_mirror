@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -179,6 +179,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         for (final Map<String, Object> hoster : hosters) {
             final List<String> domains = (List<String>) hoster.get("alternatives_domain");
             final String primary_domain = hoster.get("primary_domain").toString();
+            final String customStatusText = (String) hoster.get("StatusText");
             final MultiHostHost mhost = new MultiHostHost(primary_domain);
             mhost.addDomains(domains);
             if (hoster.get("status").toString().equalsIgnoreCase("offline")) {
@@ -205,6 +206,9 @@ public class UploadedpremiumlinkNet extends PluginForHost {
                 statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
             } else {
                 statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
+            }
+            if (customStatusText != null) {
+                mhost.setStatusText(customStatusText);
             }
             mhost.setStatusText(statustext);
             supportedhosts.add(mhost);
@@ -268,7 +272,8 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         final HashSet<String> accountErrorsTemporary = new HashSet<String>();
         accountErrorsTemporary.add("AUTH_USER_BANNED");
         accountErrorsTemporary.add("AUTH_IP_BANNED");
-        accountErrorsTemporary.add("DAILY_LIMIT_EXCEEDED");
+        /* 2024-11-04: Is now HOSTER_DAILY_LIMIT_EXCEEDEDs */
+        // accountErrorsTemporary.add("DAILY_LIMIT_EXCEEDED");
         accountErrorsTemporary.add("LINK_GENERATION_LIMIT_EXCEEDED");
         accountErrorsTemporary.add("PREMIUM_TRAFFIC_UNAVAILABLE");
         accountErrorsTemporary.add("RATE_LIMIT_EXCEEDED");
@@ -279,6 +284,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         accountErrorsTemporary.add("FREE_USER_DAILY_LIMIT_EXCEEDED");
         accountErrorsTemporary.add("PROXY_NOT_ALLOWED");
         final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
+        downloadErrorsHostUnavailable.add("HOSTER_DAILY_LIMIT_EXCEEDEDs");
         downloadErrorsHostUnavailable.add("HOSTER_MAINTENANCE");
         downloadErrorsHostUnavailable.add("HOSTER_NOT_AVAILABLE_BY_API");
         downloadErrorsHostUnavailable.add("HOSTER_TEMPORARILY_UNAVAILABLE");
@@ -332,7 +338,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://www." + getHost() + "/myaccount/";
+        return "https://www." + getHost() + "/myaccount";
     }
 
     @Override

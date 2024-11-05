@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -39,6 +39,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.lang.ref.WeakReference;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -58,6 +59,15 @@ import org.appwork.utils.reflection.CompiledType;
  * @author thomas
  */
 public class FlexiJSONParser {
+    protected static enum NumberFormat {
+        UNKNOWN,
+        EXPLICIT_HEX,
+        EXPLICIT_BINARY,
+        EXPLICIT_OCTAL,
+        IMPLICIT_OCTAL,
+        FLOAT
+    }
+
     static final HashSet<ParsingError>        IGNORE_LIST_ALL                   = new HashSet<ParsingError>();
     public static final HashSet<ParsingError> IGNORE_LIST_JS                    = new HashSet<ParsingError>();
     // https://json5.org/
@@ -135,65 +145,62 @@ public class FlexiJSONParser {
     /**
      *
      */
-    private static final char SQUARE_BRACKET_CLOSE = ']';
+    private static final char                 SQUARE_BRACKET_CLOSE              = ']';
     /**
      *
      */
-    private static final char CURLY_BRACKET_CLOSE  = '}';
+    private static final char                 CURLY_BRACKET_CLOSE               = '}';
     /**
      *
      */
-    private static final char COLON                = ':';
+    private static final char                 COLON                             = ':';
     /**
      *
      */
-    private static final char ASTERISK             = '*';
+    private static final char                 ASTERISK                          = '*';
     /**
      *
      */
-    private static final char SLASH                = '/';
+    private static final char                 SLASH                             = '/';
     /**
      *
      */
-    private static final char SQUARE_BRACKET_OPEN  = '[';
+    private static final char                 SQUARE_BRACKET_OPEN               = '[';
     /**
      *
      */
-    private static final char CURLY_BRACKET_OPEN   = '{';
+    private static final char                 CURLY_BRACKET_OPEN                = '{';
     /**
      *
      */
-    private static final char COMMA                = ',';
+    private static final char                 COMMA                             = ',';
 
     public class NumberParser {
         /**
          *
          */
-        private static final char ZERO  = '0';
+        private static final char ZERO         = '0';
         /**
          *
          */
-        private static final char MINUS = '-';
+        private static final char MINUS        = '-';
         /**
          *
          */
-        private static final char PLUS  = '+';
-        private boolean           bin;
+        private static final char PLUS         = '+';
         private int               digitsStartIndex;
         protected boolean         firstIsZero;
         private boolean           hasDigit;
-        private boolean           hasPoint;
         private boolean           hasPot;
-        private boolean           hex;
-        protected int             index = 0;
+        protected int             index        = 0;
         private StringParser      Infinity;
         private boolean           invalid;
         private boolean           leadingMinus;
         private boolean           leadingPlus;
         private StringParser      NaN;
-        private boolean           oct;
         // private String error;
         private int               trailingWhitespace;
+        private NumberFormat      numberFormat = NumberFormat.UNKNOWN;
 
         public NumberParser() {
             NaN = new StringParser("NaN".toCharArray());
@@ -241,26 +248,30 @@ public class FlexiJSONParser {
             if (localStartIndex < 0) {
                 localStartIndex = index;
             }
-            if (!hasPoint) {
+            if (!NumberFormat.FLOAT.equals(numberFormat)) {
                 if (localStartIndex == index && c == ZERO) {
                 } else if (index == localStartIndex + 1 && firstIsZero) {
                     if (c == 'x') {
                         return true;
                     } else if (c == 'b') {
                         return true;
+                    } else if (c == 'o') {
+                        return true;
                     }
                 }
             }
             if (Character.isDigit(c)) {
-                if (oct && (c == '8' || c == '9')) {
-                    return false;
+                switch (numberFormat) {
+                case IMPLICIT_OCTAL:
+                case EXPLICIT_OCTAL:
+                    return !(c == '8' || c == '9');
+                case EXPLICIT_BINARY:
+                    return c == ZERO || c == '1';
+                default:
+                    return true;
                 }
-                if (bin && c != ZERO && c != '1') {
-                    return false;
-                }
-                return true;
             }
-            if (hex) {
+            if (NumberFormat.EXPLICIT_HEX.equals(numberFormat)) {
                 switch (c) {
                 case 'a':
                 case 'A':
@@ -280,24 +291,33 @@ public class FlexiJSONParser {
                 }
             }
             if (c == '.') {
-                if (!hasPoint) {
-                    if (hex || bin) {
+                if (!NumberFormat.FLOAT.equals(numberFormat)) {
+                    switch (numberFormat) {
+                    case EXPLICIT_HEX:
+                    case EXPLICIT_BINARY:
+                    case EXPLICIT_OCTAL:
                         return false;
-                    }
-                    if (oct && index > digitsStartIndex + 1) {
-                        return false;
+                    case IMPLICIT_OCTAL:
+                        if (index > digitsStartIndex + 1) {
+                            return false;
+                        }
+                        break;
+                    default:
+                        break;
                     }
                     return true;
                 } else {
                     return false;
                 }
             }
-            if (hasPoint && !hasPot) {
+            if (!hasPot) {
                 if (c == 'E' || c == 'e') {
-                    if (oct || hex || bin) {
+                    switch (numberFormat) {
+                    case FLOAT:
+                        return true;
+                    default:
                         return false;
                     }
-                    return true;
                 }
             }
             if (hasPot) {
@@ -311,7 +331,17 @@ public class FlexiJSONParser {
         protected Number parseFixedNumber(final CharSequence charSequence, final int radix) {
             final String string = charSequence.toString();
             // TODO: Add Java9 Long.valueOf(CharSequence)
-            final Long ret = Long.valueOf(string, radix);
+            final Long ret;
+            try {
+                ret = Long.valueOf(string, radix);
+            } catch (NumberFormatException e) {
+                // is thrown when number doesn't fit into Long
+                if (isBigIntegerAllowed()) {
+                    return new BigInteger(string, radix);
+                } else {
+                    throw e;
+                }
+            }
             if (ret.longValue() <= Integer.MAX_VALUE && ret.longValue() >= Integer.MIN_VALUE) {
                 if (ret.longValue() <= Short.MAX_VALUE && ret.longValue() >= Short.MIN_VALUE) {
                     if (ret.longValue() <= Byte.MAX_VALUE && ret.longValue() >= Byte.MIN_VALUE) {
@@ -374,23 +404,26 @@ public class FlexiJSONParser {
                     return Double.POSITIVE_INFINITY;
                 }
             }
-            if (bin) {
+            if (NumberFormat.EXPLICIT_BINARY.equals(numberFormat)) {
                 throwParserExceptionInternal(ParsingError.ERROR_NUMBERFORMAT_BINARY, path, null, container, null);
                 // trim leading 0b and plus/minus/whitespace
                 return parseSmallestFixedNumberType(string.substring(digitsStartIndex + 2, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 2, leadingMinus);
-            } else if (oct) {
+            } else if (NumberFormat.IMPLICIT_OCTAL.equals(numberFormat)) {
                 if ((trailingWhitespace >= 0 ? trailingWhitespace : string.length()) - digitsStartIndex > 1) {
                     // for 1 the value is 0 which is also dec format
                     throwParserExceptionInternal(ParsingError.ERROR_NUMBERFORMAT_OCTAL, path, null, container, null);
                     // trim leading 0 and plus/minus/whitespace
                     return parseSmallestFixedNumberType(string.substring(digitsStartIndex + 1, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 8, leadingMinus);
                 }
-            } else if (hex) {
+            } else if (NumberFormat.EXPLICIT_HEX.equals(numberFormat)) {
                 throwParserExceptionInternal(ParsingError.ERROR_NUMBERFORMAT_HEXADECIMAL, path, null, container, null);
                 // trim leading 0x and plus/minus/whitespace
                 return parseSmallestFixedNumberType(string.substring(digitsStartIndex + 2, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 16, leadingMinus);
-            }
-            if (hasPoint) {
+            } else if (NumberFormat.EXPLICIT_OCTAL.equals(numberFormat)) {
+                throwParserExceptionInternal(ParsingError.ERROR_NUMBERFORMAT_OCTAL, path, null, container, null);
+                // trim leading 0o and plus/minus/whitespace
+                return parseSmallestFixedNumberType(string.substring(digitsStartIndex + 2, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 8, leadingMinus);
+            } else if (NumberFormat.FLOAT.equals(numberFormat)) {
                 // trim plus/minus/whitespace
                 String trimmed = string.substring(digitsStartIndex, trailingWhitespace >= 0 ? trailingWhitespace : string.length());
                 if (trimmed.charAt(0) == '.') {
@@ -402,7 +435,11 @@ public class FlexiJSONParser {
                 return parseSmalltestFloatNumberType(trimmed, leadingMinus);
             }
             // trim plus/minus/whitespace
-            return parseSmallestFixedNumberType(string.substring(digitsStartIndex, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 10, leadingMinus);
+            if (NumberFormat.IMPLICIT_OCTAL.equals(numberFormat)) {
+                return parseSmallestFixedNumberType(string.substring(digitsStartIndex, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 8, leadingMinus);
+            } else {
+                return parseSmallestFixedNumberType(string.substring(digitsStartIndex, trailingWhitespace >= 0 ? trailingWhitespace : string.length()), 10, leadingMinus);
+            }
         }
 
         /**
@@ -421,10 +458,7 @@ public class FlexiJSONParser {
         public void reset() {
             leadingPlus = false;
             leadingMinus = false;
-            hex = false;
-            oct = false;
-            bin = false;
-            hasPoint = false;
+            numberFormat = NumberFormat.UNKNOWN;
             hasDigit = false;
             trailingWhitespace = -1;
             hasPot = false;
@@ -479,37 +513,47 @@ public class FlexiJSONParser {
                 if (digitsStartIndex < 0) {
                     digitsStartIndex = index;
                 }
-                if (!hasPoint) {
+                if (!NumberFormat.FLOAT.equals(numberFormat)) {
                     if (digitsStartIndex == index && c == ZERO) {
+                        if (isImplicitOctalAllowed()) {
+                            numberFormat = NumberFormat.IMPLICIT_OCTAL;
+                        }
                         firstIsZero = true;
-                        oct = true;
                     } else if (index == digitsStartIndex + 1 && firstIsZero) {
                         if (c == 'x') {
-                            hex = true;
-                            oct = false;
+                            numberFormat = NumberFormat.EXPLICIT_HEX;
                             return true;
                         } else if (c == 'b') {
-                            bin = true;
-                            oct = false;
+                            numberFormat = NumberFormat.EXPLICIT_BINARY;
+                            return true;
+                        } else if (c == 'o') {
+                            numberFormat = NumberFormat.EXPLICIT_OCTAL;
                             return true;
                         }
                     }
                 }
                 if (Character.isDigit(c)) {
-                    if (oct && (c == '8' || c == '9')) {
-                        // error = "'" + c + "' is not oct format";
-                        invalid = true;
-                        return false;
-                    }
-                    if (bin && c != ZERO && c != '1') {
-                        // error = "'" + c + "' is not bin format";
-                        invalid = true;
-                        return false;
+                    switch (numberFormat) {
+                    case IMPLICIT_OCTAL:
+                    case EXPLICIT_OCTAL:
+                        if (c == '8' || c == '9') {
+                            invalid = true;
+                            return false;
+                        }
+                        break;
+                    case EXPLICIT_BINARY:
+                        if (c != ZERO && c != '1') {
+                            invalid = true;
+                            return false;
+                        }
+                        break;
+                    default:
+                        break;
                     }
                     hasDigit = true;
                     return true;
                 }
-                if (hex) {
+                if (NumberFormat.EXPLICIT_HEX.equals(numberFormat)) {
                     switch (c) {
                     case 'a':
                     case 'A':
@@ -528,35 +572,43 @@ public class FlexiJSONParser {
                     }
                 }
                 if (c == '.') {
-                    if (!hasPoint) {
-                        hasPoint = true;
-                        if (hex || bin) {
+                    if (!NumberFormat.FLOAT.equals(numberFormat)) {
+                        switch (numberFormat) {
+                        case EXPLICIT_HEX:
+                        case EXPLICIT_BINARY:
+                        case EXPLICIT_OCTAL:
                             invalid = true;
-                            // error = "'" + c + "' is not allowed for hex or binary format";
                             return false;
+                        case IMPLICIT_OCTAL:
+                            if (index > digitsStartIndex + 1) {
+                                invalid = true;
+                                return false;
+                            }
+                            break;
+                        default:
+                            break;
                         }
-                        if (oct && index > digitsStartIndex + 1) {
-                            invalid = true;
-                            // error = "'" + c + "' is not allowed for octal format";
-                            return false;
-                        }
-                        // no oct but floating point number
-                        oct = false;
+                        numberFormat = NumberFormat.FLOAT;
                         return true;
                     } else {
                         invalid = true;
                         return false;
                     }
                 }
-                if (hasPoint && !hasPot) {
+                if (!hasPot) {
                     if (c == 'E' || c == 'e') {
-                        if (oct || hex || bin) {
-                            // error = "'" + c + "' is not allowed for oct/hex/bin format";
+                        switch (numberFormat) {
+                        case UNKNOWN:
+                            numberFormat = NumberFormat.FLOAT;
+                            hasPot = true;
+                            return true;
+                        case FLOAT:
+                            hasPot = true;
+                            return true;
+                        default:
                             invalid = true;
                             return false;
                         }
-                        hasPot = true;
-                        return true;
                     }
                 }
                 if (hasPot) {
@@ -700,14 +752,13 @@ public class FlexiJSONParser {
         public boolean check(char c) {
             if (invalid) {
                 return false;
-            }
-            if (index < expected.length && expected[index] == c) {
+            } else if (index < expected.length && expected[index] == c) {
                 return true;
-            }
-            if (isFinished() && Character.isWhitespace(c)) {
+            } else if (isFinished() && Character.isWhitespace(c)) {
                 return true;
+            } else {
+                return false;
             }
-            return false;
         }
 
         /**
@@ -727,12 +778,15 @@ public class FlexiJSONParser {
          * @return
          */
         public boolean validate(char c) {
-            if (check(c)) {
+            if (invalid) {
+                return false;
+            } else if (check(c)) {
                 index++;
                 return true;
+            } else {
+                invalid = true;
+                return false;
             }
-            invalid = true;
-            return false;
         }
 
         /**
@@ -935,6 +989,14 @@ public class FlexiJSONParser {
         isReference = new ReferenceParser();
     }
 
+    protected boolean isImplicitOctalAllowed() {
+        return false;
+    }
+
+    protected boolean isBigIntegerAllowed() {
+        return false;
+    }
+
     private boolean parseReferencesEnabled = false;
 
     public boolean isParseReferencesEnabled() {
@@ -973,7 +1035,7 @@ public class FlexiJSONParser {
         }
     }
 
-    protected Object assignFinalType(Object path, Token type) throws FlexiParserException {  
+    protected Object assignFinalType(Object path, Token type) throws FlexiParserException {
         String str = null;
         if (tokenParserExtensions != null) {
             for (FlexiJSONParserExtension sp : tokenParserExtensions) {
@@ -1020,17 +1082,13 @@ public class FlexiJSONParser {
         }
         if (isFalse.isFinished()) {
             return Boolean.FALSE;
-        }
-        if (isTrue.isFinished()) {
+        } else if (isTrue.isFinished()) {
             return Boolean.TRUE;
-        }
-        if (isUndefined.isFinished()) {
+        } else if (isUndefined.isFinished()) {
             return null;
-        }
-        if (isNull.isFinished()) {
+        } else if (isNull.isFinished()) {
             return null;
-        }
-        if (isNumber.isFinished()) {
+        } else if (isNumber.isFinished()) {
             try {
                 if (str == null) {
                     str = sb.toString();
@@ -2225,8 +2283,12 @@ public class FlexiJSONParser {
         throwParserException(error, path, cause, parent, value);
     }
 
+    protected boolean isIgnored(ParsingError error, Object path, Throwable cause, FlexiJSonNode parent, FlexiJSonNode value) {
+        return getIgnoreIssues().contains(error);
+    }
+
     protected void throwParserException(ParsingError error, Object path, Throwable cause, FlexiJSonNode parent, FlexiJSonNode value) throws FlexiParserException {
-        if (getIgnoreIssues().contains(error)) {
+        if (isIgnored(error, path, cause, parent, value)) {
             return;
         } else {
             String json = "";

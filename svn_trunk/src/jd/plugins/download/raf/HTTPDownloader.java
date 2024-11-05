@@ -1244,9 +1244,7 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
                     } else {
                         logger.info("Close File?: " + lbytesMappedFile.getFile());
                         ret = BytesMappedFileManager.getInstance().close(lbytesMappedFile, this);
-                        if (ret != null && ret) {
-                            logger.info("File closed: " + lbytesMappedFile.getFile());
-                        }
+                        logger.info("File closed: " + lbytesMappedFile.getFile() + "|result:" + ret);
                     }
                 }
             }

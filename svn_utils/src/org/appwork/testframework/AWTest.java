@@ -70,6 +70,7 @@ import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.utils.Application;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
 import org.appwork.utils.JVMVersion;
@@ -110,13 +111,24 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     public static abstract class AssertAnException<ExceptionType extends Exception> {
+        public static enum MODE {
+            INSTANCEOF,
+            CONTAINS
+        }
+
         private final CompiledType expectedExceptionType;
+        private final MODE         mode;
 
         /**
          * @throws Exception
          *
          */
         public AssertAnException() throws Exception {
+            this(MODE.INSTANCEOF);
+        }
+
+        public AssertAnException(MODE mode) throws Exception {
+            this.mode = mode != null ? mode : MODE.INSTANCEOF;
             this.expectedExceptionType = CompiledType.create(((ParameterizedType) this.getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
             checkAssert();
         }
@@ -138,7 +150,14 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
 
         protected boolean validateException(final Exception e) {
-            return CompiledType.create(e.getClass()).isInstanceOf(expectedExceptionType.raw);
+            switch (mode) {
+            case INSTANCEOF:
+                return CompiledType.create(e.getClass()).isInstanceOf(expectedExceptionType.raw);
+            case CONTAINS:
+                return Exceptions.containsInstanceOf(e, (Class<? extends Throwable>) expectedExceptionType.raw);
+            default:
+                throw new WTFException("Unsupported mode:" + mode);
+            }
         }
     }
 
@@ -151,7 +170,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
@@ -381,7 +400,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         LogV3.setFactory(new SimpleLoggerFactory() {
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#removeSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -394,7 +413,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToConsole(org.appwork.loggingv3.simple.sink.LogToStdOutSink)
              */
             @Override
@@ -407,7 +426,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToFile(org.appwork.loggingv3.simple.sink.LogToFileSink)
              */
             @Override
@@ -420,7 +439,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             *
+             * 
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#addSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -436,7 +455,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                 return new LoggerToSink(this) {
                     /*
                      * (non-Javadoc)
-                     *
+                     * 
                      * @see org.appwork.loggingv3.AbstractLogger#getThrownAt()
                      */
                     @Override

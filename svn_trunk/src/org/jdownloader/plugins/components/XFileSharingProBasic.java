@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -2182,7 +2182,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        resolveShortURL(this.br.cloneBrowser(), link, null);
+        resolveShortURL(br.cloneBrowser(), link, null);
         doFree(link, null);
     }
 
@@ -5636,8 +5636,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         final String apikey = getAPIKeyFromAccount(account);
         if (StringUtils.isEmpty(apikey)) {
             /* This should never happen */
-            logger.warning("Cannot do this without apikey");
-            return null;
+            throw new IllegalArgumentException("apikey is null");
         }
         final String fileid_to_download;
         if (requiresAPIGetdllinkCloneWorkaround(account)) {
@@ -5669,7 +5668,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * TODO: Add quality selection. 2020-05-20: Did not add selection yet because so far this API call has NEVER worked for ANY
          * filehost&videohost!
          */
-        /* For videohosts: Pick the best quality */
+        /* For video hosts: Pick the best quality */
         String dllink = null;
         final String[] qualities = new String[] { "o", "h", "n", "l" };
         for (final String quality : qualities) {
@@ -5689,7 +5688,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
         if (StringUtils.isEmpty(dllink)) {
             /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl via API");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find final downloadurl via API");
         }
         logger.info("Successfully found dllink via API: " + dllink);
         return dllink;

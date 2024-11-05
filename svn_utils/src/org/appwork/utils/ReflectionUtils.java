@@ -1021,12 +1021,12 @@ public class ReflectionUtils {
 
     public static boolean isFloatRange(Number number) { // do not check for floatingpoint number. fixed to floating is ok
         final Float floatValue = getFloatValue(number); // do not use doubleValue here. (double)3.4028235E38 != (float)3.4028235E38
-        return floatValue != null && floatValue.floatValue() <= Float.MAX_VALUE && floatValue.floatValue() >= -Float.MAX_VALUE;
+        return floatValue != null && ((floatValue.floatValue() <= Float.MAX_VALUE && floatValue.floatValue() >= -Float.MAX_VALUE) || Float.isNaN(floatValue.floatValue()));
     }
 
     public static boolean isDoubleRange(Number number) {
         final Double doubleValue = getDoubleValue(number); // do not check for floatingpoint number. fixed to floating is ok
-        return doubleValue != null && doubleValue.doubleValue() <= Double.MAX_VALUE && doubleValue.doubleValue() >= -Double.MAX_VALUE;
+        return doubleValue != null && ((doubleValue.doubleValue() <= Double.MAX_VALUE && doubleValue.doubleValue() >= -Double.MAX_VALUE) || Double.isNaN(doubleValue.doubleValue()));
     }
 
     /**

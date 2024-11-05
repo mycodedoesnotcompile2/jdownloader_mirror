@@ -25,8 +25,9 @@ import jd.http.Browser;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.hoster.CrazypornXxx;
 
-@DecrypterPlugin(revision = "$Revision: 50052 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50069 $", interfaceVersion = 2, names = {}, urls = {})
 public class CrazypornXxxCrawler extends PornEmbedParser {
     public CrazypornXxxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,14 +86,7 @@ public class CrazypornXxxCrawler extends PornEmbedParser {
 
     @Override
     protected boolean isOffline(final Browser br) {
-        final String offlineTrait = "/404.php";
-        if (br.getHttpConnection().getResponseCode() == 404) {
-            return true;
-        } else if (br.getURL().contains(offlineTrait) || br.getRedirectLocation() != null && br.getRedirectLocation().contains(offlineTrait)) {
-            return true;
-        } else {
-            return false;
-        }
+        return CrazypornXxx.isOfflineStatic(br);
     }
 
     @Override

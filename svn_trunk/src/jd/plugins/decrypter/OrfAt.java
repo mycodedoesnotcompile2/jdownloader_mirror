@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50052 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50069 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -722,8 +722,8 @@ public class OrfAt extends PluginForDecrypt {
         if (rewriteUrlsToNewMediathek && videoIDFromURL != null) {
             return this.crawlOrfmediathekNew(param, generateContenturlMediathek(videoIDFromURL, null));
         }
-        /* This should never happen */
-        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        /* Assume that we got an invalid/unsupported link */
+        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
     }
 
     private static String generateContenturlMediathek(final String videoID, final String slug) {

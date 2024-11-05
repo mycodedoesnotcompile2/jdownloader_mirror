@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -197,6 +197,7 @@ public class CrossSystem {
         RASPBIAN_BUSTER(OSFamily.LINUX, "buster"),
         RASPBIAN_BULLSEYE(OSFamily.LINUX, "bull"),
         RASPBIAN_BOOKWORM(OSFamily.LINUX, "bookworm"),
+        RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
          * 
@@ -231,6 +232,7 @@ public class CrossSystem {
         UBUNTU_MANTIC(OSFamily.LINUX, "23\\.10"), // 23.10
         UBUNTU_NOBLE(OSFamily.LINUX, "24\\.04"), // 24.04
         UBUNTU_ORACULAR(OSFamily.LINUX, "24\\.10"), // 24.10
+        UBUNTU_PLUCKY(OSFamily.LINUX, "25\\.04"), // 25.04
         /*
          * MAC: List must be sorted by release Date!!
          */
@@ -293,7 +295,6 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -360,7 +361,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -765,7 +765,8 @@ public class CrossSystem {
                     // TODO: query is workstation
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
-                        if (buildNumber >= 26040) {
+                        // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             set(OperatingSystem.WINDOWS_SERVER_2022);

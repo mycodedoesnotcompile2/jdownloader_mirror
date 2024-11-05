@@ -21,18 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.YetiShareCore;
 
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 @HostPlugin(revision = "$Revision: 50072 $", interfaceVersion = 2, names = {}, urls = {})
-public class GoodstreamUno extends YetiShareCore {
-    public GoodstreamUno(PluginWrapper wrapper) {
+public class SqzfileCom extends YetiShareCore {
+    public SqzfileCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(getPurchasePremiumURL());
     }
@@ -42,19 +38,14 @@ public class GoodstreamUno extends YetiShareCore {
      ****************************
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2023-03-21: null <br />
+     * captchatype-info: 2024-11-04: null <br />
      * other: <br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "goodstream.one", "goodstream.uno" });
+        ret.add(new String[] { "sqzfile.com" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -67,43 +58,7 @@ public class GoodstreamUno extends YetiShareCore {
     }
 
     public static String[] getAnnotationUrls() {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + YetiShareCore.buildHostsPatternPart(domains) + "/(?!folder|shared)(video/embed/[A-Za-z0-9]+(/\\d+x\\d+/[^/<>]+)?|[A-Za-z0-9]+(?:/[^/<>]+)?)");
-        }
-        return ret.toArray(new String[0]);
-    }
-
-    final String PATTERN_EMBED = "(?i)https?://[^/]+/video/embed/([A-Za-z0-9]+)(/\\d+x\\d+/([^/<>]+))?";
-
-    @Override
-    protected String getContentURL(final DownloadLink link) {
-        if (link == null || link.getPluginPatternMatcher() == null) {
-            return null;
-        }
-        /* Change embed URLs -> Normal file-URLs. */
-        final Regex embed = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED);
-        if (embed.patternFind()) {
-            /* Make sure that upper handling can work with these links -> Return a fitting URL. */
-            final String filenameInsideURL = embed.getMatch(2);
-            String newurl = this.getMainPage(link) + "/" + embed.getMatch(0);
-            if (filenameInsideURL != null) {
-                newurl += "/" + filenameInsideURL;
-            }
-            return newurl;
-        } else {
-            return super.getContentURL(link);
-        }
-    }
-
-    @Override
-    public String getFUIDFromURL(final String url) {
-        final Regex embed = new Regex(url, PATTERN_EMBED);
-        if (embed.patternFind()) {
-            return embed.getMatch(0);
-        } else {
-            return super.getFUIDFromURL(url);
-        }
+        return YetiShareCore.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
@@ -145,17 +100,5 @@ public class GoodstreamUno extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected void checkResponseCodeErrors(final URLConnectionAdapter con) throws PluginException {
-        if (con == null) {
-            return;
-        }
-        super.checkResponseCodeErrors(con);
-        final long responsecode = con.getResponseCode();
-        if (responsecode == 500) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500", 30 * 60 * 1000l);
-        }
     }
 }
