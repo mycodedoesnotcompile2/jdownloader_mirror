@@ -19,6 +19,7 @@ import java.util.ArrayList;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -26,24 +27,31 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46956 $", interfaceVersion = 3, names = { "pixabay.com" }, urls = { "https?://(?:www\\.)?pixabay\\.com/(?:videos|music|sound-effects)/[a-z0-9\\-]+-(\\d+)/?" })
+@DecrypterPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = { "pixabay.com" }, urls = { "https?://(?:www\\.)?pixabay\\.com/(?:videos|music|sound-effects)/[a-z0-9\\-]+-(\\d+)/?" })
 public class PixabayComCrawler extends PluginForDecrypt {
     public PixabayComCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private final String TYPE_VIDEO         = "https?://(?:www\\.)?pixabay\\.com/videos/[a-z0-9\\-]+-(\\d+)/?";
-    private final String TYPE_MUSIC         = "https?://(?:www\\.)?pixabay\\.com/music/[a-z0-9\\-]+-(\\d+)/?";
-    private final String TYPE_SOUND_EFFECTS = "https?://(?:www\\.)?pixabay\\.com/sound-effects/[a-z0-9\\-]+-(\\d+)/?";
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private final String TYPE_VIDEO         = "(?i)https?://(?:www\\.)?pixabay\\.com/videos/[a-z0-9\\-]+-(\\d+)/?";
+    private final String TYPE_MUSIC         = "(?i)https?://(?:www\\.)?pixabay\\.com/music/[a-z0-9\\-]+-(\\d+)/?";
+    private final String TYPE_SOUND_EFFECTS = "(?i)https?://(?:www\\.)?pixabay\\.com/sound-effects/[a-z0-9\\-]+-(\\d+)/?";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.toString();
-        br.getPage(parameter);
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (parameter.matches(TYPE_VIDEO)) {
+        if (contenturl.matches(TYPE_VIDEO)) {
             final String finallink = this.br.getRegex("\"contentUrl\"\\s*:\\s*\"([^\"]+)").getMatch(0);
             if (finallink == null) {
                 logger.info("Failed to find any downloadable content");

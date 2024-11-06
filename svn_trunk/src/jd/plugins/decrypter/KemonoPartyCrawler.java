@@ -25,6 +25,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig;
+import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
+import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -45,18 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig;
-import org.jdownloader.plugins.components.config.KemonoPartyConfig.TextCrawlMode;
-import org.jdownloader.plugins.components.config.KemonoPartyConfigCoomerParty;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49535 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -173,7 +173,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
             final int numberofUniqueItemsOld = dupes.size();
             for (final HashMap<String, Object> post : posts) {
-                final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(dupes, useAdvancedDupecheck, post);
+                final ArrayList<DownloadLink> thisresults = this.crawlProcessPostAPI(post, dupes, useAdvancedDupecheck);
                 for (final DownloadLink thisresult : thisresults) {
                     if (!perPostPackageEnabled) {
                         thisresult._setFilePackage(profileFilePackage);
@@ -334,11 +334,12 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        return crawlProcessPostAPI(new HashSet<String>(), false, entries);
+        final Map<String, Object> post = (Map<String, Object>) entries.get("post");
+        return crawlProcessPostAPI(post, new HashSet<String>(), false);
     }
 
     /** Processes a map of an API response containing information about a users' post. */
-    private ArrayList<DownloadLink> crawlProcessPostAPI(final HashSet<String> dupes, final boolean useAdvancedDupecheck, final Map<String, Object> postmap) throws PluginException {
+    private ArrayList<DownloadLink> crawlProcessPostAPI(final Map<String, Object> postmap, final HashSet<String> dupes, final boolean useAdvancedDupecheck) throws PluginException {
         final String portal = postmap.get("service").toString();
         final String userID = postmap.get("user").toString();
         final String postID = postmap.get("id").toString();

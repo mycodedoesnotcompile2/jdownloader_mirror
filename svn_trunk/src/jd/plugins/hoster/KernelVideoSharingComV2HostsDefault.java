@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -87,8 +87,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "femdomrip.com" });
         /* 2022-01-17 */
         ret.add(new String[] { "fpo.xxx" });
-        /* 2022-02-23 */
-        ret.add(new String[] { "watchporn.to" });
         /* 2022-03-24 */
         ret.add(new String[] { "footstockings.com" });
         /* 2022-03-24 */

@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50022 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 2, names = {}, urls = {})
 public class SharingWtf extends YetiShareCore {
     public SharingWtf(PluginWrapper wrapper) {
         super(wrapper);
@@ -211,8 +211,7 @@ public class SharingWtf extends YetiShareCore {
         }
         final String dailyLimitReachedText = br.getRegex(">\\s*(You have reached the daily download limit of \\d+ files)").getMatch(0);
         if (dailyLimitReachedText != null) {
-            // ipBlockedOrAccountLimit(link, account, dailyLimitReachedText, 30 * 60 * 1000l);
-            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, dailyLimitReachedText);
+            ipBlockedOrAccountLimit(link, account, dailyLimitReachedText, 30 * 60 * 1000l);
         }
         super.checkErrors(br, link, account);
         final String errorMsg = getErrorMsgURL(br);

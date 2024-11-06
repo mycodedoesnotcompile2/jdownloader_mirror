@@ -16,15 +16,11 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
@@ -46,13 +42,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50072 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
+@HostPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = { "krakenfiles.com" }, urls = { "https?://(?:www\\.)?krakenfiles\\.com/view/([a-z0-9]+)/file\\.html" })
 public class KrakenfilesCom extends PluginForHost {
     public KrakenfilesCom(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/premium");
-        }
+        this.enablePremium("https://" + getHost() + "/premium");
     }
 
     @Override
@@ -91,10 +85,10 @@ public class KrakenfilesCom extends PluginForHost {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return true;
+            return false;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return true;
+            return false;
         } else {
             /* Free(anonymous) and unknown account type */
             return false;
@@ -108,7 +102,7 @@ public class KrakenfilesCom extends PluginForHost {
             return 1;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return 0;
+            return 1;
         } else {
             /* Free(anonymous) and unknown account type */
             return 1;
@@ -144,17 +138,28 @@ public class KrakenfilesCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        doFree(link, "free_directlink");
+        handleDownload(link, null);
     }
 
-    private void doFree(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, this.isResumeable(link, null), this.getMaxChunks(link, null))) {
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        String directlinkproperty = "directurl";
+        if (account != null) {
+            directlinkproperty += "_account_" + account.getType();
+            this.login(account, false);
+        }
+        final String storedDirecturl = link.getStringProperty(directlinkproperty);
+        final String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Re-using stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
             br.getPage(link.getPluginPatternMatcher());
             final Form dlform = br.getFormbyActionRegex(".*?download/.*?");
             if (dlform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             dlform.setMethod(MethodType.POST);
+            /* 2024-11-05: lol Even premium users need to enter that captcha, lol */
             boolean captchaNeeded = false;
             if (CaptchaHelperHostPluginRecaptchaV2.containsRecaptchaV2Class(dlform)) {
                 captchaNeeded = true;
@@ -173,54 +178,32 @@ public class KrakenfilesCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
                 }
             }
-            final String dllink = entries.get("url").toString();
+            dllink = entries.get("url").toString();
             if (StringUtils.isEmpty(dllink) && dllink.startsWith("http")) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
-            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                br.followConnection(true);
-                if (dl.getConnection().getResponseCode() == 403) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-                } else if (dl.getConnection().getResponseCode() == 405) {
-                    /**
-                     * 2023-02-05: This sometimes happens. Strange! See: https://board.jdownloader.org/showthread.php?t=95055 </br>
-                     * This may happen when we're trying to open too many connections.
-                     */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 405 'Method not allowed'", 60 * 60 * 1000l);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unexpected response: Expected file, got html");
-                }
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
+            if (dl.getConnection().getResponseCode() == 403) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
+            } else if (dl.getConnection().getResponseCode() == 405) {
+                /**
+                 * 2023-02-05: This sometimes happens. Strange! See: https://board.jdownloader.org/showthread.php?t=95055 </br>
+                 * This may happen when we're trying to open too many connections.
+                 */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 405 'Method not allowed'", 60 * 60 * 1000l);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unexpected response: Expected file, got html");
             }
+        }
+        if (storedDirecturl == null) {
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         dl.startDownload();
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String property, final boolean resumes, final int chunks) throws Exception {
-        final String url = link.getStringProperty(property);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, resumes, chunks);
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     private boolean login(final Account account, final boolean force) throws Exception {
@@ -279,10 +262,14 @@ public class KrakenfilesCom extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, true);
         final AccountInfo ai = new AccountInfo();
+        long premiumTimeRemainingMillis = 0;
+        final String premiumDaysLeftStr = br.getRegex("(\\d+) days? left").getMatch(0);
+        if (premiumDaysLeftStr != null) {
+            premiumTimeRemainingMillis = (Long.parseLong(premiumDaysLeftStr) + 1) * 24 * 60 * 60 * 1000;
+        }
         ai.setUnlimitedTraffic();
-        final String expire = br.getRegex("(_TODO_)").getMatch(0);
-        if (expire != null) {
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "dd MMMM yyyy", Locale.ENGLISH));
+        if (premiumTimeRemainingMillis > 0) {
+            ai.setValidUntil(System.currentTimeMillis() + premiumTimeRemainingMillis);
             account.setType(AccountType.PREMIUM);
             account.setConcurrentUsePossible(true);
         } else {
@@ -293,8 +280,7 @@ public class KrakenfilesCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        // TODO
-        // this.handleDownload(link, account);
+        this.handleDownload(link, account);
     }
 
     @Override
@@ -320,35 +306,35 @@ public class KrakenfilesCom extends PluginForHost {
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
     }
-
-    private Object checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
-        try {
-            final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            if (jsonO == null || !(jsonO instanceof Map)) {
-                return jsonO;
-            }
-            final Map<String, Object> entries = (Map<String, Object>) jsonO;
-            final String status = (String) entries.get("status");
-            if (!"error".equalsIgnoreCase(status)) {
-                return entries;
-            }
-            // TODO: Add functionality
-            final String msg = entries.get("msg").toString();
-            if (link == null) {
-                throw new AccountInvalidException(msg);
-            }
-            if (msg.equalsIgnoreCase("captcha not valid")) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            } else {
-                /* Unknown error */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
-            }
-        } catch (final JSonMapperException jme) {
-            final String errortext = "Bad API response";
-            // TODO
-        }
-        return null;
-    }
+    // private Object checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException,
+    // InterruptedException {
+    // try {
+    // final Object jsonO = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+    // if (jsonO == null || !(jsonO instanceof Map)) {
+    // return jsonO;
+    // }
+    // final Map<String, Object> entries = (Map<String, Object>) jsonO;
+    // final String status = (String) entries.get("status");
+    // if (!"error".equalsIgnoreCase(status)) {
+    // return entries;
+    // }
+    // // TODO: Add functionality
+    // final String msg = entries.get("msg").toString();
+    // if (link == null) {
+    // throw new AccountInvalidException(msg);
+    // }
+    // if (msg.equalsIgnoreCase("captcha not valid")) {
+    // throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+    // } else {
+    // /* Unknown error */
+    // throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, entries.get("msg").toString());
+    // }
+    // } catch (final JSonMapperException jme) {
+    // final String errortext = "Bad API response";
+    // // TODO
+    // }
+    // return null;
+    // }
 
     @Override
     public void reset() {

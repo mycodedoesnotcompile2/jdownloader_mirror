@@ -39,7 +39,6 @@ public class CFG_YOUTUBE {
     public static final StringKeyHandler              AUDIO_FILENAME_PATTERN                                    = SH.getKeyHandler("AudioFilenamePattern", StringKeyHandler.class);
     public static final StringKeyHandler              FILENAME_PATTERN                                          = SH.getKeyHandler("FilenamePattern", StringKeyHandler.class);
     public static final ObjectKeyHandler              BLACKLISTED_PROJECTIONS                                   = SH.getKeyHandler("BlacklistedProjections", ObjectKeyHandler.class);
-    public static final BooleanKeyHandler             PROXY_ENABLED                                             = SH.getKeyHandler("ProxyEnabled", BooleanKeyHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_RESOLUTIONS             = SH.getKeyHandler("ChooseVariantDialogBlacklistedResolutions", ObjectKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_FILETYPE                    = SH.getKeyHandler("QualitySortIdentifierOrderFiletype", StringListHandler.class);
     /**
@@ -68,7 +67,6 @@ public class CFG_YOUTUBE {
     public static final StringKeyHandler              VARIANT_NAME_PATTERN_AUDIO                                = SH.getKeyHandler("VariantNamePatternAudio", StringKeyHandler.class);
     public static final StringKeyHandler              VIDEO_FILENAME_PATTERN                                    = SH.getKeyHandler("VideoFilenamePattern", StringKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_VIDEO_CODEC                 = SH.getKeyHandler("QualitySortIdentifierOrderVideoCodec", StringListHandler.class);
-    public static final ObjectKeyHandler              PROXY                                                     = SH.getKeyHandler("Proxy", ObjectKeyHandler.class);
     public static final EnumKeyHandler                LINK_IS_PLAYLIST_URL_ACTION                               = SH.getKeyHandler("LinkIsPlaylistUrlAction", EnumKeyHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_VIDEO_FRAMERATES        = SH.getKeyHandler("ChooseVariantDialogBlacklistedVideoFramerates", ObjectKeyHandler.class);
     public static final ObjectKeyHandler              BLACKLISTED_AUDIO_CODECS                                  = SH.getKeyHandler("BlacklistedAudioCodecs", ObjectKeyHandler.class);

@@ -34,7 +34,6 @@ import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -79,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -280,7 +279,7 @@ public class AllDebridCom extends PluginForHost {
         login(account, ai, true);
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
         final boolean includeStreamingItems = true;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && includeStreamingItems) {
+        if (includeStreamingItems) {
             br.getPage(api_base + "/user/hosts?" + agent);
         } else {
             br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
@@ -376,7 +375,7 @@ public class AllDebridCom extends PluginForHost {
             }
         }
         final boolean filterJDownloaderUnsupportedStreamHosts = true;
-        if (filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
+        if (includeStreamingItems && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
             /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
             ai.setMultiHostSupportV2(this, supportedhosts);
             final List<MultiHostHost> results = ai.getMultiHostSupportV2();

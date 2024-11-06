@@ -37,24 +37,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.proxy.ProxyController;
-import jd.controlling.proxy.SingleBasicProxySelectorImpl;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -74,7 +56,6 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.extmanager.Log;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyStorable;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.controlling.ffmpeg.AbstractFFmpegBinary;
@@ -109,8 +90,6 @@ import org.jdownloader.scripting.JSRhinoPermissionRestricter;
 import org.jdownloader.scripting.JSShutterDelegate;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
-import org.jdownloader.updatev2.FilterList;
-import org.jdownloader.updatev2.FilterList.Type;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 import org.w3c.dom.Document;
@@ -122,6 +101,22 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -131,18 +126,6 @@ public class YoutubeHelper {
             cfg.setVideoFilenamePattern(filepattern);
             cfg.setAudioFilenamePattern(filepattern);
             cfg.setFilenamePattern(null);
-        }
-        if (cfg.isProxyEnabled()) {
-        }
-        HTTPProxyStorable proxyStorable = cfg.getProxy();
-        if (proxyStorable != null) {
-            HTTPProxy proxy = HTTPProxy.getHTTPProxy(proxyStorable);
-            SingleBasicProxySelectorImpl selector = new SingleBasicProxySelectorImpl(proxy);
-            FilterList filterlist = new FilterList(Type.WHITELIST, new String[] { "youtube.com" });
-            selector.setEnabled(cfg.isProxyEnabled());
-            selector.setFilter(filterlist);
-            ProxyController.getInstance().addProxy(selector);
-            cfg.setProxy(null);
         }
     }
     private static final String REGEX_DASHMPD_FROM_JSPLAYER_SETUP          = "\"dashmpd\"\\s*:\\s*(\".*?\")";
@@ -3763,22 +3746,6 @@ public class YoutubeHelper {
     public void setupProxy() {
         if (br == null) {
             return;
-        }
-        if (this.cfg.isProxyEnabled()) {
-            final HTTPProxyStorable proxy = this.cfg.getProxy();
-            // int PROXY_PORT = cfg.getProxyPort();
-            // if (StringUtils.isEmpty(PROXY_ADDRESS) || PROXY_PORT < 0) return;
-            // PROXY_ADDRESS = new Regex(PROXY_ADDRESS, "^[0-9a-zA-Z]+://").matches() ? PROXY_ADDRESS : "http://" + PROXY_ADDRESS;
-            // org.appwork.utils.net.httpconnection.HTTPProxy proxy =
-            // org.appwork.utils.net.httpconnection.HTTPProxy.parseHTTPProxy(PROXY_ADDRESS + ":" + PROXY_PORT);
-            if (proxy != null) {
-                HTTPProxy prxy = HTTPProxy.getHTTPProxy(proxy);
-                if (prxy != null) {
-                    br.setProxy(prxy);
-                } else {
-                }
-                return;
-            }
         }
         br.setProxy(br.getThreadProxy());
     }

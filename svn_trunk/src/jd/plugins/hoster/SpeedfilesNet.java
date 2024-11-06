@@ -21,15 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 3, names = {}, urls = {})
-public class FastbitCc extends XFileSharingProBasic {
-    public FastbitCc(final PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
+public class SpeedfilesNet extends XFileSharingProBasic {
+    public SpeedfilesNet(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -37,14 +36,14 @@ public class FastbitCc extends XFileSharingProBasic {
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
-     * limit-info: 2022-01-26: Tested <br />
-     * captchatype-info: 2022-01-26: null<br />
+     * limit-info:<br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fastbit.cc" });
+        ret.add(new String[] { "speedfiles.net" });
         return ret;
     }
 
@@ -66,13 +65,13 @@ public class FastbitCc extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
+            return true;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
     }
 
@@ -81,36 +80,33 @@ public class FastbitCc extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return 1;
+            return 0;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
-            return -2;
+            return 0;
         } else {
             /* Free(anonymous) and unknown account type */
-            return 1;
+            return 0;
         }
     }
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {
-        return 1;
+        return -1;
     }
 
     @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
-        return 1;
+        return -1;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return 10;
+        return -1;
     }
 
     @Override
-    protected String getPremiumOnlyErrorMessage(final Browser br) {
-        if (br.containsHTML(">\\s*Online viewing is available")) {
-            return "Downloading/streaming is available for premium users only";
-        }
-        return super.getPremiumOnlyErrorMessage(br);
+    protected boolean isVideohosterEmbed() {
+        return true;
     }
 }

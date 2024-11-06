@@ -16,6 +16,8 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -48,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@DecrypterPlugin(revision = "$Revision: 50072 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
 public class GenericYetiShareFolder extends PluginForDecrypt {
     public GenericYetiShareFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -145,6 +147,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             currentFolderID = new Regex(parameter, TYPE_NEW_NONACCOUNTSHARED).getMatch(0);
         }
         if (currentFolderID == null) {
+            /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
@@ -157,6 +160,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                 final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
                 try {
                     if (!(plg instanceof YetiShareCore)) {
+                        /* Developer mistake */
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     final boolean validatedCookies = ((YetiShareCore) plg).loginWebsite(account, false);
@@ -177,6 +181,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                 }
             }
         } else {
+            /* No account */
             br.getPage(parameter);
         }
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -211,7 +216,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         folderquery.add("additionalParams%5BfilterUploadedDateRange%5D", "");
         folderquery.add("pageStart", "1");
         br.postPage("/account/ajax/load_files", folderquery.toString());
-        Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (entries.containsKey("javascript")) {
             final String js = (String) entries.get("javascript");
             /*
@@ -223,10 +228,10 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                 logger.info("Possible error-reason for offline folder: " + js);
             }
         }
-        final String fpName = (String) entries.get("page_title");
+        // final String title = (String) entries.get("page_title");
         String htmlInsideJson = (String) entries.get("html");
         br.getRequest().setHtmlCode(htmlInsideJson);
-        boolean passwordSuccess = true;
+        boolean passwordSuccess = false;
         String passCode = null;
         Form pwForm = null;
         int counter = 0;
@@ -236,6 +241,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                 pwForm = br.getFormbyProperty("id", "folderPasswordForm");
                 if (pwForm == null) {
                     /* Folder is not password protected */
+                    passwordSuccess = true;
                     break;
                 }
             }
@@ -243,7 +249,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             passCode = getUserInput("Password?", param);
             pwForm.put("folderPassword", Encoding.urlEncode(passCode));
             br.submitForm(pwForm);
-            entries = restoreFromString(br.toString(), TypeRef.MAP);
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             passwordSuccess = ((Boolean) entries.get("success")).booleanValue();
             counter++;
         } while (!this.isAbort() && !passwordSuccess && counter < 3);
@@ -252,20 +258,15 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         } else if (passCode != null) {
             /* Re-do request to access folder content */
             br.postPage("/account/ajax/load_files", folderquery.toString());
-            entries = restoreFromString(br.toString(), TypeRef.MAP);
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             htmlInsideJson = (String) entries.get("html");
             br.getRequest().setHtmlCode(htmlInsideJson);
         }
         int page = 1;
-        FilePackage fp = null;
-        if (contenturl.matches(TYPE_NEW) && !StringUtils.isEmpty(fpName)) {
-            fp = FilePackage.getInstance();
-            fp.setName(fpName);
-        }
         /* Try to construct absolute path to current folder */
         String subfolderPath = "";
         final String[] subfolderParts = br.getRegex("<a href=\"[^\"]+\"[^>]*class=\"btn btn-white[^\"]*\">([^<>]+)<").getColumn(0);
-        if (subfolderParts.length > 0) {
+        if (subfolderParts != null && subfolderParts.length > 0) {
             for (String subfolderPart : subfolderParts) {
                 if (subfolderPath.length() > 0) {
                     subfolderPath += "/";
@@ -280,8 +281,10 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             logger.warning("Failed to find absolute folder path");
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final Map<String, FilePackage> packages = new HashMap<String, FilePackage>();
+        final HashSet<String> dupes = new HashSet<String>();
+        dupes.add(addedFolderHash);
         pagination: do {
-            logger.info("Crawling page: " + page);
             /* 2021-04-30: "</div></div>" when loggedin */
             final int numberofResultsOld = ret.size();
             final String[] fileHTMLSnippets = br.getRegex("<div[^>]*(dttitle.*?)(?:</span></div>|</div></div>)").getColumn(0);
@@ -295,43 +298,50 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
                     if (StringUtils.isEmpty(url) || StringUtils.isEmpty(internalFileID)) {
                         /* Skip invalid items */
                         continue;
+                    } else if (!dupes.add(url)) {
+                        /* Skip dupes */
+                        continue;
                     }
-                    final DownloadLink dl = createDownloadlink(url);
+                    final DownloadLink file = createDownloadlink(url);
                     if (!StringUtils.isEmpty(filename)) {
-                        dl.setName(Encoding.htmlDecode(filename).trim());
+                        file.setName(Encoding.htmlDecode(filename).trim());
                     }
                     if (!StringUtils.isEmpty(filesizeStr)) {
-                        dl.setDownloadSize(Long.parseLong(filesizeStr));
+                        file.setDownloadSize(Long.parseLong(filesizeStr));
                     }
-                    dl.setProperty(org.jdownloader.plugins.components.YetiShareCore.PROPERTY_INTERNAL_FILE_ID, internalFileID);
+                    file.setProperty(org.jdownloader.plugins.components.YetiShareCore.PROPERTY_INTERNAL_FILE_ID, internalFileID);
                     if (uploaddateStr != null) {
                         /* 2020-11-26: For Packagizer/EventScripter - not used anywhere else. */
-                        dl.setProperty(YetiShareCore.PROPERTY_UPLOAD_DATE_RAW, uploaddateStr);
+                        file.setProperty(YetiShareCore.PROPERTY_UPLOAD_DATE_RAW, uploaddateStr);
                     }
                     /* We know for sure that this file is online! */
-                    dl.setAvailable(true);
+                    file.setAvailable(true);
                     if (subfolderPath.length() > 0) {
-                        dl.setRelativeDownloadFolderPath(subfolderPath);
+                        file.setRelativeDownloadFolderPath(subfolderPath);
+                        FilePackage fp = packages.get(subfolderPath);
+                        if (fp == null) {
+                            fp = FilePackage.getInstance();
+                            fp.setName(subfolderPath);
+                            packages.put(subfolderPath, fp);
+                        }
+                        file._setFilePackage(fp);
                     }
                     if (passCode != null) {
-                        dl.setDownloadPassword(passCode);
+                        file.setDownloadPassword(passCode);
                     }
-                    if (fp != null) {
-                        dl._setFilePackage(fp);
-                    }
-                    ret.add(dl);
-                    distribute(dl);
+                    ret.add(file);
+                    distribute(file);
                 }
             }
-            /* Now crawl subfolders inside this folder */
+            /* Crawl subfolders inside this folder */
             final String[] folderHashes = br.getRegex("(/folder/[a-f0-9]{32})").getColumn(0);
             if (folderHashes != null && folderHashes.length > 0) {
                 for (String folderHash : folderHashes) {
-                    if (folderHash.equalsIgnoreCase(addedFolderHash)) {
-                        /* Don't re-add the folder we're just crawling! */
+                    if (!dupes.add(folderHash)) {
+                        /* Skip dupes */
                         continue;
                     }
-                    final String folderURL = br.getURL(folderHash).toString();
+                    final String folderURL = br.getURL(folderHash).toExternalForm();
                     final DownloadLink folder = this.createDownloadlink(folderURL);
                     /*
                      * 2020-11-13: Not required. If a "root" folder is password-protected, all files within it are usually not password
@@ -345,25 +355,29 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
             }
             final int numberofItemsNewThisPage = ret.size() - numberofResultsOld;
             logger.info("Crawled page " + page + " | New this page: " + numberofItemsNewThisPage + " | Total so far: " + ret.size());
-            if (numberofItemsNewThisPage < maxItemsPerPage) {
-                logger.info("Stopping because: Reached end?");
-                break pagination;
-            }
             final String nextpageStr = br.getRegex("onClick=\"loadImages\\('(?:folder|nonaccountshared)', '\\d+', (\\d+),[^\\)]+\\); return false;\"><span>Next</span>").getMatch(0);
             /* Only continue if found page matches expected page! */
-            if (nextpageStr != null && nextpageStr.equals(Integer.toString(page + 1))) {
-                page++;
-                folderquery.add("pageStart", Integer.toString(page));
-                br.postPage("/account/ajax/load_files", folderquery.toString());
-                entries = restoreFromString(br.toString(), TypeRef.MAP);
-                htmlInsideJson = (String) entries.get("html");
-                br.getRequest().setHtmlCode(htmlInsideJson);
-                continue pagination;
-            } else {
-                /* We should be on the last page */
-                logger.info("Stopping because: Failed to find nextpage -> Stopping");
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (numberofItemsNewThisPage < maxItemsPerPage) {
+                logger.info("Stopping because: Current page contains less than " + maxItemsPerPage + " items -> Reached end?");
+                break pagination;
+            } else if (nextpageStr == null) {
+                logger.info("Stopping because: Failed to find nextpage");
+                break pagination;
+            } else if (nextpageStr.equals(Integer.toString(page + 1))) {
+                logger.info("Stopping because: nextpage == current page");
                 break pagination;
             }
+            /* Continue to next page */
+            page++;
+            folderquery.add("pageStart", Integer.toString(page));
+            br.postPage("/account/ajax/load_files", folderquery.toString());
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            htmlInsideJson = (String) entries.get("html");
+            br.getRequest().setHtmlCode(htmlInsideJson);
+            continue pagination;
         } while (!this.isAbort());
         if (ret.isEmpty()) {
             String offlineName;
@@ -385,6 +399,7 @@ public class GenericYetiShareFolder extends PluginForDecrypt {
         final String contenturl = param.getCryptedUrl();
         final String folderID = new Regex(contenturl, TYPE_OLD).getMatch(0);
         if (folderID == null) {
+            /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         br.getPage(contenturl);

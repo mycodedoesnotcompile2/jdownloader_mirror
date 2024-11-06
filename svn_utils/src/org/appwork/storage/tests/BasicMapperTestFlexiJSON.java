@@ -68,6 +68,11 @@ public class BasicMapperTestFlexiJSON extends AbstractMapperTest {
                     }
 
                     @Override
+                    protected boolean isBigIntegerAllowed() {
+                        return BasicMapperTestFlexiJSON.this.isBigIntegerSupported();
+                    }
+
+                    @Override
                     protected boolean isImplicitOctalAllowed() {
                         return BasicMapperTestFlexiJSON.this.isImplicitOctalSupported();
                     }

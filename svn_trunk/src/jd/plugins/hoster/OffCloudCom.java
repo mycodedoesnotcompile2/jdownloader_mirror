@@ -62,7 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -116,8 +116,6 @@ public class OffCloudCom extends UseNet {
         br.setConnectTimeout(60 * 1000);
         br.setReadTimeout(60 * 1000);
         br.setAllowedResponseCodes(500);
-        /* 2020-12-10: List of supported websites can be HUGE! */
-        // br.setLoadLimit(2 * br.getLoadLimit());
         br.setFollowRedirects(true);
         return br;
     }
@@ -210,7 +208,7 @@ public class OffCloudCom extends UseNet {
                 requestID = PluginJSonUtils.getJsonValue(br, "requestId");
                 if (requestID == null) {
                     /* Should never happen */
-                    mhm.handleErrorGeneric(this.currAcc, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
+                    mhm.handleErrorGeneric(account, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
                 }
                 do {
                     this.sleep(5000l, link);
@@ -221,7 +219,7 @@ public class OffCloudCom extends UseNet {
                 if (!"downloaded".equals(status)) {
                     logger.warning("Cloud failed");
                     /* Should never happen but will happen */
-                    mhm.handleErrorGeneric(this.currAcc, link, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
+                    mhm.handleErrorGeneric(account, link, "cloud_download_failed_reason_unknown", 50, 5 * 60 * 1000l);
                 }
                 /* Filename needed in URL or server will return bad filenames! */
                 dllink = "https://" + getHost() + "/cloud/download/" + requestID + "/" + Encoding.urlEncode(filename);
@@ -232,12 +230,12 @@ public class OffCloudCom extends UseNet {
                 requestID = (String) entries.get("requestId");
                 if (requestID == null) {
                     /* Should never happen */
-                    mhm.handleErrorGeneric(this.currAcc, link, "instant_requestIdnull", 50, 5 * 60 * 1000l);
+                    mhm.handleErrorGeneric(account, link, "instant_requestIdnull", 50, 5 * 60 * 1000l);
                 }
                 dllink = (String) entries.get("url");
                 if (StringUtils.isEmpty(dllink)) {
                     /* Should never happen */
-                    mhm.handleErrorGeneric(this.currAcc, link, "dllinknull", 50, 5 * 60 * 1000l);
+                    mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
                 }
             }
             dllink = dllink.replaceAll("\\\\/", "/");
@@ -287,7 +285,7 @@ public class OffCloudCom extends UseNet {
                 }
                 updatestatuscode();
                 handleAPIErrors(this.br);
-                mhm.handleErrorGeneric(this.currAcc, link, "unknowndlerror", 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, "unknowndlerror", 50, 5 * 60 * 1000l);
             }
             controlSlot(+1);
             try {
@@ -351,13 +349,10 @@ public class OffCloudCom extends UseNet {
         return null;
     }
 
-    @SuppressWarnings({ "deprecation", "unchecked", "rawtypes" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         setConstants(account, null);
         final OffCloudComPluginConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class);
-        final long last_deleted_complete_download_history_time_ago = getLast_deleted_complete_download_history_time_ago();
-        logger.info("last_deleted_complete_download_history_time_ago: " + TimeFormatter.formatMilliSeconds(last_deleted_complete_download_history_time_ago, 0));
         this.login(account, true);
         final AccountInfo ai = new AccountInfo();
         br.postPage("https://" + getHost() + "/stats/usage-left", "");
@@ -373,7 +368,7 @@ public class OffCloudCom extends UseNet {
         List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("data");
         String packagetype = null;
         String activeTill = null;
-        boolean foundPackage = false;
+        boolean foundPremiumPackage = false;
         for (final Map<String, Object> packageinfo : ressourcelist) {
             packagetype = (String) packageinfo.get("type");
             activeTill = (String) packageinfo.get("activeTill");
@@ -384,7 +379,7 @@ public class OffCloudCom extends UseNet {
              * a lot simpler.
              */
             if ("premium-downloading".equalsIgnoreCase(packagetype)) {
-                foundPackage = true;
+                foundPremiumPackage = true;
                 break;
             }
         }
@@ -396,24 +391,28 @@ public class OffCloudCom extends UseNet {
             if (remainingLinksCount instanceof Number) {
                 remaininglinksnum = ((Number) remainingLinksCount).longValue();
             }
-            account.setProperty("accinfo_linksleft", remaininglinksnum);
-        } else if (foundPackage) {
+        } else if (foundPremiumPackage) {
             account.setType(AccountType.PREMIUM);
             ai.setUnlimitedTraffic();
             activeTill = activeTill.replaceAll("Z$", "+0000");
             ai.setValidUntil(TimeFormatter.getMilliSeconds(activeTill, "yyyy-MM-dd'T'HH:mm:ss.S", Locale.ENGLISH), br);
-            account.setProperty("accinfo_linksleft", remaininglinksnum);
         } else {
             /* This should never happen */
             account.setType(AccountType.UNKNOWN);
-            return ai;
         }
-        if (remaininglinksnum == 0) {
+        account.setProperty("accinfo_linksleft", remaininglinksnum);
+        /*
+         * 2024-11-05: Either the API is returning wrong values or I misinterpreted them. Either way, "links" with a value of zero does not
+         * mean that the account is out of traffic!
+         */
+        final boolean throwExceptionOnZeroLinksLeft = false;
+        if (remaininglinksnum == 0 && throwExceptionOnZeroLinksLeft) {
+            /*  */
             /*
              * No links downloadable (anymore) --> No traffic left --> Free account limit reached --> At this stage the user cannot use the
              * account for anything
              */
-            ai.setTrafficLeft(0);
+            throw new AccountUnavailableException("No link generations left", 5 * 60 * 1000);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         ai.setStatus(account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes));
@@ -537,7 +536,7 @@ public class OffCloudCom extends UseNet {
             }
         }
         logger.info("Performing full login");
-        postAPISafe(API_BASE + "login/classic", "username=" + Encoding.urlEncode(currAcc.getUser()) + "&password=" + Encoding.urlEncode(currAcc.getPass()));
+        postAPISafe(API_BASE + "login/classic", "username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
         final String logincookie = br.getCookie(this.getHost(), "connect.sid", Cookies.NOTDELETEDPATTERN);
         if (logincookie == null) {
             /* This should never happen as we got errorhandling for invalid logindata */

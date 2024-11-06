@@ -98,7 +98,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -905,7 +905,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         texts.add("This file is not available for free download");
         texts.add("Only Premium user can download this file");
         /* 2019-05-30: Example: xvideosharing.com */
-        texts.add("This video is available for Premium users only");
+        texts.add("This video is available for Premium Users only");
+        texts.add("This file is available for Premium Users only");
         String msg = null;
         for (final String text : texts) {
             msg = br.getRegex(">(\\s*" + Pattern.quote(text) + "[^<]*)").getMatch(0);

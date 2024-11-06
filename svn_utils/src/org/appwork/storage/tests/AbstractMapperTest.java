@@ -236,7 +236,7 @@ public abstract class AbstractMapperTest extends AWTest {
     }
 
     protected boolean isBigIntegerSupported() {
-        return false;
+        return BigIntegerSupported;
     }
 
     public void floatNumberFormatTests(JSONMapper mapper) throws Exception {

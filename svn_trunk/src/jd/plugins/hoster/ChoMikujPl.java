@@ -54,7 +54,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.ChoMikujPlFolder;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
+@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = { "chomikuj.pl" }, urls = { "https?://chomikujdecrypted\\.pl/.*?,\\d+$" })
 public class ChoMikujPl extends antiDDoSForHost {
     private String               dllink                                                = null;
     private static final String  PREMIUMONLY                                           = "(Aby pobrać ten plik, musisz być zalogowany lub wysłać jeden SMS\\.|Właściciel tego chomika udostępnia swój transfer, ale nie ma go już w wystarczającej|wymaga opłacenia kosztów transferu z serwerów Chomikuj\\.pl)";
@@ -423,115 +423,114 @@ public class ChoMikujPl extends antiDDoSForHost {
         if (this.getPluginConfig().getBooleanProperty(AVOIDPREMIUMMP3TRAFFICUSAGE, false) && link.getName().toLowerCase().endsWith(".mp3")) {
             /* User wants to force stream download for .mp3 files --> Does not use up any premium traffic. */
             dllink = getDllinkMP3(link);
-        } else {
-            /* Premium users can always download the original file */
-            final boolean accountHasLessTrafficThanRequiredForThisFile = account.getAccountInfo().getTrafficLeft() < link.getView().getBytesTotal();
-            try {
-                final String requestVerificationToken = br.getRegex("<div id=\"content\">\\s*?<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-                if (requestVerificationToken == null) {
-                    logger.warning("Failed to find requestVerificationToken");
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                /* First, kind of a linkcheck - if we haven't found the filesize before we'll probably find it now. */
-                getPageWithCleanup(br, "https://chomikuj.pl/action/fileDetails/Index/" + fid);
-                final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
-                if (filesize != null) {
-                    link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
-                }
-                if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("fileDetails/Unavailable")) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
+            return true;
+        }
+        /* Premium users can always download the original file */
+        final boolean accountHasLessTrafficThanRequiredForThisFile = account.getAccountInfo().getTrafficLeft() < link.getView().getBytesTotal();
+        try {
+            final String requestVerificationToken = br.getRegex("<div id=\"content\">\\s*?<input name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+            if (requestVerificationToken == null) {
+                logger.warning("Failed to find requestVerificationToken");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            /* First, kind of a linkcheck - if we haven't found the filesize before we'll probably find it now. */
+            getPageWithCleanup(br, "https://chomikuj.pl/action/fileDetails/Index/" + fid);
+            final String filesize = br.getRegex("<p class=\"fileSize\">([^<>\"]*?)</p>").getMatch(0);
+            if (filesize != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesize.replace(",", ".")));
+            }
+            if (br.getRedirectLocation() != null && br.getRedirectLocation().contains("fileDetails/Unavailable")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (!account.getAccountInfo().isSpecialTraffic() && accountHasLessTrafficThanRequiredForThisFile) {
                 /* Users can override traffic check. For this case we'll check if we have enough traffic for this file here. */
-                if (!account.getAccountInfo().isSpecialTraffic() && accountHasLessTrafficThanRequiredForThisFile) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
-                }
-                br.setCookie("http://chomikuj.pl/", "__RequestVerificationToken_Lw__", requestVerificationToken);
-                br.getHeaders().put("Referer", link.getDownloadURL());
-                postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadContext", "fileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-                if (cbr.containsHTML(ACCESSDENIED)) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
+            }
+            br.setCookie("http://chomikuj.pl/", "__RequestVerificationToken_Lw__", requestVerificationToken);
+            br.getHeaders().put("Referer", link.getDownloadURL());
+            postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadContext", "fileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            if (cbr.containsHTML(ACCESSDENIED)) {
+                return false;
+            }
+            /* Low traffic warning(?) */
+            if (cbr.containsHTML("action=\"/action/License/DownloadWarningAccept\"")) {
+                final String serializedUserSelection = cbr.getRegex("name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+                final String serializedOrgFile = cbr.getRegex("name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
+                if (serializedUserSelection == null || serializedOrgFile == null) {
+                    logger.warning("Failed to pass low traffic warning!");
                     return false;
                 }
-                /* Low traffic warning(?) */
-                if (cbr.containsHTML("action=\"/action/License/DownloadWarningAccept\"")) {
-                    final String serializedUserSelection = cbr.getRegex("name=\"SerializedUserSelection\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-                    final String serializedOrgFile = cbr.getRegex("name=\"SerializedOrgFile\" type=\"hidden\" value=\"([^<>\"]*?)\"").getMatch(0);
-                    if (serializedUserSelection == null || serializedOrgFile == null) {
-                        logger.warning("Failed to pass low traffic warning!");
-                        return false;
-                    }
-                    postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadWarningAccept", "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-                }
-                if (cbr.containsHTML("dontShowBoxInSession")) {
-                    postPageWithCleanup(br, "/action/chomikbox/DontDownloadWithBox", "__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-                    postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
-                }
-                if (cbr.containsHTML("/action/License/acceptLargeTransfer")) {
-                    // this can happen also
-                    // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
-                    cleanupBrowser(br, PluginJSonUtils.unescape(br.toString()));
-                    // so we can get output in logger for debug purposes.
-                    logger.info(cbr.toString());
-                    final Form f = cbr.getFormbyAction("/action/License/acceptLargeTransfer");
-                    if (f == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    submitFormWithCleanup(br, f);
-                } else if (cbr.containsHTML("/action/License/AcceptOwnTransfer")) {
-                    /*
-                     * Some files on chomikuj hoster are available to download using transfer from file owner. When there's no owner
-                     * transfer left then transfer is reduced from downloader account (downloader is asked if he wants to use his own
-                     * transfer). We have to confirm this here.
-                     */
-                    // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
-                    cleanupBrowser(cbr, PluginJSonUtils.unescape(br.toString()));
-                    // so we can get output in logger for debug purposes.
-                    logger.info(cbr.toString());
-                    final Form f = cbr.getFormbyAction("/action/License/AcceptOwnTransfer");
-                    if (f == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    f.remove(null);
-                    f.remove(null);
-                    f.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
-                    submitFormWithCleanup(br, f);
-                }
-                dllink = br.getRegex("redirectUrl\":\"(https?://.*?)\"").getMatch(0);
-                if (dllink == null) {
-                    dllink = br.getRegex("\\\\u003ca href=\\\\\"([^\"]*?)\\\\\" title").getMatch(0);
-                }
-                if (dllink == null) {
-                    dllink = br.getRegex("\"(https?://[A-Za-z0-9\\-_\\.]+\\.chomikuj\\.pl/File\\.aspx[^<>\"]*?)\\\\\"").getMatch(0);
-                }
-                if (dllink == null) {
-                    if (cbr.containsHTML("\"BuyAdditionalTransfer")) {
-                        logger.info("Disabling chomikuj.pl account: Not enough traffic available");
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-                    }
-                    logger.warning("Failed to find final downloadurl");
+                postPageWithCleanup(br, "https://chomikuj.pl/action/License/DownloadWarningAccept", "FileId=" + fid + "&SerializedUserSelection=" + Encoding.urlEncode(serializedUserSelection) + "&SerializedOrgFile=" + Encoding.urlEncode(serializedOrgFile) + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            }
+            if (cbr.containsHTML("dontShowBoxInSession")) {
+                postPageWithCleanup(br, "/action/chomikbox/DontDownloadWithBox", "__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+                postPageWithCleanup(br, "/action/License/Download", "FileId=" + fid + "&__RequestVerificationToken=" + Encoding.urlEncode(requestVerificationToken));
+            }
+            if (cbr.containsHTML("/action/License/acceptLargeTransfer")) {
+                // this can happen also
+                // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
+                cleanupBrowser(br, PluginJSonUtils.unescape(br.toString()));
+                // so we can get output in logger for debug purposes.
+                logger.info(cbr.toString());
+                final Form f = cbr.getFormbyAction("/action/License/acceptLargeTransfer");
+                if (f == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                dllink = Encoding.unicodeDecode(dllink);
-                dllink = Encoding.htmlDecode(dllink);
-                if (dllink.contains("#SliderTransfer")) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Traffic limit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+                submitFormWithCleanup(br, f);
+            } else if (cbr.containsHTML("/action/License/AcceptOwnTransfer")) {
+                /*
+                 * Some files on chomikuj hoster are available to download using transfer from file owner. When there's no owner transfer
+                 * left then transfer is reduced from downloader account (downloader is asked if he wants to use his own transfer). We have
+                 * to confirm this here.
+                 */
+                // problem is.. general cleanup is wrong, response is = Content-Type: application/json; charset=utf-8
+                cleanupBrowser(cbr, PluginJSonUtils.unescape(br.toString()));
+                // so we can get output in logger for debug purposes.
+                logger.info(cbr.toString());
+                final Form f = cbr.getFormbyAction("/action/License/AcceptOwnTransfer");
+                if (f == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                br.setFollowRedirects(redirectsSetting);
-            } catch (final PluginException e) {
-                String msg = null;
-                try {
-                    final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
-                    msg = (String) entries.get("Content");
-                    msg = msg.trim();
-                } catch (final Throwable e2) {
+                f.remove(null);
+                f.remove(null);
+                f.put("__RequestVerificationToken", Encoding.urlEncode(requestVerificationToken));
+                submitFormWithCleanup(br, f);
+            }
+            dllink = br.getRegex("redirectUrl\":\"(https?://.*?)\"").getMatch(0);
+            if (dllink == null) {
+                dllink = br.getRegex("\\\\u003ca href=\\\\\"([^\"]*?)\\\\\" title").getMatch(0);
+            }
+            if (dllink == null) {
+                dllink = br.getRegex("\"(https?://[A-Za-z0-9\\-_\\.]+\\.chomikuj\\.pl/File\\.aspx[^<>\"]*?)\\\\\"").getMatch(0);
+            }
+            if (dllink == null) {
+                if (cbr.containsHTML("\"BuyAdditionalTransfer")) {
+                    logger.info("Disabling chomikuj.pl account: Not enough traffic available");
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
                 }
-                if (e.getLinkStatus() == LinkStatus.ERROR_PLUGIN_DEFECT && accountHasLessTrafficThanRequiredForThisFile) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
-                } else if (!StringUtils.isEmpty(msg) && msg.length() <= 100) {
-                    /* Try to display more precise errormessage, avoid plugin defect. */
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg);
-                } else {
-                    throw e;
-                }
+                logger.warning("Failed to find final downloadurl");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            dllink = Encoding.unicodeDecode(dllink);
+            dllink = Encoding.htmlDecode(dllink);
+            if (dllink.contains("#SliderTransfer")) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "Traffic limit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+            }
+            br.setFollowRedirects(redirectsSetting);
+        } catch (final PluginException e) {
+            String msg = null;
+            try {
+                final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.toString());
+                msg = (String) entries.get("Content");
+                msg = msg.trim();
+            } catch (final Throwable e2) {
+            }
+            if (e.getLinkStatus() == LinkStatus.ERROR_PLUGIN_DEFECT && accountHasLessTrafficThanRequiredForThisFile) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic to download this file", 30 * 60 * 1000l);
+            } else if (!StringUtils.isEmpty(msg) && msg.length() <= 100) {
+                /* Try to display more precise errormessage, avoid plugin defect. */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg);
+            } else {
+                throw e;
             }
         }
         return true;

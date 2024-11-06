@@ -23,7 +23,6 @@ import org.appwork.storage.config.annotations.StorageHandlerFactoryAnnotation;
 import org.appwork.storage.config.defaults.AbstractDefaultFactory;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPProxyStorable;
 import org.jdownloader.plugins.components.youtube.configpanel.YoutubeVariantCollection;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
@@ -421,13 +420,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
     @AboutConfig
     String[] getPreferedSubtitleLanguages();
 
-    @Deprecated
-    /**
-     * @deprecated use proxy and whitelist instead
-     * @return
-     */
-    HTTPProxyStorable getProxy();
-
     @AboutConfig
     @CustomValueGetter(QualitySortIdentifierOrderDefaultGetter.class)
     String[] getQualitySortIdentifierOrder();
@@ -516,14 +508,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setDASHMuxingEnabled(boolean b);
 
-    @DefaultBooleanValue(false)
-    @Deprecated
-    /**
-     * @deprecated use proxy and whitelist instead
-     * @return
-     */
-    boolean isProxyEnabled();
-
     @DefaultBooleanValue(true)
     @DescriptionForConfigEntry("Appends String representing internal variant information ('#variant=...') to URL the user gets when copying URL of added item.")
     @AboutConfig
@@ -596,16 +580,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
     void setLinkIsVideoAndPlaylistUrlAction(YoutubeConfig.IfUrlisAVideoAndPlaylistAction action);
 
     void setPreferedSubtitleLanguages(String[] lngKeys);
-
-    @Deprecated
-    void setProxy(HTTPProxyStorable address);
-
-    @Deprecated
-    /**
-     * @deprecated use proxy and whitelist instead
-     * @return
-     */
-    void setProxyEnabled(boolean b);
 
     void setQualitySortIdentifierOrder(String[] s);
 

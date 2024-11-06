@@ -40,8 +40,6 @@ import org.appwork.utils.Application;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.Base64;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyStorable;
 import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
@@ -98,6 +96,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
@@ -105,7 +104,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 50072 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -677,26 +676,33 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
         }
-        final List<YoutubeStreamData> playlistThumbnails = helper.getPlaylistThumbnails();
         // TODO: Add setting, see: https://svn.jdownloader.org/issues/90496
         boolean crawlPlaylistThumbnails = true;
-        if (crawlPlaylistThumbnails && playlistThumbnails != null) {
+        playlistThumbnailHandling: if (true) {
+            if (!crawlPlaylistThumbnails) {
+                /* Do nothing */
+                break playlistThumbnailHandling;
+            } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                break playlistThumbnailHandling;
+            }
+            final List<YoutubeStreamData> playlistThumbnails = helper.getPlaylistThumbnails();
             // TODO: Add to list of download-results
-            if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                for (final YoutubeStreamData thumbinfo : playlistThumbnails) {
-                    final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbinfo.getUrl()));
-                    if (thumbinfo.getEstimatedContentLength() > 0) {
-                        thumb.setDownloadSize(thumbinfo.estimatedContentLength());
-                    }
-                    thumb.setAvailable(true);
-                    if (channelOrPlaylistPackage != null) {
-                        thumb._setFilePackage(channelOrPlaylistPackage);
-                    }
-                    // TODO: Add customizable filenames
-                    ret.add(thumb);
-                    distribute(thumb);
-                    break;
+            for (final YoutubeStreamData thumbinfo : playlistThumbnails) {
+                final String directurl = thumbinfo.getUrl();
+                final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+                if (thumbinfo.getEstimatedContentLength() > 0) {
+                    thumb.setDownloadSize(thumbinfo.estimatedContentLength());
                 }
+                if (channelOrPlaylistPackage != null) {
+                    thumb._setFilePackage(channelOrPlaylistPackage);
+                    final String fileExtension = Plugin.getFileNameExtensionFromURL(directurl, ".jpg");
+                    thumb.setFinalFileName(channelOrPlaylistPackage.getName() + fileExtension);
+                }
+                thumb.setAvailable(true);
+                // TODO: Add customizable filenames
+                ret.add(thumb);
+                distribute(thumb);
+                break;
             }
         }
         Integer indexFromAddedURL = null;
@@ -1184,22 +1190,6 @@ public class TbCmV2 extends PluginForDecrypt {
             getLogger().log(e);
             return null;
         }
-    }
-
-    @Override
-    public void setBrowser(Browser brr) {
-        if (CFG_YOUTUBE.CFG.isProxyEnabled()) {
-            final HTTPProxyStorable proxy = CFG_YOUTUBE.CFG.getProxy();
-            if (proxy != null) {
-                HTTPProxy prxy = HTTPProxy.getHTTPProxy(proxy);
-                if (prxy != null) {
-                    this.br.setProxy(prxy);
-                } else {
-                }
-                return;
-            }
-        }
-        super.setBrowser(brr);
     }
 
     private ArrayList<YoutubeClipData> crawlPlaylistOrChannel(final YoutubeHelper helper, final Browser br, final String playlistID, final String userName, final String channelID, final String referenceUrl, final int maxItemsLimit) throws Exception {
