@@ -10,7 +10,6 @@ import org.jdownloader.images.BadgeIcon;
 
 public enum VariantGroup implements LabelInterface {
     AUDIO(IconKey.ICON_AUDIO) {
-
         @Override
         public String getLabel() {
             return _GUI.T.YoutubeBasicVariant_getLabel_audio();
@@ -46,11 +45,16 @@ public enum VariantGroup implements LabelInterface {
             return _GUI.T.YoutubeBasicVariant_getLabel_image();
         }
     },
+    IMAGE_PLAYLIST_COVER(IconKey.ICON_IMAGE) {
+        @Override
+        public String getLabel() {
+            return _GUI.T.YoutubeBasicVariant_getLabel_playlist_cover_image();
+        }
+    },
     SUBTITLES(IconKey.ICON_LANGUAGE) {
         @Override
         public Icon getIcon(int size) {
             return new BadgeIcon(IconKey.ICON_TEXT, IconKey.ICON_LANGUAGE, size);
-
         }
 
         @Override
@@ -59,12 +63,12 @@ public enum VariantGroup implements LabelInterface {
         }
     },
     DESCRIPTION(IconKey.ICON_TEXT) {
-
         @Override
         public String getLabel() {
             return _GUI.T.YoutubeBasicVariant_getLabel_description();
         }
     };
+
     private String iconKey;
 
     private VariantGroup(String iconKey) {
@@ -74,5 +78,4 @@ public enum VariantGroup implements LabelInterface {
     public Icon getIcon(int size) {
         return new AbstractIcon(iconKey, size);
     }
-
 }

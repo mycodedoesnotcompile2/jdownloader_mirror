@@ -21,6 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -28,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47708 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50080 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedditComCrawlerRedditMedia extends PluginForDecrypt {
     public RedditComCrawlerRedditMedia(PluginWrapper wrapper) {
         super(wrapper);
@@ -75,14 +76,34 @@ public class RedditComCrawlerRedditMedia extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         /* Sometimes protocol in URL is missing e.g. https://www.redditmedia.com/mediaembed/7q164i */
-        String finallink = this.br.getRegex("<iframe[^>]*src=\"((http?:)?//[^\"]+)").getMatch(0);
+        String finallink = br.getRegex("<iframe[^>]*src=\"((https?:)?//[^\"]+)").getMatch(0);
         if (finallink == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* 2024-11-06: Reddit selfhosted video content e.g. https://www.redditmedia.com/mediaembed/xmz9o3 */
+            finallink = br.getRegex("data-seek-preview-url=\"([^\"]+)").getMatch(0);
+            if (finallink == null) {
+                /* 2024-11-06 e.g. https://www.redditmedia.com/mediaembed/xmz9o3 */
+                finallink = br.getRegex("data-hls-url=\"([^\"]+)").getMatch(0);
+            }
         }
-        if (!finallink.startsWith("http")) {
-            finallink = "https:" + finallink;
+        if (finallink != null) {
+            /* Single result */
+            /* Change potential relative URL to absolute URL. */
+            finallink = br.getURL(finallink).toExternalForm();
+            ret.add(createDownloadlink(finallink));
+        } else {
+            /*
+             * Fallback for misc externally hosted content -> Add all http URLs e.g. twitter items e.g.
+             * https://www.redditmedia.com/mediaembed/1dzak7a
+             */
+            final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+            if (urls == null || urls.length == 0) {
+                /* No links at all -> Item must be offline */
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            for (final String url : urls) {
+                ret.add(createDownloadlink(url));
+            }
         }
-        ret.add(createDownloadlink(finallink));
         return ret;
     }
 }

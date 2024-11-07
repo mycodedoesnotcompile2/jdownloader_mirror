@@ -81,6 +81,15 @@ public class MultiHostHost {
     private String                statusText                      = null;
     private MultihosterHostStatus status                          = null;
     private static final long     MAX_UNAVAILABLE_TIME            = 5 * 60 * 1000;
+    private AccountInfo           accountInfo                     = null;
+
+    public AccountInfo getAccountInfo() {
+        return accountInfo;
+    }
+
+    protected void setAccountInfo(AccountInfo accountInfo) {
+        this.accountInfo = accountInfo;
+    }
 
     public MultiHostHost() {
     }
@@ -195,8 +204,8 @@ public class MultiHostHost {
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br>
-     * 500 = 5 times the size of the downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
+     * downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
         if (trafficCalculationFactorPercent == null) {
@@ -235,8 +244,8 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns custom set status text. </br>
-     * Typically used to describe why this host is currently not working but can also be used as an informative field.
+     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
+     * informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -283,7 +292,11 @@ public class MultiHostHost {
     }
 
     public void setStatus(MultihosterHostStatus status) {
-        this.status = status;
+        if (MultihosterHostStatus.WORKING.equals(status)) {
+            this.status = null;// see getStatus
+        } else {
+            this.status = status;
+        }
     }
 
     public int getMaxChunks() {
@@ -353,8 +366,7 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns time this item is unavailable for. </br>
-     * This can return negative values.
+     * Returns time this item is unavailable for. </br> This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();

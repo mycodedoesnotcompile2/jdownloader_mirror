@@ -41,9 +41,6 @@ public class PackageControllerQueue extends Queue {
 
     @Override
     public QueueAction<?, ? extends Throwable> peek() {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            return null;
-        }
         try {
             return super.peek();
         } catch (Throwable e) {

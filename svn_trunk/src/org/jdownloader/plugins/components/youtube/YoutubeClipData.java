@@ -8,8 +8,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import jd.plugins.DownloadLink;
-
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.AbstractVariant;
@@ -22,6 +20,8 @@ import org.jdownloader.plugins.components.youtube.variants.VariantInfo;
 import org.jdownloader.plugins.components.youtube.variants.VideoVariant;
 import org.jdownloader.plugins.components.youtube.variants.YoutubeSubtitleStorable;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
+
+import jd.plugins.DownloadLink;
 
 public class YoutubeClipData {
     /**
@@ -322,7 +322,7 @@ public class YoutubeClipData {
     public List<VariantInfo> findVariants() {
         ArrayList<VariantInfo> ret = new ArrayList<VariantInfo>();
         for (VariantBase v : VariantBase.values()) {
-            if (!CFG_YOUTUBE.CFG.isExternMultimediaToolUsageEnabled() && v.isVideoToolRequired()) {
+            if (v.isVideoToolRequired() && !CFG_YOUTUBE.CFG.isExternMultimediaToolUsageEnabled()) {
                 continue;
             }
             if (!v.isValidFor(this)) {

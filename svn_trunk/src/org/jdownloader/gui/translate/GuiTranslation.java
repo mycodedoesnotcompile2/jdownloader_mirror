@@ -4658,6 +4658,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Images" })
     String YoutubeBasicVariant_getLabel_image();
 
+    @Default(lngs = { "en" }, values = { "Playlist cover image" })
+    String YoutubeBasicVariant_getLabel_playlist_cover_image();
+
     @Default(lngs = { "en" }, values = { "Subtitles" })
     String YoutubeBasicVariant_getLabel_subtitles();
 
@@ -7014,7 +7017,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "Deactivated by user", "Vom Benutzer deaktiviert" })
     String multihost_single_host_object_status_deactivated_user();
 
-    @Default(lngs = { "en", "de" }, values = { "Temporarily deactivated by JD", "Temporär von JD deaktiviert" })
+    @Default(lngs = { "en", "de" }, values = { "Deactivated by JDownloader", "Deaktiviert von JDownloader" })
     String multihost_single_host_object_status_deactivated_jdownloader();
 
     @Default(lngs = { "en", "de" }, values = { "Not supported by JD", "Wird nicht von JD unterstützt" })

@@ -190,6 +190,8 @@ public class IconIO {
             }
             final Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, this.interpolation.getHint());
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             final AffineTransform old = g2.getTransform();
             g2.translate(x, y);
             g2.scale(this.faktor, this.faktor);

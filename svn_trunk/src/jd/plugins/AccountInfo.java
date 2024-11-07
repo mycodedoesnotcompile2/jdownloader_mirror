@@ -29,6 +29,12 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
+import jd.config.Property;
+import jd.http.Browser;
+import jd.nutils.NaturalOrderComparator;
+import jd.parser.Regex;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -38,12 +44,6 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
-
-import jd.config.Property;
-import jd.http.Browser;
-import jd.nutils.NaturalOrderComparator;
-import jd.parser.Regex;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
 public class AccountInfo extends Property implements AccountTrafficView {
     private static final long   serialVersionUID           = 1825140346023286206L;
@@ -58,20 +58,29 @@ public class AccountInfo extends Property implements AccountTrafficView {
     private volatile String     account_status;
     private long                account_createTime         = 0;
     private static final String PROPERTY_MULTIHOST_SUPPORT = "multiHostSupport";
+    private Account             account                    = null;
+
+    protected void setAccount(Account account) {
+        this.account = account;
+    }
+
+    public Account getAccount() {
+        return account;
+    }
+
     /**
      * indicator that host, account has special traffic handling, do not temp disable if traffic =0
      */
-    private volatile boolean    specialTraffic             = false;
-    private volatile boolean    account_trafficRefill      = true;
+    private volatile boolean specialTraffic        = false;
+    private volatile boolean account_trafficRefill = true;
 
     public boolean isTrafficRefill() {
         return account_trafficRefill;
     }
 
     /**
-     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br>
-     * Set this to false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account
-     * stays empty.
+     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br> Set this to
+     * false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account stays empty.
      */
     public void setTrafficRefill(boolean account_trafficRefill) {
         this.account_trafficRefill = account_trafficRefill;
@@ -297,55 +306,6 @@ public class AccountInfo extends Property implements AccountTrafficView {
         this.account_LastValidUntil = validUntil;
     }
 
-    public static void testsetMultiHostSupport(final PluginForHost plg) {
-        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* Do nothing */
-            return;
-        }
-        final PluginFinder finder = new PluginFinder(plg.getLogger());
-        final String onlyThisPlugin = null;
-        final AccountInfo ai = new AccountInfo();
-        for (final LazyHostPlugin plugin : HostPluginController.getInstance().list()) {
-            if (plugin.isOfflinePlugin()) {
-                continue;
-            } else if (onlyThisPlugin != null && !StringUtils.equalsIgnoreCase(onlyThisPlugin, plugin.getHost())) {
-                continue;
-            }
-            final List<String> hosts = new ArrayList<String>();
-            hosts.add(plugin.getHost());
-            PluginForHost pl = null;
-            try {
-                pl = plugin.getPrototype(null);
-                final String[] names = pl.siteSupportedNames();
-                if (names != null && hosts.size() == 1) {
-                    hosts.addAll(Arrays.asList(names));
-                }
-            } catch (final Exception e) {
-                plg.getLogger().log(e);
-            }
-            for (String host : hosts) {
-                final List<String> ret = ai.setMultiHostSupport(plg, Arrays.asList(new String[] { host }), finder);
-                if (ret == null || ret.size() != 1) {
-                    final LazyHostPlugin lazy = finder._assignHost(host);
-                    if (lazy != null && lazy.isOfflinePlugin()) {
-                        continue;
-                    }
-                    final String debugPattern = lazy != null ? lazy.getPatternSource() : null;
-                    System.out.println("WTF:" + host + "|" + debugPattern);
-                } else if (!host.equals(ret.get(0))) {
-                    if (hosts.contains(ret.get(0)) && hosts.get(0).equals(ret.get(0))) {
-                        continue;
-                    } else if (pl != null && ret.get(0).equals(pl.rewriteHost(host))) {
-                        continue;
-                    }
-                    System.out.println("WTF:" + host + "!=" + ret.get(0));
-                }
-            }
-            System.out.println("nice:" + plugin);
-        }
-        System.out.println("nice");
-    }
-
     /**
      * Removes forbidden hosts, adds host corrections, de-dupes, and then sets AccountInfo property 'multiHostSupport'
      *
@@ -355,7 +315,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
      */
     public List<String> setMultiHostSupport(final PluginForHost multiHostPlugin, final List<String> multiHostSupportListStr) {
         if (multiHostPlugin != null && multiHostPlugin.getLogger() != null) {
-            return setMultiHostSupport(multiHostPlugin, multiHostSupportListStr, new PluginFinder(LogController.TRASH));
+            return setMultiHostSupport(multiHostPlugin, multiHostSupportListStr, new PluginFinder(multiHostPlugin.getLogger()));
         } else {
             final LogSource logSource = LogController.getFastPluginLogger(Thread.currentThread().getName());
             try {
@@ -367,6 +327,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /* Last revision with newer slash "in the middle" version of this function: 49753 */
+    @Deprecated
     public List<String> setMultiHostSupport(final PluginForHost multiHostPlugin, final List<String> multiHostSupportListStr, final PluginFinder pluginFinder) {
         /* Last revision with old handling: 49800 */
         final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
@@ -384,7 +345,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
 
     public List<String> setMultiHostSupportV2(final PluginForHost multiHostPlugin, final List<MultiHostHost> multiHostSupportList) {
         if (multiHostPlugin != null && multiHostPlugin.getLogger() != null) {
-            return setMultiHostSupportV2(multiHostPlugin, multiHostSupportList, new PluginFinder(LogController.TRASH));
+            return setMultiHostSupportV2(multiHostPlugin, multiHostSupportList, new PluginFinder(multiHostPlugin.getLogger()));
         } else {
             final LogSource logSource = LogController.getFastPluginLogger(Thread.currentThread().getName());
             try {
@@ -513,6 +474,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 unassignedMultiHostSupport.add(maindomainCleaned);
                 finalresults_new.add(mhost);
                 continue cleanListLoop;
+            } else if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
+                mhost.setStatus(MultihosterHostStatus.WORKING);
             }
             /* Remove dupes based on the results we already have */
             final Iterator<LazyHostPlugin> iterator = plugins.iterator();
@@ -529,8 +492,10 @@ public class AccountInfo extends Property implements AccountTrafficView {
             /* Multiple possible results -> Evaluate what's the best */
             final List<LazyHostPlugin> best = new ArrayList<LazyHostPlugin>();
             final Set<LazyHostPlugin> thisSkippedByPluginAllowHandleEntries = new HashSet<LazyHostPlugin>();
+            final Set<LazyHostPlugin> thisSkippedByOfflinePluginEntries = new HashSet<LazyHostPlugin>();
             for (final LazyHostPlugin plugin : plugins) {
                 if (plugin.isOfflinePlugin()) {
+                    thisSkippedByOfflinePluginEntries.add(plugin);
                     skippedOfflineEntries.add(maindomainCleaned);
                     continue;
                 } else if (plugin.isFallbackPlugin()) {
@@ -558,11 +523,21 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
             final LazyHostPlugin finalplugin;
             if (best.size() == 1) {
+                /* Success -> We found a single matching result */
                 finalplugin = best.get(0);
             } else if (thisSkippedByPluginAllowHandleEntries.size() == plugins.size()) {
-                /* Take first result of fallback list. */
+                /* Success but hoster cannot be used because the original plugin does not allow multihosts. */
                 finalplugin = plugins.iterator().next();
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_NOT_ALLOWED_BY_ORIGINAL_PLUGIN);
+            } else if (thisSkippedByOfflinePluginEntries.size() == plugins.size()) {
+                /* Success but our result is a host which we know is permanently offline. */
+                finalplugin = plugins.iterator().next();
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+                mhost.setStatusText("Permanently offline");
+                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    /* Skip such items completely in stable */
+                    continue cleanListLoop;
+                }
             } else {
                 /* Too many results and/or all results are for offline domains */
                 unassignedMultiHostSupport.add(maindomainCleaned);
@@ -607,9 +582,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
             finalresults_new.add(mhost);
         }
         /**
-         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
-         * If a multihost provides multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but
-         * "rg.to" may remain on the list of unassigned hosts.
+         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br> If a multihost provides
+         * multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but "rg.to" may remain on the
+         * list of unassigned hosts.
          */
         for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
@@ -666,15 +641,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
         /* sorting will now work properly since they are all pre-corrected to lowercase. */
         Collections.sort(finalresults_old, new NaturalOrderComparator());
         this.setProperty(PROPERTY_MULTIHOST_SUPPORT, new CopyOnWriteArrayList<String>(finalresults_old));
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            Collections.sort(finalresults_new, new Comparator<MultiHostHost>() {
-                @Override
-                public int compare(MultiHostHost o1, MultiHostHost o2) {
-                    return o1.getDomain().compareToIgnoreCase(o2.getDomain());
-                }
-            });
-            multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(finalresults_new);
-        }
+        setMultiHostSupportV2(finalresults_new);
         return finalresults_old;
     }
 
@@ -683,11 +650,12 @@ public class AccountInfo extends Property implements AccountTrafficView {
     @Override
     public boolean removeProperty(String key) {
         if (PROPERTY_MULTIHOST_SUPPORT.equals(key)) {
-            multihostSupportV2 = null;
+            setMultiHostSupportV2(null);
         }
         return super.removeProperty(key);
     }
 
+    @Deprecated
     public List<String> getMultiHostSupport() {
         final Object ret = getProperty(PROPERTY_MULTIHOST_SUPPORT, null);
         if (ret == null) {
@@ -704,30 +672,45 @@ public class AccountInfo extends Property implements AccountTrafficView {
 
     /** 2024-09-06: wrapper function */
     public List<MultiHostHost> getMultiHostSupportV2() {
-        final boolean allowUseNewHandling = true;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && allowUseNewHandling) {
-            final List<MultiHostHost> ret = this.multihostSupportV2;
-            if (ret != null) {
-                return ret;
-            }
+        final List<MultiHostHost> ret = this.multihostSupportV2;
+        if (ret != null) {
+            return ret;
         }
         final List<String> domains = getMultiHostSupport();
         if (domains == null) {
             return null;
         } else if (domains.isEmpty()) {
             return null;
+        } else {
+            final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
+            for (final String domain : domains) {
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                mhosts.add(mhost);
+            }
+            setMultiHostSupportV2(mhosts);
+            return mhosts;
         }
-        final List<MultiHostHost> mhosts = new CopyOnWriteArrayList<MultiHostHost>();
-        for (final String domain : domains) {
-            final MultiHostHost mhost = new MultiHostHost(domain);
-            mhosts.add(mhost);
-        }
-        this.multihostSupportV2 = mhosts;
-        return mhosts;
     }
 
-    public void setMultiHostSupport_internal(final List<MultiHostHost> mhosts) {
-        this.multihostSupportV2 = mhosts;
+    public void setMultiHostSupportV2(final List<MultiHostHost> mhosts) {
+        if (mhosts == null || mhosts.size() == 0) {
+            this.multihostSupportV2 = null;
+        } else {
+            for (final MultiHostHost mhost : mhosts) {
+                mhost.setAccountInfo(this);
+            }
+            try {
+                Collections.sort(mhosts, new Comparator<MultiHostHost>() {
+                    @Override
+                    public int compare(MultiHostHost o1, MultiHostHost o2) {
+                        return StringUtils.valueOrEmpty(o1.getDomain()).compareToIgnoreCase(StringUtils.valueOrEmpty(o2.getDomain()));
+                    }
+                });
+            } catch (UnsupportedOperationException ignore) {
+                // eg mHosts instanceof CopyOnWriteArrayList
+            }
+            this.multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(mhosts);
+        }
     }
 
     /** Returns information about specific host if it is supported. */

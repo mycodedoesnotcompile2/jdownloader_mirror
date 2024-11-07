@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50079 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -334,7 +334,11 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> post = (Map<String, Object>) entries.get("post");
+        /* 2024-11-06: Looks like they are playing around with API changes. */
+        Map<String, Object> post = (Map<String, Object>) entries.get("post");
+        if (post == null) {
+            post = entries;
+        }
         return crawlProcessPostAPI(post, new HashSet<String>(), false);
     }
 

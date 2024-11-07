@@ -21,7 +21,10 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.KVSConfig;
+import org.jdownloader.plugins.components.config.KVSConfigWatchpornTo;
+
+@HostPlugin(revision = "$Revision: 50083 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComWatchpornTo extends KernelVideoSharingComV2 {
     public KernelVideoSharingComWatchpornTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -49,11 +52,13 @@ public class KernelVideoSharingComWatchpornTo extends KernelVideoSharingComV2 {
     }
 
     @Override
+    public Class<? extends KVSConfig> getConfigInterface() {
+        return KVSConfigWatchpornTo.class;
+    }
+
+    @Override
     protected String generateContentURL(final String host, final String fuid, final String urlTitle) {
         return generateContentURLDefaultVideosPattern(host, fuid, urlTitle);
     }
-    // @Override
-    // public Class<? extends KVSConfig> getConfigInterface() {
-    // return KVSConfigWatchpornTo.class;
-    // }
+
 }

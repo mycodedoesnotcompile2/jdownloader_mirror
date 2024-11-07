@@ -36,6 +36,7 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -44,9 +45,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50080 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
 public class MydebridCom extends antiDDoSForHost {
     /* Documentation: https://api.mydebrid.com/v1/ */
     private static final String                  API_BASE             = "https://api.mydebrid.com/v1";
@@ -156,7 +156,6 @@ public class MydebridCom extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         handleDL(account, link);
     }
 
@@ -169,10 +168,11 @@ public class MydebridCom extends antiDDoSForHost {
             entries = handleErrors(br, account, null);
         }
         final AccountInfo ai = new AccountInfo();
-        boolean is_premium = "premium".equalsIgnoreCase((String) entries.get("accountType"));
+        final boolean is_premium = "premium".equalsIgnoreCase((String) entries.get("accountType"));
+        final String expireDate = (String) entries.get("expiryDate");
         /* 2020-05-06: This will usually return "unlimited" */
         // final String trafficleft = (String) entries.get("remainingTraffic");
-        if (!is_premium) {
+        if (!is_premium || StringUtils.equals(expireDate, "expired")) {
             /* Assume free accounts cannot be used to download anything */
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
@@ -181,7 +181,6 @@ public class MydebridCom extends antiDDoSForHost {
         } else {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
-            final String expireDate = (String) entries.get("expiryDate");
             if (!StringUtils.isEmpty(expireDate)) {
                 ai.setValidUntil(TimeFormatter.getMilliSeconds(expireDate, "MM-dd-yyyy", Locale.ENGLISH), this.br);
             }
@@ -198,13 +197,6 @@ public class MydebridCom extends antiDDoSForHost {
             /* These fields contain either the string "unlimited" */
             final Object trafficMaxO = hostinfo.get("dailyLimit");
             final Object trafficLeftO = hostinfo.get("remaining");
-            if (trafficLeftO instanceof Number) {
-                mhost.setTrafficLeft(((Number) trafficLeftO).longValue());
-            }
-            if (trafficMaxO instanceof Number) {
-                mhost.setTrafficMax(((Number) trafficMaxO).longValue());
-            }
-            mhost.setMaxDownloads(((Number) hostinfo.get("maxDownloads")).intValue());
             int max_chunks = ((Number) hostinfo.get("maxChunks")).intValue();
             if (max_chunks <= 0) {
                 max_chunks = 1;
@@ -212,22 +204,26 @@ public class MydebridCom extends antiDDoSForHost {
                 max_chunks = -max_chunks;
             }
             final boolean canResume = ((Boolean) hostinfo.get("resumable")).booleanValue();
-            final int resumable;
-            if (canResume) {
-                resumable = 1;
-            } else {
-                resumable = 0;
+            if (trafficLeftO instanceof Number) {
+                mhost.setTrafficLeft(((Number) trafficLeftO).longValue());
             }
+            if (trafficMaxO instanceof Number) {
+                mhost.setTrafficMax(((Number) trafficMaxO).longValue());
+            }
+            mhost.setMaxDownloads(((Number) hostinfo.get("maxDownloads")).intValue());
+            mhost.setMaxChunks(max_chunks);
+            mhost.setResume(canResume);
+            supportedhosts.add(mhost);
+            /* Legacy handling */
             final String originalHost = finder.assignHost(domain);
             if (originalHost == null) {
                 /* This should never happen */
                 logger.info("Skipping host because failed to find supported/original host: " + domain);
                 continue;
             }
-            supportedhosts.add(mhost);
             final LinkedHashMap<String, Integer> limits = new LinkedHashMap<String, Integer>();
             limits.put("max_chunks", max_chunks);
-            limits.put("resumable", resumable);
+            limits.put("resumable", canResume ? 1 : 0);
             individualHostLimits.put(originalHost, limits);
         }
         ai.setMultiHostSupportV2(this, supportedhosts);
@@ -262,10 +258,10 @@ public class MydebridCom extends antiDDoSForHost {
         final String postData = String.format("username=%s&password=%s", Encoding.urlEncode(account.getUser()), Encoding.urlEncode(account.getPass()));
         postPage(API_BASE + "/login", postData);
         entries = handleErrors(br, account, null);
-        token = PluginJSonUtils.getJson(br, "token");
+        token = entries.get("token").toString();
         if (StringUtils.isEmpty(token)) {
             /* This should never happen - do not permanently disable accounts for unexpected login errors! */
-            throw new PluginException(LinkStatus.ERROR_PREMIUM, "Unknown login failure", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+            throw new AccountInvalidException("Unknown login failure");
         }
         account.setProperty(PROPERTY_logintoken, token);
         return entries;

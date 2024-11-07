@@ -52,6 +52,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
@@ -510,17 +511,17 @@ abstract public class ZeveraCore extends UseNet {
          */
         final List<String> cachehosts = (List<String>) hosterinfo.get("cache");
         final Map<String, Number> fairusefactor = (Map<String, Number>) hosterinfo.get("fairusefactor");
-        for (final String cachehost : cachehosts) {
-            if (!supportedHostsMainDomains.contains(cachehost)) {
-                logger.info("Host which is only in cache list but not in any other supported list: " + cachehost);
-            }
-        }
         if (supportsUsenet(account)) {
             supportedHostsMainDomains.add("usenet");
         }
+        final HashSet<String> supportedHostsMainDomainsFinal = new HashSet<String>();
+        supportedHostsMainDomainsFinal.addAll(supportedHostsMainDomains);
+        if (cachehosts != null) {
+            supportedHostsMainDomainsFinal.addAll(cachehosts);
+        }
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final Map<String, Object> aliasesmap = (Map<String, Object>) hosterinfo.get("aliases");
-        for (final String mainDomain : supportedHostsMainDomains) {
+        for (final String mainDomain : supportedHostsMainDomainsFinal) {
             final MultiHostHost mhost = new MultiHostHost(mainDomain);
             final List<String> allDomains = (List<String>) aliasesmap.get(mainDomain);
             if (allDomains != null) {
@@ -530,6 +531,10 @@ abstract public class ZeveraCore extends UseNet {
             if (fairusefactorThisHost != null) {
                 /* E.g. factor 4 -> 400% traffic is deducted when downloading from that hoster. */
                 mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
+            }
+            if (cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomains.contains(mainDomain)) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                mhost.setStatusText("Cache only");
             }
             supportedhosts.add(mhost);
         }

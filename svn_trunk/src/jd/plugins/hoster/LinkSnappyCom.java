@@ -73,13 +73,24 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 50080 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
     public LinkSnappyCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/home");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("User-Agent", "JDownloader " + getVersion());
+        br.addAllowedResponseCodes(new int[] { 425, 429, 502, 503, 504, 507 });
+        br.setConnectTimeout(2 * 60 * 1000);
+        br.setReadTimeout(2 * 60 * 1000);
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -132,15 +143,6 @@ public class LinkSnappyCom extends PluginForHost {
     private final int    CACHE_WAIT_THRESHOLD     = 10 * 60000;
     private final String PROPERTY_DIRECTURL       = "linksnappycomdirectlink";
     private final String PROPERTY_HOSTER_INFO_MAP = "hoster_info_map";
-
-    public void setBrowser(final Browser br) {
-        super.setBrowser(br);
-        br.getHeaders().put("User-Agent", "JDownloader " + getVersion());
-        br.addAllowedResponseCodes(new int[] { 425, 429, 502, 503, 504, 507 });
-        br.setConnectTimeout(2 * 60 * 1000);
-        br.setReadTimeout(2 * 60 * 1000);
-        br.setFollowRedirects(true);
-    }
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
@@ -308,7 +310,7 @@ public class LinkSnappyCom extends PluginForHost {
                         ac.setUnlimitedTraffic();
                     }
                     ac.setStatus(String.format("Free Account [%s of %s daily links left]", remainingDailyURLsStr, maxDailyURLsStr));
-                } catch (final Throwable ignore) {
+                } catch (final Exception ignore) {
                     logger.exception("Failed to find free Account limits --> Setting ZERO trafficleft", ignore);
                     ac.setTrafficLeft(0);
                     ac.setStatus("Free Account [Failed to find number of URLs left]");
@@ -519,24 +521,22 @@ public class LinkSnappyCom extends PluginForHost {
             }
             link.setProperty(PROPERTY_DIRECTURL, dllink);
         }
-        if (dl.startDownload()) {
+        if (dl.startDownload() && PluginJsonConfig.get(LinkSnappyComConfig.class).isClearDownloadHistoryEnabled()) {
             /**
              * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br>
              * Also make sure we get no exception as our download was successful. </br>
              * NOTE: Even failed downloads will appear in the download history - but they will also be cleared once there is one successful
              * download.
              */
-            if (PluginJsonConfig.get(LinkSnappyComConfig.class).isClearDownloadHistoryEnabled()) {
-                logger.info("Clearing download history");
-                try {
-                    br.getPage("https://" + this.getHost() + "/api/DELETELINK?type=filehost&hash=all");
-                    this.handleErrors(br, link, account);
-                    /* No exception = Success! */
-                    logger.info("Delete history succeeded!");
-                } catch (final Throwable ignore) {
-                    logger.log(ignore);
-                    logger.warning("Delete download history failed");
-                }
+            logger.info("Clearing download history");
+            try {
+                br.getPage("https://" + this.getHost() + "/api/DELETELINK?type=filehost&hash=all");
+                this.handleErrors(br, link, account);
+                /* No exception = Success! */
+                logger.info("Delete history succeeded!");
+            } catch (final Throwable ignore) {
+                logger.log(ignore);
+                logger.warning("Delete download history failed");
             }
         }
     }
@@ -759,7 +759,7 @@ public class LinkSnappyCom extends PluginForHost {
                     final Map<String, Object> entries = this.handleErrors(br, null, account);
                     logger.info("Cached login successful");
                     /* Save new cookie timestamp */
-                    account.saveCookies(br.getCookies(this.getHost()), "");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
                     return entries;
                 } catch (final Throwable e) {
                     logger.log(e);

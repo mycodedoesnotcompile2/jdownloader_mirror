@@ -2585,7 +2585,7 @@ public class YoutubeHelper {
                 logger.warning("Ignore Error:" + unavailableReason);
             }
         }
-        final List<YoutubeStreamData> thumbnails = loadThumbnails(vid.videoID, true);
+        final List<YoutubeStreamData> thumbnails = crawlThumbnailData(vid.videoID, true);
         if (thumbnails != null) {
             for (YoutubeStreamData thumbnail : thumbnails) {
                 addYoutubeStreamData(ret, thumbnail);
@@ -3393,7 +3393,7 @@ public class YoutubeHelper {
      * Returns null if nothing is found. <br>
      * 2024-08-22: Thumbnail presentation inside html code is the same for playlists and single videos.
      */
-    public List<YoutubeStreamData> loadThumbnails(String itemID, final boolean grabFilesize) {
+    public List<YoutubeStreamData> crawlThumbnailData(String itemID, final boolean grabFilesize) {
         final Regex thumbregex = br.getRegex("<meta property=\"og:image\" content=\"https?://i\\.ytimg.com/vi/([\\w-]+)/(.+\\.jpg)[^\"]*\">");
         if (!thumbregex.patternFind()) {
             return null;
@@ -4021,8 +4021,8 @@ public class YoutubeHelper {
         return list;
     }
 
-    public static String createLinkID(String videoID, AbstractVariant variant) {
-        final String ret = "youtubev2://" + videoID + "/" + Hash.getMD5(Encoding.urlEncode(variant._getUniqueId()));
+    public static String createLinkID(String contentID, AbstractVariant variant) {
+        final String ret = "youtubev2://" + contentID + "/" + Hash.getMD5(Encoding.urlEncode(variant._getUniqueId()));
         return ret;
     }
 
@@ -4250,7 +4250,7 @@ public class YoutubeHelper {
             }
         }
         if (this.playlistID != null) {
-            playlistThumbnails = this.loadThumbnails(null, false);
+            playlistThumbnails = this.crawlThumbnailData(null, false);
             if (playlistThumbnails == null) {
                 logger.warning("Failed to crawl playlist thumbnails");
             }

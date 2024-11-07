@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -115,6 +116,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtComponentRowHighlighter;
+import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
@@ -231,14 +233,14 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-                                                  /**
-                                                   * these patterns should split filename and fileextension (extension must include the
-                                                   * point)
-                                                   */
-                                                  // multipart rar archives
-            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-            // normal files with extension
-            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+        // normal files with extension
+        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -1443,16 +1445,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         * 
+         *
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         * 
+         *
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         * 
+         *
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         * 
-         * 
-         * 
+         *
+         *
+         *
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3347,6 +3349,43 @@ public abstract class PluginForHost extends Plugin {
                             return mhost.getUnavailableTimeMillis();
                         }
 
+                        private final AtomicReference<Timer> timerReference = new AtomicReference<Timer>();
+
+                        @Override
+                        public boolean isVisible(boolean savedValue) {
+                            final boolean ret = super.isVisible(savedValue);
+                            final ExtLongColumn<MultiHostHost> thisColumn = this;
+                            if (ret && timerReference.get() == null) {
+                                final Timer countdownTimer = new Timer(1000, new ActionListener() {
+                                    @Override
+                                    public void actionPerformed(ActionEvent e) {
+                                        final ExtTable<MultiHostHost> table = getTable();
+                                        if (table == null) {
+                                            // no table set yet
+                                            return;
+                                        }
+                                        if (!table.isShowing() || !getModel().isColumnVisible(thisColumn) || timerReference.get() != e.getSource()) {
+                                            ((Timer) e.getSource()).stop();
+                                            return;
+                                        }
+                                        table.getModel().fireTableDataChanged();
+                                    }
+                                }) {
+
+                                    private static final long serialVersionUID = -8818019184160268747L;
+
+                                    @Override
+                                    public void stop() {
+                                        super.stop();
+                                        timerReference.compareAndSet(this, null);
+                                    };
+                                };
+                                countdownTimer.start();
+                                timerReference.set(countdownTimer);
+                            }
+                            return ret;
+                        }
+
                         @Override
                         protected String getLongFormatted(MultiHostHost mhost) {
                             final long unavailableFor = getLong(mhost);
@@ -3357,6 +3396,7 @@ public abstract class PluginForHost extends Plugin {
                             }
                         }
                     });
+
                 }
                 if (shouldShowLinkLimitColumns_final) {
                     addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left_max()) {
@@ -3556,22 +3596,6 @@ public abstract class PluginForHost extends Plugin {
                     }
                 }
             });
-        }
-        if (shouldShowUnavailableForColumn && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            // TODO: only refresh when visible
-            /* Add wait time countdown if needed. */
-            final Timer countdownTimer = new Timer(1000, new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    for (int i = 0; i < tableModel.getRowCount(); i++) {
-                        final MultiHostHost mhost = tableModel.getObjectbyRow(i);
-                        if (mhost.getUnavailableTimeMillis() > 0) {
-                            tableModel.fireTableRowsUpdated(i, i);
-                        }
-                    }
-                }
-            });
-            countdownTimer.start();
         }
         tableModel._fireTableStructureChanged(hosts, false);
         final BasicJDTable<MultiHostHost> table = new BasicJDTable<MultiHostHost>(tableModel);

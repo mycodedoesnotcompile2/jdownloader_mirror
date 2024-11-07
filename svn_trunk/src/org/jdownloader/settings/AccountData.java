@@ -5,15 +5,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
-import org.appwork.storage.Storable;
-import org.appwork.utils.StringUtils;
-
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.AccountInfo;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHostData;
+
+import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
+import org.appwork.storage.Storable;
+import org.appwork.utils.StringUtils;
 
 public class AccountData implements Storable {
     // Variables
@@ -279,10 +279,10 @@ public class AccountData implements Storable {
     }
 
     public Account toAccount() {
-        Account ret = new Account(user, password);
+        final Account ret = new Account(user, password);
         ret.setProperties(properties);
         if (infoProperties != null) {
-            AccountInfo ai = new AccountInfo();
+            final AccountInfo ai = new AccountInfo();
             ret.setAccountInfo(ai);
             ai.setProperties(infoProperties);
             ai.setCreateTime(createTime);
@@ -300,7 +300,7 @@ public class AccountData implements Storable {
                 for (final MultiHostHostData mhostdata : this.infoSupportedhostlist) {
                     supportedhosts.add(mhostdata.toMultiHostHost());
                 }
-                ai.setMultiHostSupport_internal(supportedhosts);
+                ai.setMultiHostSupportV2(supportedhosts);
             }
         }
         ret.setHosterHistory(getHosterHistory());

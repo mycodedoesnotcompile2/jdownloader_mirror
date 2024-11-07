@@ -62,7 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50082 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -88,12 +88,11 @@ public class OffCloudCom extends UseNet {
     /* Contains <host><number of currently running simultan downloads> */
     private static HashMap<String, AtomicInteger> hostRunningDlsNumMap                         = new HashMap<String, AtomicInteger>();
     /* List of hosts which are only available via cloud (queue) download system */
-    public static ArrayList<String>               cloudOnlyHosts                               = new ArrayList<String>();
+    public static List<String>                    cloudOnlyHosts                               = new ArrayList<String>();
     private Account                               currAcc                                      = null;
     private DownloadLink                          currDownloadLink                             = null;
     private static Object                         CTRLLOCK                                     = new Object();
     private static AtomicInteger                  maxPrem                                      = new AtomicInteger(1);
-    private long                                  deletedDownloadHistoryEntriesNum             = 0;
     private static MultiHosterManagement          mhm                                          = new MultiHosterManagement("offcloud.com");
 
     public OffCloudCom(PluginWrapper wrapper) {
@@ -168,11 +167,10 @@ public class OffCloudCom extends UseNet {
     @Override
     public void handlePremium(DownloadLink link, Account account) throws Exception {
         if (isUsenetLink(link)) {
-            super.handleMultiHost(link, account);
-        } else {
             /* handle premium should never be called */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        super.handleMultiHost(link, account);
     }
 
     @Override
@@ -596,6 +594,7 @@ public class OffCloudCom extends UseNet {
     private void deleteCompleteDownloadHistory(final String downloadtype) throws Exception {
         try {
             /* First let's find all requestIDs to delete. */
+            int deletedDownloadHistoryEntriesNum = 0;
             logger.info("Deleting complete download history");
             final ArrayList<String> requestIDs = new ArrayList<String>();
             boolean isEnd = false;

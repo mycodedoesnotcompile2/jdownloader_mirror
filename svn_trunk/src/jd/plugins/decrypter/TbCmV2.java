@@ -104,7 +104,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50082 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -677,15 +677,21 @@ public class TbCmV2 extends PluginForDecrypt {
             }
         }
         // TODO: Add setting, see: https://svn.jdownloader.org/issues/90496
-        boolean crawlPlaylistThumbnails = true;
-        playlistThumbnailHandling: if (true) {
-            if (!crawlPlaylistThumbnails) {
-                /* Do nothing */
-                break playlistThumbnailHandling;
+        playlistCoverHandling: if (true) {
+            if (CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER)) {
+                /* Playlist cover is disabled by user */
+                break playlistCoverHandling;
             } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                break playlistThumbnailHandling;
+                break playlistCoverHandling;
+            } else if (channelOrPlaylistPackage == null) {
+                /* We are currently not crawling a playlist item so we do not expect a playlist cover to be available. */
+                break playlistCoverHandling;
             }
             final List<YoutubeStreamData> playlistThumbnails = helper.getPlaylistThumbnails();
+            if (playlistThumbnails == null || playlistThumbnails.size() == 0) {
+                logger.info("Failed to find any thumbnail items");
+                break playlistCoverHandling;
+            }
             // TODO: Add to list of download-results
             for (final YoutubeStreamData thumbinfo : playlistThumbnails) {
                 final String directurl = thumbinfo.getUrl();
@@ -874,7 +880,7 @@ public class TbCmV2 extends PluginForDecrypt {
             if (requestedVariant != null) {
                 // create a dummy collection
                 links = new ArrayList<YoutubeVariantCollection>();
-                ArrayList<VariantIDStorable> varList = new ArrayList<VariantIDStorable>();
+                final ArrayList<VariantIDStorable> varList = new ArrayList<VariantIDStorable>();
                 varList.add(new VariantIDStorable(requestedVariant));
                 links.add(new YoutubeVariantCollection("Dummy", varList));
             }
@@ -889,13 +895,13 @@ public class TbCmV2 extends PluginForDecrypt {
                 foundVariableMap.put(v, new String[] { storable.createUniqueID(), storable.createGroupingID(), storable.getContainer() });
             }
             if (CFG_YOUTUBE.CFG.isCollectionMergingEnabled()) {
-                for (YoutubeVariantCollection l : links) {
-                    if (!l.isEnabled()) {
+                for (final YoutubeVariantCollection yvc : links) {
+                    if (!yvc.isEnabled()) {
                         continue;
                     }
                     final ArrayList<VariantInfo> linkVariants = new ArrayList<VariantInfo>();
                     final ArrayList<VariantInfo> cutLinkVariantsDropdown = new ArrayList<VariantInfo>();
-                    final HashSet<String> customAlternateSet = l.createUniqueIDSetForDropDownList();
+                    final HashSet<String> customAlternateSet = yvc.createUniqueIDSetForDropDownList();
                     if (customAlternateSet.size() > 0) {
                         for (Entry<VariantInfo, String[]> foundVariant : foundVariableMap.entrySet()) {
                             final String uId = foundVariant.getValue()[0];
@@ -908,8 +914,8 @@ public class TbCmV2 extends PluginForDecrypt {
                             }
                         }
                     }
-                    if (StringUtils.isNotEmpty(l.getGroupingID())) {
-                        final String groupingID = l.getGroupingID();
+                    if (StringUtils.isNotEmpty(yvc.getGroupingID())) {
+                        final String groupingID = yvc.getGroupingID();
                         for (Entry<VariantInfo, String[]> foundVariant : foundVariableMap.entrySet()) {
                             final String gId = foundVariant.getValue()[1];
                             final String cId = foundVariant.getValue()[2];
@@ -922,8 +928,8 @@ public class TbCmV2 extends PluginForDecrypt {
                                 }
                             }
                         }
-                    } else if (l.getVariants() != null && l.getVariants().size() > 0) {
-                        HashSet<String> idSet = l.createUniqueIDSet();
+                    } else if (yvc.getVariants() != null && yvc.getVariants().size() > 0) {
+                        HashSet<String> idSet = yvc.createUniqueIDSet();
                         for (Entry<VariantInfo, String[]> foundVariant : foundVariableMap.entrySet()) {
                             final String uId = foundVariant.getValue()[0];
                             if (idSet.contains(uId)) {
@@ -976,29 +982,41 @@ public class TbCmV2 extends PluginForDecrypt {
                     // VariantInfo cur = it.next();
                     // System.out.println(cur.getVariant().getBaseVariant() + "\t" + cur.getVariant().getQualityRating());
                     // }
-                    if (linkVariants.size() > 0) {
-                        DownloadLink lnk = createLink(l, linkVariants.get(0), cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
-                        ret.add(lnk);
-                        if (linkVariants.get(0).getVariant().getGroup() == VariantGroup.SUBTITLES) {
-                            List<String> extras = CFG_YOUTUBE.CFG.getExtraSubtitles();
-                            if (extras != null) {
-                                for (String s : extras) {
-                                    if (s == null) {
-                                        continue;
-                                    }
-                                    for (VariantInfo vi : linkVariants) {
-                                        if (!(vi.getVariant() instanceof SubtitleVariant)) {
-                                            continue;
-                                        }
-                                        if ("*".equals(s)) {
-                                            lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
-                                            ret.add(lnk);
-                                        } else if (StringUtils.equalsIgnoreCase(((SubtitleVariant) vi.getVariant()).getGenericInfo().getLanguage(), s)) {
-                                            lnk = createLink(l, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
-                                            ret.add(lnk);
-                                            break;
-                                        }
-                                    }
+                    if (linkVariants.size() == 0) {
+                        continue;
+                    }
+                    DownloadLink lnk = createLink(yvc, linkVariants.get(0), cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
+                    ret.add(lnk);
+                    addExtraSubtitles: if (true) {
+                        if (linkVariants.get(0).getVariant().getGroup() != VariantGroup.SUBTITLES) {
+                            /* This is not a subtitle item */
+                            break addExtraSubtitles;
+                        }
+                        final List<String> extras = CFG_YOUTUBE.CFG.getExtraSubtitles();
+                        if (extras == null || extras.size() == 0) {
+                            /* No extra subtitles wished by user */
+                            break addExtraSubtitles;
+                        }
+                        /* Add users' desired extra subtitle variants */
+                        for (final String s : extras) {
+                            if (s == null) {
+                                continue;
+                            }
+                            /* Walk through all our variants to find the ones we want. */
+                            for (final VariantInfo vi : linkVariants) {
+                                if (!(vi.getVariant() instanceof SubtitleVariant)) {
+                                    /* Skip non-subtitle items. */
+                                    continue;
+                                }
+                                if ("*".equals(s)) {
+                                    /* User wants all available subtitles as separate entries in linkgrabber. */
+                                    lnk = createLink(yvc, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
+                                    ret.add(lnk);
+                                } else if (StringUtils.equalsIgnoreCase(((SubtitleVariant) vi.getVariant()).getGenericInfo().getLanguage(), s)) {
+                                    /* User wants specific subtitle(s) as separate entry/entries in linkgrabber. */
+                                    lnk = createLink(yvc, vi, cutLinkVariantsDropdown.size() > 0 ? cutLinkVariantsDropdown : linkVariants, channelOrPlaylistPackage, singleVideoPackageNamePatternOverride);
+                                    ret.add(lnk);
+                                    break;
                                 }
                             }
                         }
@@ -1041,8 +1059,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             if (this.isAbort()) {
-                logger.info("Aborted!");
-                throw new InterruptedException();
+                throw new InterruptedException("Aborted!");
             }
         }
         return ret;
@@ -1070,126 +1087,123 @@ public class TbCmV2 extends PluginForDecrypt {
         return ret;
     }
 
-    private DownloadLink createLink(YoutubeVariantCollection l, VariantInfo variantInfo, List<VariantInfo> alternatives, final FilePackage groupPackage, final String packageNamePatternOverride) {
-        try {
-            YoutubeClipData clip = null;
-            if (clip == null && variantInfo.getVideoStreams() != null) {
-                clip = variantInfo.getVideoStreams().get(0).getClip();
-            }
-            if (clip == null && variantInfo.getAudioStreams() != null) {
-                clip = variantInfo.getAudioStreams().get(0).getClip();
-            }
-            if (clip == null && variantInfo.getDataStreams() != null) {
-                clip = variantInfo.getDataStreams().get(0).getClip();
-            }
-            boolean hasVariants = false;
-            ArrayList<String> altIds = new ArrayList<String>();
-            if (alternatives != null) {
-                for (VariantInfo vi : alternatives) {
-                    if (!StringUtils.equals(variantInfo.getVariant()._getUniqueId(), vi.getVariant()._getUniqueId())) {
-                        hasVariants = true;
-                    }
-                    altIds.add(vi.getVariant().getStorableString());
-                }
-            }
-            final String linkID = YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant());
-            final DownloadLink ret = createDownloadlink(linkID);
-            final YoutubeHelper helper = new YoutubeHelper(br, getLogger());
-            ClipDataCache.referenceLink(helper, ret, clip);
-            ret.setProperty(YoutubeHelper.YT_ID, clip.videoID);
-            ret.setProperty(YoutubeHelper.YT_COLLECTION, l.getName());
-            for (Entry<String, Object> es : globalPropertiesForDownloadLink.entrySet()) {
-                if (es.getKey() != null && !ret.hasProperty(es.getKey())) {
-                    ret.setProperty(es.getKey(), es.getValue());
-                }
-            }
-            clip.copyToDownloadLink(ret);
-            // thislink.getTempProperties().setProperty(YoutubeHelper.YT_VARIANT_INFO, variantInfo);
-            ret.setVariantSupport(hasVariants);
-            ret.setProperty(YoutubeHelper.YT_VARIANTS, altIds);
-            // Object cache = downloadLink.getTempProperties().getProperty(YoutubeHelper.YT_VARIANTS, null);
-            // thislink.setProperty(YoutubeHelper.YT_VARIANT, variantInfo.getVariant()._getUniqueId());
-            YoutubeHelper.writeVariantToDownloadLink(ret, variantInfo.getVariant());
-            // variantInfo.fillExtraProperties(thislink, alternatives);
-            final String filename = helper.createFilename(ret);
-            ret.setFinalFileName(filename);
-            ret.setLinkID(linkID);
-            if (groupPackage != null) {
-                groupPackage.add(ret);
-            } else {
-                final String fpName;
-                if (packageNamePatternOverride != null) {
-                    fpName = helper.replaceVariables(ret, packageNamePatternOverride);
-                } else {
-                    fpName = helper.replaceVariables(ret, helper.getConfig().getPackagePattern());
-                }
-                // req otherwise returned "" value = 'various', regardless of user settings for various!
-                if (StringUtils.isNotEmpty(fpName)) {
-                    final FilePackage fp = FilePackage.getInstance();
-                    fp.setName(fpName);
-                    // let the packagizer merge several packages that have the same name
-                    fp.setAllowMerge(true);
-                    // fp.setPackageKey("ytvideo://" + clip.videoID);
-                    fp.add(ret);
-                }
-            }
-            long estimatedFileSize = 0;
-            final AbstractVariant variant = variantInfo.getVariant();
-            switch (variant.getType()) {
-            case VIDEO:
-            case DASH_AUDIO:
-            case DASH_VIDEO:
-                final StreamCollection audioStreams = clip.getStreams(variant.getBaseVariant().getiTagAudio(), variant);
-                if (audioStreams != null && audioStreams.size() > 0) {
-                    for (YoutubeStreamData stream : audioStreams) {
-                        if (stream.getContentLength() > 0) {
-                            estimatedFileSize += stream.getContentLength();
-                            break;
-                        } else if (stream.estimatedContentLength() > 0) {
-                            estimatedFileSize += stream.estimatedContentLength();
-                            break;
-                        }
-                    }
-                }
-                final StreamCollection videoStreams = clip.getStreams(variant.getBaseVariant().getiTagVideo(), variant);
-                if (videoStreams != null && videoStreams.size() > 0) {
-                    for (YoutubeStreamData stream : videoStreams) {
-                        if (stream.getContentLength() > 0) {
-                            estimatedFileSize += stream.getContentLength();
-                            break;
-                        } else if (stream.estimatedContentLength() > 0) {
-                            estimatedFileSize += stream.estimatedContentLength();
-                            break;
-                        }
-                    }
-                }
-                break;
-            case IMAGE:
-                final StreamCollection dataStreams = clip.getStreams(variant.getiTagData(), variant);
-                if (dataStreams != null && dataStreams.size() > 0) {
-                    for (YoutubeStreamData stream : dataStreams) {
-                        if (stream.getContentLength() > 0) {
-                            estimatedFileSize += stream.getContentLength();
-                            break;
-                        } else if (stream.estimatedContentLength() > 0) {
-                            estimatedFileSize += stream.estimatedContentLength();
-                            break;
-                        }
-                    }
-                }
-                break;
-            default:
-                break;
-            }
-            if (estimatedFileSize > 0) {
-                ret.setDownloadSize(estimatedFileSize);
-            }
-            ret.setAvailableStatus(AvailableStatus.TRUE);
-            return ret;
-        } catch (Exception e) {
-            getLogger().log(e);
-            return null;
+    private DownloadLink createLink(YoutubeVariantCollection yvc, VariantInfo variantInfo, List<VariantInfo> alternatives, final FilePackage groupPackage, final String packageNamePatternOverride) {
+        YoutubeClipData clip = null;
+        if (clip == null && variantInfo.getVideoStreams() != null) {
+            clip = variantInfo.getVideoStreams().get(0).getClip();
         }
+        if (clip == null && variantInfo.getAudioStreams() != null) {
+            clip = variantInfo.getAudioStreams().get(0).getClip();
+        }
+        if (clip == null && variantInfo.getDataStreams() != null) {
+            clip = variantInfo.getDataStreams().get(0).getClip();
+        }
+        boolean hasVariants = false;
+        ArrayList<String> altIds = new ArrayList<String>();
+        if (alternatives != null) {
+            for (VariantInfo vi : alternatives) {
+                if (!StringUtils.equals(variantInfo.getVariant()._getUniqueId(), vi.getVariant()._getUniqueId())) {
+                    hasVariants = true;
+                }
+                altIds.add(vi.getVariant().getStorableString());
+            }
+        }
+        final String linkID = YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant());
+        final DownloadLink ret = createDownloadlink(linkID);
+        final YoutubeHelper helper = new YoutubeHelper(br, getLogger());
+        ClipDataCache.referenceLink(helper, ret, clip);
+        ret.setProperty(YoutubeHelper.YT_ID, clip.videoID);
+        if (yvc != null) {
+            ret.setProperty(YoutubeHelper.YT_COLLECTION, yvc.getName());
+        }
+        for (Entry<String, Object> es : globalPropertiesForDownloadLink.entrySet()) {
+            if (es.getKey() != null && !ret.hasProperty(es.getKey())) {
+                ret.setProperty(es.getKey(), es.getValue());
+            }
+        }
+        clip.copyToDownloadLink(ret);
+        // thislink.getTempProperties().setProperty(YoutubeHelper.YT_VARIANT_INFO, variantInfo);
+        ret.setVariantSupport(hasVariants);
+        ret.setProperty(YoutubeHelper.YT_VARIANTS, altIds);
+        // Object cache = downloadLink.getTempProperties().getProperty(YoutubeHelper.YT_VARIANTS, null);
+        // thislink.setProperty(YoutubeHelper.YT_VARIANT, variantInfo.getVariant()._getUniqueId());
+        YoutubeHelper.writeVariantToDownloadLink(ret, variantInfo.getVariant());
+        // variantInfo.fillExtraProperties(thislink, alternatives);
+        final String filename = helper.createFilename(ret);
+        ret.setFinalFileName(filename);
+        ret.setLinkID(linkID);
+        if (groupPackage != null) {
+            groupPackage.add(ret);
+        } else {
+            final String fpName;
+            if (packageNamePatternOverride != null) {
+                fpName = helper.replaceVariables(ret, packageNamePatternOverride);
+            } else {
+                fpName = helper.replaceVariables(ret, helper.getConfig().getPackagePattern());
+            }
+            // req otherwise returned "" value = 'various', regardless of user settings for various!
+            if (StringUtils.isNotEmpty(fpName)) {
+                final FilePackage fp = FilePackage.getInstance();
+                fp.setName(fpName);
+                // let the packagizer merge several packages that have the same name
+                fp.setAllowMerge(true);
+                // fp.setPackageKey("ytvideo://" + clip.videoID);
+                fp.add(ret);
+            }
+        }
+        long estimatedFileSize = 0;
+        final AbstractVariant variant = variantInfo.getVariant();
+        switch (variant.getType()) {
+        case VIDEO:
+        case DASH_AUDIO:
+        case DASH_VIDEO:
+            final StreamCollection audioStreams = clip.getStreams(variant.getBaseVariant().getiTagAudio(), variant);
+            if (audioStreams != null && audioStreams.size() > 0) {
+                for (YoutubeStreamData stream : audioStreams) {
+                    if (stream.getContentLength() > 0) {
+                        estimatedFileSize += stream.getContentLength();
+                        break;
+                    } else if (stream.estimatedContentLength() > 0) {
+                        estimatedFileSize += stream.estimatedContentLength();
+                        break;
+                    }
+                }
+            }
+            final StreamCollection videoStreams = clip.getStreams(variant.getBaseVariant().getiTagVideo(), variant);
+            if (videoStreams != null && videoStreams.size() > 0) {
+                for (YoutubeStreamData stream : videoStreams) {
+                    if (stream.getContentLength() > 0) {
+                        estimatedFileSize += stream.getContentLength();
+                        break;
+                    } else if (stream.estimatedContentLength() > 0) {
+                        estimatedFileSize += stream.estimatedContentLength();
+                        break;
+                    }
+                }
+            }
+            break;
+        case IMAGE:
+            final StreamCollection dataStreams = clip.getStreams(variant.getiTagData(), variant);
+            if (dataStreams != null && dataStreams.size() > 0) {
+                for (YoutubeStreamData stream : dataStreams) {
+                    if (stream.getContentLength() > 0) {
+                        estimatedFileSize += stream.getContentLength();
+                        break;
+                    } else if (stream.estimatedContentLength() > 0) {
+                        estimatedFileSize += stream.estimatedContentLength();
+                        break;
+                    }
+                }
+            }
+            break;
+        default:
+            break;
+        }
+        if (estimatedFileSize > 0) {
+            ret.setDownloadSize(estimatedFileSize);
+        }
+        ret.setAvailableStatus(AvailableStatus.TRUE);
+        return ret;
     }
 
     private ArrayList<YoutubeClipData> crawlPlaylistOrChannel(final YoutubeHelper helper, final Browser br, final String playlistID, final String userName, final String channelID, final String referenceUrl, final int maxItemsLimit) throws Exception {

@@ -34,6 +34,7 @@
 package org.appwork.storage.tests;
 
 import java.math.BigInteger;
+import java.util.Locale;
 
 import org.appwork.storage.JSONMapper;
 import org.appwork.storage.SimpleTypeRef;
@@ -266,7 +267,7 @@ public abstract class AbstractMapperTest extends AWTest {
         }
         for (float num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33f) {
             final boolean isNegativ = num < 0;
-            for (String numberString : new String[] { Float.toString(Math.abs(num)), String.format("%e", Math.abs(num)), String.format("%E", Math.abs(num)) }) {
+            for (String numberString : new String[] { Float.toString(Math.abs(num)), String.format(Locale.ENGLISH, "%e", Math.abs(num)), String.format(Locale.ENGLISH, "%E", Math.abs(num)) }) {
                 Float diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Float.class).floatValue();
                 assertTrue(diff < 0.01f);
                 if (!isNegativ) {
@@ -277,7 +278,7 @@ public abstract class AbstractMapperTest extends AWTest {
         }
         for (double num = Short.MIN_VALUE; num < Short.MAX_VALUE; num += 0.33d) {
             final boolean isNegativ = num < 0;
-            for (String numberString : new String[] { Double.toString(Math.abs(num)), String.format("%e", Math.abs(num)), String.format("%E", Math.abs(num)) }) {
+            for (String numberString : new String[] { Double.toString(Math.abs(num)), String.format(Locale.ENGLISH, "%e", Math.abs(num)), String.format(Locale.ENGLISH, "%E", Math.abs(num)) }) {
                 Double diff = num - mapper.stringToObject((isNegativ ? "-" : "") + numberString, Double.class).doubleValue();
                 assertTrue(diff < 0.01d);
                 if (!isNegativ) {

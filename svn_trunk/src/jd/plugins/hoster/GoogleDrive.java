@@ -83,7 +83,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50079 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -1748,6 +1748,7 @@ public class GoogleDrive extends PluginForHost {
             return;
         }
         if (errors == null || errors.isEmpty()) {
+            /* No error */
             return;
         }
         /* Most of all times there will be only one errort */
@@ -1759,6 +1760,9 @@ public class GoogleDrive extends PluginForHost {
             final String message = (String) errormap.get("message");
             /* First check for known issues */
             if (reason.equalsIgnoreCase("notFound")) {
+                if (link != null && StringUtils.isEmpty(link.getComment())) {
+                    link.setComment("Remove your Google Drive API key to be able to download private files!");
+                }
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else if (reason.equalsIgnoreCase("downloadQuotaExceeded")) {
                 this.errorQuotaReachedInAPIMode(link, account);

@@ -50,7 +50,6 @@ import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.net.HTTPHeader;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.appwork.utils.net.httpconnection.HTTPProxyStorable;
 import org.appwork.utils.net.httpserver.HttpServer;
 import org.appwork.utils.net.httpserver.handler.HttpRequestHandler;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
@@ -136,6 +135,7 @@ import jd.http.requests.HeadRequest;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.BrowserAdapter;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -155,7 +155,7 @@ import jd.plugins.download.Downloadable;
 import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.ChunkRange;
 
-@HostPlugin(revision = "$Revision: 50075 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 50082 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -325,6 +325,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         return requestFileInformation(downloadLink, false);
     }
 
+    private final String ERROR_AGE_RESTRICTED_CONTENT = "Account needed to access age restricted content";
+
     private AvailableStatus requestFileInformation(final DownloadLink downloadLink, final boolean isDownload) throws Exception {
         final String id = downloadLink.getStringProperty(YoutubeHelper.YT_ID);
         // final YoutubeProperties data = downloadLink.bindData(YoutubeProperties.class);
@@ -399,8 +401,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
                 }
-                if (con.getLongContentLength() > 0) {
-                    totalSize = con.getLongContentLength();
+                if (con.getCompleteContentLength() > 0) {
+                    totalSize = con.getCompleteContentLength();
                 }
                 break;
             }
@@ -425,7 +427,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         con.disconnect();
                     }
                 }
-                if (con == null || !con.getContentType().startsWith("image/") || con.getResponseCode() != 200) {
+                if (con == null || !this.looksLikeDownloadableContent(con)) {
                     if (i == 0) {
                         resetStreamUrls(downloadLink);
                         continue;
@@ -435,7 +437,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
                 }
-                totalSize = con.getLongContentLength();
+                totalSize = con.getCompleteContentLength();
                 break;
             }
             break;
@@ -670,7 +672,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                         if (lastCon != null && lastCon.getResponseCode() == 403) {
                             final YoutubeClipData clipData = ClipDataCache.hasCache(helper, downloadLink) ? ClipDataCache.get(helper, downloadLink) : null;
                             if (clipData != null && clipData.ageCheck) {
-                                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+                                throw new AccountRequiredException(ERROR_AGE_RESTRICTED_CONTENT);
                             } else if (cache != null && cache.getThrottle() == 0) {
                                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                             }
@@ -697,7 +699,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 if (!hasCachedVideo && !hasCachedAudio && !hasCachedData) {
                     final YoutubeClipData clipData = ClipDataCache.hasCache(helper, downloadLink) ? ClipDataCache.get(helper, downloadLink) : null;
                     if (clipData != null && clipData.ageCheck) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+                        throw new AccountRequiredException(ERROR_AGE_RESTRICTED_CONTENT);
                     } else {
                         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                     }
@@ -2811,6 +2813,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
         switch (group) {
         case AUDIO:
         case IMAGE:
+        case IMAGE_PLAYLIST_COVER:
         case VIDEO:
         case SUBTITLES:
             popup.add(new JMenuItem(new BasicAction() {
