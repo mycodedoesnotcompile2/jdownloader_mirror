@@ -8,6 +8,15 @@ import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 
+import org.appwork.swing.action.BasicAction;
+import org.appwork.utils.event.queue.QueueAction;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo.PluginView;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.linkcollector.LinkCollectingJob;
@@ -25,19 +34,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.swing.action.BasicAction;
-import org.appwork.utils.event.queue.QueueAction;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo.PluginView;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
-@HostPlugin(revision = "$Revision: 49586 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50087 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     public LinkCrawlerRetry(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL };
     }
 
     @Override
@@ -70,11 +75,6 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     @Override
-    public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.INTERNAL };
-    }
-
-    @Override
     public AvailableStatus requestFileInformation(DownloadLink parameter) {
         final String reason = parameter.getStringProperty("reason", null);
         if ("FILE_NOT_FOUND".equals(reason)) {
@@ -86,41 +86,43 @@ public class LinkCrawlerRetry extends PluginForHost {
 
     @Override
     public boolean checkLinks(DownloadLink[] urls) {
-        if (urls != null) {
-            for (final DownloadLink link : urls) {
-                link.setAvailableStatus(requestFileInformation(link));
-            }
+        if (urls == null) {
+            return true;
+        }
+        for (final DownloadLink link : urls) {
+            link.setAvailableStatus(requestFileInformation(link));
         }
         return true;
     }
 
     @Override
     public void extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, final Collection<PluginView<CrawledLink>> allPvs) {
-        if (pv.size() > 0) {
-            parent.add(new JMenuItem(new BasicAction() {
-                {
-                    setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    LinkCollector.getInstance().getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
-                        @Override
-                        protected Void run() throws RuntimeException {
-                            final List<CrawledLink> links = new ArrayList<CrawledLink>(pv.getChildren());
-                            LinkCollector.getInstance().removeChildren(links);
-                            for (final CrawledLink crawledLink : links) {
-                                final DownloadLink downloadLink = crawledLink.getDownloadLink();
-                                prepareForLinkCrawler(downloadLink);
-                            }
-                            retry(links);
-                            return null;
-                        }
-                    });
-                }
-            }));
+        if (pv.size() == 0) {
+            return;
         }
+        parent.add(new JMenuItem(new BasicAction() {
+            {
+                setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
+                setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                LinkCollector.getInstance().getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        final List<CrawledLink> links = new ArrayList<CrawledLink>(pv.getChildren());
+                        LinkCollector.getInstance().removeChildren(links);
+                        for (final CrawledLink crawledLink : links) {
+                            final DownloadLink downloadLink = crawledLink.getDownloadLink();
+                            prepareForLinkCrawler(downloadLink);
+                        }
+                        retry(links);
+                        return null;
+                    }
+                });
+            }
+        }));
     }
 
     private void retry(List<CrawledLink> links) {
@@ -129,42 +131,44 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     protected void prepareForLinkCrawler(DownloadLink downloadLink) {
-        if (downloadLink != null) {
-            // allow LinkCrawler to process this link again
-            downloadLink.setDefaultPlugin(null);
-            // required for LinkCrawler.breakPluginForDecryptLoop
-            downloadLink.setAvailableStatus(AvailableStatus.UNCHECKED);
+        if (downloadLink == null) {
+            return;
         }
+        // allow LinkCrawler to process this link again
+        downloadLink.setDefaultPlugin(null);
+        // required for LinkCrawler.breakPluginForDecryptLoop
+        downloadLink.setAvailableStatus(AvailableStatus.UNCHECKED);
     }
 
     @Override
     public void extendDownloadsTableContextMenu(final JComponent parent, final PluginView<DownloadLink> pv, final Collection<PluginView<DownloadLink>> views) {
-        if (pv.size() > 0) {
-            parent.add(new JMenuItem(new BasicAction() {
-                {
-                    setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
-                    setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
-                }
-
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    DownloadController.getInstance().getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
-                        @Override
-                        protected Void run() throws RuntimeException {
-                            final List<DownloadLink> downloadLinks = new ArrayList<DownloadLink>(pv.getChildren());
-                            DownloadController.getInstance().removeChildren(downloadLinks);
-                            final List<CrawledLink> links = new ArrayList<CrawledLink>();
-                            for (final DownloadLink downloadLink : downloadLinks) {
-                                prepareForLinkCrawler(downloadLink);
-                                links.add(new CrawledLink(downloadLink));
-                            }
-                            retry(links);
-                            return null;
-                        }
-                    });
-                }
-            }));
+        if (pv.size() == 0) {
+            return;
         }
+        parent.add(new JMenuItem(new BasicAction() {
+            {
+                setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
+                setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                DownloadController.getInstance().getQueue().addAsynch(new QueueAction<Void, RuntimeException>() {
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        final List<DownloadLink> downloadLinks = new ArrayList<DownloadLink>(pv.getChildren());
+                        DownloadController.getInstance().removeChildren(downloadLinks);
+                        final List<CrawledLink> links = new ArrayList<CrawledLink>();
+                        for (final DownloadLink downloadLink : downloadLinks) {
+                            prepareForLinkCrawler(downloadLink);
+                            links.add(new CrawledLink(downloadLink));
+                        }
+                        retry(links);
+                        return null;
+                    }
+                });
+            }
+        }));
     }
 
     @Override

@@ -285,8 +285,8 @@ public abstract class PluginForDecrypt extends Plugin {
         if (logger != null) {
             logger.log(new Exception("createOfflinelink:" + link + "|name:" + filename + "|message:" + message));
         }
-        final DownloadLink dl = createLinkCrawlerRetry(getCurrentLink(), new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, filename, message));
-        dl.setProperty("deprecatedOffline", link);
+        final CrawledLink crawledlink = new CrawledLink(link);
+        final DownloadLink dl = createLinkCrawlerRetry(crawledlink, new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, filename, message));
         return dl;
     }
 

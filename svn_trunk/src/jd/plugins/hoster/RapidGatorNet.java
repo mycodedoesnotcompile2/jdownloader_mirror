@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50057 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50085 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1586,29 +1586,6 @@ public class RapidGatorNet extends PluginForHost {
         }
         /* Check for offline file */
         checkOfflineWebsite(br, link, doExtendedOfflineCheck);
-        /* Check if item is only downloadable for premium users. */
-        final String subscribersOnlyDownload = getErrormessageSubscriberOnlyDownload(br);
-        if (subscribersOnlyDownload != null) {
-            /**
-             * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
-             * This is the same as when "isBuyFile()" returns true but with a more detailed error message.
-             */
-            throw new AccountRequiredException(subscribersOnlyDownload);
-        }
-        final String errormsgFreeFilesizeLimit = br.getRegex("'(You can download files up to ([\\d\\.]+ ?(MB|GB)) in free mode)\\s*<").getMatch(0);
-        if (errormsgFreeFilesizeLimit != null) {
-            if (isPremiumAccount(account)) {
-                throw new AccountUnavailableException("Expired premium account!?", 30 * 60 * 1000);
-            } else {
-                throw new AccountRequiredException(errormsgFreeFilesizeLimit);
-            }
-        } else if (br.containsHTML("This file can be downloaded by premium only\\s*</div>")) {
-            if (isPremiumAccount(account)) {
-                throw new AccountUnavailableException("Expired premium account!?", 30 * 60 * 1000);
-            } else {
-                throw new AccountRequiredException("This file can be downloaded by premium only");
-            }
-        }
         if (br.containsHTML("id=\"exceeded_storage\"")) {
             /**
              * 2024-10-31: <br>
@@ -1640,7 +1617,7 @@ public class RapidGatorNet extends PluginForHost {
         } else {
             maxReconnectWait = 2 * 60 * 60 * 1000;
         }
-        final String reconnectWaitMinutesStr = br.getRegex("Delay between downloads must be not less than (\\d+) min\\.<br>Don.t want to wait\\?").getMatch(0);
+        final String reconnectWaitMinutesStr = br.getRegex("Delay between downloads must be not less than (\\d+) min[^<]*<").getMatch(0);
         if (reconnectWaitMinutesStr != null) {
             /*
              * Mostly 120 minutes. They do not provide the real time to wait but if we know when the last free download was started with the
@@ -1677,6 +1654,29 @@ public class RapidGatorNet extends PluginForHost {
         }
         if (br.containsHTML(">\\s*An unexpected error occurred\\s*\\.?\\s*<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "An unexpected error occurred", 15 * 60 * 1000l);
+        }
+        /* Check if item is only downloadable for premium users. */
+        final String subscribersOnlyDownload = getErrormessageSubscriberOnlyDownload(br);
+        if (subscribersOnlyDownload != null) {
+            /**
+             * This can even happen for premium account owners since an extra subscription is needed to download such files. </br>
+             * This is the same as when "isBuyFile()" returns true but with a more detailed error message.
+             */
+            throw new AccountRequiredException(subscribersOnlyDownload);
+        }
+        final String errormsgFreeFilesizeLimit = br.getRegex("'(You can download files up to ([\\d\\.]+ ?(MB|GB)) in free mode)\\s*<").getMatch(0);
+        if (errormsgFreeFilesizeLimit != null) {
+            if (isPremiumAccount(account)) {
+                throw new AccountUnavailableException("Expired premium account!?", 30 * 60 * 1000);
+            } else {
+                throw new AccountRequiredException(errormsgFreeFilesizeLimit);
+            }
+        } else if (br.containsHTML("This file can be downloaded by premium only\\s*</div>")) {
+            if (isPremiumAccount(account)) {
+                throw new AccountUnavailableException("Expired premium account!?", 30 * 60 * 1000);
+            } else {
+                throw new AccountRequiredException("This file can be downloaded by premium only");
+            }
         }
         /* Check for some generic http error response codes */
         if (br.getHttpConnection().getResponseCode() == 403) {

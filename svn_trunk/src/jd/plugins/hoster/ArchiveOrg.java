@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -63,7 +64,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.ArchiveOrgCrawler;
 
-@HostPlugin(revision = "$Revision: 50070 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
+@HostPlugin(revision = "$Revision: 50084 $", interfaceVersion = 3, names = { "archive.org" }, urls = { "https?://(?:[\\w\\.]+)?archive\\.org/download/[^/]+/[^/]+(/.+)?" })
 public class ArchiveOrg extends PluginForHost {
     public ArchiveOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -650,11 +651,14 @@ public class ArchiveOrg extends PluginForHost {
             /* 2021-08-09: Added this as alternative method e.g. for users that have registered on archive.org via Google login. */
             final Cookies userCookies = account.loadUserCookies();
             if (userCookies != null) {
+                /* Use cookies supplied by user */
                 if (!force) {
                     /* Do not check cookies */
                     br.setCookies(account.getHoster(), userCookies);
                     return;
-                } else if (this.checkCookies(this.br, account, userCookies)) {
+                }
+                /* Validate cookies */
+                if (this.checkLogin(this.br, account, userCookies)) {
                     return;
                 } else {
                     if (account.hasEverBeenValid()) {
@@ -672,7 +676,7 @@ public class ArchiveOrg extends PluginForHost {
                     /* Do not check cookies */
                     return;
                 } else {
-                    if (this.checkCookies(this.br, account, cookies)) {
+                    if (this.checkLogin(this.br, account, cookies)) {
                         account.saveCookies(br.getCookies(br.getHost()), "");
                         return;
                     } else {
@@ -685,9 +689,12 @@ public class ArchiveOrg extends PluginForHost {
             logger.info("Performing full login");
             br.getPage("https://" + this.getHost() + "/account/login");
             br.postPageRaw(br.getURL(), "remember=true&referer=https%3A%2F%2Farchive.org%2FCREATE%2F&login=true&submit_by_js=true&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
-            if (!isLoggedIN(br)) {
+            final String logincookie = br.getCookie(br.getHost(), "logged-in-sig", Cookies.NOTDELETEDPATTERN);
+            if (logincookie == null) {
                 throw new AccountInvalidException();
             }
+            /* Double-check if login has worked */
+            this.checkLogin(br, account, null);
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
@@ -830,20 +837,24 @@ public class ArchiveOrg extends PluginForHost {
     }
 
     /** Checks if given cookies grant us access to given account. */
-    private boolean checkCookies(final Browser br, final Account account, final Cookies cookies) throws IOException {
-        br.setCookies(account.getHoster(), cookies);
-        br.getPage("https://" + this.getHost() + "/account/");
-        if (this.isLoggedIN(br)) {
+    private boolean checkLogin(final Browser br, final Account account, final Cookies cookies) throws IOException {
+        if (cookies != null) {
+            br.setCookies(account.getHoster(), cookies);
+        }
+        br.getPage("https://" + this.getHost() + "/services/user.php?op=whoami");
+        /*
+         * E.g. success response:
+         * {"success":true,"value":{"username":"bbla@bla.tld","itemname":"@username","screenname":"username","privs":[],"image_info":{
+         * "mtime":"","size":"","format":""}}}
+         */
+        final Map<String, Object> entries = JSonStorage.restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        if (Boolean.TRUE.equals(entries.get("success"))) {
             logger.info("Cookie login successful");
             return true;
         } else {
             logger.info("Cookie login failed");
             return false;
         }
-    }
-
-    public boolean isLoggedIN(final Browser br) {
-        return br.getCookie(br.getHost(), "logged-in-sig", Cookies.NOTDELETEDPATTERN) != null;
     }
 
     @Override

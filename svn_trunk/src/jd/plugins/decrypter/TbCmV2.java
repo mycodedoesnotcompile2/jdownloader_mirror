@@ -104,7 +104,7 @@ import jd.plugins.components.UserAgents.BrowserName;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 50082 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50088 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -278,7 +278,7 @@ public class TbCmV2 extends PluginForDecrypt {
     private YoutubeHelper           helper;
 
     @Override
-    protected DownloadLink createOfflinelink(String link, String filename, String message) {
+    protected DownloadLink createOfflinelink(final String link, final String filename, final String message) {
         final DownloadLink ret = super.createOfflinelink(link, filename, message);
         logger.log(new Exception("Debug:" + filename + "|" + message));
         return ret;
@@ -343,6 +343,16 @@ public class TbCmV2 extends PluginForDecrypt {
         globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_ID, playlistID);
         globalPropertiesForDownloadLink.put(YoutubeHelper.YT_CHANNEL_ID, channelID);
         globalPropertiesForDownloadLink.put(YoutubeHelper.YT_USER_NAME, userName);
+        {
+            /* Nullification to avoid that cached items have that data. */
+            final String[] nullificationKeys = new String[] { YoutubeHelper.YT_PLAYLIST_DESCRIPTION, YoutubeHelper.YT_PLAYLIST_CREATOR, YoutubeHelper.YT_PLAYLIST_POSITION, YoutubeHelper.YT_PLAYLIST_SIZE };
+            for (final String key : nullificationKeys) {
+                if (globalPropertiesForDownloadLink.containsKey(key)) {
+                    continue;
+                }
+                globalPropertiesForDownloadLink.put(key, null);
+            }
+        }
         /* @Developer: Enable this boolean if pagination is broken and you are unable to quickly fix it. */
         final boolean paginationIsBroken = false;
         final short maxItemsPerPage = 100;
@@ -360,6 +370,11 @@ public class TbCmV2 extends PluginForDecrypt {
         };
         if (StringUtils.isEmpty(playlistID) && StringUtils.isEmpty(userName) && !StringUtils.isEmpty(videoID)) {
             /* Single video */
+            final YoutubeClipData singleVid = new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID);
+            final String indexFromAddedURLStr = new Regex(cleanedurl, "(?i)index=(\\d+)").getMatch(0);
+            if (indexFromAddedURLStr != null) {
+                singleVid.playlistEntryNumber = Integer.parseInt(indexFromAddedURLStr);
+            }
             videoIdsToAdd.add(new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID));
         } else {
             /* Channel/Playlist/User or single Video + playlist in one URL. */
@@ -707,14 +722,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 thumb.setAvailable(true);
                 // TODO: Add customizable filenames
                 ret.add(thumb);
-                distribute(thumb);
                 break;
             }
-        }
-        Integer indexFromAddedURL = null;
-        final String indexFromAddedURLStr = new Regex(cleanedurl, "(?i)index=(\\d+)").getMatch(0);
-        if (indexFromAddedURLStr != null) {
-            indexFromAddedURL = Integer.parseInt(indexFromAddedURLStr);
         }
         boolean reversePlaylistNumber = false;
         if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder() && (userDefinedMaxPlaylistOrProfileItemsLimit == -1 || videoIdsToAdd.size() < userDefinedMaxPlaylistOrProfileItemsLimit)) {
@@ -725,22 +734,27 @@ public class TbCmV2 extends PluginForDecrypt {
         final boolean isCrawlDupeCheckEnabled = cfg.isCrawlDupeCheckEnabled();
         final Set<String> videoIDsdupeCheck = new HashSet<String>();
         int videoidindex = -1;
-        for (YoutubeClipData vid : videoIdsToAdd) {
+        final boolean specialPlaylistDupeHandling = false;
+        for (final YoutubeClipData crawledvid : videoIdsToAdd) {
             videoidindex++;
-            logger.info("Processing item " + videoidindex + "/" + videoIdsToAdd.size() + " | VideoID: " + vid);
-            if (isCrawlDupeCheckEnabled && linkCollectorContainsEntryByID(vid.videoID)) {
-                logger.info("CrawlDupeCheck skip:" + vid.videoID);
+            logger.info("Processing item " + videoidindex + "/" + videoIdsToAdd.size() + " | VideoID: " + crawledvid);
+            String mainVideoDupeID = crawledvid.videoID;
+            if (specialPlaylistDupeHandling && crawledvid.playlistEntryNumber > 0) {
+                mainVideoDupeID += "/playlist/" + crawledvid.playlistID + "/playlist_position/" + crawledvid.playlistEntryNumber;
+            }
+            if (isCrawlDupeCheckEnabled && linkCollectorContainsEntryByID(mainVideoDupeID)) {
+                logger.info("CrawlDupeCheck skip:" + crawledvid.videoID);
                 continue;
-            } else if (!videoIDsdupeCheck.add(vid.videoID)) {
-                logger.info("Duplicated Video skip:" + vid.videoID);
+            } else if (!videoIDsdupeCheck.add(mainVideoDupeID)) {
+                logger.info("Duplicated Video skip:" + mainVideoDupeID);
                 continue;
             }
+            YoutubeClipData vid = crawledvid;
             try {
                 // make sure that we reload the video
-                final boolean hasCache = ClipDataCache.hasCache(helper, vid.videoID);
-                final YoutubeClipData old = vid;
+                final boolean hasCache = ClipDataCache.hasCache(helper, crawledvid.videoID);
                 try {
-                    vid = ClipDataCache.load(helper, vid);
+                    vid = ClipDataCache.load(helper, crawledvid);
                 } catch (Exception e) {
                     logger.log(e);
                     if (hasCache) {
@@ -749,12 +763,6 @@ public class TbCmV2 extends PluginForDecrypt {
                     } else {
                         throw e;
                     }
-                }
-                if (vid.playlistEntryNumber == -1 && old.playlistEntryNumber > 0) {
-                    vid.playlistEntryNumber = reversePlaylistNumber ? (videoIdsToAdd.size() - old.playlistEntryNumber + 1) : old.playlistEntryNumber;
-                } else if (vid.playlistEntryNumber == -1 && StringUtils.equals(videoID, vid.videoID) && indexFromAddedURL != null) {
-                    /* Use index inside added URL. */
-                    vid.playlistEntryNumber = indexFromAddedURL;
                 }
             } catch (final Exception e) {
                 logger.log(e);
@@ -767,15 +775,23 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (emsg != null && StringUtils.isEmpty(vid.error)) {
                     vid.error = emsg;
                 }
-                if (vid.streams == null || StringUtils.isNotEmpty(vid.error)) {
-                    ret.add(createOfflinelink(YoutubeDashV2.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
-                    continue;
-                }
+                ret.add(createOfflinelink(YoutubeDashV2.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
+                continue;
             }
+            // TODO: Check if this can be removed
             if (vid.streams == null || StringUtils.isNotEmpty(vid.error)) {
                 ret.add(createOfflinelink(YoutubeDashV2.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
                 if (vid.streams == null) {
                     continue;
+                }
+            }
+            if (vid != crawledvid) {
+                /*
+                 * Determine playlist position. The same item can be added again as part of a different playlist so when we are re-using
+                 * cached data, we need to take the playlist position from our "live data".
+                 */
+                if (crawledvid.playlistEntryNumber != -1) {
+                    vid.playlistEntryNumber = reversePlaylistNumber ? (videoIdsToAdd.size() - (crawledvid.playlistEntryNumber + 1)) : crawledvid.playlistEntryNumber;
                 }
             }
             final List<AbstractVariant> enabledVariants = new ArrayList<AbstractVariant>(AbstractVariant.listVariants());
@@ -799,12 +815,11 @@ public class TbCmV2 extends PluginForDecrypt {
                 final HashSet<VideoCodec> disabledVideoCodecs = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedVideoCodecs());
                 final HashSet<VideoFrameRate> disabledFramerates = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedVideoFramerates());
                 for (final Iterator<AbstractVariant> it = enabledVariants.iterator(); it.hasNext();) {
-                    AbstractVariant cur = it.next();
+                    final AbstractVariant cur = it.next();
                     if (disabledGroups.contains(cur.getGroup())) {
                         it.remove();
                         continue;
-                    }
-                    if (disabledFileContainers.contains(cur.getContainer())) {
+                    } else if (disabledFileContainers.contains(cur.getContainer())) {
                         it.remove();
                         continue;
                     }
@@ -1544,7 +1559,8 @@ public class TbCmV2 extends PluginForDecrypt {
                         /**
                          * E.g. on /releases or /playlists -> inner playlists
                          *
-                         * TODO: decide which solution to go
+                         * TODO: decide which solution to go </br>
+                         * TODO: 2024-11-07: I don't understand this anymore lol
                          */
                         if (true) {
                             // proper playlist handling with packaging and correct container URLs

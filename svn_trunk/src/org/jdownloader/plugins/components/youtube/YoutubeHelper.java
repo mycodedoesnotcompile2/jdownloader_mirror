@@ -116,6 +116,7 @@ import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.decrypter.TbCmV2;
 
 public class YoutubeHelper {
     static {
@@ -710,20 +711,19 @@ public class YoutubeHelper {
             @Override
             protected String getValue(DownloadLink link, YoutubeHelper helper, String mod) {
                 final int playlistNumber = link.getIntegerProperty(YoutubeHelper.YT_PLAYLIST_POSITION, -1);
-                if (playlistNumber >= 0) {
-                    // playlistnumber
-                    DecimalFormat df = new DecimalFormat("0000");
-                    try {
-                        if (StringUtils.isNotEmpty(mod)) {
-                            df = new DecimalFormat(mod);
-                        }
-                    } catch (Throwable e) {
-                        helper.logger.log(e);
-                    }
-                    return df.format(playlistNumber);
-                } else {
+                if (playlistNumber < 0) {
                     return "";
                 }
+                // playlistnumber
+                DecimalFormat df = new DecimalFormat("0000");
+                try {
+                    if (StringUtils.isNotEmpty(mod)) {
+                        df = new DecimalFormat(mod);
+                    }
+                } catch (Throwable e) {
+                    helper.logger.log(e);
+                }
+                return df.format(playlistNumber);
             }
 
             @Override
@@ -2612,7 +2612,7 @@ public class YoutubeHelper {
      *
      * does not return opus audio codec
      */
-    protected Request buildAPI_IOS_Request(Browser br) throws Exception {
+    protected Request buildAPI_IOS_Request(final Browser br) throws Exception {
         if (!API_IOS_ENABLED) {
             logger.info("buildAPI_IOS_Request:disabled");
             return null;
@@ -2640,6 +2640,9 @@ public class YoutubeHelper {
         post.put("playbackContext", playbackContext);
         post.put("contentCheckOk", true);
         post.put("racyCheckOk", true);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            TbCmV2.prepBrowserWebAPI(br, this.getAccountLoggedIn());
+        }
         final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
         request.getHeaders().put("X-Youtube-Client-Name", "5");
@@ -2693,6 +2696,9 @@ public class YoutubeHelper {
         post.put("playbackContext", playbackContext);
         post.put("contentCheckOk", true);
         post.put("racyCheckOk", true);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            TbCmV2.prepBrowserWebAPI(br, this.getAccountLoggedIn());
+        }
         final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
         request.getHeaders().put("X-Youtube-Client-Name", Integer.toString(clientNameID));
         request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));

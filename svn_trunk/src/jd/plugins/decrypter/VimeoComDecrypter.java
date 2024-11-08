@@ -68,7 +68,7 @@ import jd.plugins.hoster.VimeoCom;
 import jd.plugins.hoster.VimeoCom.VIMEO_URL_TYPE;
 import jd.plugins.hoster.VimeoCom.WrongRefererException;
 
-@DecrypterPlugin(revision = "$Revision: 49491 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50086 $", interfaceVersion = 3, names = {}, urls = {})
 public class VimeoComDecrypter extends PluginForDecrypt {
     private final String type_player_private_external_direct = "(?i)https?://player\\.vimeo.com/external/\\d+\\.(source|hd|sd)\\.(mp4|mov|wmv|avi|flv).+";
     private final String type_player_private_play_direct     = "(?i)https?://player\\.vimeo.com/play/\\d+.+";
@@ -78,8 +78,8 @@ public class VimeoComDecrypter extends PluginForDecrypt {
      * 2018-03-26: Such URLs will later have an important parameter "s" inside player.vimeo.com URL. Without this String, we cannot
      * watch/download them!!
      */
-    private final String type_normal                         = ".+vimeo\\.com/\\d+.*";
-    private final String type_player                         = "https?://player\\.vimeo.com/video/\\d+.+";
+    private final String type_normal                         = "(?i).+vimeo\\.com/\\d+.*";
+    private final String type_player                         = "(?i)https?://player\\.vimeo.com/video/\\d+.+";
 
     public VimeoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);

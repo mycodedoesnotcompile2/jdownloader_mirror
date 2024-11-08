@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50084 $", interfaceVersion = 3, names = {}, urls = {})
 public class SpeedfilesNet extends XFileSharingProBasic {
     public SpeedfilesNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -108,5 +108,10 @@ public class SpeedfilesNet extends XFileSharingProBasic {
     @Override
     protected boolean isVideohosterEmbed() {
         return true;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filename_abuse() {
+        return false;
     }
 }

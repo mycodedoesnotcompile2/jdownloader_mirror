@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
@@ -62,38 +63,39 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50082 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50085 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
-    private static final String                   PROPERTY_DOWNLOADTYPE                        = "offclouddownloadtype";
-    private static final String                   PROPERTY_DOWNLOADTYPE_instant                = "instant";
-    private static final String                   PROPERTY_DOWNLOADTYPE_cloud                  = "cloud";
-    private static final String                   PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY = "last_time_deleted_history";
+    private static final String                   PROPERTY_DOWNLOADTYPE                                = "offclouddownloadtype";
+    private static final String                   PROPERTY_DOWNLOADTYPE_instant                        = "instant";
+    private static final String                   PROPERTY_DOWNLOADTYPE_cloud                          = "cloud";
+    private static final String                   PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_DELETED_HISTORY = "last_time_deleted_history";
+    private static final String                   PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST                = "premium_packages_list";
     /* Other constants & properties */
-    private static final String                   API_BASE                                     = "https://offcloud.com/api/";
-    private static final String                   WEBSITE_BASE                                 = "https://offcloud.com/";
-    private static final String                   NOCHUNKS                                     = "NOCHUNKS";
-    private static final String                   NORESUME                                     = "NORESUME";
+    private static final String                   API_BASE                                             = "https://offcloud.com/api/";
+    private static final String                   WEBSITE_BASE                                         = "https://offcloud.com/";
+    private static final String                   NOCHUNKS                                             = "NOCHUNKS";
+    private static final String                   NORESUME                                             = "NORESUME";
     /* Connection limits */
-    private static final boolean                  ACCOUNT_PREMIUM_RESUME                       = true;
-    private static final int                      ACCOUNT_PREMIUM_MAXCHUNKS                    = 0;
-    private static final int                      ACCOUNT_PREMIUM_MAXDOWNLOADS                 = 20;
-    private static final long                     CLOUD_MAX_WAITTIME                           = 600000l;
-    private int                                   statuscode                                   = 0;
+    private static final boolean                  ACCOUNT_PREMIUM_RESUME                               = true;
+    private static final int                      ACCOUNT_PREMIUM_MAXCHUNKS                            = 0;
+    private static final int                      ACCOUNT_PREMIUM_MAXDOWNLOADS                         = 20;
+    private static final long                     CLOUD_MAX_WAITTIME                                   = 600000l;
+    private int                                   statuscode                                           = 0;
     /* Contains <host><number of max possible chunks per download> */
-    private static HashMap<String, Integer>       hostMaxchunksMap                             = new HashMap<String, Integer>();
+    private static HashMap<String, Integer>       hostMaxchunksMap                                     = new HashMap<String, Integer>();
     /* Contains <host><number of max possible simultan downloads> */
-    private static HashMap<String, Integer>       hostMaxdlsMap                                = new HashMap<String, Integer>();
+    private static HashMap<String, Integer>       hostMaxdlsMap                                        = new HashMap<String, Integer>();
     /* Contains <host><number of currently running simultan downloads> */
-    private static HashMap<String, AtomicInteger> hostRunningDlsNumMap                         = new HashMap<String, AtomicInteger>();
+    private static HashMap<String, AtomicInteger> hostRunningDlsNumMap                                 = new HashMap<String, AtomicInteger>();
     /* List of hosts which are only available via cloud (queue) download system */
-    public static List<String>                    cloudOnlyHosts                               = new ArrayList<String>();
-    private Account                               currAcc                                      = null;
-    private DownloadLink                          currDownloadLink                             = null;
-    private static Object                         CTRLLOCK                                     = new Object();
-    private static AtomicInteger                  maxPrem                                      = new AtomicInteger(1);
-    private static MultiHosterManagement          mhm                                          = new MultiHosterManagement("offcloud.com");
+    public static List<String>                    cloudOnlyHosts                                       = new ArrayList<String>();
+    private Account                               currAcc                                              = null;
+    private DownloadLink                          currDownloadLink                                     = null;
+    private static Object                         CTRLLOCK                                             = new Object();
+    private static AtomicInteger                  maxPrem                                              = new AtomicInteger(1);
+    private static MultiHosterManagement          mhm                                                  = new MultiHosterManagement("offcloud.com");
 
     public OffCloudCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -363,25 +365,29 @@ public class OffCloudCom extends UseNet {
          * generate-links feature (used free account, ZERO traffic)
          */
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("data");
-        String packagetype = null;
-        String activeTill = null;
-        boolean foundPremiumPackage = false;
-        for (final Map<String, Object> packageinfo : ressourcelist) {
-            packagetype = (String) packageinfo.get("type");
-            activeTill = (String) packageinfo.get("activeTill");
+        final List<Map<String, Object>> activePackages = (List<Map<String, Object>>) entries.get("data");
+        Map<String, Object> packagePremium = null;
+        Map<String, Object> packageUnlimitedLinks = null;
+        String packagesCommaSeparated = "";
+        for (final Map<String, Object> packagemap : activePackages) {
+            final String packagetype = packagemap.get("type").toString();
             /*
              * 2018-02-07: For some reason, the 'link-unlimited' package (if available) will always expire 1 month after the
              * "premium-downloading" package which is why we get our data from here. At this stage I have no idea whether this applies for
              * all accounts or only our test account as some years ago, they had different addons you could purchase and nowdays this is all
              * a lot simpler.
              */
-            if ("premium-downloading".equalsIgnoreCase(packagetype)) {
-                foundPremiumPackage = true;
-                break;
+            if (packagetype.equalsIgnoreCase("premium-downloading")) {
+                packagePremium = packagemap;
+            } else if (packagetype.equalsIgnoreCase("link-unlimited")) {
+                packageUnlimitedLinks = packagemap;
             }
+            if (packagesCommaSeparated.length() > 0) {
+                packagesCommaSeparated += ", ";
+            }
+            packagesCommaSeparated += packagetype;
         }
-        if (ressourcelist.size() == 0 || "premium-link-increase".equalsIgnoreCase(packagetype)) {
+        if (activePackages.size() == 0) {
             /* Free usually only has 1 package with packageType "premium-link-increase" */
             account.setType(AccountType.FREE);
             /* Important: If we found our package, get the remaining links count from there as the other one might be wrong! */
@@ -389,16 +395,14 @@ public class OffCloudCom extends UseNet {
             if (remainingLinksCount instanceof Number) {
                 remaininglinksnum = ((Number) remainingLinksCount).longValue();
             }
-        } else if (foundPremiumPackage) {
+        } else if (packagePremium != null) {
             account.setType(AccountType.PREMIUM);
             ai.setUnlimitedTraffic();
-            activeTill = activeTill.replaceAll("Z$", "+0000");
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(activeTill, "yyyy-MM-dd'T'HH:mm:ss.S", Locale.ENGLISH), br);
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(packagePremium.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH), br);
         } else {
             /* This should never happen */
             account.setType(AccountType.UNKNOWN);
         }
-        account.setProperty("accinfo_linksleft", remaininglinksnum);
         /*
          * 2024-11-05: Either the API is returning wrong values or I misinterpreted them. Either way, "links" with a value of zero does not
          * mean that the account is out of traffic!
@@ -413,7 +417,11 @@ public class OffCloudCom extends UseNet {
             throw new AccountUnavailableException("No link generations left", 5 * 60 * 1000);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-        ai.setStatus(account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes));
+        String statusText = account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes);
+        if (packagesCommaSeparated != null && packagesCommaSeparated.length() > 0) {
+            statusText += " | Packages: " + packagesCommaSeparated;
+        }
+        ai.setStatus(statusText);
         /* Only add hosts which are listed as 'active' (working) */
         postAPISafe("https://" + getHost() + "/stats/sites", "");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
@@ -498,12 +506,19 @@ public class OffCloudCom extends UseNet {
         }
         if (cfg.isDeleteDownloadHistoryCompleteInstantEnabled()) {
             this.deleteCompleteDownloadHistory(PROPERTY_DOWNLOADTYPE_instant);
-            account.setProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
+            account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
         }
         if (cfg.isDeleteDownloadHistoryCompleteCloudEnabled()) {
             this.deleteCompleteDownloadHistory(PROPERTY_DOWNLOADTYPE_cloud);
-            account.setProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
+            account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
         }
+        if (packageUnlimitedLinks != null) {
+            /* User has active "unlimited links" package */
+            account.setProperty("accinfo_linksleft", -1);
+        } else {
+            account.setProperty("accinfo_linksleft", remaininglinksnum);
+        }
+        account.setProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST, JSonStorage.serializeToJson(activePackages));
         return ai;
     }
 
@@ -704,13 +719,8 @@ public class OffCloudCom extends UseNet {
     }
 
     /* Returns the time difference between now and the last time the complete download history has been deleted. */
-    private long getLast_deleted_complete_download_history_time_ago() {
-        return System.currentTimeMillis() - this.currAcc.getLongProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
-    }
-
-    /* Returns the time difference between now and the last time the complete download history has been deleted. */
     private long getLast_deleted_complete_download_history_time_ago(final Account acc) {
-        return System.currentTimeMillis() - acc.getLongProperty(PROPERTY_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
+        return System.currentTimeMillis() - acc.getLongProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
     }
 
     private void prepareBrForJsonRequest() {
@@ -1153,6 +1163,7 @@ public class OffCloudCom extends UseNet {
         super.extendAccountSettingsPanel(account, panel);
         final AccountInfo ai = account.getAccountInfo();
         if (ai == null) {
+            /* When ai is not set, the information below isn't available anyways */
             return;
         }
         final long last_deleted_complete_download_history_time_ago = getLast_deleted_complete_download_history_time_ago(account);
@@ -1174,6 +1185,30 @@ public class OffCloudCom extends UseNet {
         panel.addStringPair(_GUI.T.plugins_offcloudcom_linksleft(), linksleft);
         panel.addStringPair(_GUI.T.plugins_offcloudcom_historydeleted(), lastDeletedCompleteDownloadlistUserDisplay);
         panel.addStringPair(_GUI.T.plugins_offcloudcom_ACCOUNT_HISTORYDELETED_COUNT(), deleted_links_user_display);
+        addPackageInformation: if (true) {
+            List<Map<String, Object>> activePackages = null;
+            try {
+                activePackages = (List<Map<String, Object>>) restoreFromString(account.getStringProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST), TypeRef.OBJECT);
+            } catch (final Throwable ignore) {
+                break addPackageInformation;
+            }
+            if (activePackages == null || activePackages.size() == 0) {
+                break addPackageInformation;
+            }
+            panel.addSeperator();
+            panel.addStartDescription("Active packages: " + activePackages.size());
+            try {
+                for (final Map<String, Object> activePackage : activePackages) {
+                    // TODO: Add formatted date according to specs how we display dates in other places of the GUI too
+                    // final long millis = TimeFormatter.getMilliSeconds(activePackage.get("activeTill").toString(),
+                    // "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+                    panel.addStringPair(activePackage.get("type").toString(), activePackage.get("activeTill").toString());
+                }
+            } catch (final Throwable ignore) {
+                logger.log(ignore);
+                logger.warning("Unexpected format of item in activePackages");
+            }
+        }
     }
 
     @Override
