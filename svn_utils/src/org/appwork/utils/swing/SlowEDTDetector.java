@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -33,18 +33,17 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.swing;
 
-import java.util.Iterator;
-import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.scheduler.DelayedRunnable;
+import org.appwork.utils.Application;
 import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogInterface;
 
 /**
  * @author daniel
- * 
+ *
  */
 public class SlowEDTDetector {
     private final AtomicLong      lastInvoke        = new AtomicLong(-1);
@@ -57,7 +56,6 @@ public class SlowEDTDetector {
     public SlowEDTDetector(final long maxEDTBlockingTime, final LogInterface logger) {
         this.maxEDTBlockingTime = maxEDTBlockingTime;
         this.detector = new DelayedRunnable(maxEDTBlockingTime, maxEDTBlockingTime) {
-
             @Override
             public void delayedrun() {
                 try {
@@ -68,16 +66,7 @@ public class SlowEDTDetector {
                     if (blocking >= SlowEDTDetector.this.maxEDTBlockingTime) {
                         if (SlowEDTDetector.this.doLog.get()) {
                             try {
-                                final Iterator<Entry<Thread, StackTraceElement[]>> it = Thread.getAllStackTraces().entrySet().iterator();
-                                while (it.hasNext()) {
-                                    final Entry<Thread, StackTraceElement[]> next = it.next();
-                                    final StringBuilder sb = new StringBuilder();
-                                    sb.append("BlockingEDT Detected(" + blocking + "ms)->Thread: " + next.getKey().getName() + "\r\n");
-                                    for (final StackTraceElement stackTraceElement : next.getValue()) {
-                                        sb.append("\tat " + stackTraceElement + "\r\n");
-                                    }
-                                    logger.severe(sb.toString());
-                                }
+                                logger.severe(Application.getThreadDump());
                             } finally {
                                 SlowEDTDetector.this.doLog.set(false);
                             }
@@ -89,7 +78,6 @@ public class SlowEDTDetector {
                     logger.log(e);
                 }
                 SlowEDTDetector.this.invokeEDT();
-
             }
         };
         this.invokeEDT();
@@ -104,7 +92,6 @@ public class SlowEDTDetector {
             this.lastEDT.set(-1);
             this.lastInvoke.set(now());
             new EDTRunner() {
-
                 @Override
                 protected void runInEDT() {
                     SlowEDTDetector.this.lastEDT.set(now() - SlowEDTDetector.this.lastInvoke.get());

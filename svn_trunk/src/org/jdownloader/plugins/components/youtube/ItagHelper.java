@@ -125,10 +125,15 @@ public class ItagHelper {
             switch (tag) {
             case SUBTITLE:
             case DESCRIPTION:
+            case COVER_HQ:
             case IMAGE_HQ:
+            case COVER_LQ:
             case IMAGE_LQ:
+            case COVER_MAX:
             case IMAGE_MAX:
+            case COVER_MQ:
             case IMAGE_MQ:
+
                 continue loop;
             }
             if (tag.getAudioCodec() == null) {

@@ -1727,6 +1727,7 @@ public enum YoutubeVariantOld {
             case VIDEO:
                 return VIDEO;
             case IMAGE:
+            case IMAGE_PLAYLIST_COVER:
                 return IMAGE;
             default:
                 return TEXT;

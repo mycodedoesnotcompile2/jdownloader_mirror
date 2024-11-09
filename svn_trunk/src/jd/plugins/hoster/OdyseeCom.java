@@ -22,6 +22,16 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.OdyseeComConfig;
+import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
@@ -35,17 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.OdyseeComConfig;
-import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49031 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50089 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,15 +80,14 @@ public class OdyseeCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/((@[A-Za-z0-9\\-\\.]+):[a-z0-9]+/([^/:]+:[a-z0-9\\-]+)|[^/:]+:[a-z0-9\\-]+|\\$/embed/[^/]+/[a-z0-9\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(@[^:]+:[a-z0-9]+/([^/:]+:[a-z0-9\\-]+)|[^/:]+:[a-z0-9\\-]+|\\$/embed/[^/]+/[a-z0-9\\-]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
     // private static final boolean ACCOUNT_FREE_RESUME = true;
     // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
@@ -183,49 +182,53 @@ public class OdyseeCom extends PluginForHost {
             link.setComment(description);
         }
         final Map<String, Object> downloadInfo = (Map<String, Object>) videoInfo.get("source");
-        if (downloadInfo != null) {
-            final String sdhash = (String) downloadInfo.get("sd_hash");
-            if (!StringUtils.isEmpty(claimID) && !StringUtils.isEmpty(sdhash)) {
-                // Old host: https://cdn.lbryplayer.xyz/
-                final String dllink = "https://player.odycdn.com/api/v4/streams/free/" + slug + "/" + claimID + "/" + sdhash.substring(0, 6);
-                final PreferredStreamQuality quality = getPreferredQuality(link);
-                final int userPreferredQualityHeight = this.getPreferredQualityHeight(link, quality);
-                if (userPreferredQualityHeight == -1 || directDownload) {
-                    String url = dllink;
-                    if (isDownload) {
-                        try {
-                            String downloadURL = dllink + "?download=true";
-                            final Browser brc = br.cloneBrowser();
-                            final URLConnectionAdapter con = checkDownloadableRequest(link, brc, brc.createGetRequest(downloadURL), 0, true);
-                            if (con != null) {
-                                url = downloadURL;
-                            } else if (brc.containsHTML("downloads are currently disabled")) {
-                                throw new IOException("downloads are currently disabled: use stream!");
-                            } else {
-                                throw new IOException("unknown error");
-                            }
-                        } catch (IOException e) {
-                            logger.log(e);
-                            logger.info("Official download is not possible -> Fallback to stream download");
-                        }
+        if (downloadInfo == null) {
+            logger.info("Failed to find downloadInfo");
+            return AvailableStatus.TRUE;
+        }
+        final String sdhash = (String) downloadInfo.get("sd_hash");
+        if (StringUtils.isEmpty(claimID) || StringUtils.isEmpty(sdhash)) {
+            logger.info("Failed to find claimID or sdhash");
+            return AvailableStatus.TRUE;
+        }
+        // Old host: https://cdn.lbryplayer.xyz/
+        final String dllink = "https://player.odycdn.com/api/v4/streams/free/" + slug + "/" + claimID + "/" + sdhash.substring(0, 6);
+        final PreferredStreamQuality quality = getPreferredQuality(link);
+        final int userPreferredQualityHeight = this.getPreferredQualityHeight(link, quality);
+        if (userPreferredQualityHeight == -1 || directDownload) {
+            String url = dllink;
+            if (isDownload) {
+                try {
+                    String downloadURL = dllink + "?download=true";
+                    final Browser brc = br.cloneBrowser();
+                    final URLConnectionAdapter con = checkDownloadableRequest(link, brc, brc.createGetRequest(downloadURL), 0, true);
+                    if (con != null) {
+                        url = downloadURL;
+                    } else if (brc.containsHTML("downloads are currently disabled")) {
+                        throw new IOException("downloads are currently disabled: use stream!");
+                    } else {
+                        throw new IOException("unknown error");
                     }
-                    final long filesize = JavaScriptEngineFactory.toLong(downloadInfo.get("size"), -1);
-                    if (filesize > 0) {
-                        /*
-                         * Do not set verifiedFilesize as we cannot be 100% sure that the file we will download will have exactly that size.
-                         */
-                        link.setDownloadSize(filesize);
-                    }
-                    link.setProperty(PROPERTY_DIRECTURL, url);
-                    link.setProperty(PROPERTY_QUALITY, PreferredStreamQuality.BEST.name());
-                } else {
-                    link.setProperty(PROPERTY_DIRECTURL, dllink);
-                    link.setProperty(PROPERTY_QUALITY, quality.name());
+                } catch (IOException e) {
+                    logger.log(e);
+                    logger.info("Official download is not possible -> Fallback to stream download");
                 }
             }
-            /* E.g. "text/markdown", "video/mp4" */
-            link.setProperty(PROPERTY_EXPECTED_CONTENT_TYPE, downloadInfo.get("media_type").toString());
+            final long filesize = JavaScriptEngineFactory.toLong(downloadInfo.get("size"), -1);
+            if (filesize > 0) {
+                /*
+                 * Do not set verifiedFilesize as we cannot be 100% sure that the file we will download will have exactly that size.
+                 */
+                link.setDownloadSize(filesize);
+            }
+            link.setProperty(PROPERTY_DIRECTURL, url);
+            link.setProperty(PROPERTY_QUALITY, PreferredStreamQuality.BEST.name());
+        } else {
+            link.setProperty(PROPERTY_DIRECTURL, dllink);
+            link.setProperty(PROPERTY_QUALITY, quality.name());
         }
+        /* E.g. "text/markdown", "video/mp4" */
+        link.setProperty(PROPERTY_EXPECTED_CONTENT_TYPE, downloadInfo.get("media_type").toString());
         return AvailableStatus.TRUE;
     }
 
@@ -378,7 +381,7 @@ public class OdyseeCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -386,7 +389,7 @@ public class OdyseeCom extends PluginForHost {
     }
 
     @Override
-    public void resetDownloadlink(DownloadLink link) {
+    public void resetDownloadlink(final DownloadLink link) {
         link.removeProperty(PROPERTY_DIRECTURL);
         link.removeProperty(PROPERTY_QUALITY);
     }

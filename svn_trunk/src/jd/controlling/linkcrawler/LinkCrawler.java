@@ -2,7 +2,6 @@ package jd.controlling.linkcrawler;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -33,12 +32,35 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jd.controlling.linkcollector.LinkCollectingJob;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
+import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
+import jd.http.AuthenticationFactory;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.parser.html.HTMLParser;
+import jd.parser.html.HTMLParser.HtmlParserCharSequence;
+import jd.parser.html.HTMLParser.HtmlParserResultSet;
+import jd.plugins.CryptedLink;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.Plugin;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginsC;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
@@ -50,7 +72,6 @@ import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.PublicSuffixList;
 import org.appwork.utils.net.URLHelper;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.auth.AuthenticationController;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -69,29 +90,6 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GeneralSettings;
-
-import jd.controlling.linkcollector.LinkCollectingJob;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerConfig.DirectHTTPPermission;
-import jd.controlling.linkcrawler.LinkCrawlerRule.RULE;
-import jd.http.AuthenticationFactory;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.PostRequest;
-import jd.nutils.SimpleFTP;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.parser.html.HTMLParser;
-import jd.parser.html.HTMLParser.HtmlParserCharSequence;
-import jd.parser.html.HTMLParser.HtmlParserResultSet;
-import jd.plugins.CryptedLink;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.Plugin;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginsC;
 
 public class LinkCrawler {
     private static enum DISTRIBUTE {
@@ -1092,6 +1090,73 @@ public class LinkCrawler {
         return task;
     }
 
+    protected interface LazyHosterPluginInvokation<T> {
+        public T invoke(PluginForHost plugin) throws Exception;
+    }
+
+    protected <T> T invokeLazyHosterPlugin(final LinkCrawlerGeneration generation, LogInterface logger, final LazyHostPlugin lazyH, final LazyHosterPluginInvokation<T> invoker) throws Exception {
+        final LinkCrawlerTask task = checkStartNotify(generation, "invokeLazyHosterPlugin:" + lazyH);
+        if (task == null) {
+            return null;
+        }
+        try {
+            final boolean newLogger = logger == null;
+            final PluginForHost wplg = lazyH.newInstance(getPluginClassLoaderChild());
+            if (logger != null) {
+                logger = LogController.getFastPluginLogger(wplg.getCrawlerLoggerID(null));
+            }
+            wplg.setLogger(logger);
+            wplg.setBrowser(wplg.createNewBrowserInstance());
+            wplg.init();
+            LogInterface oldLogger = null;
+            boolean oldVerbose = false;
+            boolean oldDebug = false;
+            /* now we run the plugin and let it find some links */
+            final LinkCrawlerThread lct = getCurrentLinkCrawlerThread();
+            Object owner = null;
+            LinkCrawler previousCrawler = null;
+            try {
+                if (lct != null) {
+                    /* mark thread to be used by decrypter plugin */
+                    owner = lct.getCurrentOwner();
+                    lct.setCurrentOwner(wplg);
+                    previousCrawler = lct.getCurrentLinkCrawler();
+                    lct.setCurrentLinkCrawler(this);
+                    /* save old logger/states */
+                    oldLogger = lct.getLogger();
+                    oldDebug = lct.isDebug();
+                    oldVerbose = lct.isVerbose();
+                    /* set new logger and set verbose/debug true */
+                    lct.setLogger(logger);
+                    lct.setVerbose(true);
+                    lct.setDebug(true);
+                }
+                try {
+                    return invoker.invoke(wplg);
+                } finally {
+                    // explicit Plugin.clean() because may not be called by LazyCrawlerPluginInvokation
+                    wplg.clean();
+                }
+            } finally {
+                if (lct != null) {
+                    /* reset thread to last known used state */
+                    lct.setCurrentOwner(owner);
+                    lct.setCurrentLinkCrawler(previousCrawler);
+                    lct.setLogger(oldLogger);
+                    lct.setVerbose(oldVerbose);
+                    lct.setDebug(oldDebug);
+                }
+                /* close the logger */
+                if (newLogger && logger instanceof ClosableLogInterface) {
+                    ((ClosableLogInterface) logger).close();
+                }
+            }
+        } finally {
+            /* restore old ClassLoader for current Thread */
+            checkFinishNotify(task);
+        }
+    }
+
     protected interface LazyCrawlerPluginInvokation<T> {
         public T invoke(PluginForDecrypt plugin) throws Exception;
     }
@@ -1105,11 +1170,11 @@ public class LinkCrawler {
             final boolean newLogger = logger == null;
             final PluginForDecrypt wplg = lazyC.newInstance(getPluginClassLoaderChild());
             final AtomicReference<LinkCrawler> nextLinkCrawler = new AtomicReference<LinkCrawler>(this);
-            wplg.setBrowser(wplg.createNewBrowserInstance());
             if (logger != null) {
                 logger = LogController.getFastPluginLogger(wplg.getCrawlerLoggerID(link));
             }
             wplg.setLogger(logger);
+            wplg.setBrowser(wplg.createNewBrowserInstance());
             wplg.init();
             LogInterface oldLogger = null;
             boolean oldVerbose = false;
@@ -1245,26 +1310,6 @@ public class LinkCrawler {
                 link.setVerifiedFileSize(contentLength);
             }
         }
-        String fileName = null;
-        final DispositionHeader dispositionHeader = Plugin.parseDispositionHeader(con);
-        if (dispositionHeader != null && StringUtils.isNotEmpty(dispositionHeader.getFilename())) {
-            // trust given filename extension via Content-Disposition header
-            fileName = dispositionHeader.getFilename();
-            if (dispositionHeader.getEncoding() == null) {
-                try {
-                    fileName = SimpleFTP.BestEncodingGuessingURLDecode(fileName);
-                } catch (final IllegalArgumentException ignore) {
-                } catch (final UnsupportedEncodingException ignore) {
-                } catch (final IOException ignore) {
-                }
-            }
-        }
-        if (StringUtils.isEmpty(fileName)) {
-            fileName = Plugin.extractFileNameFromURL(con.getRequest().getUrl());
-        }
-        link.setFinalFileName(fileName);
-        /* save filename in property so we can restore in reset case */
-        link.setProperty("fixName", fileName);
         link.setAvailable(true);
         final String requestRef = request.getHeaders().getValue(HTTPConstants.HEADER_REQUEST_REFERER);
         if (requestRef != null && !StringUtils.equals(requestRef, request.getURL().toExternalForm())) {
@@ -1274,6 +1319,24 @@ public class LinkCrawler {
             final String postString = ((PostRequest) request).getPostDataString();
             if (postString != null) {
                 link.setProperty("post", postString);
+            }
+        }
+        final LazyHostPlugin directHttpPlugin = getDirectHTTPPlugin();
+        if (directHttpPlugin != null) {
+            try {
+                invokeLazyHosterPlugin(getCurrentLinkCrawlerGeneration(), null, directHttpPlugin, new LazyHosterPluginInvokation<Void>() {
+
+                    @Override
+                    public Void invoke(PluginForHost plugin) throws Exception {
+                        ReflectionUtils.invoke(plugin.getClass(), "updateFilename", plugin, String.class, link, con);
+                        return null;
+                    }
+                });
+            } catch (InterruptedException e) {
+                LogController.CL().log(e);
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                LogController.CL().log(e);
             }
         }
         return link;
@@ -4234,6 +4297,9 @@ public class LinkCrawler {
                             ret.add(lc.crawledLinkFactorybyURL("jd://directoryindex://" + br._getURL(true).toExternalForm()));
                             return ret;
                         }
+                    } catch (InterruptedException e) {
+                        LogController.CL().log(e);
+                        Thread.currentThread().interrupt();
                     } catch (final Throwable e) {
                         LogController.CL().log(e);
                     }

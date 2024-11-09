@@ -1,8 +1,6 @@
 package org.jdownloader.startup.commands;
 
-import java.util.Iterator;
-import java.util.Map.Entry;
-
+import org.appwork.utils.Application;
 import org.appwork.utils.formatter.SizeFormatter;
 
 public class ThreadDump extends AbstractStartupCommand {
@@ -25,17 +23,7 @@ public class ThreadDump extends AbstractStartupCommand {
         } catch (final Throwable e) {
             logger.log(e);
         }
-        final Iterator<Entry<Thread, StackTraceElement[]>> it = Thread.getAllStackTraces().entrySet().iterator();
-        while (it.hasNext()) {
-            final Entry<Thread, StackTraceElement[]> next = it.next();
-            final Thread thread = next.getKey();
-            final StringBuilder sb = new StringBuilder();
-            sb.append("Thread:" + next.getKey().getName() + "|" + next.getKey().getId() + "|Daemon:" + thread.isDaemon() + "|Alive:" + thread.isAlive() + "\r\n");
-            for (final StackTraceElement stackTraceElement : next.getValue()) {
-                sb.append("\tat " + stackTraceElement + "\r\n");
-            }
-            logger.severe(sb.toString());
-        }
+        logger.severe(Application.getThreadDump());
         logger.flush();
     }
 

@@ -32,6 +32,30 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
+import jd.plugins.components.UserAgents.BrowserName;
+import jd.plugins.hoster.YoutubeDashV2;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
@@ -78,33 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
-import jd.plugins.hoster.DirectHTTP;
-import jd.plugins.hoster.YoutubeDashV2;
-
-@DecrypterPlugin(revision = "$Revision: 50088 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50099 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -312,8 +310,8 @@ public class TbCmV2 extends PluginForDecrypt {
         /**
          * 2024-07-05 e.g.
          * https://www.google.com/url?sa=t&source=web&rct=j&opi=123456&url=https://www.youtube.com/watch%3Fv%3DREDACTED&ved=REDACTED
-         * &usg=REDACTED </br>
-         * We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are [a-z0-9_-]
+         * &usg=REDACTED </br> We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are
+         * [a-z0-9_-]
          */
         cleanedurl = Encoding.htmlDecode(cleanedurl);
         videoID = getVideoIDFromUrl(cleanedurl);
@@ -345,7 +343,7 @@ public class TbCmV2 extends PluginForDecrypt {
         globalPropertiesForDownloadLink.put(YoutubeHelper.YT_USER_NAME, userName);
         {
             /* Nullification to avoid that cached items have that data. */
-            final String[] nullificationKeys = new String[] { YoutubeHelper.YT_PLAYLIST_DESCRIPTION, YoutubeHelper.YT_PLAYLIST_CREATOR, YoutubeHelper.YT_PLAYLIST_POSITION, YoutubeHelper.YT_PLAYLIST_SIZE };
+            final String[] nullificationKeys = new String[] { YoutubeHelper.YT_PLAYLIST_DESCRIPTION, YoutubeHelper.YT_PLAYLIST_CREATOR, YoutubeHelper.YT_PLAYLIST_SIZE };
             for (final String key : nullificationKeys) {
                 if (globalPropertiesForDownloadLink.containsKey(key)) {
                     continue;
@@ -707,29 +705,23 @@ public class TbCmV2 extends PluginForDecrypt {
                 logger.info("Failed to find any thumbnail items");
                 break playlistCoverHandling;
             }
-            // TODO: Add to list of download-results
-            for (final YoutubeStreamData thumbinfo : playlistThumbnails) {
-                final String directurl = thumbinfo.getUrl();
-                final DownloadLink thumb = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
-                if (thumbinfo.getEstimatedContentLength() > 0) {
-                    thumb.setDownloadSize(thumbinfo.estimatedContentLength());
-                }
-                if (channelOrPlaylistPackage != null) {
-                    thumb._setFilePackage(channelOrPlaylistPackage);
-                    final String fileExtension = Plugin.getFileNameExtensionFromURL(directurl, ".jpg");
-                    thumb.setFinalFileName(channelOrPlaylistPackage.getName() + fileExtension);
-                }
-                thumb.setAvailable(true);
-                // TODO: Add customizable filenames
-                ret.add(thumb);
-                break;
+            for (YoutubeStreamData playlistThumbnail : playlistThumbnails) {
+                // helper.addYoutubeStreamData(playlistThumbnail);
             }
         }
-        boolean reversePlaylistNumber = false;
-        if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder() && (userDefinedMaxPlaylistOrProfileItemsLimit == -1 || videoIdsToAdd.size() < userDefinedMaxPlaylistOrProfileItemsLimit)) {
+        reversePlaylistPositions: if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder()) {
             logger.info("Processing crawled playlist in reverse order");
-            reversePlaylistNumber = true;
+            if (!this.globalPropertiesForDownloadLink.containsKey(YoutubeHelper.YT_PLAYLIST_SIZE)) {
+                logger.info("Cannot reverse playlist positions because playlist size is not known");
+                break reversePlaylistPositions;
+            }
             Collections.reverse(videoIdsToAdd);
+            /* Correct positions in video elements */
+            final int playlistSize = ((Number) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_PLAYLIST_SIZE)).intValue();
+            for (final YoutubeClipData vid : videoIdsToAdd) {
+                final int newPlaylistPosition = (playlistSize - vid.playlistEntryNumber) + 1;
+                vid.playlistEntryNumber = newPlaylistPosition;
+            }
         }
         final boolean isCrawlDupeCheckEnabled = cfg.isCrawlDupeCheckEnabled();
         final Set<String> videoIDsdupeCheck = new HashSet<String>();
@@ -787,12 +779,10 @@ public class TbCmV2 extends PluginForDecrypt {
             }
             if (vid != crawledvid) {
                 /*
-                 * Determine playlist position. The same item can be added again as part of a different playlist so when we are re-using
-                 * cached data, we need to take the playlist position from our "live data".
+                 * Same video can be part of multiple playlists so it can be at a different position each time -> Overwrite position data in
+                 * cached item.
                  */
-                if (crawledvid.playlistEntryNumber != -1) {
-                    vid.playlistEntryNumber = reversePlaylistNumber ? (videoIdsToAdd.size() - (crawledvid.playlistEntryNumber + 1)) : crawledvid.playlistEntryNumber;
-                }
+                vid.playlistEntryNumber = crawledvid.playlistEntryNumber;
             }
             final List<AbstractVariant> enabledVariants = new ArrayList<AbstractVariant>(AbstractVariant.listVariants());
             final HashSet<VariantGroup> enabledVariantGroups = new HashSet<VariantGroup>();
@@ -852,7 +842,8 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                     }
                     if (cur instanceof ImageVariant) {
-                        if (disabledResolutions.contains(VideoResolution.getByHeight(((ImageVariant) cur).getHeight()))) {
+                        final int height = ((ImageVariant) cur).getHeight();
+                        if (disabledResolutions.contains(VideoResolution.getByHeight(height))) {
                             it.remove();
                             continue;
                         }
@@ -1414,8 +1405,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             /**
-             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br>
-             * Only mind this errormessage if we can't find any content.
+             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br> Only mind this
+             * errormessage if we can't find any content.
              */
             alerts = (List<Map<String, Object>>) rootMap.get("alerts");
             errorOrWarningMessage = null;
@@ -1470,9 +1461,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 videosCountText = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer, "numVideosText/runs/{0}/text");
             }
             /**
-             * Find extra information about channel </br>
-             * Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT ui does not display the total number of
-             * shorts of a user.
+             * Find extra information about channel </br> Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT
+             * ui does not display the total number of shorts of a user.
              */
             final Map<String, Object> channelHeaderRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "header/c4TabbedHeaderRenderer");
             if (channelHeaderRenderer != null && StringUtils.equalsIgnoreCase(desiredChannelTab, "Videos")) {
@@ -1532,7 +1522,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 int numberOfVideoItemsOnThisPage = 0;
-                for (final Map<String, Object> vid : varray) {
+                varrayLoop: for (final Map<String, Object> vid : varray) {
                     /* Playlist */
                     String id = (String) JavaScriptEngineFactory.walkJson(vid, "playlistVideoRenderer/videoId");
                     if (id == null) {
@@ -1559,8 +1549,7 @@ public class TbCmV2 extends PluginForDecrypt {
                         /**
                          * E.g. on /releases or /playlists -> inner playlists
                          *
-                         * TODO: decide which solution to go </br>
-                         * TODO: 2024-11-07: I don't understand this anymore lol
+                         * TODO: decide which solution to go </br> TODO: 2024-11-07: I don't understand this anymore lol
                          */
                         if (true) {
                             // proper playlist handling with packaging and correct container URLs
@@ -1601,13 +1590,11 @@ public class TbCmV2 extends PluginForDecrypt {
                         }
                         if (playListDupes.size() == maxItemsLimit) {
                             reachedUserDefinedMaxItemsLimit = true;
-                            break;
+                            break varrayLoop;
                         } else {
-                            continue;
+                            continue varrayLoop;
                         }
                     }
-                    /* Typically last item (item 101) will contain the continuationToken. */
-                    final String continuationToken = (String) JavaScriptEngineFactory.walkJson(vid, "continuationItemRenderer/continuationEndpoint/continuationCommand/token");
                     if (id != null) {
                         numberOfVideoItemsOnThisPage++;
                         videoPositionCounter++;
@@ -1615,32 +1602,35 @@ public class TbCmV2 extends PluginForDecrypt {
                             /* Playlists can contain the same video multiple times */
                             logger.info("Skipping dupe: " + id + " | Position: " + videoPositionCounter);
                             numberofSkippedDuplicates++;
-                            continue;
+                            continue varrayLoop;
                         }
                         ret.add(new YoutubeClipData(id, videoPositionCounter));
                         if (playListDupes.size() == maxItemsLimit) {
                             reachedUserDefinedMaxItemsLimit = true;
-                            break;
+                            break varrayLoop;
                         }
-                    } else if (continuationToken != null) {
+                    }
+                    /* Typically last item (item 101) will contain the continuationToken. */
+                    String continuationToken = (String) JavaScriptEngineFactory.walkJson(vid, "continuationItemRenderer/continuationEndpoint/continuationCommand/token");
+                    if (nextPageToken == null) {
+                        /* Last chance */
+                        final Set<String> continuationTokens = new HashSet<String>();
+                        this.findContinuationTokens(continuationTokens, vid);
+                        if (continuationTokens.size() == 1) {
+                            nextPageToken = continuationTokens.iterator().next();
+                        } else if (continuationTokens.size() > 1) {
+                            logger.warning("Found multiple possible continuationTokens: " + continuationTokens);
+                        }
+                    }
+                    if (continuationToken != null) {
                         /* Typically last item contains token for next page */
                         nextPageToken = continuationToken;
                     } else {
-                        logger.info("Found unknown playlist item: " + vid);
+                        logger.info("Skipping unknown playlist item: " + vid);
                     }
                 }
                 if (internalGuessedPaginationSize == -1) {
                     internalGuessedPaginationSize = numberOfVideoItemsOnThisPage;
-                }
-                if (nextPageToken == null) {
-                    /* Last chance */
-                    final Set<String> continuationTokens = new HashSet<String>();
-                    this.findContinuationTokens(continuationTokens, rootMap);
-                    if (continuationTokens.size() == 1) {
-                        nextPageToken = continuationTokens.iterator().next();
-                    } else if (continuationTokens.size() > 1) {
-                        logger.warning("Found multiple possible continuationTokens: " + continuationTokens);
-                    }
                 }
                 /* Check for some abort conditions */
                 final int numberofNewItemsThisRun = playListDupes.size() - crawledItemsSizeOld;
@@ -1706,9 +1696,8 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (alerts != null && alerts.size() > 0) {
                         /**
                          * 2023-08-03: E.g. playlist with 700 videos but 680 of them are hidden/unavailable which means first pagination
-                         * attempt will fail. </br>
-                         * Even via website this seems to be and edge case as the loading icon will never disappear and no error is
-                         * displayed.
+                         * attempt will fail. </br> Even via website this seems to be and edge case as the loading icon will never disappear
+                         * and no error is displayed.
                          */
                         logger.info("Pagination failed -> Possible reason: " + errorOrWarningMessage);
                     } else {

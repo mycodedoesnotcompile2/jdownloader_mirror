@@ -6606,6 +6606,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Image: %s1" })
     String Youtube_imagevariant_name(String localeName);
 
+    @Default(lngs = { "en" }, values = { "Cover: %s1" })
+    String Youtube_covervariant_name(String localeName);
+
     @Default(lngs = { "en" }, values = { "Quality Rating" })
     String YOUTUBE_CONFIG_PANEL_TABLE_PRIORITY();
 
@@ -7013,9 +7016,6 @@ public interface GuiTranslation extends TranslateInterface {
 
     @Default(lngs = { "en", "de" }, values = { "Unstable", "Instabil" })
     String multihost_single_host_object_status_working_unstable();
-
-    @Default(lngs = { "en", "de" }, values = { "Deactivated by user", "Vom Benutzer deaktiviert" })
-    String multihost_single_host_object_status_deactivated_user();
 
     @Default(lngs = { "en", "de" }, values = { "Deactivated by JDownloader", "Deaktiviert von JDownloader" })
     String multihost_single_host_object_status_deactivated_jdownloader();

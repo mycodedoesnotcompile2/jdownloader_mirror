@@ -28,6 +28,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -35,16 +36,15 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48314 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.test.com/help/privacy";
+        return "https://" + getHost() + "/privacy.php";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -66,21 +66,20 @@ public class GigafileNu extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://\\d+\\." + buildHostsPatternPart(domains) + "/(\\d+-[a-f0-9]+)");
+            ret.add("https?://\\d+\\." + buildHostsPatternPart(domains) + "/(\\d+-[a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private static final boolean FREE_RESUME    = true;
-    private static final int     FREE_MAXCHUNKS = 0;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 0;
+    }
+
     @Override
     public String getLinkID(final DownloadLink link) {
         final String fid = getFID(link);
@@ -141,11 +140,11 @@ public class GigafileNu extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleDownload(link, "free_directlink");
     }
 
-    private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, resumable, maxchunks)) {
+    private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
+        if (!attemptStoredDownloadurlDownload(link, directlinkproperty, this.isResumeable(link, null), this.getMaxChunks(link, null))) {
             requestFileInformation(link);
             final String mainFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
             final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
@@ -169,14 +168,18 @@ public class GigafileNu extends PluginForHost {
                 /* .zip download */
                 /* 2023-09-19: Now both ways are the same??! */
                 // dllink = "/dl_zip.php?file=" + mainFileID;
-                dllink = "/download.php?file=" + mainFileID;
+                if (br.containsHTML("download_zip")) {
+                    dllink = "/dl_zip.php?file=" + mainFileID;
+                } else {
+                    dllink = "/download.php?file=" + mainFileID;
+                }
             } else {
                 /* Single file download */
                 dllink = "/download.php?file=" + fileIDForDownload;
             }
             // final String fileiidFromURL = new Regex(br.getURL(), "https?://[^/]+/(.+)").getMatch(0);
             // final String dllink = "/dl_zip.php?file=" + fileiidFromURL;
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getResponseCode() == 403) {
@@ -225,7 +228,7 @@ public class GigafileNu extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -15,7 +15,7 @@ import org.jdownloader.plugins.components.youtube.variants.generics.ImageGeneric
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 public class ImageVariant extends AbstractVariant<ImageGenericInfo> {
-    private static final Icon IMAGE = new AbstractIcon(IconKey.ICON_IMAGE, 16);
+    protected static final Icon IMAGE = new AbstractIcon(IconKey.ICON_IMAGE, 16);
 
     public ImageVariant(VariantBase base) {
         super(base);
@@ -66,7 +66,7 @@ public class ImageVariant extends AbstractVariant<ImageGenericInfo> {
         case IMAGE_MQ:
             return 320;
         default:
-            throw new WTFException();
+            throw new WTFException("Unsupported:" + getBaseVariant());
         }
     }
 
@@ -81,7 +81,7 @@ public class ImageVariant extends AbstractVariant<ImageGenericInfo> {
         case IMAGE_MQ:
             return 180;
         default:
-            throw new WTFException();
+            throw new WTFException("Unsupported:" + getBaseVariant());
         }
     }
 }

@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50085 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = {}, urls = {})
 public class RapidGatorNet extends PluginForHost {
     public RapidGatorNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -1593,9 +1593,10 @@ public class RapidGatorNet extends PluginForHost {
              * <a href="/article/premium" style="color: #ff801a;">storage plan</a>.<br>
              * It looks like this error can happen even when a user is not logged in. At this moment we just assume that this means that the
              * uploaders' account is out of space and for this reason, the file can't be downloaded. </br>
+             * This could also be a fake message which they display whenever the user tried to use a blocked proxy/VPN.
              *
              */
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
+            throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Uploaders' storage is full. Wait until uploader buys more traffic to download this file");
         }
         /* Determine max wait time if a limit related error would happen in free download mode. */
         long passedTimeSinceLastDlMilliseconds = 0;

@@ -37,6 +37,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -100,23 +116,6 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.decrypter.TbCmV2;
 
 public class YoutubeHelper {
     static {
@@ -2224,7 +2223,11 @@ public class YoutubeHelper {
         refreshVideo(vid);
     }
 
-    private boolean addYoutubeStreamData(Map<YoutubeITAG, StreamCollection> map, YoutubeStreamData match) {
+    public boolean addYoutubeStreamData(YoutubeStreamData match) {
+        return addYoutubeStreamData(vid.streams, match);
+    }
+
+    public boolean addYoutubeStreamData(Map<YoutubeITAG, StreamCollection> map, YoutubeStreamData match) {
         if (!isSegmentLoadingAllowed(match)) {
             logger.info("itag not allowed(segments):" + match.toString());
             return false;
@@ -2640,14 +2643,24 @@ public class YoutubeHelper {
         post.put("playbackContext", playbackContext);
         post.put("contentCheckOk", true);
         post.put("racyCheckOk", true);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            TbCmV2.prepBrowserWebAPI(br, this.getAccountLoggedIn());
-        }
         final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
         request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
         request.getHeaders().put("X-Youtube-Client-Name", "5");
         request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.youtube.com");
+        final String domain = "https://www.youtube.com";
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
+        final Account account = getAccountLoggedIn();
+        if (account != null) {
+            /* For logged in users: */
+            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
+            if (sapisidhash != null) {
+                request.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
+            }
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        } else {
+            request.getHeaders().remove("Authorization");
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        }
         return request;
     }
 
@@ -2696,13 +2709,23 @@ public class YoutubeHelper {
         post.put("playbackContext", playbackContext);
         post.put("contentCheckOk", true);
         post.put("racyCheckOk", true);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            TbCmV2.prepBrowserWebAPI(br, this.getAccountLoggedIn());
-        }
         final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
         request.getHeaders().put("X-Youtube-Client-Name", Integer.toString(clientNameID));
         request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.youtube.com");
+        final String domain = "https://www.youtube.com";
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
+        final Account account = getAccountLoggedIn();
+        if (account != null) {
+            /* For logged in users: */
+            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
+            if (sapisidhash != null) {
+                request.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
+            }
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        } else {
+            request.getHeaders().remove("Authorization");
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        }
         return request;
     }
 
@@ -2736,7 +2759,7 @@ public class YoutubeHelper {
             API_TV_ENABLED = false;
             logger.log(e);
         }
-        if (!vid.ageCheck) {
+        if (!vid.ageCheck || getAccountLoggedIn() != null) {
             try {
                 final Browser brc = br.cloneBrowser();
                 final Request request = buildAPI_IOS_Request(brc);
@@ -3405,7 +3428,9 @@ public class YoutubeHelper {
             return null;
         }
         final String itemIDFromURL = thumbregex.getMatch(0);
+
         if (itemID == null) {
+
             itemID = itemIDFromURL;
         }
         final String bestFname = thumbregex.getMatch(1);
@@ -3423,6 +3448,42 @@ public class YoutubeHelper {
             if (ret.size() > 0 && StringUtils.equalsIgnoreCase(thumbnail.getKey(), bestFname)) {
                 return ret;
             }
+        }
+        return ret;
+    }
+
+    public List<YoutubeStreamData> crawlCoverData(final boolean grabFilesize) {
+        final String[][] covers = br.getRegex("<meta property=\"og:image\" content=\"(https?://i\\.ytimg.com/pl_c/[^\"]*)\">(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?").getMatches();
+        if (covers == null || covers.length == 0) {
+            return null;
+        }
+        final StreamCollection ret = new StreamCollection();
+        for (final String[] cover : covers) {
+            int height = -1;
+            // int width = -1;
+            if (cover.length == 5) {
+                // width = "width".equals(cover[1]) ? Integer.parseInt(cover[2]) : Integer.parseInt(cover[4]);
+                height = "height".equals(cover[1]) ? Integer.parseInt(cover[2]) : Integer.parseInt(cover[4]);
+            }
+            final YoutubeITAG itag;
+            if (height >= 720) {
+                itag = YoutubeITAG.COVER_MAX;
+            } else if (height >= 360) {
+                itag = YoutubeITAG.COVER_HQ;
+            } else if (height >= 180) {
+                itag = YoutubeITAG.COVER_MQ;
+            } else if (height >= 90) {
+                itag = YoutubeITAG.COVER_LQ;
+            } else {
+                continue;
+            }
+            final YoutubeStreamData match = (new YoutubeStreamData(null, vid, Encoding.htmlOnlyDecode(cover[0]), itag, null));
+            if (!grabFilesize || getThumbnailSize(br.cloneBrowser(), match)) {
+                ret.add(match);
+            }
+        }
+        if (ret.size() == 0) {
+            return null;
         }
         return ret;
     }
@@ -4256,8 +4317,8 @@ public class YoutubeHelper {
             }
         }
         if (this.playlistID != null) {
-            playlistThumbnails = this.crawlThumbnailData(null, false);
-            if (playlistThumbnails == null) {
+            playlistThumbnails = crawlCoverData(false);
+            if (playlistThumbnails == null || playlistThumbnails.size() == 0) {
                 logger.warning("Failed to crawl playlist thumbnails");
             }
         }

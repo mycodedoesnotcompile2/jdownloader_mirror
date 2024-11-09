@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50093 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -737,6 +737,7 @@ public abstract class HighWayCore extends UseNet {
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
             final PluginFinder pluginFinder = new PluginFinder(getLogger());
+            /* List of items which should not be displayed in JD GUI. */
             final HashSet<String> ignoreItems = new HashSet<String>();
             ignoreItems.add("beta");
             ignoreItems.add("TV Recorder");
@@ -807,6 +808,7 @@ public abstract class HighWayCore extends UseNet {
                         mhost.setTrafficLeft(remainingTrafficDaily);
                     }
                     supportedhosts.add(mhost);
+                    /* Check if usenet is supported */
                     if (!supportsUsenet && domain.equalsIgnoreCase("usenet")) {
                         supportsUsenet = true;
                     }

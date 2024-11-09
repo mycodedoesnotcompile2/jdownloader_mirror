@@ -15,6 +15,8 @@ import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.table.JTableHeader;
 
+import jd.gui.swing.jdgui.AlternateHighlighter;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -49,8 +51,6 @@ import org.jdownloader.plugins.components.youtube.variants.VideoVariant;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.gui.swing.jdgui.AlternateHighlighter;
 
 public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper> implements GenericConfigEventListener<Object> {
     protected static int globalCompare(int ret, AbstractVariantWrapper o1, AbstractVariantWrapper o2, boolean b) {
@@ -661,6 +661,7 @@ public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper>
                 case DESCRIPTION:
                     return _GUI.T.lit_desciption();
                 case IMAGE:
+                case IMAGE_PLAYLIST_COVER:
                     return _GUI.T.YOUTUBE_CONFIG_PANEL_TABLE_IMAGES(value.variant.getFileNameQualityTag());
                 case SUBTITLES:
                     if (((SubtitleVariant) value.variant).getGenericInfo()._getLocale() != null) {
@@ -735,6 +736,7 @@ public class VariantsMapTableModel extends ExtTableModel<AbstractVariantWrapper>
                 hasDescription = true;
                 break;
             case IMAGE:
+            case IMAGE_PLAYLIST_COVER:
                 hasImage = true;
                 break;
             case SUBTITLES:

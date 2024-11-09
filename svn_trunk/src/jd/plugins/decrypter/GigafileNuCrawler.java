@@ -22,29 +22,30 @@ import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 44659 $", interfaceVersion = 3, names = { "xgf.nu" }, urls = { "https?://(?:www\\.)?xgf\\.nu/([A-Za-z0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 50089 $", interfaceVersion = 3, names = { "xgf.nu" }, urls = { "https?://(?:www\\.)?xgf\\.nu/([A-Za-z0-9]+)" })
 public class GigafileNuCrawler extends PluginForDecrypt {
     public GigafileNuCrawler(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString().replaceFirst("http://", "https://");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl().replaceFirst("http://", "https://");
         br.setFollowRedirects(false);
-        br.getPage(parameter);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
-            decryptedLinks.add(this.createOfflinelink(parameter));
-            return decryptedLinks;
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String finallink = this.br.getRedirectLocation();
         if (finallink != null) {
-            decryptedLinks.add(createDownloadlink(finallink));
+            ret.add(createDownloadlink(finallink));
         } else {
             logger.warning("Crawler broken or URL offline");
         }
-        return decryptedLinks;
+        return ret;
     }
 }

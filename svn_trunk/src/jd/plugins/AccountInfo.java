@@ -29,12 +29,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
-import jd.config.Property;
-import jd.http.Browser;
-import jd.nutils.NaturalOrderComparator;
-import jd.parser.Regex;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -44,6 +38,12 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+
+import jd.config.Property;
+import jd.http.Browser;
+import jd.nutils.NaturalOrderComparator;
+import jd.parser.Regex;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
 public class AccountInfo extends Property implements AccountTrafficView {
     private static final long   serialVersionUID           = 1825140346023286206L;
@@ -79,8 +79,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /**
-     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br> Set this to
-     * false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account stays empty.
+     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br>
+     * Set this to false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account
+     * stays empty.
      */
     public void setTrafficRefill(boolean account_trafficRefill) {
         this.account_trafficRefill = account_trafficRefill;
@@ -461,6 +462,13 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 plugins.add(hit);
             }
         }
+        final boolean skipOfflineEntries;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            skipOfflineEntries = false;
+        } else {
+            /* Stable: Do not display known offline entries */
+            skipOfflineEntries = true;
+        }
         final List<String> finalresults_old = new ArrayList<String>();
         /* TODO: Return this once refactoring is done. */
         final List<MultiHostHost> finalresults_new = new ArrayList<MultiHostHost>();
@@ -534,7 +542,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                 finalplugin = plugins.iterator().next();
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
                 mhost.setStatusText("Permanently offline");
-                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                if (skipOfflineEntries) {
                     /* Skip such items completely in stable */
                     continue cleanListLoop;
                 }
@@ -582,14 +590,14 @@ public class AccountInfo extends Property implements AccountTrafficView {
             finalresults_new.add(mhost);
         }
         /**
-         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br> If a multihost provides
-         * multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but "rg.to" may remain on the
-         * list of unassigned hosts.
+         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
+         * If a multihost provides multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but
+         * "rg.to" may remain on the list of unassigned hosts.
          */
         for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
         }
-        if (skippedOfflineEntries.size() > 0 && logger != null) {
+        if (skipOfflineEntries && skippedOfflineEntries.size() > 0 && logger != null) {
             logger.info("Found " + skippedOfflineEntries.size() + " offline entries");
             for (final String host : skippedOfflineEntries) {
                 logger.info("Skipped offline entry: " + host);

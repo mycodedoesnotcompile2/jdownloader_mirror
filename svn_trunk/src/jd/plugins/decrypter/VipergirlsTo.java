@@ -19,7 +19,6 @@ import java.io.File;
 import java.util.ArrayList;
 
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -31,26 +30,33 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47648 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/secure/([A-F0-9]+)" })
-public class VipergirlsTo extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/secure/([A-F0-9]+)" })
+public class VipergirlsTo extends PluginForDecrypt {
     public VipergirlsTo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String parameter = param.getCryptedUrl();
-        final String fid = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
-        br.setFollowRedirects(true);
-        getPage(parameter);
+        final String contenturl = param.getCryptedUrl();
+        final String fid = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("Generate fresh links by refreshing the source page")) {
             /* 2020-01-21: "Invalid or expired cypher. Generate fresh links by refreshing the source page." */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String captchaURL = "https://" + this.getHost() + "/secure/";
         final File captcha = this.getLocalCaptchaFile(".gif");
-        final URLConnectionAdapter con = openAntiDDoSRequestConnection(br.cloneBrowser(), br.createGetRequest(captchaURL));
+        final URLConnectionAdapter con = br.openGetConnection(captchaURL);
         try {
             Browser.download(captcha, con);
         } finally {
@@ -94,12 +100,12 @@ public class VipergirlsTo extends antiDDoSForDecrypt {
         if (selectedLetterNumbers.length() != clickCount) {
             logger.info("Result has not the expected length of " + clickCount);
         }
-        br.setFollowRedirects(false);
-        postPage(br.getURL(), "o=" + fid + "&clicks=" + selectedLetterNumbers);
-        final String finallink = br.getRedirectLocation();
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(false);
+        brc.postPage(br.getURL(), "o=" + fid + "&clicks=" + selectedLetterNumbers);
+        final String finallink = brc.getRedirectLocation();
         if (finallink == null) {
-            logger.warning("Decrypter broken for link: " + parameter);
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         ret.add(createDownloadlink(finallink));
         return ret;

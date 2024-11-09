@@ -35,7 +35,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50085 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50089 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexhdPics extends PluginForDecrypt {
     public SexhdPics(PluginWrapper wrapper) {
         super(wrapper);
@@ -85,7 +85,11 @@ public class SexhdPics extends PluginForDecrypt {
             throw new DecrypterRetryException(RetryReason.HOST_RATE_LIMIT);
         }
         final String titleSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(2);
-        final String title = Encoding.htmlDecode(titleSlug).replace("-", " ").trim();
+        String title = br.getRegex("<h4>Gallery :([^<]+)</h4>").getMatch(0);
+        if (title == null) {
+            title = titleSlug.replace("-", " ").trim();
+        }
+        title = Encoding.htmlDecode(title).trim();
         final String[] links = br.getRegex("class=.?relativetop*><a href=\"([^\"]+)").getColumn(0);
         if (links == null || links.length == 0) {
             if (br.containsHTML("Gallery\\s*: ! !\\s*</h4>")) {

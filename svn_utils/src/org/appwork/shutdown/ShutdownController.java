@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -304,16 +304,23 @@ public class ShutdownController extends Thread {
     private String getStackTrace(final Thread thread) {
         try {
             final StackTraceElement[] st = thread.getStackTrace();
-            final StringBuilder sb = new StringBuilder("");
-            for (final StackTraceElement element : st) {
-                sb.append(element);
-                sb.append("\r\n");
-            }
-            return sb.toString();
+            return getStackTrace(st);
         } catch (final Throwable e) {
             e.printStackTrace();
             return null;
         }
+    }
+
+    protected String getStackTrace(final StackTraceElement[] st) {
+        if (st == null) {
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder("");
+        for (final StackTraceElement element : st) {
+            sb.append(element);
+            sb.append("\r\n");
+        }
+        return sb.toString();
     }
 
     /**
@@ -562,8 +569,9 @@ public class ShutdownController extends Thread {
                             e1.printStackTrace();
                         }
                         if (thread.isAlive()) {
+                            log("TIMEOUT");
                             log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: " + e + "->is still running after " + e.getMaxDuration() + " ms");
-                            log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: " + e + "->StackTrace:\r\n" + this.getStackTrace(thread));
+                            log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: " + e + "-> Thread Dump:\r\n" + Application.getThreadDump());
                         } else {
                             log("[" + i + "/" + list.size() + "|Priority: " + e.getHookPriority() + "]" + "ShutdownController: item ended after->" + (Time.systemIndependentCurrentJVMTimeMillis() - started));
                         }

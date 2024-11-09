@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50093 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -88,6 +88,17 @@ public class DebridLinkCom extends PluginForHost {
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
+        br.getHeaders().put("User-Agent", "JDownloader");
+        br.setCustomCharset("UTF-8");
+        br.setAllowedResponseCodes(new int[] { 400 });
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    @Override
     public String getAGBLink() {
         return "https://" + getHost() + "/tos";
     }
@@ -100,16 +111,6 @@ public class DebridLinkCom extends PluginForHost {
         } else {
             return super.rewriteHost(host);
         }
-    }
-
-    private static Browser prepBR(final Browser prepBr) {
-        /* Define custom browser headers and language settings. */
-        prepBr.getHeaders().put("Accept-Language", "en-gb, en;q=0.9");
-        prepBr.getHeaders().put("User-Agent", "JDownloader");
-        prepBr.setCustomCharset("UTF-8");
-        prepBr.setFollowRedirects(true);
-        prepBr.setAllowedResponseCodes(new int[] { 400 });
-        return prepBr;
     }
 
     private String getApiBase() {
@@ -192,7 +193,6 @@ public class DebridLinkCom extends PluginForHost {
         final Map<String, Object> resp_downloader_limits_all = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> resp_downloader_limits_all_value = (Map<String, Object>) resp_downloader_limits_all.get("value");
         final List<Map<String, Object>> resp_downloader_limits_all_value_hosters = (List<Map<String, Object>>) resp_downloader_limits_all_value.get("hosters");
-        final HashMap<String, String> name2RealHostMap = new HashMap<String, String>();
         final AccountInfo dummyAccInfo = new AccountInfo();
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hosterinfo : hosters) {
@@ -232,22 +232,6 @@ public class DebridLinkCom extends PluginForHost {
                 }
                 if (mhost.getTrafficLeft() <= 0) {
                     logger.info("Currently link quota limited host: " + hostname);
-                }
-            }
-            /* Workaround: Find our "real host" which we internally use -> We need this later! */
-            final List<String> hostsReal = dummyAccInfo.setMultiHostSupport(null, domains);
-            if (hostsReal != null) {
-                /* Legacy code */
-                int index = -1;
-                for (final String realHost : hostsReal) {
-                    index += 1;
-                    if (realHost == null) {
-                        continue;
-                    }
-                    if (index == 0) {
-                        /* Allow only exactly one host as mapping -> Should be fine in most of all cases */
-                        name2RealHostMap.put(hostname, realHost);
-                    }
                 }
             }
             supportedhosts.add(mhost);
@@ -300,7 +284,6 @@ public class DebridLinkCom extends PluginForHost {
 
     private void login(final Account account, final boolean verifyLogin) throws Exception {
         synchronized (account) {
-            prepBR(this.br);
             long expiresIn = 0;
             if (this.accountGetAccessToken(account) != null && !accountAccessTokenExpired(account) && !accountAccessTokenNeedsRefresh(account)) {
                 /* Check existing token */
@@ -321,7 +304,6 @@ public class DebridLinkCom extends PluginForHost {
                 query.add("client_id", Encoding.urlEncode(this.getClientID()));
                 query.add("refresh_token", this.accountGetRefreshToken(account));
                 query.add("grant_type", "refresh_token");
-                prepBR(this.br);
                 br.postPage(this.getApiBaseOauth() + "/token", query);
                 final TokenResponse tokenResponse = restoreFromString(br.getRequest().getHtmlCode(), new TypeRef<TokenResponse>(TokenResponse.class) {
                 });
@@ -348,7 +330,6 @@ public class DebridLinkCom extends PluginForHost {
                 final UrlQuery queryDevicecode = new UrlQuery();
                 queryDevicecode.add("client_id", Encoding.urlEncode(this.getClientID()));
                 queryDevicecode.add("scopes", "get.account,get.post.downloader");
-                prepBR(this.br);
                 br.postPage(this.getApiBaseOauth() + "/device/code", queryDevicecode);
                 final CodeResponse code = restoreFromString(this.br.getRequest().getHtmlCode(), new TypeRef<CodeResponse>(CodeResponse.class) {
                 });

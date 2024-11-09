@@ -15,35 +15,24 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Dimension;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.TakeValueFromSubconfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
+import javax.swing.Icon;
+import javax.swing.JScrollPane;
 
 import jd.PluginWrapper;
 import jd.config.Property;
+import jd.gui.swing.jdgui.BasicJDTable;
 import jd.http.Browser;
 import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
@@ -63,7 +52,31 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50085 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.swing.exttable.columns.ExtDateColumn;
+import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.TakeValueFromSubconfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 50099 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -403,23 +416,14 @@ public class OffCloudCom extends UseNet {
             /* This should never happen */
             account.setType(AccountType.UNKNOWN);
         }
-        /*
-         * 2024-11-05: Either the API is returning wrong values or I misinterpreted them. Either way, "links" with a value of zero does not
-         * mean that the account is out of traffic!
-         */
-        final boolean throwExceptionOnZeroLinksLeft = false;
-        if (remaininglinksnum == 0 && throwExceptionOnZeroLinksLeft) {
-            /*  */
-            /*
-             * No links downloadable (anymore) --> No traffic left --> Free account limit reached --> At this stage the user cannot use the
-             * account for anything
-             */
+        if (packagePremium == null && remaininglinksnum == 0) {
+            /* Free account that has no link generations left. */
             throw new AccountUnavailableException("No link generations left", 5 * 60 * 1000);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         String statusText = account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes);
         if (packagesCommaSeparated != null && packagesCommaSeparated.length() > 0) {
-            statusText += " | Packages: " + packagesCommaSeparated;
+            statusText += " | Addons: " + packagesCommaSeparated;
         }
         ai.setStatus(statusText);
         /* Only add hosts which are listed as 'active' (working) */
@@ -808,6 +812,7 @@ public class OffCloudCom extends UseNet {
                 statuscode = 666;
             }
         } else {
+            /* Check for html errors */
             /* The following errors will usually happen after the attempt to download the generated 'directlink'. */
             if (br.containsHTML("We\\'re sorry but your download ticket couldn\\'t have been found, please repeat the download process\\.")) {
                 /* TODO: Remove this as it is an errormessage from uploaded.net which they directly forwarded. */
@@ -937,7 +942,7 @@ public class OffCloudCom extends UseNet {
             case 15:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 *
+                 * 
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This cann be considered as a small workaround.
                  */
@@ -947,7 +952,7 @@ public class OffCloudCom extends UseNet {
             case 16:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 *
+                 * 
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This extra errorhandling can be considered as a small workaround.
                  */
@@ -1159,7 +1164,7 @@ public class OffCloudCom extends UseNet {
     }
 
     @Override
-    public void extendAccountSettingsPanel(Account account, PluginConfigPanelNG panel) {
+    public void extendAccountSettingsPanel(Account account, final PluginConfigPanelNG panel) {
         super.extendAccountSettingsPanel(account, panel);
         final AccountInfo ai = account.getAccountInfo();
         if (ai == null) {
@@ -1193,21 +1198,65 @@ public class OffCloudCom extends UseNet {
                 break addPackageInformation;
             }
             if (activePackages == null || activePackages.size() == 0) {
+                /* No extra information available */
                 break addPackageInformation;
             }
-            panel.addSeperator();
-            panel.addStartDescription("Active packages: " + activePackages.size());
+            /* Prepare/parse data */
+            final List<Map<String, Date>> parsed_data = new ArrayList<Map<String, Date>>();
             try {
                 for (final Map<String, Object> activePackage : activePackages) {
-                    // TODO: Add formatted date according to specs how we display dates in other places of the GUI too
-                    // final long millis = TimeFormatter.getMilliSeconds(activePackage.get("activeTill").toString(),
-                    // "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
-                    panel.addStringPair(activePackage.get("type").toString(), activePackage.get("activeTill").toString());
+                    final long millis = TimeFormatter.getMilliSeconds(activePackage.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+                    final Date date = new Date(millis);
+                    final HashMap<String, Date> map = new HashMap<String, Date>();
+                    map.put(activePackage.get("type").toString(), date);
+                    parsed_data.add(map);
                 }
             } catch (final Throwable ignore) {
                 logger.log(ignore);
                 logger.warning("Unexpected format of item in activePackages");
+                break addPackageInformation;
             }
+            panel.addSeperator();
+            panel.addStartDescription("Active addons");
+            final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
+            final ExtTableModel<Map<String, Date>> tableModel = new ExtTableModel<Map<String, Date>>("OffcloudPremiumAddonsTable") {
+                @Override
+                protected void initColumns() {
+                    addColumn(new ExtTextColumn<Map<String, Date>>("Premium addon") {
+                        @Override
+                        public String getStringValue(final Map<String, Date> data) {
+                            return data.keySet().iterator().next();
+                        }
+
+                        @Override
+                        public Icon getIcon(Map<String, Date> data) {
+                            return icon_okay;
+                        }
+                    });
+                    addColumn(new ExtDateColumn<Map<String, Date>>(_GUI.T.premiumaccounttablemodel_column_expiredate()) {
+                        @Override
+                        protected Date getDate(Map<String, Date> data, Date date) {
+                            return data.values().iterator().next();
+                        }
+                    });
+                }
+            };
+            tableModel._fireTableStructureChanged(parsed_data, false);
+            final BasicJDTable<Map<String, Date>> table = new BasicJDTable<Map<String, Date>>(tableModel);
+            table.setPreferredScrollableViewportSize(new Dimension(table.getPreferredSize().width, table.getRowHeight() * table.getRowCount()));
+            table.setSearchEnabled(false);
+            table.addMouseWheelListener(new MouseWheelListener() {
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    /*
+                     * Forward event to upper panel so that the scrolling happens in it and not in our table which is always full-size and
+                     * has no vertical scrollbar.
+                     */
+                    panel.dispatchEvent(e);
+                }
+            });
+            final JScrollPane scrollPane = new JScrollPane(table);
+            panel.add(scrollPane);
         }
     }
 
@@ -1217,6 +1266,9 @@ public class OffCloudCom extends UseNet {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+        if (link == null) {
+            return;
+        }
         /*
          * Sometimes saved offcloud directlinks cause problems, are very slow or time out so this gives us a higher chance of a working
          * download after a reset.

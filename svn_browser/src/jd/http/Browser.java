@@ -2856,6 +2856,39 @@ public class Browser {
                 return null;
             }
         },
+        DNSPROXY_ORG {
+            @Override
+            public String getLabel() {
+                return "DNSProxy.org";
+            }
+
+            @Override
+            public BlockedTypeInterface isBlocked(Browser browser, Request request) {
+                if (request == null || !request.isLoaded() || request.getHttpConnection() == null) {
+                    return null;
+                } else {
+                    if (request.containsHTML("<title>Browser Check - DNSProxy\\.org</title>") && request.containsHTML("DNSProxy\\.org\\. All rights reserved\\.?<")) {
+                        return this;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public BlockLevelType getBlockLevelType() {
+                return BlockLevelType.SITE;
+            }
+
+            @Override
+            public BlockSourceType getBlockSourceType() {
+                return BlockSourceType.SERVICE;
+            }
+
+            @Override
+            public Boolean prepareBlockDetection(Browser browser, Request request) {
+                return null;
+            }
+        },
         DNS_BLOCK_CUII {
             @Override
             public String getLabel() {

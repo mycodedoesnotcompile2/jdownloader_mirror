@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -46,8 +46,13 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.lang.management.LockInfo;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MonitorInfo;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -61,6 +66,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1208,5 +1214,133 @@ public class Application {
             file = Application.getResource("tmp/path_" + UniqueAlltimeID.next() + postFix);
         }
         return file;
+    }
+
+    /**
+     * @return
+     */
+    public synchronized static String getThreadDump() {
+        final StringBuilder sb = new StringBuilder();
+        enhancedThreadDump: try {
+            // Access the ThreadMXBean instance
+            final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+            if (threadMXBean == null) {
+                break enhancedThreadDump;
+            }
+            final Boolean originalContentionMonitoring = threadMXBean.isThreadContentionMonitoringSupported() ? threadMXBean.isThreadContentionMonitoringEnabled() : null;
+            try {
+                if (originalContentionMonitoring != null) {
+                    threadMXBean.setThreadContentionMonitoringEnabled(true); // Enable contention monitoring
+                }
+                // Retrieve all thread info, including lock information
+                final ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(threadMXBean.isObjectMonitorUsageSupported(), threadMXBean.isSynchronizerUsageSupported());
+                // Use StringBuilder for efficient string building
+                sb.append("=== Enhanced Thread Dump ===\r\n\r\n");
+                for (ThreadInfo threadInfo : threadInfos) {
+                    sb.append("Thread Name: ").append(threadInfo.getThreadName()).append("\r\n");
+                    sb.append("Thread ID: ").append(threadInfo.getThreadId()).append("\r\n");
+                    sb.append("Thread State: ").append(threadInfo.getThreadState()).append("\r\n");
+                    if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_9_0)) {
+                        try {
+                            sb.append("Thread Daemon: ").append(ReflectionUtils.invoke(ThreadInfo.class, "isDaemon", threadInfo, boolean.class)).append("\r\n");
+                            sb.append("Thread Priority: ").append(ReflectionUtils.invoke(ThreadInfo.class, "getPriority", threadInfo, int.class)).append("\r\n");
+                        } catch (InvocationTargetException e) {
+                        }
+                    }
+                    // Blocked and waited time
+                    if (originalContentionMonitoring != null && threadMXBean.isThreadContentionMonitoringEnabled()) {
+                        final long blockedTime = threadInfo.getBlockedTime();
+                        if (blockedTime > 0) {
+                            sb.append("Blocked Time (ms/count): ").append(blockedTime).append("/").append(threadInfo.getBlockedCount()).append("\r\n");
+                        }
+                        final long waitedTime = threadInfo.getWaitedTime();
+                        if (waitedTime > 0) {
+                            sb.append("Waited Time (ms/count): ").append(waitedTime).append("/").append(threadInfo.getWaitedCount()).append("\r\n");
+                        }
+                    }
+                    // Lock that this thread is waiting to acquire
+                    final LockInfo lockInfo = threadInfo.getLockInfo();
+                    if (lockInfo != null && threadInfo.getLockOwnerId() != -1) {
+                        sb.append("  Waiting for Lock: ").append(lockInfo).append("\r\n");
+                        sb.append("  Owned by Thread: ").append(threadInfo.getLockOwnerName()).append(" (ID: ").append(threadInfo.getLockOwnerId()).append(")\r\n");
+                    }
+                    // All monitors held by this thread
+                    final MonitorInfo[] lockedMonitors = threadInfo.getLockedMonitors();
+                    if (lockedMonitors.length > 0) {
+                        sb.append("  Locked Monitors:\r\n");
+                        for (final MonitorInfo monitor : lockedMonitors) {
+                            sb.append("    - ").append(monitor).append(" at ").append(monitor.getLockedStackFrame()).append("\r\n");
+                        }
+                    }
+                    // Synchronization locks held by this thread
+                    final LockInfo[] lockedSynchronizers = threadInfo.getLockedSynchronizers();
+                    if (lockedSynchronizers.length > 0) {
+                        sb.append("  Locked Synchronizers:\r\n");
+                        for (final LockInfo synchronizer : lockedSynchronizers) {
+                            sb.append("    - ").append(synchronizer).append("\r\n");
+                        }
+                    }
+                    sb.append("  Stack Trace:\r\n");
+                    for (StackTraceElement element : threadInfo.getStackTrace()) {
+                        sb.append("    at ").append(element).append("\r\n");
+                    }
+                    sb.append("\r\n");
+                }
+                // Deadlock detection
+                long[] deadlockedThreads = null;
+                try {
+                    if (threadMXBean.isSynchronizerUsageSupported()) {
+                        deadlockedThreads = threadMXBean.findDeadlockedThreads();
+                    }
+                } catch (UnsupportedOperationException e) {
+                }
+                if (deadlockedThreads != null) {
+                    sb.append("=== Deadlock Detected ===\r\n\r\n");
+                    final ThreadInfo[] deadlockedThreadInfos = threadMXBean.getThreadInfo(deadlockedThreads);
+                    for (ThreadInfo deadlockThreadInfo : deadlockedThreadInfos) {
+                        sb.append("Thread Name: ").append(deadlockThreadInfo.getThreadName()).append("\r\n");
+                        sb.append("Thread ID: ").append(deadlockThreadInfo.getThreadId()).append("\r\n");
+                        sb.append("Thread State: ").append(deadlockThreadInfo.getThreadState()).append("\r\n");
+                        final LockInfo lockInfo = deadlockThreadInfo.getLockInfo();
+                        if (lockInfo != null) {
+                            sb.append("  Waiting for Lock: ").append(lockInfo).append("\r\n");
+                            sb.append("  Owned by Thread: ").append(deadlockThreadInfo.getLockOwnerName()).append(" (ID: ").append(deadlockThreadInfo.getLockOwnerId()).append(")\r\n");
+                        }
+                        sb.append("  Stack Trace:\r\n");
+                        for (final StackTraceElement element : deadlockThreadInfo.getStackTrace()) {
+                            sb.append("    at ").append(element).append("\r\n");
+                        }
+                        sb.append("\r\n");
+                    }
+                } else {
+                    sb.append("No deadlocks detected.\r\n");
+                }
+                return sb.toString();
+            } finally {
+                // Restore original contention monitoring state
+                if (originalContentionMonitoring != null) {
+                    threadMXBean.setThreadContentionMonitoringEnabled(originalContentionMonitoring.booleanValue());
+                }
+            }
+        } catch (RuntimeException e) {
+            sb.append("\r\nException during ThreadDump: \r\n" + Exceptions.getStackTrace(e));
+        }
+        sb.append("=== Basic Thread Dump ===\r\n\r\n");
+        final Iterator<Entry<Thread, StackTraceElement[]>> it = Thread.getAllStackTraces().entrySet().iterator();
+        while (it.hasNext()) {
+            final Entry<Thread, StackTraceElement[]> next = it.next();
+            final Thread thread = next.getKey();
+            sb.append("Thread Name: ").append(thread.getName()).append("\r\n");
+            sb.append("Thread ID: ").append(thread.getId()).append("\r\n");
+            sb.append("Thread State: ").append(thread.getState()).append("\r\n");
+            sb.append("Thread Daemon: ").append(thread.isDaemon()).append("\r\n");
+            sb.append("Thread Priority: ").append(thread.getPriority()).append("\r\n");
+            sb.append("  Stack Trace:\r\n");
+            for (final StackTraceElement stackTraceElement : next.getValue()) {
+                sb.append("\tat " + stackTraceElement + "\r\n");
+            }
+            sb.append("\r\n");
+        }
+        return sb.toString();
     }
 }

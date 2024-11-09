@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import jd.plugins.DownloadLink;
+import jd.plugins.PluginForHost;
+
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.logging2.extmanager.Log;
 import org.jdownloader.plugins.components.youtube.ExternalToolRequired;
@@ -18,9 +21,6 @@ import org.jdownloader.plugins.components.youtube.converter.YoutubeConverterMP4T
 import org.jdownloader.plugins.components.youtube.converter.YoutubeSRTConverter;
 import org.jdownloader.plugins.components.youtube.itag.VideoFrameRate;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
-
-import jd.plugins.DownloadLink;
-import jd.plugins.PluginForHost;
 
 public enum VariantBase {
     AAC_128KBIT_DASH(VariantGroup.AUDIO, DownloadType.DASH_AUDIO, FileContainer.AAC, null, YoutubeITAG.DASH_AUDIO_128K_AAC, null, null),
@@ -99,10 +99,10 @@ public enum VariantBase {
     IMAGE_LQ(VariantGroup.IMAGE, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_LQ, null),
     IMAGE_MAX(VariantGroup.IMAGE, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_MAX, null),
     IMAGE_MQ(VariantGroup.IMAGE, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_MQ, null),
-    PLAYLIST_COVER_IMAGE_HQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_HQ, null),
-    PLAYLIST_COVER_IMAGE_LQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_LQ, null),
-    PLAYLIST_COVER_IMAGE_MAX(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_MAX, null),
-    PLAYLIST_COVER_IMAGE_MQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.IMAGE_MQ, null),
+    PLAYLIST_COVER_HQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.COVER_HQ, null),
+    PLAYLIST_COVER_LQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.COVER_LQ, null),
+    PLAYLIST_COVER_MAX(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.COVER_MAX, null),
+    PLAYLIST_COVER_MQ(VariantGroup.IMAGE_PLAYLIST_COVER, DownloadType.IMAGE, FileContainer.JPG, null, null, YoutubeITAG.COVER_MQ, null),
     M4A_AAC_128KBIT_DASH(VariantGroup.AUDIO, DownloadType.DASH_AUDIO, FileContainer.M4A, null, YoutubeITAG.DASH_AUDIO_128K_AAC, null, null),
     M4A_AAC_256KBIT_DASH(VariantGroup.AUDIO, DownloadType.DASH_AUDIO, FileContainer.M4A, null, YoutubeITAG.DASH_AUDIO_256K_AAC, null, null),
     M4A_AAC_48KBIT_DASH(VariantGroup.AUDIO, DownloadType.DASH_AUDIO, FileContainer.M4A, null, YoutubeITAG.DASH_AUDIO_48K_AAC, null, null),

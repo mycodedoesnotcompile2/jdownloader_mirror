@@ -72,6 +72,10 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
                         ret = new ImageVariant(base);
                         ret.setJson("{}");
                         break;
+                    case IMAGE_PLAYLIST_COVER:
+                        ret = new ImagePlaylistCoverVariant(base);
+                        ret.setJson("{}");
+                        break;
                     case SUBTITLES:
                         ret = new SubtitleVariant();
                         ret.setJson("{}");
@@ -115,6 +119,9 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
                 break;
             case IMAGE:
                 ret = new ImageVariant(base);
+                break;
+            case IMAGE_PLAYLIST_COVER:
+                ret = new ImagePlaylistCoverVariant(base);
                 break;
             case SUBTITLES:
                 ret = new SubtitleVariant();
@@ -265,25 +272,25 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
     }
 
     private static final SimpleMapper MAPPER = new SimpleMapper() {
-                                                 @Override
-                                                 protected JSonFactory newJsonFactory(String jsonString) {
-                                                     return new JSonFactory(jsonString) {
-                                                         @Override
-                                                         protected String dedupeString(String string) {
-                                                             return string;
-                                                         }
-                                                     };
-                                                 }
+        @Override
+        protected JSonFactory newJsonFactory(String jsonString) {
+            return new JSonFactory(jsonString) {
+                @Override
+                protected String dedupeString(String string) {
+                    return string;
+                }
+            };
+        }
 
-                                                 @Override
-                                                 protected void initMapper() {
-                                                 }
+        @Override
+        protected void initMapper() {
+        }
 
-                                                 @Override
-                                                 public boolean isPrettyPrintEnabled() {
-                                                     return false;
-                                                 }
-                                             };
+        @Override
+        public boolean isPrettyPrintEnabled() {
+            return false;
+        }
+    };
 
     public String getStorableString() {
         String ret = storableString;

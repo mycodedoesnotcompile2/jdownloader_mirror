@@ -82,8 +82,8 @@ public enum YoutubeITAG {
     DASH_VIDEO_360P_H264(134, StreamContainer.DASH_VIDEO, VideoResolution.P_360, VideoCodec.H264, VideoFrameRate.FPS_30),
     DASH_VIDEO_480P_H264(135, StreamContainer.DASH_VIDEO, VideoResolution.P_480, VideoCodec.H264, VideoFrameRate.FPS_30),
     /*
-     *
-     *
+     * 
+     * 
      * Video ID : 1 Format : AVC Format/Info : Advanced Video Codec Format profile : Main@L3 Format settings, CABAC : Yes Format settings,
      * ReFrames : 3 frames Codec ID : avc1 Codec ID/Info : Advanced Video Coding Duration : 6s 773ms Bit rate : 1 063 Kbps Width : 720
      * pixels Height : 480 pixels Display aspect ratio : 3:2 Frame rate mode : Variable Frame rate : 29.970 fps Minimum frame rate : 29.970
@@ -167,6 +167,16 @@ public enum YoutubeITAG {
     IMAGE_MAX(10001, StreamContainer.PLAIN, ImageQuality.HIGHEST),
     // fake id
     IMAGE_MQ(10003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+
+    // fake id
+    COVER_HQ(11002, StreamContainer.PLAIN, ImageQuality.HIGH),
+    // fake id
+    COVER_LQ(11004, StreamContainer.PLAIN, ImageQuality.LOW),
+    // fake id
+    COVER_MAX(11001, StreamContainer.PLAIN, ImageQuality.HIGHEST),
+    // fake id
+    COVER_MQ(11003, StreamContainer.PLAIN, ImageQuality.NORMAL),
+
     // 192 kbits aac
     MP4_VIDEO_1080P_H264_AUDIO_AAC(37, StreamContainer.MP4, VideoResolution.P_1080, VideoCodec.H264, VideoFrameRate.FPS_30, AudioCodec.AAC, AudioBitrate.KBIT_192),
     MP4_VIDEO_1080P_H264_AUDIO_AAC_3D(85, StreamContainer.MP4, VideoResolution.P_1080, VideoCodec.H264, VideoFrameRate.FPS_30, AudioCodec.AAC, AudioBitrate.KBIT_192),
