@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49755 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 50101 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML             = "(?i)class=\"text\">HTML download</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML           = "<div class=\"grf\\-indent\"";
@@ -283,6 +283,7 @@ public class DeviantArtCom extends PluginForHost {
         List<String> blockReasons = new ArrayList<String>();
         Map<String, Object> premiumFolderData = null;
         String deviationHTML = null;
+        String originalFileExt = null;
         if (json != null) {
             json = PluginJSonUtils.unescape(json);
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
@@ -356,6 +357,7 @@ public class DeviantArtCom extends PluginForHost {
                 }
                 if (originalFile != null) {
                     originalFileSizeBytes = (Number) originalFile.get("filesize");
+                    originalFileExt = originalFile.get("type").toString();
                 }
                 final Map<String, Object> descriptionText = (Map<String, Object>) deviationExtendedThisArt.get("descriptionText");
                 if (descriptionText != null) {
@@ -407,7 +409,6 @@ public class DeviantArtCom extends PluginForHost {
              * We're ignoring this during linkcheck as by now we know the file is online.
              */
         }
-        String extByMimeType = null;
         boolean allowGrabFilesizeFromHeader = false;
         /* Check if either user wants to download the html code or if we have a linktype which needs this. */
         if (link.getPluginPatternMatcher().matches(PATTERN_JOURNAL) || link.getPluginPatternMatcher().matches(PATTERN_STATUS) || isLiterature || isStatus) {
@@ -446,11 +447,10 @@ public class DeviantArtCom extends PluginForHost {
         if (forcedExt != null) {
             /* Forced ext has highest priority */
             ext = forcedExt;
-        } else if (extByMimeType != null) {
-            /* This one we know for sure! */
-            ext = extByMimeType;
         } else if (extByURL != null) {
             ext = extByURL;
+        } else if (originalFileExt != null) {
+            ext = originalFileExt;
         } else {
             ext = null;
         }
@@ -482,14 +482,16 @@ public class DeviantArtCom extends PluginForHost {
                 final String premiumType = (String) premiumFolderData.get("type");
                 if (StringUtils.equalsIgnoreCase(premiumType, "watchers")) {
                     throw new AccountRequiredException("Item is only accessible for followers of this artist");
+                } else if (blockReasons != null && blockReasons.size() > 0) {
+                    throw new AccountRequiredException("Paid content and blocked for reasons: " + blockReasons);
                 } else {
-                    throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
+                    throw new AccountRequiredException("Paid content");
                 }
             } else if (blockReasons != null && !blockReasons.isEmpty()) {
                 /* Mature content (account required) or blocked for other reasons. */
                 /* Examples for block reasons we can always circumvent: mature_filter */
                 this.accountRequiredWhenDownloadImpossible = true;
-                if (dllink == null) {
+                if (dllink == null && officialDownloadurl == null) {
                     throw new AccountRequiredException("Item blocked for reasons: " + blockReasons);
                 }
                 /*
@@ -540,10 +542,6 @@ public class DeviantArtCom extends PluginForHost {
                     } else {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                }
-                final String mimeTypeExtTmp = getExtensionFromMimeType(con);
-                if (mimeTypeExtTmp != null) {
-                    extByMimeType = "." + mimeTypeExtTmp;
                 }
             } finally {
                 try {
@@ -659,9 +657,9 @@ public class DeviantArtCom extends PluginForHost {
             link.setDownloadSize(oldVerifiedFilesize);
         }
         String dllink = null;
+        final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
         if (isImage(link)) {
             /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
-            final String officialDownloadurl = link.getStringProperty(PROPERTY_OFFICIAL_DOWNLOADURL);
             final DeviantArtComConfig cfg = PluginJsonConfig.get(DeviantArtComConfig.class);
             final ImageDownloadMode mode = cfg.getImageDownloadMode();
             if (mode == ImageDownloadMode.OFFICIAL_DOWNLOAD_ONLY) {
@@ -690,6 +688,9 @@ public class DeviantArtCom extends PluginForHost {
         } else if (isVideo(link)) {
             /* officialDownloadurl can be given while account is not given -> Will lead to error 404 then! */
             dllink = link.getStringProperty(PROPERTY_VIDEO_DISPLAY_OR_PREVIEW_URL);
+        } else if (officialDownloadurl != null) {
+            /* E.g. official pdf download */
+            dllink = officialDownloadurl;
         }
         return dllink;
     }

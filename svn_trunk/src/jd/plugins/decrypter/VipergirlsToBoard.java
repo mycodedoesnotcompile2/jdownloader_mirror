@@ -17,7 +17,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/threads/(\\d+)([a-z0-9\\-]+(/page\\d+)?)?" })
+@DecrypterPlugin(revision = "$Revision: 50101 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/threads/(\\d+)([a-z0-9\\-]+).*" })
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -41,27 +41,24 @@ public class VipergirlsToBoard extends PluginForDecrypt {
         final String threadID = new Regex(contenturl, "(?i)threads/(\\d+)").getMatch(0);
         final String targetPageStr = new Regex(contenturl, "(?i)/page(\\d+)").getMatch(0);
         int page = targetPageStr != null ? Integer.parseInt(targetPageStr) : 1;
+        final String targetPostID = new Regex(contenturl, "(?i)(?:post|p=)(\\d+)").getMatch(0);
         final HashSet<String> dupes = new HashSet<String>();
         pagination: do {
-            String postID = new Regex(contenturl, "p(?:=|post)(\\d+)").getMatch(0);
-            if (postID == null) {
-                postID = "";
-            }
-            final String[] posts = br.getRegex("<li[^>]*id\\s*=\\s*\"post_" + postID + "[^>]*>(.*?)</li>\\s*<(li[^>]*id\\s*=\\s*\"post|/ol)").getColumn(0);
+            final String[] posts = br.getRegex("<li[^>]*id\\s*=\\s*\"post_[^>]*>(.*?)</li>\\s*<(li[^>]*id\\s*=\\s*\"post|/ol)").getColumn(0);
             if (posts == null || posts.length == 0) {
                 logger.info("Stopping because: Found zero results on page " + page);
                 break pagination;
             }
             int numberofNewItemsThisPage = 0;
             for (final String post : posts) {
-                final String postNumber = new Regex(post, "name\\s*=\\s*\"post(\\d+)").getMatch(0);
+                final String postID = new Regex(post, "name\\s*=\\s*\"post(\\d+)").getMatch(0);
                 final ArrayList<DownloadLink> thisCrawledLinks = new ArrayList<DownloadLink>();
                 String title = new Regex(post, "<div style\\s*=\\s*\"text-align: center;\">\\s*<i>\\s*<b>\\s*<font color\\s*=\\s*\\s*\"red\"\\s*>\\s*<font[^>]*>(.*?)</font>\\s*</font>\\s*</b>\\s*</i>\\s*<br />").getMatch(0);
                 if (title == null) {
                     // The title is in the H2 tag spanning 3 lines
                     title = new Regex(post, "<h2[^>]*>[\\r\\n\\s]*(.*?)[\\r\\n\\s]*</h2>").getMatch(0);
                     if (title == null) {
-                        title = threadID + "_" + postNumber;
+                        title = threadID + "_" + postID;
                     }
                 }
                 FilePackage fp = null;
@@ -70,7 +67,7 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     title = Encoding.htmlDecode(title).trim();
                     fp = FilePackage.getInstance();
                     fp.setName(title);
-                    fp.setComment("https://vipergirls.to/threads/" + threadID + "?p=" + postNumber + "&viewfull=1#post" + postNumber);
+                    fp.setComment("https://vipergirls.to/threads/" + threadID + "?p=" + postID + "&viewfull=1#post" + postID);
                 }
                 // Get all post content and then filter it for the href links
                 String postContent = new Regex(post, "<h2 class=\"title icon\">\\s*(.*?)\\s*<div\\s*class\\s*=\\s*\"(after_content|postfoot)\"").getMatch(0);
@@ -87,10 +84,18 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     if (fp != null) {
                         link._setFilePackage(fp);
                     }
-                    distribute(link);
+                    if (targetPostID == null) {
+                        /* We aren't looking for a specific post -> Return all results instantly. */
+                        distribute(link);
+                    }
                     thisCrawledLinks.add(link);
                 }
                 ret.addAll(thisCrawledLinks);
+                if (targetPostID != null && targetPostID.equals(postID)) {
+                    /* Return only all results for user wished specific post. */
+                    logger.info("Found user wished postID: " + targetPostID);
+                    return thisCrawledLinks;
+                }
             }
             final String nextPage = br.getRegex("(threads/" + threadID + "[^/]+/page" + (page + 1) + "[^\"]*)\"").getMatch(0);
             logger.info("Crawled page " + page + " | New items this page: " + numberofNewItemsThisPage + " | nextPage: " + nextPage);
@@ -105,6 +110,9 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                 break pagination;
             } else if (numberofNewItemsThisPage == 0) {
                 logger.info("Stopping because: Failed to find any new items");
+                break pagination;
+            } else if (targetPostID != null) {
+                logger.info("Stopping because: User wants specific post only but that was not found");
                 break pagination;
             } else {
                 /* Continue to next page */

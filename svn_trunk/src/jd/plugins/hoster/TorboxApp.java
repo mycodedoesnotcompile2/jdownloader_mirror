@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50070 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50100 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -207,7 +207,7 @@ public class TorboxApp extends PluginForHost {
                 throw e;
             }
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     /** Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. */
@@ -223,7 +223,7 @@ public class TorboxApp extends PluginForHost {
         } else {
             final String dateStrFixed = fixDateString(dateStr);
             if (dateStr.matches(".+\\+\\d{2}:\\d{2}$")) {
-                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH);
+                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ENGLISH);
             } else {
                 return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
             }
@@ -279,6 +279,7 @@ public class TorboxApp extends PluginForHost {
         /* Handle notifications */
         notificationHandling: if (true) {
             if (Boolean.FALSE.equals(user_settings.get("jdownloader_notifications"))) {
+                logger.info("User has disabled notifications in web interface of " + getHost());
                 break notificationHandling;
             }
             long highestNotificationTimestamp = 0;
