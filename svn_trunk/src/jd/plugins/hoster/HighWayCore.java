@@ -70,7 +70,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50093 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -364,7 +364,7 @@ public abstract class HighWayCore extends UseNet {
                     } else {
                         msg = "Downloads of this host are currently not possible: Too many simultaneous downloads (max " + maxDlsForCurrentHost + ")";
                     }
-                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 15 * 1000, msg));
+                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 2 * 1000, msg));
                 }
             }
         }

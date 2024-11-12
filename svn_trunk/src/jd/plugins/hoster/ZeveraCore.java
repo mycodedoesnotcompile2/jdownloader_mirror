@@ -418,13 +418,13 @@ abstract public class ZeveraCore extends UseNet {
             }
         }
         // TODO: 2024-04-26: Work in progress: Make use of this
-        final int maxChunks;
-        final String cacheStatus = dl.getConnection().getRequest().getResponseHeader("X-Cached");
-        if (StringUtils.equalsIgnoreCase(cacheStatus, "hit")) {
-            maxChunks = getMaxChunks(account);
-        } else {
-            maxChunks = 1;
-        }
+        // final int maxChunks;
+        // final String cacheStatus = dl.getConnection().getRequest().getResponseHeader("X-Cached");
+        // if (StringUtils.equalsIgnoreCase(cacheStatus, "hit")) {
+        // maxChunks = getMaxChunks(account);
+        // } else {
+        // maxChunks = 1;
+        // }
     }
 
     private void handleDLSelfhosted(final DownloadLink link, final Account account) throws Exception {
@@ -458,31 +458,24 @@ abstract public class ZeveraCore extends UseNet {
         }
         /* E.g. free account: "premium_until":false or "premium_until":null */
         if (premium_untilO != null) {
+            /* Premium account */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
-            if (isBoosterPointsUnlimitedTrafficWorkaroundActive(account)) {
-                ai.setStatus("Premium | Unlimited Traffic Booster workaround enabled");
-                ai.setUnlimitedTraffic();
+            final boolean boosterWorkaroundActive = isBoosterPointsUnlimitedTrafficWorkaroundActive(account);
+            final double d = fair_use_usedO.doubleValue();
+            final int fairUsagePercentUsed = (int) (d * 100.0);
+            final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
+            String statustext = String.format("Premium | Fair-Use Status: %d%% left", fairUsagePercentLeft);
+            if (boosterWorkaroundActive) {
+                statustext += " | Unlimited Traffic Booster workaround enabled";
             } else {
-                if (fair_use_usedO != null && fair_use_usedO instanceof Number) {
-                    final double d = fair_use_usedO.doubleValue();
-                    final int fairUsagePercentUsed = (int) (d * 100.0);
-                    final int fairUsagePercentLeft = 100 - fairUsagePercentUsed;
-                    if (fairUsagePercentUsed >= 100) {
-                        /* Fair use limit reached --> No traffic left, no downloads possible at the moment */
-                        ai.setTrafficLeft(0);
-                        ai.setStatus("Premium | Fair-Use Status: 100% used [0% left - limit reached]");
-                    } else {
-                        ai.setUnlimitedTraffic();
-                        ai.setStatus(String.format("Premium | Fair-Use Status: %d%% used [%d%% left]", fairUsagePercentUsed, fairUsagePercentLeft));
-                    }
-                } else {
-                    /* This should never happen */
-                    ai.setStatus("Premium | Fair-Use Status: Unknown");
-                    ai.setUnlimitedTraffic();
+                if (fairUsagePercentUsed >= 100) {
+                    throw new AccountUnavailableException("Fair use limit reached", 5 * 60 * 1000l);
                 }
             }
+            ai.setStatus(statustext);
             ai.setValidUntil(premium_untilO.longValue() * 1000, br);
+            ai.setUnlimitedTraffic();
         } else {
             /* Expired == FREE */
             account.setType(AccountType.FREE);

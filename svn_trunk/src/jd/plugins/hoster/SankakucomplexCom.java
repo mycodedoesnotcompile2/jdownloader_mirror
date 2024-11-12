@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 49431 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,7 +92,7 @@ public class SankakucomplexCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.sankakucomplex.com/";
+        return "https://www." + getHost() + "/";
     }
 
     @Override
@@ -397,7 +397,7 @@ public class SankakucomplexCom extends PluginForHost {
         return null;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
@@ -422,6 +422,7 @@ public class SankakucomplexCom extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
+            setDefaultCookies(br, this.getHost());
             /*
              * 2024-04-26: It is really important to have the right URL here in order to properly login in a way which also works for 'old'
              * "chan." subdomain.

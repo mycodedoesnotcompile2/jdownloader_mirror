@@ -55,7 +55,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FaceBookComVideos;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 50039 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
 public class FaceBookComGallery extends PluginForDecrypt {
     public FaceBookComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,12 +88,13 @@ public class FaceBookComGallery extends PluginForDecrypt {
         String videoid = query.get("v");
         if (videoid == null) {
             videoid = query.get("video_id");
-            if (videoid == null) {
-                videoid = new Regex(url, "(?i)/videos/(\\d+)").getMatch(0);
-                if (videoid == null) {
-                    videoid = new Regex(url, "(?i)/reel/(\\d+)").getMatch(0);
-                }
-            }
+        }
+        if (videoid != null && videoid.matches("\\d+")) {
+            return videoid;
+        }
+        videoid = new Regex(url, "(?i)/videos/(\\d+)").getMatch(0);
+        if (videoid == null) {
+            videoid = new Regex(url, "(?i)/reel/(\\d+)").getMatch(0);
         }
         return videoid;
     }
@@ -226,7 +227,6 @@ public class FaceBookComGallery extends PluginForDecrypt {
         // final ArrayList<DownloadLink> videoPermalinks = new ArrayList<DownloadLink>();
         final HashSet<String> processedJsonStrings = new HashSet<String>();
         final List<Object> parsedJsons = new ArrayList<Object>();
-        int numberofJsonsFound = 0;
         for (final String jsonRegEx : jsonRegExes) {
             final String[] jsons = br.getRegex(jsonRegEx).getColumn(0);
             for (final String json : jsons) {
@@ -234,7 +234,6 @@ public class FaceBookComGallery extends PluginForDecrypt {
                 if (!processedJsonStrings.add(json)) {
                     continue;
                 }
-                numberofJsonsFound++;
                 try {
                     /* 2021-03-23: Use JavaScriptEngineFactory as they can also have json without quotes around the keys. */
                     // final Object jsonO = restoreFromString(json, TypeRef.OBJECT);
@@ -246,10 +245,8 @@ public class FaceBookComGallery extends PluginForDecrypt {
                     final ArrayList<DownloadLink> photos = new ArrayList<DownloadLink>();
                     this.crawlPhotos(jsonO, photos);
                     ret.addAll(photos);
-                    // if (ret.isEmpty()) {
-                    // this.crawlVideoPermalinks(jsonO, videoPermalinks);
-                    // }
                 } catch (final Throwable ignore) {
+                    /* Do not log to avoid log spam */
                     // logger.log(ignore);
                 }
             }
@@ -260,7 +257,7 @@ public class FaceBookComGallery extends PluginForDecrypt {
         if (ret.isEmpty() && this.skippedLivestreams > 0) {
             logger.info("Livestreams are not supported");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (numberofJsonsFound == 0) {
+        } else if (processedJsonStrings.isEmpty()) {
             logger.info("Failed to find any jsons --> Probably unsupported URL");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -280,11 +277,32 @@ public class FaceBookComGallery extends PluginForDecrypt {
             }
             /* No errors found -> Last resort: Look for any URLs which look like links to other single images or videos. */
             final String[] allurls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+            final HashSet<String> dupes = new HashSet<String>();
             for (final String thisurl : allurls) {
-                if (!thisurl.equals(br.getURL()) && getUrlType(thisurl) != null) {
-                    logger.info("Adding last resort URL: " + thisurl);
-                    ret.add(this.createDownloadlink(thisurl));
+                String contentID = getVideoidFromURL(thisurl);
+                if (contentID == null) {
+                    contentID = getPhotoidFromURL(thisurl);
                 }
+                if (contentID == null) {
+                    /* Unsupported URL */
+                    continue;
+                } else if (!dupes.add(contentID)) {
+                    /* Skip duplicates */
+                    continue;
+                } else if (thisurl.equals(br.getURL())) {
+                    continue;
+                } else if (br.getURL().contains(contentID)) {
+                    /* Same ID inside URL which we are currently processing -> Skip */
+                    continue;
+                } else if (addedurl.contains(contentID)) {
+                    /* Same ID inside URL which we are currently processing -> Skip */
+                    continue;
+                } else if (!this.canHandle(thisurl)) {
+                    /* Skip links which this plugin cannot handle */
+                    continue;
+                }
+                logger.info("Adding last resort URL: " + thisurl);
+                ret.add(this.createDownloadlink(thisurl));
             }
             if (ret.isEmpty()) {
                 logger.warning("Unsupported link or broken plugin -> Returning empty array");
@@ -534,12 +552,13 @@ public class FaceBookComGallery extends PluginForDecrypt {
 
     private int skippedLivestreams = 0;
 
-    private void crawlVideos(final Object o, final List<DownloadLink> results) {
+    private void crawlVideos(final Object o, final List<DownloadLink> results) throws PluginException {
         if (o instanceof Map) {
             final Map<String, Object> map = (Map<String, Object>) o;
             final Map<String, Object> videoDeliveryLegacyFields = (Map<String, Object>) map.get("videoDeliveryLegacyFields");
+            final List<Map<String, Object>> progressive_urls = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(map, "videoDeliveryResponseFragment/videoDeliveryResponseResult/progressive_urls");
             // final Map<String, Object> owner = (Map<String, Object>) map.get("owner");
-            isVideo: if (videoDeliveryLegacyFields != null) {
+            isVideo: if (videoDeliveryLegacyFields != null || progressive_urls != null) {
                 final String id = map.get("id").toString();
                 final Boolean is_live_streaming = (Boolean) map.get("is_live_streaming");
                 if (Boolean.TRUE.equals(is_live_streaming)) {
@@ -575,15 +594,35 @@ public class FaceBookComGallery extends PluginForDecrypt {
                         uploaderNameFromURL = new Regex(url, "https?://[^/]+/([^/]+)$").getMatch(0);
                     }
                 }
-                String urlLow = (String) videoDeliveryLegacyFields.get("playable_url");
-                if (StringUtils.isEmpty(urlLow)) {
-                    /* 2023-07-13 */
-                    urlLow = (String) videoDeliveryLegacyFields.get("browser_native_sd_url");
+                String urlLow = null;
+                String urlHigh = null;
+                if (videoDeliveryLegacyFields != null) {
+                    urlLow = (String) videoDeliveryLegacyFields.get("playable_url");
+                    if (StringUtils.isEmpty(urlLow)) {
+                        /* 2023-07-13 */
+                        urlLow = (String) videoDeliveryLegacyFields.get("browser_native_sd_url");
+                    }
+                    urlHigh = (String) videoDeliveryLegacyFields.get("playable_url_quality_hd");
+                    if (StringUtils.isEmpty(urlHigh)) {
+                        /* 2023-07-13 */
+                        urlHigh = (String) videoDeliveryLegacyFields.get("browser_native_hd_url");
+                    }
                 }
-                String urlHigh = (String) videoDeliveryLegacyFields.get("playable_url_quality_hd");
-                if (StringUtils.isEmpty(urlHigh)) {
-                    /* 2023-07-13 */
-                    urlHigh = (String) videoDeliveryLegacyFields.get("browser_native_hd_url");
+                if (progressive_urls != null) {
+                    /* 2024-11-11: For users who are logged in */
+                    for (final Map<String, Object> progressive_url_map : progressive_urls) {
+                        final String progressive_url = progressive_url_map.get("progressive_url").toString();
+                        final Map<String, Object> metadata = (Map<String, Object>) progressive_url_map.get("metadata");
+                        final String quality = metadata.get("quality").toString();
+                        if (quality.equalsIgnoreCase("HD")) {
+                            urlHigh = progressive_url;
+                        } else {
+                            urlLow = progressive_url;
+                        }
+                    }
+                }
+                if (urlHigh == null && urlLow == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 if (!StringUtils.isEmpty(urlHigh)) {
                     video.setProperty(FaceBookComVideos.PROPERTY_DIRECTURL_HD, urlHigh);

@@ -48,6 +48,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -555,14 +556,14 @@ public class HttpClient {
         }
     }
 
-    protected final static Charset          UTF8           = Charset.forName("UTF-8");
-    protected HashSet<Integer>              allowedResponseCodes;
-    protected int                           connectTimeout = 15000;
-    protected LogInterface                  logger         = null;
-    protected HTTPProxy                     proxy          = HTTPProxy.NONE;
-    protected int                           readTimeout    = 30000;
+    protected final static Charset          UTF8                 = Charset.forName("UTF-8");
+    protected HashSet<Integer>              allowedResponseCodes = new HashSet<Integer>(Arrays.asList(-1));
+    protected int                           connectTimeout       = 15000;
+    protected LogInterface                  logger               = null;
+    protected HTTPProxy                     proxy                = HTTPProxy.NONE;
+    protected int                           readTimeout          = 30000;
     protected final HashMap<String, String> requestHeader;
-    private final List<RequestContext>      requests       = new CopyOnWriteArrayList<RequestContext>();
+    private final List<RequestContext>      requests             = new CopyOnWriteArrayList<RequestContext>();
 
     public HttpClient() {
         this.requestHeader = new HashMap<String, String>();

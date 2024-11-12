@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50100 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
@@ -153,16 +153,19 @@ public class TorboxApp extends PluginForHost {
             /*
              * 2024-06-13: Disabled this handling.
              */
-            final boolean doCachecheck = false;
-            if (doCachecheck) {
+            cacheCheck: if (true) {
                 /* Optional step */
+                final boolean doCachecheck = false;
+                if (!doCachecheck) {
+                    break cacheCheck;
+                }
                 /* Items need to be cached before they can be downloaded -> Check cache status */
                 logger.info("Checking downloadability of internal file_id: " + file_id + " | hash: " + hash);
                 final UrlQuery query_checkcached = new UrlQuery();
-                query_checkcached.add("hash", hash);
-                query_checkcached.add("format", "object");
+                query_checkcached.appendEncoded("hash", hash);
+                query_checkcached.appendEncoded("format", "object");
                 /* 2024-06-13: Use this for now to avoid problems with outdated response from this API call. */
-                query_checkcached.add("bypass_cache", "true");
+                query_checkcached.appendEncoded("bypass_cache", "true");
                 final Request req_checkcached = br.createGetRequest(API_BASE + "/webdl/checkcached?" + query_checkcached.toString());
                 final Object resp_checkcached = this.callAPI(br, req_checkcached, account, link);
                 Map<String, Object> cachemap = null;
@@ -185,9 +188,9 @@ public class TorboxApp extends PluginForHost {
             }
             logger.info("Trying to init download for internal file_id: " + file_id + " | hash: " + hash);
             final UrlQuery query_requestdl = new UrlQuery();
-            query_requestdl.add("token", this.getApikey(account));
-            query_requestdl.add("web_id", file_id);
-            query_requestdl.add("zip", "false");
+            query_requestdl.appendEncoded("token", this.getApikey(account));
+            query_requestdl.appendEncoded("web_id", file_id);
+            query_requestdl.appendEncoded("zip", "false");
             final Request req_requestdl = br.createGetRequest(API_BASE + "/webdl/requestdl?" + query_requestdl.toString());
             dllink = this.callAPI(br, req_requestdl, account, link).toString();
             /* Store directurl so we can re-use it next time. */
@@ -220,13 +223,15 @@ public class TorboxApp extends PluginForHost {
     private long parseTimeStamp(final String dateStr) {
         if (dateStr == null) {
             return -1;
+        }
+        final String dateStrFixed = fixDateString(dateStr);
+        if (dateStrFixed.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{3}\\+\\d{2}:\\d{2}")) {
+            return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ENGLISH);
+        } else if (dateStrFixed.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+\\d{2}:\\d{2}")) {
+            return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ENGLISH);
         } else {
-            final String dateStrFixed = fixDateString(dateStr);
-            if (dateStr.matches(".+\\+\\d{2}:\\d{2}$")) {
-                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ENGLISH);
-            } else {
-                return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
-            }
+            /* Fallback */
+            return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
         }
     }
 
@@ -255,7 +260,7 @@ public class TorboxApp extends PluginForHost {
             ai.setExpired(true);
         }
         final String subscribedStr;
-        if ((Boolean) user.get("is_subscribed")) {
+        if (Boolean.TRUE.equals(user.get("is_subscribed"))) {
             subscribedStr = "Yes";
         } else {
             subscribedStr = "No";
@@ -284,12 +289,12 @@ public class TorboxApp extends PluginForHost {
             }
             long highestNotificationTimestamp = 0;
             List<Map<String, Object>> notifications = null;
+            int numberofNotificationsActuallyDisplayed = 0;
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
                 /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
                 notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
-                int counterDisplayed = 0;
                 for (final Map<String, Object> notification : notifications) {
                     final long notification_created_at = parseTimeStamp(notification.get("created_at").toString());
                     if (notification_created_at > highestNotificationTimestamp) {
@@ -301,13 +306,13 @@ public class TorboxApp extends PluginForHost {
                     }
                     logger.info("Displaying notification with ID: " + notification.get("id"));
                     displayBubbleNotification(notification.get("title").toString(), notification.get("message").toString());
-                    counterDisplayed++;
-                    if (timestampNotificationsDisplayed == 0 && counterDisplayed >= 5) {
+                    numberofNotificationsActuallyDisplayed++;
+                    if (timestampNotificationsDisplayed == 0 && numberofNotificationsActuallyDisplayed >= 5) {
                         logger.info("First time we are displaying notifications for this account. Let's not spam the user with all past notifications he has.");
                         break;
                     }
                 }
-                logger.info("Total number of notifications: " + notifications.size() + " | Displayed this run: " + counterDisplayed);
+                logger.info("Total number of notifications: " + notifications.size() + " | Displayed this run: " + numberofNotificationsActuallyDisplayed);
             } catch (final Exception e) {
                 /*
                  * Ignore exception as the important part [the account-check] was successful and we don't care about a failure at this
@@ -318,7 +323,7 @@ public class TorboxApp extends PluginForHost {
             } finally {
                 /* Save this timestamp so we are able to know to which time we've already displayed notifications. */
                 account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, highestNotificationTimestamp);
-                if (notifications != null && notifications.size() > 0) {
+                if (numberofNotificationsActuallyDisplayed > 0) {
                     try {
                         /* Clear all notifications ("mark as read") */
                         final Request req_clear_all_notifications = br.createGetRequest(API_BASE + "/notifications/clear");
@@ -332,6 +337,12 @@ public class TorboxApp extends PluginForHost {
             }
         }
         return ai;
+    }
+
+    @Override
+    protected void displayBubbleNotification(String title, final String text) {
+        title = "TorBox | " + title;
+        super.displayBubbleNotification(title, text);
     }
 
     private Map<String, Object> login(final Account account, final boolean validateLogins) throws IOException, PluginException, InterruptedException {

@@ -487,14 +487,14 @@ public class StringUtils {
      */
     @Deprecated
     public static String join(Object[] parameters, String separator) {
-        StringBuilder sb = new StringBuilder();
-        for (Object s : parameters) {
-            if (sb.length() > 0) {
-                sb.append(separator);
+        return new StringJoiner(separator) {
+            protected void addSeparator(int index, Object element, Object[] parameters, StringBuilder sb) {
+                // lagacy - this ignores an empty element until there is any real content.s
+                if (sb.length() > 0) {
+                    sb.append(getSeparator(index, element, parameters, sb));
+                }
             }
-            sb.append(String.valueOf(s));
-        }
-        return sb.toString();
+        }.join(parameters);
     }
 
     /**
@@ -502,14 +502,7 @@ public class StringUtils {
      */
     @Deprecated
     public static String join(String separator, Object... parameters) {
-        StringBuilder sb = new StringBuilder();
-        for (Object s : parameters) {
-            if (sb.length() > 0) {
-                sb.append(separator);
-            }
-            sb.append(String.valueOf(s));
-        }
-        return sb.toString();
+        return join(parameters, separator);
     }
 
     /**
@@ -528,19 +521,26 @@ public class StringUtils {
      * @deprecated does not add seperator if the first element is ""
      */
     @Deprecated
-    public static <T> String join(Collection<T> params, String separator, Stringifier<T> stringifier) {
-        StringBuilder sb = new StringBuilder();
-        for (T o : params) {
-            String s = stringifier.toString(o);
-            if (s == null) {
-                continue;
+    public static <T> String join(Collection<T> params, String separator, final Stringifier<T> stringifier) {
+        return new StringJoiner(separator) {
+            protected String elementToString(Object s) {
+                return stringifier.toString((T) s);
+            };
+
+            protected boolean skip(Object s) {
+                if (elementToString(s) == null) {
+                    return true;
+                }
+                return false;
+            };
+
+            protected void addSeparator(int index, Object element, Object[] parameters, StringBuilder sb) {
+                // lagacy - this ignores an empty element until there is any real content.s
+                if (sb.length() > 0) {
+                    sb.append(getSeparator(index, element, parameters, sb));
+                }
             }
-            if (sb.length() > 0) {
-                sb.append(separator);
-            }
-            sb.append(s);
-        }
-        return sb.toString();
+        }.join(params);
     }
 
     /**

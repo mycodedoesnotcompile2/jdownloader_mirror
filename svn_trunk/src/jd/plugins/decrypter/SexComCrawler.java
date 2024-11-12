@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -41,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49747 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
 public class SexComCrawler extends PornEmbedParser {
     public SexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,7 +77,7 @@ public class SexComCrawler extends PornEmbedParser {
     private static final String PATTERN_RELATIVE_USER            = "(?i)/user/([a-z0-9\\-]+)/([a-z0-9\\-]+)/";
     private static final String PATTERN_RELATIVE_PIN             = "(?i)/pin/\\d+(-[a-z0-9\\-]+)?/";
     private static final String PATTERN_RELATIVE_PICTURE         = "(?i)/picture/\\d+/?";
-    private static final String PATTERN_RELATIVE_SHORT           = "(?i)/(?:[a-z]{2}/)?shorts/(([\\w\\-]+)/video/([\\w\\-]+))";
+    private static final String PATTERN_RELATIVE_SHORT           = "(?i)/(?:[a-z]{2}/)?shorts/(?:creator/)?(([\\w\\-]+)/video/([\\w\\-]+))";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
@@ -86,6 +87,7 @@ public class SexComCrawler extends PornEmbedParser {
         return ret.toArray(new String[0]);
     }
 
+    @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String externID;
@@ -112,7 +114,7 @@ public class SexComCrawler extends PornEmbedParser {
         }
         final Pattern userpatternfull = Pattern.compile("https?://[^/]+" + PATTERN_RELATIVE_USER);
         final Pattern shortspatternfull = Pattern.compile("https?://[^/]+" + PATTERN_RELATIVE_SHORT);
-        final String shortspath;
+        final Regex shortsRegex;
         if (new Regex(br.getURL(), userpatternfull).patternFind()) {
             /* Find all items of profile. Those can be spread across multiple pages -> Handle pagination */
             /* Example: http://www.sex.com/user/sanje/sexy-vika/ */
@@ -148,7 +150,9 @@ public class SexComCrawler extends PornEmbedParser {
                     page++;
                 }
             } while (!this.isAbort());
-        } else if ((shortspath = new Regex(br.getURL(), shortspatternfull).getMatch(0)) != null) {
+        } else if ((shortsRegex = new Regex(br.getURL(), shortspatternfull)).patternFind()) {
+            final String shortspath = shortsRegex.getMatch(0);
+            final String shortstitle = shortsRegex.getMatch(2).replace("-", " ").trim();
             br.getPage("https://shorts.sex.com/api/media/getMedia?relativeUrl=" + Encoding.urlEncode(shortspath));
             /* 2024-06-06: Alternative: https://iframe.sex.com/api/media/getMedia?relativeUrl= */
             if (br.getHttpConnection().getResponseCode() == 404) {
@@ -163,13 +167,24 @@ public class SexComCrawler extends PornEmbedParser {
                 throw new AccountRequiredException();
             }
             final List<Map<String, Object>> sources = (List<Map<String, Object>>) media.get("sources");
+            final ArrayList<DownloadLink> blurredVideos = new ArrayList<DownloadLink>();
             for (final Map<String, Object> source : sources) {
                 final String url = source.get("fullPath").toString();
                 final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
                 /* Referer header is important for downloading! */
                 video.setReferrerUrl(param.getCryptedUrl());
                 video.setAvailable(true);
-                ret.add(video);
+                if (StringUtils.containsIgnoreCase(url, "blurred")) {
+                    video.setFinalFileName(shortstitle + "_blurred.mp4");
+                    blurredVideos.add(video);
+                } else {
+                    video.setFinalFileName(shortstitle + ".mp4");
+                    ret.add(video);
+                }
+            }
+            if (ret.size() == 0 && blurredVideos.size() > 0) {
+                /* Only add blurred videos if no other items were found */
+                ret.addAll(blurredVideos);
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(shortspath);

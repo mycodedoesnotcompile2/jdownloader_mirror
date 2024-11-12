@@ -30,28 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.Icon;
 import javax.swing.JScrollPane;
 
-import jd.PluginWrapper;
-import jd.config.Property;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.components.PluginJSonUtils;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -76,7 +54,29 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 50099 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.config.Property;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.components.PluginJSonUtils;
+
+@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -194,9 +194,6 @@ public class OffCloudCom extends UseNet {
             super.handleMultiHost(link, account);
             return;
         }
-        String status = null;
-        String filename = null;
-        String requestID = null;
         mhm.runCheck(account, link);
         /*
          * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it is
@@ -210,7 +207,8 @@ public class OffCloudCom extends UseNet {
         }
         setConstants(account, link);
         this.login(account, false);
-        String dllink = checkDirectLink(link, this.getHost() + "directlink");
+        String dllink = checkDirectLink(link);
+        String requestID = null;
         if (dllink == null) {
             final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
             if (cloudOnlyHosts.contains(link.getHost())) {
@@ -223,12 +221,13 @@ public class OffCloudCom extends UseNet {
                     /* Should never happen */
                     mhm.handleErrorGeneric(account, link, "cloud_requestIdnull", 50, 5 * 60 * 1000l);
                 }
+                String status = null;
                 do {
                     this.sleep(5000l, link);
                     this.postRawAPISafe("https://" + getHost() + "/cloud/status", "{\"requestIds\":[\"" + requestID + "\"]}");
                     status = PluginJSonUtils.getJsonValue(br, "status");
                 } while (System.currentTimeMillis() - timeStarted < CLOUD_MAX_WAITTIME && "downloading".equals(status));
-                filename = PluginJSonUtils.getJsonValue(br, "fileName");
+                final String filename = PluginJSonUtils.getJsonValue(br, "fileName");
                 if (!"downloaded".equals(status)) {
                     logger.warning("Cloud failed");
                     /* Should never happen but will happen */
@@ -259,7 +258,6 @@ public class OffCloudCom extends UseNet {
 
     @SuppressWarnings("deprecation")
     private void handleDL(final Account account, final DownloadLink link, final String dllink) throws Exception {
-        final String requestID = link.getStringProperty("offcloudrequestId", null);
         /* First set hardcoded limit */
         int maxChunks = ACCOUNT_PREMIUM_MAXCHUNKS;
         /* Then check if we got an individual limit. */
@@ -280,7 +278,8 @@ public class OffCloudCom extends UseNet {
             resume = false;
             link.setProperty(OffCloudCom.NORESUME, Boolean.valueOf(false));
         }
-        link.setProperty(this.getHost() + "directlink", dllink);
+        final String directlinkproperty = getDirectlinkproperty();
+        link.setProperty(directlinkproperty, dllink);
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
@@ -316,6 +315,7 @@ public class OffCloudCom extends UseNet {
                     }
                 } else if (PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class).isDeleteDownloadHistorySingleLinkEnabled()) {
                     /* Delete download history entry of downloaded file from history immediately after each download */
+                    final String requestID = link.getStringProperty("offcloudrequestId", null);
                     deleteSingleDownloadHistoryEntry(requestID);
                 }
             } catch (final PluginException e) {
@@ -333,13 +333,13 @@ public class OffCloudCom extends UseNet {
                 controlSlot(-1);
             }
         } catch (final Exception e) {
-            link.setProperty(this.getHost() + "directlink", Property.NULL);
+            link.setProperty(directlinkproperty, Property.NULL);
             throw e;
         }
     }
 
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
+    private String checkDirectLink(final DownloadLink link) {
+        String dllink = link.getStringProperty(getDirectlinkproperty());
         if (dllink != null) {
             URLConnectionAdapter con = null;
             try {
@@ -365,7 +365,6 @@ public class OffCloudCom extends UseNet {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         setConstants(account, null);
-        final OffCloudComPluginConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class);
         this.login(account, true);
         final AccountInfo ai = new AccountInfo();
         br.postPage("https://" + getHost() + "/stats/usage-left", "");
@@ -444,6 +443,7 @@ public class OffCloudCom extends UseNet {
         hostMaxdlsMap.clear();
         this.getAPISafe("https://" + getHost() + "/api/sites/chunks");
         final List<Map<String, Object>> chunklimits = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        final OffCloudComPluginConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class);
         for (final Map<String, Object> domaininfo : filehosts) {
             final String status = domaininfo.get("isActive").toString().toLowerCase(Locale.ENGLISH);
             // final String name = domaininfo.get("name").toString();
@@ -522,6 +522,7 @@ public class OffCloudCom extends UseNet {
         } else {
             account.setProperty("accinfo_linksleft", remaininglinksnum);
         }
+        /* Save packages as json as we will use that information later */
         account.setProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST, JSonStorage.serializeToJson(activePackages));
         return ai;
     }
@@ -548,7 +549,7 @@ public class OffCloudCom extends UseNet {
                 return;
             } else {
                 logger.info("Cookie login failed");
-                br.clearCookies(br.getURL());
+                br.clearCookies(null);
                 account.clearCookies("");
             }
         }
@@ -567,8 +568,8 @@ public class OffCloudCom extends UseNet {
      * "confirm your IP address" e-mails.
      */
     private void clearAllowedIPAddresses() {
+        logger.info("Remove IP handling active: Removing all registered IPs but the current one");
         try {
-            logger.info("Remove IP handling active: Removing all registered IPs but the current one");
             postAPISafe("https://www." + getHost() + "/account/registered-ips", "");
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final List<Map<String, Object>> data = (List<Map<String, Object>>) entries.get("data");
@@ -598,9 +599,9 @@ public class OffCloudCom extends UseNet {
                     throw new InterruptedException();
                 }
             }
-        } catch (final Throwable e) {
+        } catch (final Throwable ignore) {
             logger.warning("FATAL error occured in IP-remove handling!");
-            e.printStackTrace();
+            ignore.printStackTrace();
         }
     }
 
@@ -681,9 +682,9 @@ public class OffCloudCom extends UseNet {
                 logger.info("Failed to delete some requestIDs. Successfully deleted " + counter_success + " of " + requestIDs.size() + " requestIDs");
             }
             this.currAcc.setProperty("req_ids_size", deletedDownloadHistoryEntriesNum);
-        } catch (final Throwable e) {
+        } catch (final Throwable ignore) {
             logger.warning("Failed to clear complete download history");
-            e.printStackTrace();
+            ignore.printStackTrace();
         }
     }
 
@@ -942,7 +943,7 @@ public class OffCloudCom extends UseNet {
             case 15:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This cann be considered as a small workaround.
                  */
@@ -952,7 +953,7 @@ public class OffCloudCom extends UseNet {
             case 16:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This extra errorhandling can be considered as a small workaround.
                  */
@@ -1032,7 +1033,7 @@ public class OffCloudCom extends UseNet {
          */
         String statusMessage;
         if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-            statusMessage = "\r\nFree Account Limits erreicht. Kaufe dir einen premium Account um weiter herunterladen zu können.";
+            statusMessage = "\r\nFree Account Limits erreicht. Kaufe einen premium Account um weiter herunterladen zu können.";
         } else {
             statusMessage = "\r\nFree account limits reached. Buy a premium account to continue downloading.";
         }
@@ -1260,6 +1261,10 @@ public class OffCloudCom extends UseNet {
         }
     }
 
+    private final String getDirectlinkproperty() {
+        return this.getHost() + "directlink";
+    }
+
     @Override
     public void reset() {
     }
@@ -1273,7 +1278,7 @@ public class OffCloudCom extends UseNet {
          * Sometimes saved offcloud directlinks cause problems, are very slow or time out so this gives us a higher chance of a working
          * download after a reset.
          */
-        link.setProperty(this.getHost() + "directlink", Property.NULL);
+        link.removeProperty(getDirectlinkproperty());
         link.setProperty("offcloudrequestId", Property.NULL);
     }
 

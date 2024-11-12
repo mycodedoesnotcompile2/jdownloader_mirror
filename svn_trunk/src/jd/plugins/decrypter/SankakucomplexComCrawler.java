@@ -40,7 +40,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 49286 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,6 +100,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     public static final String API_BASE        = "https://capi-v2.sankakucomplex.com";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        // final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        // if (account != null) {
+        // final SankakucomplexCom hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
+        // hosterplugin.login(account, false);
+        // }
         if (param.getCryptedUrl().matches(TYPE_TAGS_BOOKS)) {
             return crawlTagsBooks(param);
         } else if (param.getCryptedUrl().matches(TYPE_BOOK)) {
@@ -130,9 +135,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
         final int maxItemsPerPage = 40;
         final UrlQuery query = new UrlQuery();
-        query.add("lang", languageFromURL);
-        query.add("limit", Integer.toString(maxItemsPerPage));
-        query.add("hide_posts_in_books", "in-larger-tags");
+        query.appendEncoded("lang", languageFromURL);
+        query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
+        query.appendEncoded("hide_posts_in_books", "in-larger-tags");
         query.add("tags", tagsUrlEncoded);
         int page = 1;
         do {
@@ -163,6 +168,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 break;
             } else if (page == maxPage) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
+                this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
                 break;
             } else if (StringUtils.isEmpty(nextPageHash)) {
                 logger.info("Stopping because: Reached end(?)");
@@ -171,6 +177,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
                 break;
             } else {
+                /* Continue to next page */
                 page++;
                 query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
             }
@@ -197,11 +204,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final int maxItemsPerPage = 20;
         final UrlQuery query = new UrlQuery();
-        query.add("lang", languageFromURL);
-        query.add("limit", Integer.toString(maxItemsPerPage));
-        query.add("includes[]", "series");
+        query.appendEncoded("lang", languageFromURL);
+        query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
+        query.appendEncoded("includes[]", "series");
         query.add("tags", URLEncode.encodeURIComponent(tags));
-        query.add("pool_type", "0");
+        query.appendEncoded("pool_type", "0");
         int page = 1;
         do {
             br.getPage(API_BASE + "/pools/keyset?" + query.toString());
@@ -229,6 +236,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 break;
             } else if (page == maxPage) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
+                this.displayBubbleNotification("Tags books: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
                 break;
             } else if (StringUtils.isEmpty(nextPageHash)) {
                 logger.info("Stopping because: Reached end(?)");
@@ -237,6 +245,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
                 break;
             } else {
+                /* Continue to next page */
                 page++;
                 query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
             }

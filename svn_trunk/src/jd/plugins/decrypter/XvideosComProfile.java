@@ -53,7 +53,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.XvideosCom;
 import jd.plugins.hoster.XvideosCore;
 
-@DecrypterPlugin(revision = "$Revision: 50041 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
 public class XvideosComProfile extends PluginForDecrypt {
     public XvideosComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -403,8 +403,13 @@ public class XvideosComProfile extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             final int totalNumberofVideoItems = ((Number) entries.get("nb_videos")).intValue();
             if (totalNumberofVideoItems == 0) {
-                logger.info("Stopping because: User doesn't have any videos");
-                throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+                if (ret.size() > 0) {
+                    logger.info("Looks like this profile contains only quickies/shorts but no 'normal' videos");
+                    return ret;
+                } else {
+                    logger.info("Stopping because: User doesn't have any videos");
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+                }
             }
             int numberofNewItemsOnCurrentPage = 0;
             final List<Map<String, Object>> videos = (List<Map<String, Object>>) entries.get("videos");
