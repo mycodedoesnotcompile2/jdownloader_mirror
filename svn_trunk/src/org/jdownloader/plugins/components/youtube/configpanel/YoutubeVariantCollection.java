@@ -78,11 +78,9 @@ public class YoutubeVariantCollection implements Storable {
     }
 
     public static List<YoutubeVariantCollection> load() {
-        List<YoutubeVariantCollection> links = CFG_YOUTUBE.CFG.getCollections();
-        ;
-        ArrayList<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
-
-        HashSet<String> groupIds = new HashSet<String>();
+        final List<YoutubeVariantCollection> links = CFG_YOUTUBE.CFG.getCollections();
+        final ArrayList<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
+        final HashSet<String> groupIds = new HashSet<String>();
         if (links != null) {
             for (YoutubeVariantCollection l : links) {
                 if (l != null) {
@@ -91,7 +89,6 @@ public class YoutubeVariantCollection implements Storable {
                         groupIds.add(l.getGroupingID());
                     }
                 }
-
             }
         }
         for (YoutubeVariantCollection g : getDefaults()) {
@@ -99,12 +96,11 @@ public class YoutubeVariantCollection implements Storable {
                 ret.add(g);
             }
         }
-
         return ret;
     }
 
     public HashSet<String> createUniqueIDSet() {
-        HashSet<String> ret = new HashSet<String>();
+        final HashSet<String> ret = new HashSet<String>();
         if (variants != null) {
             for (VariantIDStorable v : variants) {
                 ret.add(v.createUniqueID());
@@ -114,7 +110,7 @@ public class YoutubeVariantCollection implements Storable {
     }
 
     public HashSet<String> createUniqueIDSetForDropDownList() {
-        HashSet<String> ret = new HashSet<String>();
+        final HashSet<String> ret = new HashSet<String>();
         if (dropdown != null) {
             for (VariantIDStorable v : dropdown) {
                 ret.add(v.createUniqueID());
@@ -124,35 +120,26 @@ public class YoutubeVariantCollection implements Storable {
     }
 
     public static List<YoutubeVariantCollection> getDefaults() {
-        ArrayList<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
-
+        final ArrayList<YoutubeVariantCollection> ret = new ArrayList<YoutubeVariantCollection>();
         for (VariantGroup g : VariantGroup.values()) {
-
             switch (g) {
             case VIDEO:
                 for (Projection p : Projection.values()) {
                     String id = g.name() + "_" + p.name();
-
                     ret.add(0, new YoutubeVariantCollection(_GUI.T.Youtube_bestcollection(p, g), id));
-
                 }
                 break;
             default:
                 String id = g.name();
-
                 ret.add(0, new YoutubeVariantCollection(_GUI.T.Youtube_bestcollection_2(g), id));
-
             }
         }
         for (FileContainer fc : FileContainer.values()) {
             String id = fc.name();
-
             YoutubeVariantCollection l;
             ret.add(l = new YoutubeVariantCollection(_GUI.T.Youtube_bestcollection_2(fc), id));
             l.setEnabled(false);
-
         }
-
         return ret;
     }
 

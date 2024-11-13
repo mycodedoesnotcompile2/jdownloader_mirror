@@ -5,6 +5,8 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.StringUtils;
@@ -70,7 +72,7 @@ public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
     }
 
     @Override
-    public String getFileNamePattern() {
+    public String getFileNamePattern(final DownloadLink downloadLink) {
         return PluginJsonConfig.get(YoutubeConfig.class).getSubtitleFilenamePattern();
     }
 

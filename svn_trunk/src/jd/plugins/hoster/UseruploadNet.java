@@ -23,14 +23,13 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48265 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
 public class UseruploadNet extends XFileSharingProBasic {
     public UseruploadNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -110,18 +109,18 @@ public class UseruploadNet extends XFileSharingProBasic {
     public String[] scanInfo(final String[] fileInfo) {
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, "class=\"zmdi zmdi-file visible-xs\"></i>([^<>\"]+)<").getMatch(0);
+            fileInfo[0] = br.getRegex("class=\"zmdi zmdi-file visible-xs\"></i>([^<>\"]+)<").getMatch(0);
         }
         if (StringUtils.isEmpty(fileInfo[0])) {
             /* 2020-02-04 */
-            fileInfo[0] = new Regex(correctedBR, "class=\"name\">\\s*<h4>([^<>\"]+)<").getMatch(0);
+            fileInfo[0] = br.getRegex("class=\"name\">\\s*<h4>([^<>\"]+)<").getMatch(0);
         }
         if (StringUtils.isEmpty(fileInfo[1])) {
-            final String fileSize = new Regex(correctedBR, "<span>\\s*Uploaded on.*?</span>\\s*(<span>[^<]+</span>)").getMatch(0);
+            final String fileSize = br.getRegex("<span>\\s*Uploaded on.*?</span>\\s*(<span>[^<]+</span>)").getMatch(0);
             fileInfo[1] = scanGenericFileSize(fileSize);
         }
         if (StringUtils.isEmpty(fileInfo[1])) {
-            fileInfo[1] = new Regex(correctedBR, "<strong>Size:</strong>([^<>\"]+)</li>").getMatch(0);
+            fileInfo[1] = br.getRegex("<strong>Size:</strong>([^<>\"]+)</li>").getMatch(0);
         }
         fileInfo[0] = removeHostNameFromFilename(fileInfo[0]);
         return fileInfo;

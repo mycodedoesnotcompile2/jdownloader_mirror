@@ -52,6 +52,7 @@ import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.decrypter.TbCmV2;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
@@ -96,6 +97,7 @@ import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.AbstractVariant;
 import org.jdownloader.plugins.components.youtube.variants.AudioInterface;
 import org.jdownloader.plugins.components.youtube.variants.SubtitleVariant;
+import org.jdownloader.plugins.components.youtube.variants.VariantGroup;
 import org.jdownloader.plugins.components.youtube.variants.VariantInfo;
 import org.jdownloader.plugins.components.youtube.variants.VideoInterface;
 import org.jdownloader.plugins.components.youtube.variants.VideoVariant;
@@ -170,18 +172,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -635,7 +637,7 @@ public class YoutubeHelper {
         REPLACER.add(new YoutubeReplacer("PLAYLIST_CREATOR", "PLAYLIST_USERNAME", "PL_USR") {
             @Override
             protected String getValue(DownloadLink link, YoutubeHelper helper, String mod) {
-                return link.getStringProperty(YoutubeHelper.YT_PLAYLIST_CREATOR, "");
+                return link.getStringProperty(YoutubeHelper.YT_PLAYLIST_CREATOR, link.getStringProperty(YoutubeHelper.YT_USER_NAME));
             }
 
             @Override
@@ -2223,11 +2225,7 @@ public class YoutubeHelper {
         refreshVideo(vid);
     }
 
-    public boolean addYoutubeStreamData(YoutubeStreamData match) {
-        return addYoutubeStreamData(vid.streams, match);
-    }
-
-    public boolean addYoutubeStreamData(Map<YoutubeITAG, StreamCollection> map, YoutubeStreamData match) {
+    protected boolean addYoutubeStreamData(Map<YoutubeITAG, StreamCollection> map, YoutubeStreamData match) {
         if (!isSegmentLoadingAllowed(match)) {
             logger.info("itag not allowed(segments):" + match.toString());
             return false;
@@ -2317,6 +2315,8 @@ public class YoutubeHelper {
         }
         return false;
     }
+
+    protected Map<String, List<YoutubeStreamData>> streamDataCache = new HashMap<String, List<YoutubeStreamData>>();
 
     public void refreshVideo(final YoutubeClipData vid) throws Exception {
         account = login(logger, false);
@@ -2592,6 +2592,19 @@ public class YoutubeHelper {
         if (thumbnails != null) {
             for (YoutubeStreamData thumbnail : thumbnails) {
                 addYoutubeStreamData(ret, thumbnail);
+            }
+        }
+        final String playListID = getPlaylistID();
+        if (!CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER) && playListID != null) {
+            List<YoutubeStreamData> covers = streamDataCache.get(playListID);
+            if (covers == null && !streamDataCache.containsKey(playListID)) {
+                covers = crawlCoverData(playListID, true);
+                streamDataCache.put(playListID, covers);
+            }
+            if (covers != null) {
+                for (YoutubeStreamData cover : covers) {
+                    addYoutubeStreamData(ret, cover);
+                }
             }
         }
         for (Entry<YoutubeITAG, StreamCollection> es : ret.entrySet()) {
@@ -3396,7 +3409,7 @@ public class YoutubeHelper {
         }
     }
 
-    private boolean getThumbnailSize(Browser br, YoutubeStreamData match) {
+    private boolean probeSize(Browser br, YoutubeStreamData match) {
         final Browser check = br.cloneBrowser();
         check.setFollowRedirects(true);
         try {
@@ -3428,9 +3441,7 @@ public class YoutubeHelper {
             return null;
         }
         final String itemIDFromURL = thumbregex.getMatch(0);
-
         if (itemID == null) {
-
             itemID = itemIDFromURL;
         }
         final String bestFname = thumbregex.getMatch(1);
@@ -3442,48 +3453,12 @@ public class YoutubeHelper {
         thumbnails.put("default.jpg", YoutubeITAG.IMAGE_LQ);
         for (Entry<String, YoutubeITAG> thumbnail : thumbnails.entrySet()) {
             final YoutubeStreamData match = (new YoutubeStreamData(null, vid, "https://i.ytimg.com/vi/" + itemID + "/" + thumbnail.getKey(), thumbnail.getValue(), null));
-            if (!grabFilesize || getThumbnailSize(br.cloneBrowser(), match)) {
+            if (!grabFilesize || probeSize(br.cloneBrowser(), match)) {
                 ret.add(match);
             }
             if (ret.size() > 0 && StringUtils.equalsIgnoreCase(thumbnail.getKey(), bestFname)) {
                 return ret;
             }
-        }
-        return ret;
-    }
-
-    public List<YoutubeStreamData> crawlCoverData(final boolean grabFilesize) {
-        final String[][] covers = br.getRegex("<meta property=\"og:image\" content=\"(https?://i\\.ytimg.com/pl_c/[^\"]*)\">(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?").getMatches();
-        if (covers == null || covers.length == 0) {
-            return null;
-        }
-        final StreamCollection ret = new StreamCollection();
-        for (final String[] cover : covers) {
-            int height = -1;
-            // int width = -1;
-            if (cover.length == 5) {
-                // width = "width".equals(cover[1]) ? Integer.parseInt(cover[2]) : Integer.parseInt(cover[4]);
-                height = "height".equals(cover[1]) ? Integer.parseInt(cover[2]) : Integer.parseInt(cover[4]);
-            }
-            final YoutubeITAG itag;
-            if (height >= 720) {
-                itag = YoutubeITAG.COVER_MAX;
-            } else if (height >= 360) {
-                itag = YoutubeITAG.COVER_HQ;
-            } else if (height >= 180) {
-                itag = YoutubeITAG.COVER_MQ;
-            } else if (height >= 90) {
-                itag = YoutubeITAG.COVER_LQ;
-            } else {
-                continue;
-            }
-            final YoutubeStreamData match = (new YoutubeStreamData(null, vid, Encoding.htmlOnlyDecode(cover[0]), itag, null));
-            if (!grabFilesize || getThumbnailSize(br.cloneBrowser(), match)) {
-                ret.add(match);
-            }
-        }
-        if (ret.size() == 0) {
-            return null;
         }
         return ret;
     }
@@ -3616,7 +3591,7 @@ public class YoutubeHelper {
 
     public String createFilename(final DownloadLink link) {
         AbstractVariant variant = AbstractVariant.get(link);
-        String formattedFilename = variant.getFileNamePattern();
+        String formattedFilename = variant.getFileNamePattern(link);
         // validate the pattern
         if (formattedFilename != null && !formattedFilename.toLowerCase(Locale.ENGLISH).matches(".*\\*[^\\*]*ext[^\\*]*\\*.*")) {
             formattedFilename = null;
@@ -4316,12 +4291,7 @@ public class YoutubeHelper {
                 this.ytCfgSet = null;
             }
         }
-        if (this.playlistID != null) {
-            playlistThumbnails = crawlCoverData(false);
-            if (playlistThumbnails == null || playlistThumbnails.size() == 0) {
-                logger.warning("Failed to crawl playlist thumbnails");
-            }
-        }
+
     }
 
     public String getChannelPlaylistCrawlerContainerUrlOverride(final String fallback) {
@@ -4348,11 +4318,47 @@ public class YoutubeHelper {
         this.playlistID = playlistID;
     }
 
-    public List<YoutubeStreamData> getPlaylistThumbnails() {
-        return playlistThumbnails;
+    public List<YoutubeStreamData> crawlCoverData(final String playListID, final boolean grabFilesize) throws Exception {
+        if (playListID == null) {
+            return null;
+        }
+        final Browser brc = br.cloneBrowser();
+        if (brc.getRequest() == null || !brc.getURL().equalsIgnoreCase(TbCmV2.generatePlaylistURL(playListID))) {
+            brc.getPage(TbCmV2.generatePlaylistURL(playListID));
+        }
+        final String[][] customCovers = brc.getRegex("<meta property=\"og:image\" content=\"(https?://i\\.ytimg.com/pl_c/[^\"]*)\">(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?").getMatches();
+        if (customCovers == null || customCovers.length == 0) {
+            return crawlThumbnailData(null, grabFilesize);
+        }
+        final StreamCollection data = new StreamCollection();
+        for (final String[] customCover : customCovers) {
+            int height = -1;
+            if (customCover.length == 5) {
+                height = "height".equals(customCover[1]) ? Integer.parseInt(customCover[2]) : Integer.parseInt(customCover[4]);
+            } else if (customCover.length == 3) {
+                height = "height".equals(customCover[1]) ? Integer.parseInt(customCover[2]) : -1;
+            }
+            final YoutubeITAG itag;
+            if (height >= 720) {
+                itag = YoutubeITAG.COVER_MAX;
+            } else if (height >= 360) {
+                itag = YoutubeITAG.COVER_HQ;
+            } else if (height >= 180) {
+                itag = YoutubeITAG.COVER_MQ;
+            } else if (height >= 90) {
+                itag = YoutubeITAG.COVER_LQ;
+            } else {
+                continue;
+            }
+            final YoutubeStreamData match = (new YoutubeStreamData(null, vid, Encoding.htmlOnlyDecode(customCover[0]), itag, null));
+            if (!grabFilesize || probeSize(br.cloneBrowser(), match)) {
+                data.add(match);
+            }
+        }
+        if (data.size() == 0) {
+            return null;
+        }
+        return data;
     }
 
-    public void setPlaylistThumbnails(List<YoutubeStreamData> playlistThumbnails) {
-        this.playlistThumbnails = playlistThumbnails;
-    }
 }

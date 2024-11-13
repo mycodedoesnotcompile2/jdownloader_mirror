@@ -5,6 +5,8 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -115,7 +117,7 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
     }
 
     @Override
-    public String getFileNamePattern() {
+    public String getFileNamePattern(final DownloadLink downloadLink) {
         return PluginJsonConfig.get(YoutubeConfig.class).getAudioFilenamePattern();
     }
 

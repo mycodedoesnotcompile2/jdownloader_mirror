@@ -487,12 +487,12 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
             /* Remove dupes based on the results we already have */
             final Iterator<LazyHostPlugin> iterator = plugins.iterator();
-            do {
+            while (iterator.hasNext()) {
                 final LazyHostPlugin plugin = iterator.next();
                 if (finalresults_old.contains(plugin.getHost())) {
-                    plugins.remove(plugin);
+                    iterator.remove();
                 }
-            } while (iterator.hasNext());
+            }
             if (plugins.size() == 0) {
                 /* All items were dupes -> Skip them */
                 continue cleanListLoop;

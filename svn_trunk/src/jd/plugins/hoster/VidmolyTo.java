@@ -31,7 +31,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidmolyTo extends XFileSharingProBasic {
     public VidmolyTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -166,7 +166,7 @@ public class VidmolyTo extends XFileSharingProBasic {
         /* 2020-05-18: Special */
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, ">([^<>\"]+)</span><br>\\s+<span style=").getMatch(0);
+            fileInfo[0] = br.getRegex(">([^<>\"]+)</span><br>\\s+<span style=").getMatch(0);
         }
         return fileInfo;
     }

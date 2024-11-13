@@ -102,7 +102,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 50099 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50112 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -689,26 +689,7 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
         }
-        // TODO: Add setting, see: https://svn.jdownloader.org/issues/90496
-        playlistCoverHandling: if (true) {
-            if (CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER)) {
-                /* Playlist cover is disabled by user */
-                break playlistCoverHandling;
-            } else if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                break playlistCoverHandling;
-            } else if (channelOrPlaylistPackage == null) {
-                /* We are currently not crawling a playlist item so we do not expect a playlist cover to be available. */
-                break playlistCoverHandling;
-            }
-            final List<YoutubeStreamData> playlistThumbnails = helper.getPlaylistThumbnails();
-            if (playlistThumbnails == null || playlistThumbnails.size() == 0) {
-                logger.info("Failed to find any thumbnail items");
-                break playlistCoverHandling;
-            }
-            for (YoutubeStreamData playlistThumbnail : playlistThumbnails) {
-                // helper.addYoutubeStreamData(playlistThumbnail);
-            }
-        }
+
         reversePlaylistPositions: if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder()) {
             logger.info("Processing crawled playlist in reverse order");
             if (!this.globalPropertiesForDownloadLink.containsKey(YoutubeHelper.YT_PLAYLIST_SIZE)) {
@@ -800,6 +781,9 @@ public class TbCmV2 extends PluginForDecrypt {
                 final HashSet<AudioCodec> disabledAudioCodecs = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedAudioCodecs());
                 final HashSet<FileContainer> disabledFileContainers = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedFileContainers());
                 final HashSet<VariantGroup> disabledGroups = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedGroups());
+                if (channelOrPlaylistPackage == null) {
+                    disabledGroups.add(VariantGroup.IMAGE_PLAYLIST_COVER);
+                }
                 final HashSet<Projection> disabledProjections = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedProjections());
                 final HashSet<VideoResolution> disabledResolutions = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedResolutions());
                 final HashSet<VideoCodec> disabledVideoCodecs = createHashSet(CFG_YOUTUBE.CFG.getBlacklistedVideoCodecs());
@@ -1114,11 +1098,18 @@ public class TbCmV2 extends PluginForDecrypt {
                 altIds.add(vi.getVariant().getStorableString());
             }
         }
-        final String linkID = YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant());
+        final String linkID = clip != null ? YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant()) : null;
         final DownloadLink ret = createDownloadlink(linkID);
-        final YoutubeHelper helper = new YoutubeHelper(br, getLogger());
-        ClipDataCache.referenceLink(helper, ret, clip);
-        ret.setProperty(YoutubeHelper.YT_ID, clip.videoID);
+        final YoutubeHelper helper;
+        if (this.helper != null) {
+            helper = this.helper;
+        } else {
+            helper = new YoutubeHelper(br, getLogger());
+        }
+        if (clip != null) {
+            ClipDataCache.referenceLink(helper, ret, clip);
+            ret.setProperty(YoutubeHelper.YT_ID, clip.videoID);
+        }
         if (yvc != null) {
             ret.setProperty(YoutubeHelper.YT_COLLECTION, yvc.getName());
         }
@@ -1127,7 +1118,9 @@ public class TbCmV2 extends PluginForDecrypt {
                 ret.setProperty(es.getKey(), es.getValue());
             }
         }
-        clip.copyToDownloadLink(ret);
+        if (clip != null) {
+            clip.copyToDownloadLink(ret);
+        }
         // thislink.getTempProperties().setProperty(YoutubeHelper.YT_VARIANT_INFO, variantInfo);
         ret.setVariantSupport(hasVariants);
         ret.setProperty(YoutubeHelper.YT_VARIANTS, altIds);
@@ -1157,56 +1150,58 @@ public class TbCmV2 extends PluginForDecrypt {
                 fp.add(ret);
             }
         }
-        long estimatedFileSize = 0;
-        final AbstractVariant variant = variantInfo.getVariant();
-        switch (variant.getType()) {
-        case VIDEO:
-        case DASH_AUDIO:
-        case DASH_VIDEO:
-            final StreamCollection audioStreams = clip.getStreams(variant.getBaseVariant().getiTagAudio(), variant);
-            if (audioStreams != null && audioStreams.size() > 0) {
-                for (YoutubeStreamData stream : audioStreams) {
-                    if (stream.getContentLength() > 0) {
-                        estimatedFileSize += stream.getContentLength();
-                        break;
-                    } else if (stream.estimatedContentLength() > 0) {
-                        estimatedFileSize += stream.estimatedContentLength();
-                        break;
+        if (clip != null) {
+            long estimatedFileSize = 0;
+            final AbstractVariant variant = variantInfo.getVariant();
+            switch (variant.getType()) {
+            case VIDEO:
+            case DASH_AUDIO:
+            case DASH_VIDEO:
+                final StreamCollection audioStreams = clip.getStreams(variant.getBaseVariant().getiTagAudio(), variant);
+                if (audioStreams != null && audioStreams.size() > 0) {
+                    for (YoutubeStreamData stream : audioStreams) {
+                        if (stream.getContentLength() > 0) {
+                            estimatedFileSize += stream.getContentLength();
+                            break;
+                        } else if (stream.estimatedContentLength() > 0) {
+                            estimatedFileSize += stream.estimatedContentLength();
+                            break;
+                        }
                     }
                 }
-            }
-            final StreamCollection videoStreams = clip.getStreams(variant.getBaseVariant().getiTagVideo(), variant);
-            if (videoStreams != null && videoStreams.size() > 0) {
-                for (YoutubeStreamData stream : videoStreams) {
-                    if (stream.getContentLength() > 0) {
-                        estimatedFileSize += stream.getContentLength();
-                        break;
-                    } else if (stream.estimatedContentLength() > 0) {
-                        estimatedFileSize += stream.estimatedContentLength();
-                        break;
+                final StreamCollection videoStreams = clip.getStreams(variant.getBaseVariant().getiTagVideo(), variant);
+                if (videoStreams != null && videoStreams.size() > 0) {
+                    for (YoutubeStreamData stream : videoStreams) {
+                        if (stream.getContentLength() > 0) {
+                            estimatedFileSize += stream.getContentLength();
+                            break;
+                        } else if (stream.estimatedContentLength() > 0) {
+                            estimatedFileSize += stream.estimatedContentLength();
+                            break;
+                        }
                     }
                 }
-            }
-            break;
-        case IMAGE:
-            final StreamCollection dataStreams = clip.getStreams(variant.getiTagData(), variant);
-            if (dataStreams != null && dataStreams.size() > 0) {
-                for (YoutubeStreamData stream : dataStreams) {
-                    if (stream.getContentLength() > 0) {
-                        estimatedFileSize += stream.getContentLength();
-                        break;
-                    } else if (stream.estimatedContentLength() > 0) {
-                        estimatedFileSize += stream.estimatedContentLength();
-                        break;
+                break;
+            case IMAGE:
+                final StreamCollection dataStreams = clip.getStreams(variant.getiTagData(), variant);
+                if (dataStreams != null && dataStreams.size() > 0) {
+                    for (YoutubeStreamData stream : dataStreams) {
+                        if (stream.getContentLength() > 0) {
+                            estimatedFileSize += stream.getContentLength();
+                            break;
+                        } else if (stream.estimatedContentLength() > 0) {
+                            estimatedFileSize += stream.estimatedContentLength();
+                            break;
+                        }
                     }
                 }
+                break;
+            default:
+                break;
             }
-            break;
-        default:
-            break;
-        }
-        if (estimatedFileSize > 0) {
-            ret.setDownloadSize(estimatedFileSize);
+            if (estimatedFileSize > 0) {
+                ret.setDownloadSize(estimatedFileSize);
+            }
         }
         ret.setAvailableStatus(AvailableStatus.TRUE);
         return ret;
@@ -1875,7 +1870,7 @@ public class TbCmV2 extends PluginForDecrypt {
         return false;
     }
 
-    private static String generatePlaylistURL(final String playlistID) {
+    public static String generatePlaylistURL(final String playlistID) {
         if (playlistID.startsWith("RD")) {
             /* Youtube auto generated playlist / "Mix" */
             return getBaseURL() + "/watch?list=" + playlistID;

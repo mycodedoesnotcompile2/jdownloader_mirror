@@ -16,7 +16,9 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
@@ -27,10 +29,13 @@ import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
+import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -40,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50117 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,17 +101,17 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     private final String       TYPE_BOOK       = "(?i)https?://[^/]+/([a-z]{2})/books/(\\d+)";
     private final String       TYPE_TAGS_BOOK  = "(?i)https?://[^/]+/([a-z]{2})\\?tags=pool:(\\d+)";
     private final String       TYPE_TAGS_BOOKS = "(?i)https?://[^/]+/([a-z0-9]{2})/books\\?tags=(.+)";
-    private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/([a-z]{2})(?:/posts)?\\?tags=([^&]+)";
+    private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/(([a-z]{2})/)?.*tags=([^&]+)";
     public static final String API_BASE        = "https://capi-v2.sankakucomplex.com";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        // final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        // if (account != null) {
-        // final SankakucomplexCom hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
-        // hosterplugin.login(account, false);
-        // }
+        final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        if (account != null) {
+            final SankakucomplexCom hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
+            hosterplugin.login(account, false);
+        }
         if (param.getCryptedUrl().matches(TYPE_TAGS_BOOKS)) {
-            return crawlTagsBooks(param);
+            return crawlTagsBooksAPI(param);
         } else if (param.getCryptedUrl().matches(TYPE_BOOK)) {
             return crawlBook(param);
         } else {
@@ -123,24 +128,145 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_POSTS);
-        final String languageFromURL = urlinfo.getMatch(0);
-        String tags = urlinfo.getMatch(1);
-        if (languageFromURL == null || tags == null) {
+        final String language = urlinfo.getMatch(1);
+        String tags = urlinfo.getMatch(2);
+        if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
+        final boolean preferAPI = false;
+        if (preferAPI) {
+            return crawlTagsPostsAPI(param, tags, language);
+        } else {
+            return crawlTagsPostsWebsite(param, tags, language);
+        }
+    }
+
+    private ArrayList<DownloadLink> crawlTagsPostsWebsite(final CryptedLink param, final String tags, final String language) throws Exception {
+        if (language == null || tags == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String langPart = "";
+        if (language != null) {
+            langPart = language + "/";
+        }
+        final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
+        br.getPage("https://chan.sankakucomplex.com/" + langPart + "posts?tags=" + tagsUrlEncoded);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getURL().contains("/premium")) {
+            /* Account required (most times due to adult content so free account is enough). */
+            throw new AccountRequiredException();
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
+        final int maxPage = cfg.getPostTagCrawlerMaxPageLimit();
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(tags);
+        int page = 1;
+        final String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>(\\d+)</span>").getMatch(0);
+        final HashSet<String> dupes = new HashSet<String>();
+        int position = 1;
+        pagination: do {
+            final String[] postIDs = br.getRegex("/posts/([A-Za-z0-9]+)").getColumn(0);
+            if (postIDs == null || postIDs.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            int numberofNewItemsThisPage = 0;
+            for (final String postID : postIDs) {
+                if (!dupes.add(postID)) {
+                    /* Skip dupes */
+                    continue;
+                } else if (postID.toLowerCase(Locale.ENGLISH).equals(postID)) {
+                    /**
+                     * Skip invalid items such as: </br>
+                     * https://chan.sankakucomplex.com/posts/update </br>
+                     * https://chan.sankakucomplex.com/posts/upload
+                     */
+                    logger.info("Skipping invalid lowercase postID: " + postID);
+                    continue;
+                }
+                numberofNewItemsThisPage++;
+                final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
+                link.setProperty(SankakucomplexCom.PROPERTY_POSITION_NUMBER, position);
+                /* Set temporary filename -> Can be image or video file */
+                final String tagsSpaceSeparated = br.getRegex("\"id\":\"" + postID + "\",\"tags\":\"([^\"]+)").getMatch(0);
+                if (StringUtils.containsIgnoreCase(tagsSpaceSeparated, "mp4")) {
+                    link.setProperty(SankakucomplexCom.PROPERTY_EXT_HINT, "mp4");
+                    link.setName(postID + ".mp4");
+                } else {
+                    /* Image or fallback */
+                    link.setName(postID + ".png");
+                }
+                if (!StringUtils.isEmpty(tagsSpaceSeparated)) {
+                    final String tagsCommaSeparated = tagsSpaceSeparated.trim().replace(" ", ",");
+                    link.setProperty(SankakucomplexCom.PROPERTY_TAGS_COMMA_SEPARATED, tagsCommaSeparated);
+                    if (cfg.isSetCommaSeparatedTagsOfPostsAsComment()) {
+                        link.setComment(tagsCommaSeparated);
+                    }
+                }
+                link.setAvailable(true);
+                link._setFilePackage(fp);
+                ret.add(link);
+                distribute(link);
+                position++;
+            }
+            String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);
+            logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + numberofItemsStr + " | nextPageURL = " + nextPageURL);
+            if (this.isAbort()) {
+                logger.info("Stopping because: Aborted by user");
+                throw new InterruptedException();
+            } else if (page == maxPage) {
+                logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
+                this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
+                break pagination;
+            } else if (nextPageURL == null) {
+                logger.info("Stopping because: Reached end(?)");
+                break pagination;
+            } else if (numberofNewItemsThisPage == 0) {
+                logger.info("Stopping because: Current page contains no new items");
+                break pagination;
+            } else {
+                /* Continue to next page */
+                nextPageURL = Encoding.htmlOnlyDecode(nextPageURL);
+                br.getPage(nextPageURL);
+                page++;
+                continue pagination;
+            }
+        } while (true);
+        if (numberofItemsStr != null) {
+            final int numberofItems = Integer.parseInt(numberofItemsStr);
+            if (ret.size() < numberofItems) {
+                this.displayBubbleNotification("Missing items! Tags: " + tags, "Some items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
+            }
+        }
+        return ret;
+    }
+
+    private ArrayList<DownloadLink> crawlTagsPostsAPI(final CryptedLink param, final String tags, final String language) throws Exception {
+        if (tags == null) {
+            /* Developer mistake */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
+        final int maxPage = cfg.getPostTagCrawlerMaxPageLimit();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
         final String tagsUrlEncoded = URLEncode.encodeURIComponent(tags);
         final int maxItemsPerPage = 40;
         final UrlQuery query = new UrlQuery();
-        query.appendEncoded("lang", languageFromURL);
+        if (language != null) {
+            query.appendEncoded("lang", language);
+        }
         query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         query.appendEncoded("hide_posts_in_books", "in-larger-tags");
         query.add("tags", tagsUrlEncoded);
         int page = 1;
-        do {
+        int position = 1;
+        pagination: do {
             br.getPage(API_BASE + "/posts/keyset?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
@@ -152,41 +278,52 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     logger.info("Stopping because: Current page is empty");
-                    break;
+                    break pagination;
                 }
             }
             for (final Map<String, Object> post : data) {
-                final DownloadLink link = this.createDownloadlink("https://beta.sankakucomplex.com/" + languageFromURL + "/post/show/" + post.get("id") + "?tags=" + tagsUrlEncoded);
+                final String postID = post.get("id").toString();
+                final DownloadLink link = this.createDownloadlink(generateSinglePostURL(postID, language, tagsUrlEncoded));
+                link.setProperty(SankakucomplexCom.PROPERTY_POSITION_NUMBER, position);
                 SankakucomplexCom.parseFileInfoAndSetFilenameAPI(this, link, post);
                 link._setFilePackage(fp);
                 ret.add(link);
                 distribute(link);
+                position++;
             }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                break pagination;
             } else if (page == maxPage) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
                 this.displayBubbleNotification("Tags: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
-                break;
+                break pagination;
             } else if (StringUtils.isEmpty(nextPageHash)) {
                 logger.info("Stopping because: Reached end(?)");
-                break;
+                break pagination;
             } else if (data.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
-                break;
+                break pagination;
             } else {
                 /* Continue to next page */
                 page++;
                 query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
+                continue pagination;
             }
         } while (true);
         return ret;
     }
 
+    private static String generateSinglePostURL(final String postID, String language, final String tagsUrlEncoded) {
+        if (language == null) {
+            language = "en";
+        }
+        return "https://beta.sankakucomplex.com/" + language + "/post/show/" + postID + "?tags=" + tagsUrlEncoded;
+    }
+
     /** Crawls books via tag. Typically used to crawl all books of a user. */
-    private ArrayList<DownloadLink> crawlTagsBooks(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsBooksAPI(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final int maxPage = cfg.getBookTagCrawlerMaxPageLimit();
@@ -210,7 +347,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         query.add("tags", URLEncode.encodeURIComponent(tags));
         query.appendEncoded("pool_type", "0");
         int page = 1;
-        do {
+        pagination: do {
             br.getPage(API_BASE + "/pools/keyset?" + query.toString());
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> meta = (Map<String, Object>) entries.get("meta");
@@ -222,7 +359,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 } else {
                     logger.info("Stopping because: Current page is empty");
-                    break;
+                    break pagination;
                 }
             }
             for (final Map<String, Object> book : data) {
@@ -233,21 +370,22 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size());
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
-                break;
+                break pagination;
             } else if (page == maxPage) {
                 logger.info("Stopping because: Reached user defined max page limit of " + maxPage);
                 this.displayBubbleNotification("Tags books: " + tags, "Stopping early because: Reached max user defined page: " + maxPage + "\r\nYou can adjust this limit in the plugin settings.");
-                break;
+                break pagination;
             } else if (StringUtils.isEmpty(nextPageHash)) {
                 logger.info("Stopping because: Reached end(?)");
-                break;
+                break pagination;
             } else if (data.size() < maxItemsPerPage) {
                 logger.info("Stopping because: Current page contains less items than " + maxItemsPerPage);
-                break;
+                break pagination;
             } else {
                 /* Continue to next page */
                 page++;
                 query.addAndReplace("next", Encoding.urlEncode(nextPageHash));
+                continue pagination;
             }
         } while (true);
         return ret;

@@ -22,7 +22,6 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.CharacterCodingException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -577,6 +576,18 @@ public abstract class Request {
         return this.headers;
     }
 
+    public String getHtmlCode(final boolean throwExceptionOnWrongContentType) {
+        try {
+            return this.getHtmlCode();
+        } catch (NoHTMLContentException e) {
+            if (throwExceptionOnWrongContentType) {
+                throw e;
+            } else {
+                return null;
+            }
+        }
+    }
+
     public String getHtmlCode() {
         final byte[] responseBytes = this.getResponseBytes();
         if (this.htmlCode == null && responseBytes != null) {
@@ -704,7 +715,7 @@ public abstract class Request {
     }
 
     public String getHTMLRefresh() {
-        final String refresh = new Regex(this.getHtmlCode(), "<meta[^>]*http-equiv\\s*=\\s*(\"|')refresh\\1[^>]*content\\s*=\\s*(\"|')\\d+\\s*;\\s*URL\\s*=[\\s'\"]*(https?://[^\"']+)").getMatch(2);
+        final String refresh = new Regex(this.getHtmlCode(false), "<meta[^>]*http-equiv\\s*=\\s*(\"|')refresh\\1[^>]*content\\s*=\\s*(\"|')\\d+\\s*;\\s*URL\\s*=[\\s'\"]*(https?://[^\"']+)").getMatch(2);
         return refresh;
     }
 
@@ -809,13 +820,6 @@ public abstract class Request {
     public Map<String, List<String>> getResponseHeaders() {
         final URLConnectionAdapter lhttpConnection = this.getHttpConnection();
         return lhttpConnection == null ? null : lhttpConnection.getHeaderFields();
-    }
-
-    /**
-     * Will replace #getHtmlCode() with next release
-     */
-    public String getResponseText() throws CharacterCodingException {
-        return this.getHtmlCode();
     }
 
     public String getUrl() {
@@ -1005,17 +1009,17 @@ public abstract class Request {
     }
 
     public boolean containsHTML(final String regex) {
-        final String htmlCode = this.getHtmlCode();
+        final String htmlCode = this.getHtmlCode(false);
         return htmlCode != null ? new Regex(htmlCode, regex).matches() : false;
     }
 
     public Regex getRegex(final Pattern pattern) {
-        final String htmlCode = this.getHtmlCode();
+        final String htmlCode = this.getHtmlCode(false);
         return new Regex(htmlCode != null ? htmlCode : "", pattern);
     }
 
     public Regex getRegex(final String string) {
-        final String htmlCode = this.getHtmlCode();
+        final String htmlCode = this.getHtmlCode(false);
         return new Regex(htmlCode != null ? htmlCode : "", string);
     }
 

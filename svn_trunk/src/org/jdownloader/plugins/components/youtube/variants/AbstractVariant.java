@@ -272,25 +272,25 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
     }
 
     private static final SimpleMapper MAPPER = new SimpleMapper() {
-        @Override
-        protected JSonFactory newJsonFactory(String jsonString) {
-            return new JSonFactory(jsonString) {
-                @Override
-                protected String dedupeString(String string) {
-                    return string;
-                }
-            };
-        }
+                                                 @Override
+                                                 protected JSonFactory newJsonFactory(String jsonString) {
+                                                     return new JSonFactory(jsonString) {
+                                                         @Override
+                                                         protected String dedupeString(String string) {
+                                                             return string;
+                                                         }
+                                                     };
+                                                 }
 
-        @Override
-        protected void initMapper() {
-        }
+                                                 @Override
+                                                 protected void initMapper() {
+                                                 }
 
-        @Override
-        public boolean isPrettyPrintEnabled() {
-            return false;
-        }
-    };
+                                                 @Override
+                                                 public boolean isPrettyPrintEnabled() {
+                                                     return false;
+                                                 }
+                                             };
 
     public String getStorableString() {
         String ret = storableString;
@@ -344,7 +344,7 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
         return ret;
     }
 
-    public abstract String getFileNamePattern();
+    public abstract String getFileNamePattern(final DownloadLink downloadLink);
 
     //
     //

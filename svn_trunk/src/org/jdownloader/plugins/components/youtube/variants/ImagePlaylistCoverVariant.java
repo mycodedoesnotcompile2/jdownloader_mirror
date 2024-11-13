@@ -1,7 +1,13 @@
 package org.jdownloader.plugins.components.youtube.variants;
 
 import org.appwork.exceptions.WTFException;
+import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.components.youtube.YoutubeConfig;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+import jd.plugins.DownloadLink;
 
 public class ImagePlaylistCoverVariant extends ImageVariant {
     public ImagePlaylistCoverVariant(VariantBase base) {
@@ -21,6 +27,22 @@ public class ImagePlaylistCoverVariant extends ImageVariant {
         default:
             throw new WTFException("Unsupported:" + getBaseVariant());
         }
+    }
+
+    @Override
+    public String getFileNamePattern(final DownloadLink link) {
+        final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
+        final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
+        String pattern;
+        if (playlistID != null) {
+            pattern = cfg.getPackagePatternForPlaylists();
+        } else {
+            pattern = cfg.getPackagePatternForChannelPackages();
+        }
+        if (!StringUtils.endsWithCaseInsensitive(pattern, ".*EXT*")) {
+            pattern += ".*EXT*";
+        }
+        return pattern;
     }
 
     @Override

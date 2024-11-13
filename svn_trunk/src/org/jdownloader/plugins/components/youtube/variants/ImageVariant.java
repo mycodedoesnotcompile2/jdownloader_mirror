@@ -4,6 +4,8 @@ import java.util.List;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.exceptions.WTFException;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -31,7 +33,7 @@ public class ImageVariant extends AbstractVariant<ImageGenericInfo> {
     }
 
     @Override
-    public String getFileNamePattern() {
+    public String getFileNamePattern(final DownloadLink downloadLink) {
         return PluginJsonConfig.get(YoutubeConfig.class).getImageFilenamePattern();
     }
 

@@ -320,7 +320,11 @@ public class YoutubeClipData {
     }
 
     public List<VariantInfo> findVariants() {
-        ArrayList<VariantInfo> ret = new ArrayList<VariantInfo>();
+        return findVariants(streams);
+    }
+
+    public List<VariantInfo> findVariants(final Map<YoutubeITAG, StreamCollection> streams) {
+        final ArrayList<VariantInfo> ret = new ArrayList<VariantInfo>();
         for (VariantBase v : VariantBase.values()) {
             if (v.isVideoToolRequired() && !CFG_YOUTUBE.CFG.isExternMultimediaToolUsageEnabled()) {
                 continue;

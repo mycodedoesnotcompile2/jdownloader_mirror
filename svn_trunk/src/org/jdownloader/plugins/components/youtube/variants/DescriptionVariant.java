@@ -4,6 +4,8 @@ import java.util.List;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.testframework.IgnoreInAWTest;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
@@ -58,7 +60,7 @@ public class DescriptionVariant extends AbstractVariant<DescriptionGenericInfo> 
     }
 
     @Override
-    public String getFileNamePattern() {
+    public String getFileNamePattern(final DownloadLink downloadLink) {
         return PluginJsonConfig.get(YoutubeConfig.class).getDescriptionFilenamePattern();
     }
 

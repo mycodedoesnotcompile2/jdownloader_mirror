@@ -8,15 +8,15 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.net.httpconnection.HTTPProxy;
-import org.jdownloader.translate._JDT;
-
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.httpconnection.HTTPProxy;
+import org.jdownloader.translate._JDT;
 
 public class ClipDataCache {
     public static final String  THE_DOWNLOAD_IS_NOT_AVAILABLE_IN_YOUR_COUNTRY = "The Download is not available in your country";
@@ -54,7 +54,15 @@ public class ClipDataCache {
 
     public static YoutubeClipData get(YoutubeHelper helper, DownloadLink downloadLink) throws Exception {
         final String videoID = downloadLink.getStringProperty(YoutubeHelper.YT_ID);
-        final CachedClipData ret = get(helper, new YoutubeClipData(videoID));
+        final String playListID = downloadLink.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
+        final CachedClipData ret;
+        final String previousPlayListID = helper.getPlaylistID();
+        try {
+            helper.setPlaylistID(playListID);
+            ret = get(helper, new YoutubeClipData(videoID));
+        } finally {
+            helper.setPlaylistID(previousPlayListID);
+        }
         ret.clipData.copyToDownloadLink(downloadLink);
         // put a reference to the link. if we remove all links with the ref, the cache will cleanup it self
         downloadLink.getTempProperties().setProperty("CLIP_DATA_REFERENCE", ret);

@@ -16,6 +16,12 @@
 package jd.plugins.hoster;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -30,18 +36,46 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 47487 $", interfaceVersion = 3, names = { "top4top.io" }, urls = { "https?://(?:www\\.)?(?:up\\.top4top\\.net|top4top\\.io)/downloadf\\-([a-z0-9\\-]+)\\.html" })
+@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
 public class Top4topIo extends PluginForHost {
     public Top4topIo(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "top4top.io", "top4top.net" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:(?:up|www)\\.)?" + buildHostsPatternPart(domains) + "/downloadf-([a-z0-9\\-]+)\\.html");
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    @Override
     public String getAGBLink() {
-        return "https://up.top4top.net/";
+        return "https://" + getHost() + "/rules.html";
     }
 
     @Override
@@ -58,45 +92,34 @@ public class Top4topIo extends PluginForHost {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
     }
 
-    @Override
-    public String rewriteHost(String host) {
-        if (host == null || host.equalsIgnoreCase("top4top.net")) {
-            return this.getHost();
-        } else {
-            return super.rewriteHost(host);
-        }
-    }
-
     /* Connection stuff */
-    private static final boolean FREE_RESUME       = true;
-    private static final int     FREE_MAXCHUNKS    = 0;
-    private static final int     FREE_MAXDOWNLOADS = 20;
+    private static final boolean FREE_RESUME    = true;
+    private static final int     FREE_MAXCHUNKS = 0;
 
-    // private static final boolean ACCOUNT_FREE_RESUME = true;
-    // private static final int ACCOUNT_FREE_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_FREE_MAXDOWNLOADS = 20;
-    // private static final boolean ACCOUNT_PREMIUM_RESUME = true;
-    // private static final int ACCOUNT_PREMIUM_MAXCHUNKS = 0;
-    // private static final int ACCOUNT_PREMIUM_MAXDOWNLOADS = 20;
-    //
-    // /* don't touch the following! */
-    // private static AtomicInteger maxPrem = new AtomicInteger(1);
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getPage(link.getDownloadURL());
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">\\s*لم نتمكن من إيجاد الملف..!!")) {
+        final String file_id = this.getFID(link);
+        if (!link.isNameSet()) {
+            link.setName(file_id.replace("-", "."));
+        }
+        final String hostFromURL = new Regex(link.getPluginPatternMatcher(), "https?://([^/]+)").getMatch(0);
+        String contenturl = link.getPluginPatternMatcher();
+        /* top4top.net is dead -> Always use main domain */
+        contenturl = contenturl.replaceFirst(Pattern.quote(hostFromURL), getHost());
+        br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML(">\\s*لم نتمكن من إيجاد الملف..!!")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fid = this.getFID(link);
         /* 2020-11-26: File-extension is not given in title we find in html but it is usually given inside our fuid! */
         String betterFileExtension = null;
-        if (fid != null && fid.contains("-")) {
-            betterFileExtension = fid.substring(fid.lastIndexOf("-") + 1);
+        if (file_id != null && file_id.contains("-")) {
+            betterFileExtension = file_id.substring(file_id.lastIndexOf("-") + 1);
         }
         String filename = br.getRegex("class=\"title_page\">([^<>\"]+) \\| تحميل</h1>").getMatch(0);
-        String filesize = br.getRegex(">حجم الملف</td>\\s*?<td class=\"tddata\">([^<>\"]+)</td>").getMatch(0);
+        final String filesize = br.getRegex(">حجم الملف</td>\\s*?<td class=\"tddata\">([^<>\"]+)</td>").getMatch(0);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             if (betterFileExtension != null) {
@@ -106,9 +129,13 @@ public class Top4topIo extends PluginForHost {
                 filename += ".zip";
             }
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filesize");
         }
         return AvailableStatus.TRUE;
     }
@@ -140,7 +167,7 @@ public class Top4topIo extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -150,7 +177,6 @@ public class Top4topIo extends PluginForHost {
             URLConnectionAdapter con = null;
             try {
                 final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
                 con = br2.openHeadConnection(dllink);
                 if (this.looksLikeDownloadableContent(con)) {
                     return dllink;
@@ -177,7 +203,7 @@ public class Top4topIo extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

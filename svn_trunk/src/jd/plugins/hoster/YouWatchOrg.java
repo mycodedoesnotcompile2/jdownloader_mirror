@@ -24,7 +24,6 @@ import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
@@ -32,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
 public class YouWatchOrg extends XFileSharingProBasic {
     public YouWatchOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -143,7 +142,7 @@ public class YouWatchOrg extends XFileSharingProBasic {
          * Some video sites contain their directurl right on the first page - let's use this as an indicator and assume that the file is
          * online if we find a directurl. This also speeds-up linkchecking! Example: uqload.com
          */
-        String dllink = getDllink(link, account, br, correctedBR);
+        String dllink = getDllink(link, account, br, br.getRequest().getHtmlCode());
         if (StringUtils.isEmpty(dllink)) {
             if (br.getURL() != null && !br.getURL().contains("/embed")) {
                 final String embed_access = getMainPage() + "/embed-" + this.getFUIDFromURL(link) + ".html";
@@ -183,7 +182,7 @@ public class YouWatchOrg extends XFileSharingProBasic {
     public String[] scanInfo(final String[] fileInfo) {
         /* 2020-06-12: Special: Encrypted filenames */
         super.scanInfo(fileInfo);
-        String filename = new Regex(correctedBR, "<h3 id=\"title\">([^<>\"]*?)</h3>").getMatch(0);
+        String filename = br.getRegex("<h3 id=\"title\">([^<>\"]*?)</h3>").getMatch(0);
         if (!StringUtils.isEmpty(filename)) {
             // Decode Caesar's shift code
             filename = filename.replaceAll("(</?b>|\\.html)", "");
