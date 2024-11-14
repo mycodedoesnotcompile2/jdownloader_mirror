@@ -99,6 +99,9 @@ public class MultiHostHost {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+        if (enabled) {
+            clearErrorStatus();
+        }
     }
 
     /**
@@ -268,8 +271,8 @@ public class MultiHostHost {
     }
 
     public void clearErrorStatus() {
-        this.setStatus(MultihosterHostStatus.WORKING);
-        this.setStatusText(null);
+        // this.setStatus(MultihosterHostStatus.WORKING);
+        this.setUnavailableStatusText(null);
         this.setUnavailableTimestamp(-1);
     }
 

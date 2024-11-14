@@ -44,27 +44,21 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:www\\.)?(slidesharedecrypted\\.net/[a-z0-9\\-_]+/[a-z0-9\\-_]+|slidesharepicturedecrypted\\.net/\\d+)" })
+@HostPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "" })
 public class SlideShareNet extends PluginForHost {
     public SlideShareNet(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://www.slideshare.net/business/premium/plans?cmp_src=main_nav");
+        this.enablePremium("https://www." + getHost() + "/business/premium/plans?cmp_src=main_nav");
     }
 
     private static final String APIKEY       = "ZXdvclNoQm0=";
     private static final String SHAREDSECRET = "UjZIRW9VVEQ=";
-    private static final String FILENOTFOUND = ">Sorry\\! We could not find what you were looking for|>Don\\'t worry, we will help you get to the right place|<title>404 error\\. Page Not Found\\.</title>";
 
     @Override
     public String getAGBLink() {
-        return "http://www.slideshare.net/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
-    public void correctDownloadLink(final DownloadLink link) {
-        link.setUrlDownload(link.getDownloadURL().replace("slidesharedecrypted.net/", "slideshare.net/"));
-    }
-
-    private static final String PICTURELINK     = "https?://slidesharepicturedecrypted\\.net/\\d+";
     private static final String NOTDOWNLOADABLE = "class=\"sprite iconNoDownload j\\-tooltip\"";
     private String              dllink          = null;
     private boolean             isVideo         = false;
@@ -79,7 +73,7 @@ public class SlideShareNet extends PluginForHost {
     public static boolean isOffline(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 410) {
             return true;
-        } else if (br.containsHTML(FILENOTFOUND) || br.containsHTML("(?i)>\\s*Uploaded Content Removed\\s*<")) {
+        } else if (br.containsHTML(">\\s*Sorry\\! We could not find what you were looking for|>Don\\'t worry, we will help you get to the right place|<title>404 error\\. Page Not Found\\.</title>") || br.containsHTML("(?i)>\\s*Uploaded Content Removed\\s*<")) {
             return true;
         } else {
             return false;
@@ -99,119 +93,96 @@ public class SlideShareNet extends PluginForHost {
         server_issues = false;
         this.setBrowserExclusive();
         prepBR(this.br);
-        if (link.getBooleanProperty("offline", false)) {
+        br.getPage(link.getPluginPatternMatcher());
+        br.followConnection();
+        if (isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (link.getDownloadURL().matches(PICTURELINK)) {
-            final String directlink = link.getStringProperty("directpiclink", null);
-            link.setFinalFileName(link.getStringProperty("filename", null));
-            URLConnectionAdapter con = null;
-            try {
-                con = br.openGetConnection(directlink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                }
-                if (con.getCompleteContentLength() > 0) {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
+        final String json = this.br.getRegex("slideshare_object,\\s*?(\\{.*?)\\);").getMatch(0);
+        if (json == null && !this.br.containsHTML("id=\"slideview\\-container\"")) {
+            /* 2016-11-23: No slideshow-class in html --> Probably offline content */
+            if (isDownload) {
+                throw new AccountRequiredException();
+            } else {
+                /* Item is online but can only be downloaded with account. */
+                return AvailableStatus.TRUE;
             }
-        } else {
-            br.getPage(link.getDownloadURL());
-            br.followConnection();
-            if (isOffline(br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final String json = this.br.getRegex("slideshare_object,\\s*?(\\{.*?)\\);").getMatch(0);
-            if (json == null && !this.br.containsHTML("id=\"slideview\\-container\"")) {
-                /* 2016-11-23: No slideshow-class in html --> Probably offline content */
-                if (isDownload) {
-                    throw new AccountRequiredException();
+        }
+        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
+        entries = (Map<String, Object>) entries.get("slideshow");
+        final String url_filename = new Regex(link.getDownloadURL(), "https?://[^/]+/([a-z0-9\\-_]+/[a-z0-9\\-_]+)").getMatch(0).replace("/", " - ");
+        String filename = (String) entries.get("title");
+        final String type = (String) entries.get("type");
+        final String ext;
+        if (StringUtils.isEmpty(filename)) {
+            /* Fallback */
+            filename = url_filename;
+        }
+        filename = Encoding.htmlDecode(filename).trim();
+        if ("video".equalsIgnoreCase(type)) {
+            /* Video */
+            // entries = (Map<String, Object>) entries.get("jsplayer");
+            ext = ".mp4";
+            isVideo = true;
+            /* Easier to RegEx as it can be found in multiple places in the json. */
+            final String embedCode = this.br.getRegex("embed_code/key/([A-Za-z0-9]+)").getMatch(0);
+            if (embedCode != null && !embedCode.equals("")) {
+                this.br.getPage("/slideshow/embed_code/key/" + embedCode);
+                if (this.br.getHttpConnection().getResponseCode() == 500) {
+                    /* HTTP/1.1 500 INKApi Error */
+                    server_issues = true;
                 } else {
-                    /* Item is online but can only be downloaded with account. */
-                    return AvailableStatus.TRUE;
-                }
-            }
-            Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
-            entries = (Map<String, Object>) entries.get("slideshow");
-            final String url_filename = new Regex(link.getDownloadURL(), "https?://[^/]+/([a-z0-9\\-_]+/[a-z0-9\\-_]+)").getMatch(0).replace("/", " - ");
-            String filename = (String) entries.get("title");
-            final String type = (String) entries.get("type");
-            final String ext;
-            if (StringUtils.isEmpty(filename)) {
-                /* Fallback */
-                filename = url_filename;
-            }
-            filename = Encoding.htmlDecode(filename).trim();
-            if ("video".equalsIgnoreCase(type)) {
-                /* Video */
-                // entries = (Map<String, Object>) entries.get("jsplayer");
-                ext = ".mp4";
-                isVideo = true;
-                /* Easier to RegEx as it can be found in multiple places in the json. */
-                final String embedCode = this.br.getRegex("embed_code/key/([A-Za-z0-9]+)").getMatch(0);
-                if (embedCode != null && !embedCode.equals("")) {
-                    this.br.getPage("/slideshow/embed_code/key/" + embedCode);
-                    if (this.br.getHttpConnection().getResponseCode() == 500) {
-                        /* HTTP/1.1 500 INKApi Error */
-                        server_issues = true;
-                    } else {
-                        /* E.g. https://vcdn.slidesharecdn.com/160818dataanalyticsandsocialmedia-160907135456-lva1-app6892-video-SD.mp4 */
+                    /* E.g. https://vcdn.slidesharecdn.com/160818dataanalyticsandsocialmedia-160907135456-lva1-app6892-video-SD.mp4 */
+                    /*
+                     * 2016-11-23: videourl can also be built via information in json (in multiple places) but it (currently) makes more
+                     * sense to grad it from the "embed_code" html code."
+                     */
+                    dllink = this.br.getRegex("(//[^<>\"]+\\.mp4)").getMatch(0);
+                    if (dllink != null) {
+                        /* Fix protocol/beginning of the url. */
+                        dllink = "https:" + dllink;
                         /*
-                         * 2016-11-23: videourl can also be built via information in json (in multiple places) but it (currently) makes more
-                         * sense to grad it from the "embed_code" html code."
+                         * Try HD first as most videos are available in HD ... and we can only try as there is no indicator on which
+                         * resolution is available - browser (http version) always uses SD.
                          */
-                        dllink = this.br.getRegex("(//[^<>\"]+\\.mp4)").getMatch(0);
-                        if (dllink != null) {
-                            /* Fix protocol/beginning of the url. */
-                            dllink = "https:" + dllink;
-                            /*
-                             * Try HD first as most videos are available in HD ... and we can only try as there is no indicator on which
-                             * resolution is available - browser (http version) always uses SD.
-                             */
-                            dllink = videourlSDtoHD(this.dllink);
-                            URLConnectionAdapter con = null;
-                            try {
+                        dllink = videourlSDtoHD(this.dllink);
+                        URLConnectionAdapter con = null;
+                        try {
+                            con = br.openHeadConnection(dllink);
+                            if (con.getResponseCode() == 403) {
+                                /* Probably HD not available --> Try SD */
+                                dllink = videourlHDtoSD(this.dllink);
                                 con = br.openHeadConnection(dllink);
-                                if (con.getResponseCode() == 403) {
-                                    /* Probably HD not available --> Try SD */
-                                    dllink = videourlHDtoSD(this.dllink);
-                                    con = br.openHeadConnection(dllink);
+                            }
+                            if (this.looksLikeDownloadableContent(con)) {
+                                if (con.getCompleteContentLength() > 0) {
+                                    link.setVerifiedFileSize(con.getCompleteContentLength());
                                 }
-                                if (this.looksLikeDownloadableContent(con)) {
-                                    if (con.getCompleteContentLength() > 0) {
-                                        link.setVerifiedFileSize(con.getCompleteContentLength());
-                                    }
-                                    link.setProperty("directlink", dllink);
-                                } else {
-                                    server_issues = true;
-                                }
-                            } finally {
-                                try {
-                                    con.disconnect();
-                                } catch (final Throwable e) {
-                                }
+                                link.setProperty("directlink", dllink);
+                            } else {
+                                server_issues = true;
+                            }
+                        } finally {
+                            try {
+                                con.disconnect();
+                            } catch (final Throwable e) {
                             }
                         }
                     }
                 }
-                link.setFinalFileName(filename + ext);
+            }
+            link.setFinalFileName(filename + ext);
+        } else {
+            /* Document: pptx, ppt or pdf usually. */
+            /* 2016-11-23: We'll simply assume that most content is .pdf. */
+            final SlideshareNetConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.SlideShareNet.SlideshareNetConfigInterface.class);
+            ext = ".pdf";
+            if (cfg.getPreferServerFilenames()) {
+                /* Final filename will be set on downloadstart. */
+                link.setName(filename + ext);
             } else {
-                /* Document: pptx, ppt or pdf usually. */
-                /* 2016-11-23: We'll simply assume that most content is .pdf. */
-                final SlideshareNetConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.SlideShareNet.SlideshareNetConfigInterface.class);
-                ext = ".pdf";
-                if (cfg.getPreferServerFilenames()) {
-                    /* Final filename will be set on downloadstart. */
-                    link.setName(filename + ext);
-                } else {
-                    /* Set final filename here because user wants it this way. */
-                    link.setFinalFileName(url_filename + ext);
-                }
+                /* Set final filename here because user wants it this way. */
+                link.setFinalFileName(url_filename + ext);
             }
         }
         return AvailableStatus.TRUE;
@@ -229,13 +200,9 @@ public class SlideShareNet extends PluginForHost {
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link, true);
         // TODO: Check if anything is downloadable without account (easy to check via API)
-        if (link.getDownloadURL().matches(PICTURELINK)) {
-            dllink = link.getStringProperty("directpiclink");
-        } else {
-            handleErrors();
-            if (!this.isVideo) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
-            }
+        handleErrors();
+        if (!this.isVideo) {
+            throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
         }
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -339,55 +306,49 @@ public class SlideShareNet extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link, true);
         handleErrors();
-        if (link.getDownloadURL().matches(PICTURELINK)) {
-            dllink = link.getStringProperty("directpiclink", null);
-        } else {
-            if (!this.isVideo) {
-                login(this.br, account, false);
-                br.setFollowRedirects(false);
-                final boolean useAPI = false;
-                if (useAPI) {
-                    // NOTE: This can also be used without username and password to check links but we always have to access the normal link
-                    // in
-                    // order to get this stupid slideshow_id
-                    br.getPage(link.getDownloadURL());
-                    br.followRedirect();
-                    final String slideshareID = br.getRegex("\"slideshow_id\":(\\d+)").getMatch(0);
-                    if (slideshareID == null) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    final String timestamp = System.currentTimeMillis() + "";
-                    // Examplelink: http://www.slideshare.net/webbmedia/webbmedia-group-2013-tech-trends
-                    final String getLink = "https://www.slideshare.net/api/2/get_slideshow?api_key=" + Encoding.Base64Decode(APIKEY) + "&ts=" + timestamp + "&hash=" + JDHash.getSHA1(Encoding.Base64Decode(SHAREDSECRET) + timestamp) + "&slideshow_id=" + slideshareID;
-                    br.getPage(getLink);
-                    dllink = getXML("DownloadUrl");
-                } else {
-                    br.getPage(link.getDownloadURL());
-                    br.followRedirect();
-                    if (br.containsHTML(NOTDOWNLOADABLE)) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "This document is not downloadable");
-                    }
-                    this.br.setFollowRedirects(true);
-                    br.getPage(link.getDownloadURL() + "/download");
-                    if (br.containsHTML(FILENOTFOUND)) {
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "This document is not downloadable!");
-                    } else if (br.containsHTML("You have exhausted your daily limit")) {
-                        /*
-                         * E.g. html:
-                         * "<span>You have exhausted your daily limit of 20 downloads. To download more, please try after 24 hours. Read <a href="
-                         * #{help_page_url(:download_limit)}" target="_blank">FAQs</a>"
-                         */
-                        logger.info("Daily limit reached");
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Daily limit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
-                    }
-                    dllink = br.getRegex("class=\"altDownload\">[\t\n\r ]+<a class=\"btn\" href=\"(http[^<>\"]*?)\"").getMatch(0);
-                    if (dllink == null) {
-                        dllink = br.getRegex("\"(https?://[a-z0-9]+\\.amazonaws\\.com/[^<>\"]*?)\"").getMatch(0);
-                    }
+        if (!this.isVideo) {
+            login(this.br, account, false);
+            br.setFollowRedirects(false);
+            final boolean useAPI = false;
+            if (useAPI) {
+                // NOTE: This can also be used without username and password to check links but we always have to access the normal link
+                // in
+                // order to get this stupid slideshow_id
+                br.getPage(link.getDownloadURL());
+                br.followRedirect();
+                final String slideshareID = br.getRegex("\"slideshow_id\":(\\d+)").getMatch(0);
+                if (slideshareID == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-                if (this.dllink != null) {
-                    this.dllink = Encoding.htmlOnlyDecode(dllink);
+                final String timestamp = System.currentTimeMillis() + "";
+                // Examplelink: http://www.slideshare.net/webbmedia/webbmedia-group-2013-tech-trends
+                final String getLink = "https://www.slideshare.net/api/2/get_slideshow?api_key=" + Encoding.Base64Decode(APIKEY) + "&ts=" + timestamp + "&hash=" + JDHash.getSHA1(Encoding.Base64Decode(SHAREDSECRET) + timestamp) + "&slideshow_id=" + slideshareID;
+                br.getPage(getLink);
+                dllink = getXML("DownloadUrl");
+            } else {
+                br.getPage(link.getDownloadURL());
+                br.followRedirect();
+                if (br.containsHTML(NOTDOWNLOADABLE)) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "This document is not downloadable");
                 }
+                br.setFollowRedirects(true);
+                br.getPage(link.getDownloadURL() + "/download");
+                if (br.containsHTML("You have exhausted your daily limit")) {
+                    /*
+                     * E.g. html:
+                     * "<span>You have exhausted your daily limit of 20 downloads. To download more, please try after 24 hours. Read <a href="
+                     * #{help_page_url(:download_limit)}" target="_blank">FAQs</a>"
+                     */
+                    logger.info("Daily limit reached");
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Daily limit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
+                }
+                dllink = br.getRegex("class=\"altDownload\">[\t\n\r ]+<a class=\"btn\" href=\"(http[^<>\"]*?)\"").getMatch(0);
+                if (dllink == null) {
+                    dllink = br.getRegex("\"(https?://[a-z0-9]+\\.amazonaws\\.com/[^<>\"]*?)\"").getMatch(0);
+                }
+            }
+            if (this.dllink != null) {
+                this.dllink = Encoding.htmlOnlyDecode(dllink);
             }
         }
         if (dllink == null) {
@@ -442,8 +403,13 @@ public class SlideShareNet extends PluginForHost {
     }
 
     @Override
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
+        return false;
+    }
+
+    @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -452,7 +418,7 @@ public class SlideShareNet extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

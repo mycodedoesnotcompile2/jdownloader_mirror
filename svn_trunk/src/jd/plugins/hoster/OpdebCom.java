@@ -17,7 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50059 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50125 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -141,7 +141,7 @@ public class OpdebCom extends PluginForHost {
         if (storedDirecturl == null) {
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     @Override
@@ -170,22 +170,8 @@ public class OpdebCom extends PluginForHost {
             ai.setCreateTime(account_create.longValue() * 1000);
         }
         ai.setUnlimitedTraffic();
-        final Map<String, Map<String, Object>> freehostmapping = new HashMap<String, Map<String, Object>>();
-        final Map<String, Map<String, Object>> limithostermapping = new HashMap<String, Map<String, Object>>();
-        if (account.getType() == AccountType.FREE) {
-            final Map<String, Object> freehosters_root = (Map<String, Object>) this.callAPI("/freehosters", null, account);
-            final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) freehosters_root.get("freehosters");
-            for (final Map<String, Object> hostermap : arrayHoster) {
-                freehostmapping.put(hostermap.get("hoster").toString(), hostermap);
-            }
-        }
-        final Map<String, Object> limithosters_root = (Map<String, Object>) this.callAPI("/limithosters", null, account);
-        final List<Map<String, Object>> limithosters_array = (List<Map<String, Object>>) limithosters_root.get("limithosters");
-        for (final Map<String, Object> hostermap : limithosters_array) {
-            limithostermapping.put(hostermap.get("hoster").toString(), hostermap);
-        }
         final Map<String, Object> supportedhosts_root = (Map<String, Object>) this.callAPI("/hosters", null, account);
-        final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) supportedhosts_root.get("hosters_list");
+        final List<Map<String, Object>> arrayHoster = (List<Map<String, Object>>) supportedhosts_root.get("hosters");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hostermap : arrayHoster) {
             final String domain = hostermap.get("name").toString();
@@ -197,25 +183,19 @@ public class OpdebCom extends PluginForHost {
                     mhost.setStatusText("Broken/Down since " + downsincedate);
                 }
             }
-            final Map<String, Object> limitmap;
+            final Number maxlinksO;
             if (account.getType() == AccountType.FREE) {
-                limitmap = freehostmapping.get(domain);
-                if (limitmap == null) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-                }
+                maxlinksO = (Number) hostermap.get("free_max_links_limit_per_day");
             } else {
-                limitmap = limithostermapping.get(domain);
+                maxlinksO = (Number) hostermap.get("premium_maxlinks_limit_per_day");
             }
             /* Set host-specific limits if any exist. */
-            if (limitmap != null) {
-                final Number maxlinksO = (Number) limitmap.get("maxlinks");
-                if (maxlinksO != null) {
-                    final long maxlinks = maxlinksO.longValue();
-                    mhost.setLinksLeft(maxlinks);
-                    mhost.setLinksMax(maxlinks);
-                }
+            if (maxlinksO != null) {
+                final long maxlinks = maxlinksO.longValue();
+                mhost.setLinksLeft(maxlinks);
+                mhost.setLinksMax(maxlinks);
                 /* Cal also have value \u221e -> ∞ -> Unlimited symbol */
-                final String maxTrafficStr = (String) limitmap.get("maxbandwidth");
+                final String maxTrafficStr = (String) hostermap.get("maxbandwidth");
                 if (maxTrafficStr != null && maxTrafficStr.matches("^\\d+.+")) {
                     final long maxTraffic = SizeFormatter.getSize(maxTrafficStr);
                     mhost.setTrafficLeft(maxTraffic);
@@ -267,9 +247,30 @@ public class OpdebCom extends PluginForHost {
         /* Decide if error is link/download related or account related. */
         final List<String> patternsLoginInvalid = new ArrayList<String>();
         patternsLoginInvalid.add("The Api Key .+ does not exists or is not authorized");
-        for (final String patternLoginInvalid : patternsLoginInvalid) {
-            if (message.matches(patternLoginInvalid)) {
+        patternsLoginInvalid.add("AUTH_KEY_BAD");
+        patternsLoginInvalid.add("AUTH_ACCOUNT_BANNED");
+        patternsLoginInvalid.add("AUTH_API_BANNED");
+        patternsLoginInvalid.add("AUTH_BAD_APIKEY");
+        patternsLoginInvalid.add("AUTH_NOT_PREMIUM");
+        patternsLoginInvalid.add("VPN_DETECTION");
+        for (final String pattern : patternsLoginInvalid) {
+            if (message.matches(pattern)) {
                 throw new AccountInvalidException(message);
+            }
+        }
+        final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
+        downloadErrorsHostUnavailable.add("GEN_LIMIT");
+        for (final String pattern : downloadErrorsHostUnavailable) {
+            if (message.matches(pattern)) {
+                mhm.putError(account, link, 5 * 60 * 1000l, message);
+            }
+        }
+        final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
+        downloadErrorsFileUnavailable.add("GEN_SERVER_ERROR");
+        downloadErrorsFileUnavailable.add("GEN_ERROR");
+        for (final String pattern : downloadErrorsFileUnavailable) {
+            if (message.matches(pattern)) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
             }
         }
         mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 5);

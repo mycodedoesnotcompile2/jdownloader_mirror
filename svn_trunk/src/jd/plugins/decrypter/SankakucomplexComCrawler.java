@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
@@ -26,6 +25,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
+import org.jdownloader.plugins.components.config.SankakucomplexComConfig.PostTagCrawlerCrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50117 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50133 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -115,11 +115,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         } else if (param.getCryptedUrl().matches(TYPE_BOOK)) {
             return crawlBook(param);
         } else {
-            return crawlTagsPosts(param);
+            return crawlTagsPosts(param, account);
         }
     }
 
-    private ArrayList<DownloadLink> crawlTagsPosts(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawlTagsPosts(final CryptedLink param, final Account account) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final SankakucomplexComConfig cfg = PluginJsonConfig.get(SankakucomplexComConfig.class);
         final int maxPage = cfg.getPostTagCrawlerMaxPageLimit();
@@ -135,11 +135,11 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
-        final boolean preferAPI = false;
-        if (preferAPI) {
-            return crawlTagsPostsAPI(param, tags, language);
-        } else {
+        final PostTagCrawlerCrawlMode mode = cfg.getPostTagCrawlerCrawlMode();
+        if (mode == PostTagCrawlerCrawlMode.WEBSITE || (mode == PostTagCrawlerCrawlMode.AUTO && account != null)) {
             return crawlTagsPostsWebsite(param, tags, language);
+        } else {
+            return crawlTagsPostsAPI(param, tags, language);
         }
     }
 
@@ -179,7 +179,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 if (!dupes.add(postID)) {
                     /* Skip dupes */
                     continue;
-                } else if (postID.toLowerCase(Locale.ENGLISH).equals(postID)) {
+                } else if (!SankakucomplexCom.isValidPostID(postID)) {
                     /**
                      * Skip invalid items such as: </br>
                      * https://chan.sankakucomplex.com/posts/update </br>

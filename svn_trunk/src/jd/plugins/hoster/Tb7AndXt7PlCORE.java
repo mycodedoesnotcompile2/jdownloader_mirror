@@ -130,21 +130,20 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         login(account, "/mojekonto", true);
         final AccountInfo ai = new AccountInfo();
-        if (br.containsHTML("Brak ważnego dostępu Premium")) {
+        account.setType(AccountType.PREMIUM);
+        String validUntilDateStr = br.getRegex("(\\d{2}\\.\\d{2}.\\d{4}\\s*/\\s*\\d{2}:\\d{2})").getMatch(0);
+        if (validUntilDateStr != null) {
+            validUntilDateStr = validUntilDateStr.replaceFirst("\\s*/\\s*", "");
+            final long expireTimeMillis = TimeFormatter.getMilliSeconds(validUntilDateStr, "dd.MM.yyyyHH:mm", Locale.ENGLISH);
+            ai.setValidUntil(expireTimeMillis, br);
+        } else {
             /* Not a premium account or expired premium account */
             ai.setExpired(true);
             account.setType(AccountType.FREE);
-        } else if (br.containsHTML(">\\s*Brak ważnego dostępu Premium\\s*<")) {
-            throw new AccountInvalidException(getPhrase("UNSUPPORTED_ACCOUNT_TYPE_NOT_PREMIUM"));
+            // if (br.containsHTML(">\\s*Brak ważnego dostępu Premium\\s*<")) {
+            // throw new AccountInvalidException(getPhrase("UNSUPPORTED_ACCOUNT_TYPE_NOT_PREMIUM"));
+            // }
         }
-        account.setType(AccountType.PREMIUM);
-        String validUntilDateStr = br.getRegex("(\\d{2}\\.\\d{2}.\\d{4}\\s*/\\s*\\d{2}:\\d{2})").getMatch(0);
-        if (validUntilDateStr == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find premium expire date");
-        }
-        validUntilDateStr = validUntilDateStr.replaceFirst("\\s*/\\s*", "");
-        final long expireTimeMillis = TimeFormatter.getMilliSeconds(validUntilDateStr, "dd.MM.yyyyHH:mm", Locale.ENGLISH);
-        ai.setValidUntil(expireTimeMillis, br);
         /* 2024-02-06: Is that the daily traffic-limit? [30GB] */
         String otherHostersLimitLeftStr = br.getRegex("Pozostały Limit Premium do wykorzystania\\s*:\\s*<b>([^<]+)</b></div>").getMatch(0);
         if (otherHostersLimitLeftStr == null) {

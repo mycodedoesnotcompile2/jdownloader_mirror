@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 49485 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -252,6 +252,8 @@ public class TiktokComCrawler extends PluginForDecrypt {
                 } else {
                     throw plge;
                 }
+            } catch (final NullPointerException npe) {
+                logger.info("Attempting website handling as fallback");
             }
         }
         /* Normal website handling as fallback */
@@ -340,7 +342,7 @@ public class TiktokComCrawler extends PluginForDecrypt {
         /* In some cases this will be "0". In these cases, the date will be obtained from "last modified" header via website. */
         final String createTime = itemInfos.get("createTime").toString();
         String description = (String) itemInfos.get("text");
-        final String videoDllink = (String) JavaScriptEngineFactory.walkJson(itemInfos, "video/urls/{0}");
+        final String videoDllink = JavaScriptEngineFactory.walkJson(itemInfos, "video/urls/{0}").toString();
         /* Always look for username --> Username given inside URL which user added can be wrong! */
         final Object authorInfosO = videoData.get("authorInfos");
         String username = null;

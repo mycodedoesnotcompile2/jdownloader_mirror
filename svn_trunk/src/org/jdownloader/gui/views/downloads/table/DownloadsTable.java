@@ -45,6 +45,7 @@ import org.jdownloader.controlling.contextmenu.MenuLink;
 import org.jdownloader.controlling.contextmenu.SeparatorData;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
@@ -154,9 +155,7 @@ public class DownloadsTable extends PackageControllerTable<FilePackage, Download
                     return;
                 }
                 if (getModel().getSortColumn() != null) {
-                    if (CFG_GUI.CFG.isHelpDialogsEnabled()) {
-                        HelpDialog.show(e1.getLocationOnScreen(), "downloadtabe_sortwarner", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.DownloadsTable_actionPerformed_sortwarner_title(getModel().getSortColumn().getName()), _GUI.T.DownloadsTable_actionPerformed_sortwarner_text(), new AbstractIcon(IconKey.ICON_SORT, 32));
-                    }
+                    HelpDialog.showIfAllowed(new MessageConfig(e1.getLocationOnScreen(), "downloadtabe_sortwarner", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.DownloadsTable_actionPerformed_sortwarner_title(getModel().getSortColumn().getName()), _GUI.T.DownloadsTable_actionPerformed_sortwarner_text(), new AbstractIcon(IconKey.ICON_SORT, 32)));
                 }
             }
         }).start();

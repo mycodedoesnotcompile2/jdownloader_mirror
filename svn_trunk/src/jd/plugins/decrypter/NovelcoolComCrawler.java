@@ -21,6 +21,7 @@ import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
@@ -32,10 +33,17 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     public static List<String[]> getPluginDomains() {
@@ -58,7 +66,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final String PATTERN_RELATIVE_CHAPTER = "(?i)/chapter/[a-z\\-]+(\\d+(-\\d+)?)/(\\d+)/";
+    private static final String PATTERN_RELATIVE_CHAPTER = "(?i)/chapter/[A-Za-z0-9\\-]+/(\\d+)/?";
     private static final String PATTERN_RELATIVE_NOVEL   = "(?i)/novel/([\\w\\-]+)\\.html";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -71,14 +79,14 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String chapterNumber = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER).getMatch(0);
-        if (chapterNumber != null) {
+        final String chapterIDFromURL = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER).getMatch(0);
+        if (chapterIDFromURL != null) {
             /* Find all pictures of a chapter of a novel */
+            final String chapterNumber = new Regex(param.getCryptedUrl(), "Chapter-(\\d+)").getMatch(0);
             final String bookID = br.getRegex("cur_book_id = \"(\\d+)").getMatch(0);
             final String chapterID = br.getRegex("cur_chapter_id = \"(\\d+)").getMatch(0);
             final String seriesTitle = NovelcoolCom.findSeriesTitle(br);
@@ -89,8 +97,8 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                     final DownloadLink chapterAsHTML = this.createDownloadlink(br.getURL() + ".jdeatme");
                     chapterAsHTML.setFinalFileName(br._getURL().getPath() + ".html");
                     chapterAsHTML.setDownloadSize(br.getRequest().getHtmlCode().getBytes("UTF-8").length);
-                    ret.add(chapterAsHTML);
                     chapterAsHTML.setAvailable(true);
+                    ret.add(chapterAsHTML);
                     return ret;
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -108,7 +116,9 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                 if (seriesTitle != null) {
                     image.setProperty(NovelcoolCom.PROPERTY_SERIES_TITLE, seriesTitle);
                 }
-                image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_NUMBER, chapterNumber);
+                if (chapterNumber != null) {
+                    image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_NUMBER, chapterNumber);
+                }
                 image.setProperty(NovelcoolCom.PROPERTY_PAGE_NUMBER, position);
                 image.setProperty(NovelcoolCom.PROPERTY_PAGE_MAX, links.length);
                 image.setName(NovelcoolCom.formatFilename(image));

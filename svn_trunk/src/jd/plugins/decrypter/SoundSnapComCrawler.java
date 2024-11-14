@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 46986 $", interfaceVersion = 2, names = { "soundsnap.com" }, urls = { "https?://(?:www\\.)?soundsnap\\.com/node/(\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 50133 $", interfaceVersion = 2, names = { "soundsnap.com" }, urls = { "https?://(?:www\\.)?soundsnap\\.com/node/(\\d+)" })
 public class SoundSnapComCrawler extends PluginForDecrypt {
     public SoundSnapComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +44,12 @@ public class SoundSnapComCrawler extends PluginForDecrypt {
         // final String thisnodeID = new Regex(parameter, this.getSupportedLinks()).getMatch(0);
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)(Page not found|Sorry, unable to find that page)")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.containsHTML("(Page not found|Sorry, unable to find that page)")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (!this.canHandle(br.getURL())) {
+            /* E.g. redirect to main page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         String[] ids = br.getRegex("node(-|/)(\\d+)").getColumn(1);
@@ -60,6 +65,7 @@ public class SoundSnapComCrawler extends PluginForDecrypt {
         return ret;
     }
 
+    @Override
     public boolean hasCaptcha(final CryptedLink link, final jd.plugins.Account acc) {
         return false;
     }

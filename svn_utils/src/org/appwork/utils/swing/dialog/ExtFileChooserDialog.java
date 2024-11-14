@@ -94,8 +94,6 @@ import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.dimensor.RememberLastDialogDimension;
 
-import sun.swing.FilePane;
-
 public class ExtFileChooserDialog extends AbstractDialog<File[]> {
     /**
      * @author DESKTOP-7KP0VLD$
@@ -731,7 +729,7 @@ public class ExtFileChooserDialog extends AbstractDialog<File[]> {
                     ExtFileChooserDialog.super.setReturnmask(false);
                     //
                     ExtFileChooserDialog.this.dispose();
-                } else if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand()) || FilePane.ACTION_APPROVE_SELECTION.equals(e.getActionCommand())) {
+                } else if (JFileChooser.APPROVE_SELECTION.equals(e.getActionCommand()) || /* FilePane.ACTION_APPROVE_SELECTION */"approveSelection".equals(e.getActionCommand())) {
                     getLogger().fine("Answer: FC APPROVE>");
                     ExtFileChooserDialog.this.setReturnmask(true);
                     ExtFileChooserDialog.this.dispose();

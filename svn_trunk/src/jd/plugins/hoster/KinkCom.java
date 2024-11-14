@@ -51,7 +51,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49757 $", interfaceVersion = 3, names = { "kink.com" }, urls = { "https?://(?:www\\.)?kink.com/shoot/(\\d+)" })
+@HostPlugin(revision = "$Revision: 50126 $", interfaceVersion = 3, names = { "kink.com" }, urls = { "https?://(?:www\\.)?kink.com/shoot/(\\d+)" })
 public class KinkCom extends PluginForHost {
     public KinkCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -133,19 +133,30 @@ public class KinkCom extends PluginForHost {
         String title = br.getRegex("<title>\\s*([^<>\"]+)\\s*</title>").getMatch(0);
         String directurl = null;
         String json = br.getRegex("data-setup=\"([^\"]+)").getMatch(0);
-        int heightMaxTrailer = -1;
-        String directurlTrailerBest = null;
-        if (json != null) {
+        int heightMaxStream = -1;
+        String directurlStreamBest = null;
+        streamDownload: if (json != null) {
             json = Encoding.htmlOnlyDecode(json);
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             title = entries.get("title").toString();
-            final Map<String, Object> trailer = (Map<String, Object>) entries.get("trailer");
-            final List<Map<String, Object>> sources = (List<Map<String, Object>>) trailer.get("sources");
+            final Map<String, Object> videosource;
+            if (account != null) {
+                /* Streams of full video */
+                videosource = (Map<String, Object>) entries.get("video");
+            } else {
+                /* Streams of trailer */
+                videosource = (Map<String, Object>) entries.get("trailer");
+            }
+            if (videosource == null) {
+                logger.info("Required stream video source is not available");
+                break streamDownload;
+            }
+            final List<Map<String, Object>> sources = (List<Map<String, Object>>) videosource.get("sources");
             for (final Map<String, Object> source : sources) {
                 final int height = ((Number) source.get("resolution")).intValue();
-                if (directurlTrailerBest == null || height > heightMaxTrailer) {
-                    directurlTrailerBest = source.get("url").toString();
-                    heightMaxTrailer = height;
+                if (directurlStreamBest == null || height > heightMaxStream) {
+                    directurlStreamBest = source.get("url").toString();
+                    heightMaxStream = height;
                 }
             }
         }
@@ -153,22 +164,25 @@ public class KinkCom extends PluginForHost {
             /* Look for "official" downloadlinks --> Find highest quality */
             int qualityMax = -1;
             final String[][] dlinfos = br.getRegex("download\\s*=\\s*\"(https?://[^\"]+)\"[^>]*quality=\"(\\d+)\"").getMatches();
-            if (dlinfos == null || dlinfos.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            for (final String[] dlinfo : dlinfos) {
-                final int qualityTmp = Integer.parseInt(dlinfo[1]);
-                if (qualityTmp > qualityMax) {
-                    qualityMax = qualityTmp;
-                    String url = dlinfo[0];
-                    url = Encoding.htmlOnlyDecode(url);
-                    directurl = url;
+            if (dlinfos != null && dlinfos.length > 0) {
+                for (final String[] dlinfo : dlinfos) {
+                    final int qualityTmp = Integer.parseInt(dlinfo[1]);
+                    if (qualityTmp > qualityMax) {
+                        qualityMax = qualityTmp;
+                        String url = dlinfo[0];
+                        url = Encoding.htmlOnlyDecode(url);
+                        directurl = url;
+                    }
                 }
+                logger.info("Chosen premium download quality: " + qualityMax + " -> " + directurl);
+            } else {
+                /* No official download possible -> Download stream */
+                logger.info("Chosen premium stream quality: " + heightMaxStream + " -> " + directurlStreamBest);
+                directurl = directurlStreamBest;
             }
-            logger.info("Chosen premium download quality: " + qualityMax + " -> " + directurl);
         } else {
             /* Download trailer */
-            directurl = directurlTrailerBest;
+            directurl = directurlStreamBest;
             logger.info("Chosen trailer: " + directurl);
         }
         String filetitle;

@@ -172,18 +172,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-        @Override
-        public boolean add(final YoutubeReplacer e) {
-            for (final String tag : e.getTags()) {
-                if (REPLACER_MAP.put(tag, e) != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        throw new WTFException("Duplicate error:" + tag);
-                    }
-                }
-            }
-            return super.add(e);
-        };
-    };
+                                                                       @Override
+                                                                       public boolean add(final YoutubeReplacer e) {
+                                                                           for (final String tag : e.getTags()) {
+                                                                               if (REPLACER_MAP.put(tag, e) != null) {
+                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                                                                       throw new WTFException("Duplicate error:" + tag);
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                           return super.add(e);
+                                                                       };
+                                                                   };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -2595,7 +2595,7 @@ public class YoutubeHelper {
             }
         }
         final String playListID = getPlaylistID();
-        if (!CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER) && playListID != null) {
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER) && playListID != null) {
             List<YoutubeStreamData> covers = streamDataCache.get(playListID);
             if (covers == null && !streamDataCache.containsKey(playListID)) {
                 covers = crawlCoverData(playListID, true);

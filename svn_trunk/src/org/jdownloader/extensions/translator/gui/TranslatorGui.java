@@ -61,9 +61,9 @@ import org.jdownloader.extensions.translator.TranslatorExtensionListener;
 import org.jdownloader.extensions.translator.gui.actions.NewTranslationAction;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.RestartController;
 import org.jdownloader.updatev2.SmartRlyRestartRequest;
 import org.tmatesoft.svn.core.SVNException;
@@ -88,13 +88,10 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             throw new HeadlessException();
         }
     }
-
     private static final String   ID = "TRANSLATORGUI";
     private TranslateTableModel   tableModel;
     private TranslateTable        table;
-
     private SwitchPanel           panel;
-
     private MigPanel              menuPanel;
     private JLabel                lbl;
     private Timer                 ti;
@@ -117,10 +114,8 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
         super(plg);
         logger = LogController.getInstance().getLogger(TranslatorExtension.class.getName());
         this.panel = new SwitchPanel(new MigLayout("ins 0,wrap 1", "[grow,fill]", "[]2[]2[grow,fill][][grow,fill][]")) {
-
             @Override
             protected void onShow() {
-
             }
 
             @Override
@@ -132,29 +127,24 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
         this.setContent(panel);
         initComponents();
         layoutPanel();
-
     }
 
     private void layoutPanel() {
-
         panel.add(menuPanel);
         panel.add(menuPanel2);
         sp = new JScrollPane(table);
         search = new TranslatorSearchField(table);
         qe = new QuickEdit(table);
-
         panel.add(sp);
         panel.add(search);
         if (getExtension().getSettings().isQuickEditBarVisible() && getExtension().getSettings().getQuickEditHeight() > 24) {
             panel.add(qe, "height " + getExtension().getSettings().getQuickEditHeight() + "!,hidemode 3");
         }
-
     }
 
     private void initComponents() {
         layoutMenu();
         initTable();
-
     }
 
     protected void initTable() {
@@ -163,7 +153,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             table.getSelectionModel().removeListSelectionListener(this);
         }
         table = new TranslateTable(getExtension(), tableModel) {
-
             @Override
             public boolean editCellAt(int row, int column) {
                 if (stopEditing) {
@@ -185,7 +174,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
 
             @Override
             public boolean editCellAt(int row, int column, EventObject e) {
-
                 if (stopEditing) {
                     if (isEditing() && table.getCellEditor() != null) {
                         getCellEditor().stopCellEditing();
@@ -202,15 +190,11 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                     return false;
                 }
             }
-
         };
-
         table.getSelectionModel().addListSelectionListener(this);
-
         if (qe != null) {
             qe.setTable(table);
         }
-
         if (search != null) {
             search.setTable(table);
         }
@@ -218,7 +202,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
 
     protected void layoutMenu() {
         // Load Menu
-
         // this.mnuFileLoad = new JMenu("Load");
         // for (TLocale t : getExtension().getTranslations()) {
         // mnuFileLoad.add(new LoadTranslationAction(this, t));
@@ -226,9 +209,7 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
         // if (getExtension().getTranslations().size() > 0) mnuFileLoad.add(new
         // JSeparator());
         // mnuFileLoad.add();
-
         menuPanel = new MigPanel("ins 0", "[]3[]3[]3[]3[]3[]", "[grow,fill]");
-
         menuPanel.add(load = new ExtButton(new AppAction() {
             {
                 setName("1. Load Translation");
@@ -238,40 +219,31 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             public void actionPerformed(ActionEvent e) {
                 final ListCellRenderer org = new JComboBox().getRenderer();
                 try {
-
                     TLocale pre = getExtension().getTLocaleByID(getExtension().getSettings().getLastLoaded());
                     if (pre == null) {
                         pre = new TLocale(TranslationFactory.getDesiredLocale().toString());
                     }
                     final ComboBoxDialog d = new ComboBoxDialog(0, "Choose Translation", "Please choose the Translation you want to modify, or create a new one", getExtension().getTranslations().toArray(new TLocale[] {}), pre == null ? 0 : getExtension().getTranslations().indexOf(pre), new AbstractIcon(IconKey.ICON_LANGUAGE, 32), null, null, null);
                     d.setLeftActions(new NewTranslationAction(TranslatorGui.this) {
-
                         @Override
                         public void actionPerformed(ActionEvent e) {
                             super.actionPerformed(e);
                             d.dispose();
-
                             String variant = null;
                             String country = null;
                             try {
                                 final String lng = (String) Dialog.getInstance().showComboDialog(0, "Choose Language ID", "Choose correct Language", Locale.getISOLanguages(), null, null, null, null, new ListCellRenderer() {
-
                                     @Override
                                     public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                                         return org.getListCellRendererComponent(list, new Locale((String) value).getDisplayLanguage(), index, isSelected, cellHasFocus);
-
                                     }
-
                                 });
                                 try {
                                     country = (String) Dialog.getInstance().showComboDialog(0, "Choose Country", "Choose correct Country", Locale.getISOCountries(), null, null, null, "No Special Country variant", new ListCellRenderer() {
-
                                         @Override
                                         public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                                             return org.getListCellRendererComponent(list, new Locale(lng, (String) value).getDisplayName(), index, isSelected, cellHasFocus);
-
                                         }
-
                                     });
                                 } catch (DialogClosedException e1) {
                                     e1.printStackTrace();
@@ -280,11 +252,9 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                 }
                                 try {
                                     variant = Dialog.getInstance().showInputDialog(0, "Anything Special?", "If this is a special variant, please enter a Variant ID", "incomplete", null, null, "Nothing Special");
-
                                     if (variant != null) {
                                         variant = variant.replaceAll("[^a-zA-Z0-9]", "");
                                     }
-
                                 } catch (DialogClosedException e1) {
                                     e1.printStackTrace();
                                 } catch (DialogCanceledException e1) {
@@ -292,7 +262,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                 }
                                 StringBuilder id = new StringBuilder();
                                 id.append(lng);
-
                                 if (!StringUtils.isEmpty(country)) {
                                     id.append("_");
                                     id.append(country);
@@ -310,14 +279,11 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                             } catch (DialogCanceledException e1) {
                                 e1.printStackTrace();
                             }
-
                         }
-
                     });
                     int sel = Dialog.getInstance().showDialog(d);
                     if (sel >= 0) {
                         load(getExtension().getTranslations().get(sel));
-
                     }
                 } catch (DialogClosedException e1) {
                     e1.printStackTrace();
@@ -326,7 +292,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 }
             }
         }));
-
         menuPanel.add(save = new ExtButton(new AppAction() {
             {
                 setName("2. Save locally");
@@ -335,10 +300,8 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             @Override
             public void actionPerformed(ActionEvent e2) {
                 ProgressGetter pg = new ProgressDialog.ProgressGetter() {
-
                     @Override
                     public void run() throws Exception {
-
                         try {
                             if (!getExtension().hasChanges()) {
                                 Dialog.getInstance().showMessageDialog("Nothing has Changed");
@@ -351,7 +314,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         } catch (Throwable e) {
                             Dialog.getInstance().showExceptionDialog("An error occured", "Could not save the changes", e);
                         }
-
                     }
 
                     @Override
@@ -369,15 +331,12 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         return null;
                     }
                 };
-
                 try {
                     Dialog.getInstance().showDialog(new ProgressDialog(pg, UIOManager.BUTTONS_HIDE_CANCEL, "Saving", "Please wait.", null, null, null) {
-
                         @Override
                         public Dimension getPreferredSize() {
                             return new Dimension(400, 100);
                         }
-
                     });
                 } catch (DialogClosedException e) {
                     e.printStackTrace();
@@ -389,17 +348,13 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
         menuPanel.add(upload = new ExtButton(new AppAction() {
             {
                 setName("3. Upload Changes");
-
             }
 
             @Override
             public void actionPerformed(ActionEvent e) {
-
                 ProgressGetter pg = new ProgressDialog.ProgressGetter() {
-
                     @Override
                     public void run() throws Exception {
-
                         try {
                             stopEditing(true);
                             SVNCommitPacket commit = getExtension().save();
@@ -425,7 +380,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         } catch (Throwable e) {
                             Dialog.getInstance().showExceptionDialog("An error occured", "Could not save and upload the changes", e);
                         }
-
                     }
 
                     @Override
@@ -443,15 +397,12 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         return null;
                     }
                 };
-
                 try {
                     Dialog.getInstance().showDialog(new ProgressDialog(pg, UIOManager.BUTTONS_HIDE_CANCEL, "Saving", "Please wait.", null, null, null) {
-
                         @Override
                         public Dimension getPreferredSize() {
                             return new Dimension(400, 100);
                         }
-
                     });
                 } catch (DialogClosedException e1) {
                     e1.printStackTrace();
@@ -460,12 +411,10 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 }
             }
         }));
-
         isWizard = false;
         menuPanel.add(wizard = new ExtButton(new AppAction() {
             {
                 setName("Wizard");
-
             }
 
             @Override
@@ -477,12 +426,9 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         try {
                             TranslateEntry currentValue = null;
                             while (true) {
-
                                 List<TranslateEntry> lst = getExtension().getTranslationEntries();
-
                                 main: for (int i = 0; i < lst.size(); i++) {
                                     TranslateEntry newValue = lst.get(i);
-
                                     if (currentValue == null) {
                                         if (!newValue.isOK()) {
                                             currentValue = newValue;
@@ -494,40 +440,31 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                             if (!newValue.isOK()) {
                                                 currentValue = newValue;
                                                 break main;
-
                                             }
                                         }
                                         currentValue = null;
                                         i = 0;
-
                                     }
                                 }
                                 if (currentValue == null) {
                                     // nothing to do
                                     break;
                                 }
-
                                 final TranslateEntry value = currentValue;
-
                                 logger.info("Next entry: " + value.getFullKey());
                                 String ret = "<style>td.a{font-style:italic;}</style><table valign=top>";
                                 ret += "<tr><td class=a>Key:</td><td>" + value.getCategory() + "." + value.getKey() + "</td></tr>";
-
                                 ret += "<tr><td class=a>Location:</td><td>" + value.getFullKey() + "</td></tr>";
-
                                 ret += "<tr><td class=a>Original:</td><td><b>" + Encoding.cdataEncode(value.getDirect()) + "</b></td></tr>";
                                 if (value.isMissing()) {
                                     ret += "<tr><td class=a><font color='#ff0000' >Error:</font></td><td class=a><font color='#ff0000' >Not translated yet</font></td></tr>";
-
                                 }
                                 if (value.isDefault()) {
                                     ret += "<tr><td class=a><font color='#339900' >Warning:</font></td><td class=a><font color='#339900' >The translation equals the english default language.</font></td></tr>";
                                 }
-
                                 if (value.isParameterInvalid()) {
                                     ret += "<tr><td class=a><font color='#ff0000' >Error:</font></td><td class=a><font color='#ff0000' >Parameter Wildcards (%s*) do not match.</font></td></tr>";
                                 }
-
                                 Type[] parameters = value.getParameters();
                                 ret += "<tr><td class=a>Parameters:</td>";
                                 if (parameters.length == 0) {
@@ -542,9 +479,7 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                     ret += "</td>";
                                     ret += "</tr>";
                                 }
-
                                 ret += "</table>";
-
                                 // ConfirmDialog d = new
                                 // ConfirmDialog(Dialog.STYLE_HTML, "", ret, null, null,
                                 // null);
@@ -554,17 +489,13 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                         if (value.getDescription() != null) {
                                             Dialog.I().showMessageDialog("IMPORTANT!!!\r\n\r\n" + value.getCategory() + "." + value.getKey() + "\r\n" + value.getDescription());
                                         }
-                                        // jdlog://6423355159731/
                                         final InputDialog d = new InputDialog(Dialog.STYLE_HTML, "Progress " + getExtension().getPercent() + "%", ret, null, null, "Next", "Cancel") {
                                             protected TextComponentInterface getSmallInputComponent() {
-
                                                 final ExtTextField ttx = new ExtTextField();
-
                                                 // private static final String
                                                 // TEXT_SUBMIT = "text-submit";
                                                 // private static final String
                                                 // INSERT_BREAK = "insert-break";
-
                                                 InputMap input = ttx.getInputMap();
                                                 KeyStroke enter = KeyStroke.getKeyStroke("ENTER");
                                                 KeyStroke shiftEnter = KeyStroke.getKeyStroke("shift ENTER");
@@ -572,7 +503,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                                                                        // =
                                                                                        // "insert-break"
                                                 input.put(enter, "TEXT_SUBMIT");
-
                                                 ActionMap actions = ttx.getActionMap();
                                                 actions.put("TEXT_SUBMIT", new AbstractAction() {
                                                     @Override
@@ -581,37 +511,30 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                                         try {
                                                             Point point = ttx.getCaret().getMagicCaretPosition();
                                                             SwingUtilities.convertPointToScreen(point, ttx);
-
                                                             ttx.getDocument().insertString(ttx.getCaretPosition(), "\\r\\n", null);
-                                                            if (CFG_GUI.CFG.isHelpDialogsEnabled()) {
-                                                                HelpDialog.show(point, "TRANSLETOR_USE_NEWLINE", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "NewLine", "Press <Enter> to insert a Newline (\\r\\n). Press <CTRL ENTER> to Confirm  translation. Press <TAB> to confirm and move to next line.", new AbstractIcon(IconKey.ICON_HELP, 32));
-                                                            }
+                                                            HelpDialog.showIfAllowed(new MessageConfig(point, "TRANSLETOR_USE_NEWLINE", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "NewLine", "Press <Enter> to insert a Newline (\\r\\n). Press <CTRL ENTER> to Confirm translation. Press <TAB> to confirm and move to next line.", new AbstractIcon(IconKey.ICON_HELP, 32)));
                                                         } catch (BadLocationException e1) {
                                                             e1.printStackTrace();
                                                         }
                                                     }
                                                 });
-
                                                 ttx.setClearHelpTextOnFocus(false);
                                                 ttx.addKeyListener(this);
                                                 ttx.addMouseListener(this);
                                                 ttx.setHelpText("Please translate: " + value.getDirect());
                                                 ttx.addActionListener(new ActionListener() {
-
                                                     @Override
                                                     public void actionPerformed(ActionEvent e) {
                                                         setReturnmask(true);
                                                     }
                                                 });
                                                 return ttx;
-
                                             }
 
                                             @Override
                                             protected int getPreferredWidth() {
                                                 return JDGui.getInstance().getMainFrame().getWidth();
                                             }
-
                                         };
                                         d.setLeftActions(new AppAction() {
                                             {
@@ -622,30 +545,22 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                             public void actionPerformed(ActionEvent e) {
                                                 d.dispose();
                                             }
-
                                         });
-
                                         String newTranslation = Dialog.getInstance().showDialog(d);
-
                                         if (newTranslation == null) {
                                             logger.info("User pressed Skip");
                                             // Skip
                                             break;
                                         }
                                         logger.info("new Translation: " + newTranslation);
-
                                         lst = getExtension().getTranslationEntries();
-
                                         for (int i = 0; i < lst.size(); i++) {
                                             TranslateEntry newValue = lst.get(i);
-
                                             if (value.equals(newValue)) {
                                                 if (currentValue != newValue) {
-                                                    
                                                 }
                                                 currentValue = newValue;
                                                 break;
-
                                             }
                                         }
                                         currentValue.setTranslation(newTranslation);
@@ -653,48 +568,36 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                                             break;
                                         }
                                         logger.info("next");
-
                                     }
                                 } catch (DialogClosedException e1) {
                                     e1.printStackTrace();
-
                                 } catch (DialogCanceledException e1) {
                                     return;
                                 }
-
                             }
                         } finally {
-
                             Dialog.getInstance().showMessageDialog("Wizard ended");
-
                             isWizard = false;
-
                         }
                     }
                 }.start();
-
             }
         }));
         menuPanel.add(Box.createHorizontalGlue(), "growx,pushx");
         menuPanel2 = new MigPanel("ins 0", "[grow,fill]3[]3[]3[]", "[grow,fill]");
         menuPanel2.add(lbl = new JLabel(), "aligny center,pushx,growx");
-
         menuPanel2.add(revert = new ExtButton(new AppAction() {
             {
                 setName("Revert");
                 setSmallIcon(new AbstractIcon(IconKey.ICON_UNDO, 18));
                 setTooltipText("Revert all your changes");
-
             }
 
             @Override
             public void actionPerformed(ActionEvent e) {
-
                 try {
-
                     Dialog.I().showConfirmDialog(0, "Revert all Changes?", "All your changes will be lost. Continue anyway?");
                     ProgressGetter pg = new ProgressDialog.ProgressGetter() {
-
                         @Override
                         public void run() throws Exception {
                             try {
@@ -722,22 +625,18 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                             return null;
                         }
                     };
-
                     try {
                         Dialog.getInstance().showDialog(new ProgressDialog(pg, UIOManager.BUTTONS_HIDE_CANCEL, "Reverting", "Please wait. Reverting all Changes", null, null, null) {
-
                             @Override
                             public Dimension getPreferredSize() {
                                 return new Dimension(400, 100);
                             }
-
                         });
                     } catch (DialogClosedException e2) {
                         e2.printStackTrace();
                     } catch (DialogCanceledException e2) {
                         e2.printStackTrace();
                     }
-
                 } catch (DialogClosedException e1) {
                     e1.printStackTrace();
                 } catch (DialogCanceledException e1) {
@@ -746,13 +645,11 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             }
         }));
         // bt.setRolloverEffectEnabled(true);
-
         menuPanel2.add(restart = new ExtButton(new AppAction() {
             {
                 setName("Restart");
                 setSmallIcon(new AbstractIcon(IconKey.ICON_RESTART, 18));
                 setTooltipText("Restart JDownloader to test the translation.");
-
             }
 
             @Override
@@ -764,7 +661,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             {
                 setName("Logout");
                 setSmallIcon(new AbstractIcon(IconKey.ICON_LOGOUT, 18));
-
             }
 
             @Override
@@ -775,7 +671,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                     } catch (InterruptedException e1) {
                         e1.printStackTrace();
                     }
-
                 } else {
                     try {
                         getExtension().doLogin();
@@ -783,20 +678,15 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                         e1.printStackTrace();
                     }
                 }
-
             }
         }));
-
         ti = new Timer(300, new ActionListener() {
-
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (getExtension().getLoadedLocale() != null && getExtension().getTranslationEntries() != null) {
                     int[] sel = table.getSelectedRows();
-
                     if (sel.length > 0) {
                         lbl.setText("Translation: " + getExtension().getLoadedLocale() + " - " + getExtension().getPercent() + "% translated (" + getExtension().getOK() + "/" + getExtension().getTranslationEntries().size() + ") " + "Selected: " + sel.length);
-
                     } else {
                         lbl.setText("Translation: " + getExtension().getLoadedLocale() + " - " + getExtension().getPercent() + "% translated (" + getExtension().getOK() + "/" + getExtension().getTranslationEntries().size() + ")");
                     }
@@ -806,12 +696,9 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             }
         });
         ti.setRepeats(true);
-
         // menubar.add(this.mnuView);
-
         // tableModel.setMarkDefaults(mnuViewMarkDef.getState());
         // tableModel.setMarkOK(mnuViewMarkOK.getState());
-
     }
 
     /**
@@ -835,7 +722,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     @Override
     protected void onActivated() {
         org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().finer("onActivated " + getClass().getSimpleName());
-
     }
 
     @Override
@@ -866,13 +752,11 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     protected void onShow() {
         ti.start();
         ShutdownController.getInstance().addShutdownVetoListener(this);
-
         org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().finer("Shown " + getClass().getSimpleName());
         if (getExtension().isLoggedIn()) {
             return;
         }
         ProgressGetter pg = new ProgressDialog.ProgressGetter() {
-
             @Override
             public void run() throws Exception {
                 try {
@@ -897,22 +781,18 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 return null;
             }
         };
-
         try {
             Dialog.getInstance().showDialog(new ProgressDialog(pg, UIOManager.BUTTONS_HIDE_CANCEL, "Login", "Please wait.", null, null, null) {
-
                 @Override
                 public Dimension getPreferredSize() {
                     return new Dimension(400, 100);
                 }
-
             });
         } catch (DialogClosedException e) {
             e.printStackTrace();
         } catch (DialogCanceledException e) {
             e.printStackTrace();
         }
-
     }
 
     /**
@@ -931,18 +811,14 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     }
 
     public void load(final TLocale locale) {
-
         ProgressGetter pg = new ProgressDialog.ProgressGetter() {
-
             @Override
             public void run() throws Exception {
                 try {
-
                     stopEditing(true);
                     if (getExtension().getLoadedLocale() != null) {
                         try {
                             if (getExtension().hasChanges()) {
-
                                 Dialog.I().showConfirmDialog(0, "Save " + getExtension().getLoadedLocale().getLocale().getDisplayName(), "Do you want to save your Changes on the " + getExtension().getLoadedLocale().getLocale().getDisplayName() + " Translation?");
                                 getExtension().write();
                             }
@@ -950,7 +826,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                             e.printStackTrace();
                         }
                     }
-
                     getExtension().load(locale, false, true);
                 } catch (SVNException e) {
                     Dialog.getInstance().showExceptionDialog("Error occured", "You got logged out", e);
@@ -975,31 +850,25 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 return null;
             }
         };
-
         try {
             Dialog.getInstance().showDialog(new ProgressDialog(pg, UIOManager.BUTTONS_HIDE_CANCEL, "Load Language", "Please wait. Loading " + locale, null, null, null) {
-
                 @Override
                 public Dimension getPreferredSize() {
                     return new Dimension(400, 100);
                 }
-
             });
         } catch (DialogClosedException e) {
             e.printStackTrace();
         } catch (DialogCanceledException e) {
             e.printStackTrace();
         }
-
     }
 
     public void refresh() {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 String desiredFont = getExtension().getFontname();
-
                 try {
                     if (desiredFont != null && !desiredFont.equals(de.javasoft.plaf.synthetica.SyntheticaLookAndFeel.getFontName())) {
                         // switch fontname. create ne table to use the new font
@@ -1011,7 +880,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 } catch (final Throwable e) {
                     LogController.CL().log(e);
                 }
-
                 tableModel.refresh(getExtension());
                 if (getExtension().getLoadedLocale() != null) {
                     restart.setEnabled(true);
@@ -1019,10 +887,8 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                 } else {
                     restart.setEnabled(false);
                 }
-
             }
         };
-
     }
 
     public void valueChanged(ListSelectionEvent e) {
@@ -1032,11 +898,9 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     @Override
     public void onLngRefresh(TranslatorExtensionEvent event) {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 refresh();
-
             }
         };
     }
@@ -1044,7 +908,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     @Override
     public void onLogInOrOut() {
         new EDTRunner() {
-
             @Override
             protected void runInEDT() {
                 if (!getExtension().isLoggedIn()) {
@@ -1056,10 +919,8 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                     restart.setEnabled(false);
                     wizard.setEnabled(false);
                     upload.setEnabled(false);
-
                 } else {
                     logout.setText("Logout");
-
                     load.setEnabled(true);
                     save.setEnabled(true);
                     revert.setEnabled(true);
@@ -1067,7 +928,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                     restart.setEnabled(true);
                     upload.setEnabled(true);
                 }
-
             }
         };
     }
@@ -1075,7 +935,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
     public void stopEditing(boolean requestStop) throws InterruptedException {
         if (requestStop) {
             new EDTRunner() {
-
                 @Override
                 protected void runInEDT() {
                     if (table.getCellEditor() != null) {
@@ -1083,14 +942,11 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
                     }
                 }
             };
-
         }
         stopEditing = true;
         try {
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().info("Wait for editstop");
-
             while (new EDTHelper<Boolean>() {
-
                 @Override
                 public Boolean edtRun() {
                     return table.isEditing();
@@ -1098,7 +954,6 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
             }.getReturnValue() || isWizard) {
                 Thread.sleep(10);
             }
-
         } finally {
             stopEditing = false;
             org.appwork.utils.logging2.extmanager.LoggerFactory.getDefaultLogger().info("Editing has stopped");
@@ -1118,12 +973,10 @@ public class TranslatorGui extends AddonPanel<TranslatorExtension> implements Li
         if (request.isSilent()) {
             throw new ShutdownVetoException("TranslatorGui is Active", this);
         }
-
     }
 
     @Override
     public long getShutdownVetoPriority() {
         return 0;
     }
-
 }

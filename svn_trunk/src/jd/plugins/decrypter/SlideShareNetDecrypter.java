@@ -15,14 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Random;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -32,39 +31,37 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
+import jd.plugins.hoster.DirectHTTP;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 47758 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:www|es|de|fr|pt)\\.)?slideshare\\.net/(?!search|business)[a-z0-9\\-_]+/[a-z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = { "slideshare.net" }, urls = { "https?://(?:(?:\\w+)\\.)?slideshare\\.net/(slideshow/[a-z0-9\\-]+/\\d+|[a-z0-9\\-_]+/[a-z0-9\\-_]+)" })
 public class SlideShareNetDecrypter extends PluginForDecrypt {
     public SlideShareNetDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
-    // This decrypter checks whether a document is downloadable or not. In case it's not, it will try to get the document in pictures.
-
-    private static final String NOTDOWNLOADABLE = "class=\"sprite iconNoDownload j\\-tooltip\"";
-    private static final String TYPE_INVALID    = "https?://(?:[a-z0-9]+\\.)?slideshare\\.net/(?:search|business).*?";
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        jd.plugins.hoster.SlideShareNet.prepBR(this.br);
-        final String parameter = param.toString().replaceAll("https?://(?:[a-z0-9]+\\.)?slideshare\\.net/", "https://www.slideshare.net/");
-        if (parameter.matches(TYPE_INVALID)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final DownloadLink mainlink = createDownloadlink(parameter.replace("slideshare.net/", "slidesharedecrypted.net/"));
-        String filename = null;
-        getUserLogin(false);
-        br.getPage(parameter);
+        jd.plugins.hoster.SlideShareNet.prepBR(br);
+        final String contenturl = param.getCryptedUrl().replaceAll("https?://(?:[a-z0-9]+\\.)?slideshare\\.net/", "https://www.slideshare.net/");
+        final PluginForHost hostplugin = this.getNewPluginForHostInstance(this.getHost());
+        final DownloadLink mainlink = createDownloadlink(contenturl);
+        mainlink.setDefaultPlugin(hostplugin);
+        mainlink.setHost(this.getHost());
+        String title = null;
+        final boolean isLoggedIN = getUserLogin(false);
+        br.getPage(contenturl);
         br.followRedirect();
-        if (jd.plugins.hoster.SlideShareNet.isOffline(this.br)) {
+        if (jd.plugins.hoster.SlideShareNet.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        if (this.br.containsHTML("class=\"profileHeader\"")) {
+        if (br.containsHTML("class=\"profileHeader\"")) {
+            // TODO: Check if this is still needed
             /* All documents/presentations/videos/info graphics of a user */
             int pagenum = 0;
             String next = null;
             do {
-                logger.info("Decrypting page: " + pagenum);
+                logger.info("Crawling page: " + pagenum);
                 if (this.isAbort()) {
                     logger.info("Decryption aborted by user");
                     return ret;
@@ -83,54 +80,45 @@ public class SlideShareNetDecrypter extends PluginForDecrypt {
                 next = this.br.getRegex("href=\"(/[^<>\"]*?\\d+)\" rel=\"next\"").getMatch(0);
                 pagenum++;
             } while (next != null);
-        } else {
-            /* Single url */
-            filename = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
-            if (filename != null) {
-                filename = Encoding.htmlDecode(filename.trim());
-            }
-            /* Only decrypt pictures if the document itself isn't officially downloadable */
-            if (br.containsHTML(NOTDOWNLOADABLE)) {
-                if (filename == null) {
-                    logger.warning("Decrypter broken for link: " + parameter);
-                }
-                final String[] links = br.getRegex("data\\-full=\"(https?://image\\.slidesharecdn\\.com/[^<>\"]*?)\"").getColumn(0);
-                if (links != null && links.length != 0) {
-                    final FilePackage fp = FilePackage.getInstance();
-                    fp.setName(filename + " (" + links.length + " pages)");
-                    int counter = 1;
-                    final DecimalFormat df = new DecimalFormat("0000");
-                    for (final String singleLink : links) {
-                        final String currentfilename = filename + "_" + df.format(counter) + ".jpg";
-                        final DownloadLink dl = createDownloadlink("http://slidesharepicturedecrypted.net/" + System.currentTimeMillis() + new Random().nextInt(1000000));
-                        dl.setProperty("directpiclink", singleLink);
-                        dl.setProperty("directname", currentfilename);
-                        dl.setFinalFileName(currentfilename);
-                        fp.add(dl);
-                        dl.setAvailable(true);
-                        ret.add(dl);
-                        counter++;
-                    }
-                }
+        }
+        /* Single url */
+        title = br.getRegex("<title>([^<>\"]*?)</title>").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title.trim());
+        }
+        if (title == null) {
+            /* Fallback */
+            title = br._getURL().getPath();
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(title);
+        final String[] htmls = br.getRegex("data-testid=\"vertical-slide-image\"([^<]+)").getColumn(0);
+        if (htmls != null && htmls.length > 0) {
+            for (final String html : htmls) {
+                final String[] qualities = new Regex(html, "\\d+w, (https?://[^ ]+)").getColumn(0);
+                /* Best quality version of each document page. */
+                final String bestQualityImageURL = qualities[qualities.length - 1];
+                final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(bestQualityImageURL));
+                dl.setAvailable(true);
+                dl._setFilePackage(fp);
+                ret.add(dl);
             }
         }
-        if (filename != null) {
-            mainlink.setName(filename);
+        if (ret.isEmpty() || isLoggedIN) {
+            mainlink.setName(title + ".pdf");
             mainlink.setAvailable(true);
+            ret.add(mainlink);
         }
-        ret.add(mainlink);
         return ret;
     }
 
-    /**
-     * JD2 CODE: DO NOIT USE OVERRIDE FÒR COMPATIBILITY REASONS!!!!!
-     */
+    @Override
     public boolean isProxyRotationEnabledForLinkCrawler() {
         return false;
     }
 
     private boolean getUserLogin(final boolean force) throws Exception {
-        final PluginForHost hostPlugin = JDUtilities.getPluginForHost("slideshare.net");
+        final PluginForHost hostPlugin = JDUtilities.getPluginForHost(this.getHost());
         final Account aa = AccountController.getInstance().getValidAccount(hostPlugin);
         if (aa == null) {
             logger.warning("There is no account available, stopping...");

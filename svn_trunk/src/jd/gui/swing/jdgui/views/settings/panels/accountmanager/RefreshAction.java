@@ -11,7 +11,10 @@ import jd.controlling.accountchecker.AccountChecker;
 import jd.plugins.Account;
 
 import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.swing.dialog.Dialog;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 
@@ -37,17 +40,20 @@ public class RefreshAction extends AbstractAction {
 
     public void actionPerformed(ActionEvent e) {
         if (!isEnabled()) {
+            /* Account was disabled -> Do nothing */
             return;
         }
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
+                boolean containedMultihosterAccount = false;
                 if (selection == null) {
                     for (Account acc : AccountController.getInstance().list()) {
                         if (acc == null || acc.isEnabled() == false || acc.isValid() == false || acc.isTempDisabled()) {
                             continue;
                         }
                         AccountChecker.getInstance().check(acc, true);
+                        containedMultihosterAccount |= acc.isMultiHost();
                     }
                 } else {
                     for (AccountEntry accEntry : selection) {
@@ -56,11 +62,19 @@ public class RefreshAction extends AbstractAction {
                             continue;
                         }
                         AccountChecker.getInstance().check(acc, true);
+                        containedMultihosterAccount |= acc.isMultiHost();
                     }
+                }
+                if (containedMultihosterAccount) {
+                    displayMultihosterDetailOverviewHelpDialog();
                 }
                 return null;
             }
         });
+    }
+
+    public static void displayMultihosterDetailOverviewHelpDialog() {
+        HelpDialog.showIfAllowed(new MessageConfig(null, "downloadtabe_sortwarner", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "Multihoster detail overview", "Click on the wrench symbol to get a more detailed overview of the supported hosts.\r\nThe detailed overview allows you to disable specific hosts, view host specific limits and, in case of problems, see the reason of failure.\r\nAlternatively, you can navigate to this information via Settings -> Plugins", new AbstractIcon(IconKey.ICON_SORT, 32)));
     }
 
     @Override

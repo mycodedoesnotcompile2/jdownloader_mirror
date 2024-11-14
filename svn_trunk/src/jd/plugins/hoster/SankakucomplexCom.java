@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -50,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50118 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50119 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,6 +96,7 @@ public class SankakucomplexCom extends PluginForHost {
     private static final String        PROPERTY_ACCOUNT_REFRESH_TOKEN        = "refresh_token";
     /* Don't touch the following! */
     private static final AtomicInteger freeRunning                           = new AtomicInteger(0);
+    private static final AtomicInteger premiumRunning                        = new AtomicInteger(0);
 
     @Override
     public String getAGBLink() {
@@ -176,16 +178,30 @@ public class SankakucomplexCom extends PluginForHost {
         link.setName(fileID + "." + assumedExt);
     }
 
+    public static boolean isValidPostID(final String str) {
+        if (StringUtils.isEmpty(str)) {
+            return false;
+        } else if (str.toLowerCase(Locale.ENGLISH).equals(str)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
     private AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         setWeakFilename(link);
         final String fileID = this.getFID(link);
         final String host = new URL(link.getPluginPatternMatcher()).getHost();
-        setDefaultCookies(br, host);
-        if (account != null) {
-            login(account, false);
+        if (!isValidPostID(fileID)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid postID");
         }
+        setDefaultCookies(br, host);
         final String contenturl = getPluginContentURL(link);
-        br.getPage(contenturl);
+        if (account != null) {
+            login(account, contenturl, true);
+        } else {
+            br.getPage(contenturl);
+        }
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML("<title>\\s*404: Page Not Found\\s*<")) {
@@ -241,7 +257,9 @@ public class SankakucomplexCom extends PluginForHost {
             if (filesizeBytesStr == null && !isDownload) {
                 /* Obtain file size from header */
                 try {
-                    basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, fileID, ext);
+                    final Browser brc = br.cloneBrowser();
+                    prepareDownloadHeaders(brc);
+                    basicLinkCheck(brc, br.createHeadRequest(dllink), link, fileID, ext);
                 } catch (final Exception e) {
                     logger.log(e);
                     logger.info("Final downloadurl did not lead to file -> File broken/unavailable serverside?");
@@ -365,23 +383,27 @@ public class SankakucomplexCom extends PluginForHost {
                 }
             }
         }
+        prepareDownloadHeaders(br);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, isResumeable(link, account), 1);
+        this.handleConnectionErrors(br, dl.getConnection());
+        /* Add a download slot */
+        controlMaxDownloads(account, link, +1);
+        try {
+            /* Start download */
+            dl.startDownload();
+        } finally {
+            /* Remove download slot */
+            controlMaxDownloads(account, link, -1);
+        }
+    }
+
+    private static void prepareDownloadHeaders(final Browser br) {
         /**
          * 2024-11-12: Do not send a referer header! </br>
          * This is really important else we may get redirected to a dummy image. Looks to be some kind of pseudo protection.
          */
         br.getHeaders().put("Referer", "");
         // br.setCurrentURL(null);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, isResumeable(link, account), 1);
-        this.handleConnectionErrors(br, dl.getConnection());
-        /* Add a download slot */
-        controlMaxFreeDownloads(account, link, +1);
-        try {
-            /* Start download */
-            dl.startDownload();
-        } finally {
-            /* Remove download slot */
-            controlMaxFreeDownloads(account, link, -1);
-        }
     }
 
     @Override
@@ -445,10 +467,16 @@ public class SankakucomplexCom extends PluginForHost {
     }
 
     public boolean login(final Account account, final boolean force) throws Exception {
+        return login(account, null, force);
+    }
+
+    public boolean login(final Account account, String logincheckurl, final boolean force) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
-            final String logincheckurl = "https://chan." + this.getHost() + "/en/users/home";
+            if (logincheckurl == null) {
+                logincheckurl = "https://chan." + this.getHost() + "/en/users/home";
+            }
             if (cookies != null) {
                 logger.info("Attempting cookie login");
                 br.setCookies(cookies);
@@ -506,7 +534,7 @@ public class SankakucomplexCom extends PluginForHost {
             br.postPage("/oidc/interaction/" + _grant + "/login", query);
             /* Double-check */
             br.getPage(logincheckurl);
-            if (!this.isLoggedin(br)) {
+            if (!isLoggedin(br)) {
                 throw new AccountInvalidException("Unknown login failure");
             }
             account.saveCookies(br.getCookies(br.getHost()), "");
@@ -542,23 +570,27 @@ public class SankakucomplexCom extends PluginForHost {
         handleDownload(link, account);
     }
 
-    protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
+    protected void controlMaxDownloads(final Account account, final DownloadLink link, final int num) {
         if (account != null) {
-            /* Do nothing */
-            return;
-        }
-        synchronized (freeRunning) {
-            final int before = freeRunning.get();
-            final int after = before + num;
-            freeRunning.set(after);
-            logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
+            synchronized (premiumRunning) {
+                final int before = premiumRunning.get();
+                final int after = before + num;
+                premiumRunning.set(after);
+                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanPremiumDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
+            }
+        } else {
+            synchronized (freeRunning) {
+                final int before = freeRunning.get();
+                final int after = before + num;
+                freeRunning.set(after);
+                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
+            }
         }
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        /* Max 1 to avoid IP blocks/rate-limit. */
-        return 1;
+        return premiumRunning.get() + 1;
     }
 
     @Override

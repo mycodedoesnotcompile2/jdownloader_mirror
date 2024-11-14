@@ -10,6 +10,8 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.config.MetartConfig;
@@ -34,11 +36,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50133 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("http://signup.met-art.com/model.htm?from=homepage");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -117,7 +126,7 @@ public class MetArtCom extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        /* Freedownloads are not possible! */
+        /* Free downloads are not possible! */
         throw new AccountRequiredException();
     }
 
@@ -129,6 +138,7 @@ public class MetArtCom extends PluginForHost {
     public void resetDownloadlink(final DownloadLink link) {
     }
 
+    @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         if (account == null) {
             return false;
@@ -144,61 +154,78 @@ public class MetArtCom extends PluginForHost {
         this.login(account, true);
         if (br.getURL() == null || !br.getURL().contains("/api/user-data")) {
             br.getPage("https://www." + account.getHoster() + "/api/user-data");
-            getSetAccountTypeSimple(account);
+            getSetAccountTypeSimple(account, ai);
         }
-        if (account.getType() == AccountType.PREMIUM) {
+        findMoreInformation: if (account.getType() == AccountType.PREMIUM) {
             /* Try to find the expire-date the hard way... */
+            final Cookies requiredCookies = account.loadCookies(COOKIES_METARTNETWORK);
+            if (requiredCookies == null || requiredCookies.isEmpty()) {
+                /* E.g. if user used cookie login method we won't have these cookies! */
+                logger.warning("Failed to find detailed account information because: Required cookies are missing");
+                break findMoreInformation;
+            }
             try {
-                final Cookies requiredCookies = account.loadCookies(COOKIES_METARTNETWORK);
-                if (requiredCookies == null || requiredCookies.isEmpty()) {
-                    /* E.g. if user used cookie login method we won't have these cookies! */
-                    logger.warning("Failed to find detailed account information because: Required cookies are missing");
-                } else {
-                    final Browser brc = br.cloneBrowser();
-                    brc.setCookies(requiredCookies);
-                    /* Not required but maybe useful in the future */
-                    // final String metartnetworkAppdataURL = "https://account-new.metartnetwork.com/api/app-data";
-                    // brc.getPage(metartnetworkAppdataURL);
-                    // final Map<String, Object> entries = restoreFromString(brc.toString(), TypeRef.MAP);
-                    // String thisMetartSiteUUID = null;
-                    // final List<Map<String, Object>> metartSites = (List<Map<String, Object>>) entries.get("sites");
-                    // for (final Map<String, Object> metartSite : metartSites) {
-                    // final String domain = metartSite.get("domain").toString();
-                    // if (domain.equalsIgnoreCase(this.getHost())) {
-                    // thisMetartSiteUUID = metartSite.get("UUID").toString();
-                    // break;
-                    // }
-                    // }
-                    final String metartnetworkSubscriptionsURL = "https://account-new.metartnetwork.com/api/subscriptions";
-                    brc.getPage(metartnetworkSubscriptionsURL);
-                    final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) restoreFromString(brc.toString(), TypeRef.OBJECT);
-                    long highestExpireDate = -1;
-                    for (final Map<String, Object> subscription : subscriptions) {
-                        final String expireDateStr = subscription.get("expireDate").toString();
-                        final long expireDateTimestamp = TimeFormatter.getMilliSeconds(expireDateStr, "yyyy-MM-dd'T'HH:mm:ss'.000Z'", Locale.ENGLISH);
-                        if (expireDateTimestamp > highestExpireDate) {
-                            highestExpireDate = expireDateTimestamp;
-                        }
-                    }
-                    ai.setValidUntil(highestExpireDate);
-                    ai.setStatus(account.getType().getLabel() + " | Packages: " + subscriptions.size());
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
+                final Browser brc = br.cloneBrowser();
+                brc.setCookies(requiredCookies);
+                /* Not required but maybe useful in the future */
+                // final String metartnetworkAppdataURL = "https://account-new.metartnetwork.com/api/app-data";
+                // brc.getPage(metartnetworkAppdataURL);
+                // final Map<String, Object> entries = restoreFromString(brc.toString(), TypeRef.MAP);
+                // String thisMetartSiteUUID = null;
+                // final List<Map<String, Object>> metartSites = (List<Map<String, Object>>) entries.get("sites");
+                // for (final Map<String, Object> metartSite : metartSites) {
+                // final String domain = metartSite.get("domain").toString();
+                // if (domain.equalsIgnoreCase(this.getHost())) {
+                // thisMetartSiteUUID = metartSite.get("UUID").toString();
+                // break;
+                // }
+                // }
+                final String metartnetworkSubscriptionsURL = "https://account-new.metartnetwork.com/api/subscriptions";
+                brc.getPage(metartnetworkSubscriptionsURL);
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) entries.get("subscriptions");
+                processSubscriptions(account, ai, subscriptions);
+            } catch (final Throwable ignore) {
+                logger.log(ignore);
                 logger.info("Failed to find detailed account information because: Exception occured");
             }
         }
         return ai;
     }
 
-    private void getSetAccountTypeSimple(final Account account) {
+    private void processSubscriptions(final Account account, final AccountInfo ai, final List<Map<String, Object>> subscriptions) {
+        long highestExpireDate = -1;
+        int numberofLifetimeSubscriptions = 0;
+        for (final Map<String, Object> subscription : subscriptions) {
+            final String expireDateStr = subscription.get("expireDate").toString();
+            final long expireDateTimestamp = TimeFormatter.getMilliSeconds(expireDateStr, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+            if (expireDateTimestamp > highestExpireDate) {
+                highestExpireDate = expireDateTimestamp;
+            }
+            if (Boolean.TRUE.equals(subscription.get("isLifetime"))) {
+                numberofLifetimeSubscriptions += 1;
+            }
+        }
+        if (numberofLifetimeSubscriptions == subscriptions.size()) {
+            logger.info("All subscriptions are lifetime subscriptions -> Account is a lifetime premium account");
+            account.setType(AccountType.LIFETIME);
+        } else {
+            ai.setValidUntil(highestExpireDate);
+        }
+        ai.setStatus(account.getType().getLabel() + " | Packages: " + subscriptions.size());
+    }
+
+    private void getSetAccountTypeSimple(final Account account, final AccountInfo ai) {
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("initialState");
         entries = (Map<String, Object>) entries.get("auth");
         entries = (Map<String, Object>) entries.get("user");
-        final boolean isPremium = ((Boolean) entries.get("validSubscription")).booleanValue();
-        if (isPremium) {
+        if (Boolean.TRUE.equals(entries.get("validSubscription"))) {
             account.setType(AccountType.PREMIUM);
+            final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) entries.get("subscriptions");
+            if (subscriptions != null && ai != null) {
+                processSubscriptions(account, ai, subscriptions);
+            }
         } else {
             account.setType(AccountType.FREE);
         }
@@ -210,7 +237,6 @@ public class MetArtCom extends PluginForHost {
     }
 
     public void login(final Account account, final boolean verifyCredentials) throws Exception {
-        br.setFollowRedirects(true);
         final Cookies cookies = account.loadCookies("");
         /* User cookie login is possible as an alternative way to login */
         final Cookies userCookies = account.loadUserCookies();
@@ -227,25 +253,24 @@ public class MetArtCom extends PluginForHost {
             if (!verifyCredentials) {
                 /* Do not verify credentials. */
                 return;
-            } else {
-                br.getPage("https://www." + this.getHost() + "/api/user-data");
-                try {
-                    getSetAccountTypeSimple(account);
-                    logger.info("Cookie login successful");
-                    account.saveCookies(br.getCookies(br.getHost()), "");
-                    return;
-                } catch (final Throwable e) {
-                    /* Not logged in = Different json -> Exception */
-                    logger.info("Cookie login failed");
-                    if (userCookies != null) {
-                        if (account.hasEverBeenValid()) {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                        } else {
-                            throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                        }
+            }
+            br.getPage("https://www." + this.getHost() + "/api/user-data");
+            try {
+                getSetAccountTypeSimple(account, account.getAccountInfo());
+                logger.info("Cookie login successful");
+                account.saveCookies(br.getCookies(br.getHost()), "");
+                return;
+            } catch (final Throwable e) {
+                /* Not logged in = Different json -> Exception */
+                logger.info("Cookie login failed");
+                if (userCookies != null) {
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
-                    br.clearAll();
                 }
+                br.clearAll();
             }
         }
         logger.info("Performing full login");
@@ -320,8 +345,28 @@ public class MetArtCom extends PluginForHost {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         this.setBrowserExclusive();
         this.login(account, false);
-        br.setFollowRedirects(true);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), true, 0);
+        String directurl = link.getPluginPatternMatcher();
+        /* Access main page to find out if a captcha is required for downloading. */
+        br.getPage("https://www." + getHost());
+        if (br.containsHTML("\"enableReCaptchaDownload\":true")) {
+            final String rcKey = br.getRegex("\"googleReCaptchaEnterprise\":\\{\"key\":\"([^\"]+)").getMatch(0);
+            if (rcKey == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, rcKey) {
+                protected boolean isEnterprise(final String source) {
+                    return true;
+                }
+
+                protected TYPE getType(String source) {
+                    return TYPE.INVISIBLE;
+                }
+            }.getToken();
+            final UrlQuery query = UrlQuery.parse(directurl);
+            query.addAndReplace("recaptchaToken", Encoding.urlEncode(recaptchaV2Response));
+            directurl = URLHelper.getUrlWithoutParams(directurl) + "?" + query.toString();
+        }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, directurl, true, 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 401) {
@@ -330,7 +375,23 @@ public class MetArtCom extends PluginForHost {
                 /* Should never happen as their URLs are static */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             } else {
-                /* Should never happen */
+                /* Check for json response with error */
+                Map<String, Object> entries = null;
+                try {
+                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                } catch (final Throwable ignore) {
+                }
+                if (entries != null) {
+                    final String errorprefix = "API error: ";
+                    final String error = (String) entries.get("error");
+                    if (error != null) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorprefix + error);
+                    }
+                    final List<String> errorcodes = (List<String>) entries.get("error-codes");
+                    if (errorcodes != null && errorcodes.size() > 0) {
+                        throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errorprefix + errorcodes.get(0));
+                    }
+                }
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Directurl expired or media content is broken");
             }
         }

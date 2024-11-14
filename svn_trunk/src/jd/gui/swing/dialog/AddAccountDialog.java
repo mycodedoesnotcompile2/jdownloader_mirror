@@ -46,17 +46,6 @@ import javax.swing.KeyStroke;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.gui.UserIO;
-import jd.gui.swing.jdgui.JDGui;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountError;
-import jd.plugins.AccountInfo;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.components.ExtTextField;
 import org.appwork.utils.StringUtils;
@@ -85,6 +74,18 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.translate._JDT;
+
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.gui.UserIO;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountError;
+import jd.plugins.AccountInfo;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
 
 public class AddAccountDialog extends AbstractDialog<Integer> implements InputChangedCallbackInterface {
     public static void showDialog(final PluginForHost pluginForHost, Account acc) {
@@ -155,19 +156,22 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
                 Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_invalid(errorMessage));
                 return false;
             }
-        } else {
-            String message = null;
-            final AccountInfo ai = ac.getAccountInfo();
-            if (ai != null) {
-                message = ai.getStatus();
-            }
-            if (StringUtils.isEmpty(message)) {
-                message = _GUI.T.lit_yes();
-            }
-            Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_valid(message));
-            AccountController.getInstance().addAccount(ac, false);
-            return true;
         }
+        /* Success */
+        String message = null;
+        final AccountInfo ai = ac.getAccountInfo();
+        if (ai != null) {
+            message = ai.getStatus();
+        }
+        if (StringUtils.isEmpty(message)) {
+            message = _GUI.T.lit_yes();
+        }
+        Dialog.getInstance().showMessageDialog(_GUI.T.accountdialog_check_valid(message));
+        AccountController.getInstance().addAccount(ac, false);
+        if (ac.isMultiHost()) {
+            RefreshAction.displayMultihosterDetailOverviewHelpDialog();
+        }
+        return true;
     }
 
     public static ProgressDialog checkAccount(final Account ac) throws Throwable {
@@ -338,27 +342,27 @@ public class AddAccountDialog extends AbstractDialog<Integer> implements InputCh
         };
         filter.getDocument().addDocumentListener(new DocumentListener() {
             private DelayedRunnable delayedRefresh = new DelayedRunnable(200, 1000) {
-                                                       String lastText = null;
+                String lastText = null;
 
-                                                       @Override
-                                                       public String getID() {
-                                                           return "AddAccountDialog";
-                                                       }
+                @Override
+                public String getID() {
+                    return "AddAccountDialog";
+                }
 
-                                                       @Override
-                                                       public void delayedrun() {
-                                                           new EDTRunner() {
-                                                               @Override
-                                                               protected void runInEDT() {
-                                                                   final String text = filter.getText();
-                                                                   if (!StringUtils.equals(lastText, text)) {
-                                                                       lastText = text;
-                                                                       hoster.refresh(text);
-                                                                   }
-                                                               }
-                                                           }.waitForEDT();
-                                                       }
-                                                   };
+                @Override
+                public void delayedrun() {
+                    new EDTRunner() {
+                        @Override
+                        protected void runInEDT() {
+                            final String text = filter.getText();
+                            if (!StringUtils.equals(lastText, text)) {
+                                lastText = text;
+                                hoster.refresh(text);
+                            }
+                        }
+                    }.waitForEDT();
+                }
+            };
 
             @Override
             public void removeUpdate(DocumentEvent e) {

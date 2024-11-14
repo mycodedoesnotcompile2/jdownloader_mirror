@@ -22,8 +22,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.JTableHeader;
 import javax.swing.text.BadLocationException;
 
-import jd.nutils.encoding.Encoding;
-
 import org.appwork.swing.components.tooltips.ToolTipController;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtDefaultRowSorter;
@@ -37,9 +35,11 @@ import org.jdownloader.extensions.translator.TranslateEntry;
 import org.jdownloader.extensions.translator.TranslatorExtension;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.helpdialogs.HelpDialog;
+import org.jdownloader.gui.helpdialogs.MessageConfig;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+import jd.nutils.encoding.Encoding;
 
 /**
  * The Tablemodel defines all columns and renderers
@@ -48,7 +48,6 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
  *
  */
 public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
-
     private ExtTextColumn<TranslateEntry> editColum;
     private List<Pattern>                 filter;
     private TranslatorExtension           extension;
@@ -57,19 +56,15 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
         // this is is used to store table states(sort,column positions,
         // properties)
         super("TranslateTableModel");
-
         this.extension = translatorExtension;
     }
 
     @Override
     protected void initColumns() {
         // we init and add all columns here.
-
         addColumn(new ExtIconColumn<TranslateEntry>("Status") {
-
             {
                 setRowSorter(new ExtDefaultRowSorter<TranslateEntry>() {
-
                     public int getPriority(TranslateEntry e) {
                         int p = 100;
                         if (e.isParameterInvalid()) {
@@ -84,7 +79,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
 
                     @Override
                     public int compare(final TranslateEntry o1, final TranslateEntry o2) {
-
                         final int w1 = getPriority(o1);
                         final int w2 = getPriority(o2);
                         if (w1 == w2) {
@@ -96,15 +90,11 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                             return w2 > w1 ? -1 : 1;
                         }
                     }
-
                 });
-
             }
 
             public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-
                 final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-
                     private static final long serialVersionUID = 3224931991570756349L;
                     final Icon                icon             = NewTheme.I().getIcon(IconKey.ICON_INFO, 16);
 
@@ -116,15 +106,12 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                         setText(null);
                         return this;
                     }
-
                 };
-
                 return ret;
             }
 
             @Override
             public int getDefaultWidth() {
-
                 return 28;
             }
 
@@ -147,7 +134,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 };
                 tt.setTipText(createInfoHtml(obj));
                 ToolTipController.getInstance().show(tt);
-
                 return true;
             }
 
@@ -157,7 +143,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                     return new AbstractIcon(IconKey.ICON_STOP, 16);
                 } else if (obj.isParameterInvalid()) {
                     return new AbstractIcon(IconKey.ICON_ERROR, 16);
-
                 } else {
                     return new AbstractIcon(IconKey.ICON_OK, 16);
                 }
@@ -167,9 +152,7 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
             protected String getTooltipText(TranslateEntry value) {
                 return createInfoHtml(value);
             }
-
         });
-
         addColumn(new ExtTextColumn<TranslateEntry>("Category") {
             @Override
             public int getDefaultWidth() {
@@ -201,7 +184,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 return value.getCategory();
             }
         });
-
         addColumn(new ExtTextColumn<TranslateEntry>("Key") {
             {
                 editorField.setEditable(false);
@@ -279,28 +261,23 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 return value.getDefault();
             }
         });
-
         addColumn(editColum = new ExtTextColumn<TranslateEntry>("Translation") {
             {
                 final JTextField ttx = editorField;
                 editorField.setBorder(new JTextField().getBorder());
                 InputMap input = ttx.getInputMap();
                 KeyStroke enter = KeyStroke.getKeyStroke("ENTER");
-
                 input.put(enter, "TEXT_SUBMIT");
                 ttx.setFocusTraversalKeysEnabled(false);
-
                 input.put(KeyStroke.getKeyStroke("shift ENTER"), "STOP_EDIT");
                 input.put(KeyStroke.getKeyStroke("ctrl ENTER"), "STOP_EDIT");
                 ActionMap actions = ttx.getActionMap();
                 actions.put("STOP_EDIT", new AbstractAction() {
-
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         getTable().getCellEditor().stopCellEditing();
                     }
                 });
-
                 actions.put("TEXT_SUBMIT", new AbstractAction() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
@@ -308,19 +285,14 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                         try {
                             Point point = ttx.getCaret().getMagicCaretPosition();
                             SwingUtilities.convertPointToScreen(point, ttx);
-
                             ttx.getDocument().insertString(ttx.getCaretPosition(), "\\r\\n", null);
-                            if (CFG_GUI.CFG.isHelpDialogsEnabled()) {
-                                HelpDialog.show(point, "TRANSLETOR_USE_NEWLINE2", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "NewLine", "Press <Enter> to insert a Newline (\\r\\n). Press <CTRL ENTER> to Confirm  translation. Press <TAB> to confirm and move to next line.", new AbstractIcon(IconKey.ICON_HELP, 32));
-                            }
+                            HelpDialog.showIfAllowed(new MessageConfig(point, "TRANSLETOR_USE_NEWLINE2", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "NewLine", "Press <Enter> to insert a Newline (\\r\\n). Press <CTRL ENTER> to Confirm translation. Press <TAB> to confirm and move to next line.", new AbstractIcon(IconKey.ICON_HELP, 32)));
                         } catch (BadLocationException e1) {
                             e1.printStackTrace();
                         }
                     }
                 });
-
             }
-
             private Color errorColor   = Color.RED;
             private Color warningColor = Color.BLUE;
             private Color defaultColor = Color.GRAY;
@@ -358,7 +330,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
             @Override
             public JComponent getEditorComponent(TranslateEntry value, boolean isSelected, int row, int column) {
                 JComponent ret = super.getEditorComponent(value, isSelected, row, column);
-
                 return ret;
             }
 
@@ -370,7 +341,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
             @Override
             public void configureRendererComponent(TranslateEntry value, boolean isSelected, boolean hasFocus, int row, int column) {
                 super.configureRendererComponent(value, isSelected, hasFocus, row, column);
-
             }
 
             public void configureEditorComponent(final TranslateEntry value, final boolean isSelected, final int row, final int column) {
@@ -378,12 +348,10 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 if (value.isMissing()) {
                     editorField.setText("");
                 }
-
             }
 
             @Override
             protected String getTooltipText(TranslateEntry value) {
-
                 return null;
             }
 
@@ -395,7 +363,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 return value.getTranslation();
             }
         });
-
     }
 
     public ExtTextColumn<TranslateEntry> getEditColum() {
@@ -405,23 +372,19 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
     protected String createInfoHtml(TranslateEntry value) {
         String ret = "<html><style>td.a{font-style:italic;}</style><table valign=top>";
         ret += "<tr><td class=a>Key:</td><td>" + value.getKey() + "</td></tr>";
-
         ret += "<tr><td class=a>Location:</td><td>" + value.getFullKey() + "</td></tr>";
         ret += "<tr><td class=a>Source:</td><td>" + value.getSource() + "</td></tr>";
         ret += "<tr><td class=a>Default:</td><td>" + Encoding.cdataEncode(value.getDefault()) + "</td></tr>";
         ret += "<tr><td class=a>Translation:</td><td>" + Encoding.cdataEncode(value.getTranslation()) + "</td></tr>";
         if (value.isMissing()) {
             ret += "<tr><td class=a><span style='color:#ff0000' >Error:</span></td><td class=a><span style='color:#ff0000' >Not translated yet</span></td></tr>";
-
         }
         if (value.isDefault()) {
             ret += "<tr><td class=a><font color='#339900' >Warning:</span></td><td class=a><font color='#339900' >The translation equals the english default language.</span></td></tr>";
         }
-
         if (value.isParameterInvalid()) {
             ret += "<tr><td class=a><span style='color:#ff0000' >Error:</span></td><td class=a><span style='color:#ff0000' >Parameter Wildcards (%s*) do not match.</span></td></tr>";
         }
-
         Type[] parameters = value.getParameters();
         ret += "<tr><td class=a>Parameters:</td>";
         if (parameters.length == 0) {
@@ -436,7 +399,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
             ret += "</td>";
             ret += "</tr>";
         }
-
         System.out.println(ret);
         return ret + "</table></html>";
     }
@@ -455,7 +417,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
     }
 
     public void _fireTableStructureChanged(java.util.List<TranslateEntry> newtableData, final boolean refreshSort) {
-
         java.util.List<TranslateEntry> lst = new ArrayList<TranslateEntry>();
         if (newtableData != null) {
             for (TranslateEntry e : newtableData) {
@@ -468,7 +429,6 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                         lst.add(e);
                         break;
                     }
-
                     if (p.matcher(e.getKey()).find()) {
                         lst.add(e);
                         break;
@@ -484,15 +444,11 @@ public class TranslateTableModel extends ExtTableModel<TranslateEntry> {
                 }
             }
         }
-
         super._fireTableStructureChanged(lst, refreshSort);
-
     }
 
     public void updateFilter(TranslatorSearchField searchField) {
         this.filter = searchField.filterPatterns;
-
         _fireTableStructureChanged(extension.getTranslationEntries(), true);
     }
-
 }

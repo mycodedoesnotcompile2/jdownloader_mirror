@@ -29,6 +29,7 @@ import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
 import jd.controlling.accountchecker.AccountChecker;
@@ -46,6 +47,8 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountProperty;
 import jd.plugins.AccountUnavailableException;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginForHost;
 
 import org.appwork.scheduler.DelayedRunnable;
@@ -83,7 +86,7 @@ import org.jdownloader.settings.AccountSettings;
 public class AccountController implements AccountControllerListener, AccountPropertyChangeHandler {
     private static final long                                                    serialVersionUID = -7560087582989096645L;
     private final HashMap<String, List<Account>>                                 ACCOUNTS;
-    private final HashMap<String, List<Account>>                                 MULTIHOSTER_ACCOUNTS;
+    private final HashMap<String, Map<Account, Object>>                          MULTIHOSTER_ACCOUNTS;
     private static AccountController                                             INSTANCE         = new AccountController();
     private final Eventsender<AccountControllerListener, AccountControllerEvent> broadcaster      = new Eventsender<AccountControllerListener, AccountControllerEvent>() {
         @Override
@@ -122,7 +125,7 @@ public class AccountController implements AccountControllerListener, AccountProp
             }
         });
         ACCOUNTS = loadAccounts(config);
-        MULTIHOSTER_ACCOUNTS = new HashMap<String, List<Account>>();
+        MULTIHOSTER_ACCOUNTS = new HashMap<String, Map<Account, Object>>();
         delayedSaver = new DelayedRunnable(5000, 30000) {
             @Override
             public String getID() {
@@ -208,27 +211,35 @@ public class AccountController implements AccountControllerListener, AccountProp
 
     private void updateInternalMultiHosterMap(Account account, AccountInfo ai) {
         synchronized (AccountController.this) {
-            Iterator<Entry<String, List<Account>>> it = MULTIHOSTER_ACCOUNTS.entrySet().iterator();
+            Iterator<Entry<String, Map<Account, Object>>> it = MULTIHOSTER_ACCOUNTS.entrySet().iterator();
             while (it.hasNext()) {
-                Entry<String, List<Account>> next = it.next();
-                List<Account> accs = next.getValue();
-                if (accs.remove(account) && accs.size() == 0) {
+                final Entry<String, Map<Account, Object>> next = it.next();
+                final Map<Account, Object> accs = next.getValue();
+                if (accs.remove(account) != null && accs.size() == 0) {
                     it.remove();
                 }
             }
             boolean isMulti = false;
             if (ai != null) {
-                final List<String> multiHostSupport = ai.getMultiHostSupport();
+                final List<MultiHostHost> multiHostSupport = ai.getMultiHostSupportV2();
                 if (multiHostSupport != null) {
-                    isMulti = true;
-                    for (String support : multiHostSupport) {
-                        String host = support.toLowerCase(Locale.ENGLISH);
-                        List<Account> accs = MULTIHOSTER_ACCOUNTS.get(host);
+                    for (MultiHostHost support : multiHostSupport) {
+                        final MultihosterHostStatus status = support.getStatus();
+                        switch (status) {
+                        case WORKING:
+                        case WORKING_UNSTABLE:
+                            break;
+                        default:
+                            continue;
+                        }
+                        isMulti = true;
+                        final String host = support.getDomain();
+                        Map<Account, Object> accs = MULTIHOSTER_ACCOUNTS.get(host);
                         if (accs == null) {
-                            accs = new ArrayList<Account>();
+                            accs = new WeakHashMap<Account, Object>();
                             MULTIHOSTER_ACCOUNTS.put(host, accs);
                         }
-                        accs.add(account);
+                        accs.put(account, this);
                     }
                 }
             }
@@ -874,9 +885,9 @@ public class AccountController implements AccountControllerListener, AccountProp
             return null;
         }
         synchronized (AccountController.this) {
-            final List<Account> list = MULTIHOSTER_ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
+            final Map<Account, Object> list = MULTIHOSTER_ACCOUNTS.get(host.toLowerCase(Locale.ENGLISH));
             if (list != null && list.size() > 0) {
-                return new ArrayList<Account>(list);
+                return new ArrayList<Account>(list.keySet());
             }
         }
         return null;

@@ -26,19 +26,6 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.appwork.storage.flexijson.FlexiJSONParser;
-import org.appwork.storage.flexijson.FlexiJSonNode;
-import org.appwork.storage.flexijson.FlexiUtils;
-import org.appwork.storage.flexijson.ParsingError;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
-import org.appwork.utils.CompareUtils;
-import org.appwork.utils.ConcatIterator;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -68,7 +55,20 @@ import jd.plugins.components.gopro.SearchResponse;
 import jd.plugins.components.gopro.Variation;
 import jd.plugins.hoster.GoProCloud;
 
-@DecrypterPlugin(revision = "$Revision: 50049 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
+import org.appwork.storage.flexijson.FlexiJSONParser;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiUtils;
+import org.appwork.storage.flexijson.ParsingError;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
+import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
+import org.appwork.utils.CompareUtils;
+import org.appwork.utils.ConcatIterator;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50127 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
 @PluginDependencies(dependencies = { GoProCloud.class })
 public class GoProCloudDecrypter extends antiDDoSForDecrypt {
     private GoProConfig hostConfig;
@@ -402,18 +402,34 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
                             decryptedLinks.add(link);
                         }
                     } else {
-                        final DownloadLink link = createDownloadlink("https://gopro.com/download" + access + "/" + id + "/source");
-                        link.setLinkID(jd.plugins.hoster.GoProCloud.createLinkID(link, null));
-                        setContentUrl(cryptedLink, id, access, link);
-                        GoProCloud.setCache(link, responseMedia != null ? responseMedia.jsonString : null, null);
-                        link.setAvailable(false);
-                        GoProCloud.setFinalFileName(this, hostConfig, media, link, null);
-                        fp.add(link);
-                        link.setAvailable(true);
-                        link.setDownloadSize(media.getFile_size());
-                        decryptedLinks.add(link);
+                        if (media.getItem_count() == 1) {
+                            final DownloadLink link = createDownloadlink("https://gopro.com/download" + access + "/" + id + "/source");
+                            link.setLinkID(jd.plugins.hoster.GoProCloud.createLinkID(link, null));
+                            setContentUrl(cryptedLink, id, access, link);
+                            GoProCloud.setCache(link, responseMedia != null ? responseMedia.jsonString : null, null);
+                            GoProCloud.setFinalFileName(this, hostConfig, media, link, null);
+                            fp.add(link);
+                            link.setAvailable(true);
+                            link.setDownloadSize(media.getFile_size());
+                            decryptedLinks.add(link);
+                        } else {
+                            for (int partIndex = 1; partIndex <= media.getItem_count(); partIndex++) {
+                                final DownloadLink link = createDownloadlink("https://gopro.com/download" + access + "/" + id + "/source/part_" + partIndex);
+                                link.setProperty(GoProCloud.PROPERTY_PART_INDEX, partIndex);
+                                link.setLinkID(jd.plugins.hoster.GoProCloud.createLinkID(link, null));
+                                setContentUrl(cryptedLink, id, access, link);
+                                GoProCloud.setCache(link, responseMedia != null ? responseMedia.jsonString : null, null);
+                                GoProCloud.setFinalFileName(this, hostConfig, media, link, null);
+                                fp.add(link);
+                                link.setAvailable(true);
+                                decryptedLinks.add(link);
+                            }
+                        }
                     }
                 } else if ("Photo".equals(media.getType())) {
+                    if (media.getItem_count() > 1) {
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    }
                     final DownloadLink link = createDownloadlink("https://gopro.com/download" + access + "/" + id + "/source");
                     link.setLinkID(jd.plugins.hoster.GoProCloud.createLinkID(link, null));
                     setContentUrl(cryptedLink, id, access, link);

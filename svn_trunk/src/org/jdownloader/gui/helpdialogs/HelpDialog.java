@@ -24,6 +24,14 @@ import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.RestartController;
 
 public class HelpDialog {
+    public static void showIfAllowed(final MessageConfig config) {
+        if (!CFG_GUI.CFG.isHelpDialogsEnabled()) {
+            /* Do not show dialog */
+            return;
+        }
+        show(config.getPoint(), config.getDontShowAgainKey(), config.getFlags(), config.getTitle(), config.getMsg(), config.getIcon());
+    }
+
     public static void show(final Point point, final String dontShowAgainKey, int flags, String title, String msg, Icon icon) {
         show(null, null, point, dontShowAgainKey, flags, title, msg, icon);
     }
@@ -46,7 +54,7 @@ public class HelpDialog {
             }
         }
         try {
-            ConfirmDialog d = new ConfirmDialog(flags | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, title, _GUI.T.literall_usage_tipp() + "\r\n\r\n..." + msg, icon, null, null) {
+            final ConfirmDialog d = new ConfirmDialog(flags | UIOManager.BUTTONS_HIDE_CANCEL | Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, title, _GUI.T.literall_usage_tipp() + "\r\n\r\n..." + msg, icon, null, null) {
                 {
                     if (point != null) {
                         setLocator(new DialogLocator() {

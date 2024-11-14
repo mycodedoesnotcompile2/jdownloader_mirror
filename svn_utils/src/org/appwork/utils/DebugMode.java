@@ -115,6 +115,14 @@ public class DebugMode {
         if (!TRUE_IN_IDE_ELSE_FALSE || !breakIf || "true".equalsIgnoreCase(System.getProperty("NO_DEBUG"))) {
             return;
         }
+        try {
+            if (!java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString().contains("-agentlib:jdwp")) {
+                // not in debug mode
+                return;
+            }
+        } catch (Exception e) {
+            // nothing
+        }
         long t = Time.systemIndependentCurrentJVMTimeMillis();
         System.err.println("BREAKPOINT");
         if (Time.systemIndependentCurrentJVMTimeMillis() - t < 20) {
