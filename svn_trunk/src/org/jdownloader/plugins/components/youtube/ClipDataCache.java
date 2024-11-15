@@ -60,10 +60,11 @@ public class ClipDataCache {
         try {
             helper.setPlaylistID(playListID);
             ret = get(helper, new YoutubeClipData(videoID));
+            ret.clipData.copyToDownloadLink(downloadLink);
         } finally {
             helper.setPlaylistID(previousPlayListID);
         }
-        ret.clipData.copyToDownloadLink(downloadLink);
+
         // put a reference to the link. if we remove all links with the ref, the cache will cleanup it self
         downloadLink.getTempProperties().setProperty("CLIP_DATA_REFERENCE", ret);
         return ret.clipData;

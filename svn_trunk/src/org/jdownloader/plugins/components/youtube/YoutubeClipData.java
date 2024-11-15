@@ -39,14 +39,10 @@ public class YoutubeClipData {
     public String                             channelTitle             = null;
     public String                             channelTitle_alternative = null;
     public int                                channelSize              = -1;
-    public String                             playlistID               = null;
-    public String                             playlistTitle            = null;
-    public String                             playlistCreator          = null;
-    public int                                playlistSize             = -1;
-    public String                             playlistDescription      = null;
+
     public String                             videoID                  = null;
     public String                             atID                     = null;
-    public int                                playlistEntryNumber      = -1;
+
     public String                             category                 = null;
     public int                                duration                 = -1;
     public String                             chapters                 = null;
@@ -63,10 +59,6 @@ public class YoutubeClipData {
     public HashSet<String>                    keywords;
     public String                             approxThreedLayout       = null;
     public String                             views                    = null;
-
-    public YoutubeClipData(final String videoID) {
-        this(videoID, -1);
-    }
 
     /**
      * Checks the keywords and guesses if this is a sbs or hou 3d video, but not declared as 3d by youtube
@@ -157,9 +149,8 @@ public class YoutubeClipData {
         return videoID + "/" + title;
     }
 
-    public YoutubeClipData(final String videoID, final int playlistEntryNumber) {
+    public YoutubeClipData(final String videoID) {
         this.videoID = videoID;
-        this.playlistEntryNumber = playlistEntryNumber;
     }
 
     public boolean copyTo(YoutubeClipData dest) {
@@ -168,16 +159,10 @@ public class YoutubeClipData {
             dest.title = title;
             dest.title_alternative = title_alternative;
             dest.category = category;
-            dest.playlistEntryNumber = playlistEntryNumber;
             dest.channelTitle = channelTitle;
             dest.chapters = chapters;
             dest.channelTitle_alternative = channelTitle_alternative;
             dest.channelSize = channelSize;
-            dest.playlistID = playlistID;
-            dest.playlistTitle = playlistTitle;
-            dest.playlistCreator = playlistCreator;
-            dest.playlistSize = playlistSize;
-            dest.playlistDescription = playlistDescription;
             dest.user = user;
             dest.atID = atID;
             dest.user_alternative = user_alternative;
@@ -209,16 +194,10 @@ public class YoutubeClipData {
         setValue(dest, YoutubeHelper.YT_TITLE, title);
         setValue(dest, YoutubeHelper.YT_TITLE_ALTERNATIVE, title_alternative);
         setValue(dest, YoutubeHelper.YT_CATEGORY, category);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_POSITION, playlistEntryNumber);
         setValue(dest, YoutubeHelper.YT_3D, is3D());
         setValue(dest, YoutubeHelper.YT_CHANNEL_TITLE, channelTitle);
         setValue(dest, YoutubeHelper.YT_CHANNEL_TITLE_ALTERNATIVE, channelTitle_alternative);
         setValue(dest, YoutubeHelper.YT_CHANNEL_SIZE, channelSize);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_ID, playlistID);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_TITLE, playlistTitle);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_CREATOR, playlistCreator);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_SIZE, playlistSize);
-        setValue(dest, YoutubeHelper.YT_PLAYLIST_DESCRIPTION, playlistDescription);
         setValue(dest, YoutubeHelper.YT_USER_NAME, user);
         setValue(dest, YoutubeHelper.YT_USER_NAME_ALTERNATIVE, user_alternative);
         if (bestVideoItag != null) {

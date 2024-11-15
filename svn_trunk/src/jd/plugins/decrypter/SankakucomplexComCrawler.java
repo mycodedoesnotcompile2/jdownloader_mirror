@@ -27,6 +27,7 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig.PostTagCrawlerCrawlMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -45,10 +46,15 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50133 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50144 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_GALLERY, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     @Override
@@ -239,7 +245,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         if (numberofItemsStr != null) {
             final int numberofItems = Integer.parseInt(numberofItemsStr);
             if (ret.size() < numberofItems) {
-                this.displayBubbleNotification("Missing items! Tags: " + tags, "Some items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
+                this.displayBubbleNotification("Missing items!", "Tags: " + tags + "\r\nSome items look to be missing!\r\nFound only " + ret.size() + "/" + numberofItemsStr + " items");
             }
         }
         return ret;

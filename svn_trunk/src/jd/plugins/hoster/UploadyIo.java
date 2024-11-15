@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50137 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,10 @@ public class UploadyIo extends XFileSharingProBasic {
 
     @Override
     protected String regexWaittime(final String html) {
-        final String waitStr = new Regex(html, "id=\"wait-time\"[^>]*>\\s*(\\d+)").getMatch(0);
+        String waitStr = new Regex(html, "var timeleft = (\\d+);").getMatch(0);
+        if (waitStr == null) {
+            waitStr = new Regex(html, "id=\"wait-time\"[^>]*>\\s*(\\d+)").getMatch(0);
+        }
         if (waitStr != null) {
             return waitStr;
         } else {

@@ -50,7 +50,6 @@ import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountCheckerEventListener;
 import jd.gui.swing.jdgui.GUIUtils;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountTrafficView;
 
@@ -148,9 +147,6 @@ public class AccountListTableModel extends ExtTableModel<AccountEntry> implement
                 protected void setBooleanValue(boolean enabled, final AccountEntry object) {
                     object.getAccount().setEnabled(enabled);
                     fireTableStructureChanged();
-                    if (enabled && object.getAccount().isMultiHost()) {
-                        RefreshAction.displayMultihosterDetailOverviewHelpDialog();
-                    }
                 }
             });
         }

@@ -19,11 +19,35 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import jd.PluginWrapper;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginProgress;
+import jd.plugins.components.MultiHosterManagement;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
@@ -46,31 +70,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-import jd.PluginWrapper;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountTrafficView;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginProgress;
-import jd.plugins.components.MultiHosterManagement;
-
-@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50145 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -82,7 +82,6 @@ public abstract class HighWayCore extends UseNet {
     private static Map<String, Map<String, Integer>>       hostMaxdlsMap                          = new HashMap<String, Map<String, Integer>>();
     /* Contains <host><number of currently running simultaneous downloads> */
     private static Map<String, Map<String, AtomicInteger>> hostRunningDlsNumMap                   = new HashMap<String, Map<String, AtomicInteger>>();
-    private static Map<String, Map<String, Integer>>       hostTrafficCalculationMap              = new HashMap<String, Map<String, Integer>>();
     private static Map<String, Object>                     mapLockMap                             = new HashMap<String, Object>();
     private final int                                      defaultMAXCHUNKS                       = -4;
     private final boolean                                  defaultRESUME                          = true;
@@ -140,8 +139,7 @@ public abstract class HighWayCore extends UseNet {
     }
 
     /**
-     * API docs: https://high-way.me/threads/highway-api.201/ </br>
-     * According to admin we can 'hammer' the API every 60 seconds
+     * API docs: https://high-way.me/threads/highway-api.201/ </br> According to admin we can 'hammer' the API every 60 seconds
      */
     protected abstract String getAPIBase();
 
@@ -169,54 +167,6 @@ public abstract class HighWayCore extends UseNet {
                 map.put(getHost(), (Map<String, T>) ret);
             }
             return (Map<String, T>) ret;
-        }
-    }
-
-    /** For some hosts this multihost calculates less/more traffic than the real file size --> Calculate this here */
-    @Override
-    public void update(final DownloadLink link, final Account account, long bytesTransfered) throws PluginException {
-        final int trafficCalc = getTrafficCalc(link);
-        bytesTransfered = (bytesTransfered * trafficCalc) / 100;
-        super.update(link, account, bytesTransfered);
-    }
-
-    /** Returns percentage factor used for traffic calculation. */
-    private int getTrafficCalc(final DownloadLink link) {
-        synchronized (getMapLock()) {
-            final Map<String, Integer> map = getMap(hostTrafficCalculationMap);
-            final Integer trafficCalc = map.get(link.getHost());
-            if (trafficCalc != null) {
-                return trafficCalc.intValue();
-            } else {
-                return 100;
-            }
-        }
-    }
-
-    @Override
-    public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
-        if (this.getStoredDirectlink(link) != null) {
-            /* Assume that no traffic is needed to download stored direct urls. */
-            return true;
-        }
-        final AccountTrafficView accountTrafficView = getAccountTrafficView(account);
-        if (accountTrafficView == null) {
-            return true;
-        } else if (accountTrafficView.isUnlimitedTraffic()) {
-            return true;
-        }
-        final long downloadSize = link.getView().getBytesTotalEstimated();
-        if (downloadSize <= 0) {
-            /* Size is unknown -> Assume we got enough traffic to download that link. */
-            return true;
-        }
-        final int trafficCalc = getTrafficCalc(link);
-        final long trafficNeeded = (downloadSize * trafficCalc) / 100;
-        final long trafficLeft = accountTrafficView.getTrafficLeft();
-        if (trafficNeeded <= trafficLeft) {
-            return true;
-        } else {
-            return false;
         }
     }
 
@@ -319,9 +269,9 @@ public abstract class HighWayCore extends UseNet {
         try {
             con = br.openHeadConnection(link.getPluginPatternMatcher());
             handleSelfhostedFileConnectionErrors(br, con);
-            final String serverFilename = getFileNameFromConnection(con);
-            if (!StringUtils.isEmpty(serverFilename)) {
-                link.setFinalFileName(serverFilename);
+            final String connectionFilename = getFileNameFromConnection(con);
+            if (!StringUtils.isEmpty(connectionFilename)) {
+                link.setFinalFileName(connectionFilename);
             }
             if (con.getCompleteContentLength() != -1) {
                 if (con.isContentDecoded()) {
@@ -423,8 +373,8 @@ public abstract class HighWayCore extends UseNet {
     @Override
     protected void handleMultiHost(DownloadLink downloadLink, Account account, UsenetFile usenetFile, String username, String password, UsenetServer server) throws Exception {
         /**
-         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br>
-         * This function should never get called with null/empty username and or password!
+         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br> This function should never get
+         * called with null/empty username and or password!
          */
         if (StringUtils.isEmpty(username)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -541,7 +491,7 @@ public abstract class HighWayCore extends UseNet {
             }
             controlSlot(+1);
             try {
-                this.dl.startDownload();
+                dl.startDownload();
             } finally {
                 // remove usedHost slot from hostMap
                 controlSlot(-1);
@@ -642,13 +592,9 @@ public abstract class HighWayCore extends UseNet {
         try {
             do {
                 /**
-                 * cacheStatus possible values and what they mean: </br>
-                 * d = download </br>
-                 * w = wait (retry) </br>
-                 * q = in queue </br>
-                 * qn = Download has been added to queue </br>
-                 * i = direct download without cache </br>
-                 * s = Cached download is ready for downloading
+                 * cacheStatus possible values and what they mean: </br> d = download </br> w = wait (retry) </br> q = in queue </br> qn =
+                 * Download has been added to queue </br> i = direct download without cache </br> s = Cached download is ready for
+                 * downloading
                  */
                 br.getPage(cachePollingURL);
                 entries = this.checkErrors(br, link, account);
@@ -658,8 +604,8 @@ public abstract class HighWayCore extends UseNet {
                     return entries;
                 } else if (!blockDownloadSlotsForCloudDownloads(account)) {
                     /**
-                     * Throw exception right away so other download candidates will be tried. </br>
-                     * This may speed up downloads significantly for some users.
+                     * Throw exception right away so other download candidates will be tried. </br> This may speed up downloads
+                     * significantly for some users.
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
                 }
@@ -745,11 +691,9 @@ public abstract class HighWayCore extends UseNet {
             boolean supportsUsenet = false;
             synchronized (getMapLock()) {
                 final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
-                final Map<String, Integer> hostTrafficCalculationMap = getMap(HighWayCore.hostTrafficCalculationMap);
                 final Map<String, Integer> hostMaxdlsMap = getMap(HighWayCore.hostMaxdlsMap);
                 final Map<String, Boolean> hostResumeMap = getMap(HighWayCore.hostResumeMap);
                 hostMaxchunksMap.clear();
-                hostTrafficCalculationMap.clear();
                 hostMaxdlsMap.clear();
                 /* Available hosts are returned by API depending on users' account type e.g. free users have much less supported hosts. */
                 final List<Map<String, Object>> array_hoster = (List<Map<String, Object>>) entries.get("hoster");
@@ -767,15 +711,12 @@ public abstract class HighWayCore extends UseNet {
                     {
                         /* Legacy handling */
                         /* Workaround to find the real domain which we need to assign the properties to later on! */
-                        final ArrayList<String> supportedHostsTmp = new ArrayList<String>();
-                        supportedHostsTmp.add(domain);
-                        final List<String> realDomainList = ai.setMultiHostSupport(this, supportedHostsTmp, pluginFinder);
+                        final List<MultiHostHost> realDomainList = new AccountInfo().setMultiHostSupportV2(this, Arrays.asList(new MultiHostHost(domain)), pluginFinder);
                         if (realDomainList != null && realDomainList.size() > 0) {
                             /* Legacy handling */
-                            final String realDomain = realDomainList.get(0);
+                            final String realDomain = realDomainList.get(0).getDomain();
                             // final String unlimited = (String) hoster_map.get("unlimited");
                             if (supportedhosts_dupes_for_legacy_handling.add(realDomain)) {
-                                hostTrafficCalculationMap.put(realDomain, trafficCalcFactorPercent.intValue());
                                 hostMaxchunksMap.put(realDomain, correctChunks(chunks));
                                 hostMaxdlsMap.put(realDomain, downloads);
                                 hostResumeMap.put(realDomain, resume);
@@ -854,8 +795,7 @@ public abstract class HighWayCore extends UseNet {
     /**
      * Login without errorhandling
      *
-     * @return true = cookies validated </br>
-     *         false = cookies set but not validated
+     * @return true = cookies validated </br> false = cookies set but not validated
      *
      * @throws PluginException
      * @throws InterruptedException
@@ -896,7 +836,7 @@ public abstract class HighWayCore extends UseNet {
             logger.info("Performing full login");
             final UrlQuery query = new UrlQuery();
             if (this.useApikeyLogin()) {
-                query.add("apikey", account.getPass());
+                query.appendEncoded("apikey", account.getPass());
             } else {
                 query.appendEncoded("user", account.getUser());
                 query.appendEncoded("pass", account.getPass());
@@ -1052,9 +992,9 @@ public abstract class HighWayCore extends UseNet {
                 getMultiHosterManagement().putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
             case 11:
                 /**
-                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br>
-                 * 2021-11-08: Admin asked us not to disable host right away when this error happens as it seems like this error is more
-                 * rleated to single files/fileservers -> Done accordingly.
+                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br> 2021-11-08: Admin asked
+                 * us not to disable host right away when this error happens as it seems like this error is more rleated to single
+                 * files/fileservers -> Done accordingly.
                  */
                 // mhm.putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);

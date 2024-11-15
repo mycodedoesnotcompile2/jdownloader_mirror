@@ -25,36 +25,13 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.Account;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.UserAgents;
-import jd.plugins.components.UserAgents.BrowserName;
-import jd.plugins.hoster.YoutubeDashV2;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -102,7 +79,31 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@DecrypterPlugin(revision = "$Revision: 50112 $", interfaceVersion = 3, names = {}, urls = {})
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.Account;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.UserAgents;
+import jd.plugins.components.UserAgents.BrowserName;
+import jd.plugins.hoster.YoutubeDashV2;
+
+@DecrypterPlugin(revision = "$Revision: 50155 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -266,14 +267,14 @@ public class TbCmV2 extends PluginForDecrypt {
         return containsFlag.get();
     }
 
-    private YoutubeConfig           cfg;
-    private static Object           DIALOGLOCK = new Object();
-    private String                  videoID;
-    private String                  playlistID;
-    private String                  channelID;
-    private String                  userName;
-    private HashMap<String, Object> globalPropertiesForDownloadLink;
-    private YoutubeHelper           helper;
+    private YoutubeConfig                    cfg;
+    private static Object                    DIALOGLOCK = new Object();
+    private String                           videoID;
+    private String                           playlistID;
+    private String                           channelID;
+    private String                           userName;
+    private Map<String, Map<String, Object>> globalPropertiesForDownloadLink;
+    private YoutubeHelper                    helper;
 
     @Override
     protected DownloadLink createOfflinelink(final String link, final String filename, final String message) {
@@ -282,13 +283,49 @@ public class TbCmV2 extends PluginForDecrypt {
         return ret;
     }
 
+    protected Object putGlobalProperty(final String targetID, final String key, final Object value) {
+        Map<String, Object> map = globalPropertiesForDownloadLink.get(targetID);
+        if (map == null) {
+            map = new HashMap<String, Object>();
+            globalPropertiesForDownloadLink.put(targetID, map);
+        }
+        return map.put(key, value);
+    }
+
+    protected Object getGlobalProperty(final String targetID, final String key) {
+        Map<String, Object> map = globalPropertiesForDownloadLink.get(targetID);
+        if (map == null) {
+            return null;
+        }
+        return map.get(key);
+    }
+
+    protected void setGlobalProperty(final String targetID, final DownloadLink dest) {
+        final Map<String, Object> globalProperties = globalPropertiesForDownloadLink.get(null);
+        if (globalProperties != null) {
+            for (final Entry<String, Object> es : globalProperties.entrySet()) {
+                if (es.getKey() != null && !dest.hasProperty(es.getKey())) {
+                    dest.setProperty(es.getKey(), es.getValue());
+                }
+            }
+        }
+        final Map<String, Object> targetProperties = targetID != null ? globalPropertiesForDownloadLink.get(targetID) : null;
+        if (targetProperties != null) {
+            for (final Entry<String, Object> es : targetProperties.entrySet()) {
+                if (es.getKey() != null && !dest.hasProperty(es.getKey())) {
+                    dest.setProperty(es.getKey(), es.getValue());
+                }
+            }
+        }
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         // nullify, for debugging purposes!
         videoID = null;
         playlistID = null;
         channelID = null;
         userName = null;
-        globalPropertiesForDownloadLink = new HashMap<String, Object>();
+        globalPropertiesForDownloadLink = new HashMap<String, Map<String, Object>>();
         cfg = PluginJsonConfig.get(YoutubeConfig.class);
         if (StringUtils.containsIgnoreCase(param.getCryptedUrl(), "yt.not.allowed") && !cfg.isAndroidSupportEnabled()) {
             /*
@@ -310,8 +347,8 @@ public class TbCmV2 extends PluginForDecrypt {
         /**
          * 2024-07-05 e.g.
          * https://www.google.com/url?sa=t&source=web&rct=j&opi=123456&url=https://www.youtube.com/watch%3Fv%3DREDACTED&ved=REDACTED
-         * &usg=REDACTED </br> We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are
-         * [a-z0-9_-]
+         * &usg=REDACTED </br>
+         * We can safely url-decode this URL as the items we are looking for are not encoded anyways, all IDs are [a-z0-9_-]
          */
         cleanedurl = Encoding.htmlDecode(cleanedurl);
         videoID = getVideoIDFromUrl(cleanedurl);
@@ -338,19 +375,9 @@ public class TbCmV2 extends PluginForDecrypt {
             logger.info("Unsupported URL");
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_ID, playlistID);
-        globalPropertiesForDownloadLink.put(YoutubeHelper.YT_CHANNEL_ID, channelID);
-        globalPropertiesForDownloadLink.put(YoutubeHelper.YT_USER_NAME, userName);
-        {
-            /* Nullification to avoid that cached items have that data. */
-            final String[] nullificationKeys = new String[] { YoutubeHelper.YT_PLAYLIST_DESCRIPTION, YoutubeHelper.YT_PLAYLIST_CREATOR, YoutubeHelper.YT_PLAYLIST_SIZE };
-            for (final String key : nullificationKeys) {
-                if (globalPropertiesForDownloadLink.containsKey(key)) {
-                    continue;
-                }
-                globalPropertiesForDownloadLink.put(key, null);
-            }
-        }
+        putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_ID, playlistID);
+        putGlobalProperty(null, YoutubeHelper.YT_CHANNEL_ID, channelID);
+        putGlobalProperty(null, YoutubeHelper.YT_USER_NAME, userName);
         /* @Developer: Enable this boolean if pagination is broken and you are unable to quickly fix it. */
         final boolean paginationIsBroken = false;
         final short maxItemsPerPage = 100;
@@ -371,7 +398,7 @@ public class TbCmV2 extends PluginForDecrypt {
             final YoutubeClipData singleVid = new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID);
             final String indexFromAddedURLStr = new Regex(cleanedurl, "(?i)index=(\\d+)").getMatch(0);
             if (indexFromAddedURLStr != null) {
-                singleVid.playlistEntryNumber = Integer.parseInt(indexFromAddedURLStr);
+                putGlobalProperty(videoID, YoutubeHelper.YT_PLAYLIST_POSITION, Integer.parseInt(indexFromAddedURLStr));
             }
             videoIdsToAdd.add(new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID));
         } else {
@@ -568,9 +595,9 @@ public class TbCmV2 extends PluginForDecrypt {
                             // channel title isn't user_name. user_name is /user/ reference. check logic in YoutubeHelper.extractData()!
                             final String channelTitle = extractWebsiteTitle(br);
                             if (channelTitle != null) {
-                                globalPropertiesForDownloadLink.put(YoutubeHelper.YT_CHANNEL_TITLE, channelTitle);
+                                putGlobalProperty(null, YoutubeHelper.YT_CHANNEL_TITLE, channelTitle);
                             }
-                            globalPropertiesForDownloadLink.put(YoutubeHelper.YT_USER_NAME, userName);
+                            putGlobalProperty(null, YoutubeHelper.YT_USER_NAME, userName);
                             // you can convert channelid UC[STATICHASH] (UserChanel) ? to UU[STATICHASH] (UsersUpload) which is covered
                             // below
                             channelID = getChannelID(helper, br);
@@ -602,7 +629,7 @@ public class TbCmV2 extends PluginForDecrypt {
                     }
                 }
                 if (channelID != null) {
-                    globalPropertiesForDownloadLink.put(YoutubeHelper.YT_CHANNEL_ID, channelID);
+                    putGlobalProperty(null, YoutubeHelper.YT_CHANNEL_ID, channelID);
                 }
                 final ArrayList<YoutubeClipData> playlist = crawlPlaylistOrChannel(helper, br, playlistID, userName, channelID, cleanedurl, userDefinedMaxPlaylistOrProfileItemsLimit);
                 if (playlist != null && playlist.size() > 0) {
@@ -626,7 +653,7 @@ public class TbCmV2 extends PluginForDecrypt {
                             channelOrPlaylistPackage = FilePackage.getInstance();
                             channelOrPlaylistPackage.setAllowMerge(true);
                             final DownloadLink dummy = this.createDownloadlink("ytdummy");
-                            dummy.setProperties(globalPropertiesForDownloadLink);
+                            setGlobalProperty(null, dummy);
                             final String formattedPackagename = YoutubeHelper.applyReplacer(channelOrPlaylistPackageNamePattern, helper, dummy);
                             if (!StringUtils.isEmpty(formattedPackagename)) {
                                 /* Formatted result is valid -> Use it */
@@ -634,8 +661,8 @@ public class TbCmV2 extends PluginForDecrypt {
                             } else {
                                 /* Formatted result is invalid -> Fallback */
                                 logger.info("Invalid result of formattedPackagename -> Fallback to defaults");
-                                final String playlistTitle = (String) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_PLAYLIST_TITLE);
-                                final String channelName = (String) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_CHANNEL_TITLE);
+                                final String playlistTitle = (String) getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_TITLE);
+                                final String channelName = (String) getGlobalProperty(null, YoutubeHelper.YT_CHANNEL_TITLE);
                                 if (playlistTitle != null) {
                                     channelOrPlaylistPackage.setName(playlistTitle);
                                 } else {
@@ -657,7 +684,7 @@ public class TbCmV2 extends PluginForDecrypt {
                                     channelOrPlaylistPackage.setName(packagename);
                                 }
                             }
-                            final String playlistDescription = (String) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_PLAYLIST_DESCRIPTION);
+                            final String playlistDescription = (String) getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_DESCRIPTION);
                             if (playlistDescription != null) {
                                 channelOrPlaylistPackage.setComment(playlistDescription);
                             }
@@ -689,7 +716,6 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
         }
-
         reversePlaylistPositions: if (this.playlistID != null && cfg.isProcessPlaylistItemsInReverseOrder()) {
             logger.info("Processing crawled playlist in reverse order");
             if (!this.globalPropertiesForDownloadLink.containsKey(YoutubeHelper.YT_PLAYLIST_SIZE)) {
@@ -700,8 +726,9 @@ public class TbCmV2 extends PluginForDecrypt {
             /* Correct positions in video elements */
             final int playlistSize = ((Number) globalPropertiesForDownloadLink.get(YoutubeHelper.YT_PLAYLIST_SIZE)).intValue();
             for (final YoutubeClipData vid : videoIdsToAdd) {
-                final int newPlaylistPosition = (playlistSize - vid.playlistEntryNumber) + 1;
-                vid.playlistEntryNumber = newPlaylistPosition;
+                final int playListPosition = (Integer) getGlobalProperty(vid.videoID, YoutubeHelper.YT_PLAYLIST_POSITION);
+                final int newPlaylistPosition = (playlistSize - playListPosition) + 1;
+                putGlobalProperty(vid.videoID, YoutubeHelper.YT_PLAYLIST_POSITION, newPlaylistPosition);
             }
         }
         final boolean isCrawlDupeCheckEnabled = cfg.isCrawlDupeCheckEnabled();
@@ -712,8 +739,10 @@ public class TbCmV2 extends PluginForDecrypt {
             videoidindex++;
             logger.info("Processing item " + videoidindex + "/" + videoIdsToAdd.size() + " | VideoID: " + crawledvid);
             String mainVideoDupeID = crawledvid.videoID;
-            if (specialPlaylistDupeHandling && crawledvid.playlistEntryNumber > 0) {
-                mainVideoDupeID += "/playlist/" + crawledvid.playlistID + "/playlist_position/" + crawledvid.playlistEntryNumber;
+            final Integer playlistEntryNumber = (Integer) getGlobalProperty(mainVideoDupeID, YoutubeHelper.YT_PLAYLIST_POSITION);
+            final String playlistID = (String) getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_ID);
+            if (specialPlaylistDupeHandling && playlistEntryNumber != null && playlistEntryNumber.intValue() > 0) {
+                mainVideoDupeID += "/playlist/" + playlistID + "/playlist_position/" + playlistEntryNumber;
             }
             if (isCrawlDupeCheckEnabled && linkCollectorContainsEntryByID(mainVideoDupeID)) {
                 logger.info("CrawlDupeCheck skip:" + crawledvid.videoID);
@@ -757,13 +786,6 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (vid.streams == null) {
                     continue;
                 }
-            }
-            if (vid != crawledvid) {
-                /*
-                 * Same video can be part of multiple playlists so it can be at a different position each time -> Overwrite position data in
-                 * cached item.
-                 */
-                vid.playlistEntryNumber = crawledvid.playlistEntryNumber;
             }
             final List<AbstractVariant> enabledVariants = new ArrayList<AbstractVariant>(AbstractVariant.listVariants());
             final HashSet<VariantGroup> enabledVariantGroups = new HashSet<VariantGroup>();
@@ -1098,7 +1120,13 @@ public class TbCmV2 extends PluginForDecrypt {
                 altIds.add(vi.getVariant().getStorableString());
             }
         }
-        final String linkID = clip != null ? YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant()) : null;
+        final String linkID;
+        if (VariantGroup.IMAGE_PLAYLIST_COVER.equals(variantInfo.getVariant().getBaseVariant().getGroup()) && getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_ID) != null) {
+            final String playListID = (String) getGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_ID);
+            linkID = YoutubeHelper.createLinkID(playListID, variantInfo.getVariant());
+        } else {
+            linkID = YoutubeHelper.createLinkID(clip.videoID, variantInfo.getVariant());
+        }
         final DownloadLink ret = createDownloadlink(linkID);
         final YoutubeHelper helper;
         if (this.helper != null) {
@@ -1113,11 +1141,7 @@ public class TbCmV2 extends PluginForDecrypt {
         if (yvc != null) {
             ret.setProperty(YoutubeHelper.YT_COLLECTION, yvc.getName());
         }
-        for (Entry<String, Object> es : globalPropertiesForDownloadLink.entrySet()) {
-            if (es.getKey() != null && !ret.hasProperty(es.getKey())) {
-                ret.setProperty(es.getKey(), es.getValue());
-            }
-        }
+        setGlobalProperty(clip != null ? clip.videoID : null, ret);
         if (clip != null) {
             clip.copyToDownloadLink(ret);
         }
@@ -1233,7 +1257,7 @@ public class TbCmV2 extends PluginForDecrypt {
             humanReadableTitle = "Playlist " + playlistID;
             if (playlistID.startsWith("RD")) {
                 /* It's a mix playlist auto created by youtube -> Set "YouTube" as name of creator of this playlist. */
-                this.globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_CREATOR, "YouTube");
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_CREATOR, "YouTube");
             }
         } else if (channelID != null) {
             /* Channel via channelID (legacy - urls containing only channelID are not common anymore) */
@@ -1282,22 +1306,24 @@ public class TbCmV2 extends PluginForDecrypt {
         do {
             run++;
             helper.getPage(br, userOrPlaylistURL);
+            if (playlistID != null) {
+                helper.crawlCoverData(playlistID, true);
+            }
             checkBasicErrors(br);
             if (originalURL == null) {
                 originalURL = br._getURL();
             }
             final String playListTitleHTML = extractWebsiteTitle(br);
             if (playListTitleHTML != null) {
-                globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_TITLE, Encoding.htmlDecode(playListTitleHTML).trim());
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_TITLE, Encoding.htmlDecode(playListTitleHTML).trim());
             }
             helper.parse();
             rootMap = helper.getYtInitialData();
             ytConfigData = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "responseContext/webResponseContextExtensionData/ytConfigData");
-            String videosCountText = null;
             final Map<String, Object> autoGeneratexYoutubeMixPlaylistProbe = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "contents/twoColumnWatchNextResults/playlist/playlist");
             if (autoGeneratexYoutubeMixPlaylistProbe != null && Boolean.TRUE.equals(autoGeneratexYoutubeMixPlaylistProbe.get("isInfinite"))) {
                 /* Auto generated "youtube mix" playlist */
-                globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_TITLE, autoGeneratexYoutubeMixPlaylistProbe.get("title").toString());
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_TITLE, autoGeneratexYoutubeMixPlaylistProbe.get("title").toString());
                 varray = (List<Map<String, Object>>) autoGeneratexYoutubeMixPlaylistProbe.get("contents");
                 /* Such playlists can contain an infinite amount of items -> Stop after first page */
                 abortPaginationAfterFirstPage = true;
@@ -1400,8 +1426,8 @@ public class TbCmV2 extends PluginForDecrypt {
                 }
             }
             /**
-             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br> Only mind this
-             * errormessage if we can't find any content.
+             * This message can also contain information like "2 unavailable videos won't be displayed in this list". </br>
+             * Only mind this errormessage if we can't find any content.
              */
             alerts = (List<Map<String, Object>>) rootMap.get("alerts");
             errorOrWarningMessage = null;
@@ -1430,37 +1456,26 @@ public class TbCmV2 extends PluginForDecrypt {
                 this.displayBubbleNotification(humanReadableTitle + " | Warning", errorOrWarningMessage);
             }
             /* Find extra information about playlist */
-            final Map<String, Object> playlistHeaderRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "header/playlistHeaderRenderer");
-            if (playlistHeaderRenderer != null) {
-                /* This is the better source for playlist title than html. */
-                final String playlistTitle = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer, "title/simpleText");
-                if (playlistTitle != null) {
-                    globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_TITLE, playlistTitle);
-                }
-                // final String playlistCreatorFullName = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer,
-                // "ownerText/runs/{0}/text");
-                String playlistCreator = null;
-                final String playlistCreatorURL = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer, "ownerText/runs/{0}/navigationEndpoint/browseEndpoint/canonicalBaseUrl");
-                if (playlistCreatorURL != null) {
-                    playlistCreator = new Regex(playlistCreatorURL, "/@(.+)").getMatch(0);
-                }
-                if (playlistCreator != null) {
-                    this.globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_CREATOR, playlistCreator);
-                } else {
-                    logger.warning("Failed to find name of playlist-uploader");
-                }
-                final String playlistDescription = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer, "descriptionText/simpleText");
-                if (playlistDescription != null) {
-                    this.globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_DESCRIPTION, playlistDescription);
-                }
-                videosCountText = (String) JavaScriptEngineFactory.walkJson(playlistHeaderRenderer, "numVideosText/runs/{0}/text");
+            final String playlistOwnerName = this.findPlaylistOwnerName(rootMap);
+            if (playlistOwnerName != null) {
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_CREATOR, playlistOwnerName);
+            }
+            final String playlistTitle = this.findPlaylistTitle(rootMap);
+            if (playlistTitle != null) {
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_TITLE, playlistTitle);
+            }
+            final String playlistDescription = this.findPlaylistDescription(rootMap);
+            if (playlistDescription != null) {
+                putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_DESCRIPTION, playlistDescription);
             }
             /**
-             * Find extra information about channel </br> Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT
-             * ui does not display the total number of shorts of a user.
+             * Find extra information about channel </br>
+             * Do not do this if tab is e.g. "shorts" as we'd then pickup an incorrect number. YT ui does not display the total number of
+             * shorts of a user.
              */
+            String videosCountText = findNumberOfVideosText(rootMap);
             final Map<String, Object> channelHeaderRenderer = (Map<String, Object>) JavaScriptEngineFactory.walkJson(rootMap, "header/c4TabbedHeaderRenderer");
-            if (channelHeaderRenderer != null && StringUtils.equalsIgnoreCase(desiredChannelTab, "Videos")) {
+            if (videosCountText == null && channelHeaderRenderer != null && StringUtils.equalsIgnoreCase(desiredChannelTab, "Videos")) {
                 videosCountText = (String) JavaScriptEngineFactory.walkJson(channelHeaderRenderer, "videosCountText/runs/{0}/text");
             }
             if (videosCountText != null) {
@@ -1544,7 +1559,8 @@ public class TbCmV2 extends PluginForDecrypt {
                         /**
                          * E.g. on /releases or /playlists -> inner playlists
                          *
-                         * TODO: decide which solution to go </br> TODO: 2024-11-07: I don't understand this anymore lol
+                         * TODO: decide which solution to go </br>
+                         * TODO: 2024-11-07: I don't understand this anymore lol
                          */
                         if (true) {
                             // proper playlist handling with packaging and correct container URLs
@@ -1565,7 +1581,8 @@ public class TbCmV2 extends PluginForDecrypt {
                                     numberofSkippedDuplicates++;
                                     continue;
                                 }
-                                ret.add(new YoutubeClipData(id, videoPositionCounter));
+                                ret.add(new YoutubeClipData(id));
+                                putGlobalProperty(id, YoutubeHelper.YT_PLAYLIST_POSITION, videoPositionCounter);
                                 if (playListDupes.size() == maxItemsLimit) {
                                     break;
                                 }
@@ -1599,7 +1616,8 @@ public class TbCmV2 extends PluginForDecrypt {
                             numberofSkippedDuplicates++;
                             continue varrayLoop;
                         }
-                        ret.add(new YoutubeClipData(id, videoPositionCounter));
+                        ret.add(new YoutubeClipData(id));
+                        putGlobalProperty(id, YoutubeHelper.YT_PLAYLIST_POSITION, videoPositionCounter);
                         if (playListDupes.size() == maxItemsLimit) {
                             reachedUserDefinedMaxItemsLimit = true;
                             break varrayLoop;
@@ -1691,8 +1709,9 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (alerts != null && alerts.size() > 0) {
                         /**
                          * 2023-08-03: E.g. playlist with 700 videos but 680 of them are hidden/unavailable which means first pagination
-                         * attempt will fail. </br> Even via website this seems to be and edge case as the loading icon will never disappear
-                         * and no error is displayed.
+                         * attempt will fail. </br>
+                         * Even via website this seems to be and edge case as the loading icon will never disappear and no error is
+                         * displayed.
                          */
                         logger.info("Pagination failed -> Possible reason: " + errorOrWarningMessage);
                     } else {
@@ -1705,7 +1724,7 @@ public class TbCmV2 extends PluginForDecrypt {
         } while (true);
         int missingVideos = 0;
         if (totalNumberofItems != null) {
-            globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_SIZE, totalNumberofItems);
+            putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_SIZE, totalNumberofItems);
             /*
              * If user set limit we maybe didn't crawl all items but then that was on purpose -> Do not calculate number of "missing" items
              * as they are not missing but they got skipped.
@@ -1716,7 +1735,7 @@ public class TbCmV2 extends PluginForDecrypt {
         } else if (!reachedUserDefinedMaxItemsLimit && !paginationFailedForUnknownReasons) {
             /* We could not determine the number of items in this channel/playlist -> Use total number of found items as this number. */
             logger.info("Unable to determine PLAYLIST_SIZE -> Using number of found items as replacement");
-            globalPropertiesForDownloadLink.put(YoutubeHelper.YT_PLAYLIST_SIZE, ret.size());
+            putGlobalProperty(null, YoutubeHelper.YT_PLAYLIST_SIZE, ret.size());
         }
         /* Number of skipped and missing items are two different numbers! */
         missingVideos -= numberofSkippedDuplicates;
@@ -1788,29 +1807,122 @@ public class TbCmV2 extends PluginForDecrypt {
 
     /** Recursive function that finds all continuationTokens in given json item. */
     private void findContinuationTokens(final Set<String> results, final Object o) {
+        final Set<Object> found = search(o, null, "continuationEndpoint/continuationCommand/token");
+        if (found != null && found.size() > 0) {
+            for (Object elem : found) {
+                results.add(elem.toString());
+            }
+        }
+    }
+
+    private Set<Object> search(final Object object, Set<Object> results, final String path) {
+        if (object instanceof Map) {
+            final Map<String, Object> map = (Map<String, Object>) object;
+            Object value = JavaScriptEngineFactory.walkJson(map, path);
+            if (value != null) {
+                if (results == null) {
+                    results = new LinkedHashSet<Object>();
+                }
+                results.add(value);
+            }
+            for (final Map.Entry<String, Object> entry : map.entrySet()) {
+                // final String key = entry.getKey();
+                value = entry.getValue();
+                if (value instanceof List || value instanceof Map) {
+                    final Set<Object> found = search(value, results, path);
+                    if (found != null) {
+                        if (results == null) {
+                            results = found;
+                        } else {
+                            results.addAll(found);
+                        }
+                    }
+                }
+            }
+        } else if (object instanceof List) {
+            final List<Object> array = (List) object;
+            for (final Object arrayo : array) {
+                if (arrayo instanceof List || arrayo instanceof Map) {
+                    final Set<Object> found = search(arrayo, results, path);
+                    if (found != null) {
+                        if (results == null) {
+                            results = found;
+                        } else {
+                            results.addAll(found);
+                        }
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
+    private String findPlaylistDescription(final Object o) {
+        Set<Object> found = search(o, null, "playlistMetadataRenderer/description");
+        found = search(o, found, "playlistSidebarPrimaryInfoRenderer/description/simpleText");
+        if (found != null && found.size() > 0) {
+            return found.iterator().next().toString();
+        }
+        return null;
+    }
+
+    private String findPlaylistOwnerName(final Object o) {
+        final Set<Object> found = search(o, null, "playlistSidebarSecondaryInfoRenderer/videoOwner/videoOwnerRenderer/title/runs/{0}/text");
+        if (found != null && found.size() > 0) {
+            return found.iterator().next().toString();
+        }
+        return null;
+    }
+
+    private String findPlaylistTitle(final Object o) {
+        final Set<Object> found = search(o, null, "playlistMetadataRenderer/title");
+        if (found != null && found.size() > 0) {
+            return found.iterator().next().toString();
+        }
+        return null;
+    }
+
+    private String findNumberOfVideosText(final Object o) {
         if (o instanceof Map) {
+            String result = null;
             final Map<String, Object> map = (Map<String, Object>) o;
-            final String continuationTrigger = (String) map.get("trigger");
-            final String thisContinuationToken = (String) JavaScriptEngineFactory.walkJson(map, "continuationEndpoint/continuationCommand/token");
-            if (continuationTrigger != null && thisContinuationToken != null) {
-                results.add(thisContinuationToken);
+            final Object metadataPartsO = map.get("metadataParts");
+            if (metadataPartsO instanceof List) {
+                final List<Object> metadataParts = (List<Object>) metadataPartsO;
+                for (final Object metadataPartO : metadataParts) {
+                    final Set<Object> found = search(metadataPartO, null, "text/content");
+                    if (found != null) {
+                        for (final Object elem : found) {
+                            final String text = elem.toString();
+                            if (text != null && text.matches("(?i)[0-9\\.,]+\\s*Videos")) {
+                                return text.replaceFirst("(?i)\\s*Videos", "").replace(",", ".");
+                            }
+                        }
+                    }
+                }
             }
             for (final Map.Entry<String, Object> entry : map.entrySet()) {
                 // final String key = entry.getKey();
                 final Object value = entry.getValue();
                 if (value instanceof List || value instanceof Map) {
-                    findContinuationTokens(results, value);
+                    result = findNumberOfVideosText(value);
+                    if (result != null) {
+                        return result;
+                    }
                 }
             }
-            return;
         } else if (o instanceof List) {
             final List<Object> array = (List) o;
             for (final Object arrayo : array) {
                 if (arrayo instanceof List || arrayo instanceof Map) {
-                    findContinuationTokens(results, arrayo);
+                    final String result = findNumberOfVideosText(arrayo);
+                    if (result != null) {
+                        return result;
+                    }
                 }
             }
         }
+        return null;
     }
 
     public static Browser prepBrowserWebAPI(final Browser br, final Account account) throws PluginException {
@@ -1858,7 +1970,7 @@ public class TbCmV2 extends PluginForDecrypt {
             String[] videos = new Regex(video_ids, "(" + VIDEO_ID_PATTERN + ")").getColumn(0);
             if (videos != null) {
                 for (String vid : videos) {
-                    ret.add(new YoutubeClipData(vid, counter++));
+                    ret.add(new YoutubeClipData(vid));
                 }
             }
         }

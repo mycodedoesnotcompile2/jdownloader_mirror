@@ -1,6 +1,7 @@
 package jd.gui.swing.jdgui.views.settings.panels.accountmanager;
 
 import java.awt.event.ActionEvent;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.AbstractAction;
@@ -22,18 +23,17 @@ public class RefreshAction extends AbstractAction {
     /**
      *
      */
-    private static final long  serialVersionUID = 1L;
-    private List<AccountEntry> selection;
-    private boolean            ignoreSelection  = false;
+    private static final long        serialVersionUID = 1L;
+    private final List<AccountEntry> selection;
 
     public RefreshAction() {
-        this(null);
-        this.putValue(AbstractAction.SMALL_ICON, new AbstractIcon(IconKey.ICON_REFRESH, 20));
-        ignoreSelection = true;
+        selection = null;
+        this.putValue(NAME, _GUI.T.settings_accountmanager_refresh());
+        this.putValue(AbstractAction.SMALL_ICON, new AbstractIcon(IconKey.ICON_REFRESH, 16));
     }
 
     public RefreshAction(List<AccountEntry> selectedObjects) {
-        selection = selectedObjects;
+        selection = selectedObjects != null ? selectedObjects : new ArrayList<AccountEntry>();
         this.putValue(NAME, _GUI.T.settings_accountmanager_refresh());
         this.putValue(AbstractAction.SMALL_ICON, new AbstractIcon(IconKey.ICON_REFRESH, 16));
     }
@@ -46,26 +46,34 @@ public class RefreshAction extends AbstractAction {
         TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                boolean containedMultihosterAccount = false;
+                final List<Account> accountsToCheck = new ArrayList<Account>();
                 if (selection == null) {
-                    for (Account acc : AccountController.getInstance().list()) {
-                        if (acc == null || acc.isEnabled() == false || acc.isValid() == false || acc.isTempDisabled()) {
-                            continue;
+                    /* All accounts */
+                    for (final Account acc : AccountController.getInstance().list()) {
+                        if (acc.isEnabled() && acc.isValid()) {
+                            accountsToCheck.add(acc);
                         }
-                        AccountChecker.getInstance().check(acc, true);
-                        containedMultihosterAccount |= acc.isMultiHost();
                     }
                 } else {
-                    for (AccountEntry accEntry : selection) {
-                        Account acc = accEntry.getAccount();
-                        if (acc == null || acc.isEnabled() == false) {
+                    /* Selected accounts only */
+                    for (final AccountEntry accEntry : selection) {
+                        final Account acc = accEntry.getAccount();
+                        if (acc == null) {
                             continue;
                         }
-                        AccountChecker.getInstance().check(acc, true);
-                        containedMultihosterAccount |= acc.isMultiHost();
+                        accountsToCheck.add(acc);
                     }
                 }
-                if (containedMultihosterAccount) {
+                if (accountsToCheck.isEmpty()) {
+                    /* Do nothing. This can happen if e.g. all selected items are disabled. */
+                    return null;
+                }
+                boolean containedCheckedMultihosterAccount = false;
+                for (final Account acc : accountsToCheck) {
+                    AccountChecker.getInstance().check(acc, true);
+                    containedCheckedMultihosterAccount |= acc.isMultiHost();
+                }
+                if (containedCheckedMultihosterAccount) {
                     displayMultihosterDetailOverviewHelpDialog();
                 }
                 return null;
@@ -74,15 +82,11 @@ public class RefreshAction extends AbstractAction {
     }
 
     public static void displayMultihosterDetailOverviewHelpDialog() {
-        HelpDialog.showIfAllowed(new MessageConfig(null, "downloadtabe_sortwarner", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, "Multihoster detail overview", "Click on the wrench symbol to get a more detailed overview of the supported hosts.\r\nThe detailed overview allows you to disable specific hosts, view host specific limits and, in case of problems, see the reason of failure.\r\nAlternatively, you can navigate to this information via Settings -> Plugins", new AbstractIcon(IconKey.ICON_SORT, 32)));
+        HelpDialog.showIfAllowed(new MessageConfig(null, "multihoster_table_detail_overview_hint", Dialog.STYLE_SHOW_DO_NOT_DISPLAY_AGAIN, _GUI.T.multihost_detailed_host_do_not_show_again_info_about_multi_host_overview_table_title(), _GUI.T.multihost_detailed_host_do_not_show_again_info_about_multi_host_overview_table_message(), new AbstractIcon(IconKey.ICON_SORT, 32)));
     }
 
     @Override
     public boolean isEnabled() {
-        if (ignoreSelection) {
-            return true;
-        } else {
-            return selection != null && selection.size() > 0;
-        }
+        return selection == null || selection.size() > 0;
     }
 }

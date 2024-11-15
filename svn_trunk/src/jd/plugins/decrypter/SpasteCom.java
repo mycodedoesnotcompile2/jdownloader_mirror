@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
  * @version raz_Template-pastebin-201508200000
  * @author raztoki
  */
-@DecrypterPlugin(revision = "$Revision: 47050 $", interfaceVersion = 3, names = { "spaste.com", "binbucks.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)", "https?://(?:www\\.)?(?:binbucks\\.com|binb\\.me)/(?:shrinker/)?[A-Za-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = { "spaste.com", "binbucks.com" }, urls = { "https?://(?:www\\.)?spaste\\.com/(?:(?:site/checkPasteUrl|p/?)\\?c=[a-zA-Z0-9]{10}|s/[a-zA-Z0-9]{6}|r/[a-zA-Z0-9]{6}\\?link=.+)", "https?://(?:www\\.)?(?:binbucks\\.com|binb\\.me)/(?:shrinker/)?[A-Za-z0-9]+" })
 public class SpasteCom extends antiDDoSForDecrypt {
     public SpasteCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class SpasteCom extends antiDDoSForDecrypt {
     /* DEV NOTES */
     // Tags: pastebin
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         final String browserReferrer = getBrowserReferrer();
         if (browserReferrer != null) {
@@ -104,12 +104,12 @@ public class SpasteCom extends antiDDoSForDecrypt {
                     break;
                 }
             }
+            if (zz > 4) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            }
             if (StringUtils.equalsIgnoreCase(form.getAction(), "bj/site")) {
                 /* 2021-11-09: Workaround for binbucks.com */
                 form.setAction(br.getURL());
-            }
-            if (zz > 4) {
-                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
             }
             final InputField fieldOpen = form.getInputField("open");
             if (fieldOpen != null && fieldOpen.getValue() == null) {
@@ -216,53 +216,58 @@ public class SpasteCom extends antiDDoSForDecrypt {
                 break;
             }
         }
-        final String directRedirect = br.getRedirectLocation();
-        if (directRedirect != null) {
-            decryptedLinks.add(this.createDownloadlink(directRedirect));
+        final String redirect = br.getRedirectLocation();
+        if (redirect != null && !this.canHandle(redirect)) {
+            /* Redirect to final link */
+            ret.add(this.createDownloadlink(redirect));
+            return ret;
+        }
+        br.setFollowRedirects(true);
+        if (redirect != null) {
+            br.followRedirect(true);
+        }
+        /* Look for other/multiple URLs. */
+        final String plaintxt;
+        // /s links have a different format
+        if (param.getCryptedUrl().contains("spaste.com/s/") || param.getCryptedUrl().contains("spaste.com/r/")) {
+            // we need some info
+            final String id = br.getRegex("\\$\\.post\\(\"/site/getRedirectLink\",\\{id:'(\\d+)'\\}").getMatch(0);
+            if (id == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            // ajax request
+            br.getHeaders().put("Accept", "*/*");
+            br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            br.getHeaders().put("Accept", "*/*");
+            sleep(5000, param);
+            postPage("/site/getRedirectLink", "id=" + Encoding.urlEncode(id));
+            plaintxt = br.toString();
         } else {
-            /* Look for other/multiple URLs. */
-            final String plaintxt;
-            // /s links have a different format
-            if (param.getCryptedUrl().contains("spaste.com/s/") || param.getCryptedUrl().contains("spaste.com/r/")) {
-                // we need some info
-                final String id = br.getRegex("\\$\\.post\\(\"/site/getRedirectLink\",\\{id:'(\\d+)'\\}").getMatch(0);
-                if (id == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            // look for content! within '/p/c=? + uid', by the way you cant just jump to it.
+            plaintxt = br.getRegex("class=\"required input-block-level pasteContent\"(.*?)(?:</div>\\s*){3}").getMatch(0);
+        }
+        if (plaintxt == null) {
+            // this isn't always an error! there might not be any links!
+            logger.info("Could not find 'plaintxt' : " + param.getCryptedUrl());
+            return ret;
+        }
+        final Set<String> pws = PasswordUtils.getPasswords(plaintxt);
+        final String[] links = HTMLParser.getHttpLinks(plaintxt, "");
+        if (links == null || links.length == 0) {
+            logger.info("Found no links[] from 'plaintxt' : " + param.getCryptedUrl());
+            return ret;
+        }
+        /* Avoid recursion */
+        for (final String link : links) {
+            if (!this.canHandle(link)) {
+                final DownloadLink dl = createDownloadlink(link);
+                if (pws != null && pws.size() > 0) {
+                    dl.setSourcePluginPasswordList(new ArrayList<String>(pws));
                 }
-                // ajax request
-                br.getHeaders().put("Accept", "*/*");
-                br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-                br.getHeaders().put("Accept", "*/*");
-                sleep(5000, param);
-                postPage("/site/getRedirectLink", "id=" + Encoding.urlEncode(id));
-                plaintxt = br.toString();
-            } else {
-                // look for content! within '/p/c=? + uid', by the way you cant just jump to it.
-                plaintxt = br.getRegex("class=\"required input-block-level pasteContent\"(.*?)(?:</div>\\s*){3}").getMatch(0);
-            }
-            if (plaintxt == null) {
-                // this isn't always an error! there might not be any links!
-                logger.info("Could not find 'plaintxt' : " + param.getCryptedUrl());
-                return decryptedLinks;
-            }
-            final Set<String> pws = PasswordUtils.getPasswords(plaintxt);
-            final String[] links = HTMLParser.getHttpLinks(plaintxt, "");
-            if (links == null || links.length == 0) {
-                logger.info("Found no links[] from 'plaintxt' : " + param.getCryptedUrl());
-                return decryptedLinks;
-            }
-            /* Avoid recursion */
-            for (final String link : links) {
-                if (!this.canHandle(link)) {
-                    final DownloadLink dl = createDownloadlink(link);
-                    if (pws != null && pws.size() > 0) {
-                        dl.setSourcePluginPasswordList(new ArrayList<String>(pws));
-                    }
-                    decryptedLinks.add(dl);
-                }
+                ret.add(dl);
             }
         }
-        return decryptedLinks;
+        return ret;
     }
 
     private final String getJS(final String input, final String key) {

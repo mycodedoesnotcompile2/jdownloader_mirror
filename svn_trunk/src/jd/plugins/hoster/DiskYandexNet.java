@@ -68,7 +68,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.DiskYandexNetFolder;
 
-@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 3, names = { "disk.yandex.net" }, urls = { "http://yandexdecrypted\\.net/\\d+" })
+@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNet extends PluginForHost {
     public DiskYandexNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -97,6 +97,30 @@ public class DiskYandexNet extends PluginForHost {
         br.setCookie(getCurrentDomain(), "ys", "");
         br.setAllowedResponseCodes(new int[] { 429, 500 });
         br.setFollowRedirects(true);
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "disk.yandex.net", "disk.yandex.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("http://yandexdecrypted\\.net/\\d+");
+        }
+        return ret.toArray(new String[0]);
     }
 
     /** Returns currently used domain. */
@@ -1368,6 +1392,8 @@ public class DiskYandexNet extends PluginForHost {
                     return;
                 } else {
                     logger.info("Cookie login failed");
+                    /* Already done in checkCookies */
+                    // account.clearCookies("");
                     br.clearCookies(null);
                 }
             }
@@ -1376,7 +1402,7 @@ public class DiskYandexNet extends PluginForHost {
                 showCookieLoginInfo();
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
-            this.prepBR(br);
+            prepBR(br);
             logger.info("Performing full login");
             try {
                 boolean isLoggedIN = false;
@@ -1567,5 +1593,11 @@ public class DiskYandexNet extends PluginForHost {
     @Override
     public Class<? extends DiskYandexNetConfig> getConfigInterface() {
         return DiskYandexNetConfig.class;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

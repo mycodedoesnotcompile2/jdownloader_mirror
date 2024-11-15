@@ -31,9 +31,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -86,12 +87,18 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         final String chapterIDFromURL = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER).getMatch(0);
         if (chapterIDFromURL != null) {
             /* Find all pictures of a chapter of a novel */
-            final String chapterNumber = new Regex(param.getCryptedUrl(), "Chapter-(\\d+)").getMatch(0);
+            String chapterNumber = new Regex(param.getCryptedUrl(), "(?i)Chapter-([0-9\\-]+)").getMatch(0);
+            if (chapterNumber == null) {
+                chapterNumber = new Regex(param.getCryptedUrl(), "(?i)(?:Cap-tulo|Capitulo)-([0-9\\-]+)").getMatch(0);
+            }
+            if (chapterNumber != null) {
+                chapterNumber = chapterNumber.replace("-", ".");
+            }
             final String bookID = br.getRegex("cur_book_id = \"(\\d+)").getMatch(0);
             final String chapterID = br.getRegex("cur_chapter_id = \"(\\d+)").getMatch(0);
             final String seriesTitle = NovelcoolCom.findSeriesTitle(br);
-            final String[] links = br.getRegex("<option[^>]*value=\"(https[^\"]+)\"[^>]*>\\d+/\\d+</option>").getColumn(0);
-            if (links == null || links.length == 0) {
+            final String[] urls = br.getRegex("<option[^>]*value=\"(https[^\"]+)\"[^>]*>\\d+/\\d+</option>").getColumn(0);
+            if (urls == null || urls.length == 0) {
                 if (br.containsHTML("chapter-start-mark")) {
                     /* Download chapter as html page */
                     final DownloadLink chapterAsHTML = this.createDownloadlink(br.getURL() + ".jdeatme");
@@ -106,11 +113,11 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
             }
             final HashSet<String> dupes = new HashSet<String>();
             int position = 1;
-            for (final String singleLink : links) {
-                if (!dupes.add(singleLink)) {
+            for (final String url : urls) {
+                if (!dupes.add(url)) {
                     continue;
                 }
-                final DownloadLink image = createDownloadlink(singleLink);
+                final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
                 image.setProperty(NovelcoolCom.PROPERTY_BOOK_ID, bookID);
                 image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_ID, chapterID);
                 if (seriesTitle != null) {
@@ -120,17 +127,23 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                     image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_NUMBER, chapterNumber);
                 }
                 image.setProperty(NovelcoolCom.PROPERTY_PAGE_NUMBER, position);
-                image.setProperty(NovelcoolCom.PROPERTY_PAGE_MAX, links.length);
+                image.setProperty(NovelcoolCom.PROPERTY_PAGE_MAX, urls.length);
                 image.setName(NovelcoolCom.formatFilename(image));
                 image.setAvailable(true);
                 ret.add(image);
                 position++;
             }
+            final String chapterNumberForPackagename;
+            if (chapterNumber != null) {
+                chapterNumberForPackagename = chapterNumber;
+            } else {
+                chapterNumberForPackagename = chapterID;
+            }
             final FilePackage fp = FilePackage.getInstance();
             if (seriesTitle != null) {
-                fp.setName(seriesTitle + " - " + chapterNumber);
+                fp.setName(seriesTitle + " - " + chapterNumberForPackagename);
             } else {
-                fp.setName("Unknown novel" + " - " + chapterNumber);
+                fp.setName("Unknown novel" + " - " + chapterNumberForPackagename);
             }
             fp.addLinks(ret);
         } else {

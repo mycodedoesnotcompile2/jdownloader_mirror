@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50119 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50134 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -576,7 +576,7 @@ public class SankakucomplexCom extends PluginForHost {
                 final int before = premiumRunning.get();
                 final int after = before + num;
                 premiumRunning.set(after);
-                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanPremiumDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
+                logger.info("premiumRunning(" + link.getName() + ")|max:" + getMaxSimultanPremiumDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
             }
         } else {
             synchronized (freeRunning) {

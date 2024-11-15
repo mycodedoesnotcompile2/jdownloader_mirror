@@ -566,7 +566,11 @@ public class FavIcons {
                         }
                     }
                     int y1 = j + 1;
-                    if (x0 == 0 && y0 == 0 && (x1 - x0) == width && (y1 - y0) == height) {
+                    if (x0 == width && y0 == height) {
+                        // complete empty/transparent picture
+                        return source;
+                    } else if (x0 == 0 && y0 == 0 && x1 - x0 == width && y1 - y0 == height) {
+                        // no transparency cropping
                         return source;
                     } else {
                         final boolean sameAspectRatio = Math.abs(((double) width / height) - ((double) (x1 - x0) / (y1 - y0))) < 0.00001d;

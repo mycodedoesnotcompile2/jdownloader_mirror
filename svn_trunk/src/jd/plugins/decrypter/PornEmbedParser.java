@@ -21,7 +21,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.DecrypterArrayList;
 
-@DecrypterPlugin(revision = "$Revision: 48965 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class PornEmbedParser extends PluginForDecrypt {
     public PornEmbedParser(PluginWrapper wrapper) {
         super(wrapper);
@@ -114,6 +114,9 @@ public abstract class PornEmbedParser extends PluginForDecrypt {
             return ret;
         } else {
             ret.addAll(this.findEmbedUrl(br, getFileTitle(param, br)));
+            if (assumeSelfhostedContentOnNoResults() && assumeOfflineOnNoResults()) {
+                logger.warning("!DEV! This does not make any sense: assumeSelfhostedContentOnNoResults && assumeOfflineOnNoResults is both true!");
+            }
             if (ret.isEmpty() && assumeSelfhostedContentOnNoResults()) {
                 ret.add(getDownloadLinkSelfhosted(param, br));
             }

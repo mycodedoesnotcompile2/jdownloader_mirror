@@ -19,6 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -32,12 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.HighWayCore;
 import jd.plugins.hoster.HighWayMe2;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50144 $", interfaceVersion = 3, names = {}, urls = {})
 public class HighWayMeFolder2 extends PluginForDecrypt {
     public HighWayMeFolder2(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,8 +87,8 @@ public class HighWayMeFolder2 extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
-            displayBubbleNotification("Account benötigt", "Account benötigt, um Torrent und Usenet Dateien aus dem eigenen High-Way Account einfügen zu können.");
-            throw new AccountRequiredException();
+            displayBubbleNotification("Account benötigt", "Account benötigt, um Torrent oder Usenet Dateien aus dem eigenen High-Way Account einfügen zu können.");
+            throw new AccountRequiredException("Account benötigt, um Torrent oder Usenet Dateien aus dem eigenen High-Way Account einfügen zu können.");
         }
         final HighWayMe2 hosterplugin = (HighWayMe2) this.getNewPluginForHostInstance(this.getHost());
         hosterplugin.login(account, false);

@@ -28,7 +28,7 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.hoster.StileProjectCom;
 
-@DecrypterPlugin(revision = "$Revision: 47770 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = {}, urls = {})
 public class StileProjectComDecrypter extends PornEmbedParser {
     public StileProjectComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,7 +70,7 @@ public class StileProjectComDecrypter extends PornEmbedParser {
     @Override
     protected String getFileTitle(final CryptedLink param, final Browser br) {
         final Regex type1 = new Regex(param.getCryptedUrl(), StileProjectCom.TYPE_NORMAL);
-        if (type1.matches()) {
+        if (type1.patternFind()) {
             return type1.getMatch(0).replace("-", " ").trim();
         } else {
             return new Regex(param.getCryptedUrl(), StileProjectCom.TYPE_NORMAL2).getMatch(1).replace("-", " ").trim();
@@ -83,14 +83,8 @@ public class StileProjectComDecrypter extends PornEmbedParser {
     }
 
     @Override
-    protected boolean isSelfhosted(final Browser br) {
-        final String[] embedURLs = br.getRegex(StileProjectCom.TYPE_EMBED).getColumn(-1);
-        // e.g. html will always contain: "embedUrl": "https://www.stileproject.com/embed/123456789",
-        if (embedURLs != null && embedURLs.length > 1) {
-            return true;
-        } else {
-            return false;
-        }
+    protected boolean assumeSelfhostedContentOnNoResults() {
+        return true;
     }
 
     @Override

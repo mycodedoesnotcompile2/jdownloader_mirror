@@ -23,6 +23,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.SrfChConfig;
+import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionFallbackMode;
+import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionMode;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.URLConnectionAdapter;
@@ -39,22 +51,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SrfCh;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.SrfChConfig;
-import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionFallbackMode;
-import org.jdownloader.plugins.components.config.SrfChConfig.QualitySelectionMode;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50140 $", interfaceVersion = 3, names = {}, urls = {})
 public class SrfChCrawler extends PluginForDecrypt {
     public SrfChCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -131,6 +131,8 @@ public class SrfChCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(br._getURL().getPath());
         final String json = br.getRegex(">\\s*window\\.__SSR_VIDEO_DATA__ = (\\{.*?\\})</script>").getMatch(0);
         if (json != null) {
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
@@ -147,24 +149,41 @@ public class SrfChCrawler extends PluginForDecrypt {
                 /* Unsupported content */
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-        } else {
-            /*
-             * Example: https://www.srf.ch/news/panorama/gefaelschte-unterschrift-immobilienfirma-betreibt-ahnungslose-frau
-             */
-            final String[] urns = br.getRegex("data-assetid=\"(urn:srf:(audio|video):[a-f0-9\\-]+)\"").getColumn(0);
-            if (urns == null || urns.length == 0) {
-                logger.info("Failed to find any downloadable content");
+        }
+        final String json2 = br.getRegex("\"application/ld\\+json\">([^<]+)").getMatch(0);
+        if (json2 != null) {
+            /* E.g. https://www.swissinfo.ch/eng/banking-fintech/destruction-of-swiss-damaged-banknotes/87340353 */
+            final Map<String, Object> entries = restoreFromString(json2, TypeRef.MAP);
+            final Map<String, Object> video = (Map<String, Object>) entries.get("video");
+            if (video == null) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final HashSet<String> urnsWithoutDuplicates = new HashSet<String>(Arrays.asList(urns));
-            int progress = 1;
-            for (final String urn : urnsWithoutDuplicates) {
-                logger.info("Crawling embedded media " + progress + "/" + urnsWithoutDuplicates.size());
-                final ArrayList<DownloadLink> results = this.crawlMedia(urn, mode, qualitySelectionFallbackMode);
-                this.distribute(results);
-                ret.addAll(results);
-                progress++;
-            }
+            final String thumbnailUrl = entries.get("thumbnailUrl").toString();
+            final DownloadLink thumbnaillink = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(thumbnailUrl));
+            thumbnaillink.setAvailable(true);
+            ret.add(thumbnaillink);
+            final String hlsUrl = video.get("contentUrl").toString();
+            final DownloadLink videolink = this.createDownloadlink(hlsUrl);
+            ret.add(videolink);
+            fp.addLinks(ret);
+            return ret;
+        }
+        /*
+         * Example: https://www.srf.ch/news/panorama/gefaelschte-unterschrift-immobilienfirma-betreibt-ahnungslose-frau
+         */
+        final String[] urns = br.getRegex("data-assetid=\"(urn:srf:(audio|video):[a-f0-9\\-]+)\"").getColumn(0);
+        if (urns == null || urns.length == 0) {
+            logger.info("Failed to find any downloadable content");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final HashSet<String> urnsWithoutDuplicates = new HashSet<String>(Arrays.asList(urns));
+        int progress = 1;
+        for (final String urn : urnsWithoutDuplicates) {
+            logger.info("Crawling embedded media " + progress + "/" + urnsWithoutDuplicates.size());
+            final ArrayList<DownloadLink> results = this.crawlMedia(urn, mode, qualitySelectionFallbackMode);
+            this.distribute(results);
+            ret.addAll(results);
+            progress++;
         }
         return ret;
     }

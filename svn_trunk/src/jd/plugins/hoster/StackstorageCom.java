@@ -29,7 +29,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48488 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "https?://(?:www\\.)?stackstorage\\.com/fileid/(\\d+)" })
+@HostPlugin(revision = "$Revision: 50140 $", interfaceVersion = 2, names = { "stackstorage.com" }, urls = { "" })
 public class StackstorageCom extends PluginForHost {
     public StackstorageCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -118,7 +118,7 @@ public class StackstorageCom extends PluginForHost {
             dlform.put(URLEncode.encodeURIComponent("paths[]"), Encoding.urlEncode(path));
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dlform, true, 1);
         }
-        if (dl.getConnection().getContentType().contains("html")) {
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             if (dl.getConnection().getResponseCode() == 403) {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
             } else if (dl.getConnection().getResponseCode() == 404) {
@@ -127,7 +127,7 @@ public class StackstorageCom extends PluginForHost {
             br.followConnection();
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        link.setProperty("directlink", dl.getConnection().getURL().toString());
+        link.setProperty("directlink", dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 

@@ -570,8 +570,11 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
             }
 
             @Override
-            protected void setBooleanValue(boolean value, final AccountEntry object) {
-                object.getAccount().setEnabled(value);
+            protected void setBooleanValue(boolean enabled, final AccountEntry object) {
+                object.getAccount().setEnabled(enabled);
+                if (enabled && object.getAccount().isMultiHost()) {
+                    RefreshAction.displayMultihosterDetailOverviewHelpDialog();
+                }
             }
         });
     }

@@ -23,7 +23,6 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -33,7 +32,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.StileProjectComDecrypter.class })
 public class StileProjectCom extends PluginForHost {
     private String             dllink       = null;
@@ -135,6 +134,7 @@ public class StileProjectCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(getWeakFilename(link));
         }
+        final String extDefault = ".mp4";
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getHeaders().put("Referer", "https://www." + this.getHost());
@@ -161,34 +161,20 @@ public class StileProjectCom extends PluginForHost {
             titleByURL = getURLTitleCleaned(br.getURL());
         }
         if (titleByURL != null) {
-            link.setFinalFileName(titleByURL.replace("-", " ").trim() + ".mp4");
+            titleByURL = titleByURL.replace("-", " ").trim();
+            link.setFinalFileName(titleByURL + extDefault);
         }
         this.dllink = this.getdllink();
         if (!StringUtils.isEmpty(dllink) && !isDownload) {
-            br.setFollowRedirects(true);
-            URLConnectionAdapter con = null;
-            try {
-                con = br.openHeadConnection(dllink);
-                if (!this.looksLikeDownloadableContent(con)) {
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Broken video?");
-                }
-                if (con.isContentDecoded()) {
-                    link.setDownloadSize(con.getCompleteContentLength());
-                } else {
-                    link.setVerifiedFileSize(con.getCompleteContentLength());
-                }
-            } finally {
-                try {
-                    con.disconnect();
-                } catch (Throwable e) {
-                }
-            }
+            this.basicLinkCheck(br, br.createHeadRequest(this.dllink), link, titleByURL, extDefault);
         }
         return AvailableStatus.TRUE;
     }
 
     public static boolean isOffline(final Browser br) {
-        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*404 Error Page") || br.containsHTML("video_removed_dmca\\.jpg\"|error\">We're sorry")) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML("(?i)>\\s*404 Error Page") || br.containsHTML("video_removed_dmca\\.jpg\"|error\">We're sorry")) {
             return true;
         } else {
             return false;

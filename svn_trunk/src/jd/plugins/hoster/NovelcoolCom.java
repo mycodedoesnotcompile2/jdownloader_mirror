@@ -33,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolCom extends PluginForHost {
     public NovelcoolCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,13 +150,19 @@ public class NovelcoolCom extends PluginForHost {
     public static String formatFilename(final DownloadLink link) {
         final String seriesTitle = link.getStringProperty(PROPERTY_SERIES_TITLE);
         final String chapterNumber = link.getStringProperty(PROPERTY_CHAPTER_NUMBER);
+        final String chapterID = link.getStringProperty(PROPERTY_CHAPTER_ID);
         final String pageNumber = link.getStringProperty(PROPERTY_PAGE_NUMBER);
-        String filename;
-        if (seriesTitle != null) {
-            link.setProperty(PROPERTY_SERIES_TITLE, seriesTitle);
-            filename = seriesTitle + " - " + chapterNumber + " - " + pageNumber;
+        final String chapterNumberForFilename;
+        if (chapterNumber != null) {
+            chapterNumberForFilename = chapterNumber;
         } else {
-            filename = chapterNumber + " - " + pageNumber;
+            chapterNumberForFilename = chapterID;
+        }
+        String filename;
+        if (seriesTitle != null && chapterNumber != null) {
+            filename = seriesTitle + " - " + chapterNumberForFilename + " - " + pageNumber;
+        } else {
+            filename = chapterNumberForFilename + " - " + pageNumber;
         }
         filename += extDefault;
         return filename;

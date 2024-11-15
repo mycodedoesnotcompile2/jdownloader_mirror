@@ -51,8 +51,9 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50107 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
+    /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";

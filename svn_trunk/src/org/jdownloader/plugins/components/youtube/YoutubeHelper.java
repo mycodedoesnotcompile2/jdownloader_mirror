@@ -172,18 +172,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -2591,18 +2591,20 @@ public class YoutubeHelper {
         final List<YoutubeStreamData> thumbnails = crawlThumbnailData(vid.videoID, true);
         if (thumbnails != null) {
             for (YoutubeStreamData thumbnail : thumbnails) {
+                if (thumbnail.getClip() == null) {
+                    thumbnail.setClip(vid);
+                }
                 addYoutubeStreamData(ret, thumbnail);
             }
         }
         final String playListID = getPlaylistID();
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER) && playListID != null) {
-            List<YoutubeStreamData> covers = streamDataCache.get(playListID);
-            if (covers == null && !streamDataCache.containsKey(playListID)) {
-                covers = crawlCoverData(playListID, true);
-                streamDataCache.put(playListID, covers);
-            }
+        if (!CFG_YOUTUBE.CFG.getBlacklistedGroups().contains(VariantGroup.IMAGE_PLAYLIST_COVER) && playListID != null) {
+            final List<YoutubeStreamData> covers = crawlCoverData(playListID, true);
             if (covers != null) {
                 for (YoutubeStreamData cover : covers) {
+                    if (cover.getClip() == null) {
+                        cover.setClip(vid);
+                    }
                     addYoutubeStreamData(ret, cover);
                 }
             }
@@ -4322,6 +4324,10 @@ public class YoutubeHelper {
         if (playListID == null) {
             return null;
         }
+        final List<YoutubeStreamData> cachedCovers = streamDataCache.get(playListID);
+        if (cachedCovers != null) {
+            return cachedCovers;
+        }
         final Browser brc = br.cloneBrowser();
         if (brc.getRequest() == null || !brc.getURL().equalsIgnoreCase(TbCmV2.generatePlaylistURL(playListID))) {
             brc.getPage(TbCmV2.generatePlaylistURL(playListID));
@@ -4355,6 +4361,7 @@ public class YoutubeHelper {
                 data.add(match);
             }
         }
+        streamDataCache.put(playListID, data);
         if (data.size() == 0) {
             return null;
         }

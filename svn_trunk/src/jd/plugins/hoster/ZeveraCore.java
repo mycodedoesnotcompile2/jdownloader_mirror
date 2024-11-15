@@ -526,7 +526,7 @@ abstract public class ZeveraCore extends UseNet {
                 mhost.setTrafficCalculationFactorPercent((short) (fairusefactorThisHost.intValue() * 100));
             }
             if (cachehosts != null && cachehosts.contains(mainDomain) && !supportedHostsMainDomains.contains(mainDomain)) {
-                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
                 mhost.setStatusText("Cache only");
             }
             supportedhosts.add(mhost);

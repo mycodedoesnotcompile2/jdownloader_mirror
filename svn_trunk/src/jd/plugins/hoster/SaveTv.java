@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
@@ -65,7 +66,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
+@HostPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(?:www\\.)?save\\.tv/STV/M/obj/(?:archive/VideoArchiveDetails|archive/VideoArchiveStreaming|TC/SendungsDetails)\\.cfm\\?TelecastID=\\d+(?:\\&adsfree=(?:true|false|unset))?(?:\\&preferformat=[0-9])?|https?://[A-Za-z0-9\\-]+\\.save\\.tv/\\d+_\\d+_.+" })
 public class SaveTv extends PluginForHost {
     /* Static information */
     /* API functions developed for API version 3.0.0.1631 */
@@ -136,8 +137,6 @@ public class SaveTv extends PluginForHost {
     private static final String[] FORMATS                                      = new String[] { "HD", "H.264 HQ", "H.264 MOBILE" };
     /* Crawler settings */
     private static final String   CRAWLER_ONLY_ADD_NEW_IDS                     = "CRAWLER_ONLY_ADD_NEW_IDS";
-    private static final String   ACTIVATE_BETA_FEATURES                       = "ACTIVATE_BETA_FEATURES";
-    private static final String   USEAPI                                       = "USEAPI_2017_11_14";
     private static final String   CRAWLER_ACTIVATE                             = "CRAWLER_ACTIVATE";
     public static final String    CRAWLER_ENABLE_FAST_LINKCHECK                = "CRAWLER_ENABLE_FASTER_2";
     public static final String    CRAWLER_ENABLE_DIALOGS                       = "CRAWLER_ENABLE_DIALOGS";
@@ -156,8 +155,6 @@ public class SaveTv extends PluginForHost {
     /* Download connections constants */
     private static final boolean  ACCOUNT_PREMIUM_RESUME                       = true;
     private static final int      ACCOUNT_PREMIUM_MAXCHUNKS                    = -2;
-    private static final int      ACCOUNT_PREMIUM_MAXDOWNLOADS                 = -1;
-    private static final int      FREE_MAXDOWNLOADS                            = -1;
     /* Other API/site errorhandling constants */
     public static final String    URL_LOGGED_OUT                               = "Token=MSG_LOGOUT_B";
     /* Property / Filename constants / States / Small user display texts */
@@ -175,7 +172,6 @@ public class SaveTv extends PluginForHost {
     private static final int      SITE_FORMAT_LQ                               = 4;
     /* Other */
     public static Object          LOCK                                         = new Object();
-    public static Object          LOCK_login                                   = new Object();
     private Account               currAcc                                      = null;
     private DownloadLink          currDownloadlink                             = null;
     private SubConfiguration      cfg                                          = null;
@@ -200,12 +196,12 @@ public class SaveTv extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -419,7 +415,6 @@ public class SaveTv extends PluginForHost {
         /* ISO2 to country-code (german) according to ISO 3166 */
         final Map<String, String> countryMapper = new HashMap<String, String>();
         /* 2019-12-13: I build a small 'converter' and extracted most of this list from here: https://de.switch-case.com/46232452 */
-        /* TODO: Maybe move this to another place so we can use it in other modules too! */
         countryMapper.put("AFGHANISTAN", "AF");
         countryMapper.put("ÅLAND", "AX");
         countryMapper.put("ALBANIEN", "AL");
@@ -1107,7 +1102,6 @@ public class SaveTv extends PluginForHost {
         synchronized (LOCK) {
             checkFeatureDialogAll();
             checkFeatureDialogCrawler();
-            checkFeatureDialogNew();
         }
         requestFileInformation(link);
         setConstants(account, link);
@@ -1431,19 +1425,17 @@ public class SaveTv extends PluginForHost {
      */
     private AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        String package_name = null;
         api_GET(br, "/user?fields=contract.hasxlpackage%2C%20contract.hasxxlpackage%2C%20contract.islocked%2C%20contract.isrunning%2C%20contract.packagename");
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("contract");
-        final boolean isPremium = ((Boolean) entries.get("isRunning")).booleanValue();
-        package_name = (String) entries.get("packageName");
-        if (isPremium) {
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> contract = (Map<String, Object>) entries.get("contract");
+        String package_name = (String) contract.get("packageName");
+        if (StringUtils.isEmpty(package_name)) {
+            package_name = ACCOUNTTYPE_UNKNOWN;
+        }
+        if (Boolean.TRUE.equals(entries.get("isRunning"))) {
             account.setType(AccountType.PREMIUM);
         } else {
             account.setType(AccountType.FREE);
-        }
-        if (StringUtils.isEmpty(package_name)) {
-            package_name = ACCOUNTTYPE_UNKNOWN;
         }
         ai.setStatus(package_name);
         account.setProperty(PROPERTY_acc_type, package_name);
@@ -1464,7 +1456,7 @@ public class SaveTv extends PluginForHost {
             if (long_cookie == null || long_cookie.trim().equals("bAutoLoginActive=1")) {
                 logger.info("Long session cookie does not exist yet/anymore - enabling it");
                 br.postPage("https://www." + this.getHost() + "/STV/M/obj/user/submit/submitAutoLogin.cfm", "IsAutoLogin=true&Messages=");
-                long_cookie = br.getCookie("http://save.tv/", "SLOCO");
+                long_cookie = br.getCookie(br.getHost(), "SLOCO");
                 if (long_cookie == null || long_cookie.trim().equals("")) {
                     logger.info("Failed to get long session cookie");
                 } else {
@@ -1545,10 +1537,11 @@ public class SaveTv extends PluginForHost {
         }
     }
 
+    @Deprecated
     public static void login_website(final Browser br, final Account account, final boolean force) throws Exception {
         final String lang = System.getProperty("user.language");
         site_prepBrowser(br);
-        synchronized (LOCK_login) {
+        synchronized (account) {
             try {
                 br.setCookiesExclusive(true);
                 final Cookies cookies = account.loadCookies("");
@@ -1589,7 +1582,7 @@ public class SaveTv extends PluginForHost {
     }
 
     public static void login_api(final Browser br, final Account account, final boolean force) throws Exception {
-        synchronized (LOCK_login) {
+        synchronized (account) {
             api_prepBrowser(br);
             String api_access_token = getAccessTokenAndSetHeaderAPI(br, account);
             String refresh_token = account.getStringProperty(PROPERTY_refresh_token, null);
@@ -1885,7 +1878,7 @@ public class SaveTv extends PluginForHost {
 
     /** Set Authorization header(s) for API usage. */
     public static void setAPIAuthHeaders(final Browser br, final String auth_token) {
-        br.getHeaders().put("Authorization", "Bearer " + auth_token);
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + auth_token);
     }
 
     /**
@@ -2658,7 +2651,7 @@ public class SaveTv extends PluginForHost {
     /** Returns 'normal' save.tv downloadurl. */
     private String buildArchiveDownloadURL(final DownloadLink downloadLink) {
         final String telecastID = getTelecastId(downloadLink);
-        return String.format("https://www.%s/STV/M/obj/archive/VideoArchiveDetails.cfm?TelecastId=%s", this.getHost(), telecastID);
+        return String.format("https://www.%s/STV/M/obj/archive/VideoArchiveDetails.cfm?TelecastId=%s", getHost(), telecastID);
     }
 
     /**
@@ -2684,12 +2677,11 @@ public class SaveTv extends PluginForHost {
     private final static int     defaultADS_FREE_UNAVAILABLE_HOURS          = 24;
     private static final boolean defaultCrawlerActivate                     = false;
     public static final boolean  defaultCrawlerActivateInformationDialogs   = true;
-    private static final boolean defaultCrawlerFastLinkcheck                = true;
+    public static final boolean  defaultCrawlerFastLinkcheck                = true;
     private static final boolean defaultCrawlerAddNew                       = false;
     private static final boolean defaultPreferAdsFree                       = true;
     private static final boolean defaultUseOriginalFilename                 = false;
     private static final String  defaultCustomDate                          = "dd.MM.yyyy";
-    private static final boolean defaultACTIVATE_BETA_FEATURES              = false;
     public static final boolean  defaultUSEAPI                              = true;
     private static final boolean defaultDeleteTelecastIDAfterDownload       = false;
     private static final boolean defaultDeleteTelecastIDIfFileAlreadyExists = false;
@@ -2706,14 +2698,6 @@ public class SaveTv extends PluginForHost {
         getConfig().addEntry(crawlerAddNew);
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SaveTv.CRAWLER_GRAB_TIMEFRAME_COUNT, "Nur Aufnahmen der letzten X Tage crawlen??\r\nAnzahl der Tage, die gecrawlt werden sollen [0 = komplettes Archiv]:", 0, 62, 1).setDefaultValue(defaultCrawlLastDays).setEnabledCondidtion(crawlerAddNew, false));
-        /*
-         * 2017-09-21: Disable this setting as we're switching to API-only mode and API provides all required information straight away so
-         * this is not required anymore.
-         */
-        // getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.CRAWLER_ENABLE_FAST_LINKCHECK,
-        // "Aktiviere schnellen Linkcheck für Archiv-Crawler?\r\nVorteil: Über den Archiv-Crawler hinzugefügte Links landen viel schneller
-        // im Linkgrabber\r\nNachteil: Es sind nicht alle Informationen (z.B. Kategorie) verfügbar - erst beim Download oder späterem
-        // Linkcheck\r\n").setDefaultValue(defaultCrawlerFastLinkcheck).setEnabledCondidtion(crawlerActivate, true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.CRAWLER_ENABLE_DIALOGS, "<html>Info Dialoge des Archiv-Crawlers aktivieren?<br />[Erscheinen nach dem Crawlen oder im Fehlerfall] </html>").setDefaultValue(defaultCrawlerActivateInformationDialogs).setEnabledCondidtion(crawlerActivate, true));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
@@ -2791,23 +2775,11 @@ public class SaveTv extends PluginForHost {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Erweiterte Einstellungen:\r\n<html><p style=\"color:#F62817\"><b>Warnung: Ändere die folgenden Einstellungen nur, wenn du weißt was du tust!\r\nMit einem Klick auf den gelben Pfeil rechts oben kannst du jederzeit zu den Standardeinstellungen zurück.</b></p></html>"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        // getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.ACTIVATE_BETA_FEATURES,
-        // JDL.L("plugins.hoster.SaveTv.ActivateBETAFeatures", "Aktiviere BETA-Features?\r\nINFO: Was diese Features sind und ob es aktuell
-        // welche gibt steht im Support Forum.")).setEnabled(defaultACTIVATE_BETA_FEATURES));
-        // getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        /* More information see method 'is_API_enabled' */
-        final ConfigEntry api = new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SaveTv.USEAPI, "<html><p>APIv3 verwenden?<br />Dauerhaft aktiviert seit dem 14.11.2017, da die Webseite nicht mehr unterstützt wird.</p></html>").setDefaultValue(defaultUSEAPI).setEnabled(false);
-        getConfig().addEntry(api);
-        // getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CONFIGURED_APIKEY,
-        // JDL.L("plugins.hoster.SaveTv.apikey", "Benutzerdefinierten API-Key eingeben:\r\n<html><p style=\"color:#F62817\"><b>Warnung:</b>
-        // Die API ist nur mit gültigem API-Key (in der Regel mit den Standardeinstellungen)
-        // nutzbar!</p></html>")).setDefaultValue(defaultCONFIGURED_APIKEY).setEnabledCondidtion(api, true).setEnabled(false));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, "Soll die telecastID in bestimmten Situationen aus dem save.tv Archiv gelöscht werden?\r\n<html><p style=\"color:#F62817\"><b>Warnung:</b> Gelöschte telecastIDs können nicht wiederhergestellt werden!</p></html>"));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_AFTER_DOWNLOAD, "Erfolgreich heruntergeladene telecastIDs aus dem save.tv Archiv löschen?").setDefaultValue(defaultDeleteTelecastIDAfterDownload));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), DELETE_TELECAST_ID_IF_FILE_ALREADY_EXISTS, "Falls Datei bereits auf der Festplatte existiert, telecastIDs aus dem save.tv Archiv löschen?").setDefaultValue(defaultDeleteTelecastIDIfFileAlreadyExists));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_API_PARAMETERS_CRAWLER, "Crawler: eigene API Parameter definieren (alles außer 'limit,fields,nopagingheader,paging,offset') [urlEncoded]:\r\nBeispiel: 'tags=record:manual&fsk=6'\r\nWeitere Informationen siehe: api.save.tv/v3/docs/index#!/Records_|_get/Records_Get<html><p style=\"color:#F62817\"><b>Warnung:</b> Falsche Werte können den Crawler 'kaputtmachen' und andere Crawler-Einstellungen beeinflussen (ggf. Einstellungen zurücksetzen)!</p></html>").setDefaultValue(null).setEnabledCondidtion(api, true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_API_PARAMETERS_CRAWLER, "Crawler: eigene API Parameter definieren (alles außer 'limit,fields,nopagingheader,paging,offset') [urlEncoded]:\r\nBeispiel: 'tags=record:manual&fsk=6'\r\nWeitere Informationen siehe: api.save.tv/v3/docs/index#!/Records_|_get/Records_Get<html><p style=\"color:#F62817\"><b>Warnung:</b> Falsche Werte können den Crawler 'kaputtmachen' und andere Crawler-Einstellungen beeinflussen (ggf. Einstellungen zurücksetzen)!</p></html>").setDefaultValue(null));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_FILENAME_SEPERATION_MARK, "Trennzeichen als Ersatz für '/'  (da ungültig in Dateinamen):").setDefaultValue(defaultCustomSeperationMark).setEnabledCondidtion(origName, false));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_FILENAME_EMPTY_TAG_STRING, "Zeichen, mit dem Tags ersetzt werden sollen, deren Daten fehlen:").setDefaultValue(defaultCustomStringForEmptyTags).setEnabledCondidtion(origName, false));
@@ -2961,48 +2933,6 @@ public class SaveTv extends PluginForHost {
             message += "Um den Crawler nutzen zu können, musst du ihn erst in den Plugin Einstellungen aktivieren.\r\n";
             message += "\r\n";
             message += "Die Crawler Einstellungen sind in der Version JDownloader 2 verfügbar unter:\r\nEinstellungen -> Plugin Einstellungen -> save.tv";
-            message += getMessageEnd();
-            UIOManager.I().showMessageDialog(message);
-        } catch (Throwable e) {
-            logger.log(e);
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private void checkFeatureDialogNew() {
-        final String featureDialogProperty = "featuredialog_new20092017_Shown";
-        SubConfiguration config = null;
-        try {
-            config = getPluginConfig();
-            if (config.getBooleanProperty(featureDialogProperty, Boolean.FALSE) == false) {
-                if (config.getProperty(featureDialogProperty + "2") == null) {
-                    showFeatureDialogNew();
-                } else {
-                    config = null;
-                }
-            } else {
-                config = null;
-            }
-        } catch (final Throwable e) {
-        } finally {
-            if (config != null) {
-                config.setProperty(featureDialogProperty, Boolean.TRUE);
-                config.setProperty(featureDialogProperty + "2", "shown");
-                config.save();
-            }
-        }
-    }
-
-    private void showFeatureDialogNew() {
-        try {
-            String message = "Hallo lieber save.tv Nutzer/liebe save.tv NutzerIn\r\n";
-            message += "Das save.tv Plugin bietet neben Fehlerbehebungen seit dem 20.09.2017 folgende neue Features:\r\n";
-            message += "- Abgeschlossene Downloads bekommen einen 'Download vollständig' Verweis; zu sehen auf der telecastID Save.tv Seite unter 'Tags' (da wo auch sowas steht wie 'Länge werbefreie Aufnahme: 22:56')\r\n";
-            message += "- Einstellung zum erzwungenen Download ohne Schnittliste (falls keine verfügbar) wurde vereinfacht\r\n";
-            message += "- Berechnung der Dateigröße ist nun viel genauer[bis auf 10 MB]\r\n";
-            message += "- Und vieles mehr ...\r\n";
-            message += "\r\n";
-            message += "Die Plugin Einstellungen sind in der Version JDownloader 2 verfügbar unter:\r\nEinstellungen -> Plugin Einstellungen -> save.tv";
             message += getMessageEnd();
             UIOManager.I().showMessageDialog(message);
         } catch (Throwable e) {

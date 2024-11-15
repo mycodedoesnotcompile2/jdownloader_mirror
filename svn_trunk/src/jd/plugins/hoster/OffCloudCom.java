@@ -30,6 +30,31 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.Icon;
 import javax.swing.JScrollPane;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.swing.exttable.ExtTableModel;
+import org.appwork.swing.exttable.columns.ExtDateColumn;
+import org.appwork.swing.exttable.columns.ExtTextColumn;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.images.NewTheme;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.config.TakeValueFromSubconfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.config.Property;
 import jd.gui.swing.jdgui.BasicJDTable;
@@ -52,31 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.swing.exttable.ExtTableModel;
-import org.appwork.swing.exttable.columns.ExtDateColumn;
-import org.appwork.swing.exttable.columns.ExtTextColumn;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.images.NewTheme;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.config.TakeValueFromSubconfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 50127 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -943,7 +944,7 @@ public class OffCloudCom extends UseNet {
             case 15:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This cann be considered as a small workaround.
                  */
@@ -953,7 +954,7 @@ public class OffCloudCom extends UseNet {
             case 16:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This extra errorhandling can be considered as a small workaround.
                  */
@@ -1192,24 +1193,29 @@ public class OffCloudCom extends UseNet {
         panel.addStringPair(_GUI.T.plugins_offcloudcom_historydeleted(), lastDeletedCompleteDownloadlistUserDisplay);
         panel.addStringPair(_GUI.T.plugins_offcloudcom_ACCOUNT_HISTORYDELETED_COUNT(), deleted_links_user_display);
         addPackageInformation: if (true) {
-            List<Map<String, Object>> activePackages = null;
+            List<Map<String, Object>> activeAddons = null;
             try {
-                activePackages = (List<Map<String, Object>>) restoreFromString(account.getStringProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST), TypeRef.OBJECT);
+                activeAddons = (List<Map<String, Object>>) restoreFromString(account.getStringProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST), TypeRef.OBJECT);
             } catch (final Throwable ignore) {
                 break addPackageInformation;
             }
-            if (activePackages == null || activePackages.size() == 0) {
+            if (activeAddons == null || activeAddons.size() == 0) {
                 /* No extra information available */
                 break addPackageInformation;
             }
             /* Prepare/parse data */
             final List<Map<String, Date>> parsed_data = new ArrayList<Map<String, Date>>();
             try {
-                for (final Map<String, Object> activePackage : activePackages) {
-                    final long millis = TimeFormatter.getMilliSeconds(activePackage.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+                for (final Map<String, Object> activeAddon : activeAddons) {
+                    final String addonType = activeAddon.get("type").toString();
+                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && addonType.matches(".+-downloading$")) {
+                        /* Skip some internal addon types in stable version */
+                        continue;
+                    }
+                    final long millis = TimeFormatter.getMilliSeconds(activeAddon.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
                     final Date date = new Date(millis);
                     final HashMap<String, Date> map = new HashMap<String, Date>();
-                    map.put(activePackage.get("type").toString(), date);
+                    map.put(addonType, date);
                     parsed_data.add(map);
                 }
             } catch (final Throwable ignore) {

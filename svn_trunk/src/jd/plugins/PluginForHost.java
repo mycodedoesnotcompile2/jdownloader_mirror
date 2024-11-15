@@ -233,14 +233,16 @@ import org.jdownloader.updatev2.UpdateHandler;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-                                                  /**
-                                                   * these patterns should split filename and fileextension (extension must include the
-                                                   * point)
-                                                   */
-                                                  // multipart rar archives
-        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-        // normal files with extension
-        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+            // normal files with extension
+            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -1445,16 +1447,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         * 
+         *
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         * 
+         *
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         * 
+         *
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         * 
-         * 
-         * 
+         *
+         *
+         *
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3239,6 +3241,7 @@ public abstract class PluginForHost extends Plugin {
                             mhost.setEnabled(enabled);
                             fireTableStructureChanged();
                         }
+
                     });
                 }
                 addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
@@ -3282,6 +3285,11 @@ public abstract class PluginForHost extends Plugin {
                         }
                         return sb.toString();
                     }
+
+                    @Override
+                    public boolean isEnabled(final MultiHostHost mhost) {
+                        return mhost.isEnabled();
+                    }
                 });
                 addColumn(new ExtTextColumn<MultiHostHost>("Status") {
                     @Override
@@ -3321,6 +3329,11 @@ public abstract class PluginForHost extends Plugin {
                             return icon_error;
                         }
                     }
+
+                    @Override
+                    public boolean isEnabled(final MultiHostHost mhost) {
+                        return mhost.isEnabled();
+                    }
                 });
                 if (shouldShowDetailedTextColumn_final) {
                     addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_detailed_status_text()) {
@@ -3339,6 +3352,11 @@ public abstract class PluginForHost extends Plugin {
                         @Override
                         protected String getTooltipText(MultiHostHost mhost) {
                             return _GUI.T.multihost_detailed_host_info_table_column_detailed_status_text_tooltip();
+                        }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
                         }
                     });
                 }
@@ -3394,6 +3412,11 @@ public abstract class PluginForHost extends Plugin {
                                 return "---";
                             }
                         }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
                     });
                 }
                 if (shouldShowLinkLimitColumns_final) {
@@ -3434,6 +3457,11 @@ public abstract class PluginForHost extends Plugin {
                                 return mhost.getLinksLeft();
                             }
                         }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
                     });
                     addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_left()) {
                         @Override
@@ -3454,6 +3482,11 @@ public abstract class PluginForHost extends Plugin {
                         public boolean isDefaultVisible() {
                             return false;
                         }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
                     });
                     addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_links_max()) {
                         @Override
@@ -3473,6 +3506,11 @@ public abstract class PluginForHost extends Plugin {
                         @Override
                         public boolean isDefaultVisible() {
                             return false;
+                        }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
                         }
                     });
                 }
@@ -3521,6 +3559,11 @@ public abstract class PluginForHost extends Plugin {
                                 return mhost.getTrafficLeft();
                             }
                         }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
                     });
                     addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left()) {
                         @Override
@@ -3540,6 +3583,11 @@ public abstract class PluginForHost extends Plugin {
                         @Override
                         public boolean isDefaultVisible() {
                             return false;
+                        }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
                         }
                     });
                     addColumn(new ExtFileSizeColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_max()) {
@@ -3561,6 +3609,11 @@ public abstract class PluginForHost extends Plugin {
                         public boolean isDefaultVisible() {
                             return false;
                         }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
                     });
                 }
                 if (shouldShowTrafficCaculationColumn_final) {
@@ -3573,6 +3626,11 @@ public abstract class PluginForHost extends Plugin {
                         @Override
                         protected String getLongFormatted(MultiHostHost mhost) {
                             return getLong(mhost) + "%";
+                        }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
                         }
                     });
                 }

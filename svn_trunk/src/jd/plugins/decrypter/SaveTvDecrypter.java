@@ -42,6 +42,7 @@ import jd.http.Browser.BrowserException;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterException;
 import jd.plugins.DecrypterPlugin;
@@ -51,7 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.SaveTv;
 
-@DecrypterPlugin(revision = "$Revision: 49970 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
+@DecrypterPlugin(revision = "$Revision: 50142 $", interfaceVersion = 3, names = { "save.tv" }, urls = { "https?://(www\\.)?save\\.tv/STV/M/obj/archive/(?:Horizontal)?VideoArchive\\.cfm" })
 public class SaveTvDecrypter extends PluginForDecrypt {
     public SaveTvDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +61,6 @@ public class SaveTvDecrypter extends PluginForDecrypt {
     /* Settings stuff */
     @SuppressWarnings("deprecation")
     private final SubConfiguration   cfg                                          = SubConfiguration.getConfig("save.tv");
-    // private static final String ACTIVATE_BETA_FEATURES = "ACTIVATE_BETA_FEATURES";
     private final String             CRAWLER_ONLY_ADD_NEW_IDS                     = "CRAWLER_ONLY_ADD_NEW_IDS";
     private final String             CRAWLER_ACTIVATE                             = "CRAWLER_ACTIVATE";
     private static final String      CRAWLER_PROPERTY_TELECASTIDS_ADDED           = "CRAWLER_PROPERTY_TELECASTIDS_ADDED";
@@ -77,7 +77,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
      */
     private static final long        TELECAST_ID_EXPIRE_TIME                      = 62 * 24 * 60 * 60 * 1000l;
     /* Decrypter variables */
-    final ArrayList<DownloadLink>    ret                               = new ArrayList<DownloadLink>();
+    final ArrayList<DownloadLink>    ret                                          = new ArrayList<DownloadLink>();
     final ArrayList<String>          dupecheckList                                = new ArrayList<String>();
     private static Map<String, Long> crawledTelecastIDsMap                        = new HashMap<String, Long>();
     private long                     only_grab_entries_of_specified_timeframe     = 0;
@@ -116,7 +116,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         timestamp_crawl_started = System.currentTimeMillis();
         parameter = param.toString();
         api_enabled = jd.plugins.hoster.SaveTv.is_API_enabled(this.getHost());
-        fast_linkcheck = cfg.getBooleanProperty(jd.plugins.hoster.SaveTv.CRAWLER_ENABLE_FAST_LINKCHECK, false);
+        fast_linkcheck = cfg.getBooleanProperty(jd.plugins.hoster.SaveTv.CRAWLER_ENABLE_FAST_LINKCHECK, SaveTv.defaultCrawlerFastLinkcheck);
         crawler_DialogsEnabled = cfg.getBooleanProperty(jd.plugins.hoster.SaveTv.CRAWLER_ENABLE_DIALOGS, jd.plugins.hoster.SaveTv.defaultCrawlerActivateInformationDialogs);
         only_grab_new_entries = cfg.getBooleanProperty(CRAWLER_ONLY_ADD_NEW_IDS, false);
         only_grab_entries_of_specified_timeframe = cfg.getLongProperty(jd.plugins.hoster.SaveTv.CRAWLER_GRAB_TIMEFRAME_COUNT, 0);
@@ -131,9 +131,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
             final ArrayList<Account> all_stv_accounts = AccountController.getInstance().getValidAccounts(this.getHost());
             totalAccountsNum = all_stv_accounts != null ? all_stv_accounts.size() : 0;
             if (totalAccountsNum == 0) {
-                logger.info("At least one account needed to use this crawler");
-                ret.add(this.createOfflinelink(parameter, "Account_fuer_save_tv_benoetigt", "Account_fuer_save_tv_benoetigt"));
-                return ret;
+                throw new AccountRequiredException("Save.tv Account benötigt");
             }
             for (final Account stvacc : all_stv_accounts) {
                 if (!getUserLogin(stvacc, false)) {
@@ -279,7 +277,7 @@ public class SaveTvDecrypter extends PluginForDecrypt {
         boolean is_groups_enabled = false;
         boolean groups_enabled_by_user = false;
         this.br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        getPageSafe(acc, "https://www.save.tv/STV/M/obj/archive/JSON/VideoArchiveApi.cfm?" + "iEntriesPerPage=1&iCurrentPage=1&dStartdate=0");
+        getPageSafe(acc, "https://www." + getHost() + "/STV/M/obj/archive/JSON/VideoArchiveApi.cfm?" + "iEntriesPerPage=1&iCurrentPage=1&dStartdate=0");
         is_groups_enabled = !br.containsHTML("\"IGROUPCOUNT\":1\\.0");
         groups_enabled_by_user = is_groups_enabled;
         final String totalLinksInsideCurrentAccount = PluginJSonUtils.getJsonValue(this.br, "ITOTALENTRIES");

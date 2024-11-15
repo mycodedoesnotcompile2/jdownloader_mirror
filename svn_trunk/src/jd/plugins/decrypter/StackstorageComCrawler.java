@@ -34,9 +34,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
 import jd.plugins.hoster.StackstorageCom;
 
-@DecrypterPlugin(revision = "$Revision: 48767 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 50140 $", interfaceVersion = 3, names = { "stackstorage.com" }, urls = { "https?://([a-z0-9]+)\\.stackstorage\\.com/s/([A-Za-z0-9]+)(\\?dir=([^\\&]+)\\&node\\-id=(\\d+))?" })
 public class StackstorageComCrawler extends PluginForDecrypt {
     public StackstorageComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,6 +54,7 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             /* Start from root */
             subdir = "%2F";
         }
+        final PluginForHost hosterplugin = this.getNewPluginForHostInstance(this.getHost());
         final boolean useApiV2 = true;
         if (useApiV2) {
             /* 2023-11-20 */
@@ -60,7 +62,11 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             final String apiurl = "https://" + subdomain + ".stackstorage.com/api/v2/share/" + folderID;
             /* Obtain token / cookie */
             br.postPageRaw(apiurl, "{\"password\":\"\"}");
-            if (br.getHttpConnection().getResponseCode() == 404) {
+            if (br.getHttpConnection().getResponseCode() == 401) {
+                logger.info("Password protected URLs are not yet supported");
+                ret.add(this.createOfflinelink(contenturl, "PASSWORD_PROTECTED"));
+                return ret;
+            } else if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Item offline or account required to access it");
             } else if (br.getHttpConnection().getResponseCode() == 503) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Error 503 offline");
@@ -76,6 +82,8 @@ public class StackstorageComCrawler extends PluginForDecrypt {
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String filename = entries.get("name").toString();
             final DownloadLink file = createDownloadlink(String.format("https://stackstorage.com/fileid/%s", entries.get("id").toString()));
+            file.setDefaultPlugin(hosterplugin);
+            file.setHost(this.getHost());
             file.setFinalFileName(filename);
             file.setVerifiedFileSize(((Number) entries.get("size")).longValue());
             file.setAvailable(true);
@@ -145,6 +153,8 @@ public class StackstorageComCrawler extends PluginForDecrypt {
                     } else {
                         /* File */
                         dl = createDownloadlink(String.format("https://stackstorage.com/fileid/%s", fileid));
+                        dl.setDefaultPlugin(hosterplugin);
+                        dl.setHost(this.getHost());
                         /* Path also contains filename but we need to separate that and remove filename from path */
                         final String path_without_filename;
                         final String[] pathParts = path_with_filename.split("/");
