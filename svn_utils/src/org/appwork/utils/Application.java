@@ -736,7 +736,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(int)
          */
         @Override
@@ -759,7 +759,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
@@ -782,7 +782,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
@@ -805,7 +805,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#flush()
          */
         @Override
@@ -826,7 +826,7 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         *
+         * 
          * @see java.io.OutputStream#close()
          */
         @Override
@@ -984,13 +984,11 @@ public class Application {
      * @param newAppFolder
      * @param newJar
      */
-    public synchronized static String setApplication(final String newAppFolder) {
+    public synchronized static void setApplication(final String newAppFolder) {
         Application.ROOT = null;
-        String old = newAppFolder;
         Application.APP_FOLDER = newAppFolder;
         Application.ensureFrameWorkInit();
         Application.ROOT = getRoot(Application.class);
-        return old;
     }
 
     /**

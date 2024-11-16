@@ -57,7 +57,7 @@ public class MultiHostHost {
         };
     }
 
-    private boolean               enabled                         = true;
+    private Boolean               enabled                         = null;
     private String                name                            = null;
     private List<String>          domains                         = new ArrayList<String>();
     private Boolean               isUnlimitedTraffic              = null;
@@ -93,12 +93,34 @@ public class MultiHostHost {
         this.setDomain(domain);
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    private boolean isEnabled(final Boolean booleanValue) {
+        return booleanValue == null || booleanValue.booleanValue();
     }
 
-    public void setEnabled(boolean enabled) {
+    private String getEnabledProperty() {
+        return "multihost_" + getDomain() + "_enabled";
+    }
+
+    public boolean isEnabled() {
+        final Account ac = getAccount();
+        final boolean ret = ac == null ? isEnabled(enabled) : ac.getBooleanProperty(getEnabledProperty(), isEnabled(enabled));
+        return ret;
+    }
+
+    protected Account getAccount() {
+        final AccountInfo ai = getAccountInfo();
+        if (ai == null) {
+            return null;
+        }
+        return ai.getAccount();
+    }
+
+    public void setEnabled(final boolean enabled) {
         this.enabled = enabled;
+        final Account ac = getAccount();
+        if (ac != null) {
+            ac.setProperty(getEnabledProperty(), this.enabled);
+        }
         if (enabled) {
             clearErrorStatus();
         }
@@ -201,8 +223,8 @@ public class MultiHostHost {
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br>
-     * 500 = 5 times the size of the downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
+     * downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
         if (trafficCalculationFactorPercent == null) {
@@ -241,8 +263,8 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns custom set status text. </br>
-     * Typically used to describe why this host is currently not working but can also be used as an informative field.
+     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
+     * informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -360,8 +382,7 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns time this item is unavailable for. </br>
-     * This can return negative values.
+     * Returns time this item is unavailable for. </br> This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();

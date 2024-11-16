@@ -32,8 +32,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.NovelcoolComCrawler;
 
-@HostPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolCom extends PluginForHost {
     public NovelcoolCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -72,7 +73,7 @@ public class NovelcoolCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/chapter/[A-Za-z\\-]+(\\d+(-\\d+)?)/(\\d+)-(\\d+)\\.html");
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/chapter/[A-Za-z0-9\\-]+/(\\d+)-(\\d+)\\.html");
         }
         return ret.toArray(new String[0]);
     }
@@ -113,9 +114,10 @@ public class NovelcoolCom extends PluginForHost {
         if (!link.isNameSet()) {
             link.setName(this.getLinkID(link) + extDefault);
         }
-        final Regex urlinfo = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks());
-        final String chapterNumber = urlinfo.getMatch(0);
-        final String pageNumber = urlinfo.getMatch(3);
+        final String contenturl = link.getPluginPatternMatcher();
+        final Regex urlinfo = new Regex(contenturl, this.getSupportedLinks());
+        final String chapterNumber = NovelcoolComCrawler.getChapterNumberFromURL(contenturl);
+        final String pageNumber = urlinfo.getMatch(1);
         link.setProperty(PROPERTY_CHAPTER_NUMBER, chapterNumber);
         link.setProperty(PROPERTY_PAGE_NUMBER, pageNumber);
         this.setBrowserExclusive();

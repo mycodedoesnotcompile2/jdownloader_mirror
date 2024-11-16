@@ -25,6 +25,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -40,6 +52,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -49,19 +62,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49831 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50166 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,9 +90,11 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -145,7 +148,7 @@ public class XHamsterCom extends PluginForHost {
             /* Movies old pattern --> Redirects to TYPE_VIDEOS_2 (or TYPE_VIDEOS_3) */
             pattern += "|https?://(?:[a-z0-9\\-]+\\.)?" + buildHostsPatternPart(domains) + "/movies/[0-9]+/[^/]+\\.html";
             /* Premium pattern */
-            pattern += "|https?://(?:gold\\.xhamsterpremium\\.com|faphouse\\.com)/([a-z]{2}/)?videos/([A-Za-z0-9]+)";
+            pattern += "|https?://(?:gold\\.xhamsterpremium\\.com|faphouse\\.com)/([a-z]{2}/)?videos/([A-Za-z0-9\\-]+)";
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);
@@ -172,7 +175,7 @@ public class XHamsterCom extends PluginForHost {
     /* Porn_plugin */
     private final String          SETTING_SELECTED_VIDEO_FORMAT          = "SELECTED_VIDEO_FORMAT";
     /* The list of qualities/formats displayed to the user */
-    private static final String[] FORMATS                                = new String[] { "Best available", "240p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
+    private static final String[] FORMATS                                = new String[] { "Best available", "240p", "360p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
     public static final String    domain_premium                         = "faphouse.com";
     public static final String    api_base_premium                       = "https://faphouse.com/api";
     private static final String   TYPE_MOVIES                            = "(?i)^https?://[^/]+/movies/(\\d+)/([^/]+)\\.html$";
@@ -194,7 +197,7 @@ public class XHamsterCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://xhamster.com/terms.php";
+        return "https://" + getHost() + "/info/terms";
     }
 
     public static final String  TYPE_MOBILE    = "(?i).+m\\.xhamster\\.+";
@@ -702,8 +705,25 @@ public class XHamsterCom extends PluginForHost {
             /* Do not perform http request now to speed up linkcheck */
             return null;
         }
+        final String streamHlsMaster = br.getRegex("data-el-hls-url=\"(https?://[^\"]+)").getMatch(0);
+        if (br.containsHTML(">You've reached the download limit for this month")) {
+            if (streamHlsMaster != null) {
+                logger.info("Download limit reached -> Fallback to HLS stream download");
+                return streamHlsMaster;
+            }
+            throw new AccountUnavailableException("You've reached the download limit for this month", 10 * 60 * 1000);
+        }
         br.getPage(String.format(api_base_premium + "/videos/%s/original-video-config", internalVideoID));
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> errors = (Map<String, Object>) entries.get("errors");
+        if (errors != null) {
+            // final Object _globalO = errors.get("_global");
+            // if(_globalO != null) {
+            // final List<String> globalErrors = (List<String>)_globalO;
+            // }
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Official download not possible");
+        }
+        /* E.g. {"errors":{"_global":["NOT_PURCHASED"]},"userId":1234567,"hasGoldSubscription":true,"username":"username"} */
         final String username = (String) entries.get("username");
         if (username != null) {
             /* Set Packagizer property */
@@ -752,18 +772,20 @@ public class XHamsterCom extends PluginForHost {
         final int selected_format = getPluginConfig().getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, 0);
         switch (selected_format) {
         default:
-        case 7:
+        case 8:
             return 2160;
-        case 6:
+        case 7:
             return 1440;
-        case 5:
+        case 6:
             return 1080;
-        case 4:
+        case 5:
             return 960;
-        case 3:
+        case 4:
             return 720;
-        case 2:
+        case 3:
             return 480;
+        case 2:
+            return 360;
         case 1:
             return 240;
         case 0:
@@ -1092,9 +1114,25 @@ public class XHamsterCom extends PluginForHost {
         if (StringUtils.containsIgnoreCase(dllink, ".m3u8")) {
             /* 2021-02-01: HLS download */
             br.getPage(this.dllink);
-            final HlsContainer hlsbest = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            final int preferredVideoQualityHeight = getPreferredQualityHeight();
+            final List<HlsContainer> hlsContainers = HlsContainer.getHlsQualities(this.br);
+            HlsContainer preferredQuality = null;
+            for (final HlsContainer container : hlsContainers) {
+                if (container.getHeight() == preferredVideoQualityHeight) {
+                    logger.info("Found preferred quality: " + preferredVideoQualityHeight);
+                    preferredQuality = container;
+                    break;
+                }
+            }
+            final HlsContainer chosenQuality;
+            if (preferredQuality != null) {
+                chosenQuality = preferredQuality;
+            } else {
+                /* Best quality */
+                chosenQuality = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(this.br));
+            }
             checkFFmpeg(link, "Download a HLS Stream");
-            dl = new HLSDownloader(link, br, hlsbest.getDownloadurl());
+            dl = new HLSDownloader(link, br, chosenQuality.getDownloadurl());
             dl.startDownload();
         } else {
             boolean resume = true;
@@ -1393,9 +1431,10 @@ public class XHamsterCom extends PluginForHost {
             /* Check vja ajax request -> json */
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
-             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
-             * user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br>
+             * Redirects to mainpage if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
              */
             final boolean looksLikeJsonResponse = br.getRequest().getHtmlCode().startsWith("{");
             if (br.getHttpConnection().getContentType().contains("json") && (looksLikeJsonResponse || br.toString().equals("null"))) {

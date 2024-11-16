@@ -19,30 +19,44 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("https://www." + getHost() + "/vip/");
+        this.enablePremium("https://www." + getHost() + "/vip/");
+    }
+
+    @Override
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.XXX, LazyPlugin.FEATURE.COOKIE_LOGIN_OPTIONAL };
     }
 
     @Override
@@ -89,10 +103,13 @@ public class ModelKarteiDe extends PluginForHost {
         return buildSupportedNames(getPluginDomains());
     }
 
+    private static Pattern TYPE_PHOTO = Pattern.compile("/(?:fotos|photos)/(?:foto|photo)/(\\d+)/?", Pattern.CASE_INSENSITIVE);
+    private static Pattern TYPE_VIDEO = Pattern.compile("/video/video/(\\d+)/?", Pattern.CASE_INSENSITIVE);
+
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:fotos/foto|videos/video)/(\\d+)/");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_PHOTO.pattern() + "| " + TYPE_VIDEO.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -113,7 +130,11 @@ public class ModelKarteiDe extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), TYPE_PHOTO).getMatch(0);
+        if (fid == null) {
+            fid = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO).getMatch(0);
+        }
+        return fid;
     }
 
     private boolean isVideo(final DownloadLink link) {
@@ -126,10 +147,10 @@ public class ModelKarteiDe extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, false);
+        return requestFileInformation(link, null, false);
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         dllink = null;
         final String extDefault;
         if (isVideo(link)) {
@@ -144,6 +165,9 @@ public class ModelKarteiDe extends PluginForHost {
             link.setName(contentID + extDefault);
         }
         this.setBrowserExclusive();
+        if (account != null) {
+            this.login(account, false);
+        }
         /* Ensure English language */
         br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, link.getPluginPatternMatcher());
         /**
@@ -185,7 +209,7 @@ public class ModelKarteiDe extends PluginForHost {
             if (dllink == null) {
                 dllink = br.getRegex("type=\"video/webm\"[^>]*src=\"(https?://[^\"]+)").getMatch(0); // video WEBM
                 if (dllink == null) {
-                    /* Super old flash player .flv videos */
+                    /* Super old flash player .flv videos e.g. /videos/video/1370/ */
                     dllink = br.getRegex("\"(https?://[^/]+/[^\"]+\\.flv)\"").getMatch(0); // video FLV
                 }
             }
@@ -195,18 +219,27 @@ public class ModelKarteiDe extends PluginForHost {
             ext = getFileNameExtensionFromURL(dllink, extDefault);
         }
         try {
-            if (!StringUtils.isEmpty(dllink) && (isDownload == false || dateFormatted == null)) {
-                /* Find filesize */
+            findDateViaHeader: if (!StringUtils.isEmpty(dllink) && (isDownload == false || dateFormatted == null)) {
+                /* Find file size */
                 final URLConnectionAdapter con = basicLinkCheck(br.cloneBrowser(), br.createHeadRequest(dllink), link, null, null);
-                if (dateFormatted == null) {
-                    final Date lastModifiedDate = TimeFormatter.parseDateString(con.getHeaderField(HTTPConstants.HEADER_RESPONSE_LAST_MODFIED));
-                    if (lastModifiedDate != null) {
-                        dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
-                    }
+                final String lastModifiedHeader = con.getHeaderField(HTTPConstants.HEADER_RESPONSE_LAST_MODFIED);
+                if (lastModifiedHeader == null) {
+                    logger.warning("Last modified header is missing");
+                    break findDateViaHeader;
+                }
+                final Date lastModifiedDate = TimeFormatter.parseDateString(lastModifiedHeader);
+                dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(lastModifiedDate);
+                /* Now that the connection has been opened, we can also obtain the */
+                final String extensionFromMimeType = Plugin.getExtensionFromMimeTypeStatic(con.getContentType());
+                if (extensionFromMimeType != null) {
+                    ext = extensionFromMimeType;
                 }
             }
         } finally {
             /* Always set filename, even if exception has happened */
+            if (!ext.startsWith(".")) {
+                ext = "." + ext;
+            }
             if (dateFormatted != null && title != null) {
                 link.setFinalFileName(dateFormatted + "_" + contentID + "_" + title + ext);
             } else if (title != null) {
@@ -222,7 +255,16 @@ public class ModelKarteiDe extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link, true);
+        handleDownload(link, null);
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        handleDownload(link, account);
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception {
+        requestFileInformation(link, account, true);
         if (br.containsHTML("assets/images/no\\.jpg")) {
             /* Account needed to view this image */
             throw new AccountRequiredException("Account needed to download this image");
@@ -240,6 +282,105 @@ public class ModelKarteiDe extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    private boolean login(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies storedCookies = account.loadCookies("");
+            final Cookies userCookies = account.loadUserCookies();
+            final Cookies cookiesToUse;
+            if (userCookies != null) {
+                cookiesToUse = userCookies;
+            } else {
+                cookiesToUse = storedCookies;
+            }
+            if (cookiesToUse != null) {
+                logger.info("Attempting cookie login");
+                br.setCookies(cookiesToUse);
+                if (!force) {
+                    /* Don't validate cookies */
+                    return false;
+                }
+                br.getPage("https://www." + this.getHost());
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    if (userCookies != null) {
+                        /* User can put anything into the username field but we are trying to find the 100% correct value in html code. */
+                        final String username = br.getRegex("class=\"hide4\"[^>]*>([^<]+)</span>").getMatch(0);
+                        if (username != null) {
+                            account.setUser(Encoding.htmlDecode(username).trim());
+                        } else {
+                            logger.warning("Failed to find username");
+                        }
+                    } else {
+                        /* Save cookies */
+                        account.saveCookies(br.getCookies(br.getHost()), "");
+                    }
+                    return true;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                }
+                if (userCookies != null) {
+                    /* Dead end */
+                    if (account.hasEverBeenValid()) {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                    } else {
+                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
+                    }
+                }
+            }
+            logger.info("Performing full login");
+            br.getPage("https://login." + getHost());
+            final Form loginform = br.getFormbyActionRegex(".*/in/?$");
+            if (loginform == null) {
+                logger.warning("Failed to find loginform");
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            loginform.put("lID", Encoding.urlEncode(account.getUser()));
+            loginform.put("lPW", Encoding.urlEncode(account.getPass()));
+            loginform.put("stay", "1");
+            loginform.remove("goto");
+            loginform.remove("goto");
+            loginform.put("goto", "1");
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return true;
+        }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("class=\"logout\"");
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        login(account, true);
+        ai.setUnlimitedTraffic();
+        if (br.containsHTML("VIP-Account")) {
+            /* Premium accounts do not have an expire date. */
+            account.setType(AccountType.PREMIUM);
+            ai.setStatus("VIP-Account");
+        } else {
+            account.setType(AccountType.FREE);
+        }
+        return ai;
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final Account acc) {
+        return false;
     }
 
     @Override

@@ -31,10 +31,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 50134 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,13 +86,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         final String chapterIDFromURL = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER).getMatch(0);
         if (chapterIDFromURL != null) {
             /* Find all pictures of a chapter of a novel */
-            String chapterNumber = new Regex(param.getCryptedUrl(), "(?i)Chapter-([0-9\\-]+)").getMatch(0);
-            if (chapterNumber == null) {
-                chapterNumber = new Regex(param.getCryptedUrl(), "(?i)(?:Cap-tulo|Capitulo)-([0-9\\-]+)").getMatch(0);
-            }
-            if (chapterNumber != null) {
-                chapterNumber = chapterNumber.replace("-", ".");
-            }
+            final String chapterNumber = getChapterNumberFromURL(param.getCryptedUrl());
             final String bookID = br.getRegex("cur_book_id = \"(\\d+)").getMatch(0);
             final String chapterID = br.getRegex("cur_chapter_id = \"(\\d+)").getMatch(0);
             final String seriesTitle = NovelcoolCom.findSeriesTitle(br);
@@ -117,7 +110,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                 if (!dupes.add(url)) {
                     continue;
                 }
-                final DownloadLink image = createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                final DownloadLink image = createDownloadlink(url);
                 image.setProperty(NovelcoolCom.PROPERTY_BOOK_ID, bookID);
                 image.setProperty(NovelcoolCom.PROPERTY_CHAPTER_ID, chapterID);
                 if (seriesTitle != null) {
@@ -175,5 +168,16 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
             }
         }
         return ret;
+    }
+
+    public static String getChapterNumberFromURL(final String url) {
+        String chapterNumber = new Regex(url, "(?i)Chapter-([0-9\\-]+)").getMatch(0);
+        if (chapterNumber == null) {
+            chapterNumber = new Regex(url, "(?i)(?:Cap-tulo|Capitulo)-([0-9\\-]+)").getMatch(0);
+        }
+        if (chapterNumber != null) {
+            chapterNumber = chapterNumber.replace("-", ".");
+        }
+        return chapterNumber;
     }
 }

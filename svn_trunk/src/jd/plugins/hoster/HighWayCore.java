@@ -19,12 +19,31 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetFile;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -49,28 +68,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetFile;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-@HostPlugin(revision = "$Revision: 50145 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50166 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -139,7 +137,8 @@ public abstract class HighWayCore extends UseNet {
     }
 
     /**
-     * API docs: https://high-way.me/threads/highway-api.201/ </br> According to admin we can 'hammer' the API every 60 seconds
+     * API docs: https://high-way.me/threads/highway-api.201/ </br>
+     * According to admin we can 'hammer' the API every 60 seconds
      */
     protected abstract String getAPIBase();
 
@@ -373,8 +372,8 @@ public abstract class HighWayCore extends UseNet {
     @Override
     protected void handleMultiHost(DownloadLink downloadLink, Account account, UsenetFile usenetFile, String username, String password, UsenetServer server) throws Exception {
         /**
-         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br> This function should never get
-         * called with null/empty username and or password!
+         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br>
+         * This function should never get called with null/empty username and or password!
          */
         if (StringUtils.isEmpty(username)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -592,9 +591,13 @@ public abstract class HighWayCore extends UseNet {
         try {
             do {
                 /**
-                 * cacheStatus possible values and what they mean: </br> d = download </br> w = wait (retry) </br> q = in queue </br> qn =
-                 * Download has been added to queue </br> i = direct download without cache </br> s = Cached download is ready for
-                 * downloading
+                 * cacheStatus possible values and what they mean: </br>
+                 * d = download </br>
+                 * w = wait (retry) </br>
+                 * q = in queue </br>
+                 * qn = Download has been added to queue </br>
+                 * i = direct download without cache </br>
+                 * s = Cached download is ready for downloading
                  */
                 br.getPage(cachePollingURL);
                 entries = this.checkErrors(br, link, account);
@@ -604,8 +607,8 @@ public abstract class HighWayCore extends UseNet {
                     return entries;
                 } else if (!blockDownloadSlotsForCloudDownloads(account)) {
                     /**
-                     * Throw exception right away so other download candidates will be tried. </br> This may speed up downloads
-                     * significantly for some users.
+                     * Throw exception right away so other download candidates will be tried. </br>
+                     * This may speed up downloads significantly for some users.
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
                 }
@@ -656,7 +659,7 @@ public abstract class HighWayCore extends UseNet {
                 account.setType(AccountType.PREMIUM);
                 ai.setTrafficLeft(premiumTraffic);
                 ai.setTrafficMax(((Number) accountInfo.get("premium_max")).longValue());
-                ai.setValidUntil(premiumUntil * 1000, this.br);
+                ai.setValidUntil(premiumUntil * 1000, br);
             } else {
                 /* Free account */
                 account.setType(AccountType.FREE);
@@ -682,77 +685,41 @@ public abstract class HighWayCore extends UseNet {
             }
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
             final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
-            final PluginFinder pluginFinder = new PluginFinder(getLogger());
             /* List of items which should not be displayed in JD GUI. */
             final HashSet<String> ignoreItems = new HashSet<String>();
             ignoreItems.add("beta");
             ignoreItems.add("TV Recorder");
             ignoreItems.add("WebDav");
             boolean supportsUsenet = false;
-            synchronized (getMapLock()) {
-                final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
-                final Map<String, Integer> hostMaxdlsMap = getMap(HighWayCore.hostMaxdlsMap);
-                final Map<String, Boolean> hostResumeMap = getMap(HighWayCore.hostResumeMap);
-                hostMaxchunksMap.clear();
-                hostMaxdlsMap.clear();
-                /* Available hosts are returned by API depending on users' account type e.g. free users have much less supported hosts. */
-                final List<Map<String, Object>> array_hoster = (List<Map<String, Object>>) entries.get("hoster");
-                for (final Map<String, Object> hostermap : array_hoster) {
-                    final int activeStatus = ((Number) hostermap.get("active")).intValue();
-                    final String domain = hostermap.get("name").toString();
-                    if (ignoreItems.contains(domain)) {
-                        /* Skip hardcoded list of items which should never be displayed in GUI. */
-                        continue;
-                    }
-                    final Number trafficCalcFactorPercent = ((Number) hostermap.get("berechnung"));
-                    final int chunks = ((Number) hostermap.get("chunks")).intValue();
-                    final int downloads = ((Number) hostermap.get("downloads")).intValue();
-                    final boolean resume = ((Number) hostermap.get("resume")).intValue() == 1 ? true : false;
-                    {
-                        /* Legacy handling */
-                        /* Workaround to find the real domain which we need to assign the properties to later on! */
-                        final List<MultiHostHost> realDomainList = new AccountInfo().setMultiHostSupportV2(this, Arrays.asList(new MultiHostHost(domain)), pluginFinder);
-                        if (realDomainList != null && realDomainList.size() > 0) {
-                            /* Legacy handling */
-                            final String realDomain = realDomainList.get(0).getDomain();
-                            // final String unlimited = (String) hoster_map.get("unlimited");
-                            if (supportedhosts_dupes_for_legacy_handling.add(realDomain)) {
-                                hostMaxchunksMap.put(realDomain, correctChunks(chunks));
-                                hostMaxdlsMap.put(realDomain, downloads);
-                                hostResumeMap.put(realDomain, resume);
-                            } else {
-                                // multiple entries, eg 1fichier(resume=true) and and megadl.fr(resume=false) but with different
-                                // properties!?
-                                if (resume) {
-                                    hostResumeMap.put(realDomain, true);
-                                } else {
-                                    // do not disable resume
-                                }
-                            }
-                        }
-                    }
-                    /* New handling */
-                    final MultiHostHost mhost = new MultiHostHost(domain);
-                    if (activeStatus != 1) {
-                        mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                    }
-                    mhost.setTrafficCalculationFactorPercent(trafficCalcFactorPercent.shortValue());
-                    mhost.setMaxChunks(chunks);
-                    mhost.setMaxDownloads(downloads);
-                    mhost.setResume(resume);
-                    final long maxTrafficDaily = ((Number) hostermap.get("maxTrafficDaily")).longValue();
-                    // final long usedTrafficDaily = ((Number) hostermap.get("usedTrafficDaily")).longValue();
-                    final long remainingTrafficDaily = ((Number) hostermap.get("remainingTrafficDaily")).longValue();
-                    /* -1 = no limit */
-                    if (maxTrafficDaily != -1 && remainingTrafficDaily != -1) {
-                        mhost.setTrafficMax(maxTrafficDaily);
-                        mhost.setTrafficLeft(remainingTrafficDaily);
-                    }
-                    supportedhosts.add(mhost);
-                    /* Check if usenet is supported */
-                    if (!supportsUsenet && domain.equalsIgnoreCase("usenet")) {
-                        supportsUsenet = true;
-                    }
+            /* Available hosts are returned by API depending on users' account type e.g. free users have much less supported hosts. */
+            final List<Map<String, Object>> array_hoster = (List<Map<String, Object>>) entries.get("hoster");
+            for (final Map<String, Object> hostermap : array_hoster) {
+                final int activeStatus = ((Number) hostermap.get("active")).intValue();
+                final String domain = hostermap.get("name").toString();
+                if (ignoreItems.contains(domain)) {
+                    /* Skip hardcoded list of items which should never be displayed in GUI. */
+                    continue;
+                }
+                final MultiHostHost mhost = new MultiHostHost(domain);
+                if (activeStatus != 1) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                }
+                mhost.setTrafficCalculationFactorPercent(((Number) hostermap.get("berechnung")).shortValue());
+                mhost.setMaxChunks(((Number) hostermap.get("chunks")).intValue());
+                mhost.setMaxDownloads(((Number) hostermap.get("downloads")).intValue());
+                mhost.setResume(((Number) hostermap.get("resume")).intValue() == 1 ? true : false);
+                final long maxTrafficDaily = ((Number) hostermap.get("maxTrafficDaily")).longValue();
+                // final long usedTrafficDaily = ((Number) hostermap.get("usedTrafficDaily")).longValue();
+                final long remainingTrafficDaily = ((Number) hostermap.get("remainingTrafficDaily")).longValue();
+                /* -1 = no limit */
+                if (maxTrafficDaily != -1 && remainingTrafficDaily != -1) {
+                    mhost.setTrafficMax(maxTrafficDaily);
+                    mhost.setTrafficLeft(remainingTrafficDaily);
+                }
+                supportedhosts.add(mhost);
+                /* Check if usenet is supported */
+                if (!supportsUsenet && domain.equalsIgnoreCase("usenet")) {
+                    supportsUsenet = true;
                 }
             }
             /* Get- and store usenet logindata. These can differ from the logindata the user has added but may as well be equal to those. */
@@ -773,7 +740,24 @@ public abstract class HighWayCore extends UseNet {
                 account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
                 account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);
             }
-            ai.setMultiHostSupportV2(this, supportedhosts);
+            /* Assign items so they can be matched against our internal plugin domains. */
+            final List<MultiHostHost> mhosts = ai.setMultiHostSupportV2(this, supportedhosts);
+            synchronized (getMapLock()) {
+                final Map<String, Integer> hostMaxchunksMap = getMap(HighWayCore.hostMaxchunksMap);
+                final Map<String, Integer> hostMaxdlsMap = getMap(HighWayCore.hostMaxdlsMap);
+                final Map<String, Boolean> hostResumeMap = getMap(HighWayCore.hostResumeMap);
+                hostMaxchunksMap.clear();
+                hostMaxdlsMap.clear();
+                hostResumeMap.clear();
+                /* Set some special information on the now found ral/internal plugin domains. */
+                for (final MultiHostHost mhost : mhosts) {
+                    for (final String domain : mhost.getDomains()) {
+                        hostMaxchunksMap.put(domain, mhost.getMaxChunks());
+                        hostMaxdlsMap.put(domain, mhost.getMaxDownloads());
+                        hostResumeMap.put(domain, mhost.isResume());
+                    }
+                }
+            }
             return ai;
         }
     }
@@ -795,7 +779,8 @@ public abstract class HighWayCore extends UseNet {
     /**
      * Login without errorhandling
      *
-     * @return true = cookies validated </br> false = cookies set but not validated
+     * @return true = cookies validated </br>
+     *         false = cookies set but not validated
      *
      * @throws PluginException
      * @throws InterruptedException
@@ -992,9 +977,9 @@ public abstract class HighWayCore extends UseNet {
                 getMultiHosterManagement().putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
             case 11:
                 /**
-                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br> 2021-11-08: Admin asked
-                 * us not to disable host right away when this error happens as it seems like this error is more rleated to single
-                 * files/fileservers -> Done accordingly.
+                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br>
+                 * 2021-11-08: Admin asked us not to disable host right away when this error happens as it seems like this error is more
+                 * rleated to single files/fileservers -> Done accordingly.
                  */
                 // mhm.putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);

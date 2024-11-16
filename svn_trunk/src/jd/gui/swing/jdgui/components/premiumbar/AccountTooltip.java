@@ -23,6 +23,7 @@ import javax.swing.event.TableModelListener;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
 import net.miginfocom.swing.MigLayout;
 
 import org.appwork.swing.components.tooltips.PanelToolTip;
@@ -32,8 +33,6 @@ import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.locator.AbstractLocator;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
 public class AccountTooltip extends PanelToolTip {
@@ -148,22 +147,25 @@ public class AccountTooltip extends PanelToolTip {
             if (ai == null) {
                 continue;
             }
-            final List<String> supported = ai.getMultiHostSupport();
+            final List<MultiHostHost> supported = ai.getMultiHostSupportV2();
             if (supported == null) {
                 continue;
             }
-            /*
-             * synchronized on list because plugins can change the list in runtime
-             */
-            for (final String sup : supported) {
-                final LazyHostPlugin plg = HostPluginController.getInstance().get(sup);
-                if (plg == null) {
-                    continue;
+            for (final MultiHostHost sup : supported) {
+                switch (sup.getStatus()) {
+                case WORKING:
+                case WORKING_UNSTABLE:
+                    domains.add(sup.getDomainInfo());
+                    break;
+                default:
+                    break;
                 }
-                domains.add(plg.getDomainInfo());
             }
         }
         final ArrayList<DomainInfo> ret = new ArrayList<DomainInfo>(domains);
+        if (ret.size() < 2) {
+            return ret;
+        }
         Collections.sort(ret, new Comparator<DomainInfo>() {
             @Override
             public int compare(DomainInfo o1, DomainInfo o2) {

@@ -73,27 +73,28 @@ import jd.plugins.PluginProgress;
 import jd.plugins.download.HashInfo;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
+@HostPlugin(revision = "$Revision: 50165 $", interfaceVersion = 3, names = { "firefile.cc" }, urls = { "https?://firefile\\.cc/drive/s/[a-zA-Z0-9]+![a-zA-Z0-9]+" })
 public class FirefileCc extends PluginForHost {
-    private static Object         DECRYPTLOCK                = new Object();
+    private static Object        DECRYPTLOCK                = new Object();
     /** Settings stuff */
-    private final String          USED_PLUGIN                = "usedPlugin";
-    private final String          USE_TMP                    = "USE_TMP_V2";
-    private final String          encrypted                  = ".encrypted";
-    private final int             CHUNK_SIZE                 = 75 * 1024 * 1024;
-    private final int             ENCRYPTION_SIZE            = 32;
-    private final int             CHUNK_SIZE_WITH_ENCRYPTION = CHUNK_SIZE + ENCRYPTION_SIZE;
-    /**
-     * The number of retries to be performed in order to determine if a file is available.
-     */
-    private int                   max_number_retries         = 3;
-    private volatile DownloadLink decryptingDownloadLink     = null;
+    private final String         USED_PLUGIN                = "usedPlugin";
+    private final String         USE_TMP                    = "USE_TMP_V2";
+    private static final boolean default_USE_TMP            = false;
+    private final String         encrypted                  = ".encrypted";
+    private final int            CHUNK_SIZE                 = 75 * 1024 * 1024;
+    private final int            ENCRYPTION_SIZE            = 32;
+    private final int            CHUNK_SIZE_WITH_ENCRYPTION = CHUNK_SIZE + ENCRYPTION_SIZE;
 
     @SuppressWarnings("deprecation")
     public FirefileCc(final PluginWrapper wrapper) {
         super(wrapper);
         this.setStartIntervall(5000);
         setConfigElements();
+    }
+
+    @Override
+    public void init() {
+        Browser.setRequestIntervalLimitGlobal(this.getHost(), 250);
     }
 
     @Override
@@ -104,6 +105,11 @@ public class FirefileCc extends PluginForHost {
             }
         }
         return super.canHandle(link, account);
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return new String[] { "firefile.cc", "firefile" };
     }
 
     private byte[] cipherData(PaddedBufferedBlockCipher cipher, byte[] data) throws DataLengthException, IllegalStateException, InvalidCipherTextException {
@@ -362,13 +368,7 @@ public class FirefileCc extends PluginForHost {
         try {
             checkAndReserve(link, reservation);
             if (src.exists() && src.length() == link.getVerifiedFileSize()) {
-                // ready for decryption
-                decryptingDownloadLink = link;
-                try {
-                    decryptFile(path, encryptionDone, successfulFlag, link, linkData.getKey());
-                } finally {
-                    decryptingDownloadLink = null;
-                }
+                decryptFile(path, encryptionDone, successfulFlag, link, linkData.getKey());
                 link.getLinkStatus().setStatus(LinkStatus.FINISHED);
                 return;
             }
@@ -410,7 +410,7 @@ public class FirefileCc extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://firefile.cc/tos";
+        return "https://" + getHost() + "/tos";
     }
 
     private PaddedBufferedBlockCipher getCipherInstanceAesEngine(byte[] iv, byte[] key) {
@@ -480,17 +480,6 @@ public class FirefileCc extends PluginForHost {
     }
 
     @Override
-    public void handleFree(final DownloadLink link) throws Exception {
-        requestFileInformation(link);
-        download(link);
-    }
-
-    @Override
-    public void init() {
-        Browser.setRequestIntervalLimitGlobal(this.getHost(), 250);
-    }
-
-    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         correctDownloadLink(link);
         final FirefileLink linkData = FirefileLink.get(link);
@@ -522,6 +511,12 @@ public class FirefileCc extends PluginForHost {
     }
 
     @Override
+    public void handleFree(final DownloadLink link) throws Exception {
+        requestFileInformation(link);
+        download(link);
+    }
+
+    @Override
     public void reset() {
     }
 
@@ -530,15 +525,10 @@ public class FirefileCc extends PluginForHost {
     }
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), USE_TMP, JDL.L("plugins.hoster.firefilecc.usetmp", "Use tmp decrypting file?")).setDefaultValue(false));
-    }
-
-    @Override
-    public String[] siteSupportedNames() {
-        return new String[] { "firefile.cc", "firefile" };
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), USE_TMP, JDL.L("plugins.hoster.firefilecc.usetmp", "Use tmp decrypting file?")).setDefaultValue(default_USE_TMP));
     }
 
     private boolean useTMP() {
-        return getPluginConfig().getBooleanProperty(USE_TMP, false);
+        return getPluginConfig().getBooleanProperty(USE_TMP, default_USE_TMP);
     }
 }

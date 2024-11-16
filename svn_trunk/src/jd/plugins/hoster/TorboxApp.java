@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50160 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -236,6 +236,9 @@ public class TorboxApp extends PluginForHost {
         } else if (dateStrFixed.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
             /* 2024-11-12 */
             return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+        } else if (dateStrFixed.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")) {
+            /* 2024-11-15 */
+            return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ENGLISH);
         } else {
             /* Fallback */
             return TimeFormatter.getMilliSeconds(dateStrFixed, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
@@ -299,7 +302,7 @@ public class TorboxApp extends PluginForHost {
             int numberofNotificationsActuallyDisplayed = 0;
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
-                final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
+                final Request req_notifications = br.createPostRequest(API_BASE + "/notifications/mynotifications", "");
                 /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
                 notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
                 for (final Map<String, Object> notification : notifications) {

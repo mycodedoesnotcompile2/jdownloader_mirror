@@ -116,6 +116,7 @@ import org.appwork.swing.MigPanel;
 import org.appwork.swing.action.BasicAction;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtComponentRowHighlighter;
+import org.appwork.swing.exttable.ExtDefaultRowSorter;
 import org.appwork.swing.exttable.ExtTable;
 import org.appwork.swing.exttable.ExtTableHeaderRenderer;
 import org.appwork.swing.exttable.ExtTableModel;
@@ -131,7 +132,6 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
@@ -234,11 +234,11 @@ public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
 
-        /**
-         * these patterns should split filename and fileextension (extension must include the
-         * point)
-         */
-        // multipart rar archives
+                                                  /**
+                                                   * these patterns should split filename and fileextension (extension must include the
+                                                   * point)
+                                                   */
+                                                  // multipart rar archives
             Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
             // normal files with extension
             Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
@@ -1447,16 +1447,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         *
+         * 
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         *
+         * 
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         *
+         * 
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         *
-         *
-         *
+         * 
+         * 
+         * 
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -3202,48 +3202,44 @@ public abstract class PluginForHost extends Plugin {
         final ExtTableModel<MultiHostHost> tableModel = new ExtTableModel<MultiHostHost>("MultiHostHostTable_" + acc.getHoster()) {
             @Override
             protected void initColumns() {
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    // TODO: Add functionality
-                    addColumn(new ExtCheckColumn<MultiHostHost>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
-                        public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
-                            final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
-                                private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
+                addColumn(new ExtCheckColumn<MultiHostHost>(_GUI.T.premiumaccounttablemodel_column_enabled()) {
+                    public ExtTableHeaderRenderer getHeaderRenderer(final JTableHeader jTableHeader) {
+                        final ExtTableHeaderRenderer ret = new ExtTableHeaderRenderer(this, jTableHeader) {
+                            private final Icon ok = NewTheme.I().getIcon(IconKey.ICON_OK, 14);
 
-                                @Override
-                                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                                    super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                                    setIcon(ok);
-                                    setHorizontalAlignment(CENTER);
-                                    setText(null);
-                                    return this;
-                                }
-                            };
-                            return ret;
-                        }
+                            @Override
+                            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                                setIcon(ok);
+                                setHorizontalAlignment(CENTER);
+                                setText(null);
+                                return this;
+                            }
+                        };
+                        return ret;
+                    }
 
-                        @Override
-                        public int getMaxWidth() {
-                            return 30;
-                        }
+                    @Override
+                    public int getMaxWidth() {
+                        return 30;
+                    }
 
-                        @Override
-                        protected boolean getBooleanValue(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
+                    @Override
+                    protected boolean getBooleanValue(final MultiHostHost mhost) {
+                        return mhost.isEnabled();
+                    }
 
-                        @Override
-                        public boolean isEditable(MultiHostHost mhost) {
-                            return true;
-                        }
+                    @Override
+                    public boolean isEditable(MultiHostHost mhost) {
+                        return true;
+                    }
 
-                        @Override
-                        protected void setBooleanValue(final boolean enabled, final MultiHostHost mhost) {
-                            mhost.setEnabled(enabled);
-                            fireTableStructureChanged();
-                        }
-
-                    });
-                }
+                    @Override
+                    protected void setBooleanValue(final boolean enabled, final MultiHostHost mhost) {
+                        mhost.setEnabled(enabled);
+                        fireTableStructureChanged();
+                    }
+                });
                 addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_domain()) {
                     @Override
                     public String getStringValue(final MultiHostHost mhost) {
@@ -3516,6 +3512,23 @@ public abstract class PluginForHost extends Plugin {
                 }
                 if (shouldShowTrafficLimitColumns_final) {
                     addColumn(new ExtProgressColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_traffic_left_max()) {
+                        {
+                            setRowSorter(new ExtDefaultRowSorter<MultiHostHost>() {
+                                @Override
+                                public int compare(final MultiHostHost o1, final MultiHostHost o2) {
+                                    final long v1 = getValue(o1);
+                                    final long v2 = getValue(o2);
+                                    if (v1 == v2) {
+                                        return 0;
+                                    }
+                                    if (this.getSortOrderIdentifier() != ExtColumn.SORT_ASC) {
+                                        return v1 > v2 ? -1 : 1;
+                                    } else {
+                                        return v2 > v1 ? -1 : 1;
+                                    }
+                                }
+                            });
+                        }
                         private final SIZEUNIT      maxSizeUnit = JsonConfig.create(GraphicalUserInterfaceSettings.class).getMaxSizeUnit();
                         private final DecimalFormat formatter   = new DecimalFormat();
 

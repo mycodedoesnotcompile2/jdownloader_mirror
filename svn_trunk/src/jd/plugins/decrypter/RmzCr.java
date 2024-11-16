@@ -18,8 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -31,7 +29,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
+@DecrypterPlugin(revision = "$Revision: 50162 $", interfaceVersion = 3, names = {}, urls = {})
 public class RmzCr extends antiDDoSForDecrypt {
     public RmzCr(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class RmzCr extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online" });
+        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rmz.watch", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online" });
         return ret;
     }
 

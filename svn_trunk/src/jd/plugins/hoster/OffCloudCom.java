@@ -77,7 +77,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -378,29 +378,35 @@ public class OffCloudCom extends UseNet {
          * generate-links feature (used free account, ZERO traffic)
          */
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Map<String, Object>> activePackages = (List<Map<String, Object>>) entries.get("data");
-        Map<String, Object> packagePremium = null;
-        Map<String, Object> packageUnlimitedLinks = null;
-        String packagesCommaSeparated = "";
-        for (final Map<String, Object> packagemap : activePackages) {
-            final String packagetype = packagemap.get("type").toString();
+        final List<Map<String, Object>> activeAddons = (List<Map<String, Object>>) entries.get("data");
+        final List<Map<String, Object>> activeAddons_relevant = new ArrayList<Map<String, Object>>();
+        Map<String, Object> addonPremium = null;
+        Map<String, Object> addonUnlimitedLinks = null;
+        String addonsCommaSeparated = "";
+        for (final Map<String, Object> addonmap : activeAddons) {
+            final String addontype = addonmap.get("type").toString();
             /*
              * 2018-02-07: For some reason, the 'link-unlimited' package (if available) will always expire 1 month after the
              * "premium-downloading" package which is why we get our data from here. At this stage I have no idea whether this applies for
              * all accounts or only our test account as some years ago, they had different addons you could purchase and nowdays this is all
              * a lot simpler.
              */
-            if (packagetype.equalsIgnoreCase("premium-downloading")) {
-                packagePremium = packagemap;
-            } else if (packagetype.equalsIgnoreCase("link-unlimited")) {
-                packageUnlimitedLinks = packagemap;
+            if (addontype.equalsIgnoreCase("premium-downloading")) {
+                addonPremium = addonmap;
+            } else if (addontype.equalsIgnoreCase("link-unlimited")) {
+                addonUnlimitedLinks = addonmap;
             }
-            if (packagesCommaSeparated.length() > 0) {
-                packagesCommaSeparated += ", ";
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && addontype.matches(".+-downloading$")) {
+                /* Skip some internal addon types in stable version */
+                continue;
             }
-            packagesCommaSeparated += packagetype;
+            if (addonsCommaSeparated.length() > 0) {
+                addonsCommaSeparated += ", ";
+            }
+            addonsCommaSeparated += addontype;
+            activeAddons_relevant.add(addonmap);
         }
-        if (activePackages.size() == 0) {
+        if (activeAddons.size() == 0) {
             /* Free usually only has 1 package with packageType "premium-link-increase" */
             account.setType(AccountType.FREE);
             /* Important: If we found our package, get the remaining links count from there as the other one might be wrong! */
@@ -408,28 +414,27 @@ public class OffCloudCom extends UseNet {
             if (remainingLinksCount instanceof Number) {
                 remaininglinksnum = ((Number) remainingLinksCount).longValue();
             }
-        } else if (packagePremium != null) {
+        } else if (addonPremium != null) {
             account.setType(AccountType.PREMIUM);
             ai.setUnlimitedTraffic();
-            ai.setValidUntil(TimeFormatter.getMilliSeconds(packagePremium.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH), br);
+            ai.setValidUntil(TimeFormatter.getMilliSeconds(addonPremium.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH), br);
         } else {
             /* This should never happen */
             account.setType(AccountType.UNKNOWN);
         }
-        if (packagePremium == null && remaininglinksnum == 0) {
+        if (addonPremium == null && remaininglinksnum == 0) {
             /* Free account that has no link generations left. */
             throw new AccountUnavailableException("No link generations left", 5 * 60 * 1000);
         }
         final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
         String statusText = account.getType().getLabel() + " | Used so far: " + SIZEUNIT.formatValue(maxSizeUnit, premiumUsageBytes);
-        if (packagesCommaSeparated != null && packagesCommaSeparated.length() > 0) {
-            statusText += " | Addons: " + packagesCommaSeparated;
+        if (addonsCommaSeparated != null && addonsCommaSeparated.length() > 0) {
+            statusText += " | Addons: " + addonsCommaSeparated;
         }
         ai.setStatus(statusText);
         /* Only add hosts which are listed as 'active' (working) */
         postAPISafe("https://" + getHost() + "/stats/sites", "");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-        final List<String> supportedHostsTmp = new ArrayList<String>();
         final Map<String, Object> stats = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final List<Map<String, Object>> filehosts = (List<Map<String, Object>>) stats.get("fs");
         /**
@@ -445,24 +450,13 @@ public class OffCloudCom extends UseNet {
         this.getAPISafe("https://" + getHost() + "/api/sites/chunks");
         final List<Map<String, Object>> chunklimits = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
         final OffCloudComPluginConfigInterface cfg = PluginJsonConfig.get(jd.plugins.hoster.OffCloudCom.OffCloudComPluginConfigInterface.class);
+        final List<String> cloudOnlyDomainsTmp = new ArrayList<String>();
         for (final Map<String, Object> domaininfo : filehosts) {
-            final String status = domaininfo.get("isActive").toString().toLowerCase(Locale.ENGLISH);
+            String mhostStatusText = domaininfo.get("isActive").toString().toLowerCase(Locale.ENGLISH);
             // final String name = domaininfo.get("name").toString();
             final String domain = domaininfo.get("displayName").toString();
             final List<String> domains = (List<String>) domaininfo.get("tags");
-            final Object deadFor = domaininfo.get("deadFor");
-            /* Workaround to get real/mapped domain */
-            supportedHostsTmp.clear();
-            supportedHostsTmp.add(domain);
-            ai.setMultiHostSupport(this, supportedHostsTmp);
-            final List<String> realHostArrayTmp = ai.getMultiHostSupport();
-            if (realHostArrayTmp != null && !realHostArrayTmp.isEmpty()) {
-                /* Legacy handling */
-                /* Add real host to full list of supported hosts */
-                if (status.equals("cloud only")) {
-                    cloudOnlyHosts.add(domain);
-                }
-            }
+            final Object deadForDaysText = domaininfo.get("deadFor");
             final Object maxTrafficBytesO = domaininfo.get("maxAmount");
             final MultiHostHost mhost = new MultiHostHost(domain);
             mhost.addDomains(domains);
@@ -474,14 +468,16 @@ public class OffCloudCom extends UseNet {
                     break;
                 }
             }
-            if (deadFor != null) {
+            if (deadForDaysText != null) {
+                /* Example value: "15 Days" */
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-            } else if (!cfg.isShowHostersWithStatusAwaitingDemand() && status.equals("awaiting demand")) {
+                mhostStatusText = "Dead for: " + deadForDaysText;
+            } else if (!cfg.isShowHostersWithStatusAwaitingDemand() && mhostStatusText.equals("awaiting demand")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-            } else if (status.equals("fragile")) {
+            } else if (mhostStatusText.equals("fragile")) {
                 mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
             }
-            mhost.setStatusText(status);
+            mhost.setStatusText(mhostStatusText);
             if (maxTrafficBytesO instanceof Number) {
                 final long maxTrafficBytes = ((Number) maxTrafficBytesO).longValue();
                 mhost.setTrafficLeft(maxTrafficBytes);
@@ -502,7 +498,18 @@ public class OffCloudCom extends UseNet {
             }
             supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupportV2(this, supportedhosts);
+        final List<MultiHostHost> mhosts = ai.setMultiHostSupportV2(this, supportedhosts);
+        if (cloudOnlyDomainsTmp.size() > 0) {
+            /* Small workaround to match "cloud only" hosts to their real plugin domains. */
+            mhostLoop: for (final MultiHostHost mhost : mhosts) {
+                for (final String domain : mhost.getDomains()) {
+                    if (cloudOnlyDomainsTmp.contains(domain)) {
+                        cloudOnlyHosts.addAll(mhost.getDomains());
+                        continue mhostLoop;
+                    }
+                }
+            }
+        }
         /* 2020-12-11: Check this account more often */
         account.setRefreshTimeout(15 * 60 * 1000l);
         /* Let's handle some settings stuff. */
@@ -517,14 +524,14 @@ public class OffCloudCom extends UseNet {
             this.deleteCompleteDownloadHistory(PROPERTY_DOWNLOADTYPE_cloud);
             account.setProperty(PROPERTY_ACCOUNT_TIMESTAMP_LAST_TIME_DELETED_HISTORY, System.currentTimeMillis());
         }
-        if (packageUnlimitedLinks != null) {
+        if (addonUnlimitedLinks != null) {
             /* User has active "unlimited links" package */
             account.setProperty("accinfo_linksleft", -1);
         } else {
             account.setProperty("accinfo_linksleft", remaininglinksnum);
         }
         /* Save packages as json as we will use that information later */
-        account.setProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST, JSonStorage.serializeToJson(activePackages));
+        account.setProperty(PROPERTY_ACCOUNT_ACTIVE_PACKAGES_LIST, JSonStorage.serializeToJson(activeAddons_relevant));
         return ai;
     }
 
@@ -1208,10 +1215,6 @@ public class OffCloudCom extends UseNet {
             try {
                 for (final Map<String, Object> activeAddon : activeAddons) {
                     final String addonType = activeAddon.get("type").toString();
-                    if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE && addonType.matches(".+-downloading$")) {
-                        /* Skip some internal addon types in stable version */
-                        continue;
-                    }
                     final long millis = TimeFormatter.getMilliSeconds(activeAddon.get("activeTill").toString(), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
                     final Date date = new Date(millis);
                     final HashMap<String, Date> map = new HashMap<String, Date>();

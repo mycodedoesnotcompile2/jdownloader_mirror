@@ -8,10 +8,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.controlling.AccountController;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-
 import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogClosedException;
@@ -23,6 +19,11 @@ import org.jdownloader.gui.views.components.AbstractAddAction;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+
+import jd.controlling.AccountController;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
 
 public class NewRuleAction extends AbstractAddAction {
     /**
@@ -73,21 +74,22 @@ public class NewRuleAction extends AbstractAddAction {
             if (ai == null) {
                 continue;
             }
-            final List<String> supportedHosts = ai.getMultiHostSupport();
-            if (supportedHosts == null) {
+            final List<MultiHostHost> supportedhosts = ai.getMultiHostSupportV2();
+            if (supportedhosts == null) {
                 continue;
             }
-            for (final String supportedHost : supportedHosts) {
-                if (multihosterDomains.contains(supportedHost)) {
-                    /*
-                     * Multihoster supports its own domain or domains of other multihosters -> Exclude those domains from usage rule
-                     * selection
-                     */
-                    continue;
-                }
-                final LazyHostPlugin plg = HostPluginController.getInstance().get(supportedHost);
-                if (plg != null) {
-                    domains.add(plg.getDomainInfo());
+            for (final MultiHostHost mhost : supportedhosts) {
+                for (final String domain : mhost.getDomains()) {
+                    if (multihosterDomains.contains(domain)) {
+                        /*
+                         * Multihoster supports its own domain or domains of other multihosters -> Exclude those domains from usage rule
+                         * selection
+                         */
+                        continue;
+                    }
+                    domains.add(mhost.getDomainInfo());
+                    /* Continue with next MultiHostHost entry */
+                    break;
                 }
             }
         }
