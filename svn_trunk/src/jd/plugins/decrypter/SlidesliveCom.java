@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,9 +37,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.GenericM3u8;
-import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 48482 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
 public class SlidesliveCom extends PluginForDecrypt {
     public SlidesliveCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,7 +100,7 @@ public class SlidesliveCom extends PluginForDecrypt {
         }
         if (externalVideoServiceID.equalsIgnoreCase("youtube")) {
             /* E.g. https://slideslive.com/38893320/lhani-detekce-lzi-a-emoce-z-pohledu-forenzni-psychologie */
-            ret.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
+            ret.add(this.createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
         } else if (externalVideoServiceID.equalsIgnoreCase("yoda")) {
             /* E.g. https://slideslive.com/38955218/diffusion-models-and-lossy-generative-modeling */
             final String serversArray = br.getRegex("#EXT-SL-VOD-VIDEO-SERVERS:(\\[.*?)\\s").getMatch(0);

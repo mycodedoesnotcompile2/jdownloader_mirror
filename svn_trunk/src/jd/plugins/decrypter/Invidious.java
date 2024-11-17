@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -28,10 +29,9 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.YoutubeDashV2;
 
 /** Crawler for hosted instances of: https://github.com/iv-org/invidious */
-@DecrypterPlugin(revision = "$Revision: 45938 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
 public class Invidious extends PluginForDecrypt {
     public Invidious(PluginWrapper wrapper) {
         super(wrapper);
@@ -73,7 +73,7 @@ public class Invidious extends PluginForDecrypt {
             /* Programmer mistake - this should never happen! */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        decryptedLinks.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
+        decryptedLinks.add(this.createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
         return decryptedLinks;
     }
 }

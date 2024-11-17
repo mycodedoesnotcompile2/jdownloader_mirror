@@ -101,9 +101,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
-import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 50155 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -158,10 +157,6 @@ public class TbCmV2 extends PluginForDecrypt {
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
-    }
-
-    public static String getBaseURL() {
-        return "https://www.youtube.com";
     }
 
     /**
@@ -615,7 +610,7 @@ public class TbCmV2 extends PluginForDecrypt {
                          * which only contains 27 videos not the entire channels 112
                          */
                         logger.info("Trying to find playlistID for channel-playlist 'Uploads by " + channelID + "'");
-                        helper.getPage(br, getBaseURL() + "/channel/" + channelID);
+                        helper.getPage(br, YoutubeHelper.getBaseURL() + "/channel/" + channelID);
                         checkBasicErrors(br);
                         playlistID = br.getRegex("(?i)list=([A-Za-z0-9\\-_]+)\"[^<>]+play-all-icon-btn").getMatch(0);
                         if (StringUtils.isEmpty(playlistID) && channelID.startsWith("UC")) {
@@ -777,12 +772,12 @@ public class TbCmV2 extends PluginForDecrypt {
                 if (emsg != null && StringUtils.isEmpty(vid.error)) {
                     vid.error = emsg;
                 }
-                ret.add(createOfflinelink(YoutubeDashV2.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
+                ret.add(createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
                 continue;
             }
             // TODO: Check if this can be removed
             if (vid.streams == null || StringUtils.isNotEmpty(vid.error)) {
-                ret.add(createOfflinelink(YoutubeDashV2.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
+                ret.add(createOfflinelink(YoutubeHelper.generateContentURL(vid.videoID), "Error - " + vid.videoID + (vid.title != null ? " [" + vid.title + "]:" : "") + " " + vid.error, vid.error));
                 if (vid.streams == null) {
                     continue;
                 }
@@ -1253,7 +1248,7 @@ public class TbCmV2 extends PluginForDecrypt {
         final String channelTabFromURL = getChannelTabNameFromURL(referenceUrl);
         String humanReadableTitle;
         if (playlistID != null) {
-            userOrPlaylistURL = generatePlaylistURL(playlistID);
+            userOrPlaylistURL = YoutubeHelper.generatePlaylistURL(playlistID);
             humanReadableTitle = "Playlist " + playlistID;
             if (playlistID.startsWith("RD")) {
                 /* It's a mix playlist auto created by youtube -> Set "YouTube" as name of creator of this playlist. */
@@ -1265,17 +1260,17 @@ public class TbCmV2 extends PluginForDecrypt {
                 /* do not modify channelID links */
                 userOrPlaylistURL = referenceUrl;
             } else {
-                userOrPlaylistURL = getChannelURLOLD(channelID, channelTabFromURL);
+                userOrPlaylistURL = YoutubeHelper.getChannelURLOLD(channelID, channelTabFromURL);
                 desiredChannelTab = channelTabFromURL;
             }
             humanReadableTitle = "ChannelID " + channelID;
         } else {
             /* Channel/User */
             if (channelTabFromURL == null) {
-                userOrPlaylistURL = getChannelURL(userName, "videos");
+                userOrPlaylistURL = YoutubeHelper.getChannelURL(userName, "videos");
                 desiredChannelTab = "Videos";
             } else {
-                userOrPlaylistURL = getChannelURL(userName, channelTabFromURL);
+                userOrPlaylistURL = YoutubeHelper.getChannelURL(userName, channelTabFromURL);
                 desiredChannelTab = channelTabFromURL;
             }
             humanReadableTitle = "Channel " + userName;
@@ -1403,22 +1398,22 @@ public class TbCmV2 extends PluginForDecrypt {
                     if (shortstab == null && "shorts".equals(channelTabFromURL) && run == 0 && videostab != null) {
                         logger.info("User wanted shorts but channel doesn't contain shorts tab -> Fallback to Videos tab and re-do loop with that URL");
                         if (channelID != null) {
-                            userOrPlaylistURL = getChannelURLOLD(userName, "videos");
+                            userOrPlaylistURL = YoutubeHelper.getChannelURLOLD(userName, "videos");
                             desiredChannelTab = "Videos";
                         } else {
                             /* Channel/User */
-                            userOrPlaylistURL = getChannelURL(userName, "videos");
+                            userOrPlaylistURL = YoutubeHelper.getChannelURL(userName, "videos");
                             desiredChannelTab = "Videos";
                         }
                         continue;
                     } else if (videostab == null && ("videos".equals(channelTabFromURL) || channelTabFromURL == null) && run == 0 && shortstab != null) {
                         logger.info("User wanted videos but channel doesn't contain videos tab -> Fallback to shorts tab and re-do loop with that URL");
                         if (channelID != null) {
-                            userOrPlaylistURL = getChannelURLOLD(userName, "shorts");
+                            userOrPlaylistURL = YoutubeHelper.getChannelURLOLD(userName, "shorts");
                             desiredChannelTab = "Shorts";
                         } else {
                             /* Channel/User */
-                            userOrPlaylistURL = getChannelURL(userName, "shorts");
+                            userOrPlaylistURL = YoutubeHelper.getChannelURL(userName, "shorts");
                             desiredChannelTab = "Shorts";
                         }
                         continue;
@@ -1564,7 +1559,7 @@ public class TbCmV2 extends PluginForDecrypt {
                          */
                         if (true) {
                             // proper playlist handling with packaging and correct container URLs
-                            final String playlistURL = generatePlaylistURL(vidPlayListID);
+                            final String playlistURL = YoutubeHelper.generatePlaylistURL(vidPlayListID);
                             distribute(createDownloadlink(playlistURL));
                             continue;
                         } else if (true) {
@@ -1980,30 +1975,5 @@ public class TbCmV2 extends PluginForDecrypt {
     @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
-    }
-
-    public static String generatePlaylistURL(final String playlistID) {
-        if (playlistID.startsWith("RD")) {
-            /* Youtube auto generated playlist / "Mix" */
-            return getBaseURL() + "/watch?list=" + playlistID;
-        } else {
-            return getBaseURL() + "/playlist?list=" + playlistID;
-        }
-    }
-
-    private static String getChannelURLOLD(final String channelID, final String tabName) {
-        String channelURL = getBaseURL() + "/channel/" + channelID;
-        if (tabName != null) {
-            channelURL += "/" + tabName;
-        }
-        return channelURL;
-    }
-
-    private static String getChannelURL(final String userName, final String tabName) {
-        String channelURL = getBaseURL() + "/@" + userName;
-        if (tabName != null) {
-            channelURL += "/" + tabName;
-        }
-        return channelURL;
     }
 }

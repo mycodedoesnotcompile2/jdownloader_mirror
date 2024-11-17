@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
@@ -27,9 +29,8 @@ import jd.plugins.DownloadLink;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 48325 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
 public class HooktubeCom extends PluginForDecrypt {
     public HooktubeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,7 +68,7 @@ public class HooktubeCom extends PluginForDecrypt {
         if (!TbCmV2.isValidVideoID(videoID)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        ret.add(createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
+        ret.add(createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
         return ret;
     }
 }

@@ -20,6 +20,7 @@ import java.util.List;
 
 import org.appwork.utils.Regex;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -36,9 +37,8 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.MegaDpUa;
-import jd.plugins.hoster.YoutubeDashV2;
 
-@DecrypterPlugin(revision = "$Revision: 50033 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { MegaDpUa.class })
 public class MegaDpUaFolder extends PluginForDecrypt {
     public MegaDpUaFolder(PluginWrapper wrapper) {
@@ -80,7 +80,7 @@ public class MegaDpUaFolder extends PluginForDecrypt {
         final Regex video = new Regex(param.getCryptedUrl(), TYPE_VIDEO);
         if (video.patternFind()) {
             final String videoID = video.getMatch(0);
-            ret.add(this.createDownloadlink(YoutubeDashV2.generateContentURL(videoID)));
+            ret.add(this.createDownloadlink(YoutubeHelper.generateContentURL(videoID)));
         } else {
             br.getPage(param.getCryptedUrl());
             if (jd.plugins.hoster.MegaDpUa.isOffline(this.br)) {

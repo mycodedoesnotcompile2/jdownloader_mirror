@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.plugins.CryptedLink;
@@ -28,14 +30,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
-import jd.plugins.hoster.YoutubeDashV2;
 
 /**
  *
  * @author butkovip
  *
  */
-@DecrypterPlugin(revision = "$Revision: 49776 $", interfaceVersion = 2, urls = {}, names = {})
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 2, urls = {}, names = {})
 public class TopkySk extends PluginForDecrypt {
     public TopkySk(PluginWrapper wrapper) {
         super(wrapper);
@@ -93,7 +94,7 @@ public class TopkySk extends PluginForDecrypt {
         if (null != links && 0 < links.length) {
             for (String[] link : links) {
                 if (null != link && 1 == link.length && null != link[0] && 0 < link[0].length()) {
-                    ret.add(createDownloadlink(YoutubeDashV2.generateContentURL(link[0])));
+                    ret.add(createDownloadlink(YoutubeHelper.generateContentURL(link[0])));
                 }
             }
         }

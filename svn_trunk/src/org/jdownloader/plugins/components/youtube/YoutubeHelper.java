@@ -37,23 +37,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-import jd.plugins.decrypter.TbCmV2;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -119,6 +102,22 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -172,18 +171,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-        @Override
-        public boolean add(final YoutubeReplacer e) {
-            for (final String tag : e.getTags()) {
-                if (REPLACER_MAP.put(tag, e) != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        throw new WTFException("Duplicate error:" + tag);
-                    }
-                }
-            }
-            return super.add(e);
-        };
-    };
+                                                                       @Override
+                                                                       public boolean add(final YoutubeReplacer e) {
+                                                                           for (final String tag : e.getTags()) {
+                                                                               if (REPLACER_MAP.put(tag, e) != null) {
+                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                                                                       throw new WTFException("Duplicate error:" + tag);
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                           return super.add(e);
+                                                                       };
+                                                                   };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -4293,7 +4292,6 @@ public class YoutubeHelper {
                 this.ytCfgSet = null;
             }
         }
-
     }
 
     public String getChannelPlaylistCrawlerContainerUrlOverride(final String fallback) {
@@ -4320,6 +4318,50 @@ public class YoutubeHelper {
         this.playlistID = playlistID;
     }
 
+    public static String generatePlaylistURL(final String playlistID) {
+        if (playlistID.startsWith("RD")) {
+            /* Youtube auto generated playlist / "Mix" */
+            return getBaseURL() + "/watch?list=" + playlistID;
+        } else {
+            return getBaseURL() + "/playlist?list=" + playlistID;
+        }
+    }
+
+    public static String getBaseURL() {
+        return "https://www.youtube.com";
+    }
+
+    public static String getChannelURLOLD(final String channelID, final String tabName) {
+        String channelURL = getBaseURL() + "/channel/" + channelID;
+        if (tabName != null) {
+            channelURL += "/" + tabName;
+        }
+        return channelURL;
+    }
+
+    public static String getChannelURL(final String userName, final String tabName) {
+        String channelURL = getBaseURL() + "/@" + userName;
+        if (tabName != null) {
+            channelURL += "/" + tabName;
+        }
+        return channelURL;
+    }
+
+    public static String generateContentURL(final String videoID) {
+        return generateVideoContentURL(videoID, null, -1);
+    }
+
+    public static String generateVideoContentURL(final String videoID, final String playlistID, final int playlistPosition) {
+        String url = getBaseURL() + "/watch?v=" + videoID;
+        if (playlistID != null) {
+            url += "&list=" + playlistID;
+            if (playlistPosition > 0) {
+                url += "&index=" + playlistPosition;
+            }
+        }
+        return url;
+    }
+
     public List<YoutubeStreamData> crawlCoverData(final String playListID, final boolean grabFilesize) throws Exception {
         if (playListID == null) {
             return null;
@@ -4329,8 +4371,8 @@ public class YoutubeHelper {
             return cachedCovers;
         }
         final Browser brc = br.cloneBrowser();
-        if (brc.getRequest() == null || !brc.getURL().equalsIgnoreCase(TbCmV2.generatePlaylistURL(playListID))) {
-            brc.getPage(TbCmV2.generatePlaylistURL(playListID));
+        if (brc.getRequest() == null || !brc.getURL().equalsIgnoreCase(generatePlaylistURL(playListID))) {
+            brc.getPage(generatePlaylistURL(playListID));
         }
         final String[][] customCovers = brc.getRegex("<meta property=\"og:image\" content=\"(https?://i\\.ytimg.com/pl_c/[^\"]*)\">(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?").getMatches();
         if (customCovers == null || customCovers.length == 0) {
@@ -4367,5 +4409,4 @@ public class YoutubeHelper {
         }
         return data;
     }
-
 }

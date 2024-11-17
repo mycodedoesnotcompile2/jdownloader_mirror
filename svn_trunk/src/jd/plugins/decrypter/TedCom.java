@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import java.util.Random;
 
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -24,10 +25,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.hoster.YoutubeDashV2;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 47002 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
+@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 2, names = { "ted.com" }, urls = { "https?://(?:www\\.)?ted\\.com/(talks/(?:lang/[a-zA-Z\\-]+/)?[\\w_]+|[\\w_]+\\?language=\\w+|playlists/\\d+/[^/]+)" })
 public class TedCom extends PluginForDecrypt {
     public TedCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -179,7 +179,7 @@ public class TedCom extends PluginForDecrypt {
                 final String mediaCode = (String) externalMedia.get("code");
                 final String service = (String) externalMedia.get("service");
                 if (!StringUtils.isEmpty(service) && !StringUtils.isEmpty(mediaCode) && service.equalsIgnoreCase("youtube")) {
-                    decryptedLinks.add(createDownloadlink(YoutubeDashV2.generateContentURL(mediaCode)));
+                    decryptedLinks.add(createDownloadlink(YoutubeHelper.generateContentURL(mediaCode)));
                 }
                 final String uri = (String) externalMedia.get("uri");
                 if (!StringUtils.isEmpty(uri)) {
