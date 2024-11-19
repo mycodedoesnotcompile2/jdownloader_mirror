@@ -75,13 +75,13 @@ public class SimpleUseNetDownloadInterface extends DownloadInterface {
     public SimpleUseNetDownloadInterface(final SimpleUseNet client, final DownloadLink downloadLink, final UsenetFile usenetFile) {
         connectionHandler = new ManagedThrottledConnectionHandler();
         this.usenetFile = usenetFile;
-        final boolean resumeable = usenetFile.getNumSegments() > 1 || usenetFile.getSegments().size() > 1;
+        final boolean resumable = usenetFile.getNumSegments() > 1 || usenetFile.getSegments().size() > 1;
         final String host = SocketConnection.getHostName(client.getSocket().getRemoteSocketAddress());
         this.downloadLink = downloadLink;
         downloadable = new DownloadLinkDownloadable(downloadLink) {
             @Override
             public boolean isResumable() {
-                return resumeable;
+                return resumable;
             }
 
             @Override
@@ -163,14 +163,14 @@ public class SimpleUseNetDownloadInterface extends DownloadInterface {
 
             @Override
             public void setResumeable(boolean value) {
-                super.setResumeable(resumeable && value);
+                super.setResumeable(resumable && value);
             }
 
             @Override
             public void updateFinalFileName() {
             }
         };
-        if (resumeable) {
+        if (resumable) {
             downloadable.setResumeable(true);
         } else {
             downloadable.setResumeable(false);

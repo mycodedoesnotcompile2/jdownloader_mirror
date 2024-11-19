@@ -76,7 +76,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50079 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -1069,8 +1069,8 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             if (!isHLS) {
                 /* Progressive video stream download */
                 final int maxChunks = getMaxChunks(account);
-                final boolean isResumeable = isResumeable(link, account);
-                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, this.dllink, isResumeable, maxChunks);
+                final boolean isResumable = isResumeable(link, account);
+                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, this.dllink, isResumable, maxChunks);
                 if (looksLikeHLS(dl.getConnection())) {
                     /* Surprise-HLS (e.g. ok.xxx) */
                     logger.info("Got HLS instead of progressive video download");
@@ -1081,7 +1081,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                     final String workaroundURL = getHttpServerErrorWorkaroundURL(dl.getConnection());
                     if (workaroundURL != null && !this.looksLikeDownloadableContent(dl.getConnection())) {
                         dl.getConnection().disconnect();
-                        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, workaroundURL, isResumeable, maxChunks);
+                        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, workaroundURL, isResumable, maxChunks);
                     }
                     handleConnectionErrors(br, dl.getConnection());
                     link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toExternalForm());

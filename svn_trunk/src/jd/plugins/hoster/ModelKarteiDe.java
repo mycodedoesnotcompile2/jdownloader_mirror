@@ -47,7 +47,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -129,7 +129,7 @@ public class ModelKarteiDe extends PluginForHost {
         }
     }
 
-    private String getFID(final DownloadLink link) {
+    public String getFID(final DownloadLink link) {
         String fid = new Regex(link.getPluginPatternMatcher(), TYPE_PHOTO).getMatch(0);
         if (fid == null) {
             fid = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO).getMatch(0);
@@ -284,7 +284,7 @@ public class ModelKarteiDe extends PluginForHost {
         return Integer.MAX_VALUE;
     }
 
-    private boolean login(final Account account, final boolean force) throws Exception {
+    public boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
             br.setFollowRedirects(true);
             br.setCookiesExclusive(true);

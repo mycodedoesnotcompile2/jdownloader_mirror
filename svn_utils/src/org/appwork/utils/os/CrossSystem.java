@@ -170,7 +170,7 @@ public class CrossSystem {
         KALILINUX_2024_4(OSFamily.LINUX, "2024\\.4"),
         /*
          * https://www.debian.org/releases/
-         * 
+         *
          * Debian: List must be sorted by release Date!!
          */
         DEBIAN(OSFamily.LINUX),
@@ -187,7 +187,7 @@ public class CrossSystem {
         DEBIAN_SID(OSFamily.LINUX, "sid"), // unstable
         /*
          * RASPBIAN
-         * 
+         *
          * RASPBIAN: List must be sorted by release Date!!
          */
         RASPBIAN(OSFamily.LINUX),
@@ -200,9 +200,9 @@ public class CrossSystem {
         RASPBIAN_TRIXIE(OSFamily.LINUX, "trixie"),
         /*
          * https://en.wikipedia.org/wiki/Ubuntu_version_history
-         * 
+         *
          * https://wiki.ubuntu.com/Releases
-         * 
+         *
          * Ubuntu: List must be sorted by release Date!!
          */
         UBUNTU(OSFamily.LINUX),
@@ -295,6 +295,7 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -302,12 +303,12 @@ public class CrossSystem {
             this(family, (Pattern) null);
         }
 
-        private OperatingSystem(final OSFamily family, Pattern releasePattern) {
+        private OperatingSystem(final OSFamily family, final Pattern releasePattern) {
             this.family = family;
             this.releasePattern = releasePattern;
         }
 
-        private OperatingSystem(final OSFamily family, String releasePattern) {
+        private OperatingSystem(final OSFamily family, final String releasePattern) {
             this(family, releasePattern != null ? Pattern.compile(releasePattern) : null);
         }
 
@@ -316,7 +317,7 @@ public class CrossSystem {
         }
 
         private boolean isRelease(final String line) {
-            return releasePattern != null && releasePattern.matcher(line).find();
+            return this.releasePattern != null && this.releasePattern.matcher(line).find();
         }
 
         public static boolean sameOSFamily(final OperatingSystem x, final OperatingSystem y) {
@@ -334,18 +335,18 @@ public class CrossSystem {
         }
 
         public final boolean isMaximum(final OperatingSystem os) {
-            if (sameOSFamily(os)) {
+            if (this.sameOSFamily(os)) {
                 final int maximum = os.ordinal();
-                return ordinal() <= maximum;
+                return this.ordinal() <= maximum;
             } else {
                 return false;
             }
         }
 
         public final boolean isMinimum(final OperatingSystem os) {
-            if (sameOSFamily(os)) {
+            if (this.sameOSFamily(os)) {
                 final int minimum = os.ordinal();
-                return ordinal() >= minimum;
+                return this.ordinal() >= minimum;
             } else {
                 return false;
             }
@@ -361,6 +362,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -369,11 +371,11 @@ public class CrossSystem {
             if (os != null && os.length() > 2) {
                 try {
                     return OperatingSystem.valueOf(os).getFamily();
-                } catch (IllegalArgumentException ignore) {
+                } catch (final IllegalArgumentException ignore) {
                 }
                 try {
                     return OSFamily.valueOf(os.replaceFirst("(_.+)", ""));
-                } catch (IllegalArgumentException ignore) {
+                } catch (final IllegalArgumentException ignore) {
                 }
             }
             return null;
@@ -412,6 +414,10 @@ public class CrossSystem {
     private final static String            OS_STRING;
     private final static String            ARCH_STRING;
     private static Boolean                 OS64BIT             = null;
+    @Deprecated
+    /**
+     * @deprecated wmic.exe is not available for WIndows 11 24H2 or later
+     */
     public final static String             WMIC_PATH;
     static {
         /* Init OS_ID */
@@ -421,7 +427,13 @@ public class CrossSystem {
         ARCH = CrossSystem.getARCHByString(CrossSystem.ARCH_STRING);
         /* Init MIME */
         if (CrossSystem.isWindows()) {
-            CrossSystem.DESKTOP_SUPPORT = new DesktopSupportWindows();
+            try {
+                // Try to load the JNA class
+                Class.forName("com.sun.jna.Native");
+                CrossSystem.DESKTOP_SUPPORT = new DesktopSupportWindowsViaJNA();
+            } catch (final Exception e) {
+                CrossSystem.DESKTOP_SUPPORT = new DesktopSupportWindows();
+            }
         } else if (CrossSystem.isLinux()) {
             CrossSystem.DESKTOP_SUPPORT = new DesktopSupportLinux();
         } else if (CrossSystem.isMac()) {
@@ -442,7 +454,7 @@ public class CrossSystem {
         }
     }
 
-    public static void setDesktopSupportInstance(DesktopSupport desktopSupport) {
+    public static void setDesktopSupportInstance(final DesktopSupport desktopSupport) {
         if (desktopSupport == null) {
             throw new IllegalArgumentException();
         }
@@ -480,7 +492,7 @@ public class CrossSystem {
             } else if (CrossSystem.isOpenFileSupported()) {
                 CrossSystem.DESKTOP_SUPPORT.openFile(file);
             }
-        } catch (IOException e) {
+        } catch (final IOException e) {
             if (CrossSystem.isOpenFileSupported()) {
                 CrossSystem.DESKTOP_SUPPORT.openFile(file);
             } else {
@@ -522,7 +534,7 @@ public class CrossSystem {
      * @param pathPart
      * @return
      */
-    public static String alleviatePathParts(String pathPart) {
+    public static String alleviatePathParts(final String pathPart) {
         return alleviatePathParts(pathPart, true);
     }
 
@@ -537,7 +549,7 @@ public class CrossSystem {
      *            {@link Boolean} remove leading/hiding(unix) dot
      * @return
      */
-    public static String alleviatePathParts(String pathPart, boolean removeLeadingHidingDot) {
+    public static String alleviatePathParts(String pathPart, final boolean removeLeadingHidingDot) {
         if (StringUtils.isEmpty(pathPart)) {
             if (pathPart != null) {
                 return pathPart;
@@ -575,7 +587,7 @@ public class CrossSystem {
         }
         /*
          * remove ending dots, not allowed under windows and others os maybe too
-         * 
+         *
          * Do not end a file or directory name with a space or a period.
          */
         pathPart = pathPart.replaceFirst("\\.+$", "");
@@ -587,7 +599,7 @@ public class CrossSystem {
         }
     }
 
-    public static boolean isForbiddenFilename(String name) {
+    public static boolean isForbiddenFilename(final String name) {
         if (CrossSystem.isWindows() || CrossSystem.isOS2()) {
             /**
              * http://msdn.microsoft.com/en-us/library/windows/desktop/aa365247%28v=vs.85%29.aspx
@@ -694,7 +706,7 @@ public class CrossSystem {
                      * this is very fast
                      */
                     return CrossSystem17.caseSensitiveFileExists(file);
-                } catch (Throwable e) {
+                } catch (final Throwable e) {
                     LogV3.defaultLogger().log(e);
                 }
             }
@@ -705,7 +717,7 @@ public class CrossSystem {
                 loop: while ((current = current.getParentFile()) != null) {
                     final String[] list = current.list();
                     if (list != null) {
-                        for (String listItem : list) {
+                        for (final String listItem : list) {
                             if (currentName.equals(listItem)) {
                                 currentName = current.getName();
                                 continue loop;
@@ -744,7 +756,7 @@ public class CrossSystem {
         final Object initialValue = new Object();
         final AtomicReference<Object> reference = new AtomicReference<Object>(initialValue);
         final Thread thread = new Thread("getWindowsReleaseCMD: cmd -c ver") {
-            private void set(OperatingSystem operatingSystem) {
+            private void set(final OperatingSystem operatingSystem) {
                 synchronized (reference) {
                     reference.compareAndSet(initialValue, operatingSystem);
                     reference.notify();
@@ -766,14 +778,14 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
-                            set(OperatingSystem.WINDOWS_SERVER_2025);
+                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                            this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
-                            set(OperatingSystem.WINDOWS_SERVER_2022);
+                            this.set(OperatingSystem.WINDOWS_SERVER_2022);
                         } else if (buildNumber >= 17763) {
-                            set(OperatingSystem.WINDOWS_SERVER_2019);
+                            this.set(OperatingSystem.WINDOWS_SERVER_2019);
                         } else if (buildNumber >= 14393) {
-                            set(OperatingSystem.WINDOWS_SERVER_2016);
+                            this.set(OperatingSystem.WINDOWS_SERVER_2016);
                         }
                         return;
                     }
@@ -782,43 +794,43 @@ public class CrossSystem {
                     // https://betawiki.net/wiki/Windows_as_a_service
                     // https://ss64.com/nt/ver.html
                     if (buildNumber >= 27548 || buildNumber >= 27686) {
-                        set(OperatingSystem.WINDOWS_11_25H1);
+                        this.set(OperatingSystem.WINDOWS_11_25H1);
                     } else if (buildNumber >= 26052 || buildNumber >= 26080 || buildNumber >= 26100) {
                         // https://blogs.windows.com/windows-insider/2024/02/08/announcing-windows-11-insider-preview-build-26052-canary-and-dev-channels/
                         // TODO: update buildNumber
-                        set(OperatingSystem.WINDOWS_11_24H2);
+                        this.set(OperatingSystem.WINDOWS_11_24H2);
                     } else if (buildNumber >= 22631) {
-                        set(OperatingSystem.WINDOWS_11_23H2);
+                        this.set(OperatingSystem.WINDOWS_11_23H2);
                     } else if (buildNumber >= 22621) {
-                        set(OperatingSystem.WINDOWS_11_22H2);
+                        this.set(OperatingSystem.WINDOWS_11_22H2);
                     } else if (buildNumber >= 22000) {
                         // return OperatingSystem.WINDOWS_11_21H2;
-                        set(OperatingSystem.WINDOWS_11);
+                        this.set(OperatingSystem.WINDOWS_11);
                     } else if (buildNumber >= 19045) {
-                        set(OperatingSystem.WINDOWS_10_22H2);
+                        this.set(OperatingSystem.WINDOWS_10_22H2);
                     } else if (buildNumber >= 19044) {
-                        set(OperatingSystem.WINDOWS_10_21H2);
+                        this.set(OperatingSystem.WINDOWS_10_21H2);
                     } else if (buildNumber >= 19043) {
-                        set(OperatingSystem.WINDOWS_10_21H1);
+                        this.set(OperatingSystem.WINDOWS_10_21H1);
                     } else if (buildNumber >= 19042) {
-                        set(OperatingSystem.WINDOWS_10_20H2);
+                        this.set(OperatingSystem.WINDOWS_10_20H2);
                     } else if (buildNumber >= 10240) {
-                        set(OperatingSystem.WINDOWS_10);
+                        this.set(OperatingSystem.WINDOWS_10);
                     } else if (buildNumber >= 9600) {
-                        set(OperatingSystem.WINDOWS_8_1);
+                        this.set(OperatingSystem.WINDOWS_8_1);
                     } else if (buildNumber >= 9200) {
-                        set(OperatingSystem.WINDOWS_8);
+                        this.set(OperatingSystem.WINDOWS_8);
                     } else if (buildNumber >= 7601) {
-                        set(OperatingSystem.WINDOWS_7);
+                        this.set(OperatingSystem.WINDOWS_7);
                     } else if (buildNumber >= 6002) {
-                        set(OperatingSystem.WINDOWS_VISTA);
+                        this.set(OperatingSystem.WINDOWS_VISTA);
                     } else if (buildNumber >= 2600) {
-                        set(OperatingSystem.WINDOWS_XP);
+                        this.set(OperatingSystem.WINDOWS_XP);
                     }
-                } catch (Throwable ignore) {
+                } catch (final Throwable ignore) {
                     ignore.printStackTrace();
                 } finally {
-                    set(null);
+                    this.set(null);
                     if (process != null) {
                         try {
                             process.destroy();
@@ -836,7 +848,7 @@ public class CrossSystem {
                     reference.wait(1000);
                 }
             }
-        } catch (InterruptedException ignore) {
+        } catch (final InterruptedException ignore) {
         }
         final Object resultValue = reference.get();
         if (resultValue instanceof OperatingSystem) {
@@ -883,7 +895,7 @@ public class CrossSystem {
                             return ret;
                         }
                     }
-                } catch (Throwable ignore) {
+                } catch (final Throwable ignore) {
                     ignore.printStackTrace();
                 }
                 return OperatingSystem.WINDOWS_10;
@@ -1077,7 +1089,7 @@ public class CrossSystem {
         return null;
     }
 
-    private static OperatingSystem getLinuxRelease(OperatingSystem base, String release) {
+    private static OperatingSystem getLinuxRelease(final OperatingSystem base, final String release) {
         OperatingSystem best = null;
         for (final OperatingSystem os : OperatingSystems) {
             if (base.sameOSFamily(os) && os.isRelease(release)) {
@@ -1326,7 +1338,7 @@ public class CrossSystem {
             if (index >= 1) {
                 return Long.parseLong(jvmName.substring(0, index), 10);
             }
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
         }
         try {
             /**
@@ -1805,7 +1817,7 @@ public class CrossSystem {
             } else if (CrossSystem.isMac()) {
                 try {
                     ProcessBuilderFactory.create("open", "-R", saveTo.getAbsolutePath()).start();
-                } catch (IOException e) {
+                } catch (final IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -1841,132 +1853,7 @@ public class CrossSystem {
         CrossSystem.DESKTOP_SUPPORT.shutdown(force);
     }
 
-    /**
-     * @return
-     * @throws SecuritySoftwareException
-     * @throws InterruptedException
-     */
-    public static SecuritySoftwareResponse getAntiVirusSoftwareInfo() throws UnsupportedOperationException, SecuritySoftwareException, InterruptedException {
-        String response = null;
-        try {
-            if (!CrossSystem.isWindows()) {
-                throw new UnsupportedOperationException("getAntiVirusSoftwareInfo: Not Supported for your OS");
-            }
-            switch (CrossSystem.getOS()) {
-            case WINDOWS_XP:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "/NAMESPACE:\\\\root\\SecurityCenter", "path", "AntiVirusProduct", "get", "companyName,displayName,pathToEnableOnAccessUI,pathToUpdateUI,productUptoDate", "/format:value").getStdOutString();
-                break;
-            default:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "/NAMESPACE:\\\\root\\SecurityCenter2", "path", "AntiVirusProduct", "get", "displayName,pathToSignedProductExe,pathToSignedReportingExe,productState", "/format:value").getStdOutString();
-                break;
-            }
-            return parseWindowWMIResponse(response, null);
-        } catch (UnsupportedOperationException e) {
-            throw e;
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new SecuritySoftwareException(e, response);
-        }
-    }
-
-    public static SecuritySoftwareResponse parseWindowWMIResponse(final String response, OperatingSystem os) {
-        if (os == null) {
-            os = CrossSystem.getOS();
-        }
-        SecuritySoftwareResponse list = new SecuritySoftwareResponse();
-        list.setResponse(response);
-        if (StringUtils.isNotEmpty(response)) {
-            org.appwork.loggingv3.LogV3.info(response);
-            String[] lines = response.split("[\r\n]{1,2}");
-            String firstKey = null;
-            SecuritySoftwareInfo ret = new SecuritySoftwareInfo();
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i];
-                if (StringUtils.isNotEmpty(line)) {
-                    int index = line.indexOf("=");
-                    if (index > 0) {
-                        String key = line.substring(0, index);
-                        String value = line.substring(index + 1);
-                        if (firstKey != null && firstKey.equals(key)) {
-                            list.add(ret);
-                            ret = new SecuritySoftwareInfo();
-                        }
-                        if (firstKey == null) {
-                            firstKey = key;
-                        }
-                        ret.put(key, value);
-                    }
-                }
-            }
-            if (ret.size() > 0) {
-                list.add(ret);
-            }
-            return list;
-        }
-        throw new WTFException("WMIC returned no response");
-    }
-
-    /**
-     * @return
-     * @throws SecuritySoftwareException
-     * @throws InterruptedException
-     *
-     */
-    public static SecuritySoftwareResponse getFirewallSoftwareInfo() throws UnsupportedOperationException, SecuritySoftwareException, InterruptedException {
-        String response = null;
-        try {
-            if (!CrossSystem.isWindows()) {
-                throw new UnsupportedOperationException("getFirewallSoftwareInfo: Not Supported for your OS");
-            }
-            switch (CrossSystem.getOS()) {
-            case WINDOWS_XP:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "/NAMESPACE:\\\\root\\SecurityCenter", "path", "FirewallProduct", "get", "companyName,displayName,enabled,pathToEnableUI", "/format:value").getStdOutString();
-                break;
-            default:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "/NAMESPACE:\\\\root\\SecurityCenter2", "path", "FirewallProduct", "get", "displayName,pathToSignedProductExe,pathToSignedProductExe,pathToSignedReportingExe,productState", "/format:value").getStdOutString();
-                break;
-            }
-            return parseWindowWMIResponse(response, null);
-        } catch (UnsupportedOperationException e) {
-            throw e;
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new SecuritySoftwareException(e, response);
-        }
-    }
-
-    /**
-     * @return
-     * @throws SecuritySoftwareException
-     * @throws InterruptedException
-     *
-     */
-    public static SecuritySoftwareResponse getAntiSpySoftwareInfo() throws UnsupportedOperationException, SecuritySoftwareException, InterruptedException {
-        String response = null;
-        try {
-            if (!CrossSystem.isWindows()) {
-                throw new UnsupportedOperationException("getAntiSpySoftwareInfo: Not Supported for your OS");
-            }
-            switch (CrossSystem.getOS()) {
-            case WINDOWS_XP:
-                throw new UnsupportedOperationException("getAntiSpySoftwareInfo: Not Supported for your OS");
-            default:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "/NAMESPACE:\\\\root\\SecurityCenter2", "path", "AntiSpywareProduct", "get", "displayName,pathToSignedProductExe,pathToSignedProductExe,pathToSignedReportingExe,productState", "/format:value").getStdOutString();
-                break;
-            }
-            return parseWindowWMIResponse(response, null);
-        } catch (UnsupportedOperationException e) {
-            throw e;
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new SecuritySoftwareException(e, response);
-        }
-    }
-
-    public static boolean isProcessRunning(String path) throws UnexpectedResponseException, InterruptedException {
+    public static boolean isProcessRunning(final String path) throws UnexpectedResponseException, InterruptedException {
         String response = null;
         try {
             if (!CrossSystem.isWindows()) {
@@ -1982,11 +1869,11 @@ public class CrossSystem {
             } else if (StringUtils.isEmpty(response)) {
                 return false;
             }
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             throw e;
-        } catch (UnsupportedOperationException e) {
+        } catch (final UnsupportedOperationException e) {
             throw e;
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
             throw new WTFException(e);
         }
         throw new UnexpectedResponseException("Unexpected Response: " + response);

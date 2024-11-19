@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49913 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -175,9 +175,8 @@ public class XtremestreamCo extends PluginForHost {
             this.handleConnectionErrors(br, dl.getConnection());
             dl.startDownload();
             return;
-        } else {
-            logger.info("Official download is not possible");
         }
+        logger.info("Official download is not possible");
         String hlsMaster = br.getRegex("var m3u8_loader_url = `(https://[^<>\"']+data=)`;").getMatch(0);
         if (hlsMaster == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

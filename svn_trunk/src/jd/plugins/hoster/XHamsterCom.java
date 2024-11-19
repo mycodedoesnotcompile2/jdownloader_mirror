@@ -58,11 +58,14 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 50166 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,16 +114,13 @@ public class XHamsterCom extends PluginForHost {
     }
 
     /** Make sure this is the same in classes XHamsterCom and XHamsterGallery! */
-    public static List<String[]> getPluginDomains() {
-        final List<String[]> ret = new ArrayList<String[]>();
-        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xhamster.com", "xhamster.xxx", "xhamster.desi", "xhamster.one", "xhamster1.desi", "xhamster2.desi", "xhamster3.desi", "openxh.com", "openxh1.com", "openxh2.com", "megaxh.com", "xhvid.com", "xhbranch5.com", "xhamster.tv", "airportxh.life" });
-        return ret;
+    private static List<String[]> getPluginDomains() {
+        return XHamsterGallery.getPluginDomains();
     }
 
     public static String[] getDeadDomains() {
         /* Add dead domains here so plugin can correct domain in added URL if it is a dead domain. */
-        return new String[] { "gold.xhamsterpremium.com", "xhamsterpremium.com" };
+        return new String[] { "gold.xhamsterpremium.com", "xhamsterpremium.com", "airportxh.life" };
     }
 
     public static String[] getAnnotationNames() {

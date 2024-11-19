@@ -17,8 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,7 +29,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48082 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z]/[a-z0-9\\-_]+/(\\d+)\\.php" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50169 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z]/([a-z0-9\\-_]+)/(\\d+)\\.php" })
 public class GirlfriendvideosCom extends PluginForHost {
     public GirlfriendvideosCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,12 @@ public class GirlfriendvideosCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        if (link.getPluginPatternMatcher() == null) {
+            return null;
+        }
+        final String user = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        final String id = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
+        return user + "/" + id;
     }
 
     @Override

@@ -54,7 +54,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -271,7 +271,7 @@ public class TeraboxCom extends PluginForHost {
             br.getPage("https://www." + this.getHost() + "/main?category=all");
             if (br.getHttpConnection().getResponseCode() == 404) {
                 /* Fallback if link changes e.g. old link was: https://www.terabox.com/disk/home -> Leads to error 404 now */
-                br.getPage("https://www." + this.getHost() + "/");
+                br.getPage("https://" + br.getHost(true) + "/");
             }
             final String bdstoken = br.getRegex("\"bdstoken\":\"([a-f0-9]{32})\"").getMatch(0);
             final String pcftoken = br.getRegex("\"pcftoken\":\"([a-f0-9]{32})\"").getMatch(0);

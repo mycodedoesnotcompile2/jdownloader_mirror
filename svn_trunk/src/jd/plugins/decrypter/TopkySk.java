@@ -22,6 +22,7 @@ import org.jdownloader.plugins.components.youtube.YoutubeHelper;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.parser.Regex;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
@@ -36,7 +37,7 @@ import jd.plugins.hoster.DirectHTTP;
  * @author butkovip
  *
  */
-@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 2, urls = {}, names = {})
+@DecrypterPlugin(revision = "$Revision: 50174 $", interfaceVersion = 2, urls = {}, names = {})
 public class TopkySk extends PluginForDecrypt {
     public TopkySk(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,7 +66,7 @@ public class TopkySk extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/cl?/\\d+/\\d+/([a-zA-Z0-9\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/cl?/(\\d+)/(\\d+)/([a-zA-Z0-9\\-]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -80,6 +81,7 @@ public class TopkySk extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final String contentID = new Regex(contenturl, this.getSupportedLinks()).getMatch(1);
         // extract img.zoznam.sk like vids
         String[][] links = br.getRegex("fo\\.addVariable[(]\"file\", \"(.*?)\"[)]").getMatches();
         if (null != links && 0 < links.length) {
@@ -114,6 +116,13 @@ public class TopkySk extends PluginForDecrypt {
         final String[] hlsplaylists = br.getRegex("(https?://img\\.topky\\.sk/video/\\d+/master\\.m3u8)").getColumn(0);
         for (final String hlsplaylist : hlsplaylists) {
             ret.add(createDownloadlink(hlsplaylist));
+        }
+        if (br.containsHTML("class=\"box-audio-content\"")) {
+            /*
+             * Article read out as audio file. This is not availabble for all articles but the website also just tries it and hides the
+             * audio button if the file is not available (lol).
+             */
+            ret.add(createDownloadlink(DirectHTTP.createURLForThisPlugin("https://img.topky.sk/audio/" + contentID + ".mp3")));
         }
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

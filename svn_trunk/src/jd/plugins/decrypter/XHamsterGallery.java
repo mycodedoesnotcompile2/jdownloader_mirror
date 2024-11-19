@@ -48,7 +48,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.XHamsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48372 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
 public class XHamsterGallery extends PluginForDecrypt {
     public XHamsterGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -63,7 +63,7 @@ public class XHamsterGallery extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "xhamster.com", "xhamster.xxx", "xhamster.desi", "xhamster.one", "xhamster1.desi", "xhamster2.desi", "xhamster3.desi", "openxh.com", "openxh1.com", "openxh2.com", "megaxh.com" });
+        ret.add(new String[] { "xhamster.com", "xhamster.xxx", "xhamster.desi", "xhamster.one", "xhamster1.desi", "xhamster2.desi", "xhamster3.desi", "openxh.com", "openxh1.com", "openxh2.com", "megaxh.com", "xhvid.com", "xhbranch5.com", "xhamster.tv", "airportxh.life", "xhsay.life" });
         return ret;
     }
 

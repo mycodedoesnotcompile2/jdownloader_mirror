@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.nio.channels.ClosedChannelException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -486,7 +485,7 @@ public class ZipIOWriter {
                 if (os instanceof FileOutputStream) {
                     try {
                         ((FileOutputStream) os).getChannel().force(true);
-                    } catch (ClosedChannelException e) {
+                    } catch (IOException e) {
                         // ignore.
                     }
                 }

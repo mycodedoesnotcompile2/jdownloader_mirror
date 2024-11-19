@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,63 +32,104 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.tests;
+package org.appwork.utils;
 
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.UniqueAlltimeID;
+import java.util.Collection;
 
 /**
  * @author thomas
- * @date 26.10.2022
+ * @date 11.11.2024
  *
  */
-public class ThreadDumpTest extends AWTest {
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        final Thread normalThread = new Thread("normalThread:" + UniqueAlltimeID.next()) {
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        final Thread daemonThread = new Thread("daemonThread:" + UniqueAlltimeID.next()) {
-            {
-                setDaemon(true);
-            }
+public class Joiner {
+    private String separator;
 
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        try {
-            normalThread.start();
-            daemonThread.start();
-            final String dump = Application.getThreadDump();
-            assertTrue(StringUtils.contains(dump, normalThread.getName()));
-            assertTrue(StringUtils.contains(dump, daemonThread.getName()));
-        } finally {
-            normalThread.interrupt();
-            daemonThread.interrupt();
-        }
+    /**
+     * @param separator
+     */
+    public Joiner(String separator) {
+        this.separator = separator;
     }
 
-    public static void main(String[] args) {
-        run();
+    private boolean skipEmptyOrNullElements = false;
+
+    /**
+     * @return the skipEmptyOrNullElements
+     */
+    public boolean isSkipEmptyOrNullElements() {
+        return skipEmptyOrNullElements;
+    }
+
+    /**
+     * @param skipEmptyOrNullElements
+     *            the skipEmptyOrNullElements to set
+     * @return
+     */
+    public Joiner skipEmptyOrNullElements(boolean skipEmptyOrNullElements) {
+        this.skipEmptyOrNullElements = skipEmptyOrNullElements;
+        return this;
+    }
+
+    /**
+     * @param skipEmptyOrNullElements
+     *            the skipEmptyOrNullElements to set
+     */
+    public void setSkipEmptyOrNullElements(boolean skipEmptyOrNullElements) {
+        this.skipEmptyOrNullElements = skipEmptyOrNullElements;
+    }
+
+    public String join(Collection<?> params) {
+        return join(params.toArray(new Object[0]));
+    }
+
+    /**
+     * @param parameters
+     * @return
+     */
+    public String join(Object... parameters) {
+        StringBuilder sb = new StringBuilder();
+        int added = 0;
+        for (Object s : parameters) {
+            if (skip(s)) {
+                continue;
+            }
+            addSeparator(added, s, parameters, sb);
+            String toString = elementToString(s);
+            added++;
+            sb.append(toString);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * @param s
+     * @return
+     */
+    protected boolean skip(Object s) {
+        return false;
+    }
+
+    protected Object getSeparator(int addedElements, Object element, Object[] parameters, StringBuilder sb) {
+        return separator;
+    };
+
+    /**
+     * @param s
+     * @return
+     */
+    protected String elementToString(Object s) {
+        return String.valueOf(s);
+    }
+
+    /**
+     * @param i
+     * @param s
+     * @param parameters
+     * @param sb
+     */
+    protected void addSeparator(int addedElements, Object element, Object[] parameters, StringBuilder sb) {
+        if (addedElements > 0) {
+            sb.append(elementToString(getSeparator(addedElements, element, parameters, sb)));
+        }
     }
 }

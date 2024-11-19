@@ -28,6 +28,8 @@ import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
+import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
@@ -51,7 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50160 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends PluginForHost {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -296,15 +298,17 @@ public class TorboxApp extends PluginForHost {
             if (Boolean.FALSE.equals(user_settings.get("jdownloader_notifications"))) {
                 logger.info("User has disabled notifications in web interface of " + getHost());
                 break notificationHandling;
+            } else if (BubbleNotifyEnabledState.NEVER.equals(CFG_BUBBLE.CFG.getBubbleNotifyEnabledState())) {
+                logger.info("User has disabled BubbleNotifications in JDownloader settings");
+                break notificationHandling;
             }
             long highestNotificationTimestamp = 0;
-            List<Map<String, Object>> notifications = null;
-            int numberofNotificationsActuallyDisplayed = 0;
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
-                final Request req_notifications = br.createPostRequest(API_BASE + "/notifications/mynotifications", "");
+                final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
                 /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
-                notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
+                int numberofNotificationsActuallyDisplayed = 0;
+                final List<Map<String, Object>> notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
                 for (final Map<String, Object> notification : notifications) {
                     final long notification_created_at = parseTimeStamp(notification.get("created_at").toString());
                     if (notification_created_at > highestNotificationTimestamp) {
@@ -323,6 +327,16 @@ public class TorboxApp extends PluginForHost {
                     }
                 }
                 logger.info("Total number of notifications: " + notifications.size() + " | Displayed this run: " + numberofNotificationsActuallyDisplayed);
+                if (numberofNotificationsActuallyDisplayed == 0) {
+                    /* Zero notifications were displayed to use -> Do not clear notifications */
+                    break notificationHandling;
+                }
+                /* Save this timestamp so we are able to know to which time we've already displayed notifications. */
+                account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, highestNotificationTimestamp);
+                /* Clear all notifications ("mark as read") */
+                final Request req_clear_all_notifications = br.createPostRequest(API_BASE + "/notifications/clear", "");
+                this.callAPI(br, req_clear_all_notifications, account, null);
+                logger.info("Successfully cleared notifications");
             } catch (final Exception e) {
                 /*
                  * Ignore exception as the important part [the account-check] was successful and we don't care about a failure at this
@@ -330,20 +344,6 @@ public class TorboxApp extends PluginForHost {
                  */
                 logger.log(e);
                 logger.warning("Exception happened in notification handling");
-            } finally {
-                /* Save this timestamp so we are able to know to which time we've already displayed notifications. */
-                account.setProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, highestNotificationTimestamp);
-                if (numberofNotificationsActuallyDisplayed > 0) {
-                    try {
-                        /* Clear all notifications ("mark as read") */
-                        final Request req_clear_all_notifications = br.createGetRequest(API_BASE + "/notifications/clear");
-                        this.callAPI(br, req_clear_all_notifications, account, null);
-                        // final Object req_clear_allnotofications_answer = this.callAPI(req_clear_all_notifications, account, null);
-                    } catch (final Exception e) {
-                        logger.log(e);
-                        logger.info("Clearing notifications API request failed");
-                    }
-                }
             }
         }
         return ai;

@@ -112,7 +112,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     public static abstract class AssertAnException<ExceptionType extends Exception> {
         public static enum MODE {
+            /**
+             * true if the exception is instance of the target
+             */
             INSTANCEOF,
+            /**
+             * true if the exception or any of it's causes is instance of the target
+             */
             CONTAINS
         }
 
@@ -140,6 +146,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                 this.run();
             } catch (final Exception e) {
                 if (validateException(e)) {
+                    LogV3.info("Exception as expected: " + Exceptions.toCauseChainClassString(e, true) + " - " + e.getMessage());
                     // fine;
                     return;
                 } else {
@@ -170,7 +177,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.appwork.testframework.PostBuildTestInterface#runPostBuildTest(java.lang.String[], java.io.File)
      */
     @Override
@@ -400,7 +407,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         LogV3.setFactory(new SimpleLoggerFactory() {
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#removeSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -413,7 +420,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToConsole(org.appwork.loggingv3.simple.sink.LogToStdOutSink)
              */
             @Override
@@ -426,7 +433,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#setSinkToFile(org.appwork.loggingv3.simple.sink.LogToFileSink)
              */
             @Override
@@ -439,7 +446,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
 
             /*
              * (non-Javadoc)
-             * 
+             *
              * @see org.appwork.loggingv3.simple.SimpleLoggerFactory#addSink(org.appwork.loggingv3.simple.sink.Sink)
              */
             @Override
@@ -455,7 +462,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
                 return new LoggerToSink(this) {
                     /*
                      * (non-Javadoc)
-                     * 
+                     *
                      * @see org.appwork.loggingv3.AbstractLogger#getThrownAt()
                      */
                     @Override

@@ -66,7 +66,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50135 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -227,7 +227,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50135 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 50174 $"));
     }
 
     /**
@@ -1306,7 +1306,7 @@ public abstract class K2SApi extends PluginForHost {
                      * {"status":"error","code":406,"message":"Download is not available","errorCode":21,"errors":[{"code":9,
                      * "message":"This download available only for store subscribers"}]}
                      */
-                    throw new AccountRequiredException();
+                    throw new AccountRequiredException(msgForUser);
                 case 8:
                     // PRIVATE_ONLY = 8; //'This is private file',
                     privateDownloadRestriction(msgForUser);

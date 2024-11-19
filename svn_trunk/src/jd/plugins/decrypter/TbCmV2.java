@@ -102,7 +102,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -702,6 +702,9 @@ public class TbCmV2 extends PluginForDecrypt {
                     // TODO: Check if this is still needed
                     videoIdsToAdd.addAll(parseVideoIds(video_ids_comma_separated));
                 }
+            } catch (final InterruptedException ie) {
+                /* Always thow InterruptedException */
+                throw ie;
             } catch (final Exception e) {
                 if (videoID != null) {
                     logger.info("Playlist handling failed -> Processing single videoID from URL as fallback");
@@ -1163,7 +1166,7 @@ public class TbCmV2 extends PluginForDecrypt {
             if (StringUtils.isNotEmpty(fpName)) {
                 final FilePackage fp = FilePackage.getInstance();
                 fp.setName(fpName);
-                // let the packagizer merge several packages that have the same name
+                /* let the packagizer merge several packages that have the same name because users are used to this default feature. */
                 fp.setAllowMerge(true);
                 // fp.setPackageKey("ytvideo://" + clip.videoID);
                 fp.add(ret);

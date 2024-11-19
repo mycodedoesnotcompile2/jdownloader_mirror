@@ -78,7 +78,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50076 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +136,6 @@ public class AllDebridCom extends PluginForHost {
     private static WeakHashMap<Account, HashSet<String>> RATE_LIMITED                       = new WeakHashMap<Account, HashSet<String>>();
     public static final String                           api_base                           = "https://api.alldebrid.com/v4";
     public static final String                           api_base_41                        = "https://api.alldebrid.com/v4.1";
-    // this is used by provider which calculates unique token to agent/client.
     public static final String                           agent_raw                          = "JDownloader";
     private static final String                          agent                              = "agent=" + agent_raw;
     private final String                                 PROPERTY_APIKEY_CREATED_TIMESTAMP  = "APIKEY_CREATED_TIMESTAMP";
@@ -374,11 +373,11 @@ public class AllDebridCom extends PluginForHost {
                 }
             }
         }
+        /* Set list of supported hosts */
+        final List<MultiHostHost> results = ai.setMultiHostSupportV2(this, supportedhosts);
         final boolean filterJDownloaderUnsupportedStreamHosts = true;
         if (includeStreamingItems && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
             /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
-            ai.setMultiHostSupportV2(this, supportedhosts);
-            final List<MultiHostHost> results = ai.getMultiHostSupportV2();
             final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
             for (final MultiHostHost mhost : results) {
                 if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
@@ -387,10 +386,8 @@ public class AllDebridCom extends PluginForHost {
                     filteredresults.add(mhost);
                 }
             }
-            logger.info("Results initially: " + supportedhosts.size() + " | Filtered results: " + filteredresults.size());
+            logger.info("Results initially: " + supportedhosts.size() + " | Results after filtering unsupported stream hosts: " + filteredresults.size());
             ai.setMultiHostSupportV2(this, filteredresults);
-        } else {
-            ai.setMultiHostSupportV2(this, supportedhosts);
         }
         return ai;
     }

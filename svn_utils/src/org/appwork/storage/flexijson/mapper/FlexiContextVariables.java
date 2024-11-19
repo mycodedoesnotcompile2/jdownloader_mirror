@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,63 +32,77 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.tests;
+package org.appwork.storage.flexijson.mapper;
 
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.UniqueAlltimeID;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiJSonObject;
+import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.KeyValueElement;
+import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiVariables;
+import org.appwork.utils.reflection.CompiledType;
 
 /**
  * @author thomas
- * @date 26.10.2022
+ * @date 29.10.2024
  *
  */
-public class ThreadDumpTest extends AWTest {
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        final Thread normalThread = new Thread("normalThread:" + UniqueAlltimeID.next()) {
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        final Thread daemonThread = new Thread("daemonThread:" + UniqueAlltimeID.next()) {
-            {
-                setDaemon(true);
-            }
+public class FlexiContextVariables {
+    public static class VariablesEntry {
+        private FlexiVariables annotation;
+        private FlexiJSonNode  node;
 
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        try {
-            normalThread.start();
-            daemonThread.start();
-            final String dump = Application.getThreadDump();
-            assertTrue(StringUtils.contains(dump, normalThread.getName()));
-            assertTrue(StringUtils.contains(dump, daemonThread.getName()));
-        } finally {
-            normalThread.interrupt();
-            daemonThread.interrupt();
+        /**
+         * @param annotation
+         * @param node
+         */
+        public VariablesEntry(FlexiVariables annotation, FlexiJSonNode node) {
+            this.annotation = annotation;
+            this.node = node;
         }
     }
 
-    public static void main(String[] args) {
-        run();
+    private List<VariablesEntry> entries = new ArrayList<VariablesEntry>();
+
+    /**
+     * @param annotation
+     * @param node
+     * @return
+     */
+    public FlexiContextVariables add(FlexiVariables annotation, FlexiJSonNode node) {
+        FlexiContextVariables ret = new FlexiContextVariables();
+        ret.entries.addAll(entries);
+        ret.entries.add(0, new VariablesEntry(annotation, node));
+        return ret;
+    }
+
+    /**
+     * @param mapper
+     * @param newType
+     * @param value
+     * @param string
+     * @return
+     */
+    public FlexiJSonNode resolve(FlexiJSonMapper mapper, CompiledType newType, FlexiJSonValue value, String string) {
+        FlexiJSonNode ret = value;
+        String strVal = string;
+        for (VariablesEntry e : entries) {
+            if (e.node instanceof FlexiJSonObject) {
+                for (KeyValueElement el : ((FlexiJSonObject) e.node).getElements()) {
+                    if (string.equals(el.getKey())) {
+                        return el.getValue();
+                    }
+                    if (newType.isString() && el.getValue() instanceof FlexiJSonValue && ((FlexiJSonValue) el.getValue() != null)) {
+                        strVal = strVal.replace(el.getKey(), String.valueOf(((FlexiJSonValue) el.getValue()).getValue()));
+                    }
+                }
+            }
+        }
+        if (strVal != string) {
+            return mapper.createFlexiJSonValue(strVal);
+        }
+        return ret;
     }
 }

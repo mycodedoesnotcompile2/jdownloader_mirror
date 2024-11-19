@@ -487,7 +487,7 @@ public class StringUtils {
      */
     @Deprecated
     public static String join(Object[] parameters, String separator) {
-        return new StringJoiner(separator) {
+        return new Joiner(separator) {
             protected void addSeparator(int index, Object element, Object[] parameters, StringBuilder sb) {
                 // lagacy - this ignores an empty element until there is any real content.s
                 if (sb.length() > 0) {
@@ -522,7 +522,7 @@ public class StringUtils {
      */
     @Deprecated
     public static <T> String join(Collection<T> params, String separator, final Stringifier<T> stringifier) {
-        return new StringJoiner(separator) {
+        return new Joiner(separator) {
             protected String elementToString(Object s) {
                 return stringifier.toString((T) s);
             };

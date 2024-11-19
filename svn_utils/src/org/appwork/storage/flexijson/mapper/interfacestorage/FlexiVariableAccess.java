@@ -31,63 +31,15 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.tests;
+package org.appwork.storage.flexijson.mapper.interfacestorage;
 
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.UniqueAlltimeID;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/**
- * @author thomas
- * @date 26.10.2022
- *
- */
-public class ThreadDumpTest extends AWTest {
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        final Thread normalThread = new Thread("normalThread:" + UniqueAlltimeID.next()) {
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        final Thread daemonThread = new Thread("daemonThread:" + UniqueAlltimeID.next()) {
-            {
-                setDaemon(true);
-            }
-
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        try {
-            normalThread.start();
-            daemonThread.start();
-            final String dump = Application.getThreadDump();
-            assertTrue(StringUtils.contains(dump, normalThread.getName()));
-            assertTrue(StringUtils.contains(dump, daemonThread.getName()));
-        } finally {
-            normalThread.interrupt();
-            daemonThread.interrupt();
-        }
-    }
-
-    public static void main(String[] args) {
-        run();
-    }
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.METHOD, ElementType.FIELD, ElementType.TYPE, ElementType.PARAMETER })
+public @interface FlexiVariableAccess {
+    public String value();
 }

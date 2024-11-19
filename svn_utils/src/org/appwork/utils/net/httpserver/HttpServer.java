@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -41,6 +41,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -345,7 +346,7 @@ public class HttpServer implements Runnable, HTTPBridge {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Runnable#run()
      */
     /**
@@ -386,6 +387,9 @@ public class HttpServer implements Runnable, HTTPBridge {
                         serverSockets.add(controlSocket);
                         localPort = controlSocket.getLocalPort();
                     } catch (BindException e) {
+                        bindExceptions.add(Exceptions.addSuppressed(new BindException("cannot bind to:" + socketAddress), e));
+                    } catch (SocketException e) {
+                        // eg IPv6 on IPv4 stack only
                         bindExceptions.add(Exceptions.addSuppressed(new BindException("cannot bind to:" + socketAddress), e));
                     }
                 }
@@ -462,7 +466,7 @@ public class HttpServer implements Runnable, HTTPBridge {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see
      * org.appwork.utils.net.httpserver.requests.HTTPBridge#canHandleChunkedEncoding(org.appwork.utils.net.httpserver.requests.HttpRequest,
      * org.appwork.utils.net.httpserver.responses.HttpResponse)

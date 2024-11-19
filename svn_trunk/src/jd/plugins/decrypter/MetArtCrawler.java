@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 49073 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50174 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -243,6 +243,7 @@ public class MetArtCrawler extends PluginForDecrypt {
         return ret;
     }
 
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

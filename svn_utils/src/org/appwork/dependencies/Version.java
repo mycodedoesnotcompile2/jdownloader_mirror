@@ -45,6 +45,10 @@ public class Version implements Comparable<Version> {
         }
     }
 
+    public String getNumeric() {
+        return this.numeric;
+    }
+
     @Override
     public int hashCode() {
         int ret = this.numeric.hashCode();

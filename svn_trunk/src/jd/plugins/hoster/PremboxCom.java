@@ -18,11 +18,13 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.ConditionalSkipReasonException;
@@ -50,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -78,7 +80,6 @@ public class PremboxCom extends PluginForHost {
     private static HashMap<String, AtomicInteger> hostRunningDlsNumMap                       = new HashMap<String, AtomicInteger>();
     /* List of hosts which are only available via cloud (queue) download system */
     public static ArrayList<String>               cloudOnlyHosts                             = new ArrayList<String>();
-    public static Object                          ACCLOCK                                    = new Object();
     private static Object                         CTRLLOCK                                   = new Object();
     private static AtomicInteger                  maxPrem                                    = new AtomicInteger(1);
 
@@ -129,7 +130,7 @@ public class PremboxCom extends PluginForHost {
                      * Max downloads for specific host for this MOCH reached --> Avoid irritating/wrong 'Account missing' errormessage for
                      * this case - wait and retry!
                      */
-                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 2 * 1000, getHost() + ": Max concurrent download limit reached"));
+                    throw new ConditionalSkipReasonException(new WaitingSkipReason(CAUSE.HOST_TEMP_UNAVAILABLE, 2 * 1000, getHost() + ": Individual host max concurrent download limit reached"));
                 }
             }
         }
@@ -193,7 +194,7 @@ public class PremboxCom extends PluginForHost {
                 /* TODO: Use json parser here */
                 query.appendEncoded("directDownload", "0");
                 br.postPage(API_SERVER + "/downloadLink", query);
-                this.handleErrors(br, account);
+                this.handleErrors(br, account, link);
                 /* 'downloadLink' value will be "fileNotReadyYet" at this stage. */
                 do {
                     // this.postAPISafe(API_SERVER + "/serverFileStatus", "login=" + JSonUtils.escape(this.currAcc.getUser()) + "&pass=" +
@@ -201,7 +202,7 @@ public class PremboxCom extends PluginForHost {
                     final UrlQuery query2 = getLoginPassPostData(account);
                     query2.appendEncoded("url", url);
                     br.postPage(API_SERVER + "/serverFileStatus", query2);
-                    this.handleErrors(br, account);
+                    this.handleErrors(br, account, link);
                     dllink = PluginJSonUtils.getJsonValue(br, "downloadLink");
                     if (!StringUtils.isEmpty(dllink)) {
                         break;
@@ -213,14 +214,14 @@ public class PremboxCom extends PluginForHost {
                 } while (counter <= count_max);
                 if (StringUtils.isEmpty(dllink) || !dllink.startsWith("http")) {
                     /* Should never happen */
-                    mhm.handleErrorGeneric(account, this.getDownloadLink(), "Serverside download timed out", 20);
+                    mhm.handleErrorGeneric(account, link, "Serverside download timed out", 20);
                 }
             } else {
                 link.setProperty(PROPERTY_DOWNLOADTYPE, PROPERTY_DOWNLOADTYPE_instant);
                 /* TODO: Use json parser here */
                 query.appendEncoded("directDownload", "1");
                 br.postPage(API_SERVER + "/downloadLink", query);
-                this.handleErrors(br, account);
+                this.handleErrors(br, account, link);
                 // this.postAPISafe(API_SERVER + "/serverFileStatus", "directDownload=1&login=" + JSonUtils.escape(this.currAcc.getUser()) +
                 // "&pass=" + JSonUtils.escape(this.currAcc.getPass()) + "&url=" +
                 // Encoding.urlEncode(this.currDownloadLink.getDownloadURL()));
@@ -228,7 +229,7 @@ public class PremboxCom extends PluginForHost {
                 /* Check if the url starts with "http" --> Extra errorhandling for faulty API responses */
                 if (StringUtils.isEmpty(dllink) || !dllink.startsWith("http")) {
                     /* Should never happen */
-                    mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknull", 50);
+                    mhm.handleErrorGeneric(account, link, "dllinknull", 50);
                 }
             }
             link.setProperty(PROPERTY_DLLINK_GENERATED_TIMESTAMP, System.currentTimeMillis());
@@ -236,8 +237,8 @@ public class PremboxCom extends PluginForHost {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, isResumable(link), getMaxChunks(link));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
-                handleErrors(this.br, account);
-                mhm.handleErrorGeneric(account, this.getDownloadLink(), "unknowndlerror", 50);
+                handleErrors(this.br, account, link);
+                mhm.handleErrorGeneric(account, link, "unknowndlerror", 50);
             }
         } else {
             logger.info("Re-using generated directurl for downloading");
@@ -308,11 +309,11 @@ public class PremboxCom extends PluginForHost {
     @SuppressWarnings({ "unchecked", "deprecation" })
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final Map<String, Object> resp1 = login(account);
-        final Map<String, Object> resp1_data = (Map<String, Object>) resp1.get("data");
-        final Map<String, Object> trafficStandard = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp1_data, "traffic/standard");
-        final Map<String, Object> trafficDaily = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp1_data, "traffic/daily");
-        String statustext = null;
+        final Map<String, Object> resp_login = login(account);
+        final Map<String, Object> resp_login_data = (Map<String, Object>) resp_login.get("data");
+        final Map<String, Object> trafficStandard = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp_login_data, "traffic/standard");
+        final Map<String, Object> trafficDaily = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resp_login_data, "traffic/daily");
+        String accountStatustext = null;
         long trafficLeftTotal = 0;
         long expireTimestampStandard = JavaScriptEngineFactory.toLong(trafficStandard.get("expireTstamp"), -1);
         long expireTimestampDaily = JavaScriptEngineFactory.toLong(trafficDaily.get("expireTstamp"), -1);
@@ -320,18 +321,18 @@ public class PremboxCom extends PluginForHost {
         /* Accounts can also have negative traffic (=no traffic left) */
         long trafficLeftStandard = JavaScriptEngineFactory.toLong(trafficStandard.get("left"), 0);
         long traffic_left_daily = JavaScriptEngineFactory.toLong(trafficDaily.get("left"), 0);
-        final String accounttype = (String) resp1_data.get("accountType");
+        final String accounttype = (String) resp_login_data.get("accountType");
         if (traffic_left_daily > 0 && trafficLeftStandard > 0) {
-            statustext = " account with daily & standard traffic";
+            accountStatustext = " account with daily & standard traffic";
             trafficLeftTotal = traffic_left_daily + trafficLeftStandard;
         } else if (traffic_left_daily > 0) {
-            statustext = " account with daily traffic";
+            accountStatustext = " account with daily traffic";
             trafficLeftTotal = traffic_left_daily;
         } else if (trafficLeftStandard > 0) {
-            statustext = " account with standard traffic";
+            accountStatustext = " account with standard traffic";
             trafficLeftTotal = trafficLeftStandard;
         } else {
-            statustext = " account without traffic";
+            accountStatustext = " account without traffic";
             trafficLeftTotal = 0;
         }
         if (expireTimestampStandard > expireTimestampDaily) {
@@ -344,21 +345,20 @@ public class PremboxCom extends PluginForHost {
         ai.setTrafficRefill(false);
         if ("premium".equals(accounttype) && expireTimestamp > System.currentTimeMillis()) {
             account.setType(AccountType.PREMIUM);
-            statustext = "Premium" + statustext;
+            accountStatustext = "Premium" + accountStatustext;
         } else {
             account.setType(AccountType.FREE);
-            statustext = "Free" + statustext;
+            accountStatustext = "Free" + accountStatustext;
         }
         /* 2021-09-16: Free- and premium accounts can have expire-dates(?) */
         if (expireTimestamp > System.currentTimeMillis()) {
             ai.setValidUntil(expireTimestamp, this.br);
         }
-        ai.setStatus(statustext);
+        ai.setStatus(accountStatustext);
         ai.setTrafficLeft(trafficLeftTotal);
-        account.setMaxSimultanDownloads(getMaxSimultanPremiumDownloadNum());
         br.getPage(API_SERVER + "/supportedHosts");
-        final Map<String, Object> resp2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final List<Map<String, Object>> domaininfos = (List<Map<String, Object>>) resp2.get("data");
+        final Map<String, Object> resp_supportedHosts = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final List<Map<String, Object>> domaininfos = (List<Map<String, Object>>) resp_supportedHosts.get("data");
         /**
          * Explanation of their status-types: Healthy = working, Fragile = may work or not - if not will be fixed within the next 72 hours
          * (support also said it means that they currently have no accounts for this host), Limited = broken, will be fixed tomorrow, dead =
@@ -366,46 +366,50 @@ public class PremboxCom extends PluginForHost {
          * though it is marked RED on the site)
          */
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final HashSet<String> cloudOnlyDomains = new HashSet<String>();
+        for (final Map<String, Object> domaininfo : domaininfos) {
+            final boolean canResume = ((Boolean) domaininfo.get("resumable")).booleanValue();
+            final String domain = (String) domaininfo.get("host");
+            if (Integer.parseInt(domaininfo.get("serverOnly").toString()) == 1) {
+                cloudOnlyDomains.add(domain);
+            }
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            if (Integer.parseInt(domaininfo.get("tmpTurnedOff").toString()) == 0) {
+                mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            mhost.setMaxChunks(((Number) domaininfo.get("maxChunks")).intValue());
+            mhost.setResume(canResume);
+            mhost.setMaxDownloads(((Number) domaininfo.get("maxDownloads")).intValue());
+            supportedhosts.add(mhost);
+        }
+        /* Set list of supported hosts */
+        final List<MultiHostHost> mhosts = ai.setMultiHostSupportV2(this, supportedhosts);
         synchronized (hostMaxchunksMap) {
+            /* Set additional individual host special properties lists. */
             cloudOnlyHosts.clear();
             hostMaxchunksMap.clear();
             hostMaxdlsMap.clear();
             hostResumeMap.clear();
-            for (final Map<String, Object> domaininfo : domaininfos) {
-                /*
-                 * 2017-03-03: Admin asked why we do not show all hosts so we told them that we skip offline hosts. This is a possibility
-                 * for them to easily force JD to display certain hosts. So far it has not been used (not present in json).
-                 */
-                /* 2024-10-23: Not needed anymore, see mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST); */
-                // final boolean force_display = Boolean.TRUE.equals(domaininfo.get("force_display"));
-                final boolean canResume = ((Boolean) domaininfo.get("resumable")).booleanValue();
-                final long isoffline = JavaScriptEngineFactory.toLong(domaininfo.get("tmpTurnedOff"), 0);
-                final int maxChunks = ((Number) domaininfo.get("maxChunks")).intValue();
-                final int maxDownloads = ((Number) domaininfo.get("maxDownloads")).intValue();
-                final String domain = (String) domaininfo.get("host");
-                /* Workaround to get our internal/real domain of the host in case we got a plugin for it. */
-                final ArrayList<String> dummyList = new ArrayList<String>();
-                dummyList.add(domain);
-                final List<String> realHosts = ai.setMultiHostSupport(this, dummyList);
-                if (realHosts != null && !realHosts.isEmpty()) {
-                    /* Legacy handling */
-                    final String realHost = realHosts.get(0);
-                    if (JavaScriptEngineFactory.toLong(domaininfo.get("serverOnly"), 0) == 1) {
-                        cloudOnlyHosts.add(realHost);
+            for (final MultiHostHost mhost : mhosts) {
+                boolean isCloudOnlyHost = false;
+                for (final String domain : mhost.getDomains()) {
+                    hostMaxchunksMap.put(domain, this.correctChunks(mhost.getMaxChunks()));
+                    hostMaxdlsMap.put(domain, this.correctMaxdls(mhost.getMaxDownloads()));
+                    hostResumeMap.put(domain, mhost.isResume());
+                    if (!isCloudOnlyHost && cloudOnlyDomains.contains(domain)) {
+                        isCloudOnlyHost = true;
                     }
-                    hostMaxchunksMap.put(domain, this.correctChunks(maxChunks));
-                    hostMaxdlsMap.put(domain, this.correctMaxdls(maxDownloads));
-                    hostResumeMap.put(domain, canResume);
                 }
-                final MultiHostHost mhost = new MultiHostHost(domain);
-                if (isoffline == 1) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                if (isCloudOnlyHost) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        mhost.setStatusText("Cloud only");
+                    }
+                    for (final String domain : mhost.getDomains()) {
+                        cloudOnlyHosts.add(domain);
+                    }
                 }
-                mhost.setResume(canResume);
-                supportedhosts.add(mhost);
             }
         }
-        ai.setMultiHostSupportV2(this, supportedhosts);
         if (this.getPluginConfig().getBooleanProperty(CLEAR_DOWNLOAD_HISTORY, default_CLEAR_DOWNLOAD_HISTORY) && getLast_deleted_complete_download_history_time_ago(account) >= DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL) {
             /*
              * Go in here if user wants to have it's history deleted && last deletion was before DELETE_COMPLETE_DOWNLOAD_HISTORY_INTERVAL
@@ -430,7 +434,7 @@ public class PremboxCom extends PluginForHost {
      */
     private Map<String, Object> login(final Account account) throws Exception {
         br.postPage(API_SERVER + "/login", getLoginPassPostData(account));
-        return this.handleErrors(br, account);
+        return this.handleErrors(br, account, null);
     }
 
     /**
@@ -442,7 +446,7 @@ public class PremboxCom extends PluginForHost {
         boolean success1 = false;
         boolean success2 = false;
         try {
-            this.handleErrors(br, account);
+            this.handleErrors(br, account, null);
             success1 = true;
         } catch (final Throwable ignore) {
             logger.log(ignore);
@@ -451,7 +455,7 @@ public class PremboxCom extends PluginForHost {
         /* This deletes the download history. */
         br.postPage(API_SERVER + "/clearHistory", getLoginPassPostData(account));
         try {
-            this.handleErrors(br, account);
+            this.handleErrors(br, account, null);
             success2 = true;
         } catch (final Throwable ignore) {
             logger.warning("Failed to delete download history");
@@ -463,25 +467,14 @@ public class PremboxCom extends PluginForHost {
         }
     }
 
-    private String getDownloadType() {
-        String type;
-        if (PROPERTY_DOWNLOADTYPE_cloud.equals(this.getDownloadLink().getStringProperty(PROPERTY_DOWNLOADTYPE))) {
-            type = PROPERTY_DOWNLOADTYPE_cloud;
-        } else {
-            type = PROPERTY_DOWNLOADTYPE_instant;
-        }
-        return type;
-    }
-
     /* Returns the time difference between now and the last time the complete download history has been deleted. */
     private long getLast_deleted_complete_download_history_time_ago(final Account account) {
         return System.currentTimeMillis() - account.getLongProperty(PROPERTY_ACCOUNT_last_time_deleted_history, 0);
     }
 
-    private Map<String, Object> handleErrors(final Browser br, final Account account) throws Exception {
+    private Map<String, Object> handleErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final boolean success = ((Boolean) entries.get("success")).booleanValue();
-        if (success) {
+        if (Boolean.TRUE.equals(entries.get("success"))) {
             /* No error */
             return entries;
         }
@@ -514,16 +507,16 @@ public class PremboxCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Cannot download this file with this account", 3 * 60 * 1000l);
             } else if (StringUtils.containsIgnoreCase(errorDescription, "Maximum supported file size in direct download mode is")) {
                 /* 2021-09-16: Typically "Maximum supported file size in direct download mode is 15 GB" */
-                if (this.getDownloadLink().hasProperty(PROPERTY_ENFORCE_CLOUD_DOWNLOAD)) {
+                if (link.hasProperty(PROPERTY_ENFORCE_CLOUD_DOWNLOAD)) {
                     /* This should never happen! */
-                    mhm.putError(account, this.getDownloadLink(), 5 * 60 * 1000l, errorDescription);
+                    mhm.putError(account, link, 5 * 60 * 1000l, errorDescription);
                 } else {
                     /* 2021-09-16: Workaround for API design flaw. */
-                    this.getDownloadLink().setProperty(PROPERTY_ENFORCE_CLOUD_DOWNLOAD, true);
+                    link.setProperty(PROPERTY_ENFORCE_CLOUD_DOWNLOAD, true);
                     throw new PluginException(LinkStatus.ERROR_RETRY, "Retry with cloud download instead of direct download");
                 }
             } else {
-                mhm.putError(account, this.getDownloadLink(), 3 * 60 * 1000l, "Host unsupported ?!");
+                mhm.putError(account, link, 3 * 60 * 1000l, "Host unsupported ?!");
             }
         } else if (error.equalsIgnoreCase("tooManyConcurrentDownloads")) {
             throw new AccountUnavailableException("Too many concurrent downloads with this account", 30 * 1000l);
@@ -531,13 +524,13 @@ public class PremboxCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Cannot download this file with this account at the moment", 3 * 60 * 1000l);
         } else if (error.equalsIgnoreCase("emptyUrl") || error.equalsIgnoreCase("tooLongUrl")) {
             /* This one should never happen! */
-            mhm.handleErrorGeneric(account, this.getDownloadLink(), "Empty or too long URL", 10);
+            mhm.handleErrorGeneric(account, link, "Empty or too long URL", 10);
         } else {
             logger.info("Unknown error happened: " + error);
-            if (this.getDownloadLink() == null) {
+            if (link == null) {
                 throw new AccountUnavailableException(error, 5 * 60 * 1000l);
             } else {
-                mhm.handleErrorGeneric(account, this.getDownloadLink(), error, 50);
+                mhm.handleErrorGeneric(account, link, error, 50);
             }
         }
         /* This code should never be reached */
@@ -581,7 +574,7 @@ public class PremboxCom extends PluginForHost {
         synchronized (CTRLLOCK) {
             final String currentHost = this.getDownloadLink().getHost();
             int was = maxPrem.get();
-            maxPrem.set(Math.min(Math.max(1, maxPrem.addAndGet(num)), getMaxSimultanPremiumDownloadNum()));
+            maxPrem.set(Math.min(Math.max(1, maxPrem.addAndGet(num)), this.getMaxSimultanPremiumDownloadNum()));
             logger.info("maxPrem was = " + was + " && maxPrem now = " + maxPrem.get());
             AtomicInteger currentRunningDls = new AtomicInteger(0);
             if (hostRunningDlsNumMap.containsKey(currentHost)) {
@@ -614,6 +607,9 @@ public class PremboxCom extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+        if (link == null) {
+            return;
+        }
         /* Allow generation of new directurl on reset. */
         link.removeProperty(PROPERTY_DLLINK_GENERATED_TIMESTAMP);
         /* Remove this special flag needed for a workaround. */

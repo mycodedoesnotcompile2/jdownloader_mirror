@@ -4,7 +4,13 @@
 	<classpathentry kind="src" path="themes"/>
 	<classpathentry kind="lib" path="libs/miglayout.jar"/>
 	<classpathentry kind="lib" path="libs/svgSalamander.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="dev_libs/jna.jar"/>
+	<classpathentry kind="lib" path="dev_libs/jna-platform.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/jdk-8.0.312.7-hotspot">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="lib" path="libs/jsvg.jar" sourcepath="C:/Users/thomas/AppData/Local/Temp/.org.sf.feeling.decompiler1712753437479/source/jsvg-1.4.0-sources.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

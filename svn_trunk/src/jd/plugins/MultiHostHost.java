@@ -223,8 +223,8 @@ public class MultiHostHost {
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
-     * downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br>
+     * 500 = 5 times the size of the downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
         if (trafficCalculationFactorPercent == null) {
@@ -263,8 +263,8 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
-     * informative field.
+     * Returns custom set status text. </br>
+     * Typically used to describe why this host is currently not working but can also be used as an informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -323,6 +323,7 @@ public class MultiHostHost {
         this.maxChunks = maxChunks;
     }
 
+    /* TODO: Rename to isResumable, allowsResume or canResume */
     public boolean isResume() {
         if (resume == null) {
             return true;
@@ -382,7 +383,8 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns time this item is unavailable for. </br> This can return negative values.
+     * Returns time this item is unavailable for. </br>
+     * This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();

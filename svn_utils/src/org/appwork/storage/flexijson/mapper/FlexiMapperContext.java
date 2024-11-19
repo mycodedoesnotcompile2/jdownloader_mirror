@@ -7,6 +7,7 @@
  *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,63 +32,66 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.tests;
+package org.appwork.storage.flexijson.mapper;
 
-import org.appwork.testframework.AWTest;
-import org.appwork.utils.Application;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.UniqueAlltimeID;
+import org.appwork.storage.flexijson.FlexiJSonNode;
+import org.appwork.storage.flexijson.FlexiJSonValue;
+import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiVariables;
+import org.appwork.utils.reflection.CompiledType;
 
 /**
  * @author thomas
- * @date 26.10.2022
+ * @date 28.10.2024
  *
  */
-public class ThreadDumpTest extends AWTest {
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.appwork.testframework.TestInterface#runTest()
-     */
-    @Override
-    public void runTest() throws Exception {
-        final Thread normalThread = new Thread("normalThread:" + UniqueAlltimeID.next()) {
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        final Thread daemonThread = new Thread("daemonThread:" + UniqueAlltimeID.next()) {
-            {
-                setDaemon(true);
-            }
+public class FlexiMapperContext {
+    private FlexiContextVariables variables;
+    private CompiledType          rootType;
 
-            public void run() {
-                try {
-                    synchronized (this) {
-                        this.wait();
-                    }
-                } catch (InterruptedException e) {
-                }
-            };
-        };
-        try {
-            normalThread.start();
-            daemonThread.start();
-            final String dump = Application.getThreadDump();
-            assertTrue(StringUtils.contains(dump, normalThread.getName()));
-            assertTrue(StringUtils.contains(dump, daemonThread.getName()));
-        } finally {
-            normalThread.interrupt();
-            daemonThread.interrupt();
-        }
+    public CompiledType getRootType() {
+        return rootType;
     }
 
-    public static void main(String[] args) {
-        run();
+    /**
+     * @param cType
+     */
+    public FlexiMapperContext(CompiledType cType) {
+        rootType = cType;
+    }
+
+    public void setVariables(FlexiContextVariables variables) {
+        this.variables = variables;
+    }
+
+    /**
+     * @return
+     */
+    public FlexiContextVariables getVariables() {
+        return variables;
+    }
+
+    /**
+     * @param annotation
+     * @param node
+     */
+    public void addVariables(FlexiVariables annotation, FlexiJSonNode node) {
+        if (variables == null) {
+            variables = new FlexiContextVariables();
+        }
+        variables = variables.add(annotation, node);
+    }
+
+    /**
+     * @param mapper
+     * @param newType
+     * @param value
+     * @param string
+     * @return
+     */
+    public FlexiJSonNode resolveVariables(FlexiJSonMapper mapper, CompiledType newType, FlexiJSonValue value, String string) {
+        if (variables == null) {
+            return value;
+        }
+        return variables.resolve(mapper, newType, value, string);
     }
 }

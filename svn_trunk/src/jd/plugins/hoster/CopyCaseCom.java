@@ -7,14 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -32,7 +24,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49651 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50172 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -270,6 +271,18 @@ public class CopyCaseCom extends PluginForHost {
             postData.put("password", account.getPass());
             final Browser brc = br.cloneBrowser();
             brc.setAllowedResponseCodes(422);
+            // Recaptcha now required for login
+            final Browser brc2 = br.cloneBrowser();
+            brc2.getPage("https://copycase.com/login");
+            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, brc2, "6LcjZ0EgAAAAAAZRgmPrZBH7aVM09gggWOzKNFIp") {
+                @Override
+                public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
+                    return org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE.INVISIBLE;
+                }
+            };
+            final String recaptchaV2Response = rc2.getToken();
+            postData.put("g-recaptcha-response", recaptchaV2Response);
+
             Map<String, Object> resp = this.callAPI(brc, null, account, brc.createPostRequest(getAPIBase() + "/auth/login", JSonStorage.serializeToJson(postData)), true);
             final String status = (String) resp.get("status");
             boolean required2FALogin = false;

@@ -1,0 +1,71 @@
+{
+  "artefact":"net.java.dev.jna/jna",
+  "dependencies":null,
+  "filter":null,
+  "history":[],
+  "installed":{
+    "changes":null,
+    "date":"2024-11-18T16:48:28.903+01:00",
+    "dependencies":null,
+    "description":"Java Native Access",
+    "files":[
+      "",
+      "jna-javadoc.jar",
+      "jna-javadoc.jar.asc",
+      "jna-javadoc.jar.asc.md5",
+      "jna-javadoc.jar.asc.sha1",
+      "jna-javadoc.jar.md5",
+      "jna-javadoc.jar.sha1",
+      "jna-sources.jar",
+      "jna-sources.jar.asc",
+      "jna-sources.jar.asc.md5",
+      "jna-sources.jar.asc.sha1",
+      "jna-sources.jar.md5",
+      "jna-sources.jar.sha1",
+      "jna.aar",
+      "jna.aar.asc",
+      "jna.aar.asc.md5",
+      "jna.aar.asc.sha1",
+      "jna.aar.md5",
+      "jna.aar.sha1",
+      "jna.jar",
+      "jna.jar.asc",
+      "jna.jar.asc.md5",
+      "jna.jar.asc.sha1",
+      "jna.jar.md5",
+      "jna.jar.sha1",
+      "jna.pom",
+      "jna.pom.asc",
+      "jna.pom.asc.md5",
+      "jna.pom.asc.sha1",
+      "jna.pom.md5",
+      "jna.pom.sha1",
+      "meta.json"
+    ],
+    "hashes":{"jna.jar":"66d4f819a062a51a1d5627bffc23fac55d1677f0e0a1feba144aabdd670a64bb"},
+    "licenses":[
+      {
+        "name":"LGPL-2.1-or-later",
+        "url":"https://www.gnu.org/licenses/old-licenses/lgpl-2.1",
+        "distribution":"repo",
+        "comments":"\n        Java Native Access (JNA) is licensed under the LGPL, version 2.1 or\n        later, or the Apache License, version 2.0. You can freely decide which\n        license you want to apply to the project.\n      "
+      },
+      {
+        "name":"Apache-2.0",
+        "url":"https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "distribution":"repo",
+        "comments":"\n        Java Native Access (JNA) is licensed under the LGPL, version 2.1 or\n        later, or the Apache License, version 2.0. You can freely decide which\n        license you want to apply to the project.\n      "
+      }
+    ],
+    "minJRE":"JVM_1_6",
+    "name":"Java Native Access",
+    "version":"5.13.0"
+  },
+  "minJRE":null,
+  "provider":"maven",
+  "renames":null,
+  "requiredBy":[],
+  "version":"latest_JVM_1_6",
+  "autoRenameEnabled":true,
+  "confirm":true
+}

@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 49998 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -231,9 +231,9 @@ public class TeraboxComFolder extends PluginForDecrypt {
         queryFolder.add("jsToken", jstoken != null ? jstoken : "");
         queryFolder.add("dp-logid", "");
         queryFolder.add("site_referer", "");
-        queryFolder.add("scene", "purchased_list");
+        // queryFolder.add("scene", "purchased_list");
         queryFolder.add("by", "name");
-        queryFolder.add("order", "time");
+        queryFolder.add("order", "asc");
         queryFolder.add("desc", "1");
         queryFolder.add("shorturl", surl);
         if (!StringUtils.isEmpty(preGivenPath)) {
@@ -245,12 +245,13 @@ public class TeraboxComFolder extends PluginForDecrypt {
         if (targetFileID != null) {
             logger.info("Trying to find item with the following fs_id ONLY: " + targetFileID);
         }
+        final String protocolAndSubdomain = "https://dm.";
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             logger.info("Crawling page: " + page);
             queryFolder.addAndReplace("page", Integer.toString(page));
             queryFolder.addAndReplace("num", Integer.toString(maxItemsPerPage));
-            final String requesturl = "https://www." + this.getHost() + "/share/list?" + queryFolder.toString();
+            final String requesturl = protocolAndSubdomain + this.getHost() + "/share/list?" + queryFolder.toString();
             br.getPage(requesturl);
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             int errno = ((Number) entries.get("errno")).intValue();
@@ -342,7 +343,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 final long category = JavaScriptEngineFactory.toLong(ressource.get("category"), -1);
                 if (JavaScriptEngineFactory.toLong(ressource.get("isdir"), -1) == 1) {
                     /* Folder */
-                    final String url = "https://www." + this.getHost() + "/web/share/link?surl=" + surl + "&path=" + Encoding.urlEncode(path);
+                    final String url = protocolAndSubdomain + this.getHost() + "/web/share/link?surl=" + surl + "&path=" + Encoding.urlEncode(path);
                     final DownloadLink folder = this.createDownloadlink(url);
                     if (passCode != null) {
                         folder.setDownloadPassword(passCode);
@@ -368,11 +369,11 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     thisparams.appendEncoded("dir", realpath);// only the path!
                     thisparams.add("fsid", fsidStr);
                     thisparams.appendEncoded("fileName", serverfilename);
-                    final String url = "https://www." + this.getHost() + "/sharing/link?" + thisparams.toString();
+                    final String url = protocolAndSubdomain + this.getHost() + "/sharing/link?" + thisparams.toString();
                     final String contentURL;
                     if (category == 1) {
                         thisparams.add("page", Integer.toString(page));
-                        contentURL = "https://www." + this.getHost() + "/sharing/videoPlay?" + thisparams.toString();
+                        contentURL = protocolAndSubdomain + this.getHost() + "/sharing/videoPlay?" + thisparams.toString();
                     } else {
                         /* No URL available that points directly to that file! */
                         contentURL = param.toString();
