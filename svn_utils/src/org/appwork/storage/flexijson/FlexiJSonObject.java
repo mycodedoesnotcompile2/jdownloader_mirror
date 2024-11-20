@@ -55,7 +55,6 @@ import org.appwork.storage.flexijson.stringify.FlexiJSonPrettyStringify;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
 import org.appwork.storage.simplejson.JSonUtils;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.CompiledType;
 
@@ -90,7 +89,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
 
     private int                                                size = 0;
     private final LinkedHashMap<String, List<KeyValueElement>> keys;
-    private FlexiJSonComments                     commentsBefore;
+    private FlexiJSonComments                                  commentsBefore;
     private FlexiJSonComments                                  commentsInside;
 
     public FlexiJSonComments getCommentsInside() {
@@ -445,13 +444,7 @@ public class FlexiJSonObject implements FlexiJSonNode {
                 obj = ((FlexiJSonArray) obj).get(JSPath.toArrayIndex(key));
                 depths++;
             } else {
-                if (depths == path.size() - 1) {
-                    // hä?
-                    DebugMode.debugger();
-                    return null;
-                } else {
-                    return null;
-                }
+                return null;
             }
         }
         return obj;

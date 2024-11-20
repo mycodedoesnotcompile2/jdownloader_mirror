@@ -33,6 +33,8 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
 import java.net.URL;
 
 import org.appwork.exceptions.WTFException;
@@ -116,7 +118,8 @@ public class DebugMode {
             return;
         }
         try {
-            if (!java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().toString().contains("-agentlib:jdwp")) {
+            final RuntimeMXBean mxBean = ManagementFactory.getRuntimeMXBean();
+            if (mxBean != null && !mxBean.getInputArguments().toString().contains("-agentlib:jdwp")) {
                 // not in debug mode
                 return;
             }

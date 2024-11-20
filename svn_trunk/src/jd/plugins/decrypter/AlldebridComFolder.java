@@ -40,7 +40,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 49984 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50179 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -87,9 +87,10 @@ public class AlldebridComFolder extends PluginForDecrypt {
         if (account == null) {
             throw new AccountRequiredException();
         }
+        final AllDebridCom plg = (AllDebridCom) this.getNewPluginForHostInstance(this.getHost());
         final UrlQuery query = new UrlQuery();
         query.appendEncoded("agent", AllDebridCom.agent_raw);
-        query.appendEncoded("apikey", AllDebridCom.getStoredApiKey(account));
+        query.appendEncoded("apikey", plg.getApiKey(account));
         query.appendEncoded("id", magnetID);
         /* When "jd" parameter is supplied, information which is unnecessary for JD will be excluded from json response. */
         query.appendEncoded("jd", "");
@@ -105,7 +106,7 @@ public class AlldebridComFolder extends PluginForDecrypt {
         final String torrentName = (String) magnet.get("filename");
         final List<Map<String, Object>> resourcelist = (List<Map<String, Object>>) magnet.get("files");
         if (resourcelist == null || resourcelist.isEmpty()) {
-            /* Probably unfinished torrent download */
+            /* Most likely we have an unfinished torrent download */
             final String status = (String) magnet.get("status");
             throw new DecrypterRetryException(RetryReason.FILE_NOT_FOUND, torrentName + "_" + status, status);
         }

@@ -27,9 +27,9 @@ public interface XtremestreamCoConfig extends PluginConfigInterface {
     @DefaultEnumValue("AUTO")
     @DescriptionForConfigEntry("Prefer download via official download button or download of stream?")
     @Order(10)
-    DownloadType getPreferredDownloadType();
+    DownloadMode getDownloadMode();
 
-    void setPreferredDownloadType(DownloadType type);
+    void setDownloadMode(DownloadMode mode);
 
     public static enum Quality implements LabelInterface {
         Q360 {
@@ -72,7 +72,7 @@ public interface XtremestreamCoConfig extends PluginConfigInterface {
 
     void setPreferredStreamQuality(Quality quality);
 
-    public static enum DownloadType implements LabelInterface {
+    public static enum DownloadMode implements LabelInterface {
         AUTO {
             @Override
             public String getLabel() {

@@ -56,11 +56,11 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49186 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50176 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://pixeldrain.com/#pro");
+        this.enablePremium("https://" + getHost() + "/#pro");
     }
 
     @Override
@@ -522,7 +522,10 @@ public class PixeldrainCom extends PluginForHost {
             }
         }
         final Object successO = entries.get("success");
-        if (successO == null || Boolean.TRUE.equals(successO)) {
+        if (successO == null) {
+            /* No error */
+            return entries;
+        } else if (Boolean.TRUE.equals(successO)) {
             /* No error */
             return entries;
         }

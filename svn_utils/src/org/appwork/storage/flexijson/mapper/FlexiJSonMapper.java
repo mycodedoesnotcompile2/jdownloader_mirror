@@ -47,6 +47,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +57,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -82,6 +85,7 @@ import org.appwork.storage.StorableUnique;
 import org.appwork.storage.StorableValidateMandatoryInJson;
 import org.appwork.storage.StorableValidateNotNull;
 import org.appwork.storage.TypeRef;
+import org.appwork.storage.flexijson.CannotResolvePathException;
 import org.appwork.storage.flexijson.FlexiComment;
 import org.appwork.storage.flexijson.FlexiCommentJsonNode;
 import org.appwork.storage.flexijson.FlexiJSonArray;
@@ -90,14 +94,19 @@ import org.appwork.storage.flexijson.FlexiJSonNode;
 import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiJSonValue;
 import org.appwork.storage.flexijson.FlexiUtils;
+import org.appwork.storage.flexijson.InvalidPathException;
+import org.appwork.storage.flexijson.JSPath;
+import org.appwork.storage.flexijson.JSPath.MetaElement;
 import org.appwork.storage.flexijson.KeyValueElement;
 import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiStorableInterface;
+import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiVariableAccess;
 import org.appwork.storage.flexijson.mapper.interfacestorage.InterfaceStorage;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.LocaleMapMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.ReadableBytesMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.TimeSpanMapper;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
+import org.appwork.storage.simplejson.ValueType;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
 import org.appwork.storage.simplejson.mapper.Setter;
@@ -105,8 +114,11 @@ import org.appwork.storage.validator.classvalidator.StorableClassValidator1;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator2;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator3;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Joiner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;
 import org.appwork.utils.reflection.TypeBuilder;
@@ -312,7 +324,7 @@ public class FlexiJSonMapper {
                 }
                 try {
                     context.add(type, next.getKey());
-                    putObjectPropertyForMap(ret, this.createKeyValueElement(ret, next.getKey().toString(), this.objectToJsonNode(reference, next.getValue(), context)), type, context, obj, next.getValue());
+                    this.putObjectPropertyForMap(ret, this.createKeyValueElement(ret, next.getKey().toString(), this.objectToJsonNode(reference, next.getValue(), context)), type, context, obj, next.getValue());
                 } finally {
                     context.removeLast();
                 }
@@ -425,21 +437,21 @@ public class FlexiJSonMapper {
                                 if (cType.isAnonymousInterfaceImpl()) {
                                     // empty is a proxy of the interface
                                     try {
-                                        Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        final Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
                                         if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
                                             continue;
                                         }
-                                    } catch (NoSuchMethodException e) {
+                                    } catch (final NoSuchMethodException e) {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
                                 } else if (cType.isAnonymousClass()) {
                                     // empty is a proxy of the interface
                                     try {
-                                        Method correctedGetter = cType.superType.raw.getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        final Method correctedGetter = cType.superType.raw.getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
                                         if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
                                             continue;
                                         }
-                                    } catch (NoSuchMethodException e) {
+                                    } catch (final NoSuchMethodException e) {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
                                 } else {
@@ -458,11 +470,11 @@ public class FlexiJSonMapper {
                                 if (cType.isAnonymousInterfaceImpl()) {
                                     // empty is a proxy of the interface
                                     try {
-                                        Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
+                                        final Method correctedGetter = cType.raw.getInterfaces()[0].getMethod(g.getMethod().getName(), g.getMethod().getParameterTypes());
                                         if (CompareUtils.equalsDeep(correctedGetter.invoke(empty, new Object[] {}), value)) {
                                             subNode.tag(FlexiMapperTags.DEFAULT_VALUE);
                                         }
-                                    } catch (NoSuchMethodException e) {
+                                    } catch (final NoSuchMethodException e) {
                                         // seems to be a Anonymous method only available in the impl.no way to get a default value
                                     }
                                 } else if (CompareUtils.equalsDeep(g.getValue(empty), value)) {
@@ -499,7 +511,7 @@ public class FlexiJSonMapper {
                             }
                             orderMap.put(element, orders.get(0).value());
                         }
-                        putObjectPropertyForStorableOrInterface(ret, element, cc, t, g, context, obj, value);
+                        this.putObjectPropertyForStorableOrInterface(ret, element, cc, t, g, context, obj, value);
                     } catch (final IllegalArgumentException e) {
                         this.returnFallbackOrThrowException(new FlexiMapperException(ret, cType, e.getMessage(), e));
                     } catch (final IllegalAccessException e) {
@@ -519,7 +531,7 @@ public class FlexiJSonMapper {
                             emptyKeyValueElement.addCommentsBeforeKey(el.getCommentsBeforeKey(), true);
                             this.cleanUpComments(emptyKeyValueElement.getCommentsBeforeKey());
                             this.cleanUpComments(emptyKeyValueElement.getCommentsAfterKey());
-                            putObjectPropertyForInterfaceBackend(ret, emptyKeyValueElement, cc, context, obj);
+                            this.putObjectPropertyForInterfaceBackend(ret, emptyKeyValueElement, cc, context, obj);
                             continue;
                         }
                         if (!cc.getGetterMap().containsKey(el.getKey())) {
@@ -528,7 +540,7 @@ public class FlexiJSonMapper {
                             element.addCommentsBeforeKey(el.getCommentsBeforeKey(), true);
                             this.cleanUpComments(element.getCommentsBeforeKey());
                             this.cleanUpComments(element.getCommentsAfterKey());
-                            putObjectPropertyForInterfaceBackend(ret, element, cc, context, obj);
+                            this.putObjectPropertyForInterfaceBackend(ret, element, cc, context, obj);
                         }
                     }
                 }
@@ -578,15 +590,15 @@ public class FlexiJSonMapper {
      * @param t
      * @param g
      */
-    protected void putObjectPropertyForMap(final FlexiJSonObject ret, KeyValueElement element, CompiledType type, DefaultObjectToJsonContext context, Object parent, Object value) {
+    protected void putObjectPropertyForMap(final FlexiJSonObject ret, final KeyValueElement element, final CompiledType type, final DefaultObjectToJsonContext context, final Object parent, final Object value) {
         ret.add(element);
     }
 
-    protected void putObjectPropertyForInterfaceBackend(final FlexiJSonObject ret, KeyValueElement element, ClassCache cc, DefaultObjectToJsonContext context, Object parent) {
+    protected void putObjectPropertyForInterfaceBackend(final FlexiJSonObject ret, final KeyValueElement element, final ClassCache cc, final DefaultObjectToJsonContext context, final Object parent) {
         ret.add(element);
     }
 
-    protected void putObjectPropertyForStorableOrInterface(final FlexiJSonObject ret, KeyValueElement element, ClassCache cc, CompiledType type, Getter getter, DefaultObjectToJsonContext context, Object parent, Object value) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException, FlexiMapperException {
+    protected void putObjectPropertyForStorableOrInterface(final FlexiJSonObject ret, final KeyValueElement element, final ClassCache cc, final CompiledType type, final Getter getter, final DefaultObjectToJsonContext context, final Object parent, final Object value) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException, FlexiMapperException {
         ret.add(element);
     }
 
@@ -1300,9 +1312,34 @@ public class FlexiJSonMapper {
         return this.jsonToObject(json, cType, null);
     }
 
+    /**
+     * @param cType
+     * @return
+     */
+    private boolean initContext(CompiledType cType) {
+        FlexiMapperContext c = context.get();
+        if (c != null) {
+            return false;
+        }
+        context.set(new FlexiMapperContext(cType));
+        return true;
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public Object jsonToObject(final FlexiJSonNode json, CompiledType cType, final Setter setter) throws FlexiMapperException {
+    public Object jsonToObject(FlexiJSonNode json, CompiledType cType, final Setter setter) throws FlexiMapperException {
+        boolean clearContext = initContext(cType);
         try {
+            if (setter != null && json instanceof FlexiJSonValue && ((FlexiJSonValue) json).getType() == ValueType.STRING) {
+                List<FlexiVariableAccess> access;
+                try {
+                    access = ClassCache.getClassCache(setter.getMethod().getDeclaringClass()).getAnnotations(setter.getKey(), FlexiVariableAccess.class);
+                    json = this.resolveValue(json, cType, access, null);
+                } catch (final NoSuchMethodException e) {
+                    throw new FlexiMapperException(json, cType, null, e);
+                } catch (CannotResolvePathException e) {
+                    throw new FlexiMapperException(json, cType, null, e);
+                }
+            }
             cType = this.guessTypeForObject(json, cType, setter);
             if (cType.isInstanceOf(FlexiJSonObject.class) && json instanceof FlexiJSonObject) {
                 return json;
@@ -1420,7 +1457,7 @@ public class FlexiJSonMapper {
                         this.writeNodeToObject(cType, (FlexiJSonObject) json, inst);
                         return inst;
                     }
-                } catch (ClassCastException e) {
+                } catch (final ClassCastException e) {
                     // try to map a primitive to an object
                     return this.returnFallbackOrThrowException(new ClassCastFlexiMapperException(json, cType, "Cannot map " + json.getClass().getSimpleName() + " to type " + cType, e, null));
                 }
@@ -1429,9 +1466,11 @@ public class FlexiJSonMapper {
             // returnFallbackOrThrowException should be handled earlier.
             throw e;
         } catch (final RuntimeException e) {
-            e.printStackTrace();
             return this.returnFallbackOrThrowException(new FlexiMapperException(json, cType, e));
         } finally {
+            if (clearContext) {
+                context.set(null);
+            }
         }
     }
 
@@ -1444,7 +1483,7 @@ public class FlexiJSonMapper {
         return componentType;
     }
 
-    public CompiledType guessTypeForObject(final FlexiJSonNode json, CompiledType cType, Setter setter) {
+    public CompiledType guessTypeForObject(final FlexiJSonNode json, CompiledType cType, final Setter setter) {
         if (cType.isObject() || cType.raw == null) {
             if (json instanceof FlexiJSonArray) {
                 cType = this.autoMapFlexiJSonArrayclass;
@@ -1687,7 +1726,7 @@ public class FlexiJSonMapper {
             value = es.getValue();
             //
             CompiledType fieldType = CompiledType.create(s.getType(), cType.type);
-            CompiledType newType = handleConditionalTypeAnnotations(cType, obj, key);
+            final CompiledType newType = this.handleConditionalTypeAnnotations(cType, obj, key);
             if (newType != null) {
                 fieldType = newType;
             }
@@ -1726,15 +1765,214 @@ public class FlexiJSonMapper {
         }
     }
 
+    protected FlexiJSonNode resolveValue(FlexiJSonNode value, final CompiledType fieldType, final List<FlexiVariableAccess> access, LinkedHashSet<JSPath> loopCheck) throws FlexiMapperException, CannotResolvePathException {
+        try {
+            long a = Time.systemIndependentCurrentJVMTimeMillis();
+            boolean isStepping = Time.systemIndependentCurrentJVMTimeMillis() - a > 10;
+            ;
+            if (access != null && access.size() > 0) {
+                if (loopCheck == null) {
+                    loopCheck = new LinkedHashSet<JSPath>();
+                }
+                JSPath valuePath = FlexiUtils.fromFlexiNode(value);
+                if (!loopCheck.add(valuePath) && !isStepping) {
+                    throw new ReferenceLoopException(value, fieldType, "Reference Loop detected:  Reference- Loop: " + new Joiner("->") {
+                        /**
+                         * @see org.appwork.utils.Joiner#elementToString(java.lang.Object)
+                         */
+                        @Override
+                        protected String elementToString(Object s) {
+                            if (s instanceof JSPath) {
+                                return ((JSPath) s).toPathString(false);
+                            } else {
+                                return super.elementToString(s);
+                            }
+                        }
+                    }.join(loopCheck) + "->" + valuePath.toPathString(false), null);
+                }
+                {
+                    final HashSet<String> refs = new HashSet<String>();
+                    String raw = ((FlexiJSonValue) value).getStringValue();
+                    final String orgRaw = raw;
+                    final Pattern pat = Pattern.compile("\\$\\{[\\w\\.\\d\\[\\]]+(#p\\d+)?}");
+                    final Matcher matcher = pat.matcher(raw);
+                    while (matcher.find()) {
+                        final String group = matcher.group(0);
+                        final String path = group.substring(2, group.length() - 1);
+                        refs.add(path);
+                    }
+                    if (refs.size() == 0) {
+                        return value;
+                    }
+                    final HashSet<String> replaced = new HashSet<String>();
+                    FlexiJSonNode root = null;
+                    NEXT_ANNOTATION: for (final FlexiVariableAccess anno : access) {
+                        NEXT_REF: for (final String path : refs) {
+                            if (path.matches(anno.value())) {
+                                FlexiJSonNode base = null;
+                                JSPath jsPath = JSPath.fromPathString(path);
+                                final Object last = jsPath.getLast();
+                                if (last instanceof MetaElement) {
+                                    jsPath = jsPath.getParent();
+                                    String meta = ((MetaElement) last).getString().substring(1);
+                                    base = value;
+                                    // supports #ppp or #p3
+                                    while (meta.startsWith("p")) {
+                                        base = base.getParent();
+                                        meta = meta.substring(1);
+                                    }
+                                    // this allows even a mixture like #pp2 ( -> #ppp)
+                                    String num = "";
+                                    while (meta.length() > 0 && Character.isDigit(meta.charAt(0))) {
+                                        num += meta.substring(0, 1);
+                                        meta = meta.substring(1);
+                                    }
+                                    for (int i = 1; i < Integer.parseInt(num); i++) {
+                                        base = base.getParent();
+                                    }
+                                    base = base.resolvePath(JSPath.fromPathString(meta));
+                                    if (base == null) {
+                                        throw new FlexiMapperException(value, fieldType, "Illegal #..base path definition");
+                                    }
+                                } else {
+                                    if (root == null) {
+                                        root = FlexiUtils.getRoot(value.getParent());
+                                    }
+                                    base = root;
+                                }
+                                JSPath backToWildcard = jsPath;
+                                int i = 0;
+                                int foundWildcardAt = -1;
+                                for (Object o : backToWildcard) {
+                                    if ("".equals(o)) {
+                                        foundWildcardAt = i;
+                                    }
+                                    i++;
+                                }
+                                JSPath me = valuePath;
+                                ArrayList<Object> add = new ArrayList<Object>();
+                                if (foundWildcardAt >= 0) {
+                                    for (i = backToWildcard.size() - 1; i > foundWildcardAt; i--) {
+                                        add.add(0, backToWildcard.getLast());
+                                        backToWildcard = backToWildcard.getParent();
+                                    }
+                                }
+                                if (add.size() > 0) {
+                                    JSPath basePath = FlexiUtils.fromFlexiNode(base);
+                                    if (basePath.size() + backToWildcard.size() > me.size()) {
+                                        throw new FlexiMapperException(value, fieldType, "Cannot Resolve");
+                                    }
+                                    JSPath mustMatchWildCards = me.subPath(basePath.size(), basePath.size() + backToWildcard.size());
+                                    boolean matches = true;
+                                    for (int ii = 0; ii < mustMatchWildCards.size(); ii++) {
+                                        if ("".equals(backToWildcard.get(ii))) {
+                                            continue;
+                                        } else if (CompareUtils.equals(mustMatchWildCards.get(ii), backToWildcard.get(ii))) {
+                                            continue;
+                                        } else {
+                                            matches = false;
+                                            break;
+                                        }
+                                    }
+                                    if (!matches) {
+                                        throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
+                                    }
+                                    base = base.resolvePath(mustMatchWildCards);
+                                    jsPath = JSPath.fromPathElements(add);
+                                }
+                                if (base == null) {
+                                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Base not found: " + path, null);
+                                }
+                                FlexiJSonNode newValue = base.resolvePath(jsPath);
+                                if (newValue == null) {
+                                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
+                                }
+                                JSPath pathFromRoot = FlexiUtils.fromFlexiNode(newValue);
+                                Object lastKey = pathFromRoot.getLast();
+                                JSPath parent = pathFromRoot.getParent();
+                                CompiledType linkedType = getContext().getRootType().resolve(parent);
+                                while (linkedType.isListContainer()) {
+                                    lastKey = parent.getLast();
+                                    parent = parent.getParent();
+                                    linkedType = getContext().getRootType().resolve(parent);
+                                }
+                                // ensure that the target is fully resolved
+                                List<FlexiVariableAccess> subaccess = linkedType.getClassCache().getAnnotations(StringUtils.valueOfOrNull(lastKey), FlexiVariableAccess.class);
+                                newValue = resolveValue(newValue, fieldType, subaccess, loopCheck);
+                                if (fieldType.isString()) {
+                                    if (newValue != null && newValue instanceof FlexiJSonValue) {
+                                        if (raw.equals("${" + path + "}")) {
+                                            if (((FlexiJSonValue) newValue).getType() == ValueType.STRING) {
+                                                value = newValue;
+                                                replaced.add(path);
+                                                break NEXT_ANNOTATION;
+                                            }
+                                        } else {
+                                            raw = raw.replaceAll(Pattern.quote("${" + path + "}"), String.valueOf(((FlexiJSonValue) newValue).getValue()));
+                                            replaced.add(path);
+                                            if (replaced.size() == refs.size()) {
+                                                // nothing more to replace
+                                                break NEXT_ANNOTATION;
+                                            } else {
+                                                continue NEXT_REF;
+                                            }
+                                        }
+                                    }
+                                } else if (raw.equals("${" + path + "}")) {
+                                    // ref only
+                                    if (newValue != null) {
+                                        replaced.add(path);
+                                        value = newValue;
+                                        // break - ref resolved
+                                        break NEXT_ANNOTATION;
+                                    }
+                                } else {
+                                    throw new FlexiMapperException(value, fieldType, "Illegal Link - no replace allowed at this point - only direct links", null);
+                                }
+                            } else {
+                                try {
+                                    LogV3.info("Forbidden Reference: " + path + " @ " + FlexiUtils.getPathString(value));
+                                } catch (final InvalidPathException e) {
+                                    LogV3.log(e);
+                                }
+                            }
+                        }
+                    }
+                    refs.removeAll(replaced);
+                    if (refs.size() > 0) {
+                        LogV3.info("Could not resolve :" + refs);
+                    }
+                    if (raw != orgRaw) {
+                        value = this.createFlexiJSonValue(raw);
+                    }
+                }
+            }
+        } catch (final InvalidPathException e) {
+            throw new FlexiMapperException(value, fieldType, "Illegal ${reference} path.", e);
+        }
+        return value;
+    }
+
+    private ThreadLocal<FlexiMapperContext> context = new ThreadLocal<FlexiMapperContext>();
+
+    /**
+     * @return
+     */
+    private FlexiMapperContext getContext() {
+        FlexiMapperContext ret = context.get();
+        DebugMode.breakIf(ret == null);
+        return ret;
+    }
+
     protected CompiledType handleConditionalTypeAnnotations(final CompiledType cType, final FlexiJSonObject obj, final String key) throws FlexiMapperException {
         try {
-            ClassCache cc = cType.getClassCache();
+            final ClassCache cc = cType.getClassCache();
             if (cc != null) {
                 {
-                    List<StorableConditionalType> annos = cc.getAnnotations(key, StorableConditionalType.class);
+                    final List<StorableConditionalType> annos = cc.getAnnotations(key, StorableConditionalType.class);
                     if (annos != null && annos.size() > 0) {
-                        for (StorableConditionalType a : annos) {
-                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                        for (final StorableConditionalType a : annos) {
+                            final org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
                             condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
                             if (condition.matches(obj)) {
                                 if (StringUtils.isNotEmpty(a.type())) {
@@ -1747,10 +1985,10 @@ public class FlexiJSonMapper {
                     }
                 }
                 {
-                    List<StorableConditionalType2> annos = cc.getAnnotations(key, StorableConditionalType2.class);
+                    final List<StorableConditionalType2> annos = cc.getAnnotations(key, StorableConditionalType2.class);
                     if (annos != null && annos.size() > 0) {
-                        for (StorableConditionalType2 a : annos) {
-                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                        for (final StorableConditionalType2 a : annos) {
+                            final org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
                             condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
                             if (condition.matches(obj)) {
                                 if (StringUtils.isNotEmpty(a.type())) {
@@ -1763,10 +2001,10 @@ public class FlexiJSonMapper {
                     }
                 }
                 {
-                    List<StorableConditionalType3> annos = cc.getAnnotations(key, StorableConditionalType3.class);
+                    final List<StorableConditionalType3> annos = cc.getAnnotations(key, StorableConditionalType3.class);
                     if (annos != null && annos.size() > 0) {
-                        for (StorableConditionalType3 a : annos) {
-                            org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
+                        for (final StorableConditionalType3 a : annos) {
+                            final org.appwork.moncompare.Condition condition = FlexiCondition.parse(a.condition());
                             condition.setTypeHandler(Arrays.asList(new FlexiTypeHandler()));
                             if (condition.matches(obj)) {
                                 if (StringUtils.isNotEmpty(a.type())) {
@@ -1779,11 +2017,11 @@ public class FlexiJSonMapper {
                     }
                 }
             }
-        } catch (BadFormatException e) {
+        } catch (final BadFormatException e) {
             throw new FlexiMapperException(obj, cType, e);
-        } catch (ConditionException e) {
+        } catch (final ConditionException e) {
             throw new FlexiMapperException(obj, cType, e);
-        } catch (TypeParserException e) {
+        } catch (final TypeParserException e) {
             throw new FlexiMapperException(obj, cType, e);
         }
         return null;
@@ -1877,7 +2115,8 @@ public class FlexiJSonMapper {
      */
     @SuppressWarnings("unchecked")
     public <T> T jsonToObject(final FlexiJSonNode json, final TypeRef<T> type) throws FlexiMapperException {
-        return (T) this.jsonToObject(json, CompiledType.create(type.getType()), null);
+        CompiledType ct = CompiledType.create(type.getType());
+        return (T) this.jsonToObject(json, ct);
     }
 
     /**

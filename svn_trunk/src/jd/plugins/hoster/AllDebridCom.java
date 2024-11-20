@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -26,11 +27,16 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.WeakHashMap;
 
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
@@ -41,9 +47,12 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.downloads.columns.ETAColumn;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -52,6 +61,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.linkcrawler.CheckableLink;
+import jd.gui.swing.components.linkbutton.JLink;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
@@ -78,7 +88,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50187 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -138,14 +148,147 @@ public class AllDebridCom extends PluginForHost {
     public static final String                           api_base_41                        = "https://api.alldebrid.com/v4.1";
     public static final String                           agent_raw                          = "JDownloader";
     private static final String                          agent                              = "agent=" + agent_raw;
-    private final String                                 PROPERTY_APIKEY_CREATED_TIMESTAMP  = "APIKEY_CREATED_TIMESTAMP";
     private static final String                          PROPERTY_apikey                    = "apiv4_apikey";
     private final String                                 PROPERTY_maxchunks                 = "alldebrid_maxchunks";
     private static final String                          ERROR_CODE_LINK_PASSWORD_PROTECTED = "LINK_PASS_PROTECTED";
 
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        if (account.getPass() != null && !this.looksLikeValidAPIKey(account.getPass())) {
+            /*
+             * Do not store the users' real password! The only thing we need is the users' apikey.
+             */
+            logger.info("Nullifying password field as it contains a non-apikey value");
+            account.setPass(null);
+        }
+        final AccountInfo ai = new AccountInfo();
+        login(account, ai, true);
+        /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
+        final boolean includeStreamingItems = true;
+        if (includeStreamingItems) {
+            br.getPage(api_base + "/user/hosts?" + agent);
+        } else {
+            br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
+        }
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+        final String[] allowedServiceTypes = new String[] { "hosts", "streams" };
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
+        final HashSet<String> streamDomains = new HashSet<String>();
+        for (final String serviceType : allowedServiceTypes) {
+            final Object supportedHostsInfoO = data.get(serviceType);
+            if (supportedHostsInfoO == null) {
+                continue;
+            } else if (!(supportedHostsInfoO instanceof Map)) {
+                /* When "&hostsOnly=true" is used, "streams" is an empty list. */
+                continue;
+            }
+            final Map<String, Object> supportedHostsInfo = (Map<String, Object>) supportedHostsInfoO;
+            final Iterator<Entry<String, Object>> iterator = supportedHostsInfo.entrySet().iterator();
+            boolean turbobitWorkaroundDone = false;
+            while (iterator.hasNext()) {
+                final Entry<String, Object> entry = iterator.next();
+                // final String hosterKey = entry.getKey();
+                final Map<String, Object> hosterinfos = (Map<String, Object>) entry.getValue();
+                final String host_without_tld = hosterinfos.get("name").toString();
+                final Number quota = (Number) hosterinfos.get("quota");
+                final Number quotaMax = (Number) hosterinfos.get("quotaMax");
+                final String quotaType = (String) hosterinfos.get("quotaType");
+                final List<String> domains = (List<String>) hosterinfos.get("domains");
+                final MultiHostHost mhost = new MultiHostHost();
+                mhost.setName(host_without_tld);
+                mhost.setDomains(domains);
+                /*
+                 * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and
+                 * JD also does not accept them but we're doing this check nevertheless.
+                 */
+                if (Boolean.FALSE.equals(hosterinfos.get("status"))) {
+                    /* Hosts flaggedas not working may still be working thus we will just flag them as unstable. */
+                    // mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
+                } else if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(hosterinfos.get("type").toString())) {
+                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+                    logger.info("This host cannot be used with current account type: " + host_without_tld);
+                }
+                /* Set individual host limits */
+                if (quotaType != null && quota != null && quotaMax != null) {
+                    if (quotaType.equalsIgnoreCase("traffic")) {
+                        /* traffic means traffic in MB */
+                        mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
+                        mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
+                    } else if (quotaType.equalsIgnoreCase("nb_download")) {
+                        /* nb_download means number of links left to download */
+                        final long linksLeft = quota.longValue();
+                        final long linksMax = quotaMax.longValue();
+                        // -1 = Unlimited
+                        if (linksLeft != -1 && linksMax != -1) {
+                            mhost.setLinksLeft(linksLeft);
+                            mhost.setLinksMax(linksMax);
+                        }
+                    } else {
+                        // No limit or unsupported type of limit
+                        logger.warning("Got unknown limit type: " + quotaType);
+                    }
+                }
+                if (serviceType.equals("streams")) {
+                    mhost.setStatusText("Stream service");
+                    /* Collect stream domains for filtering later on. */
+                    streamDomains.addAll(mhost.getDomains());
+                }
+                if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
+                    /*
+                     * Workaround for them putting turbobit.net and hitfile.net into one entry but this way upper handling would only detect
+                     * one of them.
+                     */
+                    if (turbobitWorkaroundDone) {
+                        /* This should never happen. */
+                        logger.info("WTF: Looks like API list of supported host contains Turbobit/Hitfile item twice");
+                        continue;
+                    }
+                    final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
+                    hitfile.setTrafficLeft(mhost.getTrafficLeft());
+                    hitfile.setTrafficMax(mhost.getTrafficMax());
+                    hitfile.setLinksLeft(mhost.getLinksLeft());
+                    hitfile.setLinksMax(mhost.getLinksMax());
+                    hitfile.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                    hitfile.setUnlimitedLinks(mhost.isUnlimitedLinks());
+                    supportedhosts.add(hitfile);
+                    final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
+                    turbobit.setTrafficLeft(mhost.getTrafficLeft());
+                    turbobit.setTrafficMax(mhost.getTrafficMax());
+                    turbobit.setLinksLeft(mhost.getLinksLeft());
+                    turbobit.setLinksMax(mhost.getLinksMax());
+                    turbobit.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
+                    turbobit.setUnlimitedLinks(mhost.isUnlimitedLinks());
+                    supportedhosts.add(turbobit);
+                    turbobitWorkaroundDone = true;
+                } else {
+                    supportedhosts.add(mhost);
+                }
+            }
+        }
+        /* Set list of supported hosts */
+        final List<MultiHostHost> results = ai.setMultiHostSupportV2(this, supportedhosts);
+        final boolean filterJDownloaderUnsupportedStreamHosts = true;
+        if (includeStreamingItems && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
+            /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
+            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
+            for (final MultiHostHost mhost : results) {
+                if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
+                    logger.info("Ignore unsupported stream domain: " + mhost.getDomain());
+                } else {
+                    filteredresults.add(mhost);
+                }
+            }
+            logger.info("Results initially: " + supportedhosts.size() + " | Results after filtering unsupported stream hosts: " + filteredresults.size());
+            ai.setMultiHostSupportV2(this, filteredresults);
+        }
+        return ai;
+    }
+
     private Map<String, Object> login(final Account account, final AccountInfo accountInfo, final boolean validateApikey) throws Exception {
         synchronized (account) {
-            String apikey = getStoredApiKey(account);
+            String apikey = getApiKey(account);
             if (apikey != null) {
                 if (!validateApikey) {
                     setAuthHeader(br, apikey);
@@ -206,11 +349,9 @@ public class AllDebridCom extends PluginForHost {
                 dialog.interrupt();
             }
             if (StringUtils.isEmpty(apikey)) {
-                throw new AccountInvalidException("User failed to authorize PIN/Code. Do not close the pairing dialog until you have confirmed the PIN/Code via browser!");
+                throw new AccountInvalidException("Authorization failed!\r\nLogin in your browser and confirm the code you see to allow JDownloader to login into your account.\r\nDo not close this pairing dialog until you have confirmed the code via browser!");
             }
             account.setProperty(PROPERTY_apikey, apikey);
-            /* Save this property - it might be useful in the future. */
-            account.setProperty(PROPERTY_APIKEY_CREATED_TIMESTAMP, System.currentTimeMillis());
             setAuthHeader(br, apikey);
             final Map<String, Object> userinfo = getAccountInfo(account, accountInfo, apikey);
             return userinfo;
@@ -227,11 +368,6 @@ public class AllDebridCom extends PluginForHost {
             if (!StringUtils.isEmpty(userName)) {
                 account.setUser(userName);
             }
-            /*
-             * Do not store any (old) website login credentials! The only thing we need is the users' apikey and we will store this as a
-             * property in our Account object!
-             */
-            account.setPass(null);
             final Number premiumUntil = (Number) user.get("premiumUntil");
             if (premiumUntil != null) {
                 ai.setValidUntil(premiumUntil.longValue() * 1000l, br);
@@ -270,126 +406,6 @@ public class AllDebridCom extends PluginForHost {
             // final List<String> notifications = (List<String>) user.get("notifications");
             return user;
         }
-    }
-
-    @Override
-    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
-        login(account, ai, true);
-        /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
-        final boolean includeStreamingItems = true;
-        if (includeStreamingItems) {
-            br.getPage(api_base + "/user/hosts?" + agent);
-        } else {
-            br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
-        }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-        final String[] allowedServiceTypes = new String[] { "hosts", "streams" };
-        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-        final HashSet<String> streamDomains = new HashSet<String>();
-        for (final String serviceType : allowedServiceTypes) {
-            final Object supportedHostsInfoO = data.get(serviceType);
-            if (supportedHostsInfoO == null) {
-                continue;
-            } else if (!(supportedHostsInfoO instanceof Map)) {
-                /* When "&hostsOnly=true" is used, "streams" is an empty list. */
-                continue;
-            }
-            final Map<String, Object> supportedHostsInfo = (Map<String, Object>) supportedHostsInfoO;
-            final Iterator<Entry<String, Object>> iterator = supportedHostsInfo.entrySet().iterator();
-            while (iterator.hasNext()) {
-                final Entry<String, Object> entry = iterator.next();
-                // final String hosterKey = entry.getKey();
-                final Map<String, Object> hosterinfos = (Map<String, Object>) entry.getValue();
-                final String host_without_tld = hosterinfos.get("name").toString();
-                final Number quota = (Number) hosterinfos.get("quota");
-                final Number quotaMax = (Number) hosterinfos.get("quotaMax");
-                final String quotaType = (String) hosterinfos.get("quotaType");
-                final List<String> domains = (List<String>) hosterinfos.get("domains");
-                final MultiHostHost mhost = new MultiHostHost();
-                mhost.setName(host_without_tld);
-                mhost.setDomains(domains);
-                /*
-                 * 2020-04-01: This check will most likely never be required as free accounts officially cannot be used via API at all and
-                 * JD also does not accept them but we're doing this check nevertheless.
-                 */
-                if (Boolean.FALSE.equals(hosterinfos.get("status"))) {
-                    /* Hosts flaggedas not working may still be working thus we will just flag them as unstable. */
-                    // mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                    mhost.setStatus(MultihosterHostStatus.WORKING_UNSTABLE);
-                } else if (account.getType() == AccountType.FREE && !"free".equalsIgnoreCase(hosterinfos.get("type").toString())) {
-                    mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-                    logger.info("This host cannot be used with current account type: " + host_without_tld);
-                }
-                /* Set individual host limits */
-                if (quotaType != null && quota != null && quotaMax != null) {
-                    if (quotaType.equalsIgnoreCase("traffic")) {
-                        /* traffic means traffic in MB */
-                        mhost.setTrafficLeft(quota.longValue() * 1024 * 1024);
-                        mhost.setTrafficMax(quotaMax.longValue() * 1024 * 1024);
-                    } else if (quotaType.equalsIgnoreCase("nb_download")) {
-                        /* nb_download means number of links left to download */
-                        final long linksLeft = quota.longValue();
-                        final long linksMax = quotaMax.longValue();
-                        // -1 = Unlimited
-                        if (linksLeft != -1 && linksMax != -1) {
-                            mhost.setLinksLeft(linksLeft);
-                            mhost.setLinksMax(linksMax);
-                        }
-                    } else {
-                        // No limit or unsupported type of limit
-                        logger.warning("Got unknown limit type: " + quotaType);
-                    }
-                }
-                if (serviceType.equals("streams")) {
-                    mhost.setStatusText("Stream service");
-                    /* Collect stream domains for filtering later on. */
-                    streamDomains.addAll(mhost.getDomains());
-                }
-                if (host_without_tld.equals("turbobit") && domains.contains("hitfile.net")) {
-                    /*
-                     * Workaround for them putting turbobit.net and hitfile.net into one entry but this way upper handling would only detect
-                     * one of them.
-                     */
-                    final MultiHostHost hitfile = new MultiHostHost("hitfile.net");
-                    hitfile.setTrafficLeft(mhost.getTrafficLeft());
-                    hitfile.setTrafficMax(mhost.getTrafficMax());
-                    hitfile.setLinksLeft(mhost.getLinksLeft());
-                    hitfile.setLinksMax(mhost.getLinksMax());
-                    hitfile.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
-                    hitfile.setUnlimitedLinks(mhost.isUnlimitedLinks());
-                    supportedhosts.add(hitfile);
-                    final MultiHostHost turbobit = new MultiHostHost("turbobit.net");
-                    turbobit.setTrafficLeft(mhost.getTrafficLeft());
-                    turbobit.setTrafficMax(mhost.getTrafficMax());
-                    turbobit.setLinksLeft(mhost.getLinksLeft());
-                    turbobit.setLinksMax(mhost.getLinksMax());
-                    turbobit.setUnlimitedTraffic(mhost.isUnlimitedTraffic());
-                    turbobit.setUnlimitedLinks(mhost.isUnlimitedLinks());
-                    supportedhosts.add(turbobit);
-                } else {
-                    supportedhosts.add(mhost);
-                }
-            }
-        }
-        /* Set list of supported hosts */
-        final List<MultiHostHost> results = ai.setMultiHostSupportV2(this, supportedhosts);
-        final boolean filterJDownloaderUnsupportedStreamHosts = true;
-        if (includeStreamingItems && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
-            /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
-            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
-            for (final MultiHostHost mhost : results) {
-                if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
-                    logger.info("Ignore unsupported stream domain: " + mhost.getDomain());
-                } else {
-                    filteredresults.add(mhost);
-                }
-            }
-            logger.info("Results initially: " + supportedhosts.size() + " | Results after filtering unsupported stream hosts: " + filteredresults.size());
-            ai.setMultiHostSupportV2(this, filteredresults);
-        }
-        return ai;
     }
 
     private Thread showPINLoginInformation(final String pin_url, final int timeoutSeconds) {
@@ -1095,19 +1111,14 @@ public class AllDebridCom extends PluginForHost {
     private int getMaxChunks(final Account account, final DownloadLink link, final URL downloadURL) {
         /* 2024-05-17: Chunks limited to 16 RE: admin, limit is 32/IP/Server */
         final int defaultMaxChunks = -16;
-        int chunks = 1;
-        if (link.hasProperty(PROPERTY_maxchunks)) {
-            chunks = link.getIntegerProperty(PROPERTY_maxchunks, defaultMaxChunks);
-            if (chunks <= 0) {
-                chunks = 1;
-            } else if (chunks > 1) {
-                chunks = -chunks;
-            }
-        } else {
-            /* Default */
-            chunks = defaultMaxChunks;
+        int chunks = link.getIntegerProperty(PROPERTY_maxchunks, defaultMaxChunks);
+        if (chunks <= 0) {
+            chunks = 1;
+        } else if (chunks > 1) {
+            chunks = -chunks;
         }
         if (chunks != 1) {
+            /* Check if we are rate limited */
             synchronized (RATE_LIMITED) {
                 final HashSet<String> set = RATE_LIMITED.get(account);
                 if (set != null && set.contains(downloadURL.getHost())) {
@@ -1127,8 +1138,14 @@ public class AllDebridCom extends PluginForHost {
         }
     }
 
-    public static String getStoredApiKey(final Account account) {
-        return account.getStringProperty(PROPERTY_apikey);
+    public String getApiKey(final Account account) {
+        if (this.looksLikeValidAPIKey(account.getPass())) {
+            /* User has entered API-key-like string into the password field -> Use that. */
+            return account.getPass();
+        } else {
+            /* No API key in password field -> Return saved API key property (or null). */
+            return account.getStringProperty(PROPERTY_apikey);
+        }
     }
 
     @Override
@@ -1170,7 +1187,7 @@ public class AllDebridCom extends PluginForHost {
 
         public static class TRANSLATION {
             public String getUseHTTPSForDownloads_label() {
-                return "Use https for final downloadurls?";
+                return "Use https for final download urls?";
             }
         }
 
@@ -1179,6 +1196,103 @@ public class AllDebridCom extends PluginForHost {
         boolean isUseHTTPSForDownloads();
 
         void setUseHTTPSForDownloads(boolean b);
+    }
+
+    @Override
+    public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
+        return new AlldebridSpecialLogin(callback, this);
+    }
+
+    public class AlldebridSpecialLogin extends MigPanel implements AccountBuilderInterface {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+
+        protected String getPassword() {
+            if (this.pass == null) {
+                return null;
+            } else {
+                return new String(this.pass.getPassword());
+            }
+        }
+
+        private final ExtPasswordField pass;
+        private final JLabel           idLabel;
+        private final AllDebridCom     plg;
+
+        public boolean updateAccount(Account input, Account output) {
+            if (!StringUtils.equals(input.getPass(), output.getPass())) {
+                output.setPass(input.getPass());
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        public AlldebridSpecialLogin(final InputChangedCallbackInterface callback, final PluginForHost plg) {
+            super("ins 0, wrap 2", "[][grow,fill]", "");
+            this.plg = (AllDebridCom) plg;
+            add(new JLabel(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions()));
+            final String helplink = this.plg.getAPILoginHelpURL();
+            add(new JLink(_GUI.T.jd_gui_swing_components_AccountDialog_generic_instructions_click_here_for_instructions(), helplink));
+            this.add(this.idLabel = new JLink("<HTML><U>Enter your API key or click on 'Save' to initiate browser login.</U></HTML>", helplink));
+            add(this.pass = new ExtPasswordField() {
+                @Override
+                public void onChanged() {
+                    callback.onChangedInput(pass);
+                }
+            }, "");
+            pass.setHelpText(_GUI.T.jd_gui_swing_components_AccountDialog_api_key_help());
+        }
+
+        public void setAccount(final Account defaultAccount) {
+            if (defaultAccount != null) {
+                pass.setText(defaultAccount.getPass());
+            }
+        }
+
+        @Override
+        public boolean validateInputs() {
+            final boolean allowAnyInput = true;
+            if (allowAnyInput) {
+                return true;
+            }
+            final String password = getPassword();
+            if (plg.looksLikeValidAPIKey(password)) {
+                idLabel.setForeground(Color.BLACK);
+                return true;
+            } else {
+                idLabel.setForeground(Color.RED);
+                return false;
+            }
+        }
+
+        @Override
+        public Account getAccount() {
+            return new Account(null, getPassword());
+        }
+
+        @Override
+        public JComponent getComponent() {
+            return this;
+        }
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("[a-zA-Z0-9]{20}")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "https://help." + getHost() + "/en/Third%20party%20tools/jdownloader";
     }
 
     @Override

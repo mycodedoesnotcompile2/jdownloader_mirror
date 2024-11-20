@@ -25,26 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
-import org.jdownloader.plugins.components.usenet.UsenetFile;
-import org.jdownloader.plugins.components.usenet.UsenetServer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -68,7 +48,27 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50166 $", interfaceVersion = 1, names = {}, urls = {})
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.components.usenet.UsenetAccountConfigInterface;
+import org.jdownloader.plugins.components.usenet.UsenetFile;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
+@HostPlugin(revision = "$Revision: 50183 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -137,8 +137,7 @@ public abstract class HighWayCore extends UseNet {
     }
 
     /**
-     * API docs: https://high-way.me/threads/highway-api.201/ </br>
-     * According to admin we can 'hammer' the API every 60 seconds
+     * API docs: https://high-way.me/threads/highway-api.201/ </br> According to admin we can 'hammer' the API every 60 seconds
      */
     protected abstract String getAPIBase();
 
@@ -372,8 +371,8 @@ public abstract class HighWayCore extends UseNet {
     @Override
     protected void handleMultiHost(DownloadLink downloadLink, Account account, UsenetFile usenetFile, String username, String password, UsenetServer server) throws Exception {
         /**
-         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br>
-         * This function should never get called with null/empty username and or password!
+         * 2023-10-30: Extra check as we were trying to hunt a bug where usenet username was empty. </br> This function should never get
+         * called with null/empty username and or password!
          */
         if (StringUtils.isEmpty(username)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -591,13 +590,9 @@ public abstract class HighWayCore extends UseNet {
         try {
             do {
                 /**
-                 * cacheStatus possible values and what they mean: </br>
-                 * d = download </br>
-                 * w = wait (retry) </br>
-                 * q = in queue </br>
-                 * qn = Download has been added to queue </br>
-                 * i = direct download without cache </br>
-                 * s = Cached download is ready for downloading
+                 * cacheStatus possible values and what they mean: </br> d = download </br> w = wait (retry) </br> q = in queue </br> qn =
+                 * Download has been added to queue </br> i = direct download without cache </br> s = Cached download is ready for
+                 * downloading
                  */
                 br.getPage(cachePollingURL);
                 entries = this.checkErrors(br, link, account);
@@ -607,8 +602,8 @@ public abstract class HighWayCore extends UseNet {
                     return entries;
                 } else if (!blockDownloadSlotsForCloudDownloads(account)) {
                     /**
-                     * Throw exception right away so other download candidates will be tried. </br>
-                     * This may speed up downloads significantly for some users.
+                     * Throw exception right away so other download candidates will be tried. </br> This may speed up downloads
+                     * significantly for some users.
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
                 }
@@ -779,8 +774,7 @@ public abstract class HighWayCore extends UseNet {
     /**
      * Login without errorhandling
      *
-     * @return true = cookies validated </br>
-     *         false = cookies set but not validated
+     * @return true = cookies validated </br> false = cookies set but not validated
      *
      * @throws PluginException
      * @throws InterruptedException
@@ -791,7 +785,7 @@ public abstract class HighWayCore extends UseNet {
                 if (!this.looksLikeValidAPIKey(account.getPass())) {
                     throw new AccountInvalidException("Invalid API key format");
                 }
-                account.setPass(correctPassword(account.getPass()));
+                account.setPass(account.getPass());
             }
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
             final Cookies cookies = account.loadCookies("");
@@ -831,10 +825,6 @@ public abstract class HighWayCore extends UseNet {
             /* No Exception --> Assume that login was successful */
             account.saveCookies(br.getCookies(br.getHost()), "");
         }
-    }
-
-    public static String correctPassword(final String str) {
-        return str.trim();
     }
 
     protected abstract void exceptionAccountInvalid(final Account account) throws PluginException;
@@ -977,9 +967,9 @@ public abstract class HighWayCore extends UseNet {
                 getMultiHosterManagement().putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
             case 11:
                 /**
-                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br>
-                 * 2021-11-08: Admin asked us not to disable host right away when this error happens as it seems like this error is more
-                 * rleated to single files/fileservers -> Done accordingly.
+                 * Host (not multihost) is currently under maintenance or offline --> Disable it for some time </br> 2021-11-08: Admin asked
+                 * us not to disable host right away when this error happens as it seems like this error is more rleated to single
+                 * files/fileservers -> Done accordingly.
                  */
                 // mhm.putError(account, this.getDownloadLink(), retrySeconds * 1000l, msg);
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);
@@ -1057,7 +1047,7 @@ public abstract class HighWayCore extends UseNet {
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (correctPassword(str).matches("[A-Za-z0-9]{32}")) {
+        } else if (str.matches("[A-Za-z0-9]{32}")) {
             return true;
         } else {
             return false;

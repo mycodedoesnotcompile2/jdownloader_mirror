@@ -234,7 +234,7 @@ public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
 
-                                                  /**
+        /**
                                                    * these patterns should split filename and fileextension (extension must include the
                                                    * point)
                                                    */
@@ -1466,9 +1466,15 @@ public abstract class PluginForHost extends Plugin {
     /**
      * Stellt das Plugin in den Ausgangszustand zurueck (variablen intialisieren etc)
      */
-    public abstract void reset();
+    public void reset() {
+    }
 
-    public abstract void resetDownloadlink(DownloadLink link);
+    public final void resetLink(DownloadLink downloadLink) {
+        resetDownloadlink(downloadLink);
+    }
+
+    public void resetDownloadlink(DownloadLink link) {
+    }
 
     public List<File> listProcessFiles(DownloadLink link) {
         final HashSet<File> ret = new HashSet<File>();
@@ -1483,11 +1489,14 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public String updateAccountPassword(final Account account, final String password) {
-        if (password != null) {
-            return password.replaceAll("(?i)<" + Pattern.quote(getHost()) + ":EMPTY>", "");
-        } else {
-            return password;
+        if (password == null) {
+            return null;
         }
+        String ret = password.replaceAll("(?i)<" + Pattern.quote(getHost()) + ":EMPTY>", "");
+        if (hasFeature(FEATURE.API_KEY_LOGIN)) {
+            ret = ret.trim();
+        }
+        return ret;
     }
 
     public void setStartIntervall(long interval) {
@@ -3013,10 +3022,6 @@ public abstract class PluginForHost extends Plugin {
         return null;
     }
 
-    public void resetLink(DownloadLink downloadLink) {
-        resetDownloadlink(downloadLink);
-    }
-
     /** Returns downloadurls for external services. E.g. use this in multihost plugins instead of e.g. getPluginPatternMatcher! */
     public String buildExternalDownloadURL(DownloadLink downloadLink, PluginForHost buildForThisPlugin) {
         return downloadLink.getPluginPatternMatcher();
@@ -3716,14 +3721,17 @@ public abstract class PluginForHost extends Plugin {
             }
         }
         if (this.hasFeature(FEATURE.COOKIE_LOGIN_ONLY)) {
+            /* Check for non-cookie value in password field when only cookies are allowed. */
             if (account.loadUserCookies() == null) {
                 throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorCookieLoginMandatoryButNoCookiesGiven());
             }
         } else if (!this.hasFeature(FEATURE.COOKIE_LOGIN_OPTIONAL)) {
+            /* Check for cookies in password field when cookies are not allowed. */
             if (account.loadUserCookies() != null) {
                 throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorCookieLoginUnsupportedButGiven());
             }
         } else if (this.hasFeature(FEATURE.API_KEY_LOGIN)) {
+            /* Check for invalid-looking API key in password field when only API key is allowed. */
             if (!this.looksLikeValidAPIKey(account.getPass())) {
                 throw new AccountInvalidException(_GUI.T.accountdialog_LoginValidationErrorInvalidAPIKey());
             }
@@ -3732,7 +3740,14 @@ public abstract class PluginForHost extends Plugin {
 
     public boolean looksLikeValidEmailAddress(final Account account, final String email) {
         // TODO: Move this function to a better place
-        return email != null && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+        if (email == null) {
+            return false;
+        }
+        if (email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public boolean isSameAccount(Account downloadAccount, AbstractProxySelectorImpl downloadProxySelector, Account candidateAccount, AbstractProxySelectorImpl candidateProxySelector) {
@@ -3892,7 +3907,7 @@ public abstract class PluginForHost extends Plugin {
         final Thread thread = new Thread() {
             public void run() {
                 try {
-                    final String help_article_url = "https://support.jdownloader.org/Knowledgebase/Article/View/account-cookie-login-instructions";
+                    final String help_article_url = "https://support.jdownloader.org/knowledgebase/article/account-cookie-login-instructions";
                     String message = "";
                     final String title;
                     if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {

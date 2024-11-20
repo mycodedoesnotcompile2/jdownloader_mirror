@@ -15,6 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.io.IOException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -47,7 +49,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50175 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModelKarteiDe extends PluginForHost {
     public ModelKarteiDe(PluginWrapper wrapper) {
         super(wrapper);
@@ -145,13 +147,16 @@ public class ModelKarteiDe extends PluginForHost {
         }
     }
 
-    @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        return requestFileInformation(link, null, false);
+    public String getExtDefault(final DownloadLink link) {
+        if (isVideo(link)) {
+            /* Can be flv, webm, mp4 but mostly mp4 */
+            return ".mp4";
+        } else {
+            return ".jpg";
+        }
     }
 
-    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        dllink = null;
+    public void setWeakFilename(final DownloadLink link) {
         final String extDefault;
         if (isVideo(link)) {
             /* Can be flv, webm, mp4 but mostly mp4 */
@@ -164,21 +169,25 @@ public class ModelKarteiDe extends PluginForHost {
             /* Set weak filename */
             link.setName(contentID + extDefault);
         }
+    }
+
+    @Override
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        return requestFileInformation(link, null, false);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+        dllink = null;
+        final String extDefault = getExtDefault(link);
+        final String contentID = this.getFID(link);
+        if (!link.isNameSet()) {
+            setWeakFilename(link);
+        }
         this.setBrowserExclusive();
         if (account != null) {
             this.login(account, false);
         }
-        /* Ensure English language */
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, link.getPluginPatternMatcher());
-        /**
-         * Setting only the English language cookie wasn't enough so this should redirect us to our target-URL and enforce English language.
-         */
-        br.getPage("https://www." + getHost() + "/l.php?l=en");
-        /* Double-check: If we're not on our target-URL, navigate to it. */
-        if (!br.getURL().contains(contentID)) {
-            logger.warning("Expected redirect from language switcher to final URL did not happen");
-            br.getPage(link.getPluginPatternMatcher());
-        }
+        getPageEnsureEnglish(br, link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (br.containsHTML(">\\s*The video does not exist")) {
@@ -251,6 +260,21 @@ public class ModelKarteiDe extends PluginForHost {
             }
         }
         return AvailableStatus.TRUE;
+    }
+
+    public void getPageEnsureEnglish(final Browser br, final String url) throws IOException {
+        /* Ensure English language */
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, url);
+        final String targetPath = new URL(url).getPath();
+        /**
+         * Setting only the English language cookie wasn't enough so this should redirect us to our target-URL and enforce English language.
+         */
+        br.getPage("https://www." + getHost() + "/l.php?l=en");
+        /* Double-check: If we're not on our target-URL, navigate to it. */
+        if (!br.getURL().endsWith(targetPath)) {
+            logger.warning("Expected redirect from language switcher to final URL did not happen");
+            br.getPage(url);
+        }
     }
 
     @Override

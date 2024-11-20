@@ -25,19 +25,6 @@ import java.util.Map;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.swing.MigPanel;
-import org.appwork.swing.components.ExtPasswordField;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.gui.InputChangedCallbackInterface;
-import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.gui.swing.components.linkbutton.JLink;
@@ -58,7 +45,20 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
+import org.appwork.storage.TypeRef;
+import org.appwork.swing.MigPanel;
+import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.InputChangedCallbackInterface;
+import org.jdownloader.plugins.accounts.AccountBuilderInterface;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50183 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
 public class NexusmodsCom extends antiDDoSForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -463,7 +463,7 @@ public class NexusmodsCom extends antiDDoSForHost {
 
     private AccountInfo fetchAccountInfoAPI(final Account account) throws Exception {
         if (isAPIOnlyMode()) {
-            account.setPass(correctPassword(account.getPass()));
+            account.setPass(account.getPass());
         }
         if (!isAPIKey(getApikey(account))) {
             throw new AccountInvalidException("Invalid API key format");
@@ -546,10 +546,6 @@ public class NexusmodsCom extends antiDDoSForHost {
             }
             throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API limit has been reached", 30 * 60 * 1000l);
         }
-    }
-
-    private static String correctPassword(final String pw) {
-        return pw.trim();
     }
 
     public static String getApikey(final Account account) {
@@ -661,7 +657,7 @@ public class NexusmodsCom extends antiDDoSForHost {
             if (this.pass == null) {
                 return null;
             } else {
-                return NexusmodsCom.correctPassword(new String(this.pass.getPassword()));
+                return new String(this.pass.getPassword());
             }
         }
 

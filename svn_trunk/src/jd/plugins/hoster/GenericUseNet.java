@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50179 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
 public class GenericUseNet extends UseNet {
     public GenericUseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -99,7 +99,7 @@ public class GenericUseNet extends UseNet {
             ai.setStatus("Generic usenet:maxDownloads(current)=" + account.getMaxSimultanDownloads());
             account.setRefreshTimeout(2 * 60 * 60 * 1000l);
             return ai;
-        } catch (InvalidAuthException e) {
+        } catch (final InvalidAuthException e) {
             throw new PluginException(LinkStatus.ERROR_PREMIUM, null, PluginException.VALUE_ID_PREMIUM_DISABLE, e);
         }
     }

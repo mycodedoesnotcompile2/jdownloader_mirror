@@ -4,7 +4,7 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
  *         e-mail@appwork.org
@@ -44,6 +44,14 @@ import java.util.Collection;
 public class Joiner {
     private String separator;
 
+    public String getSeparator() {
+        return separator;
+    }
+
+    public void setSeparator(String separator) {
+        this.separator = separator;
+    }
+
     /**
      * @param separator
      */
@@ -51,6 +59,41 @@ public class Joiner {
         this.separator = separator;
     }
 
+    /**
+     * add the separator at the start - a leading separator
+     */
+    private boolean prefix = false;
+
+    public boolean isPrefix() {
+        return prefix;
+    }
+
+    public void setPrefix(boolean prefix) {
+        this.prefix = prefix;
+    }
+
+    public Joiner prefix(boolean prefix) {
+        this.prefix = prefix;
+        return this;
+    }
+
+    public boolean isPostfix() {
+        return postfix;
+    }
+
+    public Joiner postfix(boolean postfix) {
+        this.postfix = postfix;
+        return this;
+    }
+
+    public void setPostfix(boolean postfix) {
+        this.postfix = postfix;
+    }
+
+    /**
+     * add the separator at the end - a trailing separator
+     */
+    private boolean postfix                 = false;
     private boolean skipEmptyOrNullElements = false;
 
     /**
@@ -79,14 +122,22 @@ public class Joiner {
     }
 
     public String join(Collection<?> params) {
-        return join(params.toArray(new Object[0]));
+        return joinInternal(params.toArray(new Object[0]));
     }
 
-    /**
-     * @param parameters
-     * @return
-     */
-    public String join(Object... parameters) {
+    public String join(int[] parameters) {
+        Object[] ar = new Object[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            ar[i] = parameters[i];
+        }
+        return joinInternal(ar);
+    }
+
+    public <T> String join(T... parameters) {
+        return joinInternal(parameters);
+    }
+
+    public String joinInternal(Object[] parameters) {
         StringBuilder sb = new StringBuilder();
         int added = 0;
         for (Object s : parameters) {
@@ -97,6 +148,12 @@ public class Joiner {
             String toString = elementToString(s);
             added++;
             sb.append(toString);
+        }
+        if (isPostfix()) {
+            sb.append(getSeparator(added, null, parameters, sb));
+        }
+        if (isPrefix()) {
+            sb.insert(0, getSeparator(-1, null, parameters, sb));
         }
         return sb.toString();
     }

@@ -3,15 +3,20 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
 
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.DomainInfo;
+import org.jdownloader.controlling.download.DownloadControllerListener;
 import org.jdownloader.gui.translate._GUI;
 
-public class MultiHostHost {
+public class MultiHostHost implements DownloadControllerListener {
     public enum MultihosterHostStatus implements LabelInterface {
         WORKING {
             @Override
@@ -76,6 +81,7 @@ public class MultiHostHost {
     private MultihosterHostStatus status                          = null;
     private static final long     MAX_UNAVAILABLE_TIME            = 5 * 60 * 1000;
     private AccountInfo           accountInfo                     = null;
+    private final AtomicBoolean   propertyListenerEnabled         = new AtomicBoolean(false);
 
     public AccountInfo getAccountInfo() {
         return accountInfo;
@@ -146,8 +152,9 @@ public class MultiHostHost {
         if (domain == null) {
             throw new IllegalArgumentException();
         }
-        if (!this.domains.contains(domain)) {
-            this.domains.add(domain);
+        final List<String> domains = getDomains();
+        if (!domains.contains(domain)) {
+            domains.add(domain);
         }
     }
 
@@ -223,8 +230,8 @@ public class MultiHostHost {
     }
 
     /**
-     * How much traffic is needed- and credited from the account when downloading from this host? </br>
-     * 500 = 5 times the size of the downloaded file.
+     * How much traffic is needed- and credited from the account when downloading from this host? </br> 500 = 5 times the size of the
+     * downloaded file.
      */
     public short getTrafficCalculationFactorPercent() {
         if (trafficCalculationFactorPercent == null) {
@@ -263,8 +270,8 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns custom set status text. </br>
-     * Typically used to describe why this host is currently not working but can also be used as an informative field.
+     * Returns custom set status text. </br> Typically used to describe why this host is currently not working but can also be used as an
+     * informative field.
      */
     public String getStatusText() {
         return statusText;
@@ -288,12 +295,18 @@ public class MultiHostHost {
     public void setErrorStatus(final String text, final long waitMillis) {
         this.setUnavailableStatusText(text);
         this.setUnavailableTime(waitMillis);
+        if (waitMillis > 0 && propertyListenerEnabled.compareAndSet(false, true)) {
+            DownloadController.getInstance().getEventSender().addListener(this, true);
+        }
     }
 
     public void clearErrorStatus() {
         // this.setStatus(MultihosterHostStatus.WORKING);
         this.setUnavailableStatusText(null);
         this.setUnavailableTimestamp(-1);
+        if (propertyListenerEnabled.compareAndSet(true, false)) {
+            DownloadController.getInstance().getEventSender().removeListener(this);
+        }
     }
 
     public MultihosterHostStatus getStatus() {
@@ -341,7 +354,7 @@ public class MultiHostHost {
             return false;
         }
         domain = domain.toLowerCase(Locale.ENGLISH);
-        if (this.domains.contains(domain)) {
+        if (this.getDomains().contains(domain)) {
             return true;
         } else {
             return false;
@@ -350,8 +363,9 @@ public class MultiHostHost {
 
     /** Returns first domain of list of supported domains if list size is > 0. */
     public String getDomain() {
-        if (this.getDomains().size() > 0) {
-            return this.getDomains().get(0);
+        final List<String> domains = getDomains();
+        if (domains.size() > 0) {
+            return domains.get(0);
         } else {
             return null;
         }
@@ -383,8 +397,7 @@ public class MultiHostHost {
     }
 
     /**
-     * Returns time this item is unavailable for. </br>
-     * This can return negative values.
+     * Returns time this item is unavailable for. </br> This can return negative values.
      */
     public long getUnavailableTimeMillis() {
         final long unavailableTimestamp = this.getUnavailableUntilTimestamp();
@@ -407,5 +420,48 @@ public class MultiHostHost {
     public String toString() {
         final String title = getTitle();
         return title + " | Status: " + this.getStatus() + " | StatusText: " + this.getStatusText() + " | UnavailableStatusText: " + this.getUnavailableStatusText() + " | LinksAvailable: " + this.getLinksLeft() + "/" + this.getLinksMax() + " | Traffic: " + SizeFormatter.formatBytes(this.getTrafficLeft()) + "/" + SizeFormatter.formatBytes(this.getTrafficMax()) + " | Chunks: " + this.getMaxChunks() + " | Resume: " + this.isResume();
+    }
+
+    @Override
+    public void onDownloadControllerAddedPackage(FilePackage pkg) {
+    }
+
+    @Override
+    public void onDownloadControllerStructureRefresh(FilePackage pkg) {
+    }
+
+    @Override
+    public void onDownloadControllerStructureRefresh() {
+    }
+
+    @Override
+    public void onDownloadControllerStructureRefresh(AbstractNode node, Object param) {
+    }
+
+    @Override
+    public void onDownloadControllerRemovedPackage(FilePackage pkg) {
+    }
+
+    @Override
+    public void onDownloadControllerRemovedLinklist(List<DownloadLink> list) {
+    }
+
+    @Override
+    public void onDownloadControllerUpdatedData(DownloadLink downloadlink, DownloadLinkProperty property) {
+        if (downloadlink != null && DownloadLinkProperty.Property.RESET.equals(property) && downloadlink.getHost().equals(getDomain())) {
+            clearErrorStatus();
+        }
+    }
+
+    @Override
+    public void onDownloadControllerUpdatedData(FilePackage pkg, FilePackageProperty property) {
+    }
+
+    @Override
+    public void onDownloadControllerUpdatedData(DownloadLink downloadlink) {
+    }
+
+    @Override
+    public void onDownloadControllerUpdatedData(FilePackage pkg) {
     }
 }

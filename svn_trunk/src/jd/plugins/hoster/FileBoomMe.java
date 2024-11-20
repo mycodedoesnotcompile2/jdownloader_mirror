@@ -21,17 +21,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.jdownloader.plugins.components.config.Keep2shareConfig;
-import org.jdownloader.plugins.components.config.Keep2shareConfigFileboom;
-import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
-
 import jd.PluginWrapper;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 
-@HostPlugin(revision = "$Revision: 48371 $", interfaceVersion = 2, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.components.config.Keep2shareConfigFileboom;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+
+@HostPlugin(revision = "$Revision: 50178 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { Keep2ShareCcDecrypter.class })
 public class FileBoomMe extends K2SApi {
     public FileBoomMe(PluginWrapper wrapper) {
@@ -100,15 +99,6 @@ public class FileBoomMe extends K2SApi {
     @Override
     public Object getFavIcon(String host) throws IOException {
         return getInternalAPIDomain();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-        super.resetLink(link);
     }
 
     @Override

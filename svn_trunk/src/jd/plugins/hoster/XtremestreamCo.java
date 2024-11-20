@@ -25,6 +25,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig;
+import org.jdownloader.plugins.components.config.XtremestreamCoConfig.DownloadMode;
 import org.jdownloader.plugins.components.config.XtremestreamCoConfig.Quality;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.config.PluginConfigInterface;
@@ -43,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50179 $", interfaceVersion = 3, names = {}, urls = {})
 public class XtremestreamCo extends PluginForHost {
     public XtremestreamCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +137,7 @@ public class XtremestreamCo extends PluginForHost {
         /* 2022-02-28: They're using an abnormal kind of m3u8 lists which is why a plugin is required in the first place. */
         final String referer = link.getReferrerUrl();
         final Browser br2 = br.cloneBrowser();
-        final String fid = this.getFID(link);
+        final String fid = getFID(link);
         String data_folderid = null;
         String data_xtremestream = null;
         String dltoken = null;
@@ -153,28 +154,50 @@ public class XtremestreamCo extends PluginForHost {
             data_xtremestream = br2.getRegex("xtremestream:\\s*\"([^\"]+)").getMatch(0);
             dltoken = br2.getRegex("token=([^\"\\&]+)").getMatch(0);
         }
-        if (data_folderid != null && data_xtremestream != null && dltoken != null) {
+        final XtremestreamCoConfig cfg = PluginJsonConfig.get(XtremestreamCoConfig.class);
+        officialVideoDownload: if (data_folderid != null && data_xtremestream != null && dltoken != null) {
             /* Attempt official/progressive download */
-            dltoken = Encoding.htmlDecode(dltoken);
-            final Map<String, Object> postdata = new HashMap<String, Object>();
-            postdata.put("folder", data_folderid);
-            postdata.put("xtremestream", data_xtremestream);
-            final UrlQuery query = new UrlQuery();
-            query.appendEncoded("folder", data_folderid);
-            query.appendEncoded("xtremestream", data_xtremestream);
-            query.appendEncoded("token", dltoken);
-            final PostRequest req = br.createJSonPostRequest("https://download.xtremestream.xyz/generateLinkForPlayer?" + query.toString(), postdata);
-            req.getHeaders().put("Content-Type", "application/json");
-            req.getHeaders().put("Accept", "*/*");
-            br.getPage(req);
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            String dllink = entries.get("link").toString();
-            /* Typically https://pervm1.xtremestream.co/ */
-            br.getHeaders().put("Referer", "https://" + data_xtremestream + "." + getHost() + "/");
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
-            this.handleConnectionErrors(br, dl.getConnection());
-            dl.startDownload();
-            return;
+            final DownloadMode mode = cfg.getDownloadMode();
+            if (mode == DownloadMode.STREAM_DOWNLOAD) {
+                /* User prefers stream download */
+                break officialVideoDownload;
+            }
+            boolean allowAutoFallbackToStreamDownload = mode == DownloadMode.AUTO;
+            try {
+                logger.info("Attempting official download");
+                dltoken = Encoding.htmlDecode(dltoken);
+                final Map<String, Object> postdata = new HashMap<String, Object>();
+                postdata.put("folder", data_folderid);
+                postdata.put("xtremestream", data_xtremestream);
+                final UrlQuery query = new UrlQuery();
+                query.appendEncoded("folder", data_folderid);
+                query.appendEncoded("xtremestream", data_xtremestream);
+                query.appendEncoded("token", dltoken);
+                final Browser brc = br.cloneBrowser();
+                final PostRequest req = brc.createJSonPostRequest("https://download.xtremestream.xyz/generateLinkForPlayer?" + query.toString(), postdata);
+                req.getHeaders().put("Content-Type", "application/json");
+                req.getHeaders().put("Accept", "*/*");
+                brc.getPage(req);
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
+                String dllink = entries.get("link").toString();
+                /* Typically https://pervm1.xtremestream.co/ */
+                brc.getHeaders().put("Referer", "https://" + data_xtremestream + "." + getHost() + "/");
+                dl = jd.plugins.BrowserAdapter.openDownload(brc, link, dllink, true, 0);
+                this.handleConnectionErrors(brc, dl.getConnection());
+                logger.info("Official download success!");
+                /* Do not allow fallback at this stage! */
+                allowAutoFallbackToStreamDownload = false;
+                dl.startDownload();
+                return;
+            } catch (final InterruptedException ie) {
+                throw ie;
+            } catch (final Exception e) {
+                if (!allowAutoFallbackToStreamDownload) {
+                    throw e;
+                }
+                logger.log(e);
+                logger.info("Official download failed -> Fallback to stream download");
+            }
         }
         logger.info("Official download is not possible");
         String hlsMaster = br.getRegex("var m3u8_loader_url = `(https://[^<>\"']+data=)`;").getMatch(0);

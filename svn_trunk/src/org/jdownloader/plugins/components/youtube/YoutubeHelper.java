@@ -37,6 +37,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -102,22 +118,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -171,18 +171,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -3591,7 +3591,7 @@ public class YoutubeHelper {
     }
 
     public String createFilename(final DownloadLink link) {
-        AbstractVariant variant = AbstractVariant.get(link);
+        final AbstractVariant variant = AbstractVariant.get(link);
         String formattedFilename = variant.getFileNamePattern(link);
         // validate the pattern
         if (formattedFilename != null && !formattedFilename.toLowerCase(Locale.ENGLISH).matches(".*\\*[^\\*]*ext[^\\*]*\\*.*")) {
@@ -3601,10 +3601,12 @@ public class YoutubeHelper {
             formattedFilename = "*VIDEONAME* (*QUALITY*).*EXT*";
         }
         formattedFilename = replaceVariables(link, formattedFilename);
-        final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
-        final int playlistPosition = link.getIntegerProperty(YoutubeHelper.YT_PLAYLIST_POSITION, -1);
-        if (cfg.isPlaylistItemsIncludePlaylistPositionAtBeginningOfFilenames() && playlistID != null && playlistPosition != -1) {
-            formattedFilename = playlistPosition + "." + formattedFilename;
+        if (!VariantGroup.IMAGE_PLAYLIST_COVER.equals(variant.getBaseVariant().getGroup())) {
+            final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
+            final int playlistPosition = link.getIntegerProperty(YoutubeHelper.YT_PLAYLIST_POSITION, -1);
+            if (cfg.isPlaylistItemsIncludePlaylistPositionAtBeginningOfFilenames() && playlistID != null && playlistPosition != -1) {
+                formattedFilename = playlistPosition + "." + formattedFilename;
+            }
         }
         return formattedFilename;
     }
@@ -4376,7 +4378,27 @@ public class YoutubeHelper {
         }
         final String[][] customCovers = brc.getRegex("<meta property=\"og:image\" content=\"(https?://i\\.ytimg.com/pl_c/[^\"]*)\">(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?(?:\\s*<meta property=\"og:image:(width|height)\" content=\"(\\d+)\">)?").getMatches();
         if (customCovers == null || customCovers.length == 0) {
-            return crawlThumbnailData(null, grabFilesize);
+            final List<YoutubeStreamData> thumbnailData = crawlThumbnailData(null, grabFilesize);
+            if (thumbnailData == null || thumbnailData.size() == 0) {
+                return null;
+            }
+            for (final YoutubeStreamData thumbnail : thumbnailData) {
+                switch (thumbnail.getItag()) {
+                case IMAGE_MAX:
+                    thumbnail.setItag(YoutubeITAG.COVER_MAX);
+                    break;
+                case IMAGE_HQ:
+                    thumbnail.setItag(YoutubeITAG.COVER_HQ);
+                    break;
+                case IMAGE_LQ:
+                    thumbnail.setItag(YoutubeITAG.COVER_LQ);
+                    break;
+                case IMAGE_MQ:
+                    thumbnail.setItag(YoutubeITAG.COVER_MQ);
+                    break;
+                }
+            }
+            return thumbnailData;
         }
         final StreamCollection data = new StreamCollection();
         for (final String[] customCover : customCovers) {

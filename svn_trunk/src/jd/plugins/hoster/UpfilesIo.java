@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49271 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50182 $", interfaceVersion = 2, names = {}, urls = {})
 public class UpfilesIo extends PluginForHost {
     public UpfilesIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -119,8 +119,16 @@ public class UpfilesIo extends PluginForHost {
         }
     }
 
-    private String getFID(final DownloadLink link) {
+    public String getFID(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+    }
+
+    public static boolean isValidFileID(final String str) {
+        if (str.toLowerCase().equals(str)) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     @Override
@@ -130,7 +138,7 @@ public class UpfilesIo extends PluginForHost {
             /* Set fallback-name */
             link.setName(fid);
         }
-        if (fid.toLowerCase().equals(fid)) {
+        if (!isValidFileID(fid)) {
             /* Invalid fileID e.g.: https://upfiles.com/contact */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }

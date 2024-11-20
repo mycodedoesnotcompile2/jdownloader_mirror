@@ -7,10 +7,11 @@
  *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
  *         Spalter Strasse 58
  *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
- *     The intent is that the AppWork GmbH is able to provide their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
+ *     The intent is that the AppWork GmbH is able to provide  their utilities library for free to non-commercial projects whereas commercial usage is only permitted after obtaining a commercial license.
  *     These terms apply to all files that have the [The Product] License header (IN the file), a <filename>.license or <filename>.info (like mylib.jar.info) file that contains a reference to this license.
  *
  * === 3rd Party Licences ===
@@ -19,11 +20,11 @@
  *
  * === Definition: Commercial Usage ===
  *     If anybody or any organization is generating income (directly or indirectly) by using [The Product] or if there's any commercial interest or aspect in what you are doing, we consider this as a commercial usage.
- *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact us.
+ *     If your use-case is neither strictly private nor strictly educational, it is commercial. If you are unsure whether your use-case is commercial or not, consider it as commercial or contact as.
  * === Dual Licensing ===
  * === Commercial Usage ===
  *     If you want to use [The Product] in a commercial way (see definition above), you have to obtain a paid license from AppWork GmbH.
- *     Contact AppWork for further details: <e-mail@appwork.org>
+ *     Contact AppWork for further details: e-mail@appwork.org
  * === Non-Commercial Usage ===
  *     If there is no commercial usage (see definition above), you may use [The Product] under the terms of the
  *     "GNU Affero General Public License" (http://www.gnu.org/licenses/agpl-3.0.en.html).
@@ -31,51 +32,54 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.storage.flexijson.mapper.typemapper;
+package org.appwork.processes;
 
-import org.appwork.exceptions.WTFException;
-import org.appwork.moncompare.Condition;
-import org.appwork.moncompare.fromjson.FlexiConditionMapper;
-import org.appwork.storage.flexijson.FlexiJSonNode;
-import org.appwork.storage.flexijson.mapper.DefaultObjectToJsonContext;
-import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
-import org.appwork.storage.flexijson.mapper.FlexiMapperException;
-import org.appwork.storage.flexijson.mapper.FlexiTypeMapper;
-import org.appwork.storage.simplejson.mapper.Getter;
-import org.appwork.storage.simplejson.mapper.Setter;
-import org.appwork.utils.reflection.CompiledType;
+import java.io.IOException;
+import java.util.List;
+
+import org.appwork.utils.duration.TimeSpan;
+import org.appwork.utils.os.NotSupportedException;
 
 /**
  * @author thomas
+ * @date 19.11.2024
  *
  */
-public class ConditionMapper implements FlexiTypeMapper {
-    /*
-     * (non-Javadoc)
+public interface ProcessHandler {
+    List<ProcessInfo> listByPath(String pathStartsWith) throws NotSupportedException, IOException;
+
+    List<ProcessInfo> listByPids(int... pids) throws NotSupportedException, IOException;
+
+    /**
+     * Forced Kill Returns false if the process is not running any more.
      *
-     * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#mapObject(java.lang.Object)
+     * @param instance
      */
-    public FlexiJSonNode obj2JSon(FlexiJSonMapper mapper, Object obj, Getter reference, DefaultObjectToJsonContext typeHirarchy) {
-        throw new WTFException("Should not happen");
-    }
-    /*
-     * (non-Javadoc)
+    boolean destroy(ProcessInfo process) throws NotSupportedException, IOException;
+
+    /**
+     * Try to soft kill. The process may ignore this. Returns false if the process is not running any more.
      *
-     * @see org.appwork.storage.simplejson.mapper.FlexiTypeMapper#json2Obj(org.appwork.storage.simplejson.JSonNode)
+     * @param found
      */
+    boolean requestExit(ProcessInfo process) throws NotSupportedException, IOException;
 
-    public Object json2Obj(FlexiJSonMapper mapper, FlexiJSonNode json, CompiledType type, Setter reference) throws FlexiMapperException {
-        FlexiConditionMapper<Condition> condMapper = new FlexiConditionMapper<Condition>(Condition.class);
-        return condMapper.jsonToObject(json, type, reference);
-    }
+    /**
+     * tries a soft close, waits the timeout and force kills remaining processes<br>
+     * Returns false if at least one process is not running any more
+     *
+     * @param timeout
+     * @param processes
+     * @throws InterruptedException
+     */
+    boolean requestExit(TimeSpan waitForSoftClose, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException;
 
-    @Override
-    public boolean canConvert2Json(Object obj, Getter getter) {
-        return false;
-    }
-
-    @Override
-    public boolean canConvert2Object(FlexiJSonNode node, CompiledType type, Setter setter) {
-        return type.type == Condition.class;
-    }
+    /**
+     * @param instance
+     * @param timeSpan
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    List<ProcessInfo> waitForExit(TimeSpan maxWait, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException;
 }

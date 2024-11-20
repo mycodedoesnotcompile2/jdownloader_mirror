@@ -577,4 +577,13 @@ public class JSPath implements Iterable<Object>, Comparable<JSPath> {
     public static JSPath fromFlexiNode(FlexiJSonNode org) throws InvalidPathException {
         return FlexiUtils.fromFlexiNode(org);
     }
+
+    /**
+     * @param i
+     * @param size
+     * @return
+     */
+    public JSPath subPath(int from, int to) {
+        return fromPathElements(elements.subList(from, to));
+    }
 }

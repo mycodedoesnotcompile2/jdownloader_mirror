@@ -20,9 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.config.Keep2shareConfig;
-
 import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
@@ -30,7 +27,10 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 
-@HostPlugin(revision = "$Revision: 48371 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+
+@HostPlugin(revision = "$Revision: 50178 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { Keep2ShareCcDecrypter.class })
 public class Keep2ShareCc extends K2SApi {
     public Keep2ShareCc(PluginWrapper wrapper) {
@@ -103,16 +103,8 @@ public class Keep2ShareCc extends K2SApi {
     }
 
     @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
-        super.resetLink(link);
-    }
-
-    @Override
     public Class<? extends Keep2shareConfig> getConfigInterface() {
         return Keep2shareConfig.class;
     }
+
 }

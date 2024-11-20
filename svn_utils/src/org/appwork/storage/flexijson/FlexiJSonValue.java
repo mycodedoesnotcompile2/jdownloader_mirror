@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -42,6 +42,7 @@ import org.appwork.storage.flexijson.mapper.FlexiMapperTags;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder;
 import org.appwork.storage.flexijson.stringify.FlexiJSonStringBuilder.JSONBuilderOutputStream;
 import org.appwork.storage.simplejson.ValueType;
+import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
@@ -107,8 +108,13 @@ public class FlexiJSonValue implements FlexiJSonNode {
         if (obj == null || !(obj instanceof FlexiJSonValue)) {
             return false;
         }
-        FlexiJSonStringBuilder stringify = new FlexiJSonStringBuilder();
-        return stringify.toJSONString((FlexiJSonValue) obj).equals(stringify.toJSONString(this));
+        FlexiJSonValue other = (FlexiJSonValue) obj;
+        if (other.getType() == getType()) {
+            if (CompareUtils.equals(other.getValue(), this.getValue())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

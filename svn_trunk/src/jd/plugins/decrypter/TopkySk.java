@@ -37,7 +37,7 @@ import jd.plugins.hoster.DirectHTTP;
  * @author butkovip
  *
  */
-@DecrypterPlugin(revision = "$Revision: 50174 $", interfaceVersion = 2, urls = {}, names = {})
+@DecrypterPlugin(revision = "$Revision: 50175 $", interfaceVersion = 2, urls = {}, names = {})
 public class TopkySk extends PluginForDecrypt {
     public TopkySk(PluginWrapper wrapper) {
         super(wrapper);
@@ -117,20 +117,23 @@ public class TopkySk extends PluginForDecrypt {
         for (final String hlsplaylist : hlsplaylists) {
             ret.add(createDownloadlink(hlsplaylist));
         }
+        final String urlSlug = br.getURL().substring(br.getURL().lastIndexOf("/") + 1);
+        final String title = urlSlug.replace("-", " ").trim();
         if (br.containsHTML("class=\"box-audio-content\"")) {
             /*
              * Article read out as audio file. This is not availabble for all articles but the website also just tries it and hides the
              * audio button if the file is not available (lol).
              */
-            ret.add(createDownloadlink(DirectHTTP.createURLForThisPlugin("https://img.topky.sk/audio/" + contentID + ".mp3")));
+            final DownloadLink audio = createDownloadlink(DirectHTTP.createURLForThisPlugin("https://img.topky.sk/audio/" + contentID + ".mp3"));
+            audio.setFinalFileName(contentID + "_" + title + ".mp3");
+            ret.add(audio);
         }
         if (ret.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String urlSlug = br.getURL().substring(br.getURL().lastIndexOf("/") + 1);
-        final String title = urlSlug.replace("-", " ").trim();
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(title);
+        fp.setPackageKey(this.getHost() + "_" + contentID);
         fp.addLinks(ret);
         return ret;
     }

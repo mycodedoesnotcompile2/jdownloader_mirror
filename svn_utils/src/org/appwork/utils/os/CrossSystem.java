@@ -59,7 +59,6 @@ import java.util.regex.Pattern;
 
 import javax.swing.KeyStroke;
 
-import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
@@ -295,7 +294,6 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
-
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -362,7 +360,6 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
-
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -398,50 +395,33 @@ public class CrossSystem {
         return CrossSystem.isBSD() || CrossSystem.isLinux();
     }
 
-    private static volatile String[]       BROWSER_COMMANDLINE = null;
-    private volatile static DesktopSupport DESKTOP_SUPPORT     = null;
-    private static String[]                FILE_COMMANDLINE    = null;
-    private static String                  JAVAINT             = null;
+    private static volatile String[]                     BROWSER_COMMANDLINE = null;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
+    private static String[]                              FILE_COMMANDLINE    = null;
+    private static String                                JAVAINT             = null;
     /**
      * Cache to store the Mime Class in
      */
-    private static final Mime              MIME;
-    public static final OperatingSystem    OS;
-    public static final ARCHFamily         ARCH;
+    private static final AtomicReference<Mime>           MIME                = new AtomicReference<Mime>();
+    public static final OperatingSystem                  OS;
+    public static final ARCHFamily                       ARCH;
     /**
      * Cache to store the OS string in
      */
-    private final static String            OS_STRING;
-    private final static String            ARCH_STRING;
-    private static Boolean                 OS64BIT             = null;
+    private final static String                          OS_STRING;
+    private final static String                          ARCH_STRING;
+    private static Boolean                               OS64BIT             = null;
     @Deprecated
     /**
      * @deprecated wmic.exe is not available for WIndows 11 24H2 or later
      */
-    public final static String             WMIC_PATH;
+    public final static String                           WMIC_PATH;
     static {
         /* Init OS_ID */
         OS_STRING = System.getProperty("os.name");
         ARCH_STRING = System.getProperty("os.arch");
         OS = CrossSystem.getOSByString(CrossSystem.OS_STRING);
         ARCH = CrossSystem.getARCHByString(CrossSystem.ARCH_STRING);
-        /* Init MIME */
-        if (CrossSystem.isWindows()) {
-            try {
-                // Try to load the JNA class
-                Class.forName("com.sun.jna.Native");
-                CrossSystem.DESKTOP_SUPPORT = new DesktopSupportWindowsViaJNA();
-            } catch (final Exception e) {
-                CrossSystem.DESKTOP_SUPPORT = new DesktopSupportWindows();
-            }
-        } else if (CrossSystem.isLinux()) {
-            CrossSystem.DESKTOP_SUPPORT = new DesktopSupportLinux();
-        } else if (CrossSystem.isMac()) {
-            CrossSystem.DESKTOP_SUPPORT = new DesktopSupportMac();
-        } else {
-            CrossSystem.DESKTOP_SUPPORT = new DesktopSupportJavaDesktop();
-        }
-        MIME = MimeFactory.getInstance();
         if (CrossSystem.isWindows()) {
             final String wmic = System.getenv("SYSTEMROOT") + "\\System32\\Wbem\\wmic.exe";
             if (new File(wmic).exists()) {
@@ -458,12 +438,12 @@ public class CrossSystem {
         if (desktopSupport == null) {
             throw new IllegalArgumentException();
         }
-        DESKTOP_SUPPORT = desktopSupport;
+        DESKTOP_SUPPORT.set(desktopSupport);
     }
 
     public static String getDefaultDownloadDirectory() {
         try {
-            final String defaultDownloadDirectory = CrossSystem.DESKTOP_SUPPORT.getDefaultDownloadDirectory();
+            final String defaultDownloadDirectory = CrossSystem.getDesktopSupport().getDefaultDownloadDirectory();
             if (StringUtils.isNotEmpty(defaultDownloadDirectory)) {
                 //
                 return defaultDownloadDirectory;
@@ -490,11 +470,11 @@ public class CrossSystem {
             if (CrossSystem.openCustom(CrossSystem.FILE_COMMANDLINE, file.getAbsolutePath())) {
                 return;
             } else if (CrossSystem.isOpenFileSupported()) {
-                CrossSystem.DESKTOP_SUPPORT.openFile(file);
+                CrossSystem.getDesktopSupport().openFile(file);
             }
         } catch (final IOException e) {
             if (CrossSystem.isOpenFileSupported()) {
-                CrossSystem.DESKTOP_SUPPORT.openFile(file);
+                CrossSystem.getDesktopSupport().openFile(file);
             } else {
                 throw e;
             }
@@ -513,13 +493,13 @@ public class CrossSystem {
             if (CrossSystem.openCustom(CrossSystem.BROWSER_COMMANDLINE, _url)) {
                 return;
             } else if (CrossSystem.isOpenBrowserSupported()) {
-                CrossSystem.DESKTOP_SUPPORT.browseURL(new URL(_url));
+                CrossSystem.getDesktopSupport().browseURL(new URL(_url));
             } else {
                 throw new IOException("Unsupported OpenBrowser:" + _url);
             }
         } catch (final IOException e) {
             if (CrossSystem.isOpenBrowserSupported()) {
-                CrossSystem.DESKTOP_SUPPORT.browseURL(new URL(_url));
+                CrossSystem.getDesktopSupport().browseURL(new URL(_url));
             } else {
                 throw e;
             }
@@ -742,7 +722,52 @@ public class CrossSystem {
      * @see Mime
      */
     public static Mime getMime() {
-        return CrossSystem.MIME;
+        Mime ret = CrossSystem.MIME.get();
+        if (ret != null) {
+            return ret;
+        }
+        synchronized (MIME) {
+            ret = CrossSystem.MIME.get();
+            if (ret == null) {
+                ret = MimeFactory.getInstance();
+                CrossSystem.MIME.set(ret);
+            }
+        }
+        return ret;
+    }
+
+    public static DesktopSupport getDesktopSupport() {
+        DesktopSupport ret = CrossSystem.DESKTOP_SUPPORT.get();
+        if (ret != null) {
+            return ret;
+        }
+        synchronized (DESKTOP_SUPPORT) {
+            ret = CrossSystem.DESKTOP_SUPPORT.get();
+            if (ret == null) {
+                switch (getOSFamily()) {
+                case WINDOWS:
+                    try {
+                        // Try to load the JNA class
+                        Class.forName("com.sun.jna.Native", false, CrossSystem.class.getClassLoader());
+                        ret = new DesktopSupportWindowsViaJNA();
+                    } catch (final Exception e) {
+                        ret = new DesktopSupportWindows();
+                    }
+                    break;
+                case LINUX:
+                    ret = new DesktopSupportLinux();
+                    break;
+                case MAC:
+                    ret = new DesktopSupportMac();
+                    break;
+                default:
+                    ret = new DesktopSupportJavaDesktop();
+                    break;
+                }
+                CrossSystem.DESKTOP_SUPPORT.set(ret);
+            }
+        }
+        return ret;
     }
 
     /**
@@ -778,7 +803,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);
@@ -1619,11 +1644,7 @@ public class CrossSystem {
      * @return
      */
     public static boolean isOpenBrowserSupported() {
-        return CrossSystem.DESKTOP_SUPPORT.isBrowseURLSupported() || (CrossSystem.getBrowserCommandLine() != null && CrossSystem.getBrowserCommandLine().length > 0);
-    }
-
-    public static DesktopSupport getDesktopSupport() {
-        return DESKTOP_SUPPORT;
+        return CrossSystem.getDesktopSupport().isBrowseURLSupported() || (CrossSystem.getBrowserCommandLine() != null && CrossSystem.getBrowserCommandLine().length > 0);
     }
 
     /**
@@ -1632,7 +1653,7 @@ public class CrossSystem {
      * @return
      */
     public static boolean isOpenFileSupported() {
-        return CrossSystem.DESKTOP_SUPPORT.isOpenFileSupported();
+        return CrossSystem.getDesktopSupport().isOpenFileSupported();
     }
 
     public static boolean isOS2() {
@@ -1842,41 +1863,15 @@ public class CrossSystem {
     }
 
     public static void standbySystem() throws InterruptedException {
-        CrossSystem.DESKTOP_SUPPORT.standby();
+        CrossSystem.getDesktopSupport().standby();
     }
 
     public static void hibernateSystem() throws InterruptedException {
-        CrossSystem.DESKTOP_SUPPORT.hibernate();
+        CrossSystem.getDesktopSupport().hibernate();
     }
 
     public static void shutdownSystem(final boolean force) throws InterruptedException {
-        CrossSystem.DESKTOP_SUPPORT.shutdown(force);
-    }
-
-    public static boolean isProcessRunning(final String path) throws UnexpectedResponseException, InterruptedException {
-        String response = null;
-        try {
-            if (!CrossSystem.isWindows()) {
-                throw new UnsupportedOperationException("isProcessRunning: Not Supported for your OS");
-            }
-            switch (CrossSystem.getOS()) {
-            default:
-                response = ProcessBuilderFactory.runCommand(WMIC_PATH, "process", "where", "executablepath='" + path.replaceAll("[\\/\\\\]+", "\\\\\\\\") + "'", "get", "processID", "/format:value").getStdOutString();
-                break;
-            }
-            if (StringUtils.isNotEmpty(response) && response.contains("ProcessId=")) {
-                return true;
-            } else if (StringUtils.isEmpty(response)) {
-                return false;
-            }
-        } catch (final InterruptedException e) {
-            throw e;
-        } catch (final UnsupportedOperationException e) {
-            throw e;
-        } catch (final Throwable e) {
-            throw new WTFException(e);
-        }
-        throw new UnexpectedResponseException("Unexpected Response: " + response);
+        CrossSystem.getDesktopSupport().shutdown(force);
     }
 
     /**

@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -45,7 +39,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50183 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -237,7 +237,6 @@ public class CocoleechCom extends PluginForHost {
 
     private Map<String, Object> login(final Account account) throws Exception {
         synchronized (account) {
-            account.setPass(correctPassword(account.getPass()));
             br.getPage(API_ENDPOINT + "/info?key=" + Encoding.urlEncode(account.getPass()));
             /* No error here = account is valid. */
             return handleAPIErrors(this.br, account, null);
@@ -300,14 +299,6 @@ public class CocoleechCom extends PluginForHost {
             return Integer.MAX_VALUE;
         } else {
             return 0;
-        }
-    }
-
-    private static String correctPassword(final String pw) {
-        if (pw != null) {
-            return pw.trim();
-        } else {
-            return null;
         }
     }
 

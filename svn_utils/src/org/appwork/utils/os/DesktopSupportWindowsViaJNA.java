@@ -8,9 +8,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.appwork.exceptions.WTFException;
-import org.appwork.jna.Iphlpapi;
-import org.appwork.jna.MIB_TCPROW2;
-import org.appwork.jna.MIB_TCPTABLE2;
+import org.appwork.jna.windows.Iphlpapi;
+import org.appwork.jna.windows.MIB_TCPROW2;
+import org.appwork.jna.windows.MIB_TCPTABLE2;
 import org.appwork.jna.wmi.WMIConnector;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.StringUtils;

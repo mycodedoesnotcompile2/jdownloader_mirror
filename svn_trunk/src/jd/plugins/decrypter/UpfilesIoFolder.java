@@ -16,13 +16,18 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -31,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.UpfilesIo;
 
-@DecrypterPlugin(revision = "$Revision: 47388 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50182 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { UpfilesIo.class })
 public class UpfilesIoFolder extends PluginForDecrypt {
     public UpfilesIoFolder(PluginWrapper wrapper) {
@@ -70,20 +75,40 @@ public class UpfilesIoFolder extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        // final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
-        String folderTitle = br.getRegex("(?i)<h3>Folder\\s*: ([^<]+)</h3>").getMatch(0);
-        final String[] links = br.getRegex("<h3><a href=\"(https?://[^/]+/[A-Za-z0-9]+)\" target=\"_blank\"").getColumn(0);
-        if (links == null || links.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        final UpfilesIo hosterplugin = (UpfilesIo) this.getNewPluginForHostInstance(this.getHost());
+        final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+        final HashSet<String> dupes = new HashSet<String>();
+        dupes.add(br.getURL());
+        for (final String url : urls) {
+            if (!dupes.add(url)) {
+                continue;
+            } else if (!hosterplugin.canHandle(url)) {
+                continue;
+            }
+            final DownloadLink file = createDownloadlink(url);
+            final String fid = hosterplugin.getFID(file);
+            if (!UpfilesIo.isValidFileID(fid)) {
+                /* Skip invalid items */
+                continue;
+            }
+            file.setDefaultPlugin(hosterplugin);
+            file.setHost(this.getHost());
+            ret.add(file);
         }
-        for (final String singleLink : links) {
-            ret.add(createDownloadlink(singleLink));
+        if (ret.isEmpty()) {
+            /* No results but also no error -> Assume that folder is empty. */
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
+        String folderTitle = br.getRegex("<h3>Folder\\s*: ([^<]+)</h3>").getMatch(0);
+        final FilePackage fp = FilePackage.getInstance();
         if (folderTitle != null) {
-            final FilePackage fp = FilePackage.getInstance();
             fp.setName(Encoding.htmlDecode(folderTitle).trim());
-            fp.addLinks(ret);
+        } else {
+            /* Fallback */
+            final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+            fp.setName(folderID);
         }
+        fp.addLinks(ret);
         return ret;
     }
 }

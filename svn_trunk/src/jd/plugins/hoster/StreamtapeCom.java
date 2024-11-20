@@ -40,22 +40,21 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50177 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamtapeCom extends PluginForHost {
     public StreamtapeCom(PluginWrapper wrapper) {
         super(wrapper);
-        // this.enablePremium("");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://streamtape.com/terms-and-conditions";
+        return "https://" + getHost() + "/terms-and-conditions";
     }
 
     private static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "streamtape.com", "streamtape.cc", "streamtape.net", "streamtape.to", "tapecontent.net", "strtape.tech", "strcloud.in", "strcloud.club", "strcloud.link", "shavetape.cash", "streamta.pe", "strtpe.link", "streamadblocker.xyz", "strtape.cloud", "tapeadvertisement.com", "streamta.site", "streamtape.xyz" });
+        ret.add(new String[] { "streamtape.com", "streamtape.cc", "streamtape.net", "streamtape.to", "tapecontent.net", "strtape.tech", "strcloud.in", "strcloud.club", "strcloud.link", "shavetape.cash", "streamta.pe", "strtpe.link", "streamadblocker.xyz", "strtape.cloud", "tapeadvertisement.com", "streamta.site", "streamtape.xyz", "watchadsontape.com" });
         return ret;
     }
 

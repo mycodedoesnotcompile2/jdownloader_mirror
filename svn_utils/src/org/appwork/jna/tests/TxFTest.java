@@ -2,8 +2,8 @@ package org.appwork.jna.tests;
 
 import java.io.File;
 
-import org.appwork.jna.Ktmw32;
-import org.appwork.jna.NtDll;
+import org.appwork.jna.windows.Ktmw32;
+import org.appwork.jna.windows.NtDll;
 import org.appwork.utils.IO;
 
 import com.sun.jna.Memory;

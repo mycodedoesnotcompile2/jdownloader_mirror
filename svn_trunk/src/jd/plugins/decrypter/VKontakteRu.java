@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 49924 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50175 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -475,6 +475,7 @@ public class VKontakteRu extends PluginForDecrypt {
             return ret;
         }
         br.setFollowRedirects(true);
+        boolean allowJsonRequest = false;
         if (param.getCryptedUrl().matches(PATTERN_VIDEO_SINGLE_Z) && listID == null) {
             /**
              * 2022-01-07: Special: Extra request of original URL in beforehand required to find listID and/or set required cookies!
@@ -482,38 +483,40 @@ public class VKontakteRu extends PluginForDecrypt {
             getPage(param.getCryptedUrl());
             final String thisListID = br.getRegex("\\?z=video" + oid_and_id + "%2F([a-f0-9]+)\"").getMatch(0);
             final UrlQuery query = new UrlQuery();
-            query.add("act", "show");
-            query.add("al", "1");
-            query.add("autoplay", "0");
+            query.appendEncoded("act", "show");
+            query.appendEncoded("al", "1");
+            query.appendEncoded("autoplay", "0");
             if (thisListID != null) {
                 /* Should always be given! */
-                query.add("list", thisListID);
+                query.appendEncoded("list", thisListID);
             }
-            query.add("module", "");
-            query.add("video", oid_and_id);
+            query.appendEncoded("module", "");
+            query.appendEncoded("video", oid_and_id);
             br.getHeaders().put("Origin", "https://" + this.getHost());
             br.getHeaders().put("Referer", param.getCryptedUrl());
             this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
         } else if (listID != null) {
             final UrlQuery query = new UrlQuery();
-            query.add("act", "show");
-            query.add("al", "1");
-            query.add("claim", "");
-            query.add("dmcah", "");
-            query.add("hd", "");
-            query.add("list", listID);
-            query.add("module", module);
-            // query.add("playlist_id", "-12345678_-2");
-            query.add("show_original", "");
-            query.add("t", "");
-            query.add("video", oid_and_id);
+            query.appendEncoded("act", "show");
+            query.appendEncoded("al", "1");
+            query.appendEncoded("claim", "");
+            query.appendEncoded("dmcah", "");
+            query.appendEncoded("hd", "");
+            query.appendEncoded("list", listID);
+            query.appendEncoded("module", module);
+            // query.appendEncoded("playlist_id", "-12345678_-2");
+            query.appendEncoded("show_original", "");
+            query.appendEncoded("t", "");
+            query.appendEncoded("video", oid_and_id);
             br.getHeaders().put("Origin", "https://" + this.getHost());
             br.getHeaders().put("Referer", param.getCryptedUrl());
             // br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             this.getPage(br, br.createPostRequest(getProtocol() + "vk.com/al_video.php?act=show", query));
         } else {
             getPage(getProtocol() + "vk.com/video" + oid_and_id);
+            allowJsonRequest = true;
         }
+        /* Search for external embedded content. */
         String embeddedVideoURL = new Regex(PluginJSonUtils.unescape(br.toString()), "<iframe [^>]*src=('|\")(.*?)\\1").getMatch(1);
         if (embeddedVideoURL != null) {
             logger.info("Found embedded video: " + embeddedVideoURL);
@@ -522,6 +525,24 @@ public class VKontakteRu extends PluginForDecrypt {
             }
             ret.add(createDownloadlink(embeddedVideoURL));
             return ret;
+        }
+        if (allowJsonRequest) {
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("act", "show");
+            query.appendEncoded("al", "1");
+            query.appendEncoded("claim", "");
+            query.appendEncoded("force_no_repeat", "true");
+            query.appendEncoded("is_video_page", "true");
+            query.appendEncoded("list", "");
+            query.appendEncoded("module", module);
+            query.appendEncoded("t", "");
+            query.appendEncoded("show_original", "");
+            query.appendEncoded("t", "");
+            query.appendEncoded("video", oid_and_id);
+            br.getHeaders().put("Origin", "https://" + this.getHost());
+            br.getHeaders().put("Referer", param.getCryptedUrl());
+            // br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            this.getPage(br, br.createPostRequest(getProtocol() + "vk.com/al_video.php?act=show", query));
         }
         final Map<String, Object> video = findVideoMap(this.br, id);
         if (video == null) {
@@ -731,10 +752,17 @@ public class VKontakteRu extends PluginForDecrypt {
     }
 
     private static Map<String, Object> findVideoMap(final Browser br, final String videoid) throws Exception {
-        String json = br.getRegex("ajax\\.preload\\('al_video\\.php', \\{.*?\\}, (\\[.*?\\])\\);\\n").getMatch(0);
+        String json = null;
+        if (br.getRequest().getHtmlCode().startsWith("{")) {
+            /* Plain json response */
+            json = br.getRequest().getHtmlCode();
+        }
         if (json == null) {
-            /* E.g. information has been loaded via ajax request e.g. as part of a wall post/playlist */
-            json = br.getRegex("^<\\!--(\\{.+\\})$").getMatch(0);
+            json = br.getRegex("ajax\\.preload\\('al_video\\.php', \\{.*?\\}, (\\[.*?\\])\\);\\n").getMatch(0);
+            if (json == null) {
+                /* E.g. information has been loaded via ajax request e.g. as part of a wall post/playlist */
+                json = br.getRegex("^<\\!--(\\{.+\\})$").getMatch(0);
+            }
         }
         if (json == null) {
             return null;
