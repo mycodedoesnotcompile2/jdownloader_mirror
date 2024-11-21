@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50175 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -105,7 +105,7 @@ public class VKontakteRu extends PluginForDecrypt {
 
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
-        ret.add(new String[] { "vk.com", "vk.ru", "vkontakte.com", "vkontakte.ru" });
+        ret.add(new String[] { "vk.com", "vk.ru", "vkontakte.com", "vkontakte.ru", "vkvideo.ru" });
         return ret;
     }
 

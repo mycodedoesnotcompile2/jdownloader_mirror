@@ -32,79 +32,36 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.processes;
-
-import java.io.IOException;
-import java.util.List;
-
-import org.appwork.utils.duration.TimeSpan;
-import org.appwork.utils.os.NotSupportedException;
+package org.appwork.utils;
 
 /**
  * @author thomas
- * @date 19.11.2024
+ * @date 20.11.2024
  *
  */
-public class NotSupportedProcessHandler implements ProcessHandler {
+public class Timeout {
+    private int  ms;
+    private long started;
+
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPath(java.lang.String)
+     * @param i
      */
-    @Override
-    public List<ProcessInfo> listByPath(String pathStartsWith) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
+    public Timeout(int ms) {
+        this.ms = ms;
+        reset();
     }
 
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPids(int[])
+     *
      */
-    @Override
-    public List<ProcessInfo> listByPids(int... pids) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
+    private void reset() {
+        started = Time.systemIndependentCurrentJVMTimeMillis();
     }
 
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForced(org.appwork.processes.ProcessInfo, int)
+     * @return
      */
-    @Override
-    public boolean terminateForced(ProcessInfo process, int exitCode) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateRequest(org.appwork.processes.ProcessInfo)
-     */
-    @Override
-    public boolean terminateRequest(ProcessInfo process) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForcedAfterRequest(org.appwork.utils.duration.TimeSpan, int, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#waitForExit(org.appwork.utils.duration.TimeSpan, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> waitForExit(TimeSpan maxWait, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @see org.appwork.processes.ProcessHandler#listByProcessInfo(org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> listByProcessInfo(ProcessInfo... processes) throws NotSupportedException, IOException {
-        throw new NotSupportedException("No Supported");
+    public boolean isAlive() {
+        return Time.systemIndependentCurrentJVMTimeMillis() - started < ms;
     }
 }

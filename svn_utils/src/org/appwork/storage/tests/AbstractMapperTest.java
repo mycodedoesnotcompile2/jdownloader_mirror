@@ -50,6 +50,7 @@ public abstract class AbstractMapperTest extends AWTest {
     public void runWith(JSONMapper mapper) throws Exception {
         floatNumberFormatTests(mapper);
         fixedNumberFormatTests(mapper);
+        undefinedTests(mapper);
         assertEquals("10", mapper.stringToObject("10", String.class));
         assertEquals("1.0", mapper.stringToObject("1.0", String.class));
         assertEquals("false", mapper.stringToObject("false", String.class));
@@ -83,6 +84,13 @@ public abstract class AbstractMapperTest extends AWTest {
         SimpleStorable restored = mapper.stringToObject(json, new SimpleTypeRef<SimpleStorable>(SimpleStorable.class));
         assertEqualsDeep(restored, obj);
         new CharJSONTest().runTest(mapper);
+    }
+
+    public void undefinedTests(final JSONMapper mapper) throws Exception {
+        assertEquals(null, mapper.stringToObject("undefined", String.class));
+        assertEquals(null, mapper.stringToObject(" undefined", String.class));
+        assertEquals(null, mapper.stringToObject(" undefined ", String.class));
+        assertEquals(null, mapper.stringToObject("undefined ", String.class));
     }
 
     public void fixedNumberFormatTests(final JSONMapper mapper) throws Exception {

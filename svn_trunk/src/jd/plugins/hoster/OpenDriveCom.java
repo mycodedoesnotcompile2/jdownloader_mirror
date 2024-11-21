@@ -45,16 +45,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50191 $", interfaceVersion = 2, names = { "opendrive.com" }, urls = { "https?://(?:www\\.)?(?:[a-z0-9]+\\.)?(?:opendrive\\.com/files\\?[A-Za-z0-9\\-_]+|od\\.lk/(?:d|f)/[A-Za-z0-9\\-_]+)" })
 public class OpenDriveCom extends PluginForHost {
     public OpenDriveCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.opendrive.com/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.opendrive.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 
     public void correctDownloadLink(final DownloadLink link) {
@@ -227,14 +227,8 @@ public class OpenDriveCom extends PluginForHost {
         final Request initialRequest = br.createGetRequest(Encoding.htmlDecode(dllink));
         initialRequest.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "", false));
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, initialRequest, this.isResumeable(link, null), 1);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        if (StringUtils.equalsIgnoreCase(getFileNameFromConnection(dl.getConnection()), "limit_exceeded.jpg")) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Limit exeeded");
-        }
-        link.setProperty("directurl", dl.getConnection().getURL().toString());
+        this.handleConnectionErrors(br, dl.getConnection());
+        link.setProperty("directurl", dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -302,11 +296,7 @@ public class OpenDriveCom extends PluginForHost {
         final Request initialRequest = br.createGetRequest(Encoding.htmlDecode(dllink));
         initialRequest.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "", false));
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, initialRequest, this.isResumeable(link, account), 1);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            logger.warning("The final dllink seems not to be a file!");
-            br.followConnection(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 
@@ -346,6 +336,34 @@ public class OpenDriveCom extends PluginForHost {
         return null;
     }
 
+    @Override
+    protected void handleConnectionErrors(final Browser br, final URLConnectionAdapter con) throws PluginException, IOException {
+        if (StringUtils.containsIgnoreCase(con.getURL().toExternalForm(), "limit_exceeded.jpg")) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Limit exeeded");
+        }
+        if (this.looksLikeDownloadableContent(con)) {
+            return;
+        }
+        br.followConnection(true);
+        handleJsonErrors: if (br.getRequest().getHtmlCode().startsWith("{")) {
+            Map<String, Object> entries = null;
+            try {
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            } catch (final Throwable ignore) {
+                break handleJsonErrors;
+            }
+            final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
+            if (errormap == null) {
+                /* Nothing that we can work with */
+                break handleJsonErrors;
+            }
+            /* E.g. {"error":{"code":400,"message":"This file is temporarily unavailable."}} */
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormap.get("message").toString());
+        }
+        throwConnectionExceptions(br, con);
+        throwFinalConnectionException(br, con);
+    }
+
     private String getJson(final String parameter) {
         return getJson(this.br.toString(), parameter);
     }
@@ -360,7 +378,7 @@ public class OpenDriveCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -369,7 +387,7 @@ public class OpenDriveCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

@@ -1,11 +1,11 @@
 {
   "artefact":"net.java.dev.jna/jna-platform",
   "dependencies":null,
-  "filter":null,
+  "filter":["^(?!.*-test\\.jar$).+(-sources)?\\.jar$"],
   "history":[],
   "installed":{
     "changes":null,
-    "date":"2024-11-18T16:48:36.193+01:00",
+    "date":"2024-11-20T11:35:44.12+01:00",
     "dependencies":[{
       "groupId":"net.java.dev.jna",
       "artifactId":"jna",
@@ -40,7 +40,10 @@
       "jna-platform.pom.sha1",
       "meta.json"
     ],
-    "hashes":{"jna-platform.jar":"474d7b88f6e97009b6ec1d98c3024dd95c23187c65dabfbc35331bcac3d173dd"},
+    "hashes":{
+      "jna-platform-sources.jar":"2f39937649df7e74f36f2b56ee2f15c15d4f9218fde43369c48a6b51e3cc087e",
+      "jna-platform.jar":"474d7b88f6e97009b6ec1d98c3024dd95c23187c65dabfbc35331bcac3d173dd"
+    },
     "licenses":[
       {
         "name":"LGPL-2.1-or-later",

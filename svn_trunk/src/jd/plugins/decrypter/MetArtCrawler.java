@@ -34,7 +34,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50174 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -100,12 +100,11 @@ public class MetArtCrawler extends PluginForDecrypt {
         plg.login(useAcc, false);
         br.setFollowRedirects(true);
         final MetartConfig cfg = PluginJsonConfig.get(getLazyC(), MetartConfig.class);
-        if (param.getCryptedUrl().matches(TYPE_GALLERY)) {
-            /* New 2020-12-07 */
-            final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_GALLERY);
-            final String modelname = urlinfo.getMatch(0);
-            final String date = urlinfo.getMatch(1);
-            final String galleryname = urlinfo.getMatch(2);
+        final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), TYPE_GALLERY);
+        if (urlinfo_gallery.patternFind()) {
+            final String modelname = urlinfo_gallery.getMatch(0);
+            final String date = urlinfo_gallery.getMatch(1);
+            final String galleryname = urlinfo_gallery.getMatch(2);
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(modelname + " - " + date + " - " + galleryname);
             if (cfg.getPhotoCrawlMode() == PhotoCrawlMode.ZIP_BEST) {

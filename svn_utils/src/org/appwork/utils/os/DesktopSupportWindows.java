@@ -106,7 +106,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupportJavaDesktop#reboot(int)
      */
     /**
@@ -347,7 +347,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#hibernate()
      */
     @Override
@@ -429,89 +429,6 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
     }
 
     /**
-     * @param pid
-     * @return
-     * @throws InterruptedException
-     */
-    public String getProcessCommandlineByPID(long pid) throws InterruptedException {
-        try {
-            final ProcessOutput result = ProcessBuilderFactory.runCommand("wmic", "process", "where", "ProcessID=" + pid, "get", "CommandLine");
-            final String str = result.getStdOutString().trim();
-            return Regex.getLines(str)[2];
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new WTFException(e);
-        }
-    }
-
-    public String getProcessExecutablePathByPID(long pid) throws InterruptedException {
-        try {
-            final ProcessOutput result = ProcessBuilderFactory.runCommand("wmic", "process", "where", "ProcessID=" + pid, "get", "ExecutablePath");
-            final String str = result.getStdOutString().trim();
-            return Regex.getLines(str)[2];
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            return null;
-        }
-    }
-
-    /**
-     * Kills all processes that contain the executable path. This works as a "LIKE". that means C:\Program Files
-     * (x86)\Google\Chrome\Application would kill ALL executeables within this path
-     *
-     * @param path
-     * @param exitCode
-     * @return
-     * @throws InterruptedException
-     */
-    public long[] killProcessesByExecutablePath(String path, int exitCode) throws InterruptedException {
-        try {
-            final ProcessOutput result = ProcessBuilderFactory.runCommand("wmic", "process", "where", "ExecutablePath like '%" + path.replace("\\", "\\\\") + "%'", "Terminate", String.valueOf(exitCode));
-            final String str = result.getStdOutString().trim();
-            LogV3.info(result.toString());
-            final String[] terminated = new Regex(str, "Win32_Process\\.Handle=\"(\\d+)\"\\)\\-\\>Terminate\\(\\)").getColumn(0);
-            if (terminated == null) {
-                return new long[] {};
-            }
-            final long[] ret = new long[terminated.length];
-            int i = 0;
-            for (String term : terminated) {
-                ret[i++] = Long.parseLong(term);
-            }
-            return ret;
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-            return null;
-        }
-    }
-
-    /**
-     * @param pid
-     * @return
-     * @throws InterruptedException
-     */
-    public String getProcessNameByPID(int pid) throws InterruptedException {
-        try {
-            final ProcessOutput result = ProcessBuilderFactory.runCommand("cmd", "/c", "tasklist", "|", "findstr", String.valueOf(pid));
-            final String str = result.getStdOutString();
-            for (String line : Regex.getLines(str)) {
-                line = line.trim();
-                final String name = new Regex(line, "^(\\S+)\\s+" + pid + "\\s+").getMatch(0);
-                if (name != null) {
-                    return name;
-                }
-            }
-        } catch (InterruptedException e) {
-            throw e;
-        } catch (Throwable e) {
-        }
-        return null;
-    }
-
-    /**
      * @param i
      * @return
      * @throws InterruptedException
@@ -587,7 +504,7 @@ public class DesktopSupportWindows extends DesktopSupportJavaDesktop {
 
     /*
      * (non-Javadoc) from java.io.WinNTFileSystem.prefixLength(String);
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#getPrefixLength(java.lang.String)
      */
     @Override

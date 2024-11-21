@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.VscoCoCrawler;
 
-@HostPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50190 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCo extends PluginForHost {
     public VscoCo(PluginWrapper wrapper) {
         super(wrapper);
@@ -290,12 +290,12 @@ public class VscoCo extends PluginForHost {
                     }
                 }
             }
-            if (cookieLoginOnly) {
+            final boolean codeBelowIsUnfinished = true;
+            if (cookieLoginOnly || (codeBelowIsUnfinished && !DebugMode.TRUE_IN_IDE_ELSE_FALSE)) {
                 showCookieLoginInfo();
                 throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
             }
             logger.info("Performing full login");
-            final boolean codeBelowIsUnfinished = true;
             if (codeBelowIsUnfinished) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }

@@ -46,33 +46,52 @@ import org.appwork.utils.os.NotSupportedException;
  *
  */
 public interface ProcessHandler {
-    List<ProcessInfo> listByPath(String pathStartsWith) throws NotSupportedException, IOException;
+    /**
+     * path = null will return all processes
+     *
+     * @param pathStartsWith
+     * @return
+     * @throws NotSupportedException
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    List<ProcessInfo> listByPath(String pathStartsWith) throws NotSupportedException, IOException, InterruptedException;
 
-    List<ProcessInfo> listByPids(int... pids) throws NotSupportedException, IOException;
+    List<ProcessInfo> listByPids(int... pids) throws NotSupportedException, IOException, InterruptedException;
 
     /**
      * Forced Kill Returns false if the process is not running any more.
      *
+     * @param exitCode
+     *            TODO
      * @param instance
+     *
+     * @throws InterruptedException
      */
-    boolean destroy(ProcessInfo process) throws NotSupportedException, IOException;
+    boolean terminateForced(ProcessInfo process, int exitCode) throws NotSupportedException, IOException;
 
     /**
      * Try to soft kill. The process may ignore this. Returns false if the process is not running any more.
      *
      * @param found
+     * @throws InterruptedException
      */
-    boolean requestExit(ProcessInfo process) throws NotSupportedException, IOException;
+    boolean terminateRequest(ProcessInfo process) throws NotSupportedException, IOException;
+
+    List<ProcessInfo> listByProcessInfo(ProcessInfo... processes) throws NotSupportedException, IOException, InterruptedException;
 
     /**
      * tries a soft close, waits the timeout and force kills remaining processes<br>
      * Returns false if at least one process is not running any more
      *
-     * @param timeout
+     * @param exitCode
+     *            TODO
      * @param processes
+     * @param timeout
+     *
      * @throws InterruptedException
      */
-    boolean requestExit(TimeSpan waitForSoftClose, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException;
+    boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, NotSupportedException, InterruptedException;
 
     /**
      * @param instance

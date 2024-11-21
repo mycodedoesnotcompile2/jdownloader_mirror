@@ -18,7 +18,6 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -26,6 +25,7 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.HTMLSearch;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
@@ -34,10 +34,11 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 
-@DecrypterPlugin(revision = "$Revision: 48017 $", interfaceVersion = 3, names = {}, urls = {})
-public class VepornNet extends antiDDoSForDecrypt {
+@DecrypterPlugin(revision = "$Revision: 50190 $", interfaceVersion = 3, names = {}, urls = {})
+public class VepornNet extends PluginForDecrypt {
     public VepornNet(PluginWrapper wrapper) {
         super(wrapper);
     }
@@ -80,12 +81,12 @@ public class VepornNet extends antiDDoSForDecrypt {
         final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final String url = param.getCryptedUrl().replaceFirst("https?://m\\.", "https://www.");
         br.setFollowRedirects(true);
-        getPage(url);
+        br.getPage(url);
         final String rateLimitRegex = "(?i)>\\s*Site is too crowded\\s*<";
         if (br.containsHTML(rateLimitRegex)) {
             for (int i = 1; i <= 3; i++) {
                 sleep(i * 3 * 1001l, param);
-                getPage(url);
+                br.getPage(url);
                 if (!br.containsHTML(rateLimitRegex)) {
                     break;
                 }
@@ -100,7 +101,11 @@ public class VepornNet extends antiDDoSForDecrypt {
             /* Redirect to unsupported URL / mainpage. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String title = urlSlug.replace("-", " ").trim();
+        String title = HTMLSearch.searchMetaTag(br, "og:title");
+        if (title == null) {
+            title = urlSlug.replace("-", " ").trim();
+        }
+        title = Encoding.htmlDecode(title).trim().replaceFirst("(?i) - Titfap\\.com$", "");
         /* 2022-06-21: Most likely videos embedded on streamtape.com */
         final String[] embedURLs = br.getRegex("<iframe src=\"(https?://[^\"]+)\"").getColumn(0);
         if (embedURLs.length > 0) {
@@ -122,11 +127,11 @@ public class VepornNet extends antiDDoSForDecrypt {
             for (final String singleLink : links) {
                 logger.info("Crawling video item " + counter + "/" + links.length);
                 final Browser br = this.br.cloneBrowser();
-                getPage(br, "/ajax.php?page=video_play&thumb&theme=&video=&id=" + singleLink + "&server=" + counter);
+                br.getPage("/ajax.php?page=video_play&thumb&theme=&video=&id=" + singleLink + "&server=" + counter);
                 if (br.containsHTML(">Site is too crowded<")) {
                     for (int i = 1; i <= 3; i++) {
                         sleep(i * 3 * 1001l, param);
-                        getPage(br, "/ajax.php?page=video_play&thumb&theme=&video=&id=" + singleLink + "&server=" + counter);
+                        br.getPage("/ajax.php?page=video_play&thumb&theme=&video=&id=" + singleLink + "&server=" + counter);
                         if (!br.containsHTML(">Site is too crowded<")) {
                             break;
                         }

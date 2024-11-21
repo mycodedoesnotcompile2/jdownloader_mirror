@@ -4,16 +4,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.HashMap;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Iphlpapi;
 import org.appwork.jna.windows.MIB_TCPROW2;
 import org.appwork.jna.windows.MIB_TCPTABLE2;
-import org.appwork.jna.wmi.WMIConnector;
 import org.appwork.loggingv3.LogV3;
-import org.appwork.utils.StringUtils;
 
 import com.sun.jna.Memory;
 import com.sun.jna.platform.win32.WinDef.DWORD;
@@ -54,54 +50,6 @@ public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
             LogV3.log(e);
         }
         return null;
-    }
-
-    @Override
-    public String getProcessExecutablePathByPID(final long pid) throws InterruptedException {
-        final WMIConnector wmi = new WMIConnector();
-        try {
-            final ArrayList<HashMap<String, Object>> wmiResult = wmi.executeQuery(null, "SELECT ExecutablePath from Win32_Process WHERE ProcessID=" + pid);
-            if (wmiResult != null && wmiResult.size() > 0) {
-                final Object ret = wmiResult.get(0).get("ExecutablePath");
-                if (ret instanceof String && StringUtils.isNotEmpty((String) ret)) {
-                    return (String) ret;
-                }
-            }
-        } catch (final Exception e) {
-            LogV3.log(e);
-        } finally {
-            try {
-                if (wmi != null) {
-                    wmi.close();
-                }
-            } catch (final Exception e) {
-            }
-        }
-        return super.getProcessExecutablePathByPID(pid);
-    }
-
-    @Override
-    public String getProcessCommandlineByPID(final long pid) throws InterruptedException {
-        final WMIConnector wmi = new WMIConnector();
-        try {
-            final ArrayList<HashMap<String, Object>> wmiResult = wmi.executeQuery(null, "SELECT CommandLine from Win32_Process WHERE ProcessID=" + pid);
-            if (wmiResult != null && wmiResult.size() > 0) {
-                final Object ret = wmiResult.get(0).get("CommandLine");
-                if (ret instanceof String && StringUtils.isNotEmpty((String) ret)) {
-                    return (String) ret;
-                }
-            }
-        } catch (final Exception e) {
-            LogV3.log(e);
-        } finally {
-            try {
-                if (wmi != null) {
-                    wmi.close();
-                }
-            } catch (final Exception e) {
-            }
-        }
-        return super.getProcessCommandlineByPID(pid);
     }
 
     @Override

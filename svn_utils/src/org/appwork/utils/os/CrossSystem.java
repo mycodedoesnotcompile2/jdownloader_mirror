@@ -59,6 +59,7 @@ import java.util.regex.Pattern;
 
 import javax.swing.KeyStroke;
 
+import org.appwork.JNAHelper;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.JVMVersion;
@@ -294,6 +295,7 @@ public class CrossSystem {
         WINDOWS_11_23H2(OSFamily.WINDOWS),
         WINDOWS_11_24H2(OSFamily.WINDOWS),
         WINDOWS_11_25H1(OSFamily.WINDOWS);
+
         private final OSFamily family;
         private final Pattern  releasePattern;
 
@@ -360,6 +362,7 @@ public class CrossSystem {
         OS2,
         OTHERS,
         WINDOWS;
+
         public static OSFamily get(final OperatingSystem os) {
             return os != null ? os.getFamily() : null;
         }
@@ -396,7 +399,7 @@ public class CrossSystem {
     }
 
     private static volatile String[]                     BROWSER_COMMANDLINE = null;
-    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>(); ;
+    private static final AtomicReference<DesktopSupport> DESKTOP_SUPPORT     = new AtomicReference<DesktopSupport>();;
     private static String[]                              FILE_COMMANDLINE    = null;
     private static String                                JAVAINT             = null;
     /**
@@ -411,27 +414,12 @@ public class CrossSystem {
     private final static String                          OS_STRING;
     private final static String                          ARCH_STRING;
     private static Boolean                               OS64BIT             = null;
-    @Deprecated
-    /**
-     * @deprecated wmic.exe is not available for WIndows 11 24H2 or later
-     */
-    public final static String                           WMIC_PATH;
     static {
         /* Init OS_ID */
         OS_STRING = System.getProperty("os.name");
         ARCH_STRING = System.getProperty("os.arch");
         OS = CrossSystem.getOSByString(CrossSystem.OS_STRING);
         ARCH = CrossSystem.getARCHByString(CrossSystem.ARCH_STRING);
-        if (CrossSystem.isWindows()) {
-            final String wmic = System.getenv("SYSTEMROOT") + "\\System32\\Wbem\\wmic.exe";
-            if (new File(wmic).exists()) {
-                WMIC_PATH = wmic;
-            } else {
-                WMIC_PATH = "wmic";
-            }
-        } else {
-            WMIC_PATH = null;
-        }
     }
 
     public static void setDesktopSupportInstance(final DesktopSupport desktopSupport) {
@@ -730,10 +718,17 @@ public class CrossSystem {
             ret = CrossSystem.MIME.get();
             if (ret == null) {
                 ret = MimeFactory.getInstance();
-                CrossSystem.MIME.set(ret);
+                setMime(ret);
             }
         }
         return ret;
+    }
+
+    public static Mime setMime(Mime mime) {
+        if (mime == null) {
+            throw new IllegalArgumentException();
+        }
+        return MIME.getAndSet(mime);
     }
 
     public static DesktopSupport getDesktopSupport() {
@@ -747,9 +742,11 @@ public class CrossSystem {
                 switch (getOSFamily()) {
                 case WINDOWS:
                     try {
-                        // Try to load the JNA class
-                        Class.forName("com.sun.jna.Native", false, CrossSystem.class.getClassLoader());
-                        ret = new DesktopSupportWindowsViaJNA();
+                        if (JNAHelper.isJNAAvailable()) {
+                            ret = new DesktopSupportWindowsViaJNA();
+                        } else {
+                            ret = new DesktopSupportWindows();
+                        }
                     } catch (final Exception e) {
                         ret = new DesktopSupportWindows();
                     }
@@ -764,7 +761,7 @@ public class CrossSystem {
                     ret = new DesktopSupportJavaDesktop();
                     break;
                 }
-                CrossSystem.DESKTOP_SUPPORT.set(ret);
+                setDesktopSupportInstance(ret);
             }
         }
         return ret;
@@ -803,7 +800,7 @@ public class CrossSystem {
                     final boolean isServer = osName != null && osName.toLowerCase(Locale.ENGLISH).contains("server");
                     if (isServer) {
                         // https://learn.microsoft.com/en-us/windows/release-health/windows-server-release-info
-                        if (buildNumber >= 26040 /* Preview */|| buildNumber >= 26100 /* GA */) {
+                        if (buildNumber >= 26040 /* Preview */ || buildNumber >= 26100 /* GA */) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2025);
                         } else if (buildNumber >= 20348) {
                             this.set(OperatingSystem.WINDOWS_SERVER_2022);

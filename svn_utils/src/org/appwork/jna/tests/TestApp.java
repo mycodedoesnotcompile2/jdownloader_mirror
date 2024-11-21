@@ -37,6 +37,7 @@ package org.appwork.jna.tests;
 import javax.swing.JLabel;
 
 import org.appwork.app.gui.BasicGui;
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * @author thomas
@@ -48,7 +49,7 @@ public class TestApp {
         final BasicGui bg = new BasicGui("Test-" + args[0]) {
             @Override
             protected void layoutPanel() {
-                getFrame().add(new JLabel("TEst-App"));
+                getFrame().add(new JLabel("PID: " + CrossSystem.getPID()));
             }
 
             @Override

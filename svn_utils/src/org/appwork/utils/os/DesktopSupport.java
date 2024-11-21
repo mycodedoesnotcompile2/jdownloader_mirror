@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -45,8 +45,6 @@ import java.net.URL;
 public interface DesktopSupport {
     public void browseURL(URL url) throws IOException, URISyntaxException;
 
-    public long[] killProcessesByExecutablePath(String path, int exitCode) throws InterruptedException, NotSupportedException;
-
     boolean isBrowseURLSupported();
 
     boolean isOpenFileSupported();
@@ -60,22 +58,6 @@ public interface DesktopSupport {
     public boolean hibernate() throws InterruptedException;
 
     public String getDefaultDownloadDirectory();
-
-    /**
-     * @param Return
-     *            the executable path for the given pid
-     * @return
-     * @throws NotSupportedException
-     * @throws InterruptedException
-     */
-    public String getProcessExecutablePathByPID(long pid) throws NotSupportedException, InterruptedException;
-
-    /**
-     * @param pid
-     * @return
-     * @throws InterruptedException
-     */
-    public String getProcessCommandlineByPID(long pid) throws NotSupportedException, InterruptedException;
 
     /**
      * root prefix is different for each oth. windows: c:\ =3 \\=2

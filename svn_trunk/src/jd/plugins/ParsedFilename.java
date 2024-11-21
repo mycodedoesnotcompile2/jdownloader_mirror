@@ -81,4 +81,9 @@ public class ParsedFilename {
     public String getOriginalfilename() {
         return originalfilename;
     }
+
+    public boolean isMultipartArchive() {
+        // TODO: Add functionality
+        return false;
+    }
 }

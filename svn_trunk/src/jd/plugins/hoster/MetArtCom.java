@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50133 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -334,6 +334,7 @@ public class MetArtCom extends PluginForHost {
     }
 
     private void setCookies(final Browser br, final Cookies cookies) {
+        br.setCookies(cookies);
         /* Set cookies on all domains we support. */
         for (final String[] domains : getPluginDomains()) {
             for (final String domain : domains) {

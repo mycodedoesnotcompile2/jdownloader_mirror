@@ -18,16 +18,16 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49804 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50194 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadfoxNet extends XFileSharingProBasic {
     public UploadfoxNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,13 +66,13 @@ public class UploadfoxNet extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return true;
+            return false;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return true;
+            return false;
         }
     }
 

@@ -68,6 +68,7 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
@@ -75,7 +76,8 @@ import jd.plugins.decrypter.VKontakteRu;
 import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49674 $", interfaceVersion = 2, names = { "vk.com" }, urls = { "https?://vkontaktedecrypted\\.ru/(picturelink/(?:-)?\\d+_\\d+(\\?tag=[\\d\\-]+)?|audiolink/(?:-)?\\d+_\\d+)|https?://(?:new\\.)?vk\\.com/(doc[\\d\\-]+_[\\d\\-]+|s/v1/doc/[A-Za-z0-9\\-_]+|video[\\d\\-]+_[\\d\\-]+(?:#quality=\\d+p)?)(\\?hash=[^&#]+(\\&dl=[^&#]{16,})?)?|https?://(?:c|p)s[a-z0-9\\-]+\\.(?:vk\\.com|userapi\\.com|vk\\.me|vkuservideo\\.net|vkuseraudio\\.net)/[^<>\"]+\\.(?:mp[34]|(?:rar|zip|pdf).+|[rz][0-9]{2}.+)" })
+@PluginDependencies(dependencies = { VKontakteRu.class })
+@HostPlugin(revision = "$Revision: 50200 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
@@ -158,6 +160,28 @@ public class VKontakteRuHoster extends PluginForHost {
         this.setConfigElements();
     }
 
+    private static List<String[]> getPluginDomains() {
+        return VKontakteRu.getPluginDomains();
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        // TODO: Make this nicer
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://vkontaktedecrypted\\.ru/(picturelink/(?:-)?\\d+_\\d+(\\?tag=[\\d\\-]+)?|audiolink/(?:-)?\\d+_\\d+)|https?://(?:new\\.)?vk\\.com/(doc[\\d\\-]+_[\\d\\-]+|s/v1/doc/[A-Za-z0-9\\-_]+|video[\\d\\-]+_[\\d\\-]+(?:#quality=\\d+p)?)(\\?hash=[^&#]+(\\&dl=[^&#]{16,})?)?|https?://(?:c|p)s[a-z0-9\\-]+\\.(?:vk\\.com|userapi\\.com|vk\\.me|vkuservideo\\.net|vkuseraudio\\.net)/[^<>\"]+\\.(?:mp[34]|(?:rar|zip|pdf).+|[rz][0-9]{2}.+)");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     @Override
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
@@ -173,7 +197,7 @@ public class VKontakteRuHoster extends PluginForHost {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, default_user_agent);
         }
         /* Set prefer English language */
-        br.setCookie(DOMAIN, "remixlang", "3");
+        setCookie(br, "remixlang", "3");
         br.setReadTimeout(1 * 60 * 1000);
         br.setConnectTimeout(2 * 60 * 1000);
         /* Loads can be very high. Site sometimes returns more than 10 000 entries with 1 request. */
@@ -182,8 +206,8 @@ public class VKontakteRuHoster extends PluginForHost {
             final String hash = LOCK_429.get("hash");
             final String solution = LOCK_429.get("solution");
             if (StringUtils.isAllNotEmpty(hash, solution)) {
-                br.setCookie(DOMAIN, "hash429", hash);
-                br.setCookie(DOMAIN, "solution429", solution);
+                setCookie(br, "hash429", hash);
+                setCookie(br, "solution429", solution);
             }
         }
         br.setFollowRedirects(true);
@@ -1186,83 +1210,97 @@ public class VKontakteRuHoster extends PluginForHost {
     public void login(final Browser br, final Account account, final boolean forceCookieCheck) throws Exception {
         synchronized (account) {
             br.setCookiesExclusive(true);
-            try {
-                final Cookies userCookies = account.loadUserCookies();
-                if (userCookies != null) {
-                    logger.info("Attempting user cookie login");
-                    br.setCookies(DOMAIN, userCookies);
-                    if (!forceCookieCheck) {
-                        /* Do not validate login cookies */
-                        return;
-                    }
-                    if (checkCookieLogin(br, account)) {
-                        /* Success! */
-                        return;
-                    }
-                    /* Failure */
-                    if (account.hasEverBeenValid()) {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                    } else {
-                        throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                    }
+            final Cookies userCookies = account.loadUserCookies();
+            if (userCookies != null) {
+                logger.info("Attempting user cookie login");
+                setCookies(br, userCookies);
+                if (!forceCookieCheck) {
+                    /* Do not validate login cookies */
+                    return;
                 }
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Attempting cookie login");
-                    br.setCookies(DOMAIN, cookies);
-                    if (!forceCookieCheck) {
-                        /* Do not validate login cookies */
-                        return;
-                    }
-                    if (checkCookieLogin(br, account)) {
-                        return;
-                    } else {
-                        br.clearCookies(null);
-                    }
+                if (checkCookieLogin(br, account)) {
+                    /* Success! */
+                    return;
                 }
-                logger.info("Performing full login");
-                br.getPage(getBaseURL() + "/");
-                handleTooManyRequests(this, br);
-                final Form login = br.getFormbyProperty("id", "quick_login_form");
-                if (login == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                login.put("email", Encoding.urlEncode(account.getUser()));
-                login.put("pass", Encoding.urlEncode(account.getPass()));
-                br.submitForm(login);
-                // should redirect to /login/act=slogin....
-                br.getPage("/");
-                if (br.containsHTML("/login\\?act=authcheck")) {
-                    br.getPage("/login?act=authcheck");
-                }
-                // language set in user profile, so after login it could be changed! We don't want this, we need to save and use ENGLISH
-                if (!"3".equals(br.getCookie(DOMAIN, "remixlang"))) {
-                    br.setCookie(DOMAIN, "remixlang", "3");
-                    br.getPage(br.getURL());
-                }
-                /* Do NOT check based on cookies as they sometimes change them! */
-                if (!isLoggedinHTML(br)) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                /* Finish login if needed */
-                final Form finalLoginStep = br.getFormbyProperty("name", "login");
-                if (finalLoginStep != null) {
-                    finalLoginStep.put("email", Encoding.urlEncode(account.getUser()));
-                    finalLoginStep.put("pass", Encoding.urlEncode(account.getPass()));
-                    finalLoginStep.put("expire", "0");
-                    br.submitForm(finalLoginStep);
-                }
-                final String vkID = regExVKAccountID(br);
-                if (vkID != null) {
-                    account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);
+                /* Failure */
+                if (account.hasEverBeenValid()) {
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
                 } else {
-                    logger.warning("Failed to find vkID");
+                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
-                /* Save cookies */
-                account.saveCookies(br.getCookies(DOMAIN), "");
-            } catch (final PluginException e) {
-                account.clearCookies("");
-                throw e;
+            }
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                setCookies(br, cookies);
+                if (!forceCookieCheck) {
+                    /* Do not validate login cookies */
+                    return;
+                }
+                if (checkCookieLogin(br, account)) {
+                    return;
+                } else {
+                    br.clearCookies(null);
+                    account.clearCookies("");
+                }
+            }
+            logger.info("Performing full login");
+            br.getPage(getBaseURL() + "/");
+            handleTooManyRequests(this, br);
+            final Form login = br.getFormbyProperty("id", "quick_login_form");
+            if (login == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            login.put("email", Encoding.urlEncode(account.getUser()));
+            login.put("pass", Encoding.urlEncode(account.getPass()));
+            br.submitForm(login);
+            // should redirect to /login/act=slogin....
+            br.getPage("/");
+            if (br.containsHTML("/login\\?act=authcheck")) {
+                br.getPage("/login?act=authcheck");
+            }
+            // language set in user profile, so after login it could be changed! We don't want this, we need to save and use ENGLISH
+            if (!"3".equals(br.getCookie(br.getHost(), "remixlang"))) {
+                br.setCookie(br.getHost(), "remixlang", "3");
+                br.getPage(br.getURL());
+            }
+            /* Do NOT check based on cookies as they sometimes change them! */
+            if (!isLoggedinHTML(br)) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            /* Finish login if needed */
+            final Form finalLoginStep = br.getFormbyProperty("name", "login");
+            if (finalLoginStep != null) {
+                finalLoginStep.put("email", Encoding.urlEncode(account.getUser()));
+                finalLoginStep.put("pass", Encoding.urlEncode(account.getPass()));
+                finalLoginStep.put("expire", "0");
+                br.submitForm(finalLoginStep);
+            }
+            final String vkID = regExVKAccountID(br);
+            if (vkID != null) {
+                account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);
+            } else {
+                logger.warning("Failed to find vkID");
+            }
+            /* Save cookies */
+            account.saveCookies(br.getCookies(DOMAIN), "");
+        }
+    }
+
+    private static void setCookie(final Browser br, final String key, final String value) {
+        for (final String[] domains : getPluginDomains()) {
+            for (final String domain : domains) {
+                br.setCookie(domain, key, value);
+            }
+        }
+    }
+
+    private void setCookies(final Browser br, final Cookies cookies) {
+        /* Set cookies on all domains we support. */
+        br.setCookies(cookies);
+        for (final String[] domains : getPluginDomains()) {
+            for (final String domain : domains) {
+                br.setCookies(domain, cookies);
             }
         }
     }
@@ -1274,10 +1312,7 @@ public class VKontakteRuHoster extends PluginForHost {
         if (isLoggedinHTML(br)) {
             logger.info("Cookie login successful");
             // language set in user profile, so after 'login' OR 'login check' it could be changed!
-            if (!"3".equals(br.getCookie(DOMAIN, "remixlang"))) {
-                logger.info("Language preference of user != English, setting English language cookie again");
-                br.setCookie(DOMAIN, "remixlang", "3");
-            }
+            setCookie(br, "remixlang", "3");
             final String vkID = regExVKAccountID(br);
             if (vkID != null) {
                 account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);

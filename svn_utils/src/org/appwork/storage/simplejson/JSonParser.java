@@ -49,17 +49,18 @@ public class JSonParser {
     /**
      *
      */
-    private static final char[] CHAR_ARRAY_FALSE = "false".toCharArray();
+    private static final char[] CHAR_ARRAY_FALSE     = "false".toCharArray();
     /**
      *
      */
-    private static final char[] CHAR_ARRAY_TRUE  = "true".toCharArray();
+    private static final char[] CHAR_ARRAY_TRUE      = "true".toCharArray();
     /**
      *
      */
-    private static final char[] CHAR_ARRAY_NULL  = "null".toCharArray();
-    public static boolean       DEBUG            = false;
-    protected int               global           = 0;
+    private static final char[] CHAR_ARRAY_NULL      = "null".toCharArray();
+    private static final char[] CHAR_ARRAY_UNDEFINED = "undefined".toCharArray();
+    public static boolean       DEBUG                = false;
+    protected int               global               = 0;
     public final String         str;
     final StringBuilder         sb;
     private final StringBuilder sb2;
@@ -276,7 +277,7 @@ public class JSonParser {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see java.lang.Object#toString()
      */
     @Override
@@ -497,6 +498,7 @@ public class JSonParser {
         VALUE,
         VALUE_STRING,
         VALUE_NULL,
+        VALUE_UNDEFINED,
         VALUE_BOOLEAN,
         VALUE_NUMBER,
         END_OF_OBJECT,
@@ -653,6 +655,10 @@ public class JSonParser {
         case 'n':
             setToken(path, Token.VALUE_NULL);
             expectChars(path, CHAR_ARRAY_NULL);
+            return createJSonValue((String) null);
+        case 'u':
+            setToken(path, Token.VALUE_UNDEFINED);
+            expectChars(path, CHAR_ARRAY_UNDEFINED);
             return createJSonValue((String) null);
         case 't':
             setToken(path, Token.VALUE_BOOLEAN);

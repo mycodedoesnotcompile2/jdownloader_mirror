@@ -56,7 +56,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50176 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50199 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -457,37 +457,49 @@ public class PixeldrainCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         account.setUser(user.get("email").toString());
         ai.setUsedSpace(((Number) user.get("storage_space_used")).longValue());
-        if ("free".equalsIgnoreCase(subscription.get("type").toString())) {
+        final String accountType = (String) subscription.get("type");
+        String accountStatusText = subscription.get("name").toString();
+        final double euroBalance = ((Number) user.get("balance_micro_eur")).doubleValue();
+        if (euroBalance > 0.0d) {
+            accountStatusText += String.format(" | %2.2f€", euroBalance / 1000000);
+        }
+        if ("free".equalsIgnoreCase(accountType) || StringUtils.isEmpty(accountType)) {
             /* Assume it's a free account */
             account.setType(AccountType.FREE);
             account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
-            ai.setUnlimitedTraffic();
+            account.setAllowReconnectToResetLimits(true);
+            /**
+             * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br>
+             * Once one of these limits is hit, a captcha will be required for downloading.</br>
+             * These captchas can be avoided by using free/paid accounts.
+             */
+            br.getPage(API_BASE + "/misc/rate_limits");
+            /* E.g. {"download_limit":10000,"download_limit_used":0,"transfer_limit":6000000000,"transfer_limit_used":0} */
+            /* See also: https://pixeldrain.com/home#pro */
+            final Map<String, Object> freelimits = this.checkErrors(br, null, account);
+            final long transfer_max = ((Number) freelimits.get("transfer_limit")).longValue();
+            ai.setTrafficLeft(transfer_max - ((Number) freelimits.get("transfer_limit_used")).longValue());
+            ai.setTrafficMax(transfer_max);
+            /* Users can download at reduced speeds and/or need to solve a captcha for each download when traffic limit is reached. */
+            ai.setSpecialTraffic(true);
         } else {
+            /* E.g. type "prepaid" */
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
+            final long monthlyTrafficMax = ((Number) subscription.get("monthly_transfer_cap")).longValue();
+            final long monthlyTrafficUsed = ((Number) user.get("monthly_transfer_used")).longValue();
+            if (monthlyTrafficMax == -1) {
+                ai.setUnlimitedTraffic();
+            } else {
+                ai.setTrafficMax(monthlyTrafficMax);
+                ai.setTrafficLeft(monthlyTrafficMax - monthlyTrafficUsed);
+            }
+            /* Build text string which will be displayed to user in GUI. */
+            final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
+            accountStatusText += " | Monthly used: " + SIZEUNIT.formatValue(maxSizeUnit, monthlyTrafficUsed);
         }
         account.setConcurrentUsePossible(true);
-        final long monthlyTrafficMax = ((Number) subscription.get("monthly_transfer_cap")).longValue();
-        final long monthlyTrafficUsed = ((Number) user.get("monthly_transfer_used")).longValue();
-        if (monthlyTrafficMax == -1) {
-            ai.setUnlimitedTraffic();
-        } else {
-            ai.setTrafficMax(monthlyTrafficMax);
-            ai.setTrafficLeft(monthlyTrafficMax - monthlyTrafficUsed);
-        }
-        /* Build text string which will be displayed to user in GUI. */
-        final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
-        String accountStatusText = subscription.get("name").toString();
-        final double euroBalance = ((Number) user.get("balance_micro_eur")).doubleValue();
-        accountStatusText += String.format(" | %2.2f€", euroBalance / 1000000);
-        accountStatusText += " | Monthly used: " + SIZEUNIT.formatValue(maxSizeUnit, monthlyTrafficUsed);
         ai.setStatus(accountStatusText);
-        /**
-         * Global limits and limits for (anonymous) users can be checked here: https://pixeldrain.com/api/misc/rate_limits </br>
-         * Once one of these limits is hit, a captcha will be required for downloading.</br>
-         * These captchas can be avoided by using free/paid accounts.
-         */
-        account.setAllowReconnectToResetLimits(true);
         return ai;
     }
 
@@ -538,9 +550,7 @@ public class PixeldrainCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (value.equalsIgnoreCase("authentication_failed")) {
             /* Login failed. */
-            if (!account.hasEverBeenValid()) {
-                showApiLoginInformation(account);
-            }
+            showApiLoginInformation(account);
             throw new AccountInvalidException(message);
         } else if (value.equalsIgnoreCase("out_of_transfer")) {
             /**
@@ -563,8 +573,14 @@ public class PixeldrainCom extends PluginForHost {
     /** Shows special login information if it hasn't already been displayed for the given account. */
     private void showApiLoginInformation(final Account account) {
         synchronized (account) {
-            /* Do not display this dialog if it has been displayed before for this account. */
-            if (account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_APIKEY_HELP_DIALOG)) {
+            if (account.hasEverBeenValid()) {
+                /*
+                 * If this account has ever been valid before, we assume that the user knows how to add pixeldrain.com accounts -> Do not
+                 * display this information.
+                 */
+                return;
+            } else if (account.hasProperty(PROPERTY_ACCOUNT_HAS_SHOWN_APIKEY_HELP_DIALOG)) {
+                /* Do not display this dialog if it has been displayed before for this account. */
                 return;
             }
             /* Only display this dialog once per account! */

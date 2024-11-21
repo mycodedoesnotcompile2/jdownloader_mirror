@@ -23,6 +23,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -43,11 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VscoCo;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 49242 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50190 $", interfaceVersion = 3, names = {}, urls = {})
 public class VscoCoCrawler extends PluginForDecrypt {
     public VscoCoCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +121,9 @@ public class VscoCoCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String json = br.getRegex("window\\.__PRELOADED_STATE__ = (\\{.*?\\})</script>").getMatch(0);
+        String json = br.getRegex("window\\.__PRELOADED_STATE__ = (\\{.*?\\})</script>").getMatch(0);
+        /* Prepare json for our parser */
+        json = json.replace(":undefined", ":null,");
         final Map<String, Object> root = JavaScriptEngineFactory.jsonToJavaMap(json);
         final String singleImageID = new Regex(br.getURL(), "(?i)https?://[^/]+/[^/]+/media/([a-f0-9]{24})").getMatch(0);
         if (singleImageID != null) {

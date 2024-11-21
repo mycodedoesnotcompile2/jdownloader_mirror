@@ -1,7 +1,10 @@
 package org.jdownloader.plugins.components.config;
 
+import java.util.Set;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
+import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.jdownloader.plugins.config.Order;
@@ -15,6 +18,27 @@ public interface MetartConfig extends PluginConfigInterface {
     final String              text_VideoCrawlMode = "Video crawl mode";
     public static TRANSLATION TRANSLATION         = new TRANSLATION();
 
+    public static enum MediaQuality implements LabelInterface {
+        LOW {
+            @Override
+            public String getLabel() {
+                return "Low";
+            }
+        },
+        MEDIUM {
+            @Override
+            public String getLabel() {
+                return "Medium";
+            }
+        },
+        HIGH {
+            @Override
+            public String getLabel() {
+                return "High";
+            }
+        };
+    }
+
     public static class TRANSLATION {
         public String getPhotoCrawlMode_label() {
             return text_PhotoCrawlMode;
@@ -23,7 +47,46 @@ public interface MetartConfig extends PluginConfigInterface {
         public String getVideoCrawlMode_label() {
             return text_VideoCrawlMode;
         }
+
+        public String getMediaQualitiesPhotosLoose_label() {
+            return "Qualities for loose photos";
+        }
+
+        public String getMediaQualitiesPhotosZip_label() {
+            return "Qualities for .zip photos";
+        }
+
+        public String getMediaQualitiesVideos_label() {
+            return "Qualities for videos";
+        }
     }
+
+    @AboutConfig
+    @Order(110)
+    // @DefaultEnumArrayValue(value = { "HIGH" })
+    // @DefaultEnumValue("HIGH")
+    @DefaultOnNull
+    Set<MediaQuality> getMediaQualitiesPhotosLoose();
+
+    void setMediaQualitiesPhotosLoose(Set<MediaQuality> quality);
+
+    @AboutConfig
+    @Order(120)
+    // @DefaultEnumArrayValue(value = { "HIGH" })
+    // @DefaultEnumValue("HIGH")
+    @DefaultOnNull
+    Set<MediaQuality> getMediaQualitiesPhotosZip();
+
+    void setMediaQualitiesPhotosZip(Set<MediaQuality> quality);
+
+    @AboutConfig
+    @Order(130)
+    // @DefaultEnumArrayValue(value = { "HIGH" })
+    // @DefaultEnumValue("HIGH")
+    @DefaultOnNull
+    Set<MediaQuality> getMediaQualitiesVideos();
+
+    void setMediaQualitiesVideos(Set<MediaQuality> quality);
 
     public static enum PhotoCrawlMode implements LabelInterface {
         ZIP_BEST {

@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -356,36 +356,6 @@ public class DesktopSupportLinux implements DesktopSupport {
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.os.DesktopSupport#getProcessExecutablePathByPID(int)
-     */
-    @Override
-    public String getProcessExecutablePathByPID(long pid) throws NotSupportedException {
-        throw new NotSupportedException("Operating System not supported");
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.os.DesktopSupport#getProcessCommandlineByPID(int)
-     */
-    @Override
-    public String getProcessCommandlineByPID(long pid) throws NotSupportedException {
-        throw new NotSupportedException("Operating System not supported");
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.os.DesktopSupport#killProcessesByExecutablePath(java.lang.String, int)
-     */
-    @Override
-    public long[] killProcessesByExecutablePath(String path, int exitCode) throws InterruptedException, NotSupportedException {
-        throw new NotSupportedException("Operating System not supported");
-    }
-
     @Override
     public int getPrefixLength(String pathname) {
         if (pathname.length() == 0) {
@@ -408,7 +378,6 @@ public class DesktopSupportLinux implements DesktopSupport {
         } catch (Throwable e) {
             org.appwork.loggingv3.LogV3.log(e);
         }
-
         return true;
     }
 }

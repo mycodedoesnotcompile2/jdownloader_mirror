@@ -64,6 +64,46 @@ public class ProcessInfo {
     }
 
     /**
+     * like c:/programfiles/java/javaw.exe
+     */
+    private String executablePath;
+
+    /**
+     * @return the executablePath
+     */
+    public String getExecutablePath() {
+        return executablePath;
+    }
+
+    /**
+     * @param executablePath
+     *            the executablePath to set
+     */
+    public void setExecutablePath(String executablePath) {
+        this.executablePath = executablePath;
+    }
+
+    /**
+     * like javaw.exe
+     */
+    private String executableName;
+
+    /**
+     * @return the executableName
+     */
+    public String getExecutableName() {
+        return executableName;
+    }
+
+    /**
+     * @param executableName
+     *            the executableName to set
+     */
+    public void setExecutableName(String executableName) {
+        this.executableName = executableName;
+    }
+
+    /**
      * @param intValue
      * @param string
      */

@@ -63,7 +63,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.FlickrComCrawler;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 50191 $", interfaceVersion = 2, names = { "flickr.com" }, urls = { "https?://(?:www\\.)?flickr\\.com/photos/([^<>\"/]+)/(\\d+)(?:/in/album-\\d+|/in/gallery-\\d+@N\\d+-\\d+)?" })
 public class FlickrCom extends PluginForHost {
     public FlickrCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,44 +82,45 @@ public class FlickrCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.flickr.com/help/terms";
+        return "https://www." + getHost() + "/help/terms";
     }
 
     /* Settings */
-    private static final String SETTING_FAST_LINKCHECK                  = "FAST_LINKCHECK";
-    private static final String SETTING_SELECTED_PHOTO_QUALITY          = "SELECTED_PHOTO_QUALITY";
-    private static final String SETTING_SELECTED_VIDEO_QUALITY          = "SELECTED_VIDEO_QUALITY";
-    public static final String  CUSTOM_DATE                             = "CUSTOM_DATE";
-    private static final String CUSTOM_FILENAME                         = "CUSTOM_FILENAME";
-    public static final String  CUSTOM_PACKAGENAME_SET_GALLERY          = "CUSTOM_PACKAGENAME_SET_GALLERY";
-    public static final String  CUSTOM_PACKAGENAME_OTHERS               = "CUSTOM_PACKAGENAME_OTHERS";
-    private static final String CUSTOM_EMPTY_TAG_STRING                 = "CUSTOM_EMPTY_TAG_STRING";
-    public static final String  PROPERTY_EXT                            = "ext";
-    public static final String  PROPERTY_USERNAME_INTERNAL              = "username_internal";
-    public static final String  PROPERTY_USERNAME                       = "username";
-    public static final String  PROPERTY_USERNAME_FULL                  = "username_full";
-    public static final String  PROPERTY_USERNAME_URL                   = "username_url";
-    public static final String  PROPERTY_REAL_NAME                      = "real_name";
-    public static final String  PROPERTY_CONTENT_ID                     = "content_id";
-    public static final String  PROPERTY_SET_ID                         = "set_id";                                                                        // set/album
-    public static final String  PROPERTY_GALLERY_ID                     = "gallery_id";                                                                    // gallery
+    private static final String SETTING_FAST_LINKCHECK                   = "FAST_LINKCHECK";
+    private static final String SETTING_SELECTED_PHOTO_QUALITY           = "SELECTED_PHOTO_QUALITY";
+    private static final String SETTING_SELECTED_VIDEO_QUALITY           = "SELECTED_VIDEO_QUALITY";
+    public static final String  CUSTOM_DATE                              = "CUSTOM_DATE";
+    private static final String CUSTOM_FILENAME                          = "CUSTOM_FILENAME";
+    public static final String  CUSTOM_PACKAGENAME_SET_GALLERY           = "CUSTOM_PACKAGENAME_SET_GALLERY";
+    public static final String  CUSTOM_PACKAGENAME_OTHERS                = "CUSTOM_PACKAGENAME_OTHERS";
+    private static final String CUSTOM_EMPTY_TAG_STRING                  = "CUSTOM_EMPTY_TAG_STRING";
+    public static final String  PROPERTY_EXT                             = "ext";
+    public static final String  PROPERTY_USERNAME_INTERNAL               = "username_internal";
+    public static final String  PROPERTY_USERNAME                        = "username";
+    public static final String  PROPERTY_USERNAME_FULL                   = "username_full";
+    public static final String  PROPERTY_USERNAME_URL                    = "username_url";
+    public static final String  PROPERTY_REAL_NAME                       = "real_name";
+    public static final String  PROPERTY_CONTENT_ID                      = "content_id";
+    public static final String  PROPERTY_SET_ID                          = "set_id";                                                                        // set/album
+    public static final String  PROPERTY_GALLERY_ID                      = "gallery_id";                                                                    // gallery
     // id
-    public static final String  PROPERTY_DATE                           = "dateadded";                                                                     // timestamp
+    public static final String  PROPERTY_DATE                            = "dateadded";                                                                     // timestamp
     /* pre-formatted string */
-    public static final String  PROPERTY_DATE_TAKEN                     = "date_taken";
-    public static final String  PROPERTY_TITLE                          = "title";
-    public static final String  PROPERTY_ORDER_ID                       = "order_id";
-    public static final String  PROPERTY_MEDIA_TYPE                     = "media";
-    private static final String PROPERTY_SETTING_PREFER_SERVER_FILENAME = "prefer_server_filename";
-    public static final String  PROPERTY_QUALITY                        = "quality";
+    public static final String  PROPERTY_DATE_TAKEN                      = "date_taken";
+    public static final String  PROPERTY_TITLE                           = "title";
+    public static final String  PROPERTY_ORDER_ID                        = "order_id";
+    public static final String  PROPERTY_MEDIA_TYPE                      = "media";
+    private static final String PROPERTY_SETTING_PREFER_SERVER_FILENAME  = "prefer_server_filename";
+    private static final String SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED = "wait_minutes_on_error_ip_blocked";
+    public static final String  PROPERTY_QUALITY                         = "quality";
     /* required e.g. to download video streams */
-    public static final String  PROPERTY_SECRET                         = "secret";
-    public static final String  PROPERTY_DIRECTURL                      = "directurl_%s";
-    public static final String  PROPERTY_ACCOUNT_CSRF                   = "csrf";
-    public static final String  PROPERTY_ACCOUNT_USERNAME_INTERNAL      = "username_internal";
-    private static final String TYPE_PHOTO                              = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)$";
-    private static final String TYPE_PHOTO_AS_PART_OF_SET               = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/album-(\\d+)/?$";
-    private static final String TYPE_PHOTO_AS_PART_OF_GALLERY           = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/gallery-(\\d+@N\\d+)-(\\d+)/?$";
+    public static final String  PROPERTY_SECRET                          = "secret";
+    public static final String  PROPERTY_DIRECTURL                       = "directurl_%s";
+    public static final String  PROPERTY_ACCOUNT_CSRF                    = "csrf";
+    public static final String  PROPERTY_ACCOUNT_USERNAME_INTERNAL       = "username_internal";
+    private static final String TYPE_PHOTO                               = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)$";
+    private static final String TYPE_PHOTO_AS_PART_OF_SET                = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/album-(\\d+)/?$";
+    private static final String TYPE_PHOTO_AS_PART_OF_GALLERY            = "(?i)https?://[^/]+/photos/([^<>\"/]+)/(\\d+)/in/gallery-(\\d+@N\\d+)-(\\d+)/?$";
 
     /** Max 2000 requests per hour. */
     @Override
@@ -801,7 +802,8 @@ public class FlickrCom extends PluginForHost {
         if (!this.looksLikeDownloadableContent(con)) {
             br.followConnection(true);
             if (con.getResponseCode() == 403 && br.containsHTML(">\\s*Request forbidden by administrative rules")) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your IP was banned by flickr.com", 5 * 60 * 1000l);
+                final int minutesWait = this.getPluginConfig().getIntegerProperty(SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED);
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, "Your IP was banned by flickr.com", minutesWait * 60 * 1000l);
             }
             errorBrokenFile(link);
             /* This code should never be reached */
@@ -1264,16 +1266,17 @@ public class FlickrCom extends PluginForHost {
         return emptytag;
     }
 
-    private static final boolean default_SETTING_FAST_LINKCHECK      = true;
-    private static final int     defaultArrayPosSelectedPhotoQuality = 0;
-    private static final int     defaultArrayPosSelectedVideoQuality = 0;
-    private static final boolean defaultPreferServerFilename         = false;
-    public static final String   defaultCustomDate                   = "MM-dd-yyyy";
-    private static final String  defaultCustomFilename               = "*username_url*_*content_id*_*title**extension*";
-    public static final String   defaultCustomPackagenameSetGallery  = "*type* - *username_url*_*set_or_gallery_id* - *title*";
-    public static final String   defaultCustomPackagenameOthers      = "*type* - *username_url*";
-    public final static String   defaultCustomStringForEmptyTags     = "-";
-    public final static String   defaultPhotoExt                     = ".jpg";
+    private static final boolean default_SETTING_FAST_LINKCHECK                   = true;
+    private static final int     defaultArrayPosSelectedPhotoQuality              = 0;
+    private static final int     defaultArrayPosSelectedVideoQuality              = 0;
+    private static final boolean defaultPreferServerFilename                      = false;
+    public static final String   defaultCustomDate                                = "MM-dd-yyyy";
+    private static final String  defaultCustomFilename                            = "*username_url*_*content_id*_*title**extension*";
+    public static final String   defaultCustomPackagenameSetGallery               = "*type* - *username_url*_*set_or_gallery_id* - *title*";
+    public static final String   defaultCustomPackagenameOthers                   = "*type* - *username_url*";
+    public final static String   defaultCustomStringForEmptyTags                  = "-";
+    private static final int     default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED = 5;
+    public final static String   defaultPhotoExt                                  = ".jpg";
 
     @Override
     public String getDescription() {
@@ -1331,6 +1334,8 @@ public class FlickrCom extends PluginForHost {
         tagsFile.append("*username_url* = Username from inside URL - usually either the same value as 'username' or 'username_internal'");
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_LABEL, tagsFile.toString()));
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_TEXTFIELD, getPluginConfig(), CUSTOM_EMPTY_TAG_STRING, "Char which will be used for empty tags (e.g. missing data):").setDefaultValue(defaultCustomStringForEmptyTags).setEnabledCondidtion(preferServerFilenames, false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SEPARATOR));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_SPINNER, getPluginConfig(), SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED, "Minutes to wait on error 'IP banned'", 1, 15, 1).setDefaultValue(default_SETTING_WAIT_MINUTES_ON_ERROR_IP_BLOCKED));
     }
 
     @Override

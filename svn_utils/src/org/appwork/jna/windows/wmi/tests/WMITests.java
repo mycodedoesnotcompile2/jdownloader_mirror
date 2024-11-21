@@ -32,79 +32,49 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.processes;
+package org.appwork.jna.windows.wmi.tests;
 
-import java.io.IOException;
-import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Map;
 
-import org.appwork.utils.duration.TimeSpan;
-import org.appwork.utils.os.NotSupportedException;
+import org.appwork.jna.windows.wmi.JNAWMIUtils;
+import org.appwork.testframework.AWTest;
+import org.appwork.utils.os.CrossSystem;
 
 /**
  * @author thomas
- * @date 19.11.2024
+ * @date 20.11.2024
  *
  */
-public class NotSupportedProcessHandler implements ProcessHandler {
+public class WMITests extends AWTest {
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPath(java.lang.String)
+     * @param args
      */
-    @Override
-    public List<ProcessInfo> listByPath(String pathStartsWith) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
+    public static void main(String[] args) {
+        run();
     }
 
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPids(int[])
+     * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
-    public List<ProcessInfo> listByPids(int... pids) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForced(org.appwork.processes.ProcessInfo, int)
-     */
-    @Override
-    public boolean terminateForced(ProcessInfo process, int exitCode) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateRequest(org.appwork.processes.ProcessInfo)
-     */
-    @Override
-    public boolean terminateRequest(ProcessInfo process) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForcedAfterRequest(org.appwork.utils.duration.TimeSpan, int, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#waitForExit(org.appwork.utils.duration.TimeSpan, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> waitForExit(TimeSpan maxWait, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @see org.appwork.processes.ProcessHandler#listByProcessInfo(org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> listByProcessInfo(ProcessInfo... processes) throws NotSupportedException, IOException {
-        throw new NotSupportedException("No Supported");
+    public void runTest() throws Exception {
+        if (!CrossSystem.isWindows()) {
+            System.out.println("Windows Only Test");
+            return;
+        }
+        ArrayList<Map<String, Object>> a = JNAWMIUtils.query("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
+        ArrayList<Map<String, Object>> b = JNAWMIUtils.wmiQueryViaPowerShell("ROOT\\CIMV2", "SELECT Caption from Win32_UserAccount");
+        HashSet<String> contentsA = new HashSet<String>();
+        HashSet<String> contentsB = new HashSet<String>();
+        for (Map<String, Object> e : a) {
+            contentsA.add((String) e.get("Caption"));
+        }
+        for (Map<String, Object> e : b) {
+            contentsB.add((String) e.get("Caption"));
+        }
+        // may fail if a new process started
+        assertEqualsDeep(contentsA, contentsB);
     }
 }

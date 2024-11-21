@@ -34,8 +34,10 @@
  * ==================================================================================================================================================== */
 package org.appwork.processes;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.appwork.JNAHelper;
-import org.appwork.jna.processes.JNAWindowsProcessHandler;
+import org.appwork.processes.jna.JNAWindowsProcessHandler;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -44,15 +46,43 @@ import org.appwork.utils.os.CrossSystem;
  *
  */
 public class ProcessHandlerFactory {
-    public final static ProcessHandler INSTANCE = init();
+    private final static AtomicReference<ProcessHandler> INSTANCE = new AtomicReference<ProcessHandler>();
 
     /**
      * @return
      */
     private static ProcessHandler init() {
-        if (CrossSystem.isWindows() && JNAHelper.isJNAAvailable()) {
-            return new JNAWindowsProcessHandler();
+        switch (CrossSystem.getOSFamily()) {
+        case WINDOWS:
+            if (JNAHelper.isJNAAvailable()) {
+                return new JNAWindowsProcessHandler();
+            }
+            break;
+        default:
+            break;
         }
         return new NotSupportedProcessHandler();
+    }
+
+    public static ProcessHandler getProcessHandler() {
+        ProcessHandler ret = INSTANCE.get();
+        if (ret != null) {
+            return ret;
+        }
+        synchronized (INSTANCE) {
+            ret = INSTANCE.get();
+            if (ret == null) {
+                ret = init();
+                setProcessHandler(ret);
+            }
+        }
+        return ret;
+    }
+
+    public static ProcessHandler setProcessHandler(final ProcessHandler processHandler) {
+        if (processHandler == null) {
+            throw new IllegalArgumentException();
+        }
+        return INSTANCE.getAndSet(processHandler);
     }
 }

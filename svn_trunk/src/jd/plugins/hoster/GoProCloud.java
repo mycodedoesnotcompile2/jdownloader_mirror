@@ -72,7 +72,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 50132 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
+@HostPlugin(revision = "$Revision: 50198 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { GoProCloud.HTTPS_GOPRO_COM_DOWNLOAD_PREMIUM_FREE })
 public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler */{
     private static final String HTTPS_API_GOPRO_COM_V1_OAUTH2_TOKEN   = "https://api.gopro.com/v1/oauth2/token";
     private static final String CLIENT_SECRET                         = "3863c9b438c07b82f39ab3eeeef9c24fefa50c6856253e3f1d37e0e3b1ead68d";
@@ -572,7 +572,7 @@ public class GoProCloud extends PluginForHost/* implements MenuExtenderHandler *
                         request = request.cloneRequest();
                         br.getPage(request);
                     } else if (plugin instanceof GoProCloudDecrypter) {
-                        ((GoProCloudDecrypter) plugin).login(br, account);
+                        ((GoProCloudDecrypter) plugin).login(plugin, br, account);
                         request = request.cloneRequest();
                         br.getPage(request);
                     }

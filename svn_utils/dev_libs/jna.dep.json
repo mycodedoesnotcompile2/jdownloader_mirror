@@ -1,11 +1,11 @@
 {
   "artefact":"net.java.dev.jna/jna",
   "dependencies":null,
-  "filter":null,
+  "filter":["^(?!.*-test\\.jar$).+(-sources)?\\.jar$"],
   "history":[],
   "installed":{
     "changes":null,
-    "date":"2024-11-18T16:48:28.903+01:00",
+    "date":"2024-11-20T11:35:44.852+01:00",
     "dependencies":null,
     "description":"Java Native Access",
     "files":[
@@ -42,7 +42,10 @@
       "jna.pom.sha1",
       "meta.json"
     ],
-    "hashes":{"jna.jar":"66d4f819a062a51a1d5627bffc23fac55d1677f0e0a1feba144aabdd670a64bb"},
+    "hashes":{
+      "jna-sources.jar":"a4c45843e8f60df141c4f37602365a421bb278ca1ef30ba0a043d6a871dd29f4",
+      "jna.jar":"66d4f819a062a51a1d5627bffc23fac55d1677f0e0a1feba144aabdd670a64bb"
+    },
     "licenses":[
       {
         "name":"LGPL-2.1-or-later",

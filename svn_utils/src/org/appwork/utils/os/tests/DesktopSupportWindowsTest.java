@@ -32,79 +32,44 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.processes;
+package org.appwork.utils.os.tests;
 
-import java.io.IOException;
-import java.util.List;
-
-import org.appwork.utils.duration.TimeSpan;
-import org.appwork.utils.os.NotSupportedException;
+import org.appwork.testframework.AWTest;
 
 /**
  * @author thomas
- * @date 19.11.2024
+ * @date 20.11.2024
  *
  */
-public class NotSupportedProcessHandler implements ProcessHandler {
+public class DesktopSupportWindowsTest extends AWTest {
     /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPath(java.lang.String)
+     * @see org.appwork.testframework.TestInterface#runTest()
      */
     @Override
-    public List<ProcessInfo> listByPath(String pathStartsWith) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
+    public void runTest() throws Exception {
+        // String unique = "test" + UniqueAlltimeID.create();
+        // Command c = new Command("cmd", "/c", "ping localhost -n 1000 -" + unique);
+        // c.setOutputHandler(new AbstractLineHandler() {
+        // @Override
+        // public void handleLine(String line, Object caller) {
+        // // System.out.println(line);
+        // }
+        // });
+        // c.start(true);
+        // try {
+        // List<ProcessInfo> list = ProcessHandlerFactory.getProcessHandler().listByPath("ping.exe");
+        // ProcessInfo instance = null;
+        // for (ProcessInfo p : list) {
+        // if (p.getCommandLine().contains(unique)) {
+        // instance = p;
+        // }
+        // }
+        // } finally {
+        // c.destroy();
+        // }
     }
 
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#listByPids(int[])
-     */
-    @Override
-    public List<ProcessInfo> listByPids(int... pids) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForced(org.appwork.processes.ProcessInfo, int)
-     */
-    @Override
-    public boolean terminateForced(ProcessInfo process, int exitCode) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateRequest(org.appwork.processes.ProcessInfo)
-     */
-    @Override
-    public boolean terminateRequest(ProcessInfo process) throws IOException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#terminateForcedAfterRequest(org.appwork.utils.duration.TimeSpan, int, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public boolean terminateForcedAfterRequest(TimeSpan waitForSoftClose, int exitCode, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @throws NotSupportedException
-     * @see org.appwork.processes.ProcessHandler#waitForExit(org.appwork.utils.duration.TimeSpan, org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> waitForExit(TimeSpan maxWait, ProcessInfo... processes) throws IOException, InterruptedException, NotSupportedException {
-        throw new NotSupportedException("No Supported");
-    }
-
-    /**
-     * @see org.appwork.processes.ProcessHandler#listByProcessInfo(org.appwork.processes.ProcessInfo[])
-     */
-    @Override
-    public List<ProcessInfo> listByProcessInfo(ProcessInfo... processes) throws NotSupportedException, IOException {
-        throw new NotSupportedException("No Supported");
+    public static void main(String[] args) {
+        run();
     }
 }

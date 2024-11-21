@@ -38,9 +38,12 @@ import jd.plugins.Account;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
@@ -68,7 +71,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 
-@DecrypterPlugin(revision = "$Revision: 50127 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
+@DecrypterPlugin(revision = "$Revision: 50198 $", interfaceVersion = 3, names = { "gopro.com" }, urls = { "(https?://(?:plus\\.)?gopro\\.com/media-library/[a-zA-Z0-9]+|https?://(?:plus\\.)?gopro\\.com/media-library/?$|https?://(?:www\\.)?gopro\\.com/v/[A-Za-z0-9]+/?(?:[A-Za-z0-9]+)?$)" })
 @PluginDependencies(dependencies = { GoProCloud.class })
 public class GoProCloudDecrypter extends antiDDoSForDecrypt {
     private GoProConfig hostConfig;
@@ -77,7 +80,7 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
         super(wrapper);
     }
 
-    public void login(final Browser br, final Account account) throws Exception {
+    public void login(final Plugin plugin, final Browser br, final Account account) throws Exception {
         final PluginForHost plg = this.getNewPluginForHostInstance("gopro.com");
         try {
             ((GoProCloud) plg).login(br, account);
@@ -104,7 +107,17 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
         } else {
             decryptMedialibrary(decryptedLinks, account, param);
         }
-        return decryptedLinks;
+        if (decryptedLinks.size() == 0) {
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
+        } else {
+            return decryptedLinks;
+        }
+    }
+
+    @Override
+    public void clean() {
+        super.clean();
+        hostConfig = null;
     }
 
     private void decryptSharedLinks(List<DownloadLink> decryptedLinks, Account account, CryptedLink param) throws Exception {
@@ -118,7 +131,7 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
         if (json == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final String singleID = new Regex(contenturl, ".*/v/[^/]+/([^/]+)$").getMatch(0);
+        final String singleID = new Regex(contenturl, "(?i).*/v/[^/]+/([^/]+)$").getMatch(0);
         final FlexiJSONParser parser = new FlexiJSONParser(json).breakAtEndOfObject().ignoreIssues(new HashSet<ParsingError>(FlexiJSONParser.IGNORE_LIST_JS));
         final FlexiJSonNode node = parser.parse();
         final ReflectData resp = mapper.jsonToObject(node, ReflectData.TYPEREF);
@@ -142,7 +155,7 @@ public class GoProCloudDecrypter extends antiDDoSForDecrypt {
         if (account == null) {
             throw new AccountRequiredException();
         }
-        login(this.br, account);
+        login(this, this.br, account);
         final FlexiJSonMapper mapper = new FlexiJSonMapper();
         final String id = new Regex(cryptedLink.getCryptedUrl(), "(?i).*/media-library/([^/]+)").getMatch(0);
         if (StringUtils.isNotEmpty(id) && !StringUtils.equalsIgnoreCase(id, "links")) {

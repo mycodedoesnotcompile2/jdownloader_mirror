@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -58,10 +58,6 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
         }
     }
 
-    public long[] killProcessesByExecutablePath(String path, int exitCode) throws InterruptedException, NotSupportedException {
-        throw new NotSupportedException("Operating System not supported");
-    }
-
     @Override
     public boolean isBrowseURLSupported() {
         if (this.browseURLSupported != null) {
@@ -109,62 +105,42 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#shutdown()
      */
     @Override
-    public boolean shutdown(boolean force) throws InterruptedException {        
+    public boolean shutdown(boolean force) throws InterruptedException {
         return false;
     }
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#standby()
      */
     @Override
-    public boolean standby() throws InterruptedException {        
+    public boolean standby() throws InterruptedException {
         return false;
     }
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#hibernate()
      */
     @Override
-    public boolean hibernate() throws InterruptedException {        
+    public boolean hibernate() throws InterruptedException {
         return false;
     }
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#getDefaultDownloadDirectory()
      */
     @Override
     public String getDefaultDownloadDirectory() {
         return null;
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.os.DesktopSupport#getProcessExecutablePathByPID(int)
-     */
-    @Override
-    public String getProcessExecutablePathByPID(long pid) throws NotSupportedException, InterruptedException {
-        throw new NotSupportedException("Operating System not supported");
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.os.DesktopSupport#getProcessCommandlineByPID(int)
-     */
-    @Override
-    public String getProcessCommandlineByPID(long pid) throws NotSupportedException, InterruptedException {
-        throw new NotSupportedException("Operating System not supported");
     }
 
     @Override
@@ -178,12 +154,11 @@ public class DesktopSupportJavaDesktop implements DesktopSupport {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.utils.os.DesktopSupport#reboot(boolean, int)
      */
     @Override
-    public boolean reboot(boolean force, int waitms) throws InterruptedException {        
+    public boolean reboot(boolean force, int waitms) throws InterruptedException {
         return false;
     }
-
 }
