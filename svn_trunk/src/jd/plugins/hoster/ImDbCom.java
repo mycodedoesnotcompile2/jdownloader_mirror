@@ -21,13 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -43,12 +36,19 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50049 $", interfaceVersion = 2, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50207 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImDbCom extends PluginForHost {
     private String              dllink         = null;
     private boolean             mature_content = false;
     private static final String IDREGEX        = "(vi\\d+)$";
-    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/(([\\w\\-]+)/)?vi(\\d+)";
+    public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/(?:([\\w\\-]+)/)?vi(\\d+)";
     public static final String  TYPE_PHOTO     = "(?i)/[A-Za-z]+/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)";
 
     public ImDbCom(final PluginWrapper wrapper) {
@@ -100,7 +100,7 @@ public class ImDbCom extends PluginForHost {
     private String getContentURL(final DownloadLink link) {
         final Regex regex_video = new Regex(link.getPluginPatternMatcher(), TYPE_VIDEO);
         if (regex_video.patternFind()) {
-            return "https://www." + getHost() + "/video/screenplay/vi" + regex_video.getMatch(0);
+            return "https://www." + getHost() + "/video/screenplay/vi" + regex_video.getMatch(2);
         } else {
             return link.getPluginPatternMatcher();
         }
@@ -116,8 +116,8 @@ public class ImDbCom extends PluginForHost {
         }
     }
 
-    private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), "(\\d+)$").getMatch(0);
+    public static String getFID(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), "(?:rm|vi)(\\d+)").getMatch(0);
     }
 
     @Override

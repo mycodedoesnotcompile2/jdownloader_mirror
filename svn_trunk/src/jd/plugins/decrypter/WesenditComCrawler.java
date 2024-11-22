@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.appwork.storage.TypeRef;
@@ -35,7 +36,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.WesenditCom;
 
-@DecrypterPlugin(revision = "$Revision: 48622 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50205 $", interfaceVersion = 3, names = {}, urls = {})
 public class WesenditComCrawler extends PluginForDecrypt {
     public WesenditComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +89,10 @@ public class WesenditComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
+        if (folderID.equals(folderID.toLowerCase(Locale.ENGLISH))) {
+            /* Only lowercase = invalid ID e.g. http://www.wesendit.com/login -> ID = "login" */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         final String recipientID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(3);
         br.postPageRaw("https://api-prod.wesendit.com/web2/api/files/transfers/public/details", "{\"publicId\":\"" + folderID + "\"}");
         if (br.getHttpConnection().getResponseCode() == 404) {

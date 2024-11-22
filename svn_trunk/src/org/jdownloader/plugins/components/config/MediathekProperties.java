@@ -105,4 +105,10 @@ public interface MediathekProperties extends DownloadLinkDatabindingInterface {
 
     @Key("AUDIODESCRIPTION")
     void setAudioDescription(boolean isAudioDescription);
+
+    @Key("AUDIOLANGUAGE")
+    String getAudioLanguage();
+
+    @Key("AUDIOLANGUAGE")
+    void setAudioLanguage(String lang);
 }

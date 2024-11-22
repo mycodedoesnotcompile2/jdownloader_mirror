@@ -3,6 +3,7 @@ package org.jdownloader.plugins.components.config;
 import java.util.Set;
 
 import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
@@ -14,38 +15,21 @@ import org.jdownloader.plugins.config.Type;
 
 @PluginHost(host = "metart.com", type = Type.HOSTER)
 public interface MetartConfig extends PluginConfigInterface {
-    final String              text_PhotoCrawlMode = "Photo crawl mode";
-    final String              text_VideoCrawlMode = "Video crawl mode";
-    public static TRANSLATION TRANSLATION         = new TRANSLATION();
-
-    public static enum MediaQuality implements LabelInterface {
-        LOW {
-            @Override
-            public String getLabel() {
-                return "Low";
-            }
-        },
-        MEDIUM {
-            @Override
-            public String getLabel() {
-                return "Medium";
-            }
-        },
-        HIGH {
-            @Override
-            public String getLabel() {
-                return "High";
-            }
-        };
-    }
+    // class EnumSetValidator extends AbstractValidator<Set<MediaQuality>> {
+    // @Override
+    // public void validate(KeyHandler<Set<MediaQuality>> keyHandler, Set<MediaQuality> value) throws ValidationException {
+    // if (value == null) {
+    // throw new ValidationException("Cannot be null");
+    // } else if (value.isEmpty()) {
+    // throw new ValidationException("Cannot be empty");
+    // }
+    // }
+    // }
+    public static TRANSLATION TRANSLATION = new TRANSLATION();
 
     public static class TRANSLATION {
-        public String getPhotoCrawlMode_label() {
-            return text_PhotoCrawlMode;
-        }
-
         public String getVideoCrawlMode_label() {
-            return text_VideoCrawlMode;
+            return "Video crawl mode";
         }
 
         public String getMediaQualitiesPhotosLoose_label() {
@@ -61,32 +45,145 @@ public interface MetartConfig extends PluginConfigInterface {
         }
     }
 
+    public interface MediaQualityDetails {
+        String[] getInternalValues();
+    }
+
+    public static enum PhotoQuality implements LabelInterface, MediaQualityDetails {
+        HIGH {
+            @Override
+            public String getLabel() {
+                return "High";
+            }
+
+            @Override
+            public String[] getInternalValues() {
+                return new String[] { "high" };
+            }
+        },
+        MEDIUM {
+            @Override
+            public String getLabel() {
+                return "Medium";
+            }
+
+            @Override
+            public String[] getInternalValues() {
+                return new String[] { "med", "medium" };
+            }
+        },
+        LOW {
+            @Override
+            public String getLabel() {
+                return "Low";
+            }
+
+            @Override
+            public String[] getInternalValues() {
+                return new String[] { "low" };
+            }
+        }
+    }
+
+    public interface VideoQualityDetails {
+        String getInternalValue();
+    }
+
+    public static enum VideoQuality implements LabelInterface, VideoQualityDetails {
+        Q2160P {
+            @Override
+            public String getLabel() {
+                return "4k UHD";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "4k";
+            }
+        },
+        Q1080P {
+            @Override
+            public String getLabel() {
+                return "1080p HD";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "1080p";
+            }
+        },
+        Q720P {
+            @Override
+            public String getLabel() {
+                return "720p HD";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "720p";
+            }
+        },
+        Q360P {
+            @Override
+            public String getLabel() {
+                return "360p";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "360p";
+            }
+        },
+        Q270P {
+            @Override
+            public String getLabel() {
+                return "270p";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "270p";
+            }
+        },
+        QWMV {
+            @Override
+            public String getLabel() {
+                return "WMV";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "wmv";
+            }
+        },
+        QDIVX {
+            @Override
+            public String getLabel() {
+                return "DivX AVI";
+            }
+
+            @Override
+            public String getInternalValue() {
+                return "avi";
+            }
+        }
+    };
+
     @AboutConfig
     @Order(110)
-    // @DefaultEnumArrayValue(value = { "HIGH" })
-    // @DefaultEnumValue("HIGH")
+    @DefaultEnumArrayValue(value = { "HIGH" })
     @DefaultOnNull
-    Set<MediaQuality> getMediaQualitiesPhotosLoose();
+    Set<PhotoQuality> getMediaQualitiesPhotosLoose();
 
-    void setMediaQualitiesPhotosLoose(Set<MediaQuality> quality);
+    void setMediaQualitiesPhotosLoose(Set<PhotoQuality> quality);
 
     @AboutConfig
     @Order(120)
-    // @DefaultEnumArrayValue(value = { "HIGH" })
-    // @DefaultEnumValue("HIGH")
+    @DefaultEnumArrayValue(value = {})
     @DefaultOnNull
-    Set<MediaQuality> getMediaQualitiesPhotosZip();
+    Set<PhotoQuality> getMediaQualitiesPhotosZip();
 
-    void setMediaQualitiesPhotosZip(Set<MediaQuality> quality);
-
-    @AboutConfig
-    @Order(130)
-    // @DefaultEnumArrayValue(value = { "HIGH" })
-    // @DefaultEnumValue("HIGH")
-    @DefaultOnNull
-    Set<MediaQuality> getMediaQualitiesVideos();
-
-    void setMediaQualitiesVideos(Set<MediaQuality> quality);
+    void setMediaQualitiesPhotosZip(Set<PhotoQuality> quality);
 
     public static enum PhotoCrawlMode implements LabelInterface {
         ZIP_BEST {
@@ -103,34 +200,41 @@ public interface MetartConfig extends PluginConfigInterface {
         };
     }
 
-    @AboutConfig
-    @DefaultEnumValue("PHOTOS_BEST")
-    @Order(20)
-    @DescriptionForConfigEntry(text_PhotoCrawlMode)
-    PhotoCrawlMode getPhotoCrawlMode();
-
-    void setPhotoCrawlMode(PhotoCrawlMode mode);
-
     public static enum VideoCrawlMode implements LabelInterface {
+        BEST {
+            @Override
+            public String getLabel() {
+                return "Best quality only";
+            }
+        },
         ALL {
             @Override
             public String getLabel() {
                 return "All qualities";
             }
         },
-        BEST {
+        ALL_SELECTED {
             @Override
             public String getLabel() {
-                return "Best quality only";
+                return "All selected qualities";
             }
         };
     }
 
     @AboutConfig
     @DefaultEnumValue("ALL")
-    @Order(30)
-    @DescriptionForConfigEntry(text_VideoCrawlMode)
+    @Order(135)
+    @DescriptionForConfigEntry("Customize video crawler behavior")
     VideoCrawlMode getVideoCrawlMode();
 
     void setVideoCrawlMode(VideoCrawlMode mode);
+
+    @AboutConfig
+    @Order(140)
+    // @DefaultEnumArrayValue(value = { "HIGH" })
+    // @DefaultEnumValue("HIGH")
+    @DefaultOnNull
+    Set<VideoQuality> getMediaQualitiesVideos();
+
+    void setMediaQualitiesVideos(Set<VideoQuality> quality);
 }

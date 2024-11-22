@@ -11,7 +11,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,25 +31,6 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JSeparator;
 import javax.swing.SwingUtilities;
-
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.ComboBox;
-import jd.gui.swing.jdgui.views.settings.components.Label;
-import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.Spinner;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.components.TextPane;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
-import jd.nutils.Formatter;
-import net.miginfocom.swing.MigLayout;
 
 import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.config.JsonConfig;
@@ -104,8 +84,26 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.premium.BuyAndAddPremiumAccount;
 import org.jdownloader.premium.BuyAndAddPremiumDialogInterface;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
+
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.ComboBox;
+import jd.gui.swing.jdgui.views.settings.components.Label;
+import jd.gui.swing.jdgui.views.settings.components.MultiComboBox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.Spinner;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.components.TextPane;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.PremiumAccountTableModel;
+import jd.nutils.Formatter;
+import net.miginfocom.swing.MigLayout;
 
 public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements AccountControllerListener {
     private List<Group> groups = new ArrayList<Group>();
@@ -520,17 +518,8 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
     }
 
     protected String formatDate(final Date date) {
-        String custom = CFG_GUI.CFG.getDateTimeFormatAccountManagerExpireDateColumn();
-        if (StringUtils.isEmpty(custom)) {
-            final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
-            if (sd instanceof SimpleDateFormat) {
-                custom = ((SimpleDateFormat) sd).toPattern();
-                if (StringUtils.isEmpty(custom)) {
-                    custom = _GUI.T.PremiumAccountTableModel_getDateFormatString_();
-                }
-            }
-        }
-        return new SimpleDateFormat(custom).format(date);
+        final String dateformat = Account.getExpireDateFormatString(this);
+        return new SimpleDateFormat(dateformat).format(date);
     }
 
     protected void initAccountConfig(PluginForHost plugin, Account acc, Class<? extends AccountConfigInterface> accountConfig) {
@@ -640,15 +629,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                             final Map<String, Boolean> finalValue = value;
                             final MultiComboBox<String> comp = new MultiComboBox<String>(new ArrayList<String>(value.keySet())) {
                                 private final GenericConfigEventListener<Map<String, Boolean>> listener = new GenericConfigEventListener<Map<String, Boolean>>() {
-                                                                                                            @Override
-                                                                                                            public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
-                                                                                                            }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                            @Override
-                                                                                                            public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
-                                                                                                                updateModel(newValue);
-                                                                                                            }
-                                                                                                        };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Map<String, Boolean>> keyHandler, Map<String, Boolean> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     m.getEventSender().addListener(listener, true);
                                     updateModel(finalValue);
@@ -710,15 +699,15 @@ public abstract class PluginConfigPanelNG extends AbstractConfigPanel implements
                         try {
                             final MultiComboBox<Object> comp = new MultiComboBox<Object>(((Class) types[0]).getEnumConstants()) {
                                 private final GenericConfigEventListener<Set<Enum>> listener = new GenericConfigEventListener<Set<Enum>>() {
-                                                                                                 @Override
-                                                                                                 public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
-                                                                                                 }
+                                    @Override
+                                    public void onConfigValidatorError(KeyHandler<Set<Enum>> keyHandler, Set<Enum> invalidValue, ValidationException validateException) {
+                                    }
 
-                                                                                                 @Override
-                                                                                                 public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
-                                                                                                     updateModel(newValue);
-                                                                                                 }
-                                                                                             };
+                                    @Override
+                                    public void onConfigValueModified(KeyHandler<Set<Enum>> keyHandler, Set<Enum> newValue) {
+                                        updateModel(newValue);
+                                    }
+                                };
                                 {
                                     Set<Enum> value = (Set<Enum>) m.getValue();
                                     if (value == null) {

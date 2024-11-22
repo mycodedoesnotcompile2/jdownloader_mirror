@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50205 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -212,7 +212,7 @@ public class MetArtCom extends PluginForHost {
         } else {
             ai.setValidUntil(highestExpireDate);
         }
-        ai.setStatus(account.getType().getLabel() + " | Packages: " + subscriptions.size());
+        ai.setStatus(account.getType().getLabel() + " | Paid Packages: " + subscriptions.size());
     }
 
     private void getSetAccountTypeSimple(final Account account, final AccountInfo ai) {

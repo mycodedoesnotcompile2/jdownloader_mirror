@@ -86,7 +86,7 @@ public class JVMVersion {
     @Deprecated
     public final static long                  JAVA17   = JavaVersion.JVM_1_7.longID;
     @Deprecated
-    public final static long                  JAVA_1_8 = JavaVersion.JVM_1_8.longID;  // LTS Dec 2030
+    public final static long                  JAVA_1_8 = JavaVersion.JVM_1_8.longID; // LTS Dec 2030
     @Deprecated
     public final static long                  JAVA18   = JavaVersion.JVM_1_8.longID;
     @Deprecated
@@ -264,6 +264,22 @@ public class JVMVersion {
         return ret;
     }
 
+    private static int getClassID(JavaVersion base) {
+        final String version = System.getProperty("java.class.version");
+        if (version != null) {
+            try {
+                final int ret = (int) Double.parseDouble(version);
+                if (base.getClassID() != -1 && ret != base.getClassID()) {
+                    DebugMode.debugger();
+                }
+                return ret;
+            } catch (NumberFormatException ignore) {
+                DebugMode.debugger(ignore);
+            }
+        }
+        return base.getClassID();
+    }
+
     public static JavaVersionInterface toJavaVersion(final String versionString) {
         final long longID = parseJavaVersionString(versionString);
         final boolean isLTS = versionString != null && versionString.contains("LTS");
@@ -276,6 +292,8 @@ public class JVMVersion {
         }
         final JavaVersion finalBase = base;
         return new JavaVersionInterface() {
+            private final int classID = JVMVersion.getClassID(finalBase);
+
             public boolean is(JavaVersionInterface version) {
                 return getBase().is(version);
             }
@@ -308,7 +326,7 @@ public class JVMVersion {
 
             @Override
             public int getClassID() {
-                return getBase().getClassID();
+                return classID;
             }
 
             @Override

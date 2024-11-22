@@ -1,21 +1,24 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.MetartConfig;
-import org.jdownloader.plugins.components.config.MetartConfig.PhotoCrawlMode;
+import org.jdownloader.plugins.components.config.MetartConfig.PhotoQuality;
 import org.jdownloader.plugins.components.config.MetartConfig.VideoCrawlMode;
+import org.jdownloader.plugins.components.config.MetartConfig.VideoQuality;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -34,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50210 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -80,6 +83,23 @@ public class MetArtCrawler extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final MetartConfig cfg = PluginJsonConfig.get(getLazyC(), MetartConfig.class);
+        final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), TYPE_GALLERY);
+        final Regex urlinfo_movie;
+        final Set<PhotoQuality> qualitiesPhotosLoose = cfg.getMediaQualitiesPhotosLoose();
+        final Set<PhotoQuality> qualitiesPhotosZip = cfg.getMediaQualitiesPhotosZip();
+        final Set<VideoQuality> qualitiesVideos = cfg.getMediaQualitiesVideos();
+        if (urlinfo_gallery.patternFind()) {
+            if ((qualitiesPhotosLoose == null || qualitiesPhotosLoose.isEmpty()) && (qualitiesPhotosZip == null || qualitiesPhotosZip.isEmpty())) {
+                logger.info("User has deselected all qualities -> Doing nothing");
+                return ret;
+            }
+        } else {
+            if (qualitiesVideos == null || qualitiesVideos.isEmpty()) {
+                logger.info("User has deselected all video qualities -> Doing nothing");
+                return ret;
+            }
+        }
         final ArrayList<Account> accounts = AccountController.getInstance().getAllAccounts(this.getHost());
         Account useAcc = null;
         if (accounts != null && accounts.size() != 0) {
@@ -99,68 +119,90 @@ public class MetArtCrawler extends PluginForDecrypt {
         plg.setBrowser(this.br);
         plg.login(useAcc, false);
         br.setFollowRedirects(true);
-        final MetartConfig cfg = PluginJsonConfig.get(getLazyC(), MetartConfig.class);
-        final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), TYPE_GALLERY);
         if (urlinfo_gallery.patternFind()) {
             final String modelname = urlinfo_gallery.getMatch(0);
             final String date = urlinfo_gallery.getMatch(1);
             final String galleryname = urlinfo_gallery.getMatch(2);
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(modelname + " - " + date + " - " + galleryname);
-            if (cfg.getPhotoCrawlMode() == PhotoCrawlMode.ZIP_BEST) {
+            if (qualitiesPhotosZip != null && qualitiesPhotosZip.size() > 0) {
+                // for(final MediaQuality qual:qualitiesPhotosZip) {
+                // qual.getInternalValue();
+                // }
                 br.getPage("https://www." + this.getHost() + "/api/gallery?name=" + galleryname + "&date=" + date + "&mediaFirst=42&page=1");
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
-                Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                fp.setComment(entries.get("description").toString());
                 final String uuid = (String) entries.get("UUID");
-                entries = (Map<String, Object>) entries.get("files");
-                entries = (Map<String, Object>) entries.get("sizes");
-                final List<Object> zipFilesO = (List<Object>) entries.get("zips");
-                /* Assume that their array is sorted from highest to lowest. */
-                entries = (Map<String, Object>) zipFilesO.get(0);
-                String filename = (String) entries.get("fileName");
-                if (!filename.toLowerCase(Locale.ENGLISH).endsWith(".zip")) {
-                    filename += ".zip";
+                final Map<String, Object> files = (Map<String, Object>) entries.get("files");
+                final Map<String, Object> sizes = (Map<String, Object>) files.get("sizes");
+                final List<Map<String, Object>> zipFiles = (List<Map<String, Object>>) sizes.get("zips");
+                final HashSet<String> allowedQualityKeys = new HashSet<String>();
+                for (final PhotoQuality quality : qualitiesPhotosZip) {
+                    allowedQualityKeys.addAll(Arrays.asList(quality.getInternalValues()));
                 }
-                final String filesize = (String) entries.get("size");
-                final String quality = (String) entries.get("quality");
-                final DownloadLink dl = this.createDownloadlink("https://www.metart.com/api/download-media/" + uuid + "/photos/" + quality);
-                dl.setFinalFileName(filename);
-                dl.setDownloadSize(SizeFormatter.getSize(filesize));
-                dl.setAvailable(true);
-                dl._setFilePackage(fp);
-                dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
-                dl.setProperty(MetArtCom.PROPERTY_QUALITY, quality);
-                ret.add(dl);
-            } else {
+                for (final Map<String, Object> zipFile : zipFiles) {
+                    final String quality = zipFile.get("quality").toString();
+                    if (!allowedQualityKeys.contains(quality)) {
+                        /* Skip qualities deselected by user */
+                        continue;
+                    }
+                    String filename = (String) zipFile.get("fileName");
+                    if (!filename.toLowerCase(Locale.ENGLISH).endsWith(".zip")) {
+                        filename += ".zip";
+                    }
+                    final String filesizeStr = zipFile.get("size").toString();
+                    final DownloadLink dl = this.createDownloadlink("https://www.metart.com/api/download-media/" + uuid + "/photos/" + quality);
+                    dl.setFinalFileName(filename);
+                    dl.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                    dl.setAvailable(true);
+                    dl._setFilePackage(fp);
+                    dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
+                    dl.setProperty(MetArtCom.PROPERTY_QUALITY, quality);
+                    ret.add(dl);
+                }
+            }
+            if (qualitiesPhotosLoose != null && qualitiesPhotosLoose.size() > 0) {
                 br.getPage("https://www." + this.getHost() + "/api/image?name=" + galleryname + "&date=" + date + "&order=5&mediaType=gallery");
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final List<Map<String, Object>> imagesO = (List<Map<String, Object>>) entries.get("media");
-                for (final Map<String, Object> image : imagesO) {
+                final List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("media");
+                final HashSet<String> allowedQualityKeys = new HashSet<String>();
+                for (final PhotoQuality quality : qualitiesPhotosLoose) {
+                    allowedQualityKeys.addAll(Arrays.asList(quality.getInternalValues()));
+                }
+                for (final Map<String, Object> image : images) {
                     final String uuid = image.get("UUID").toString();
-                    final String url = JavaScriptEngineFactory.walkJson(image, "src_downloadable/high").toString();
-                    final String filenameURL = UrlQuery.parse(url).get("filename");
-                    final DownloadLink dl = new DownloadLink(plg, filenameURL, this.getHost(), url, true);
-                    dl.setAvailable(true);
-                    if (filenameURL != null) {
-                        dl.setName(filenameURL);
+                    final Map<String, Object> src_downloadable = (Map<String, Object>) image.get("src_downloadable");
+                    /* Add each image in all desired && available qualities */
+                    for (final String quality : allowedQualityKeys) {
+                        final String url = (String) src_downloadable.get(quality);
+                        if (url == null) {
+                            /* Quality not available */
+                            continue;
+                        }
+                        final String filenameURL = UrlQuery.parse(url).get("filename");
+                        final DownloadLink dl = new DownloadLink(plg, filenameURL, this.getHost(), url, true);
+                        dl.setAvailable(true);
+                        if (filenameURL != null) {
+                            dl.setName(filenameURL);
+                        }
+                        dl._setFilePackage(fp);
+                        dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
+                        dl.setProperty(MetArtCom.PROPERTY_QUALITY, quality);
+                        ret.add(dl);
                     }
-                    dl._setFilePackage(fp);
-                    dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
-                    dl.setProperty(MetArtCom.PROPERTY_QUALITY, "high");
-                    ret.add(dl);
                 }
             }
-        } else if (param.getCryptedUrl().matches(TYPE_MOVIE)) {
+        } else if ((urlinfo_movie = new Regex(param.getCryptedUrl(), TYPE_MOVIE)).patternFind()) {
             /* New 2020-12-08 */
-            final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_MOVIE);
-            final String modelname = urlinfo.getMatch(0);
-            final String date = urlinfo.getMatch(1);
-            final String galleryname = urlinfo.getMatch(2);
+            final String modelname = urlinfo_movie.getMatch(0);
+            final String date = urlinfo_movie.getMatch(1);
+            final String galleryname = urlinfo_movie.getMatch(2);
             br.getPage("https://www." + this.getHost() + "/api/movie?name=" + galleryname + "&date=" + date);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -169,35 +211,45 @@ public class MetArtCrawler extends PluginForDecrypt {
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(modelname + " - " + date + " - " + galleryname);
             fp.setComment(entries.get("description").toString());
-            final String title = (String) entries.get("name");
+            final String title = entries.get("name").toString();
             final String description = (String) entries.get("description");
-            final String uuid = (String) entries.get("UUID");
-            if (StringUtils.isEmpty(title) || StringUtils.isEmpty(uuid)) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
+            final String uuid = entries.get("UUID").toString();
             final Map<String, Object> files = (Map<String, Object>) entries.get("files");
             final List<Object> teasersO = (List<Object>) files.get("teasers");
             final Map<String, Object> sizes = (Map<String, Object>) files.get("sizes");
             final List<Map<String, Object>> videoQualities = (List<Map<String, Object>>) sizes.get("videos");
-            final ArrayList<DownloadLink> crawledVideos = new ArrayList<DownloadLink>();
+            if (videoQualities.isEmpty() && !teasersO.isEmpty()) {
+                /* No official downloads found -> Fallback to trailer download */
+                final DownloadLink trailer = this.createDownloadlink(GenericM3u8.createURLForThisPlugin(br.getURL("/api/m3u8/" + uuid + "/720.m3u8").toString()));
+                trailer.setAvailable(true);
+                trailer.setFinalFileName(modelname + " - " + title + " - teaser.mp4");
+                trailer._setFilePackage(fp);
+                ret.add(trailer);
+                return ret;
+            }
             long bestFilesize = -1;
             DownloadLink bestQuality = null;
+            final HashSet<String> allowedQualityKeys = new HashSet<String>();
+            for (final VideoQuality quality : qualitiesVideos) {
+                allowedQualityKeys.add(quality.getInternalValue());
+            }
+            final ArrayList<DownloadLink> selectedQualities = new ArrayList<DownloadLink>();
             for (final Map<String, Object> video : videoQualities) {
-                final String id = video.get("id").toString();
+                final String qualityKey = video.get("id").toString();
                 final String ext;
-                if (id.matches("\\d+p")) {
+                if (qualityKey.matches("\\d+p")) {
                     ext = "mp4";
-                } else if (id.equalsIgnoreCase("4k")) {
+                } else if (qualityKey.equalsIgnoreCase("4k")) {
                     ext = "mp4";
                 } else {
                     /* E.g. avi, wmv */
-                    ext = id;
+                    ext = qualityKey;
                 }
-                final String downloadurl = "https://www." + this.getHost() + "/api/download-media/" + uuid + "/film/" + id;
+                final String downloadurl = "https://www." + this.getHost() + "/api/download-media/" + uuid + "/film/" + qualityKey;
                 String filename = modelname + " - " + title;
                 /* Do not e.g. generate filenames like "title_avi.avi" */
-                if (!ext.equals(id)) {
-                    filename += "_" + id;
+                if (!ext.equals(qualityKey)) {
+                    filename += "_" + qualityKey;
                 }
                 filename += "." + ext;
                 final DownloadLink dl = new DownloadLink(plg, filename, this.getHost(), downloadurl, true);
@@ -211,29 +263,25 @@ public class MetArtCrawler extends PluginForDecrypt {
                 }
                 dl._setFilePackage(fp);
                 dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
-                dl.setProperty(MetArtCom.PROPERTY_QUALITY, id);
-                crawledVideos.add(dl);
+                dl.setProperty(MetArtCom.PROPERTY_QUALITY, qualityKey);
+                ret.add(dl);
                 if (bestQuality == null || filesize > bestFilesize) {
                     bestFilesize = filesize;
                     bestQuality = dl;
                 }
+                if (allowedQualityKeys.contains(qualityKey)) {
+                    selectedQualities.add(dl);
+                }
             }
-            if (cfg.getVideoCrawlMode() == VideoCrawlMode.BEST) {
+            if (cfg.getVideoCrawlMode() == VideoCrawlMode.ALL_SELECTED && selectedQualities.size() > 0) {
+                return selectedQualities;
+            } else if (ret.isEmpty() || cfg.getVideoCrawlMode() == VideoCrawlMode.BEST) {
+                /* Fallback or best */
+                ret.clear();
                 ret.add(bestQuality);
             } else {
-                ret.addAll(crawledVideos);
-            }
-            if (ret.isEmpty() && !teasersO.isEmpty()) {
-                /* No downloads found -> Fallback to trailer download */
-                final DownloadLink trailer = this.createDownloadlink(GenericM3u8.createURLForThisPlugin(br.getURL("/api/m3u8/" + uuid + "/720.m3u8").toString()));
-                trailer.setAvailable(true);
-                trailer.setFinalFileName(modelname + " - " + title + " - teaser.mp4");
-                trailer._setFilePackage(fp);
-                ret.add(trailer);
-            } else if (ret.isEmpty()) {
-                /* Rare case */
-                logger.info("Failed to find any downloadable content");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                /* Return all results */
+                return ret;
             }
         } else {
             /* Unsupported URL */

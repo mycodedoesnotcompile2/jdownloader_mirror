@@ -1,19 +1,8 @@
 package jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.dialog;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import javax.swing.JComponent;
-
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountCheckerEventListener;
-import jd.gui.swing.jdgui.GUIUtils;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
-import jd.nutils.Formatter;
-import jd.plugins.AccountTrafficView;
 
 import org.appwork.swing.exttable.columns.ExtDateColumn;
 import org.appwork.swing.exttable.columns.ExtProgressColumn;
@@ -23,6 +12,16 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.swing.renderer.RendererMigPanel;
 import org.jdownloader.controlling.hosterrule.FreeAccountReference;
 import org.jdownloader.gui.translate._GUI;
+
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountCheckerEventListener;
+import jd.gui.swing.jdgui.GUIUtils;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
+import jd.nutils.Formatter;
+import jd.plugins.Account;
+import jd.plugins.AccountTrafficView;
 
 public class HosterPriorityTableModel extends ExtTreeTableModel<AccountInterface> implements AccountCheckerEventListener {
     public HosterPriorityTableModel() {
@@ -114,11 +113,7 @@ public class HosterPriorityTableModel extends ExtTreeTableModel<AccountInterface
 
             @Override
             protected String getDateFormatString() {
-                DateFormat sd = SimpleDateFormat.getDateInstance(SimpleDateFormat.SHORT);
-                if (sd instanceof SimpleDateFormat) {
-                    return ((SimpleDateFormat) sd).toPattern();
-                }
-                return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
+                return Account.getExpireDateFormatString(this);
             }
 
             @Override

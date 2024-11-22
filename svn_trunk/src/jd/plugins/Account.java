@@ -15,6 +15,8 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -23,12 +25,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
@@ -39,9 +35,17 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.DomainInfo;
 import org.jdownloader.controlling.UniqueAlltimeID;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
+
+import jd.config.Property;
+import jd.controlling.AccountController;
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
 
 public class Account extends Property {
     private static final String VALID_UNTIL              = "VALID_UNTIL";
@@ -280,9 +284,9 @@ public class Account extends Property {
     }
 
     /**
-     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br> Most of all services will
-     * store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account limits by changing their
-     * IP.
+     * Set this to true to indicate that changing the IP address will also reset this accounts' limits. </br>
+     * Most of all services will store the limits on account (+ IP) but some will only rely on the IP thus allowing users to reset account
+     * limits by changing their IP.
      */
     public void setAllowReconnectToResetLimits(final boolean b) {
         /* 2022-07-19: TODO: Dummy function, see: https://svn.jdownloader.org/issues/87351 */
@@ -417,18 +421,19 @@ public class Account extends Property {
 
     public void setAccountInfo(final AccountInfo info) {
         accinfo = info;
-        if (info != null) {
-            info.setAccount(this);
-            if (AccountType.PREMIUM.equals(getType()) && !info.isExpired() && info.getValidUntil() > 0) {
-                setValidPremiumUntil(info.getValidUntil());
-            }
-            // this sets default status message based on account type
-            // TODO: translation?
-            if (getType() != null && info.getStatus() == null) {
-                String output = getType().toString();
-                output = output.substring(0, 1) + output.substring(1).toLowerCase(Locale.ENGLISH) + " Account";
-                info.setStatus(output);
-            }
+        if (info == null) {
+            return;
+        }
+        info.setAccount(this);
+        if (AccountType.PREMIUM.equals(getType()) && !info.isExpired() && info.getValidUntil() > 0) {
+            setValidPremiumUntil(info.getValidUntil());
+        }
+        // this sets default status message based on account type
+        // TODO: translation?
+        if (getType() != null && info.getStatus() == null) {
+            String output = getType().toString();
+            output = output.substring(0, 1) + output.substring(1).toLowerCase(Locale.ENGLISH) + " Account";
+            info.setStatus(output);
         }
     }
 
@@ -884,5 +889,22 @@ public class Account extends Property {
             }
         }
         return AccountType.PREMIUM;
+    }
+
+    /** Returns date format string to be used for account expire dates anywhere within GUI. */
+    public static String getExpireDateFormatString(final Object requestor) {
+        final String custom = CFG_GUI.CFG.getDateTimeFormatAccountManagerExpireDateColumn();
+        if (StringUtils.isNotEmpty(custom)) {
+            /* User defined format */
+            return custom;
+        } else {
+            final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
+            if (sd instanceof SimpleDateFormat) {
+                return ((SimpleDateFormat) sd).toPattern();
+            } else {
+                /* Localized default format */
+                return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
+            }
+        }
     }
 }

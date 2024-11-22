@@ -18,7 +18,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.VideoGoogle;
 
-@DecrypterPlugin(revision = "$Revision: 48538 $", interfaceVersion = 2, names = { "blogger.com" }, urls = { "https?://([a-z0-9\\-]+\\.)?blogger\\.com/video\\.g\\?token=[a-zA-Z0-9\\-_]+" })
+@DecrypterPlugin(revision = "$Revision: 50201 $", interfaceVersion = 2, names = { "blogger.com" }, urls = { "https?://([a-z0-9\\-]+\\.)?blogger\\.com/video\\.g\\?token=[a-zA-Z0-9\\-_]+" })
 public class BloggerCom extends PluginForDecrypt {
     public BloggerCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -34,8 +34,10 @@ public class BloggerCom extends PluginForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        br.setAllowedResponseCodes(400);
         br.getPage(param.getCryptedUrl());
-        if (br.getHttpConnection().getResponseCode() == 404) {
+        if (br.getHttpConnection().getResponseCode() != 200) {
+            /* Typically response 400 or 404 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String json = br.getRegex("var VIDEO_CONFIG = (\\{.+\\})").getMatch(0);

@@ -4,10 +4,8 @@ import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.text.DateFormat;
 import java.text.DecimalFormat;
 import java.text.FieldPosition;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -245,17 +243,7 @@ public class PremiumAccountTableModel extends ExtTableModel<AccountEntry> implem
 
         @Override
         protected String getDateFormatString() {
-            final String custom = CFG_GUI.CFG.getDateTimeFormatAccountManagerExpireDateColumn();
-            if (StringUtils.isNotEmpty(custom)) {
-                return custom;
-            } else {
-                final DateFormat sd = SimpleDateFormat.getDateTimeInstance();
-                if (sd instanceof SimpleDateFormat) {
-                    return ((SimpleDateFormat) sd).toPattern();
-                } else {
-                    return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
-                }
-            }
+            return Account.getExpireDateFormatString(this);
         }
 
         @Override

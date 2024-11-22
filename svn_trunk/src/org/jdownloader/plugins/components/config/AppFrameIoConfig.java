@@ -105,5 +105,4 @@ public interface AppFrameIoConfig extends PluginConfigInterface {
     MODE getQualityMode();
 
     void setQualityMode(MODE mode);
-
 }

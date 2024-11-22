@@ -56,7 +56,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50199 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50206 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixeldrainCom extends PluginForHost {
     public PixeldrainCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -404,7 +404,7 @@ public class PixeldrainCom extends PluginForHost {
                  * User prefers to perform reconnect to be able to download without speedlimit again. </br>
                  * 2022-07-19: Speedlimit sits only on IP, not on account but our upper system will of not do reconnects for accounts atm.
                  */
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, String.format("You are speed limited. Change your IP, try again later or allow speed limited downloads in %s plugin settings.", this.getHost()), 15 * 60 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, getErrorMessageSpeedLimited(), getWaittimeErrorSpeedLimited());
             }
             final UrlQuery query = new UrlQuery();
             query.add("download", "");
@@ -427,6 +427,14 @@ public class PixeldrainCom extends PluginForHost {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error", 5 * 60 * 1000l);
         }
         dl.startDownload();
+    }
+
+    private long getWaittimeErrorSpeedLimited() {
+        return 15 * 60 * 1000l;
+    }
+
+    private String getErrorMessageSpeedLimited() {
+        return String.format("You are speed limited. Change your IP, try again later or allow speed limited downloads in %s plugin settings.", this.getHost());
     }
 
     private static boolean isCaptchaRequiredStatus(final String str) {
@@ -478,10 +486,24 @@ public class PixeldrainCom extends PluginForHost {
             /* See also: https://pixeldrain.com/home#pro */
             final Map<String, Object> freelimits = this.checkErrors(br, null, account);
             final long transfer_max = ((Number) freelimits.get("transfer_limit")).longValue();
-            ai.setTrafficLeft(transfer_max - ((Number) freelimits.get("transfer_limit_used")).longValue());
+            final long trafficLeft = transfer_max - ((Number) freelimits.get("transfer_limit_used")).longValue();
+            ai.setTrafficLeft(trafficLeft);
             ai.setTrafficMax(transfer_max);
-            /* Users can download at reduced speeds and/or need to solve a captcha for each download when traffic limit is reached. */
-            ai.setSpecialTraffic(true);
+            final PixeldrainConfig cfg = PluginJsonConfig.get(getConfigInterface());
+            if (cfg.getActionOnSpeedLimitReached() == ActionOnSpeedLimitReached.ALLOW_SPEED_LIMITED_DOWNLOAD) {
+                /* Users can download at reduced speeds and/or need to solve a captcha for each download when traffic limit is reached. */
+                ai.setSpecialTraffic(true);
+            } else {
+                /* User does not want to download when speed limit is reached -> Respect traffic left value */
+                ai.setSpecialTraffic(false);
+                /* Check if limit is reached right now and display appropriate error message. */
+                if (trafficLeft <= 0) {
+                    /**
+                     * User does not want to download with limited speed.
+                     */
+                    throw new AccountUnavailableException(getErrorMessageSpeedLimited(), getWaittimeErrorSpeedLimited());
+                }
+            }
         } else {
             /* E.g. type "prepaid" */
             account.setType(AccountType.PREMIUM);

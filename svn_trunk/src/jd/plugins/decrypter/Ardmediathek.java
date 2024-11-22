@@ -28,6 +28,26 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import jd.PluginWrapper;
+import jd.controlling.ProgressController;
+import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.CryptedLink;
+import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.components.MediathekHelper;
+import jd.plugins.components.PluginJSonUtils;
+import jd.plugins.hoster.ARDMediathek;
+
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
@@ -51,27 +71,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-import jd.PluginWrapper;
-import jd.controlling.ProgressController;
-import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
-import jd.plugins.CryptedLink;
-import jd.plugins.DecrypterPlugin;
-import jd.plugins.DecrypterRetryException;
-import jd.plugins.DecrypterRetryException.RetryReason;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForDecrypt;
-import jd.plugins.components.MediathekHelper;
-import jd.plugins.components.PluginJSonUtils;
-import jd.plugins.hoster.ARDMediathek;
-
-@DecrypterPlugin(revision = "$Revision: 49845 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 50207 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -536,8 +536,7 @@ public class Ardmediathek extends PluginForDecrypt {
                     logger.warning("Skipping unknown resolution for URL: " + url);
                     continue;
                 }
-                final DownloadLink download = addQualityHTTP(param, metadata, foundQualitiesMap, url, null, resolution, isAudiodescription);
-                download.setProperty("languagecode", audioLanguageCode);
+                final DownloadLink download = addQualityHTTP(param, metadata, foundQualitiesMap, url, null, resolution, isAudiodescription, audioLanguageCode);
                 results.add(download);
             }
             if (isSignLanguage && this.cfg.isPreferAudioDescription()) {
@@ -589,7 +588,8 @@ public class Ardmediathek extends PluginForDecrypt {
         }
         final Map<String, Map<String, DownloadLink>> audioLanguages = new HashMap<String, Map<String, DownloadLink>>();
         for (final DownloadLink link : foundQualities) {
-            String languagecode = link.getStringProperty("languagecode");
+            final MediathekProperties data = link.bindData(MediathekProperties.class);
+            String languagecode = data.getAudioLanguage();
             if (languagecode == null) {
                 /* Assume German language */
                 languagecode = "deu";
@@ -599,7 +599,6 @@ public class Ardmediathek extends PluginForDecrypt {
                 thisLanguageItems = new HashMap<String, DownloadLink>();
                 audioLanguages.put(languagecode, thisLanguageItems);
             }
-            final MediathekProperties data = link.bindData(MediathekProperties.class);
             final long bitrate = data.getBitrateTotal();
             final String resolutionStr = data.getResolution();
             final VideoResolution resolution = VideoResolution.getByStr(resolutionStr);
@@ -784,10 +783,9 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /**
-     * Searches for videos in ardmediathek that match the given search term. </br>
-     * This is mostly used as a workaround to find stuff that is hosted on their other website on ardmediathek instead as ardmediathek is
-     * providing a fairly stable API while other websites hosting the same content such as sportschau.de can be complicated to parse. </br>
-     * This does not (yet) support pagination!
+     * Searches for videos in ardmediathek that match the given search term. </br> This is mostly used as a workaround to find stuff that is
+     * hosted on their other website on ardmediathek instead as ardmediathek is providing a fairly stable API while other websites hosting
+     * the same content such as sportschau.de can be complicated to parse. </br> This does not (yet) support pagination!
      */
     private ArrayList<DownloadLink> crawlARDMediathekSearchResultsVOD(final String searchTerm, final int maxResults) throws Exception {
         if (StringUtils.isEmpty(searchTerm)) {
@@ -905,8 +903,8 @@ public class Ardmediathek extends PluginForDecrypt {
         }
         metadata.setChannel(trackerData.get("trackerClipCategory").toString());
         /**
-         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br>
-         * Let the handling go into fallback and use the final downloadurls as unique trait!
+         * 2022-03-10: Do not use trackerClipId as unique ID as there can be different IDs for the same streams. </br> Let the handling go
+         * into fallback and use the final downloadurls as unique trait!
          */
         // metadata.setContentID(trackerData.get("trackerClipId").toString());
         metadata.setRequiresContentIDToBeSet(false);
@@ -1157,8 +1155,7 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     /**
-     * Handling for older ARD websites. </br>
-     * INFORMATION: network = akamai or limelight == RTMP </br>
+     * Handling for older ARD websites. </br> INFORMATION: network = akamai or limelight == RTMP </br>
      */
     private ArrayList<DownloadLink> crawlDasersteVideo(final CryptedLink param) throws Exception {
         br.getPage(param.getCryptedUrl());
@@ -1395,9 +1392,9 @@ public class Ardmediathek extends PluginForDecrypt {
                     continue;
                 } else if (resolution != null) {
                     /* No resolution but audio bitrate is available -> Looks like audio file */
-                    addQuality(param, metadata, foundQualitiesMap, http_url, filesizeStr, bitrate, resolution, isAudioDescription);
+                    addQuality(param, metadata, foundQualitiesMap, http_url, filesizeStr, bitrate, resolution, isAudioDescription, null);
                 } else if (bitrate_audio != null) {
-                    addQuality(param, metadata, foundQualitiesMap, http_url, filesizeStr, bitrate, resolution, true);
+                    addQuality(param, metadata, foundQualitiesMap, http_url, filesizeStr, bitrate, resolution, true, null);
                 }
             }
         }
@@ -1651,6 +1648,10 @@ public class Ardmediathek extends PluginForDecrypt {
     }
 
     private void addHLS(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> foundQualities, final Browser br, final String hlsMaster, final boolean isAudioDescription) throws Exception {
+        this.addHLS(param, metadata, foundQualities, br, hlsMaster, isAudioDescription, null);
+    }
+
+    private void addHLS(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> foundQualities, final Browser br, final String hlsMaster, final boolean isAudioDescription, final String audioLanguage) throws Exception {
         if (!this.grabHLS) {
             checkPluginSettingsFlag = true;
             /* Avoid this http request if user hasn't selected any hls qualities */
@@ -1705,7 +1706,7 @@ public class Ardmediathek extends PluginForDecrypt {
                 if (resolution == null) {
                     logger.warning("Skipping unknown width: " + hlscontainer.getWidth());
                 } else {
-                    addQuality(param, metadata, foundQualities, final_download_url, null, hlscontainer.getBandwidth(), resolution, isAudioDescription);
+                    addQuality(param, metadata, foundQualities, final_download_url, null, hlscontainer.getBandwidth(), resolution, isAudioDescription, audioLanguage);
                 }
             }
         }
@@ -1725,11 +1726,15 @@ public class Ardmediathek extends PluginForDecrypt {
 
     private boolean foundAtLeastOneValidItem = false;
 
-    private DownloadLink addQualityHTTP(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> qualitiesMap, final String directurl, final String filesize_str, final VideoResolution resolution, final boolean isAudioDescription) {
-        return addQuality(param, metadata, qualitiesMap, directurl, filesize_str, -1, resolution, isAudioDescription);
+    private DownloadLink addQualityHTTP(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> qualitiesMap, final String directurl, final String filesize_str, final VideoResolution resolution, final boolean isAudioDescription, final String audioLanguageCode) {
+        return addQuality(param, metadata, qualitiesMap, directurl, filesize_str, -1, resolution, isAudioDescription, audioLanguageCode);
     }
 
-    private DownloadLink addQuality(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> qualitiesMap, final String directurl, final String filesize_str, final long bitrate, final VideoResolution resolution, final boolean isAudioDescription) {
+    private DownloadLink addQualityHTTP(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> qualitiesMap, final String directurl, final String filesize_str, final VideoResolution resolution, final boolean isAudioDescription) {
+        return addQuality(param, metadata, qualitiesMap, directurl, filesize_str, -1, resolution, isAudioDescription, null);
+    }
+
+    private DownloadLink addQuality(final CryptedLink param, final ArdMetadata metadata, final HashMap<String, DownloadLink> qualitiesMap, final String directurl, final String filesize_str, final long bitrate, final VideoResolution resolution, final boolean isAudioDescription, final String audioLanguageCode) {
         /* Errorhandling */
         final String ext;
         if (directurl == null) {
@@ -1798,6 +1803,7 @@ public class Ardmediathek extends PluginForDecrypt {
             data.setReleaseDate(metadata.getDateTimestamp());
         }
         data.setShow(metadata.getSubtitle());
+        data.setAudioLanguage(audioLanguageCode);
         final String finalFilename = MediathekHelper.getMediathekFilename(link, data, true, false);
         link.setFinalFileName(finalFilename);
         link.setProperty(ARDMediathek.PROPERTY_CRAWLER_FORCED_FILENAME, finalFilename);

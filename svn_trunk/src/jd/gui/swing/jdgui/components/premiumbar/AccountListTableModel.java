@@ -5,9 +5,7 @@ import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.text.DateFormat;
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
@@ -50,6 +48,7 @@ import jd.controlling.accountchecker.AccountChecker;
 import jd.controlling.accountchecker.AccountCheckerEventListener;
 import jd.gui.swing.jdgui.GUIUtils;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountEntry;
+import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountTrafficView;
 
@@ -369,11 +368,7 @@ public class AccountListTableModel extends ExtTableModel<AccountEntry> implement
 
             @Override
             protected String getDateFormatString() {
-                DateFormat sd = SimpleDateFormat.getDateInstance(SimpleDateFormat.SHORT);
-                if (sd instanceof SimpleDateFormat) {
-                    return ((SimpleDateFormat) sd).toPattern();
-                }
-                return _GUI.T.PremiumAccountTableModel_getDateFormatString_();
+                return Account.getExpireDateFormatString(this);
             }
 
             @Override

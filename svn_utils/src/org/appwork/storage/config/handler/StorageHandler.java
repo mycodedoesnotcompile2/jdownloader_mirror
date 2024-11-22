@@ -36,6 +36,7 @@ package org.appwork.storage.config.handler;
 import java.io.File;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -47,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.exceptions.WTFException;
@@ -573,9 +575,21 @@ public class StorageHandler<T extends ConfigInterface> implements InvocationHand
             } else {
                 return new ObjectKeyHandler(this, key, type);
             }
+        } else if (isEnumSet(type)) {
+            return new EnumSetKeyHandler(this, key, type);
         } else {
             return new ObjectKeyHandler(this, key, type);
         }
+    }
+
+    private static boolean isEnumSet(Type type) {
+        if (type instanceof ParameterizedType) {
+            final ParameterizedType pType = (ParameterizedType) type;
+            if (pType.getRawType() == Set.class && pType.getActualTypeArguments().length == 1 && Clazz.isEnum(pType.getActualTypeArguments()[0])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

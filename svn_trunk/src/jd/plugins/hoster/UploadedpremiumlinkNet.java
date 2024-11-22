@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50206 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -201,16 +201,17 @@ public class UploadedpremiumlinkNet extends PluginForHost {
                 mhost.setTrafficLeft(0);
                 mhost.setLinksLeft(0);
             }
-            final String statustext;
-            if (weekly_percentage_used == 0) {
-                statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
-            } else {
-                statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
-            }
             if (customStatusText != null) {
                 mhost.setStatusText(customStatusText);
+            } else {
+                final String statustext;
+                if (weekly_percentage_used == 0) {
+                    statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
+                } else {
+                    statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
+                }
+                mhost.setStatusText(statustext);
             }
-            mhost.setStatusText(statustext);
             supportedhosts.add(mhost);
         }
         ai.setMultiHostSupportV2(this, supportedhosts);

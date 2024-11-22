@@ -32,7 +32,7 @@ import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 47801 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50211 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XxxBunkerCom.class })
 public class XxxBunkerCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -81,7 +81,7 @@ public class XxxBunkerCom extends PluginForHost {
     private static final int     free_maxchunks    = 1;
     private static final int     free_maxdownloads = -1;
     private String               dllink            = null;
-    private static final String  TYPE_EMBED        = "https?://[^/]+/(?:embed|player)/(\\d+)";
+    private static final String  TYPE_EMBED        = "(?i)https?://[^/]+/(?:embed|player)/(\\d+)";
     private static final String  TYPE_NORMAL       = "https?://[^/]+/([a-z0-9_\\-]+)";
     private static final String  PROPERTY_FID      = "fid";
 
@@ -122,6 +122,10 @@ public class XxxBunkerCom extends PluginForHost {
     }
 
     private String getURLTitleCleaned(final String url) {
+        if (url.matches(TYPE_EMBED)) {
+            /* No title in URL available */
+            return null;
+        }
         String title = new Regex(url, TYPE_NORMAL).getMatch(0);
         if (title != null) {
             return title.replace("-", " ").trim();
@@ -185,6 +189,9 @@ public class XxxBunkerCom extends PluginForHost {
 
     public static boolean isOffline(final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML(">\\s*VIDEO NOT AVAILABLE")) {
+            /* Embedded items e.g. https://xxxbunker.com/embed/1757856 */
             return true;
         } else {
             return false;

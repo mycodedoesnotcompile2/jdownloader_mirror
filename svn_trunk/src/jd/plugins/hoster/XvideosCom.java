@@ -26,7 +26,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginDependencies;
 
-@HostPlugin(revision = "$Revision: 49767 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50210 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.XvideosComProfile.class })
 public class XvideosCom extends XvideosCore {
     public XvideosCom(PluginWrapper wrapper) {
@@ -49,7 +49,7 @@ public class XvideosCom extends XvideosCore {
 
     @Override
     public String[] getDeadDomains() {
-        return new String[] { "xvideos2.com", "xvideos3.com" };
+        return new String[] { "xvideos2.com", "xvideos3.com", "haysex.biz" };
     }
 
     @Override

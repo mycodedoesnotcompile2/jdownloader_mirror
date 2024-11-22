@@ -33,10 +33,12 @@
  * ==================================================================================================================================================== */
 package org.appwork.storage.config.handler;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.appwork.storage.config.annotations.DefaultEnumArrayValue;
 import org.appwork.utils.DebugMode;
@@ -45,14 +47,14 @@ import org.appwork.utils.DebugMode;
  * @author Thomas
  *
  */
-public class EnumListHandler extends ListHandler<Enum<?>[]> {
-    /**
-     * @param storageHandler
-     * @param key
-     * @param type
-     */
-    public EnumListHandler(final StorageHandler<?> storageHandler, final String key, final Type type) {
-        super(storageHandler, key, type, DefaultEnumArrayValue.class);
+public class EnumSetKeyHandler extends ObjectKeyHandler {
+    public EnumSetKeyHandler(StorageHandler<?> storageHandler, String key, Type type) {
+        super(storageHandler, key, type);
+    }
+
+    @Override
+    protected Class<? extends Annotation> getDefaultAnnotation() {
+        return DefaultEnumArrayValue.class;
     }
 
     @Override
@@ -78,9 +80,9 @@ public class EnumListHandler extends ListHandler<Enum<?>[]> {
                     DebugMode.debugger(e);
                 }
             }
-            this.setDefaultValue(ret.toArray(new Enum[0]));
+            this.setDefaultValue(new CopyOnWriteArraySet<Enum<?>>(ret));
         } else {
             this.setDefaultValue(null);
         }
     }
-}
+};

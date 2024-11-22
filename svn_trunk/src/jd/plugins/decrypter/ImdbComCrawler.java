@@ -32,7 +32,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.ImDbCom;
 
-@DecrypterPlugin(revision = "$Revision: 49989 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((?:name|title)/(?:nm|tt)\\d+/(?:mediaindex|videogallery)|media/index/rg\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 50207 $", interfaceVersion = 2, names = { "imdb.com" }, urls = { "https?://(?:www\\.)?imdb\\.com/((?:name|title)/(?:nm|tt)\\d+((?:/mediaindex|videogallery)|/media/index/rg\\d+)?)" })
 public class ImdbComCrawler extends PluginForDecrypt {
     public ImdbComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,7 +45,10 @@ public class ImdbComCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
+        if (contenturl.matches(".+(?:name|title)/(?:nm|tt)\\d+")) {
+            contenturl = contenturl + "/videogallery";
+        }
         br.setFollowRedirects(true);
         br.getPage(contenturl);
         if (br.getRequest().getHttpConnection().getResponseCode() == 404) {
@@ -70,6 +73,9 @@ public class ImdbComCrawler extends PluginForDecrypt {
         }
         String fpName = br.getRegex("itemprop=\\'url\\'>([^<>\"]*?)</a>").getMatch(0);
         if (fpName == null) {
+            fpName = br.getRegex("<title>\\s*(.*?)\\s*(-\\s*Videos\\s*-\\s*IMDb\\s*)?</title>").getMatch(0);
+        }
+        if (fpName == null) {
             fpName = "imdb.com - " + new Regex(contenturl, "([a-z]{2}\\d+)").getMatch(0);
         }
         fpName = Encoding.htmlDecode(fpName).trim();
@@ -93,6 +99,10 @@ public class ImdbComCrawler extends PluginForDecrypt {
                     }
                     final DownloadLink dl = createDownloadlink(url);
                     dl.setAvailable(true);
+                    final String fid = ImDbCom.getFID(dl);
+                    // TODO: maybe parse video element for better filename
+                    dl.setName(fid + "_" + fpName + ".mp4");
+                    fp.add(dl);
                     ret.add(dl);
                     distribute(dl);
                 }

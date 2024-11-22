@@ -1,114 +1,115 @@
+//jDownloader - Downloadmanager
+//Copyright (C) 2009  JD-Team support@jdownloader.org
+//
+//This program is free software: you can redistribute it and/or modify
+//it under the terms of the GNU General Public License as published by
+//the Free Software Foundation, either version 3 of the License, or
+//(at your option) any later version.
+//
+//This program is distributed in the hope that it will be useful,
+//but WITHOUT ANY WARRANTY; without even the implied warranty of
+//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//GNU General Public License for more details.
+//
+//You should have received a copy of the GNU General Public License
+//along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import jd.PluginWrapper;
+import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
+import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
-/**
- * Downloads single galleries and all per model from elitebabes.com. Re-uses functionality from SimpleHtmlBasedGalleryPlugin, but has
- * specific functionality to get the gallery urls.
- *
- * It supports auto-paging for all galleries of a model.
- */
-@DecrypterPlugin(revision = "$Revision: 46930 $", interfaceVersion = 2, names = {}, urls = {})
-public class EliteBabesCom extends SimpleHtmlBasedGalleryPlugin {
-    private static final SiteData SITE_DATA = new SiteData("elitebabes.com", "/(?!model/).+", "/model/.+", "[^\"']+");
-
+@DecrypterPlugin(revision = "$Revision: 50203 $", interfaceVersion = 3, names = {}, urls = {})
+public class EliteBabesCom extends PluginForDecrypt {
     public EliteBabesCom(PluginWrapper wrapper) {
         super(wrapper);
     }
 
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "elitebabes.com" });
+        return ret;
+    }
+
     public static String[] getAnnotationNames() {
-        return new String[] { SITE_DATA.host[0] };
+        return buildAnnotationNames(getPluginDomains());
     }
 
     @Override
     public String[] siteSupportedNames() {
-        return SITE_DATA.host;
+        return buildSupportedNames(getPluginDomains());
     }
 
     public static String[] getAnnotationUrls() {
-        return new String[] { SITE_DATA.getUrlRegex() };
+        return buildAnnotationUrls(getPluginDomains());
     }
 
-    @Override
-    protected String[] getRawImageUrls(Browser brc) {
-        final String[] rawlinks = brc.getRegex("<a data-fancybox\\s*=\\s*\"images\"[^>]*(?:data-)srcset\\s*=\\s*(?:\"|')([^\"' ]+\\.jpe?g/?)").getColumn(0);
-        if (rawlinks.length > 0) {
-            return rawlinks;
-        } else {
-            return super.getRawImageUrls(brc);
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9\\-]+)-\\d+/?");
         }
+        return ret.toArray(new String[0]);
     }
 
-    @Override
-    protected List<SiteData> getSiteData() {
-        ArrayList<SiteData> siteData = new ArrayList<SiteData>();
-        siteData.add(SITE_DATA);
-        return siteData;
-    }
-
-    // first page is "https://www.elitebabes.com/model/alena-i/" (accessible via UI)
-    // next pages are "https://www.elitebabes.com/model/alena-i/mpage/2/" (NOT accessible via UI, only programmatic)
-    protected boolean fetchMoreGalleries() throws IOException {
-        String[][] matches = br.getRegex("href\\s*=\\s*(?:\"|')([^\"']+mpage[^\"']+)(?:\"|')").getMatches();
-        if (matches.length == 0) {
-            // only 1 page, no next pages
-            return false;
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        br.getPage(param.getCryptedUrl());
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        ArrayList<String> atLeastPage2Urls = new ArrayList<String>();
-        for (String[] match : matches) {
-            atLeastPage2Urls.add(match[0]);
-        }
-        Collections.sort(atLeastPage2Urls); // ascending, so .../mpage/2/, .../mpage/3/, and so on
-        // find current page
-        String currentUrl = br.getURL();
-        int currentPageIndex = -1; // 1st page, not containing "mpage"
-        for (int i = 0; i < atLeastPage2Urls.size(); i++) {
-            if (currentUrl.equals(atLeastPage2Urls.get(i))) {
-                currentPageIndex = i;
-                break;
+        final String urlSlug = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        String title = urlSlug.replace("-", " ").trim();
+        final String[] imgs = br.getRegex("\"(https?://[^\"]+)\" data-width=\"\\d+").getColumn(0);
+        if (imgs != null && imgs.length > 0) {
+            for (final String url : imgs) {
+                final DownloadLink image = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                image.setAvailable(true);
+                ret.add(image);
             }
         }
-        // if next page is available/in the list
-        if (currentPageIndex < atLeastPage2Urls.size() - 1) {
-            // navigate to next page
-            br.getPage(atLeastPage2Urls.get(currentPageIndex + 1)); // TODO handle 404 ?
-            return true;
-        }
-        return false;
-    }
-
-    protected ArrayList<String> getCurrentGalleryUrls(String galleryHrefRegex) throws PluginException {
-        ArrayList<String> galleryUrls = new ArrayList<String>();
-        String[][] listItems = br.getRegex("<li>(.*?)</li>").getMatches();
-        if (listItems.length == 0) {
-            return galleryUrls;
-        }
-        for (String[] listItem : listItems) {
-            try {
-                if (!listItem[0].contains("title")) {
-                    continue;
+        final String[] videos = br.getRegex("<source src=\"(https?://[^\"]+)\" type=\"video/mp4").getColumn(0);
+        if (videos != null && videos.length > 0) {
+            for (final String url : videos) {
+                final DownloadLink video = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(url));
+                if (videos.length == 1) {
+                    /* Single video quality -> Set filename */
+                    video.setFinalFileName(title + ".mp4");
                 }
-                String galleryUrl = new Regex(listItem[0], "href\\s*=\\s*(?:\"|')(" + galleryHrefRegex + ")(?:\"|')").getMatch(0);
-                if (StringUtils.isEmpty(galleryUrl)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "no gallery match found");
-                }
-                galleryUrls.add(br.getURL(galleryUrl).toString());
-            } catch (IOException e) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                video.setAvailable(true);
+                ret.add(video);
             }
         }
-        return galleryUrls;
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        for (final String singleLink : videos) {
+            ret.add(createDownloadlink(singleLink));
+        }
+        final FilePackage fp = FilePackage.getInstance();
+        fp.setName(Encoding.htmlDecode(title).trim());
+        fp.addLinks(ret);
+        return ret;
     }
 }
