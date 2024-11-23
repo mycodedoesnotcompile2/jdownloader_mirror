@@ -29,12 +29,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 
-import jd.config.Property;
-import jd.http.Browser;
-import jd.nutils.NaturalOrderComparator;
-import jd.parser.Regex;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
@@ -44,6 +38,12 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
+
+import jd.config.Property;
+import jd.http.Browser;
+import jd.nutils.NaturalOrderComparator;
+import jd.parser.Regex;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
 
 public class AccountInfo extends Property implements AccountTrafficView {
     private static final long   serialVersionUID           = 1825140346023286206L;
@@ -79,8 +79,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
     }
 
     /**
-     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br> Set this to
-     * false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account stays empty.
+     * Set this to true if we expect this account to automatically get fresh traffic every X time (typically every day). </br>
+     * Set this to false if no auto refill is expected e.g. account contains static amount of bought traffic so once used up, the account
+     * stays empty.
      */
     public void setTrafficRefill(boolean account_trafficRefill) {
         this.account_trafficRefill = account_trafficRefill;
@@ -577,9 +578,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
             final_results.add(mhost);
         }
         /**
-         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br> If a multihost provides
-         * multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but "rg.to" may remain on the
-         * list of unassigned hosts.
+         * Remove all "double" entries from remaining list of unmatched entries to avoid wrong log output. </br>
+         * If a multihost provides multiple domains of one host e.g. "rg.to" and "rapidgator.net", the main one may have been matched but
+         * "rg.to" may remain on the list of unassigned hosts.
          */
         for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
@@ -650,41 +651,9 @@ public class AccountInfo extends Property implements AccountTrafficView {
         return super.removeProperty(key);
     }
 
-    @Deprecated
-    public List<String> getMultiHostSupport() {
-        final Object ret = getProperty(PROPERTY_MULTIHOST_SUPPORT, null);
-        if (ret == null) {
-            return null;
-        } else if (!(ret instanceof List)) {
-            return null;
-        }
-        final List<String> list = (List<String>) ret;
-        if (list.size() > 0) {
-            return list;
-        }
-        return null;
-    }
-
     /** 2024-09-06: wrapper function */
     public List<MultiHostHost> getMultiHostSupportV2() {
-        final List<MultiHostHost> ret = this.multihostSupportV2;
-        if (ret != null) {
-            return ret;
-        }
-        final List<String> domains = getMultiHostSupport();
-        if (domains == null) {
-            return null;
-        } else if (domains.isEmpty()) {
-            return null;
-        } else {
-            final List<MultiHostHost> mhosts = new ArrayList<MultiHostHost>();
-            for (final String domain : domains) {
-                final MultiHostHost mhost = new MultiHostHost(domain);
-                mhosts.add(mhost);
-            }
-            setMultiHostSupportV2(mhosts);
-            return mhosts;
-        }
+        return this.multihostSupportV2;
     }
 
     public void setMultiHostSupportV2(final List<MultiHostHost> mhosts) {

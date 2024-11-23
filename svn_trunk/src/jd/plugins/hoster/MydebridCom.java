@@ -21,15 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Exceptions;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -46,7 +37,16 @@ import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50080 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Exceptions;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
+@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
 public class MydebridCom extends antiDDoSForHost {
     /* Documentation: https://api.mydebrid.com/v1/ */
     private static final String                  API_BASE             = "https://api.mydebrid.com/v1";
@@ -212,7 +212,7 @@ public class MydebridCom extends antiDDoSForHost {
             }
             mhost.setMaxDownloads(((Number) hostinfo.get("maxDownloads")).intValue());
             mhost.setMaxChunks(max_chunks);
-            mhost.setResume(canResume);
+            mhost.setResumable(canResume);
             supportedhosts.add(mhost);
             /* Legacy handling */
             final String originalHost = finder.assignHost(domain);

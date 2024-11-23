@@ -25,6 +25,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
@@ -48,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
 public class NeodebridCom extends PluginForHost {
     /** Tags: cocoleech.com */
     private static final String          API_BASE                   = "https://neodebrid.com/api/v2";
@@ -177,7 +178,7 @@ public class NeodebridCom extends PluginForHost {
             /* 402 - Payment required */
             if (dl.getConnection().getResponseCode() == 402) {
                 /* 2019-05-03: E.g. free account[or expired premium], only 1 download per day (?) possible */
-                throw new AccountUnavailableException("No traffic left", 3 * 60 * 1000l);
+                throw new AccountUnavailableException(_GUI.T.account_error_no_traffic_left(), 3 * 60 * 1000l);
             }
             /* Only check for json based errors if response looks to be json. */
             if (br.getRequest().getHtmlCode().startsWith("{")) {

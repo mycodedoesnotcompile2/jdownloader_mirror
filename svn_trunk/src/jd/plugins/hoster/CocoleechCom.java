@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50210 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50212 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -192,8 +192,8 @@ public class CocoleechCom extends PluginForHost {
             account.setType(AccountType.PREMIUM);
             account.setConcurrentUsePossible(true);
             /*
-             * 2017-02-08: Accounts do usually not have general traffic limits - however there are individual host traffic limits see
-             * mainpage (when logged in) --> Right side "Daily Limit(s)"
+             * 2017-02-08: Accounts do usually not have general traffic limits - however there are individual host traffic limits see main
+             * page (when logged in) --> Right side "Daily Limit(s)"
              */
             if (StringUtils.equalsIgnoreCase(trafficleft, "unlimited")) {
                 ai.setUnlimitedTraffic();
@@ -216,22 +216,18 @@ public class CocoleechCom extends PluginForHost {
         }
         br.getPage(API_ENDPOINT + "/hosts-status");
         final Map<String, Object> hoststatusmap = handleAPIErrors(br, account, null);
-        final List<MultiHostHost> supportedhostslist = new ArrayList<MultiHostHost>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final List<Map<String, Object>> hosters = (List<Map<String, Object>>) hoststatusmap.get("result");
         for (final Map<String, Object> hostinfo : hosters) {
-            final String host = (String) hostinfo.get("host");
-            final String status = (String) hostinfo.get("status");
-            if (StringUtils.isEmpty(host)) {
-                /* Skip invalid items */
-                continue;
-            }
+            final String host = hostinfo.get("host").toString();
+            final String status = hostinfo.get("status").toString();
             final MultiHostHost mhost = new MultiHostHost(host);
             if (!"online".equalsIgnoreCase(status)) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
-            supportedhostslist.add(mhost);
+            supportedhosts.add(mhost);
         }
-        ai.setMultiHostSupportV2(this, supportedhostslist);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 

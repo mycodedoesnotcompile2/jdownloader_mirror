@@ -30,6 +30,49 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JSeparator;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.Property;
+import jd.config.SubConfiguration;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.FileIsLockedException;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractNodeNotifier;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.HeadRequest;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.BrowserAdapter;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.DownloadLinkDatabindingInterface;
+import jd.plugins.FilePackage;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginBrowser;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.PluginProgress;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import jd.plugins.download.HashResult;
+import jd.plugins.download.raf.ChunkRange;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.remoteapi.exceptions.BasicRemoteAPIException;
@@ -111,50 +154,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.Property;
-import jd.config.SubConfiguration;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.FileIsLockedException;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractNodeNotifier;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.HeadRequest;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.BrowserAdapter;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.DownloadLinkDatabindingInterface;
-import jd.plugins.FilePackage;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginBrowser;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.PluginProgress;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import jd.plugins.download.HashResult;
-import jd.plugins.download.raf.ChunkRange;
-
-@HostPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -207,6 +207,20 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             url += "#variant=" + Encoding.urlEncode(Base64.encode(variant.getStorableString()));
         }
         return url;
+    }
+
+    @Override
+    public String getLinkID(DownloadLink link) {
+        final String linkID = link.getSetLinkID();
+        if (linkID != null) {
+            // TODO: maybe add setting for this
+            final String playlistID = link.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID);
+            if (playlistID != null) {
+                return linkID + "#playlist=" + playlistID;
+            }
+            return linkID;
+        }
+        return super.getLinkID(link);
     }
 
     @Override
@@ -328,43 +342,46 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
 
     private AvailableStatus requestFileInformation(final DownloadLink downloadLink, final boolean isDownload) throws Exception {
         final String id = downloadLink.getStringProperty(YoutubeHelper.YT_ID);
-        // final YoutubeProperties data = downloadLink.bindData(YoutubeProperties.class);
         final YoutubeHelper helper = new YoutubeHelper(br, getLogger());
         helper.setupProxy();
         final AbstractVariant variant = getVariant(downloadLink);
-        logger.info("requestFileInformation:" + id + "|" + variant.getVariantDetails());
-        // update linkid
-        final String linkid = downloadLink.getLinkID();
-        if (linkid != null && !isDownload) {
-            switch (variant.getType()) {
-            case SUBTITLES: {
-                final String subtitleID = YoutubeHelper.createLinkID(downloadLink.getStringProperty(YoutubeHelper.YT_ID), variant);
-                if (!subtitleID.equals(linkid)) {
-                    // update it
-                    downloadLink.setLinkID(subtitleID);
-                    return AvailableStatus.TRUE;
+        {
+            logger.info("requestFileInformation:" + id + "|" + variant.getVariantDetails());
+            final String linkid = downloadLink.getLinkID();
+            if (linkid != null && !isDownload) {
+                switch (variant.getType()) {
+                case SUBTITLES:
+                case VIDEO:
+                case DASH_AUDIO:
+                case DASH_VIDEO: {
+                    final String newID = YoutubeHelper.createLinkID(id, variant);
+                    if (!newID.equals(linkid)) {
+                        downloadLink.setLinkID(newID);
+                        return AvailableStatus.TRUE;
+                    }
                 }
-                break;
-            }
-            case VIDEO:
-            case DASH_AUDIO:
-            case DASH_VIDEO: {
-                final String videoID = YoutubeHelper.createLinkID(downloadLink.getStringProperty(YoutubeHelper.YT_ID), variant);
-                if (!videoID.equals(linkid)) {
-                    // update it
-                    downloadLink.setLinkID(videoID);
-                    return AvailableStatus.TRUE;
+                    break;
+                case IMAGE: {
+                    final String newID;
+                    if (VariantGroup.IMAGE_PLAYLIST_COVER.equals(variant.getBaseVariant().getGroup()) && downloadLink.hasProperty(YoutubeHelper.YT_PLAYLIST_ID)) {
+                        newID = YoutubeHelper.createLinkID(downloadLink.getStringProperty(YoutubeHelper.YT_PLAYLIST_ID), variant);
+                    } else {
+                        newID = YoutubeHelper.createLinkID(id, variant);
+                    }
+                    if (!newID.equals(linkid)) {
+                        downloadLink.setLinkID(newID);
+                        return AvailableStatus.TRUE;
+                    }
                 }
-                break;
-            }
-            case IMAGE:
-                break;
-            case DESCRIPTION:
-                break;
-            default:
-                break;
+                    break;
+                case DESCRIPTION:
+                    break;
+                default:
+                    break;
+                }
             }
         }
+
         boolean verifiedSize = true;
         long totalSize = -1;
         // youtube uses redirects - maybe for load balancing

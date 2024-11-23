@@ -37,6 +37,7 @@ import java.util.regex.PatternSyntaxException;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -76,7 +77,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.TwitterCom;
 
-@DecrypterPlugin(revision = "$Revision: 49602 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = {}, urls = {})
 public class TwitterComCrawler extends PluginForDecrypt {
     private String  resumeURL                                     = null;
     private Number  maxTweetsToCrawl                              = null;
@@ -1403,7 +1404,8 @@ public class TwitterComCrawler extends PluginForDecrypt {
     private Map<String, Object> getUserInfo(final Browser br, final Account account, final String username) throws Exception {
         this.prepareAPI(br, account);
         /* 2023-08-11: Old API can only be used when we're logged in. */
-        final boolean use_old_api_to_get_userid = true;
+        /* 2024-11-22: Looks like the old endpoint has been shut down. TODO: Remove that old code. */
+        final boolean use_old_api_to_get_userid = false;
         final Map<String, Object> user;
         if (use_old_api_to_get_userid && account != null) {
             /* https://developer.x.com/en/docs/accounts-and-users/follow-search-get-users/api-reference/get-users-show */
@@ -1426,8 +1428,23 @@ public class TwitterComCrawler extends PluginForDecrypt {
             user = users.get(0);
         } else {
             final String queryID = this.getGraphqlQueryID("UserByScreenName");
-            br.getPage("https://" + getAPIDomain() + "/graphql/" + queryID + "/UserByScreenName?variables=%7B%22screen_name%22%3A%22" + PluginJSonUtils.escape(username)
-                    + "%22%2C%22withSafetyModeUserFields%22%3Atrue%7D&features=%7B%22hidden_profile_likes_enabled%22%3Atrue%2C%22hidden_profile_subscriptions_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22subscriptions_verification_info_is_identity_verified_enabled%22%3Atrue%2C%22subscriptions_verification_info_verified_since_enabled%22%3Atrue%2C%22highlights_tweets_tab_ui_enabled%22%3Atrue%2C%22responsive_web_twitter_article_notes_tab_enabled%22%3Atrue%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%7D&fieldToggles=%7B%22withAuxiliaryUserLabels%22%3Afalse%7D");
+            if (account == null) {
+                if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    throw new AccountRequiredException();
+                }
+                /**
+                 * TODO: Generate that ID to allow us to do that request without being logged in. See: </br>
+                 * https://stackoverflow.com/questions/77186145/x-client-transaction-id-in-twitter and </br>
+                 * https://github.com/yeyuchen198/twitter-tid-generator and </br>
+                 * https://antibot.blog/twitter-header-part-3/
+                 */
+                br.getHeaders().put("x-client-transaction-id", "TODO");
+                br.getPage("https://api.x.com/graphql/laYnJPCAcVo0o6pzcnlVxQ/UserByScreenName?variables=%7B%22screen_name%22%3A%22" + PluginJSonUtils.escape(username)
+                        + "%22%7D&features=%7B%22hidden_profile_subscriptions_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22subscriptions_verification_info_is_identity_verified_enabled%22%3Atrue%2C%22subscriptions_verification_info_verified_since_enabled%22%3Atrue%2C%22highlights_tweets_tab_ui_enabled%22%3Atrue%2C%22responsive_web_twitter_article_notes_tab_enabled%22%3Atrue%2C%22subscriptions_feature_can_gift_premium%22%3Atrue%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%7D&fieldToggles=%7B%22withAuxiliaryUserLabels%22%3Afalse%7D");
+            } else {
+                br.getPage("https://" + getAPIDomain() + "/graphql/" + queryID + "/UserByScreenName?variables=%7B%22screen_name%22%3A%22" + PluginJSonUtils.escape(username)
+                        + "%22%2C%22withSafetyModeUserFields%22%3Atrue%7D&features=%7B%22hidden_profile_likes_enabled%22%3Atrue%2C%22hidden_profile_subscriptions_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22subscriptions_verification_info_is_identity_verified_enabled%22%3Atrue%2C%22subscriptions_verification_info_verified_since_enabled%22%3Atrue%2C%22highlights_tweets_tab_ui_enabled%22%3Atrue%2C%22responsive_web_twitter_article_notes_tab_enabled%22%3Atrue%2C%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%7D&fieldToggles=%7B%22withAuxiliaryUserLabels%22%3Afalse%7D");
+            }
             final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
             final Map<String, Object> userNew = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "data/user/result");
             final String userID = userNew.get("rest_id").toString();

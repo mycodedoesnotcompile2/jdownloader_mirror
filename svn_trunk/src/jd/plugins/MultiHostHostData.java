@@ -3,9 +3,9 @@ package jd.plugins;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.storage.Storable;
-
 import jd.plugins.MultiHostHost.MultihosterHostStatus;
+
+import org.appwork.storage.Storable;
 
 public class MultiHostHostData implements Storable {
     boolean              enabled;
@@ -192,7 +192,7 @@ public class MultiHostHostData implements Storable {
         hostData.setTrafficCalculationFactorPercent(source.getTrafficCalculationFactorPercent());
         hostData.setMaxChunks(source.getMaxChunks());
         hostData.setMaxDownloads(source.getMaxDownloads());
-        hostData.setResume(source.isResume());
+        hostData.setResume(source.isResumable());
         hostData.setStatusText(source.getStatusText());
         hostData.setStatus(source.getStatus());
         /* Ignore error states -> Purposely lose this information */
@@ -215,7 +215,7 @@ public class MultiHostHostData implements Storable {
         mhost.setTrafficCalculationFactorPercent(this.getTrafficCalculationFactorPercent());
         mhost.setMaxChunks(this.getMaxChunks());
         mhost.setMaxDownloads(this.getMaxDownloads());
-        mhost.setResume(this.getResume());
+        mhost.setResumable(this.getResume());
         mhost.setStatusText(this.getStatusText());
         mhost.setStatus(this.getStatus());
         // host.setUnavailableStatusText(this.getUnavailableStatusText());

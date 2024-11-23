@@ -29,7 +29,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
 public class LinkifierCom extends PluginForHost {
     private static MultiHosterManagement mhm      = new MultiHosterManagement("linkifier.com");
     private static final String          API_KEY  = "d046c4309bb7cabd19f49118a2ab25e0";
@@ -93,7 +93,9 @@ public class LinkifierCom extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             if (maxTrafficDailyMB > 0) {
-                mhost.setTrafficMax(maxTrafficDailyMB * 1024 * 1024);
+                final long trafficMaxDailyBytes = maxTrafficDailyMB * 1024 * 1024;
+                mhost.setTrafficLeft(trafficMaxDailyBytes);
+                mhost.setTrafficMax(trafficMaxDailyBytes);
             }
             supportedhosts.add(mhost);
         }

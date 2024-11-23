@@ -165,6 +165,7 @@ import jd.plugins.DownloadLinkProperty;
 import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.PluginsC;
@@ -3388,23 +3389,24 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                     }, true);
                     HosterRuleController.getInstance().getEventSender().addListener(hrcListener = new HosterRuleControllerListener() {
                         private void removeAccountCache(final String host) {
-                            if (host != null) {
-                                enqueueJob(new DownloadWatchDogJob() {
-                                    @Override
-                                    public void execute(DownloadSession currentSession) {
-                                        currentSession.removeAccountCache(host);
-                                    }
-
-                                    @Override
-                                    public void interrupt() {
-                                    }
-
-                                    @Override
-                                    public boolean isHighPriority() {
-                                        return false;
-                                    }
-                                });
+                            if (host == null) {
+                                return;
                             }
+                            enqueueJob(new DownloadWatchDogJob() {
+                                @Override
+                                public void execute(DownloadSession currentSession) {
+                                    currentSession.removeAccountCache(host);
+                                }
+
+                                @Override
+                                public void interrupt() {
+                                }
+
+                                @Override
+                                public boolean isHighPriority() {
+                                    return false;
+                                }
+                            });
                         }
 
                         @Override
@@ -3441,12 +3443,16 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                                 public void execute(DownloadSession currentSession) {
                                     currentSession.removeAccountCache(event.getAccount().getHoster());
                                     final AccountInfo ai = event.getAccount().getAccountInfo();
-                                    if (ai != null) {
-                                        final List<String> multiHostList = ai.getMultiHostSupport();
-                                        if (multiHostList != null) {
-                                            for (final String multiHost : multiHostList) {
-                                                currentSession.removeAccountCache(multiHost);
-                                            }
+                                    if (ai == null) {
+                                        return;
+                                    }
+                                    final List<MultiHostHost> supportedhosts = ai.getMultiHostSupportV2();
+                                    if (supportedhosts == null) {
+                                        return;
+                                    }
+                                    for (final MultiHostHost mhost : supportedhosts) {
+                                        for (final String domain : mhost.getDomains()) {
+                                            currentSession.removeAccountCache(domain);
                                         }
                                     }
                                 }

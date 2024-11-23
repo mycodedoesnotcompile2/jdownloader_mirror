@@ -23,16 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.ConditionalSkipReasonException;
-import org.jdownloader.plugins.WaitingSkipReason;
-import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -52,7 +42,17 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.ConditionalSkipReasonException;
+import org.jdownloader.plugins.WaitingSkipReason;
+import org.jdownloader.plugins.WaitingSkipReason.CAUSE;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "prembox.com" }, urls = { "" })
 public class PremboxCom extends PluginForHost {
     private static final String                   CLEAR_DOWNLOAD_HISTORY                     = "CLEAR_DOWNLOAD_HISTORY_COMPLETE";
     /* Properties */
@@ -378,7 +378,7 @@ public class PremboxCom extends PluginForHost {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             mhost.setMaxChunks(((Number) domaininfo.get("maxChunks")).intValue());
-            mhost.setResume(canResume);
+            mhost.setResumable(canResume);
             mhost.setMaxDownloads(((Number) domaininfo.get("maxDownloads")).intValue());
             supportedhosts.add(mhost);
         }
@@ -395,7 +395,7 @@ public class PremboxCom extends PluginForHost {
                 for (final String domain : mhost.getDomains()) {
                     hostMaxchunksMap.put(domain, this.correctChunks(mhost.getMaxChunks()));
                     hostMaxdlsMap.put(domain, this.correctMaxdls(mhost.getMaxDownloads()));
-                    hostResumeMap.put(domain, mhost.isResume());
+                    hostResumeMap.put(domain, mhost.isResumable());
                     if (!isCloudOnlyHost && cloudOnlyDomains.contains(domain)) {
                         isCloudOnlyHost = true;
                     }

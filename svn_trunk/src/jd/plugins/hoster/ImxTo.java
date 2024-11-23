@@ -17,9 +17,13 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.settings.GeneralSettings;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -31,10 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50213 $", interfaceVersion = 2, names = { "imx.to" }, urls = { "https?://(?:\\w+\\.)?imx\\.to/((?:u/)?(?:i|t)/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+|(?:i/|img\\-)[a-z0-9]+)" })
 public class ImxTo extends PluginForHost {
     private static final String PROPERTY_DIRECTURL = "directurl";
     private static final String TYPE_THUMBNAIL     = "(?i)https?://[^/]+/(?:u/)?t/\\d+/\\d+/\\d+/([a-z0-9]+)\\.[a-z]+";
@@ -46,7 +47,7 @@ public class ImxTo extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://imx.to/page/terms";
+        return "https://" + getHost() + "/page/terms";
     }
 
     @Override
@@ -102,13 +103,24 @@ public class ImxTo extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        return requestFileInformation(link, false);
+    }
+
+    private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws IOException, PluginException {
         if (!link.isNameSet()) {
             link.setName(this.getFID(link) + ".jpg");
         }
         this.setBrowserExclusive();
-        if (this.checkDirectLink(link, PROPERTY_DIRECTURL) != null) {
-            logger.info("Availablecheck via directurl complete");
-            return AvailableStatus.TRUE;
+        final String storedDirecturl = link.getStringProperty(PROPERTY_DIRECTURL);
+        if (storedDirecturl != null && !isDownload) {
+            try {
+                this.basicLinkCheck(br, br.createHeadRequest(storedDirecturl), link, null, null);
+                logger.info("Availablecheck via directurl complete");
+                return AvailableStatus.TRUE;
+            } catch (final Throwable e) {
+                logger.log(e);
+                link.removeProperty(PROPERTY_DIRECTURL);
+            }
         }
         br.setFollowRedirects(true);
         br.getPage("https://" + this.getHost() + "/i/" + this.getFID(link));
@@ -117,19 +129,29 @@ public class ImxTo extends PluginForHost {
             if (imageLink != null) {
                 imageLink = imageLink.replaceFirst("/t/", "/i/");
                 imageLink = imageLink.replaceFirst("https?://x", "https://i");
-                link.setProperty(PROPERTY_DIRECTURL, imageLink);
                 logger.info("Verify directurl:" + imageLink);
-                if (this.checkDirectLink(link, PROPERTY_DIRECTURL) != null) {
+                try {
+                    this.basicLinkCheck(br, br.createHeadRequest(imageLink), link, null, null);
                     logger.info("Availablecheck via directurl complete");
+                    link.setProperty(PROPERTY_DIRECTURL, imageLink);
                     return AvailableStatus.TRUE;
-                } else {
+                } catch (final Throwable e) {
+                    logger.log(e);
                     link.removeProperty(PROPERTY_DIRECTURL);
                 }
             }
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        /* Find- and set directurl so we can save time and requests on download-start. */
+        if (JsonConfig.create(GeneralSettings.class).isHashCheckEnabled() && link.getMD5Hash() == null && !isDownload) {
+            /* Sometimes an extra step is needed to find the md5 hash. */
+            logger.info("Trying to find md5 hash during linkcheck");
+            this.sendContinueForm(br);
+            if (link.getMD5Hash() == null) {
+                logger.warning("Failed to find m5 hash");
+            }
+        }
         getAndSetFileInfo(link);
-        /* Find- and set directurl so we can save time and requests on downloadstart. */
         final String dllink = findDownloadurl(this.br);
         if (dllink != null) {
             link.setProperty(PROPERTY_DIRECTURL, dllink);
@@ -156,19 +178,22 @@ public class ImxTo extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        if (!this.attemptStoredDownloadurlDownload(link)) {
-            requestFileInformation(link);
-            /* Form is not always present */
-            final Form continueForm = br.getFormbyKey("imgContinue");
-            if (continueForm != null) {
-                logger.info("Sending imgContinue Form...");
-                br.submitForm(continueForm);
+        final String storedDirecturl = link.getStringProperty(PROPERTY_DIRECTURL);
+        final String dllink;
+        if (storedDirecturl != null) {
+            logger.info("Re-using stored directurl: " + storedDirecturl);
+            dllink = storedDirecturl;
+        } else {
+            requestFileInformation(link, true);
+            if (this.sendContinueForm(br)) {
                 getAndSetFileInfo(link);
             }
-            final String dllink = findDownloadurl(this.br);
+            dllink = findDownloadurl(this.br);
             if (StringUtils.isEmpty(dllink)) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+        }
+        try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, false, 1);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
@@ -182,78 +207,35 @@ public class ImxTo extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toString());
-            dl.setAllowFilenameFromURL(true);// old core
+        } catch (final Exception e) {
+            if (storedDirecturl != null) {
+                link.removeProperty(PROPERTY_DIRECTURL);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
+            } else {
+                throw e;
+            }
         }
+        if (storedDirecturl == null) {
+            link.setProperty(PROPERTY_DIRECTURL, dl.getConnection().getURL().toExternalForm());
+        }
+        dl.setAllowFilenameFromURL(true);// old core
         dl.startDownload();
+    }
+
+    private boolean sendContinueForm(final Browser br) throws IOException {
+        /* Form is not always present */
+        final Form continueForm = br.getFormbyKey("imgContinue");
+        if (continueForm == null) {
+            logger.info("Failed to find continueForm");
+            return false;
+        }
+        logger.info("Sending imgContinue Form...");
+        br.submitForm(continueForm);
+        return true;
     }
 
     private String findDownloadurl(final Browser br) {
         return br.getRegex("\"(https?://[^/]+/u/i/[^\"]+)\" ").getMatch(0);
-    }
-
-    private String checkDirectLink(final DownloadLink link, final String property) {
-        String dllink = link.getStringProperty(property);
-        if (dllink != null) {
-            URLConnectionAdapter con = null;
-            try {
-                final Browser br2 = br.cloneBrowser();
-                br2.setFollowRedirects(true);
-                con = br2.openHeadConnection(dllink);
-                if (this.looksLikeDownloadableContent(con)) {
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    }
-                    if (link.getFinalFileName() == null) {
-                        String name = link.getName();
-                        final String existingExt = getFileNameExtensionFromString(name, null);
-                        if (existingExt == null || ".html".equals(existingExt)) {
-                            name = applyFilenameExtension(name, ".jpg");
-                        }
-                        link.setFinalFileName(name);
-                    }
-                    return dllink;
-                } else {
-                    throw new IOException();
-                }
-            } catch (final Exception e) {
-                logger.log(e);
-                return null;
-            } finally {
-                if (con != null) {
-                    con.disconnect();
-                }
-            }
-        }
-        return null;
-    }
-
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link) throws Exception {
-        final String url = link.getStringProperty(PROPERTY_DIRECTURL);
-        if (StringUtils.isEmpty(url)) {
-            return false;
-        }
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, false, 1);
-            if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                return true;
-            } else {
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Throwable e) {
-            logger.log(e);
-            try {
-                dl.getConnection().disconnect();
-            } catch (Throwable ignore) {
-            }
-            return false;
-        }
     }
 
     @Override
@@ -273,6 +255,9 @@ public class ImxTo extends PluginForHost {
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
+        if (link == null) {
+            return;
+        }
         link.removeProperty(PROPERTY_DIRECTURL);
     }
 }

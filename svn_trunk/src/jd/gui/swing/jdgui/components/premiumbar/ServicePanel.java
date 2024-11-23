@@ -33,6 +33,20 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.AccountController;
+import jd.controlling.AccountControllerEvent;
+import jd.controlling.AccountControllerListener;
+import jd.gui.swing.dialog.AddAccountDialog;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.ConfigurationView;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
+import jd.plugins.Account;
+import jd.plugins.AccountInfo;
+import jd.plugins.MultiHostHost;
+import jd.plugins.PluginForHost;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
@@ -49,24 +63,9 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.PremiumStatusBarDisplay;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
-import jd.gui.swing.dialog.AddAccountDialog;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.ConfigurationView;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.AccountManagerSettings;
-import jd.plugins.Account;
-import jd.plugins.AccountInfo;
-import jd.plugins.PluginForHost;
-import net.miginfocom.swing.MigLayout;
 
 public class ServicePanel extends JPanel implements MouseListener, AccountTooltipOwner {
     private static final long                                serialVersionUID = 7290466989514173719L;
@@ -78,7 +77,7 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
             throw new HeadlessException();
         }
     }
-    private AtomicBoolean redrawing = new AtomicBoolean(false);
+    private AtomicBoolean                                    redrawing        = new AtomicBoolean(false);
 
     public static ServicePanel getInstance() {
         return INSTANCE;
@@ -242,7 +241,7 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
 
     public List<ServiceCollection<?>> groupServices(PremiumStatusBarDisplay premiumStatusBarDisplay, boolean extend, final String hostFilter, Account account) {
         final List<Account> accounts = AccountController.getInstance().list();
-        final HashMap<String, AccountServiceCollection> servicesMap = new HashMap<String, AccountServiceCollection>();
+        final HashMap<DomainInfo, AccountServiceCollection> servicesMap = new HashMap<DomainInfo, AccountServiceCollection>();
         final List<ServiceCollection<?>> services = new ArrayList<ServiceCollection<?>>();
         try {
             Collections.sort(accounts, new Comparator<Account>() {
@@ -283,7 +282,6 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
             if (plugin != null) {
                 final DomainInfo domainInfo = DomainInfo.getInstance(plugin.getHost());
                 final String domainTld = domainInfo.getTld();
-                domainInfo.getFavIcon();
                 switch (premiumStatusBarDisplay) {
                 case DONT_GROUP:
                     if (hostFilter == null || StringUtils.equals(hostFilter, domainTld)) {
@@ -296,10 +294,10 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
                 case GROUP_BY_SUPPORTED_ACCOUNTS:
                 case GROUP_BY_SUPPORTED_HOSTS:
                     if (hostFilter == null || StringUtils.equals(hostFilter, domainTld)) {
-                        AccountServiceCollection asc = servicesMap.get(domainTld);
+                        AccountServiceCollection asc = servicesMap.get(domainInfo);
                         if (asc == null) {
                             asc = new AccountServiceCollection(domainInfo);
-                            servicesMap.put(domainTld, asc);
+                            servicesMap.put(domainInfo, asc);
                             services.add(asc);
                         }
                         asc.add(acc);
@@ -307,32 +305,24 @@ public class ServicePanel extends JPanel implements MouseListener, AccountToolti
                     if (PremiumStatusBarDisplay.GROUP_BY_ACCOUNT_TYPE.equals(premiumStatusBarDisplay)) {
                         break;
                     }
-                    final HashMap<String, DomainInfo> domainInfoCache = new HashMap<String, DomainInfo>();
-                    final AccountInfo accountInfo = acc.getAccountInfo();
-                    if (accountInfo == null) {
+                    final AccountInfo ai = acc.getAccountInfo();
+                    if (ai == null) {
                         break;
                     }
-                    final List<String> supportedhosts = accountInfo.getMultiHostSupport();
+                    final List<MultiHostHost> supportedhosts = ai.getMultiHostSupportV2();
                     if (supportedhosts == null) {
                         break;
                     }
                     /*
                      * synchronized on list because plugins can change the list in runtime
                      */
-                    for (final String supportedhost : supportedhosts) {
-                        DomainInfo supportedHostDomainInfo = domainInfoCache.get(supportedhost);
-                        if (supportedHostDomainInfo == null) {
-                            final LazyHostPlugin plg = HostPluginController.getInstance().get(supportedhost);
-                            if (plg != null) {
-                                supportedHostDomainInfo = DomainInfo.getInstance(plg.getHost());
-                                domainInfoCache.put(supportedhost, supportedHostDomainInfo);
-                            }
-                        }
-                        if (supportedHostDomainInfo != null && (hostFilter == null || StringUtils.equals(hostFilter, supportedHostDomainInfo.getTld()))) {
-                            AccountServiceCollection asc = servicesMap.get(supportedHostDomainInfo.getTld());
+                    for (final MultiHostHost mhost : supportedhosts) {
+                        final DomainInfo multiDomainInfo = mhost.getDomainInfo();
+                        if (multiDomainInfo != null && (hostFilter == null || StringUtils.equals(hostFilter, multiDomainInfo.getTld()))) {
+                            AccountServiceCollection asc = servicesMap.get(multiDomainInfo);
                             if (asc == null) {
-                                asc = new AccountServiceCollection(supportedHostDomainInfo);
-                                servicesMap.put(supportedHostDomainInfo.getTld(), asc);
+                                asc = new AccountServiceCollection(multiDomainInfo);
+                                servicesMap.put(multiDomainInfo, asc);
                                 services.add(asc);
                             }
                             asc.add(acc);

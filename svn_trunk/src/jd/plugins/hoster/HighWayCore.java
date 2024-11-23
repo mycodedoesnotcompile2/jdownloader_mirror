@@ -68,7 +68,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 50183 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -702,7 +702,7 @@ public abstract class HighWayCore extends UseNet {
                 mhost.setTrafficCalculationFactorPercent(((Number) hostermap.get("berechnung")).shortValue());
                 mhost.setMaxChunks(((Number) hostermap.get("chunks")).intValue());
                 mhost.setMaxDownloads(((Number) hostermap.get("downloads")).intValue());
-                mhost.setResume(((Number) hostermap.get("resume")).intValue() == 1 ? true : false);
+                mhost.setResumable(((Number) hostermap.get("resume")).intValue() == 1 ? true : false);
                 final long maxTrafficDaily = ((Number) hostermap.get("maxTrafficDaily")).longValue();
                 // final long usedTrafficDaily = ((Number) hostermap.get("usedTrafficDaily")).longValue();
                 final long remainingTrafficDaily = ((Number) hostermap.get("remainingTrafficDaily")).longValue();
@@ -749,7 +749,7 @@ public abstract class HighWayCore extends UseNet {
                     for (final String domain : mhost.getDomains()) {
                         hostMaxchunksMap.put(domain, mhost.getMaxChunks());
                         hostMaxdlsMap.put(domain, mhost.getMaxDownloads());
-                        hostResumeMap.put(domain, mhost.isResume());
+                        hostResumeMap.put(domain, mhost.isResumable());
                     }
                 }
             }
