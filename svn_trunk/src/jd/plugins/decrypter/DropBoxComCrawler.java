@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DropboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
+@DecrypterPlugin(revision = "$Revision: 50226 $", interfaceVersion = 2, names = { "dropbox.com" }, urls = { "https?://(?:www\\.)?dropbox\\.com/(?:(?:sh|s|sc|scl)/[^<>\"]+|l/[A-Za-z0-9]+).*|https?://(www\\.)?db\\.tt/[A-Za-z0-9]+|https?://dl\\.dropboxusercontent\\.com/s/.+" })
 public class DropBoxComCrawler extends PluginForDecrypt {
     public DropBoxComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -173,397 +173,414 @@ public class DropBoxComCrawler extends PluginForDecrypt {
                 ret.add(dl);
             }
             return ret;
-        } else {
-            /* File/folder */
-            /* Correct aded URL. */
-            contentURL = contentURL.replaceFirst("(?i)dl\\.dropboxusercontent\\.com/", this.getHost() + "/");
-            /*
-             * 2019-09-24: isSingleFile may sometimes be wrong but if our URL contains 'crawl_subfolders=' we know it has been added via
-             * crawler and it is definitely a folder and not a file!
-             */
-            final DownloadLink previousDownloadlink = param.getDownloadLink();
-            final boolean enforceCrawlSubfoldersByProperty = previousDownloadlink != null && previousDownloadlink.hasProperty(PROPERTY_CRAWL_SUBFOLDERS);
-            String passCode = param.getDecrypterPassword();
-            String passwordCookieValue = null;
-            final String storedPasswordCookieValue = previousDownloadlink != null ? previousDownloadlink.getStringProperty(DropboxCom.PROPERTY_PASSWORD_COOKIE) : null;
-            if (storedPasswordCookieValue != null) {
-                /**
-                 * If this is given, the folder is most likely password protected and the user has entered the correct password when a
-                 * parent folder was crawled. </br>
-                 * Re-using that cookie speeds up the crawl process as we do not have to send the password again for each subfolder we want
-                 * to crawl.
-                 */
-                DropBoxComCrawler.setPasswordCookie(br, storedPasswordCookieValue);
-                passwordCookieValue = storedPasswordCookieValue;
-            }
-            br.getPage(contentURL);
-            if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("sharing/error_shmodel|class=\"not-found\">")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.getHttpConnection().getResponseCode() == 429) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.getHttpConnection().getResponseCode() == 460) {
-                logger.info("Restricted Content: This file is no longer available. For additional information contact Dropbox Support.");
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (br.getHttpConnection().getResponseCode() == 509) {
-                /**
-                 * Temporarily unavailable link --> Rare case </br>
-                 * 2023: Unsure whether this case can still happen.
-                 */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final Browser brc = br.cloneBrowser();
-            brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
-            brc.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-            brc.getHeaders().put("Origin", "https://www." + this.getHost());
-            if (DropboxCom.isPasswordProtectedWebsite(br)) {
-                String content_id = UrlQuery.parse(br.getURL()).get("content_id");
-                if (content_id == null) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                content_id = Encoding.htmlDecode(content_id);
-                boolean success = false;
-                int counter = 0;
-                do {
-                    logger.info("Password handling attempt | " + counter + " | Password of previous folder-item: " + passCode);
-                    if (StringUtils.isEmpty(passCode) || counter > 0) {
-                        passCode = getUserInput("Password?", param);
-                    }
-                    final UrlQuery query = new UrlQuery();
-                    query.add("is_xhr", "true");
-                    final String cookie_t = br.getCookie(getHost(), "t", Cookies.NOTDELETEDPATTERN);
-                    if (cookie_t != null) {
-                        query.add("t", Encoding.urlEncode(cookie_t));
-                    }
-                    query.add("content_id", Encoding.urlEncode(content_id));
-                    query.add("password", Encoding.urlEncode(passCode));
-                    query.add("url", Encoding.urlEncode(new URL(contentURL).getPath()));
-                    brc.postPage("/sm/auth", query);
-                    final String status = PluginJSonUtils.getJson(brc, "status");
-                    if (!"error".equalsIgnoreCase(status)) {
-                        success = true;
-                        break;
-                    } else {
-                        /* Reset just in case we had a given password and that was wrong. Ask the user for the password now! */
-                        logger.info("User entered wrong password: " + passCode);
-                        passCode = null;
-                        counter++;
-                    }
-                } while (!success && counter <= 2);
-                if (!success) {
-                    throw new DecrypterException(DecrypterException.PASSWORD);
-                }
-                passwordCookieValue = brc.getCookie(brc.getHost(), "sm_auth");
-                /* 2023-05-03: It is very important to wait some seconds here or the auth token might not be accepted yet serverside! */
-                final int waitSeconds = 5;
-                logger.info("User entered correct password \"" + passCode + "\" | Waiting seconds before continuing: " + waitSeconds);
-                this.sleep(waitSeconds * 1000, param);
-                br.getPage(contentURL);
-            }
-            final String edison_page_name = br.getRegex("edison_page_name=([\\w\\-]+)").getMatch(0);
-            final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
-            if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
-                /* Item was deleted */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (StringUtils.equals(edison_page_name, "shared_link_generic_error")) {
-                /* Item was abused. */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if (StringUtils.equals(dws_page_name, "files_shared_content_link_login_page")) {
-                /* Login required to access item. */
-                throw new AccountRequiredException();
-            } else if (br.containsHTML("invitation-claimed-access-request-container")) {
-                /* User is logged in but has no access to this folder item */
-                throw new AccountRequiredException();
-            }
+        }
+        /* File/folder */
+        /* Correct aded URL. */
+        contentURL = contentURL.replaceFirst("(?i)dl\\.dropboxusercontent\\.com/", this.getHost() + "/");
+        /*
+         * 2019-09-24: isSingleFile may sometimes be wrong but if our URL contains 'crawl_subfolders=' we know it has been added via crawler
+         * and it is definitely a folder and not a file!
+         */
+        final DownloadLink previousDownloadlink = param.getDownloadLink();
+        final boolean enforceCrawlSubfoldersByProperty = previousDownloadlink != null && previousDownloadlink.hasProperty(PROPERTY_CRAWL_SUBFOLDERS);
+        String passCode = param.getDecrypterPassword();
+        String passwordCookieValue = null;
+        final String storedPasswordCookieValue = previousDownloadlink != null ? previousDownloadlink.getStringProperty(DropboxCom.PROPERTY_PASSWORD_COOKIE) : null;
+        if (storedPasswordCookieValue != null) {
             /**
-             * Very important as sometimes the initially added URL does not contain a path/filename but it gets added later e.g. </br>
-             * https://www.dropbox.com/s/5h5bnwzklsev6ch </br>
-             * --> Redirects to: https://www.dropbox.com/s/5h5bnwzklsev6ch/1mb.test
+             * If this is given, the folder is most likely password protected and the user has entered the correct password when a parent
+             * folder was crawled. </br>
+             * Re-using that cookie speeds up the crawl process as we do not have to send the password again for each subfolder we want to
+             * crawl.
              */
-            contentURL = br.getURL();
-            if (!br.getURL().matches(TYPES_NORMAL)) {
-                logger.warning("Possible redirect to unsupported URL: " + br.getURL());
+            DropBoxComCrawler.setPasswordCookie(br, storedPasswordCookieValue);
+            passwordCookieValue = storedPasswordCookieValue;
+        }
+        br.getPage(contentURL);
+        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("sharing/error_shmodel|class=\"not-found\">")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 429) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 460) {
+            logger.info("Restricted Content: This file is no longer available. For additional information contact Dropbox Support.");
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (br.getHttpConnection().getResponseCode() == 509) {
+            /**
+             * Temporarily unavailable link --> Rare case </br>
+             * 2023: Unsure whether this case can still happen.
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final boolean tryPasswordProtectedWorkaround = false;
+        pwWorkaround: if (!DropboxCom.isPasswordProtectedWebsite(br) && tryPasswordProtectedWorkaround) {
+            /*
+             * 2024-11-25: Workaround to find out if a folder is password protected without the need to decrypt Dropbox' GRPC json, see:
+             * https://svn.jdownloader.org/issues/90376
+             */
+            final UrlQuery query = UrlQuery.parse(br.getURL());
+            /* Important: This parameter is required but the content of it doesn't matter. */
+            query.appendEncoded("content_id", "xxxyyy");
+            String pathWithParams = br._getURL().getPath();
+            if (br.getURL().contains("?")) {
+                final String paramsStr = br.getURL().substring(br.getURL().lastIndexOf("?") + 1);
+                pathWithParams += "?" + paramsStr;
             }
-            /* Decrypt file- and folderlinks */
-            String subFolderPath = getAdoptedCloudFolderStructure();
-            if (subFolderPath == null) {
-                subFolderPath = "";
+            String pwurl = "https://www.dropbox.com/sm/password?cont=" + Encoding.urlEncode(pathWithParams);
+            pwurl += "&content_id=xxxyyy";
+            br.getPage(pwurl);
+        }
+        final Browser brc = br.cloneBrowser();
+        brc.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
+        brc.getHeaders().put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        brc.getHeaders().put("Origin", "https://www." + this.getHost());
+        if (DropboxCom.isPasswordProtectedWebsite(br)) {
+            String content_id = UrlQuery.parse(br.getURL()).get("content_id");
+            if (content_id == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            boolean askedUserIfHeWantsSubfolders = false;
-            final int page_start = 1;
-            int page = page_start;
-            /* Contains information about current folder but not about subfolders and/or files! */
-            String currentRootFolderName = null;
-            String link_key = null;
-            String secure_hash = null;
-            String link_type = null;
-            String rlkey = null;
-            String sub_path = null;
-            final String current_folder_json_source = br.getRegex("InitReact\\.mountComponent\\(mod,[ ]*(\\{[^\\n\\r]*?folderSharedLinkInfo[^\\n\\r]*?\\})\\);\\s+").getMatch(0);
-            if (current_folder_json_source != null) {
-                final Map<String, Object> folderInfo = restoreFromString(current_folder_json_source, TypeRef.MAP);
-                final Map<String, Object> props = (Map<String, Object>) folderInfo.get("props");
-                final Map<String, Object> folderShareToken = (Map<String, Object>) props.get("folderShareToken");
-                link_key = (String) folderShareToken.get("linkKey");
-                secure_hash = (String) folderShareToken.get("secureHash");
-                link_type = (String) folderShareToken.get("linkType");
-                rlkey = (String) folderShareToken.get("rlkey");
-                sub_path = (String) folderShareToken.get("subPath");
-                if (sub_path == null) {
-                    logger.warning("Unable to find 'sub_path' value");
-                }
-                currentRootFolderName = (String) JavaScriptEngineFactory.walkJson(props, "folderSharedLinkInfo/displayName");
-            } else {
-                /* https://svn.jdownloader.org/issues/90376 */
-                logger.info("Failed to find current_folder_json_source");
-            }
-            FilePackage fp = null;
-            String next_request_voucher = null;
-            int website_max_items_per_page = 30;
-            if (StringUtils.isEmpty(rlkey)) {
-                rlkey = UrlQuery.parse(br.getURL()).get("rlkey");
-            }
-            if (StringUtils.isEmpty(rlkey)) {
-                rlkey = UrlQuery.parse(param.getCryptedUrl()).get("rlkey");
-            }
-            final Regex urlinfoTypeC = new Regex(contentURL, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/\\?]+).*");
-            if (urlinfoTypeC.patternFind()) {
-                if (StringUtils.isEmpty(link_type)) {
-                    link_type = "c";
-                }
-                if (StringUtils.isEmpty(link_key)) {
-                    link_key = urlinfoTypeC.getMatch(1);
-                }
-                if (StringUtils.isEmpty(secure_hash)) {
-                    secure_hash = urlinfoTypeC.getMatch(2);
-                }
-            } else {
-                /* Typically dropbox.com/sh/bla/bla(?params...)? */
-                link_type = "s";
-                final Regex urlinfo = new Regex(contentURL, "(?i)https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
-                if (StringUtils.isEmpty(link_key)) {
-                    link_key = urlinfo.getMatch(1);
-                }
-                if (StringUtils.isEmpty(secure_hash)) {
-                    secure_hash = urlinfo.getMatch(2);
-                }
-            }
-            final String folderidString = link_type + "_" + link_key + "_" + secure_hash;
-            String dummyFilenameForErrors = null;
-            final String cookie_t = br.getCookie(getHost(), "t", Cookies.NOTDELETEDPATTERN);
-            brc.setAllowedResponseCodes(400);
-            int numberofItemsWalkedThroughSoFar = 0;
-            if (sub_path == null) {
-                sub_path = getFilepathFromURL(contentURL);
-            }
-            if (sub_path == null) {
-                /* We're crawling a root directory. */
-                sub_path = "";
-            }
+            content_id = Encoding.htmlDecode(content_id);
+            boolean success = false;
+            int counter = 0;
             do {
-                String json_source = null;
-                final boolean isFirstPage = page == page_start;
+                logger.info("Password handling attempt | " + counter + " | Password of previous folder-item: " + passCode);
+                if (StringUtils.isEmpty(passCode) || counter > 0) {
+                    passCode = getUserInput("Password?", param);
+                }
+                final UrlQuery query = new UrlQuery();
+                query.add("is_xhr", "true");
+                final String cookie_t = br.getCookie(getHost(), "t", Cookies.NOTDELETEDPATTERN);
+                if (cookie_t != null) {
+                    query.add("t", Encoding.urlEncode(cookie_t));
+                }
+                query.add("content_id", Encoding.urlEncode(content_id));
+                query.add("password", Encoding.urlEncode(passCode));
+                query.add("url", Encoding.urlEncode(new URL(contentURL).getPath()));
+                brc.postPage("/sm/auth", query);
+                final String status = PluginJSonUtils.getJson(brc, "status");
+                if (!"error".equalsIgnoreCase(status)) {
+                    success = true;
+                    break;
+                } else {
+                    /* Reset just in case we had a given password and that was wrong. Ask the user for the password now! */
+                    logger.info("User entered wrong password: " + passCode);
+                    passCode = null;
+                    counter++;
+                }
+            } while (!success && counter <= 2);
+            if (!success) {
+                throw new DecrypterException(DecrypterException.PASSWORD);
+            }
+            passwordCookieValue = brc.getCookie(brc.getHost(), "sm_auth");
+            /* 2023-05-03: It is very important to wait some seconds here or the auth token might not be accepted yet serverside! */
+            final int waitSeconds = 5;
+            logger.info("User entered correct password \"" + passCode + "\" | Waiting seconds before continuing: " + waitSeconds);
+            this.sleep(waitSeconds * 1000, param);
+            br.getPage(contentURL);
+        }
+        final String edison_page_name = br.getRegex("edison_page_name=([\\w\\-]+)").getMatch(0);
+        final String dws_page_name = br.getRegex("dws_page_name=([\\w\\-]+)").getMatch(0);
+        if (StringUtils.equals(edison_page_name, "shared_link_deleted")) {
+            /* Item was deleted */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (StringUtils.equals(edison_page_name, "shared_link_generic_error")) {
+            /* Item was abused. */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (StringUtils.equals(dws_page_name, "files_shared_content_link_login_page")) {
+            /* Login required to access item. */
+            throw new AccountRequiredException();
+        } else if (br.containsHTML("invitation-claimed-access-request-container")) {
+            /* User is logged in but has no access to this folder item */
+            throw new AccountRequiredException();
+        }
+        /**
+         * Very important as sometimes the initially added URL does not contain a path/filename but it gets added later e.g. </br>
+         * https://www.dropbox.com/s/5h5bnwzklsev6ch </br>
+         * --> Redirects to: https://www.dropbox.com/s/5h5bnwzklsev6ch/1mb.test
+         */
+        contentURL = br.getURL();
+        if (!br.getURL().matches(TYPES_NORMAL)) {
+            logger.warning("Possible redirect to unsupported URL: " + br.getURL());
+        }
+        /* Decrypt file- and folderlinks */
+        String subFolderPath = getAdoptedCloudFolderStructure();
+        if (subFolderPath == null) {
+            subFolderPath = "";
+        }
+        boolean askedUserIfHeWantsSubfolders = false;
+        final int page_start = 1;
+        int page = page_start;
+        /* Contains information about current folder but not about subfolders and/or files! */
+        String currentRootFolderName = null;
+        String link_key = null;
+        String secure_hash = null;
+        String link_type = null;
+        String rlkey = null;
+        String sub_path = null;
+        final String current_folder_json_source = br.getRegex("InitReact\\.mountComponent\\(mod,[ ]*(\\{[^\\n\\r]*?folderSharedLinkInfo[^\\n\\r]*?\\})\\);\\s+").getMatch(0);
+        if (current_folder_json_source != null) {
+            final Map<String, Object> folderInfo = restoreFromString(current_folder_json_source, TypeRef.MAP);
+            final Map<String, Object> props = (Map<String, Object>) folderInfo.get("props");
+            final Map<String, Object> folderShareToken = (Map<String, Object>) props.get("folderShareToken");
+            link_key = (String) folderShareToken.get("linkKey");
+            secure_hash = (String) folderShareToken.get("secureHash");
+            link_type = (String) folderShareToken.get("linkType");
+            rlkey = (String) folderShareToken.get("rlkey");
+            sub_path = (String) folderShareToken.get("subPath");
+            if (sub_path == null) {
+                logger.warning("Unable to find 'sub_path' value");
+            }
+            currentRootFolderName = (String) JavaScriptEngineFactory.walkJson(props, "folderSharedLinkInfo/displayName");
+        } else {
+            /* https://svn.jdownloader.org/issues/90376 */
+            logger.info("Failed to find current_folder_json_source");
+        }
+        FilePackage fp = null;
+        String next_request_voucher = null;
+        int website_max_items_per_page = 30;
+        if (StringUtils.isEmpty(rlkey)) {
+            rlkey = UrlQuery.parse(br.getURL()).get("rlkey");
+        }
+        if (StringUtils.isEmpty(rlkey)) {
+            rlkey = UrlQuery.parse(param.getCryptedUrl()).get("rlkey");
+        }
+        final Regex urlinfoTypeC = new Regex(contentURL, "(?i)https://[^/]+/scl/([^/]+)/([^/]+)/([^/\\?]+).*");
+        if (urlinfoTypeC.patternFind()) {
+            if (StringUtils.isEmpty(link_type)) {
+                link_type = "c";
+            }
+            if (StringUtils.isEmpty(link_key)) {
+                link_key = urlinfoTypeC.getMatch(1);
+            }
+            if (StringUtils.isEmpty(secure_hash)) {
+                secure_hash = urlinfoTypeC.getMatch(2);
+            }
+        } else {
+            /* Typically dropbox.com/sh/bla/bla(?params...)? */
+            link_type = "s";
+            final Regex urlinfo = new Regex(contentURL, "(?i)https?://[^/]+/([^/]+)/([^/]+)/([\\w\\-]+).*");
+            if (StringUtils.isEmpty(link_key)) {
+                link_key = urlinfo.getMatch(1);
+            }
+            if (StringUtils.isEmpty(secure_hash)) {
+                secure_hash = urlinfo.getMatch(2);
+            }
+        }
+        final String folderidString = link_type + "_" + link_key + "_" + secure_hash;
+        String dummyFilenameForErrors = null;
+        final String cookie_t = br.getCookie(getHost(), "t", Cookies.NOTDELETEDPATTERN);
+        brc.setAllowedResponseCodes(400);
+        int numberofItemsWalkedThroughSoFar = 0;
+        if (sub_path == null) {
+            sub_path = getFilepathFromURL(contentURL);
+        }
+        if (sub_path == null) {
+            /* We're crawling a root directory. */
+            sub_path = "";
+        }
+        do {
+            String json_source = null;
+            final boolean isFirstPage = page == page_start;
+            if (isFirstPage) {
+                /* First page: Get prefetch-json from html */
+                json_source = br.getRegex("REGISTER_SHARED_LINK_FOLDER_PRELOAD_HANDLER\"\\]\\.responseReceived\\(\"(\\{.*?\\})\"\\)\\}\\);").getMatch(0);
+                if (json_source != null) {
+                    logger.info("Found prefetch json in html code of first page");
+                    json_source = PluginJSonUtils.unescape(json_source);
+                } else {
+                    logger.info("Failed to find json source for folder content on first page --> Plugin might be broken or this is a single file and not a folder");
+                }
+            }
+            if (json_source == null) {
                 if (isFirstPage) {
-                    /* First page: Get prefetch-json from html */
-                    json_source = br.getRegex("REGISTER_SHARED_LINK_FOLDER_PRELOAD_HANDLER\"\\]\\.responseReceived\\(\"(\\{.*?\\})\"\\)\\}\\);").getMatch(0);
-                    if (json_source != null) {
-                        logger.info("Found prefetch json in html code of first page");
-                        json_source = PluginJSonUtils.unescape(json_source);
-                    } else {
-                        logger.info("Failed to find json source for folder content on first page --> Plugin might be broken or this is a single file and not a folder");
-                    }
+                    logger.info("First page didn't contain prefetch json in HTML -> Trying to obtain that via ajax request");
+                } else {
+                    logger.info("Loading next page: " + page);
                 }
-                if (json_source == null) {
-                    if (isFirstPage) {
-                        logger.info("First page didn't contain prefetch json in HTML -> Trying to obtain that via ajax request");
-                    } else {
-                        logger.info("Loading next page: " + page);
-                    }
-                    if (link_type == null || cookie_t == null || link_key == null || secure_hash == null || sub_path == null) {
-                        logger.warning("Stopping because: Pagination is not possible");
-                        break;
-                    }
-                    final Form pagination_form = new Form();
-                    pagination_form.setMethod(MethodType.POST);
-                    pagination_form.setAction("/list_shared_link_folder_entries");
-                    pagination_form.put("is_xhr", "true");
-                    pagination_form.put("link_key", link_key);
-                    pagination_form.put("link_type", link_type);
-                    pagination_form.put("secure_hash", secure_hash);
-                    pagination_form.put("sub_path", Encoding.urlEncode(sub_path));
-                    if (rlkey != null) {
-                        pagination_form.put("rlkey", Encoding.urlEncode(rlkey));
-                    }
-                    if (next_request_voucher != null) {
-                        pagination_form.put("voucher", Encoding.urlEncode(next_request_voucher));
-                    }
-                    pagination_form.put("t", cookie_t);
-                    brc.submitForm(pagination_form);
-                    if (brc.getHttpConnection().getResponseCode() == 400) {
-                        /*
-                         * DMCA deleted item -> We're not yet parsing HTML of previous age correctly thus we'll run into error 400 here.
-                         */
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else if (brc.getHttpConnection().getResponseCode() == 404) {
-                        /* Deleted item. */
-                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-                    } else {
-                        json_source = brc.getRequest().getHtmlCode();
-                    }
+                if (link_type == null || cookie_t == null || link_key == null || secure_hash == null || sub_path == null) {
+                    logger.warning("Stopping because: Pagination is not possible");
+                    break;
                 }
-                boolean crawlSubfolders = false;
-                final Map<String, Object> response = JavaScriptEngineFactory.jsonToJavaMap(json_source);
-                if (response.isEmpty()) {
-                    if (ret.isEmpty()) {
-                        /* Nothing has been found before -> Assume that we got a single file. */
-                        final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
-                        setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
-                        /**
-                         * TODO: Remove that setting once we can parse GRPC strings </br>
-                         * References: </br>
-                         * Ticket: https://svn.jdownloader.org/issues/90376 </br>
-                         * Forum: https://board.jdownloader.org/showthread.php?t=93518
-                         */
-                        if (cfg.isEnableFastLinkcheckForSingleFiles()) {
-                            singleFile.setAvailable(true);
-                        }
-                        ret.add(singleFile);
-                        return ret;
-                    } else {
-                        /* This should never happen. */
-                        logger.info("Stopping because: Current page contains an empty map");
-                        break;
-                    }
+                final Form pagination_form = new Form();
+                pagination_form.setMethod(MethodType.POST);
+                pagination_form.setAction("/list_shared_link_folder_entries");
+                pagination_form.put("is_xhr", "true");
+                pagination_form.put("link_key", link_key);
+                pagination_form.put("link_type", link_type);
+                pagination_form.put("secure_hash", secure_hash);
+                pagination_form.put("sub_path", Encoding.urlEncode(sub_path));
+                if (rlkey != null) {
+                    pagination_form.put("rlkey", Encoding.urlEncode(rlkey));
                 }
-                if (isFirstPage) {
-                    /* Do some one time checks/assignments. */
+                if (next_request_voucher != null) {
+                    pagination_form.put("voucher", Encoding.urlEncode(next_request_voucher));
+                }
+                pagination_form.put("t", cookie_t);
+                brc.submitForm(pagination_form);
+                if (brc.getHttpConnection().getResponseCode() == 400) {
+                    /*
+                     * DMCA deleted item -> We're not yet parsing HTML of previous age correctly thus we'll run into error 400 here.
+                     */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (brc.getHttpConnection().getResponseCode() == 404) {
+                    /* Deleted item. */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else {
+                    json_source = brc.getRequest().getHtmlCode();
+                }
+            }
+            boolean crawlSubfolders = false;
+            final Map<String, Object> response = JavaScriptEngineFactory.jsonToJavaMap(json_source);
+            if (response.isEmpty()) {
+                if (ret.isEmpty()) {
+                    /* Nothing has been found before -> Assume that we got a single file. */
+                    final DownloadLink singleFile = createSingleFileDownloadLink(br.getURL());
+                    setDownloadPasswordProperties(singleFile, passCode, passwordCookieValue);
+                    /**
+                     * TODO: Remove that setting once we can parse GRPC strings </br>
+                     * References: </br>
+                     * Ticket: https://svn.jdownloader.org/issues/90376 </br>
+                     * Forum: https://board.jdownloader.org/showthread.php?t=93518
+                     */
+                    if (cfg.isEnableFastLinkcheckForSingleFiles()) {
+                        singleFile.setAvailable(true);
+                    }
+                    ret.add(singleFile);
+                    return ret;
+                } else {
+                    /* This should never happen. */
+                    logger.info("Stopping because: Current page contains an empty map");
+                    break;
+                }
+            }
+            if (isFirstPage) {
+                /* Do some one time checks/assignments. */
+                if (currentRootFolderName == null) {
+                    currentRootFolderName = (String) JavaScriptEngineFactory.walkJson(response, "folder/filename");
                     if (currentRootFolderName == null) {
-                        currentRootFolderName = (String) JavaScriptEngineFactory.walkJson(response, "folder/filename");
-                        if (currentRootFolderName == null) {
-                            /* 2024-06-24 */
-                            try {
-                                currentRootFolderName = JavaScriptEngineFactory.walkJson(response, "shared_link_infos/{0}/displayName").toString();
-                            } catch (final Throwable e) {
-                            }
+                        /* 2024-06-24 */
+                        try {
+                            currentRootFolderName = JavaScriptEngineFactory.walkJson(response, "shared_link_infos/{0}/displayName").toString();
+                        } catch (final Throwable e) {
                         }
                     }
-                    if (StringUtils.isEmpty(subFolderPath) && !StringUtils.isEmpty(currentRootFolderName)) {
-                        subFolderPath = currentRootFolderName;
-                    }
-                    fp = FilePackage.getInstance();
-                    fp.setName(subFolderPath);
-                    if (dummyFilenameForErrors == null) {
-                        dummyFilenameForErrors = folderidString + "_" + currentRootFolderName;
-                    }
                 }
-                final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) response.get("entries");
-                final List<Map<String, Object>> ressourcelist_folders = new ArrayList<Map<String, Object>>();
-                final List<Map<String, Object>> ressourcelist_files = new ArrayList<Map<String, Object>>();
-                /* Separate files/folders */
-                for (final Map<String, Object> folderRessource : ressourcelist) {
-                    if ((Boolean) folderRessource.get("is_dir") == Boolean.TRUE) {
-                        ressourcelist_folders.add(folderRessource);
-                    } else {
-                        ressourcelist_files.add(folderRessource);
-                    }
+                if (StringUtils.isEmpty(subFolderPath) && !StringUtils.isEmpty(currentRootFolderName)) {
+                    subFolderPath = currentRootFolderName;
                 }
-                if (ressourcelist_files.isEmpty() && ressourcelist_folders.isEmpty()) {
-                    if (ret.isEmpty()) {
-                        /* Looks like folder is empty */
-                        throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, dummyFilenameForErrors);
-                    } else {
-                        /* Empty page withing pagination -> Should never happen but it's technically possible. */
-                        logger.info("Stopping because: Current page does not contain any items");
-                        break;
-                    }
+                fp = FilePackage.getInstance();
+                fp.setName(subFolderPath);
+                if (dummyFilenameForErrors == null) {
+                    dummyFilenameForErrors = folderidString + "_" + currentRootFolderName;
                 }
-                if (enforceCrawlSubfoldersByProperty) {
-                    crawlSubfolders = true;
-                } else if (!cfg.isAskIfSubfoldersShouldBeCrawled()) {
-                    /* Do not ask user. Always crawl subfolders. */
-                    crawlSubfolders = true;
-                } else if (ressourcelist_folders.size() > 0 && !askedUserIfHeWantsSubfolders) {
-                    /*
-                     * Only ask user if there are actually subfolders that can be crawled AND if we haven't asked him already for this
-                     * folder AND if subfolders exist in this folder!
-                     */
-                    final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, param.getCryptedUrl(), "For this URL JDownloader can crawl only the files inside the current folder or crawl subfolders as well. What would you like to do?", null, "Add files of current folder AND subfolders?", "Add only files of current folder?") {
-                        @Override
-                        public ModalityType getModalityType() {
-                            return ModalityType.MODELESS;
-                        }
+            }
+            final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) response.get("entries");
+            final List<Map<String, Object>> ressourcelist_folders = new ArrayList<Map<String, Object>>();
+            final List<Map<String, Object>> ressourcelist_files = new ArrayList<Map<String, Object>>();
+            /* Separate files/folders */
+            for (final Map<String, Object> folderRessource : ressourcelist) {
+                if ((Boolean) folderRessource.get("is_dir") == Boolean.TRUE) {
+                    ressourcelist_folders.add(folderRessource);
+                } else {
+                    ressourcelist_files.add(folderRessource);
+                }
+            }
+            if (ressourcelist_files.isEmpty() && ressourcelist_folders.isEmpty()) {
+                if (ret.isEmpty()) {
+                    /* Looks like folder is empty */
+                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, dummyFilenameForErrors);
+                } else {
+                    /* Empty page withing pagination -> Should never happen but it's technically possible. */
+                    logger.info("Stopping because: Current page does not contain any items");
+                    break;
+                }
+            }
+            if (enforceCrawlSubfoldersByProperty) {
+                crawlSubfolders = true;
+            } else if (!cfg.isAskIfSubfoldersShouldBeCrawled()) {
+                /* Do not ask user. Always crawl subfolders. */
+                crawlSubfolders = true;
+            } else if (ressourcelist_folders.size() > 0 && !askedUserIfHeWantsSubfolders) {
+                /*
+                 * Only ask user if there are actually subfolders that can be crawled AND if we haven't asked him already for this folder
+                 * AND if subfolders exist in this folder!
+                 */
+                final ConfirmDialog confirm = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, param.getCryptedUrl(), "For this URL JDownloader can crawl only the files inside the current folder or crawl subfolders as well. What would you like to do?", null, "Add files of current folder AND subfolders?", "Add only files of current folder?") {
+                    @Override
+                    public ModalityType getModalityType() {
+                        return ModalityType.MODELESS;
+                    }
 
-                        @Override
-                        public boolean isRemoteAPIEnabled() {
-                            return true;
-                        }
-                    };
-                    try {
-                        UIOManager.I().show(ConfirmDialogInterface.class, confirm).throwCloseExceptions();
-                        crawlSubfolders = true;
-                    } catch (DialogCanceledException e) {
-                        crawlSubfolders = false;
-                    } catch (DialogClosedException e) {
-                        crawlSubfolders = false;
+                    @Override
+                    public boolean isRemoteAPIEnabled() {
+                        return true;
                     }
-                    askedUserIfHeWantsSubfolders = true;
-                    if (!crawlSubfolders && ressourcelist_files.isEmpty()) {
-                        logger.info("User doesn't want subfolders but only subfolders are available!");
-                        throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "SUBFOLDER_CRAWL_DESELECTED_BUT_ONLY_SUBFOLDERS_AVAILABLE_" + dummyFilenameForErrors, "You deselected subfolder crawling but this folder contains only subfolders and no single files!");
-                    }
+                };
+                try {
+                    UIOManager.I().show(ConfirmDialogInterface.class, confirm).throwCloseExceptions();
+                    crawlSubfolders = true;
+                } catch (DialogCanceledException e) {
+                    crawlSubfolders = false;
+                } catch (DialogClosedException e) {
+                    crawlSubfolders = false;
                 }
-                for (final Map<String, Object> file : ressourcelist_files) {
-                    final DownloadLink dl = this.crawlFolderItem(file);
-                    setDownloadPasswordProperties(dl, passCode, passwordCookieValue);
+                askedUserIfHeWantsSubfolders = true;
+                if (!crawlSubfolders && ressourcelist_files.isEmpty()) {
+                    logger.info("User doesn't want subfolders but only subfolders are available!");
+                    throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "SUBFOLDER_CRAWL_DESELECTED_BUT_ONLY_SUBFOLDERS_AVAILABLE_" + dummyFilenameForErrors, "You deselected subfolder crawling but this folder contains only subfolders and no single files!");
+                }
+            }
+            for (final Map<String, Object> file : ressourcelist_files) {
+                final DownloadLink dl = this.crawlFolderItem(file);
+                setDownloadPasswordProperties(dl, passCode, passwordCookieValue);
+                /*
+                 * 2019-09-24: All URLs crawled via website crawler count as single files later on if we try to download them via API!
+                 */
+                dl.setProperty(DropboxCom.PROPERTY_IS_SINGLE_FILE, true);
+                dl.setRelativeDownloadFolderPath(subFolderPath);
+                dl._setFilePackage(fp);
+                ret.add(dl);
+                distribute(dl);
+            }
+            if (crawlSubfolders) {
+                for (final Map<String, Object> folder : ressourcelist_folders) {
+                    final DownloadLink dl = this.crawlFolderItem(folder);
                     /*
-                     * 2019-09-24: All URLs crawled via website crawler count as single files later on if we try to download them via API!
+                     * Make sure that for password protected folders, user will not be asked for password again in next round/next
+                     * subfolder-level.
                      */
-                    dl.setProperty(DropboxCom.PROPERTY_IS_SINGLE_FILE, true);
-                    dl.setRelativeDownloadFolderPath(subFolderPath);
-                    dl._setFilePackage(fp);
+                    setDownloadPasswordProperties(dl, passCode, passwordCookieValue);
+                    final String foldername = folder.get("filename").toString();
+                    /* Store next path as property so we can keep track of the full path. */
+                    final String currentPath = subFolderPath + "/" + foldername;
+                    dl.setRelativeDownloadFolderPath(currentPath);
+                    dl.setProperty(PROPERTY_CRAWL_SUBFOLDERS, true);
                     ret.add(dl);
                     distribute(dl);
                 }
-                if (crawlSubfolders) {
-                    for (final Map<String, Object> folder : ressourcelist_folders) {
-                        final DownloadLink dl = this.crawlFolderItem(folder);
-                        /*
-                         * Make sure that for password protected folders, user will not be asked for password again in next round/next
-                         * subfolder-level.
-                         */
-                        setDownloadPasswordProperties(dl, passCode, passwordCookieValue);
-                        final String foldername = folder.get("filename").toString();
-                        /* Store next path as property so we can keep track of the full path. */
-                        final String currentPath = subFolderPath + "/" + foldername;
-                        dl.setRelativeDownloadFolderPath(currentPath);
-                        dl.setProperty(PROPERTY_CRAWL_SUBFOLDERS, true);
-                        ret.add(dl);
-                        distribute(dl);
-                    }
-                }
-                numberofItemsWalkedThroughSoFar += ressourcelist.size();
-                next_request_voucher = (String) response.get("next_request_voucher");
-                logger.info("Crawled page " + page + " | Items walked through so far: " + numberofItemsWalkedThroughSoFar + "/" + response.get("total_num_entries") + " | Actually crawled items: " + ret.size() + " | next_request_voucher: " + next_request_voucher);
-                if (Boolean.FALSE.equals(response.get("has_more_entries"))) {
-                    logger.info("Stopping because: Reached end on page: " + page);
-                    break;
-                } else if (ressourcelist.size() < website_max_items_per_page) {
-                    logger.info("Stopping because: Current page contains less items than " + website_max_items_per_page);
-                    break;
-                } else if (StringUtils.isEmpty(next_request_voucher)) {
-                    logger.info("Stopping because: Failed to find next_request_voucher");
-                    break;
-                } else {
-                    /* Continue to next page */
-                    page++;
-                }
-            } while (!this.isAbort());
-            if (ret.isEmpty()) {
-                /* This should never happen. */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            return ret;
+            numberofItemsWalkedThroughSoFar += ressourcelist.size();
+            next_request_voucher = (String) response.get("next_request_voucher");
+            logger.info("Crawled page " + page + " | Items walked through so far: " + numberofItemsWalkedThroughSoFar + "/" + response.get("total_num_entries") + " | Actually crawled items: " + ret.size() + " | next_request_voucher: " + next_request_voucher);
+            if (Boolean.FALSE.equals(response.get("has_more_entries"))) {
+                logger.info("Stopping because: Reached end on page: " + page);
+                break;
+            } else if (ressourcelist.size() < website_max_items_per_page) {
+                logger.info("Stopping because: Current page contains less items than " + website_max_items_per_page);
+                break;
+            } else if (StringUtils.isEmpty(next_request_voucher)) {
+                logger.info("Stopping because: Failed to find next_request_voucher");
+                break;
+            } else {
+                /* Continue to next page */
+                page++;
+            }
+        } while (!this.isAbort());
+        if (ret.isEmpty()) {
+            /* This should never happen. */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        return ret;
     }
 
     private ArrayList<DownloadLink> crawlViaAPI(final CryptedLink param) throws Exception {

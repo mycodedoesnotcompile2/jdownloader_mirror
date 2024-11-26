@@ -3166,16 +3166,11 @@ public abstract class PluginForHost extends Plugin {
             return;
         }
         /* Determine default visibility states for some columns */
-        boolean shouldShowDetailedTextColumn = false;
         boolean shouldShowLinkLimitColumns = false;
         boolean shouldShowTrafficLimitColumns = false;
         boolean shouldShowTrafficCaculationColumn = false;
         boolean shouldShowUnavailableForColumn = false;
-        boolean singleHostDownloadLimitIsReached = false;
         for (final MultiHostHost mhost : hosts) {
-            if (mhost.getStatusText() != null) {
-                shouldShowDetailedTextColumn = true;
-            }
             if (!shouldShowLinkLimitColumns && !mhost.isUnlimitedLinks()) {
                 shouldShowLinkLimitColumns = true;
             }
@@ -3188,14 +3183,10 @@ public abstract class PluginForHost extends Plugin {
             if (!shouldShowUnavailableForColumn && mhost.getUnavailableTimeMillis() > 0) {
                 shouldShowUnavailableForColumn = true;
             }
-            if (!singleHostDownloadLimitIsReached && ((!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) || !mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0)) {
-                singleHostDownloadLimitIsReached = true;
-            }
-            if (shouldShowDetailedTextColumn && shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn && singleHostDownloadLimitIsReached) {
+            if (shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn) {
                 break;
             }
         }
-        final boolean shouldShowDetailedTextColumn_final = shouldShowDetailedTextColumn || singleHostDownloadLimitIsReached;
         final boolean shouldShowLinkLimitColumns_final = shouldShowLinkLimitColumns;
         final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
         final boolean shouldShowTrafficCaculationColumn_final = shouldShowTrafficCaculationColumn;
@@ -3296,8 +3287,26 @@ public abstract class PluginForHost extends Plugin {
                 addColumn(new ExtTextColumn<MultiHostHost>("Status") {
                     @Override
                     public String getStringValue(final MultiHostHost mhost) {
+                        final String text = mhost.getStatusText();
                         if (mhost.getUnavailableTimeMillis() > 0) {
                             return mhost.getUnavailableStatusText();
+                        } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
+                            // TODO: Add translation
+                            return "No links left";
+                        } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
+                            return _GUI.T.account_error_no_traffic_left();
+                        } else if (text != null) {
+                            return text;
+                        } else {
+                            return mhost.getStatus().getLabel();
+                        }
+                    }
+
+                    @Override
+                    protected String getTooltipText(final MultiHostHost mhost) {
+                        if (mhost.getUnavailableTimeMillis() > 0) {
+                            // TODO: Add translation
+                            return "Host temporarily unavailable because of too many wrong download attempts";
                         } else {
                             return mhost.getStatus().getLabel();
                         }
@@ -3341,37 +3350,6 @@ public abstract class PluginForHost extends Plugin {
                         return mhost.isEnabled();
                     }
                 });
-                if (shouldShowDetailedTextColumn_final) {
-                    addColumn(new ExtTextColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_detailed_status_text()) {
-                        @Override
-                        public String getStringValue(MultiHostHost mhost) {
-                            final String text = mhost.getStatusText();
-                            final String textUnavailable = mhost.getUnavailableStatusText();
-                            if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                                // TODO: Add translation
-                                return "No links left";
-                            } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
-                                return _GUI.T.account_error_no_traffic_left();
-                            } else if (mhost.getUnavailableTimeMillis() > 0 && textUnavailable != null) {
-                                return textUnavailable;
-                            } else if (text != null) {
-                                return text;
-                            } else {
-                                return "---";
-                            }
-                        }
-
-                        @Override
-                        protected String getTooltipText(MultiHostHost mhost) {
-                            return _GUI.T.multihost_detailed_host_info_table_column_detailed_status_text_tooltip();
-                        }
-
-                        @Override
-                        public boolean isEnabled(final MultiHostHost mhost) {
-                            return mhost.isEnabled();
-                        }
-                    });
-                }
                 if (shouldShowUnavailableForColumn_final) {
                     addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_unavailable_for()) {
                         @Override

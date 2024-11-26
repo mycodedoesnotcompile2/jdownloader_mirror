@@ -17,12 +17,11 @@ import jd.nutils.encoding.Encoding;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "5eurousenet.com" }, urls = { "" })
 public class FiveEuroUseNetCom extends UseNet {
     public FiveEuroUseNetCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,19 +68,12 @@ public class FiveEuroUseNetCom extends UseNet {
             login.put("name", Encoding.urlEncode(userName));
             login.put("pass", Encoding.urlEncode(account.getPass()));
             if (login.containsHTML("g-recaptcha")) {
-                final DownloadLink before = getDownloadLink();
-                try {
-                    final DownloadLink dummyLink = new DownloadLink(this, "Account", getHost(), null, true);
-                    setDownloadLink(dummyLink);
-                    final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
-                    final String code = rc2.getToken();
-                    if (StringUtils.isEmpty(code)) {
-                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                    } else {
-                        login.put("g-recaptcha-response", Encoding.urlEncode(code));
-                    }
-                } finally {
-                    setDownloadLink(before);
+                final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
+                final String code = rc2.getToken();
+                if (StringUtils.isEmpty(code)) {
+                    throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                } else {
+                    login.put("g-recaptcha-response", Encoding.urlEncode(code));
                 }
             }
             br.submitForm(login);

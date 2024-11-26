@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50051 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
     private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
@@ -266,24 +266,11 @@ public class CboxeraCom extends PluginForHost {
         /* Drop previous headers & cookies */
         logger.info("Performing full login");
         this.prepBR(this.br);
-        final DownloadLink dlinkbefore = this.getDownloadLink();
-        String recaptchaV2Response = null;
-        try {
-            final DownloadLink dl_dummy;
-            if (dlinkbefore != null) {
-                dl_dummy = dlinkbefore;
-            } else {
-                dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                this.setDownloadLink(dl_dummy);
-            }
-            /* 2020-03-24: This is their reCaptchaV2 domain which means this needs to be accessed to be able to solve the captcha! */
-            // br.getPage("https://www." + this.getHost() + "/login/");
-            /* Set request so we do not actually have to call the website in this plugin which is using the API for 100% of all requests! */
-            br.setRequest(br.createGetRequest("https://www." + this.getHost() + "/login/"));
-            recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, RECAPTCHAv2_SITEKEY).getToken();
-        } finally {
-            this.setDownloadLink(dlinkbefore);
-        }
+        /* 2020-03-24: This is their reCaptchaV2 domain which means this needs to be accessed to be able to solve the captcha! */
+        // br.getPage("https://www." + this.getHost() + "/login/");
+        /* Set request so we do not actually have to call the website in this plugin which is using the API for 100% of all requests! */
+        br.setRequest(br.createGetRequest("https://www." + this.getHost() + "/login/"));
+        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, RECAPTCHAv2_SITEKEY).getToken();
         final String postData = String.format("{\"email\": \"%s\",\"password\": \"%s\",\"token\":\"%s\"}", account.getUser(), account.getPass(), recaptchaV2Response);
         br.postPageRaw(API_BASE + "/public/login", postData);
         token = PluginJSonUtils.getJson(br, "token");

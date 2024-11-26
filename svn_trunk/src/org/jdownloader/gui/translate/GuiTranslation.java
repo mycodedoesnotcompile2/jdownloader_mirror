@@ -6987,12 +6987,6 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Domain" })
     String multihost_detailed_host_info_table_column_domain();
 
-    @Default(lngs = { "en", "de" }, values = { "Detailed status", "Detailierter Status" })
-    String multihost_detailed_host_info_table_column_detailed_status_text();
-
-    @Default(lngs = { "en", "de" }, values = { "Status text according to multihosters' API.", "Status text laut Multihoster Schnittstelle" })
-    String multihost_detailed_host_info_table_column_detailed_status_text_tooltip();
-
     @Default(lngs = { "en", "de" }, values = { "Not available for", "Nicht verfügbar für" })
     String multihost_detailed_host_info_table_column_unavailable_for();
 

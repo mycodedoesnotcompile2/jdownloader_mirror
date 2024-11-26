@@ -29,7 +29,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
 public class LinkifierCom extends PluginForHost {
     private static MultiHosterManagement mhm      = new MultiHosterManagement("linkifier.com");
     private static final String          API_KEY  = "d046c4309bb7cabd19f49118a2ab25e0";
@@ -168,7 +168,7 @@ public class LinkifierCom extends PluginForHost {
         }
         final String dllink = downloadResponse.get("url") != null ? String.valueOf(downloadResponse.get("url")) : null;
         if (StringUtils.isEmpty(dllink)) {
-            mhm.handleErrorGeneric(account, this.getDownloadLink(), "dllinknull", 50, 5 * 60 * 1000l);
+            mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
         }
         br.setConnectTimeout(120 * 1000);
         br.setReadTimeout(120 * 1000);

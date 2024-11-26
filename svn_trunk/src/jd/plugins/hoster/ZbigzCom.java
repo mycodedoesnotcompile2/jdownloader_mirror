@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "zbigz.com" }, urls = { "https?://(?:www\\.)?zbigz\\.com/file/[a-z0-9]+/\\d+|https?://api\\.zbigz\\.com/v1/storage/get/[a-f0-9]+" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 2, names = { "zbigz.com" }, urls = { "https?://(?:www\\.)?zbigz\\.com/file/[a-z0-9]+/\\d+|https?://api\\.zbigz\\.com/v1/storage/get/[a-f0-9]+" })
 public class ZbigzCom extends antiDDoSForHost {
     public ZbigzCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -181,21 +181,9 @@ public class ZbigzCom extends antiDDoSForHost {
                 }
                 final PostFormDataRequest loginReq = br.createPostFormDataRequest("/v1/account/sign-in");
                 /* 2019-11-04: Seems like login captcha is always required */
-                final DownloadLink dlinkbefore = this.getDownloadLink();
-                try {
-                    final DownloadLink dl_dummy;
-                    if (dlinkbefore != null) {
-                        dl_dummy = dlinkbefore;
-                    } else {
-                        dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                        this.setDownloadLink(dl_dummy);
-                    }
-                    /* 2019-11-04: Hardcoded reCaptchaV2 key */
-                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lei4loUAAAAACp9km05L8agghrMMNNSYo5Mfmhj").getToken();
-                    loginReq.addFormData(new FormData("recaptcha", Encoding.urlEncode(recaptchaV2Response)));
-                } finally {
-                    this.setDownloadLink(dlinkbefore);
-                }
+                /* 2019-11-04: Hardcoded reCaptchaV2 key */
+                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, "6Lei4loUAAAAACp9km05L8agghrMMNNSYo5Mfmhj").getToken();
+                loginReq.addFormData(new FormData("recaptcha", Encoding.urlEncode(recaptchaV2Response)));
                 loginReq.addFormData(new FormData("login", account.getUser()));
                 loginReq.addFormData(new FormData("email", account.getUser()));
                 loginReq.addFormData(new FormData("password", account.getPass()));

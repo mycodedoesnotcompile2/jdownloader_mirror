@@ -44,7 +44,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
 public class SeedrCc extends PluginForHost {
     public SeedrCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -284,10 +284,6 @@ public class SeedrCc extends PluginForHost {
                     }
                 }
                 logger.info("Performing full login");
-                final DownloadLink dlinkbefore = this.getDownloadLink();
-                if (dlinkbefore == null) {
-                    this.setDownloadLink(new DownloadLink(this, "Account", this.getHost(), "http://" + account.getHoster(), true));
-                }
                 br.getPage("https://www." + this.getHost() + "/auth/pages/signup");
                 final UrlQuery query = new UrlQuery();
                 query.add("username", Encoding.urlEncode(account.getUser()));

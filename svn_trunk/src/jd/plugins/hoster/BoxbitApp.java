@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -138,7 +138,7 @@ public class BoxbitApp extends PluginForHost {
                 /* Given password is correct --> Save it for later usage */
                 link.setDownloadPassword(passCode);
             }
-            final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final String dllink = (String) entries.get("link");
             if (StringUtils.isEmpty(dllink)) {
                 /* This should never happen */
@@ -318,7 +318,7 @@ public class BoxbitApp extends PluginForHost {
                     /* Send empty POST request with existing token to get a fresh token */
                     br.postPage(API_BASE + "/auth/refresh", new UrlQuery());
                     try {
-                        final Map<String, Object> entries = this.handleErrors(br, account, getDownloadLink());
+                        final Map<String, Object> entries = this.handleErrors(br, account, null);
                         logger.info("Token refresh successful");
                         /* Store new token */
                         setAuthTokenData(account, (Map<String, Object>) entries.get("auth"));
@@ -334,7 +334,7 @@ public class BoxbitApp extends PluginForHost {
             }
             logger.info("Performing full login");
             br.postPageRaw(API_BASE + "/auth/login", "{\"email\":\"" + account.getUser() + "\",\"password\":\"" + account.getPass() + "\"}");
-            final Map<String, Object> entries = this.handleErrors(this.br, account, getDownloadLink());
+            final Map<String, Object> entries = this.handleErrors(this.br, account, null);
             account.setProperty(PROPERTY_userid, JavaScriptEngineFactory.walkJson(entries, "user/uuid").toString());
             setAuthTokenData(account, (Map<String, Object>) entries.get("auth"));
             setLoginHeader(br, account);

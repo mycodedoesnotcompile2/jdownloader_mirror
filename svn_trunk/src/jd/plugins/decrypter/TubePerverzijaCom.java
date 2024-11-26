@@ -30,7 +30,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50222 $", interfaceVersion = 3, names = {}, urls = {})
 public class TubePerverzijaCom extends PluginForDecrypt {
     public TubePerverzijaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +78,7 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final PluginForHost plg = this.getNewPluginForHostInstance("xtremestream.co");
-        final String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
+        String[] links = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String singleLink : links) {
             if (plg.canHandle(singleLink)) {
                 final DownloadLink dl = createDownloadlink(singleLink);
@@ -88,7 +88,16 @@ public class TubePerverzijaCom extends PluginForDecrypt {
             }
         }
         if (ret.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Item offline or plugin failed to find any supported links");
+            /* Search for iframe embedded items e.g. from playhydrax.com */
+            links = br.getRegex("<iframe[^>]*src=\"(https?://[^\"]+)").getColumn(0);
+            if (links != null && links.length > 0) {
+                for (final String singleLink : links) {
+                    ret.add(createDownloadlink(singleLink));
+                }
+            }
+        }
+        if (ret.isEmpty()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         return ret;
     }

@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 50223 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends PluginForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -253,12 +253,13 @@ public class UseNet extends PluginForHost {
         return lastUsedUsenetServer;
     }
 
-    protected UsenetServer getUseNetServer(Account account) throws Exception {
+    protected UsenetServer getUseNetServer(final Account account) throws Exception {
         synchronized (account) {
             final UsenetAccountConfigInterface config = getAccountJsonConfig(account);
             UsenetServer server = new UsenetServer(config.getHost(), config.getPort(), config.isSSLEnabled());
             final List<UsenetServer> serverList = getAvailableUsenetServer();
             if (server == null || !server.validate() || !serverList.contains(server)) {
+                /* Return server based on config */
                 server = null;
                 for (UsenetServer entry : serverList) {
                     if (entry.isSSL() == config.isSSLEnabled()) {
@@ -444,7 +445,7 @@ public class UseNet extends PluginForHost {
             }
             dl = new SimpleUseNetDownloadInterface(client, downloadLink, usenetFile);
             dl.startDownload();
-        } catch (MessageBodyNotFoundException e) {
+        } catch (final MessageBodyNotFoundException e) {
             final String messageID = e.getMessageID();
             final int count;
             if (StringUtils.equals(messageID, downloadLink.getStringProperty(LAST_MESSAGE_NOT_FOUND, messageID))) {
@@ -547,7 +548,7 @@ public class UseNet extends PluginForHost {
         }
     }
 
-    protected List<HTTPProxy> selectProxies(URL url) throws IOException {
+    protected List<HTTPProxy> selectProxies(final URL url) throws IOException {
         final ProxySelectorInterface selector = getProxySelector();
         if (selector == null) {
             final ArrayList<HTTPProxy> ret = new ArrayList<HTTPProxy>();

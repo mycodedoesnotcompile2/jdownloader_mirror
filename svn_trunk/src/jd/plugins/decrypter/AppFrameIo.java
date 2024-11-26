@@ -6,6 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.AppFrameIoConfig;
+import org.jdownloader.plugins.components.config.AppFrameIoConfig.MODE;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.LinkCrawlerThread;
 import jd.plugins.CryptedLink;
@@ -14,22 +20,28 @@ import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.AppFrameIoConfig;
-import org.jdownloader.plugins.components.config.AppFrameIoConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 50112 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
+@DecrypterPlugin(revision = "$Revision: 50225 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
 public class AppFrameIo extends PluginForDecrypt {
-
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
         final String review_link_id = new Regex(parameter.getCryptedUrl(), getMatcher().pattern()).getMatch(0);
         br.getPage("https://api.frame.io/v2/review_links/" + review_link_id + "/items/shared");
-        final List<Map<String, Object>> response = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final Object root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+        if (!(root instanceof List)) {
+            /*
+             * E.g. {"code":404,"errors":[{"code":404,"detail":"Could not find the requested resource","status":404,"title":"Not found"}],
+             * "message":"Not found"}
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final List<Map<String, Object>> response = (List<Map<String, Object>>) root;
         Map<String, Object> video = response.get(0);
         video = (Map<String, Object>) video.get("asset");
         final Map<String, Map<String, Object>> transcode_statuses = (Map<String, Map<String, Object>>) video.get("transcode_statuses");
@@ -67,7 +79,6 @@ public class AppFrameIo extends PluginForDecrypt {
             link.setProperty(jd.plugins.hoster.AppFrameIo.PROPERTY_URL, url);
             link.setProperty(jd.plugins.hoster.AppFrameIo.PROPERTY_QUALITY, quality);
             results.put(quality, link);
-
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final AppFrameIoConfig config = PluginJsonConfig.get(getConfigInterface());

@@ -15,9 +15,13 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -30,10 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50170 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50227 $", interfaceVersion = 3, names = {}, urls = {})
 public class VidhideCom extends XFileSharingProBasic {
     public VidhideCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -61,8 +62,18 @@ public class VidhideCom extends XFileSharingProBasic {
         deadDomains.add("filelions.com"); // 2024-08-02
         deadDomains.add("filelions.site"); // 2024-08-02
         deadDomains.add("alions.pro"); // 2024-08-02
+        deadDomains.add("filelions.site"); // 2024-11-25
         return deadDomains;
     }
+
+    /**
+     * Not all domains can be used for downloadlinks. <br>
+     * Example NOT working: vidhide.com <br>
+     * Example working: vidhidehub.com <br>
+     *
+     * <b>IMPORTANT:</b> Keep this up2date!
+     */
+    private static final String MAIN_DOWNLOAD_DOMAIN = "vidhidehub.com";
 
     public static String[] getAnnotationNames() {
         return buildAnnotationNames(getPluginDomains());
@@ -307,5 +318,10 @@ public class VidhideCom extends XFileSharingProBasic {
         if (br.containsHTML("Video embed restricted for this domain")) {
             throw new PluginException(LinkStatus.ERROR_FATAL, "Video embed restricted for this domain");
         }
+    }
+
+    @Override
+    protected String getPreferredHost(final DownloadLink link, URL url) {
+        return MAIN_DOWNLOAD_DOMAIN;
     }
 }

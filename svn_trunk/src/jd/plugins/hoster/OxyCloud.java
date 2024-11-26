@@ -17,6 +17,11 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -33,12 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 49275 $", interfaceVersion = 3, names = { "oxy.cloud" }, urls = { "https?://(?:www\\.|download\\.)?oxy\\.(?:cloud|st)/d/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "oxy.cloud" }, urls = { "https?://(?:www\\.|download\\.)?oxy\\.(?:cloud|st)/d/([A-Za-z0-9]+)" })
 public class OxyCloud extends antiDDoSForHost {
     public OxyCloud(PluginWrapper wrapper) {
         super(wrapper);
@@ -199,18 +199,9 @@ public class OxyCloud extends antiDDoSForHost {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     if (br.containsHTML("google\\.com/recaptcha")) {
-                        final DownloadLink dlinkbefore = this.getDownloadLink();
-                        try {
-                            final DownloadLink dl_dummy = new DownloadLink(this, "Account", this.getHost(), "https://" + account.getHoster(), true);
-                            this.setDownloadLink(dl_dummy);
-                            final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                            // g-recaptcha-response
-                            loginform.put("g-recaptcha-response", recaptchaV2Response);
-                        } finally {
-                            if (dlinkbefore != null) {
-                                this.setDownloadLink(dlinkbefore);
-                            }
-                        }
+                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                        // g-recaptcha-response
+                        loginform.put("g-recaptcha-response", recaptchaV2Response);
                     }
                     loginform.put("email", account.getUser());
                     loginform.put("password", account.getPass());

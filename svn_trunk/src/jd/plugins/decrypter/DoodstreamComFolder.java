@@ -27,6 +27,8 @@ import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -34,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DoodstreamCom;
 
-@DecrypterPlugin(revision = "$Revision: 47663 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50222 $", interfaceVersion = 3, names = {}, urls = {})
 public class DoodstreamComFolder extends PluginForDecrypt {
     public DoodstreamComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +73,7 @@ public class DoodstreamComFolder extends PluginForDecrypt {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.containsHTML("(?i)not_found\"|<title>Video not found|>video you are looking for is not found")) {
+        } else if (br.containsHTML("not_found\"|<title>Video not found|>video you are looking for is not found")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
@@ -81,7 +83,8 @@ public class DoodstreamComFolder extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         if (title != null) {
-            fp.setName(Encoding.htmlDecode(title).trim());
+            title = Encoding.htmlDecode(title).trim();
+            fp.setName(title);
         } else {
             /* Fallback */
             fp.setName(folderID);
@@ -91,12 +94,13 @@ public class DoodstreamComFolder extends PluginForDecrypt {
         final List<String> detectedURLs = new ArrayList<String>();
         final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
         for (final String url : urls) {
-            if (hosterPlugin.canHandle(url) && !detectedURLs.contains(url)) {
+            if (hosterPlugin.canHandle(url)) {
                 detectedURLs.add(url);
             }
         }
         if (detectedURLs.isEmpty()) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* Assume that we got an empty folder */
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         final String ext = ".mp4";
         int index = 0;

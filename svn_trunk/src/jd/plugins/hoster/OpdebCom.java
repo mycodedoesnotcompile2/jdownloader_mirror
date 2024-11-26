@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50125 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -273,7 +273,7 @@ public class OpdebCom extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
             }
         }
-        mhm.handleErrorGeneric(account, this.getDownloadLink(), message, 5);
+        mhm.handleErrorGeneric(account, link, message, 5);
         return entries;
     }
 

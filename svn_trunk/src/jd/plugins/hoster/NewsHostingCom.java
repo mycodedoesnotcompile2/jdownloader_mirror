@@ -21,12 +21,11 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49729 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "newshosting.com" }, urls = { "" })
 public class NewsHostingCom extends UseNet {
     public NewsHostingCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,20 +115,12 @@ public class NewsHostingCom extends UseNet {
                     login.put("username", Encoding.urlEncode(userName));
                     login.put("password", Encoding.urlEncode(account.getPass()));
                     if (login.containsHTML("g-recaptcha")) {
-                        final DownloadLink before = getDownloadLink();
-                        try {
-                            final DownloadLink dummyLink = new DownloadLink(this, "Account", getHost(), null, true);
-                            setDownloadLink(dummyLink);
-                            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
-                            final String code = rc2.getToken();
-                            if (StringUtils.isEmpty(code)) {
-                                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                            } else {
-                                login.put("g-recaptcha-response", Encoding.urlEncode(code));
-                            }
-                        } finally {
-                            setDownloadLink(before);
+                        final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, br);
+                        final String code = rc2.getToken();
+                        if (StringUtils.isEmpty(code)) {
+                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                         }
+                        login.put("g-recaptcha-response", Encoding.urlEncode(code));
                     }
                     br.submitForm(login);
                     login = getLoginForm(br);

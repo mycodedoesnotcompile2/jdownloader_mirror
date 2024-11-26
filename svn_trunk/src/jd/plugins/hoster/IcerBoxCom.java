@@ -52,7 +52,7 @@ import jd.plugins.components.PluginJSonUtils;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50052 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends antiDDoSForHost {
     private final String language = System.getProperty("user.language");
     private final String baseURL  = "https://icerbox.com";
@@ -302,13 +302,7 @@ public class IcerBoxCom extends antiDDoSForHost {
                 handleApiErrors(ajax, account, null);
                 // recaptcha can happen here on brute force attack
                 if (ajax.getHttpConnection().getResponseCode() == 429) {
-                    final DownloadLink dummyLink = new DownloadLink(this, "Account Login", getHost(), "https://" + getHost(), true);
-                    final DownloadLink odl = this.getDownloadLink();
-                    this.setDownloadLink(dummyLink);
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, ajax, "6LcKRRITAAAAAExk3Pb2MfEBMP7HGTk8HG4cRBXv").getToken();
-                    if (odl != null) {
-                        this.setDownloadLink(odl);
-                    }
                     postPage(ajax, apiURL + "/auth/login", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response));
                     handleApiErrors(ajax, account, null);
                     if (ajax.getHttpConnection().getResponseCode() == 429 || ajax.getHttpConnection().getResponseCode() == 422) {

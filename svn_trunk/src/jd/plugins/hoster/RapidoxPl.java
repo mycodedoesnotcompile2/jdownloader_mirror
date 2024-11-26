@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
 public class RapidoxPl extends PluginForHost {
     private final String                 NICE_HOST                 = "rapidox.pl";
     private final String                 NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -403,7 +403,7 @@ public class RapidoxPl extends PluginForHost {
     private void checkErrorsWebsite(final DownloadLink link, final Account account, final Browser br) throws PluginException {
         if (br.containsHTML("Wybierz linki z innego hostingu")) {
             /* Host currently not supported */
-            mhm.putError(account, getDownloadLink(), 5 * 60 * 1000l, "Host is currently not supported");
+            mhm.putError(account, link, 5 * 60 * 1000l, "Host is currently not supported");
         } else if (br.containsHTML("Jeśli widzisz ten komunikat prosimy niezwłocznie skontaktować się z nami pod")) {
             throw new AccountUnavailableException("Your IP has been banned!", 5 * 60 * 1000);
         } else {

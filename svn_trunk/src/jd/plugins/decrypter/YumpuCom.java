@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -36,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49835 $", interfaceVersion = 3, names = { "yumpu.com" }, urls = { "https?://(?:www\\.)?yumpu\\.com/[a-z]{2}/document/read/(\\d+)/([a-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50219 $", interfaceVersion = 3, names = {}, urls = {})
 public class YumpuCom extends PluginForDecrypt {
     public YumpuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,12 +50,42 @@ public class YumpuCom extends PluginForDecrypt {
         return br;
     }
 
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "yumpu.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    private static final Pattern TYPE_OLD = Pattern.compile("/([a-z]{2})/document/read/(\\d+)/([a-z0-9\\-]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_NEW = Pattern.compile("/([\\w\\-]+)/([a-z]{2})/issue/(\\d+)-([\\w\\-]+)(/read)?", Pattern.CASE_INSENSITIVE);
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + TYPE_OLD.pattern() + "|" + TYPE_NEW.pattern() + ")");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fid = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        String fid = new Regex(param.getCryptedUrl(), TYPE_NEW).getMatch(2);
+        if (fid == null) {
+            fid = new Regex(param.getCryptedUrl(), TYPE_OLD).getMatch(1);
+        }
         final String url_name = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(1);
         final String[] possibleQualityIdentifiersSorted = new String[] { "big", "large", "medium", "small" };
         /* Old way */

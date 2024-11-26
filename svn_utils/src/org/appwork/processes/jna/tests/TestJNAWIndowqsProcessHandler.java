@@ -185,6 +185,7 @@ public class TestJNAWIndowqsProcessHandler extends AWTest {
             Thread.sleep(1000);
         }
         handler.terminateRequest(instance);
+        Thread.sleep(2000);
         assertTrue(received.get());
         List<ProcessInfo> remaining;
         if ((remaining = handler.waitForExit(TimeSpan.parse("10s"), instance)).size() > 0) {

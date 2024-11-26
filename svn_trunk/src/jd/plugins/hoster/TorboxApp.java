@@ -21,24 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
@@ -48,18 +30,40 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.gui.notify.gui.BubbleNotifyConfig.BubbleNotifyEnabledState;
 import org.jdownloader.gui.notify.gui.CFG_BUBBLE;
+import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
-public class TorboxApp extends PluginForHost {
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginException;
+import jd.plugins.components.MultiHosterManagement;
+
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
     private static MultiHosterManagement mhm                                                      = new MultiHosterManagement("torbox.app");
     private final String                 PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP = "notifications_displayed_until_timestamp";
+    private final String                 PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET                    = "max_downloads_usenet";
+    private final String                 PROPERTY_ACCOUNT_USENET_USERNAME                         = "usenetU";
+    private final String                 PROPERTY_ACCOUNT_USENET_PASSWORD                         = "usenetP";
+    private final String                 PROPERTY_ACCOUNT_USENET_SERVER                           = "usenetS";
 
-    @SuppressWarnings("deprecation")
     public TorboxApp(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + this.getHost() + "/pricing");
@@ -75,7 +79,7 @@ public class TorboxApp extends PluginForHost {
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
-        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.API_KEY_LOGIN, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST, LazyPlugin.FEATURE.USENET, LazyPlugin.FEATURE.API_KEY_LOGIN, LazyPlugin.FEATURE.BUBBLE_NOTIFICATION };
     }
 
     @Override
@@ -84,8 +88,12 @@ public class TorboxApp extends PluginForHost {
     }
 
     @Override
-    public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
-        return AvailableStatus.UNCHECKABLE;
+    public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        if (isUsenetLink(link)) {
+            return super.requestFileInformation(link);
+        } else {
+            return AvailableStatus.UNCHECKABLE;
+        }
     }
 
     @Override
@@ -95,8 +103,8 @@ public class TorboxApp extends PluginForHost {
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
         /**
-         * 2024-06-12: Max 16 total connections according to admin. </br> We'll be doing it this way right know, knowing that the user can
-         * easily try to exceed that limit with JDownloader.
+         * 2024-06-12: Max 16 total connections according to admin. </br>
+         * We'll be doing it this way right know, knowing that the user can easily try to exceed that limit with JDownloader.
          */
         return -16;
     }
@@ -118,7 +126,13 @@ public class TorboxApp extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
+        if (isUsenetLink(link)) {
+            super.handleMultiHost(link, account);
+            return;
+        } else {
+            /* This should never happen */
+            throw new AccountRequiredException();
+        }
     }
 
     private String getPropertyKey(final String property) {
@@ -145,9 +159,10 @@ public class TorboxApp extends PluginForHost {
             final Request req_createwebdownload = br.createPostRequest(API_BASE + "/webdl/createwebdownload", query);
             final Map<String, Object> entries = (Map<String, Object>) this.callAPI(br, req_createwebdownload, account, link);
             /**
-             * These two strings can be used to identify the unique item/link we just added. </br> We could cache them but instead we will
-             * simply rely on the API to do this for us. </br> Once a download was started successfully we save- and re-use the direct-URL,
-             * that should be enough - we do not want to overcomplicate things.
+             * These two strings can be used to identify the unique item/link we just added. </br>
+             * We could cache them but instead we will simply rely on the API to do this for us. </br>
+             * Once a download was started successfully we save- and re-use the direct-URL, that should be enough - we do not want to
+             * overcomplicate things.
              */
             final String file_id = entries.get("webdownload_id").toString();
             final String hash = entries.get("hash").toString();
@@ -215,8 +230,8 @@ public class TorboxApp extends PluginForHost {
     }
 
     /**
-     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br> 2024-11-12: Problems have been fixed server
-     * side so this workaround should not be needed anymore.
+     * Fixed timestamps given by API so that we got milliseconds instead of nanoseconds. </br>
+     * 2024-11-12: Problems have been fixed server side so this workaround should not be needed anymore.
      */
     private String fixDateString(final String dateStr) {
         /* 2024-07-10: They sometimes even return timestamps with 5 digits milli/nanosecs e.g.: 2024-07-05T13:57:33.76273+00:00 */
@@ -253,16 +268,15 @@ public class TorboxApp extends PluginForHost {
         /* Use shorter timeout than usually to make notification system work in a better way (see end of this function). */
         account.setRefreshTimeout(5 * 60 * 1000l);
         /**
-         * In GUI, used only needs to enter API key so we'll set the username for him here. </br> This is also important to be able to keep
-         * the user from adding the same account multiple times.
+         * In GUI, used only needs to enter API key so we'll set the username for him here. </br>
+         * This is also important to be able to keep the user from adding the same account multiple times.
          */
         account.setUser(user.get("email").toString());
-        // final int planID = ((Number) user.get("plan")).intValue();
-        {
-            final String created_at = (String) user.get("created_at");
-            if (created_at != null) {
-                ai.setCreateTime(parseTimeStamp(created_at));
-            }
+        /* 0 = free, 1 = standard, 2 = pro */
+        final int planID = ((Number) user.get("plan")).intValue();
+        final String created_at = (String) user.get("created_at");
+        if (created_at != null) {
+            ai.setCreateTime(parseTimeStamp(created_at));
         }
         long premiumExpireTimestamp = -1;
         final String premium_expires_at = (String) user.get("premium_expires_at");
@@ -297,15 +311,50 @@ public class TorboxApp extends PluginForHost {
         final List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) this.callAPI(br, req_hosters, account, null);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hosterlistitem : hosterlist) {
-            final MultiHostHost mhost = new MultiHostHost(hosterlistitem.get("domain").toString());
-            mhost.setName(hosterlistitem.get("name").toString());
+            final String domain = hosterlistitem.get("domain").toString();
+            final String name = hosterlistitem.get("name").toString();
+            if (domain.equalsIgnoreCase("usenet") || name.equalsIgnoreCase("usenet")) {
+                /* Usenet is added/handled down below */
+                continue;
+            }
+            final MultiHostHost mhost = new MultiHostHost(domain);
+            mhost.setName(name);
             if (Boolean.FALSE.equals(hosterlistitem.get("status"))) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
             }
             supportedhosts.add(mhost);
         }
+        final MultiHostHost usenet = new MultiHostHost("usenet");
+        if (planID == 2) {
+            /* Obtain usenet login credentials if user owns a pro account */
+            try {
+                final Request req_usenet = br.createGetRequest(API_BASE + "/usenet/provider/account");
+                final Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
+                final int maxConnections = ((Number) usenet_data.get("connections")).intValue();
+                account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenet_data.get("username"));
+                account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenet_data.get("password"));
+                account.setProperty(PROPERTY_ACCOUNT_USENET_SERVER, usenet_data.get("host"));
+                account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, maxConnections); // 25
+                usenet.setStatusText(usenet_data.get("limitations").toString());
+                // usenet.setMaxChunks(maxConnections);
+                usenet.setMaxDownloads(maxConnections);
+            } catch (final InterruptedException ie) {
+                throw ie;
+            } catch (final Exception e) {
+                logger.log(e);
+                usenet.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+                usenet.setStatusText("Failed to obtain Usenet information from API");
+            }
+        } else {
+            /* Usenet not supported [anymore] */
+            account.removeProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
+            account.removeProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
+            account.removeProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET);
+            usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+            usenet.setStatusText("Not supported in your current plan");
+        }
+        supportedhosts.add(usenet);
         ai.setMultiHostSupportV2(this, supportedhosts);
-        account.setConcurrentUsePossible(true);
         /* Handle notifications */
         notificationHandling: if (true) {
             if (!Boolean.TRUE.equals(user_settings.get("jdownloader_notifications"))) {
@@ -319,9 +368,9 @@ public class TorboxApp extends PluginForHost {
             try {
                 final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
+                final List<Map<String, Object>> notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
                 /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
                 int numberofNotificationsActuallyDisplayed = 0;
-                final List<Map<String, Object>> notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
                 for (final Map<String, Object> notification : notifications) {
                     final long notification_created_at = parseTimeStamp(notification.get("created_at").toString());
                     if (notification_created_at > highestNotificationTimestamp) {
@@ -350,6 +399,8 @@ public class TorboxApp extends PluginForHost {
                 final Request req_clear_all_notifications = br.createPostRequest(API_BASE + "/notifications/clear", "");
                 this.callAPI(br, req_clear_all_notifications, account, null);
                 logger.info("Successfully cleared notifications");
+            } catch (final InterruptedException ie) {
+                throw ie;
             } catch (final Exception e) {
                 /*
                  * Ignore exception as the important part [the account-check] was successful and we don't care about a failure at this
@@ -359,6 +410,7 @@ public class TorboxApp extends PluginForHost {
                 logger.warning("Exception happened in notification handling");
             }
         }
+        account.setConcurrentUsePossible(true);
         return ai;
     }
 
@@ -415,7 +467,7 @@ public class TorboxApp extends PluginForHost {
         } catch (final JSonMapperException jme) {
             final String errortext = "Bad API response";
             if (link != null) {
-                mhm.handleErrorGeneric(account, this.getDownloadLink(), errortext, 50, 5 * 60 * 1000l);
+                mhm.handleErrorGeneric(account, link, errortext, 50, 5 * 60 * 1000l);
             } else {
                 throw Exceptions.addSuppressed(new AccountUnavailableException(errortext, 1 * 60 * 1000l), jme);
             }
@@ -465,6 +517,43 @@ public class TorboxApp extends PluginForHost {
             return true;
         } else {
             return false;
+        }
+    }
+
+    @Override
+    protected String getUseNetUsername(final Account account) {
+        synchronized (account) {
+            return account.getStringProperty(PROPERTY_ACCOUNT_USENET_USERNAME);
+        }
+    }
+
+    @Override
+    protected String getUseNetPassword(final Account account) {
+        synchronized (account) {
+            return account.getStringProperty(PROPERTY_ACCOUNT_USENET_PASSWORD);
+        }
+    }
+
+    @Override
+    protected UsenetServer getUseNetServer(final Account account) throws Exception {
+        final UsenetServer userv = new UsenetServer(account.getStringProperty(PROPERTY_ACCOUNT_USENET_SERVER), 563, true);
+        userv.setConnections(account.getIntegerProperty(PROPERTY_ACCOUNT_USENET_SERVER, 1));
+        return userv;
+    }
+    // @Override
+    // public List<UsenetServer> getAvailableUsenetServer() {
+    // // TODO: Obtain this data from API
+    // final List<UsenetServer> ret = new ArrayList<UsenetServer>();
+    // ret.addAll(UsenetServer.createServerList("usenet.torbox.app", true, 563));
+    // return ret;
+    // }
+
+    @Override
+    protected int getMaxSimultanDownload(final DownloadLink link, final Account account) {
+        if (account != null && link != null && isUsenetLink(link)) {
+            return account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, 1);
+        } else {
+            return Integer.MAX_VALUE;
         }
     }
 

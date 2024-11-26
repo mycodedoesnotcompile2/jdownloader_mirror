@@ -23,6 +23,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -47,33 +67,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 /**
  *
  * @author raztoki
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -137,8 +137,8 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     /**
-     * Defines max. wait time for cached downloads after last serverside progress change. </br> Longer time than this and progress of
-     * serverside download did not change --> Abort
+     * Defines max. wait time for cached downloads after last serverside progress change. </br>
+     * Longer time than this and progress of serverside download did not change --> Abort
      */
     private final int    CACHE_WAIT_THRESHOLD     = 10 * 60000;
     private final String PROPERTY_DIRECTURL       = "linksnappycomdirectlink";
@@ -335,7 +335,7 @@ public class LinkSnappyCom extends PluginForHost {
         }
         if (link != null) {
             /* Daily specific host downloadlimit reached --> Disable host for some time */
-            mhm.putError(account, this.getDownloadLink(), 10 * 60 * 1000l, msg);
+            mhm.putError(account, link, 10 * 60 * 1000l, msg);
         } else {
             /* Daily total downloadlimit for account is reached */
             logger.info("Daily limit reached");
@@ -523,9 +523,10 @@ public class LinkSnappyCom extends PluginForHost {
         }
         if (dl.startDownload() && PluginJsonConfig.get(LinkSnappyComConfig.class).isClearDownloadHistoryEnabled()) {
             /**
-             * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br> Also
-             * make sure we get no exception as our download was successful. </br> NOTE: Even failed downloads will appear in the download
-             * history - but they will also be cleared once there is one successful download.
+             * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br>
+             * Also make sure we get no exception as our download was successful. </br>
+             * NOTE: Even failed downloads will appear in the download history - but they will also be cleared once there is one successful
+             * download.
              */
             logger.info("Clearing download history");
             try {
@@ -609,7 +610,8 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     /**
-     * Parses API json (without error handling for API answer). </br> Takes care about invalid API responses (non-json responses).
+     * Parses API json (without error handling for API answer). </br>
+     * Takes care about invalid API responses (non-json responses).
      */
     private Map<String, Object> parseJson(final Browser br, final DownloadLink link, final Account account) throws PluginException, InterruptedException {
         Map<String, Object> entries = null;

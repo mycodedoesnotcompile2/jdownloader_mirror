@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50222 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -181,6 +181,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
         }
         br.getHeaders().put("Accept", "application/json, text/plain, */*");
         br.setFollowRedirects(true);
+        String protocolAndSubdomain = null;
         Browser surlbrowser = null;
         if (account != null) {
             jstoken = account.getStringProperty(TeraboxCom.PROPERTY_ACCOUNT_JS_TOKEN);
@@ -190,6 +191,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
             if (useStrangeSUrlWorkaround) {
                 surlbrowser = br.cloneBrowser();
                 surlbrowser.getPage(contenturl);
+                protocolAndSubdomain = "https://" + surlbrowser.getHost(true);
             }
         } else {
             synchronized (anonymousJstokenTimestamp) {
@@ -212,6 +214,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     jstoken = anonymousJstoken.get();
                 }
             }
+        }
+        if (protocolAndSubdomain == null) {
+            logger.info("Finding protocolAndSubdomain");
+            final Browser brc = br.cloneBrowser();
+            brc.getPage("https://" + getHost());
+            protocolAndSubdomain = "https://" + brc.getHost(true);
         }
         if (surlbrowser != null) {
             final String newSurlValue = UrlQuery.parse(surlbrowser.getURL()).get("surl");
@@ -245,13 +253,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
         if (targetFileID != null) {
             logger.info("Trying to find item with the following fs_id ONLY: " + targetFileID);
         }
-        final String protocolAndSubdomain = "https://dm.";
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             logger.info("Crawling page: " + page);
             queryFolder.addAndReplace("page", Integer.toString(page));
             queryFolder.addAndReplace("num", Integer.toString(maxItemsPerPage));
-            final String requesturl = protocolAndSubdomain + this.getHost() + "/share/list?" + queryFolder.toString();
+            final String requesturl = protocolAndSubdomain + "/share/list?" + queryFolder.toString();
             br.getPage(requesturl);
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             int errno = ((Number) entries.get("errno")).intValue();
@@ -343,7 +350,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 final long category = JavaScriptEngineFactory.toLong(ressource.get("category"), -1);
                 if (JavaScriptEngineFactory.toLong(ressource.get("isdir"), -1) == 1) {
                     /* Folder */
-                    final String url = protocolAndSubdomain + this.getHost() + "/web/share/link?surl=" + surl + "&path=" + Encoding.urlEncode(path);
+                    final String url = protocolAndSubdomain + "/web/share/link?surl=" + surl + "&path=" + Encoding.urlEncode(path);
                     final DownloadLink folder = this.createDownloadlink(url);
                     if (passCode != null) {
                         folder.setDownloadPassword(passCode);
@@ -369,11 +376,11 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     thisparams.appendEncoded("dir", realpath);// only the path!
                     thisparams.add("fsid", fsidStr);
                     thisparams.appendEncoded("fileName", serverfilename);
-                    final String url = protocolAndSubdomain + this.getHost() + "/sharing/link?" + thisparams.toString();
+                    final String url = protocolAndSubdomain + "/sharing/link?" + thisparams.toString();
                     final String contentURL;
                     if (category == 1) {
                         thisparams.add("page", Integer.toString(page));
-                        contentURL = protocolAndSubdomain + this.getHost() + "/sharing/videoPlay?" + thisparams.toString();
+                        contentURL = protocolAndSubdomain + "/sharing/videoPlay?" + thisparams.toString();
                     } else {
                         /* No URL available that points directly to that file! */
                         contentURL = param.toString();
