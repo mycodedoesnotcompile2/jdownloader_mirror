@@ -166,6 +166,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.FilePackageProperty;
 import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
+import jd.plugins.ParsedFilename;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.PluginsC;
@@ -4138,7 +4139,11 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                                  */
                                 maxFilenameLength = maxFilenameLength - (fileOutput.getName().length() - filename.length());
                             }
+                            final ParsedFilename pfname;
                             if (e.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
+                                throw e;
+                            } else if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
+                                /* Do not offer auto filename shortening for multipart archive files. */
                                 throw e;
                             } else if (maxFilenameLength <= 0) {
                                 /*
@@ -4150,7 +4155,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                                 throw new SkipReasonException(SkipReason.INVALID_DESTINATION, e);
                             }
                             /* Shorten filename and try again */
-                            final String shortenedFilename = LinknameCleaner.shortenFilename(new jd.plugins.ParsedFilename(filename), maxFilenameLength);
+                            final String shortenedFilename = LinknameCleaner.shortenFilename(pfname, maxFilenameLength);
                             if (shortenedFilename == null) {
                                 /* Shortening this filename was not possible -> Throw exception */
                                 throw e;

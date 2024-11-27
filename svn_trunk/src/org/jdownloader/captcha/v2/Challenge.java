@@ -51,6 +51,18 @@ public abstract class Challenge<T> {
         return false;
     }
 
+    /**
+     * Used to validate result against expected pattern. <br />
+     * This is different to AbstractBrowserChallenge.isSolved, as we don't want to throw the same error exception.
+     *
+     * @param result
+     * @return
+     * @author raztoki
+     */
+    public boolean isCaptchaResponseValid() {
+        return isSolved();
+    }
+
     private boolean canBeSkippedByPluginforDecrypt(final SkipRequest skipRequest, final ChallengeSolver<?> solver, final Challenge<?> challenge, final Plugin plugin) {
         final Plugin challengePlugin = challenge.getPlugin();
         if (challengePlugin == null || !(challengePlugin instanceof PluginForDecrypt)) {
@@ -170,7 +182,10 @@ public abstract class Challenge<T> {
         return resultType;
     }
 
-    abstract public boolean isSolved();
+    public boolean isSolved() {
+        final ResponseList<T> results = getResult();
+        return results != null && results.getValue() != null;
+    }
 
     private String typeID;
     private String explain;

@@ -15,7 +15,6 @@ import org.appwork.utils.net.httpserver.requests.HttpRequest;
 import org.appwork.utils.net.httpserver.requests.PostRequest;
 import org.appwork.utils.net.httpserver.responses.HttpResponse;
 import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.solverjob.ResponseList;
 import org.jdownloader.logging.LogController;
 
 public abstract class AbstractBrowserChallenge extends Challenge<String> {
@@ -28,11 +27,6 @@ public abstract class AbstractBrowserChallenge extends Challenge<String> {
 
     public Browser getPluginBrowser() {
         return pluginBrowser;
-    }
-
-    public boolean isSolved() {
-        final ResponseList<String> results = getResult();
-        return results != null && results.getValue() != null;
     }
 
     protected AbstractBrowserChallenge(final String method, final Plugin plugin, Browser pluginBrowser) {

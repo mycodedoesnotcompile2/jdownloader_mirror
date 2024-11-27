@@ -27,9 +27,4 @@ public class ClickCaptchaChallenge extends ImageCaptchaChallenge<ClickedPoint> {
 
     }
 
-    @Override
-    public boolean isSolved() {
-        return this.getResult() != null;
-    }
-
 }

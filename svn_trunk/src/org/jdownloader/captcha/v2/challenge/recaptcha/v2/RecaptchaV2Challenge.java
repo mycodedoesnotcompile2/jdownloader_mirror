@@ -11,6 +11,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.nutils.encoding.HTMLEntities;
+import jd.plugins.Plugin;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.net.protocol.http.HTTPConstants.ResponseCode;
@@ -40,11 +45,6 @@ import org.jdownloader.captcha.v2.solver.browser.BrowserViewport;
 import org.jdownloader.captcha.v2.solver.browser.BrowserWindow;
 import org.jdownloader.captcha.v2.solver.service.BrowserSolverService;
 import org.jdownloader.gui.translate._GUI;
-
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.nutils.encoding.HTMLEntities;
-import jd.plugins.Plugin;
 
 public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
     public static final String             RAWTOKEN    = "rawtoken";
@@ -747,17 +747,9 @@ public abstract class RecaptchaV2Challenge extends AbstractBrowserChallenge {
         }
     }
 
-    /**
-     * Used to validate result against expected pattern. <br />
-     * This is different to AbstractBrowserChallenge.isSolved, as we don't want to throw the same error exception.
-     *
-     * @param result
-     * @return
-     * @author raztoki
-     */
-    protected final boolean isCaptchaResponseValid() {
-        final String v = getResult().getValue();
-        if (isSolved() && isValidResponseToken(v)) {
+    @Override
+    public boolean isCaptchaResponseValid() {
+        if (super.isCaptchaResponseValid() && isValidResponseToken(getResult().getValue())) {
             return true;
         } else {
             return false;

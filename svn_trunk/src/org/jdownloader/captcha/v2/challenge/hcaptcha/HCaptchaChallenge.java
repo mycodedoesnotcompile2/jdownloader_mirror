@@ -303,17 +303,9 @@ public class HCaptchaChallenge extends AbstractBrowserChallenge {
         return "hcaptcha";
     }
 
-    /**
-     * Used to validate result against expected pattern. <br />
-     * This is different to AbstractBrowserChallenge.isSolved, as we don't want to throw the same error exception.
-     *
-     * @param result
-     * @return
-     * @author raztoki
-     */
-    protected final boolean isCaptchaResponseValid() {
-        final String v = getResult().getValue();
-        if (isSolved() && isValidResponseToken(v)) {
+    @Override
+    public boolean isCaptchaResponseValid() {
+        if (super.isCaptchaResponseValid() && isValidResponseToken(getResult().getValue())) {
             return true;
         } else {
             return false;

@@ -66,7 +66,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50178 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50234 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                        = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
@@ -231,7 +231,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50178 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 50234 $"));
     }
 
     /**
@@ -918,8 +918,7 @@ public abstract class K2SApi extends PluginForHost {
         } else {
             /* Stop all items of this host to avoid IP ban due to too many un-answered captchas. */
             CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
-            final boolean isAccountLoginCaptchaChallenge = isAccountLoginCaptchaChallenge(link, challenge);
-            if (isAccountLoginCaptchaChallenge) {
+            if (challenge.isAccountLogin()) {
                 final String text = "You did not answer the login captcha on time | Waiting in order to avoid IP ban";
                 final long waitMillis = 3 * 60 * 60 * 1000;
                 throw new AccountUnavailableException(text, waitMillis);

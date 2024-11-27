@@ -12,7 +12,6 @@ import org.appwork.utils.images.IconIO;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
 import org.jdownloader.captcha.v2.ChallengeSolver;
-import org.jdownloader.captcha.v2.solverjob.ResponseList;
 
 public class KeyCaptchaPuzzleChallenge extends Challenge<String> {
 
@@ -102,23 +101,4 @@ public class KeyCaptchaPuzzleChallenge extends Challenge<String> {
         return plugin;
     }
 
-    /**
-     * Used to validate result against expected pattern. <br />
-     * This is different to AbstractBrowserChallenge.isSolved, as we don't want to throw the same error exception.
-     *
-     * @param result
-     * @return
-     * @author raztoki
-     */
-    protected final boolean isCaptchaResponseValid() {
-        if (isSolved()) {
-            return true;
-        }
-        return false;
-    }
-
-    public boolean isSolved() {
-        final ResponseList<String> results = getResult();
-        return results != null && results.getValue() != null;
-    }
 }

@@ -1,13 +1,15 @@
 package org.jdownloader.captcha.v2.challenge.multiclickcaptcha;
 
 import java.io.File;
+
+import jd.plugins.Plugin;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.ImageCaptchaChallenge;
 import org.jdownloader.captcha.v2.challenge.stringcaptcha.MultiClickCaptchaResponse;
-import jd.plugins.Plugin;
 
 public class MultiClickCaptchaChallenge extends ImageCaptchaChallenge<MultiClickedPoint> {
 
@@ -23,11 +25,6 @@ public class MultiClickCaptchaChallenge extends ImageCaptchaChallenge<MultiClick
 
         return new MultiClickCaptchaResponse(this, solver, res, 100);
 
-    }
-
-    @Override
-    public boolean isSolved() {
-        return this.getResult() != null;
     }
 
 }

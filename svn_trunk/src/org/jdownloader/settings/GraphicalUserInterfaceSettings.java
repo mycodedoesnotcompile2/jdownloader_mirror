@@ -1183,6 +1183,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @RequiresRestart("Restart is Required")
+    @DescriptionForConfigEntry("Table wrap enabled? Cursor/Selection will jump to the begin/end of the table when reaching bottom/top position")
     @DefaultBooleanValue(true)
     boolean isTableWrapAroundEnabled();
 

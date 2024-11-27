@@ -15,15 +15,18 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginHost;
+import org.jdownloader.plugins.config.Type;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 import org.jdownloader.translate._JDT;
 
@@ -34,6 +37,7 @@ import jd.http.Cookies;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -43,28 +47,51 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "julesjordan.com" }, urls = { "https?://dl\\d+\\.julesjordan\\.com/dl/.+|https?://(?:www\\.)?julesjordan\\.com/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html" })
-public class JulesjordanCom extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 50229 $", interfaceVersion = 3, names = {}, urls = {})
+@PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
+public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://enter.julesjordan.com/signup/signup.php");
+        this.enablePremium("http://enter." + getHost() + "/signup/signup.php");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.julesjordan.com/terms.html";
+        return "https://www." + getHost() + "/terms.html";
     }
 
-    private String  dllink        = null;
-    private boolean server_issues = false;
+    private String dllink = null;
 
     public static Browser prepBR(final Browser br, final String host) {
         br.setFollowRedirects(true);
         return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        return JulesjordanComDecrypter.getPluginDomains();
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            final String domainspatternpart = buildHostsPatternPart(domains);
+            ret.add("https?://dl\\d+\\." + domainspatternpart + "/dl/.+|https?://(?:www\\.)?" + domainspatternpart + "/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html");
+        }
+        return ret.toArray(new String[0]);
     }
 
     public int getMaxChunks(final Account account) {
@@ -74,17 +101,18 @@ public class JulesjordanCom extends antiDDoSForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this);
-        return requestFileInformation(link, account);
+        return requestFileInformation(link, account, false);
     }
 
-    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws Exception {
+    public AvailableStatus requestFileInformation(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
         dllink = null;
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
+        final String extDefault = ".mp4";
         // final String decrypter_filename = link.getStringProperty("decrypter_filename", null);
         if (isTrailerURL(link.getPluginPatternMatcher())) {
             /* Trailer download */
-            getPage(getURLFree(link.getPluginPatternMatcher()));
+            br.getPage(getURLFree(link.getPluginPatternMatcher()));
             if (JulesjordanComDecrypter.isOffline(this.br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -107,24 +135,9 @@ public class JulesjordanCom extends antiDDoSForHost {
             String title = getURLName(link.getPluginPatternMatcher()).replace("-", " ");
             title = Encoding.htmlDecode(title).trim();
             /* Do NOT set final filename yet!! */
-            link.setName(title + ".mp4");
+            link.setName(title + extDefault);
             if (!StringUtils.isEmpty(dllink)) {
-                URLConnectionAdapter con = null;
-                try {
-                    con = br.openHeadConnection(dllink);
-                    if (this.looksLikeDownloadableContent(con)) {
-                        if (con.getCompleteContentLength() > 0) {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
-                    } else {
-                        server_issues = true;
-                    }
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (final Throwable e) {
-                    }
-                }
+                this.basicLinkCheck(br, br.createHeadRequest(dllink), link, title, extDefault);
             }
         } else {
             /* Full video (premium) download */
@@ -159,17 +172,14 @@ public class JulesjordanCom extends antiDDoSForHost {
                     }
                     con = br.openHeadConnection(dllink);
                 }
-                if (this.looksLikeDownloadableContent(con)) {
-                    link.setFinalFileName(getFileNameFromConnection(con));
-                    if (con.getCompleteContentLength() > 0) {
-                        if (con.isContentDecoded()) {
-                            link.setDownloadSize(con.getCompleteContentLength());
-                        } else {
-                            link.setVerifiedFileSize(con.getCompleteContentLength());
-                        }
+                this.handleConnectionErrors(br, con);
+                link.setFinalFileName(getFileNameFromConnection(con));
+                if (con.getCompleteContentLength() > 0) {
+                    if (con.isContentDecoded()) {
+                        link.setDownloadSize(con.getCompleteContentLength());
+                    } else {
+                        link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
-                } else {
-                    this.server_issues = true;
                 }
             } finally {
                 try {
@@ -187,11 +197,9 @@ public class JulesjordanCom extends antiDDoSForHost {
     }
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        requestFileInformation(link, account);
+        requestFileInformation(link, account, true);
         handleGeneralErrors();
-        if (server_issues) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error", 10 * 60 * 1000l);
-        } else if (dllink == null) {
+        if (dllink == null) {
             /*
              * If trailer download is possible but dllink == null in theory this would be a PLUGIN_DEFECT but I think that premiumonly
              * message is more suitable here as a trailer is usually not what you'd want to download.
@@ -235,70 +243,62 @@ public class JulesjordanCom extends antiDDoSForHost {
 
     public void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                prepBR(br, account.getHoster());
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    /*
-                     * Try to avoid login captcha at all cost! Important: ALWAYS check this as their cookies can easily become invalid e.g.
-                     * when the user logs in via browser.
-                     */
-                    br.setCookies(account.getHoster(), cookies);
-                    if (!force) {
-                        logger.info("Trust cookies without checking");
-                        return;
-                    } else {
-                        br.getPage("https://www." + account.getHoster() + "/members/index.php");
-                        if (isLoggedin(br)) {
-                            logger.info("Cookie login successful");
-                            account.saveCookies(br.getCookies(br.getHost()), "");
-                            return;
-                        } else {
-                            logger.info("Cookie login failed");
-                            br.clearCookies(null);
-                        }
-                    }
+            prepBR(br, account.getHoster());
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                /*
+                 * Try to avoid login captcha at all cost! Important: ALWAYS check this as their cookies can easily become invalid e.g. when
+                 * the user logs in via browser.
+                 */
+                br.setCookies(this.getHost(), cookies);
+                if (!force) {
+                    logger.info("Trust cookies without checking");
+                    return;
                 }
-                logger.info("Performing full login");
-                // br.getPage("https://www." + this.getHost() + "/trial/index.php");
-                br.getPage("https://www." + account.getHoster() + "/members/");
-                br.setCookie(br.getHost(), "CookieScriptConsent", "{\"action\":\"accept\"}");
-                String postdata = "rlm=My+Server&for=https%253a%252f%252fwww%252ejulesjordan%252ecom%252fmembers%252f&uid=" + Encoding.urlEncode(account.getUser()) + "&pwd=" + Encoding.urlEncode(account.getPass()) + "&rmb=y";
-                final String code = this.getCaptchaCode("/img.cptcha", this.getDownloadLink());
-                postdata += "&img=" + Encoding.urlEncode(code);
-                br.getHeaders().put("Origin", "https://www.julesjordan.com");
-                /* 2021-07-26: Without these headers we'll always get http response 500! */
-                br.getHeaders().put("Cache-Control", "max-age=0");
-                br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
-                // if (br.getCookie(br.getHost(), "pcar%5fTXkgU2VydmVy", Cookies.NOTDELETEDPATTERN) != null) {
-                // /* 2021-07-26: Debug-test: Remove "pcar" cookie */
-                // final Cookies thiscookies = br.getCookies(br.getHost());
-                // final Cookies newcookies = new Cookies();
-                // for (final Cookie cookie : thiscookies.getCookies()) {
-                // if (cookie.getKey().equals("pcar%5fTXkgU2VydmVy")) {
-                // continue;
-                // }
-                // newcookies.add(cookie);
-                // }
-                // br.clearCookies(br.getHost());
-                // br.setCookies(newcookies);
-                // }
-                br.postPage("/auth.form", postdata);
+                br.getPage("https://www." + this.getHost() + "/members/index.php");
+                if (isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                    account.clearCookies("");
+                }
+            }
+            logger.info("Performing full login");
+            // br.getPage("https://www." + this.getHost() + "/trial/index.php");
+            br.getPage("https://www." + this.getHost() + "/members/");
+            br.setCookie(br.getHost(), "CookieScriptConsent", "{\"action\":\"accept\"}");
+            final Form loginform = br.getFormbyActionRegex(".*auth\\.form.*");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            // final String forURL = br.getURL("/members/").toExternalForm();
+            // loginform.put("for", Encoding.urlEncode(forURL));
+            final String code = this.getCaptchaCode("/img.cptcha", this.getDownloadLink());
+            loginform.put("img", Encoding.urlEncode(code));
+            loginform.put("uid", Encoding.urlEncode(account.getUser()));
+            loginform.put("pwd", Encoding.urlEncode(account.getPass()));
+            loginform.put("rmb", "y");
+            br.getHeaders().put("Origin", "https://www." + this.getHost());
+            /* 2021-07-26: Without these headers we'll always get http response 500! */
+            br.getHeaders().put("Cache-Control", "max-age=0");
+            br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
                 if (br.containsHTML("captcha_x=1")) {
                     /* User entered invalid login-captcha */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 } else if (br.getURL().matches("(?i).+/expired/?$")) {
                     /* Login is valid but account is not premium anymore. */
                     throw new AccountInvalidException("Account is expired");
-                } else if (!isLoggedin(br)) {
+                } else {
                     throw new AccountInvalidException();
                 }
-                account.saveCookies(br.getCookies(br.getHost()), "");
-            } catch (final PluginException e) {
-                account.clearCookies("");
-                throw e;
             }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -392,12 +392,7 @@ public class JulesjordanCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
-    }
-
-    @Override
-    public String getDescription() {
-        return "Download videos- and pictures with the julesjordan.com plugin.";
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -405,6 +400,7 @@ public class JulesjordanCom extends antiDDoSForHost {
         return JulesjordanComConfigInterface.class;
     }
 
+    @PluginHost(host = "julesjordan.com", type = Type.HOSTER)
     public static interface JulesjordanComConfigInterface extends PluginConfigInterface {
         public static class TRANSLATION {
             public String getFastLinkcheckEnabled_label() {

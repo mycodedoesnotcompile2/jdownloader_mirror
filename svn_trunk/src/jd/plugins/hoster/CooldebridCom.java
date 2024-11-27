@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -48,7 +42,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50242 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -203,11 +203,15 @@ public class CooldebridCom extends PluginForHost {
         ai.setStatus(accountType + " | " + "Daily links left: " + linksPerDayLeft + "/" + linksPerDayMax);
         if (accountType.equalsIgnoreCase("Premium User")) {
             account.setType(AccountType.PREMIUM);
-            final String daysLeft = br.getRegex("(?i)(\\d+)\\s*Days\\s*Left\\s*<").getMatch(0);
-            if (daysLeft == null) {
+            final String daysLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Days\\s*Left\\s*<").getMatch(0);
+            final String hoursLeft = br.getRegex("(?i)([\\d+\\.]+)\\s*Hours\\s*Left\\s*<").getMatch(0);
+            if (daysLeft != null) {
+                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(daysLeft) * 24 * 60 * 60 * 1000l), this.br);
+            } else if (hoursLeft != null) {
+                ai.setValidUntil(System.currentTimeMillis() + (long) (Double.parseDouble(hoursLeft) * 60 * 60 * 1000l), this.br);
+            } else {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            ai.setValidUntil(System.currentTimeMillis() + Long.parseLong(daysLeft) * 24 * 60 * 60 * 1000l, this.br);
         } else {
             /*
              * 2022-02-22: Website claims to also support some hosts for free users but when this plugin was developed they did not have a
@@ -357,9 +361,6 @@ public class CooldebridCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    private void checkErrors(final DownloadLink link, final Account account) throws PluginException, InterruptedException {
     }
 
     @Override

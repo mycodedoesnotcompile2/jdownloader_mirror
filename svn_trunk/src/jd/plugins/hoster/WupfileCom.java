@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 47734 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50229 $", interfaceVersion = 3, names = {}, urls = {})
 public class WupfileCom extends XFileSharingProBasic {
     public WupfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -113,7 +113,7 @@ public class WupfileCom extends XFileSharingProBasic {
     @Override
     protected boolean is_lifetime_account(final Browser br) {
         /* 2020-04-28: Special: Handle Premium traffic accounts without expire-date as lifetime. */
-        return br.getRegex("(?i)Premium traffic remaining\\s*<").matches();
+        return br.getRegex("Premium traffic remaining\\s*<").patternFind();
     }
 
     @Override

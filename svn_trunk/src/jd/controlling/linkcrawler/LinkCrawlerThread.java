@@ -4,14 +4,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
 import jd.http.BrowserSettingsThread;
-import jd.plugins.PluginForDecrypt;
+import jd.plugins.Plugin;
 
 import org.jdownloader.plugins.controller.PluginClassLoader;
 
 public class LinkCrawlerThread extends BrowserSettingsThread {
     private static AtomicInteger linkCrawlerThread = new AtomicInteger(0);
-    private LinkCrawler          crawler;
-    private Object               owner             = null;
+    private volatile LinkCrawler crawler;
+    private volatile Object      owner             = null;
 
     public LinkCrawlerThread(Runnable r) {
         super(r);
@@ -45,6 +45,14 @@ public class LinkCrawlerThread extends BrowserSettingsThread {
         return owner;
     }
 
+    public Plugin getCurrentPlugin() {
+        final Object ret = getCurrentOwner();
+        if (ret instanceof Plugin) {
+            return (Plugin) ret;
+        }
+        return null;
+    }
+
     /**
      * @param owner
      *            the owner to set
@@ -53,6 +61,4 @@ public class LinkCrawlerThread extends BrowserSettingsThread {
         this.owner = owner;
     }
 
-    public void setActivePlugin(PluginForDecrypt wplg) {
-    }
 }

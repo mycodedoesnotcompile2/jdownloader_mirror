@@ -25,6 +25,26 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jd.PluginWrapper;
+import jd.config.SubConfiguration;
+import jd.controlling.ProgressController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
+import jd.controlling.linkcrawler.LinkCrawlerDistributer;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.http.Browser;
+import jd.http.Browser.BlockedByException;
+import jd.http.Browser.BrowserException;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.DecrypterRetryException.RetryReason;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TrackerJob;
@@ -68,26 +88,6 @@ import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.translate._JDT;
-
-import jd.PluginWrapper;
-import jd.config.SubConfiguration;
-import jd.controlling.ProgressController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcollector.LinkCollector.JobLinkCrawler;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawler.LinkCrawlerGeneration;
-import jd.controlling.linkcrawler.LinkCrawlerDistributer;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.http.Browser;
-import jd.http.Browser.BlockedByException;
-import jd.http.Browser.BrowserException;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.DecrypterRetryException.RetryReason;
 
 /**
  * Dies ist die Oberklasse für alle Plugins, die Links entschlüsseln können
@@ -143,16 +143,16 @@ public abstract class PluginForDecrypt extends Plugin {
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
-     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
+     * build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure() {
         return getAdoptedCloudFolderStructure(null);
     }
 
     /**
-     * Use this when e.g. crawling folders & subfolders from cloud-services. </br>
-     * Use this to find the last path in order to continue to build the path until all subfolders are crawled.
+     * Use this when e.g. crawling folders & subfolders from cloud-services. </br> Use this to find the last path in order to continue to
+     * build the path until all subfolders are crawled.
      */
     protected final String getAdoptedCloudFolderStructure(final String fallback) {
         CrawledLink current = getCurrentLink();
@@ -707,28 +707,9 @@ public abstract class PluginForDecrypt extends Plugin {
         return handleCaptchaChallenge(c);
     }
 
-    protected <ReturnType> ReturnType handleCaptchaChallenge(Challenge<ReturnType> c) throws PluginException, CaptchaException, InterruptedException {
-        if (c instanceof ImageCaptchaChallenge) {
-            final File captchaFile = ((ImageCaptchaChallenge) c).getImageFile();
-            cleanUpCaptchaFiles.addIfAbsent(captchaFile);
-        }
-        if (Thread.currentThread() instanceof SingleDownloadController) {
-            logger.severe("PluginForDecrypt.getCaptchaCode inside SingleDownloadController!?");
-        }
-        c.setTimeout(getChallengeTimeout(c));
-        invalidateLastChallengeResponse();
-        final BlacklistEntry<?> blackListEntry = CaptchaBlackList.getInstance().matches(c);
-        if (blackListEntry != null) {
-            logger.warning("Cancel. Blacklist Matching");
-            throw new CaptchaException(blackListEntry);
-        }
-        try {
-            ChallengeResponseController.getInstance().handle(c);
-        } catch (InterruptedException e) {
-            LogSource.exception(logger, e);
-            throw e;
-        } catch (SkipException e) {
-            LogSource.exception(logger, e);
+    protected <ReturnType> ReturnType handleSkipException(Challenge<ReturnType> c, SkipException e) throws PluginException, CaptchaException, InterruptedException {
+        LogSource.exception(logger, e);
+        if (!c.isAccountLogin()) {
             switch (e.getSkipRequest()) {
             case BLOCK_ALL_CAPTCHAS:
                 CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(getCrawler()));
@@ -739,37 +720,84 @@ public abstract class PluginForDecrypt extends Plugin {
             case BLOCK_PACKAGE:
                 CaptchaBlackList.getInstance().add(new BlockCrawlerCaptchasByPackage(getCrawler(), getCurrentLink()));
                 break;
-            case REFRESH:
-                // refresh is not supported from the pluginsystem right now.
-                return c.getRefreshTrigger();
             case TIMEOUT:
                 onCaptchaTimeout(getCurrentLink(), c);
                 // TIMEOUT may fallthrough to SINGLE
             case SINGLE:
                 break;
-            case STOP_CURRENT_ACTION:
-                if (Thread.currentThread() instanceof LinkCrawlerThread) {
-                    final LinkCrawler linkCrawler = ((LinkCrawlerThread) Thread.currentThread()).getCurrentLinkCrawler();
-                    if (linkCrawler instanceof JobLinkCrawler) {
-                        final JobLinkCrawler jobLinkCrawler = ((JobLinkCrawler) linkCrawler);
-                        logger.info("Abort JobLinkCrawler:" + jobLinkCrawler.getUniqueAlltimeID().toString());
-                        jobLinkCrawler.abort();
-                    } else {
-                        logger.info("Abort global LinkCollector");
-                        LinkCollector.getInstance().abort();
-                    }
-                    CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(getCrawler()));
-                }
-                break;
             default:
                 break;
             }
+        }
+        switch (e.getSkipRequest()) {
+        case STOP_CURRENT_ACTION:
+            if (Thread.currentThread() instanceof LinkCrawlerThread) {
+                final LinkCrawler linkCrawler = ((LinkCrawlerThread) Thread.currentThread()).getCurrentLinkCrawler();
+                if (linkCrawler instanceof JobLinkCrawler) {
+                    final JobLinkCrawler jobLinkCrawler = ((JobLinkCrawler) linkCrawler);
+                    logger.info("Abort JobLinkCrawler:" + jobLinkCrawler.getUniqueAlltimeID().toString());
+                    jobLinkCrawler.abort();
+                } else {
+                    logger.info("Abort global LinkCollector");
+                    LinkCollector.getInstance().abort();
+                }
+                CaptchaBlackList.getInstance().add(new BlockAllCrawlerCaptchasEntry(getCrawler()));
+            }
+            break;
+        case REFRESH:
+            // refresh is not supported from the pluginsystem right now.
+            return c.getRefreshTrigger();
+        default:
+            break;
+        }
+        throw new CaptchaException(e.getSkipRequest());
+    }
+
+    public <ReturnType> ReturnType handleCaptchaChallenge(Challenge<ReturnType> c) throws PluginException, CaptchaException, InterruptedException {
+        if (c instanceof ImageCaptchaChallenge) {
+            final File captchaFile = ((ImageCaptchaChallenge) c).getImageFile();
+            cleanUpCaptchaFiles.addIfAbsent(captchaFile);
+        }
+        c.setTimeout(getChallengeTimeout(c));
+        invalidateLastChallengeResponse();
+        try {
+            if (isAccountLoginCaptchaChallenge(c)) {
+                /**
+                 * account login -> do not use anticaptcha services
+                 */
+                c.setAccountLogin(true);
+            }
+            final BlacklistEntry<?> blackListEntry = CaptchaBlackList.getInstance().matches(c);
+            if (blackListEntry != null) {
+                logger.warning("Cancel. Blacklist Matching");
+                throw new CaptchaException(blackListEntry);
+            }
+            ChallengeResponseController.getInstance().handle(c);
+            if (!c.isSolved()) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else if (!c.isCaptchaResponseValid()) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha reponse value did not validate!");
+            } else {
+                return c.getResult().getValue();
+            }
+        } catch (InterruptedException e) {
+            LogSource.exception(logger, e);
+            throw e;
+        } catch (SkipException e) {
+            final Thread thread = Thread.currentThread();
+            if (thread instanceof LinkCrawlerThread) {
+                return handleSkipException(c, e);
+            }
+            if (thread instanceof SingleDownloadController) {
+                final SingleDownloadController sdc = (SingleDownloadController) thread;
+                final PluginForHost hostPlugin = sdc.getProcessingPlugin();
+                return hostPlugin.handleSkipException(sdc.getDownloadLink(), c, e);
+            }
             throw new CaptchaException(e.getSkipRequest());
+        } finally {
+            c.cleanup();
         }
-        if (!c.isSolved()) {
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-        }
-        return c.getResult().getValue();
+
     }
 
     protected BasicCaptchaChallenge createChallenge(String method, File file, int flag, String defaultValue, String explain) {

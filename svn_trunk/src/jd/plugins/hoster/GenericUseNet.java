@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginConfigPanelNG;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50179 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50228 $", interfaceVersion = 2, names = { "genericusenet" }, urls = { "" })
 public class GenericUseNet extends UseNet {
     public GenericUseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -106,7 +106,7 @@ public class GenericUseNet extends UseNet {
 
     @Override
     public AccountBuilderInterface getAccountFactory(final InputChangedCallbackInterface callback) {
-        return new DefaultEditAccountPanel(callback) {
+        return new DefaultEditAccountPanel(callback, false) {
             private final ExtTextField host;
             private final ExtCheckBox  ssl;
             private final ExtSpinner   port;

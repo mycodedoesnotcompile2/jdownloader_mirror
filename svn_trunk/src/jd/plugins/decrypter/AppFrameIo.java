@@ -24,7 +24,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50225 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
+@DecrypterPlugin(revision = "$Revision: 50231 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
 public class AppFrameIo extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
@@ -90,7 +90,6 @@ public class AppFrameIo extends PluginForDecrypt {
             mode = config.getQualityMode();
         }
         switch (mode) {
-        default:
         case ALL:
             best = null;
             ret.addAll(filter(results, AppFrameIoConfig.QUALITY.values()));
@@ -107,6 +106,8 @@ public class AppFrameIo extends PluginForDecrypt {
             ret.addAll(filter(results, sort(config.getPreferredQuality())));
             best = ret.size() > 0 ? ret.get(0) : null;
             break;
+        default:
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + mode);
         }
         if (best != null) {
             ret.clear();
@@ -133,7 +134,7 @@ public class AppFrameIo extends PluginForDecrypt {
         return ret.toArray(new AppFrameIoConfig.QUALITY[0]);
     }
 
-    protected List<DownloadLink> filter(final Map<String, DownloadLink> results, final AppFrameIoConfig.QUALITY... qualities) {
+    protected List<DownloadLink> filter(final Map<String, DownloadLink> results, final AppFrameIoConfig.QUALITY... qualities) throws Exception {
         final List<DownloadLink> ret = new ArrayList<DownloadLink>();
         for (AppFrameIoConfig.QUALITY quality : qualities) {
             final DownloadLink result;
@@ -157,8 +158,7 @@ public class AppFrameIo extends PluginForDecrypt {
                 result = results.get("h264_360");
                 break;
             default:
-                result = null;
-                break;
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Unsupported:" + quality);
             }
             if (result != null && !ret.contains(result)) {
                 ret.add(result);

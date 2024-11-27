@@ -98,7 +98,7 @@ public class UsenetServer implements Storable {
     }
 
     public static List<UsenetServer> createServerList(final String host, final int[] nonSSLPorts, final int[] SSLPorts) {
-        List<UsenetServer> servers = new ArrayList<>();
+        final List<UsenetServer> servers = new ArrayList<UsenetServer>();
         for (int port : nonSSLPorts) {
             servers.add(new UsenetServer(host, port, false));
         }

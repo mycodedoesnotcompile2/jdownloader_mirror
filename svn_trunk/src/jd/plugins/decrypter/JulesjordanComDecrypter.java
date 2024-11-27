@@ -47,10 +47,36 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.JulesjordanCom;
 import jd.plugins.hoster.JulesjordanCom.JulesjordanComConfigInterface;
 
-@DecrypterPlugin(revision = "$Revision: 47996 $", interfaceVersion = 3, names = { "julesjordan.com" }, urls = { "https?://(?:www\\.)?julesjordan\\.com/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 50229 $", interfaceVersion = 3, names = {}, urls = {})
 public class JulesjordanComDecrypter extends PluginForDecrypt {
     public JulesjordanComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "julesjordan.com" });
+        ret.add(new String[] { "manuelferrara.com" });
+        ret.add(new String[] { "theassfactory.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:trial|members)/(?:movies|scenes)/[^/]+\\.html");
+        }
+        return ret.toArray(new String[0]);
     }
 
     /* Important: Keep this updated & keep this in order: Highest --> Lowest */
@@ -58,8 +84,6 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        List<String> all_selected_qualities = new ArrayList<String>();
-        final JulesjordanComConfigInterface cfg = PluginJsonConfig.get(JulesjordanCom.JulesjordanComConfigInterface.class);
         final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
@@ -68,6 +92,8 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
             ret.add(dl);
             return ret;
         }
+        List<String> all_selected_qualities = new ArrayList<String>();
+        final JulesjordanComConfigInterface cfg = PluginJsonConfig.get(JulesjordanCom.JulesjordanComConfigInterface.class);
         final String url_name = JulesjordanCom.getURLName(param.getCryptedUrl());
         final boolean grabBest = cfg.isGrabBESTEnabled();
         final boolean grabBestWithinUserSelection = cfg.isOnlyBestVideoQualityOfSelectedQualitiesEnabled();
@@ -181,7 +207,7 @@ public class JulesjordanComDecrypter extends PluginForDecrypt {
     public static HashMap<String, String> findAllQualities(final Browser br) throws Exception {
         final HashMap<String, String> allQualities = new HashMap<String, String>();
         /* Old handling */
-        final String[] dlinfo = br.getRegex("<option value=\"(https?://dl\\d+\\.julesjordan\\.com/dl/[^<>\"]+\\.mp4)\"").getColumn(0);
+        final String[] dlinfo = br.getRegex("<option value=\"(https?://dl\\d+\\.[^/]+/dl/[^<>\"]+\\.mp4)\"").getColumn(0);
         for (final String dlurl : dlinfo) {
             final String quality_url = new Regex(dlurl, "([A-Za-z0-9]+)\\.mp4$").getMatch(0);
             if (dlurl == null || quality_url == null) {

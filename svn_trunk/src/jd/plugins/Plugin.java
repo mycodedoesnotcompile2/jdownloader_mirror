@@ -166,6 +166,46 @@ public abstract class Plugin implements ActionListener {
         return null;
     }
 
+    private WeakReference<Account> currentAccount = null;
+
+    protected Account setCurrentAccount(final Account account) {
+        final Account currentAccount = getCurrentAccount();
+        this.currentAccount = (account != null && (currentAccount == null || currentAccount != account)) ? new WeakReference<Account>(account) : null;
+        return currentAccount;
+    }
+
+    protected Account getCurrentAccount() {
+        final Thread thread = Thread.currentThread();
+        final WeakReference<Account> currentAccount = this.currentAccount;
+        if (currentAccount != null) {
+            final Account account = currentAccount.get();
+            if (account != null) {
+                return account;
+            }
+        } else if (thread instanceof SingleDownloadController) {
+            final Account account = ((SingleDownloadController) thread).getAccount();
+            if (account != null && StringUtils.equals(getHost(), account.getHosterByPlugin())) {
+                return account;
+            }
+        } else if (thread instanceof AccountCheckerThread) {
+            final AccountCheckJob job = ((AccountCheckerThread) thread).getJob();
+            final Account account = job != null ? job.getAccount() : null;
+            if (account != null && StringUtils.equals(getHost(), account.getHosterByPlugin())) {
+                return account;
+            }
+        }
+        return null;
+    }
+
+    protected boolean isAccountLoginCaptchaChallenge(final Challenge<?> c) {
+        final Account currentAccount = getCurrentAccount();
+        if (currentAccount != null && Thread.holdsLock(currentAccount)) {
+            // Captcha Challenge while holding lock on account heavily indicates that we're inside account login/check
+            return true;
+        }
+        return c.isCreatedInsideAccountChecker() || c.isAccountLogin();
+    }
+
     protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
         return new LinkCrawlerDeepInspector() {
             @Override
@@ -784,6 +824,8 @@ public abstract class Plugin implements ActionListener {
                 logger.log(e);
             }
         }
+        this.parent = null;
+        currentAccount = null;
         try {
             cleanupLastChallengeResponse();
         } finally {
@@ -1173,13 +1215,32 @@ public abstract class Plugin implements ActionListener {
         return getNewPluginInstance(lazyPlugin, PluginClassLoader.getThreadPluginClassLoaderChild());
     }
 
+    private WeakReference<Plugin> parent = null;
+
+    private void setParentPlugin(Plugin parentPlugin) {
+        if (parentPlugin != null && parentPlugin != this) {
+            parentPlugin.pluginInstances.add(0, this);
+            this.parent = new WeakReference<Plugin>(parentPlugin);
+        } else {
+            this.parent = null;
+        }
+    }
+
+    protected Plugin getParentPlugin() {
+        final WeakReference<Plugin> parent = this.parent;
+        if (parent != null) {
+            return parent.get();
+        }
+        return null;
+    }
+
     public static <T> T getNewPluginInstance(final Plugin parentPlugin, final LazyPlugin<?> lazyPlugin, PluginClassLoaderChild classLoader) throws PluginException {
         if (lazyPlugin != null) {
             try {
                 final Plugin plugin = lazyPlugin.newInstance(classLoader, false);
                 if (classLoader != null) {
                     if (parentPlugin != null) {
-                        parentPlugin.pluginInstances.add(0, plugin);
+                        plugin.setParentPlugin(parentPlugin);
                         plugin.setLogger(parentPlugin.getLogger());
                         plugin.setBrowser(parentPlugin.getBrowser());
                     }

@@ -20,6 +20,7 @@ import java.net.MalformedURLException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -36,7 +37,6 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DiskYandexNet;
 
-@DecrypterPlugin(revision = "$Revision: 49596 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNetFolder extends PluginForDecrypt {
     public DiskYandexNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -98,6 +98,12 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             ret.add(pattern);
         }
         return ret.toArray(new String[0]);
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        Browser.setRequestIntervalLimitGlobal(getHost(), 500);
     }
 
     /** Usually docviewer.yandex.xy but we're supporting so many domains and subdomains that a generic RegEx works better. */
@@ -173,10 +179,10 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
          */
         String passCode = null;
         String passToken = null;
-        final DownloadLink parent = param.getDownloadLink();
-        if (parent != null) {
-            passToken = parent.getStringProperty(DiskYandexNet.PROPERTY_PASSWORD_TOKEN);
-            passCode = parent.getDownloadPassword();
+        final DownloadLink parentLink = param.getDownloadLink();
+        if (parentLink != null) {
+            passToken = parentLink.getStringProperty(DiskYandexNet.PROPERTY_PASSWORD_TOKEN);
+            passCode = parentLink.getDownloadPassword();
             if (passToken != null) {
                 /*
                  * If that token is still valid, it will grant us access to password protected folders without the need to send the password
@@ -200,7 +206,7 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             if (isOfflineWebsite(this.br)) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            this.hosterplugin.checkErrorsWebsite(br, parent, null);
+            this.hosterplugin.checkErrorsWebsite(br, parentLink, null);
             sk = DiskYandexNet.getSK(this.br);
             final String json = br.getRegex("<script type=\"application/json\"[^>]*id=\"store-prefetch\"[^>]*>(.*?)</script>").getMatch(0);
             if (json == null) {
@@ -230,7 +236,7 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
                 final PostRequest request = br.createJSonPostRequest("/public/api/check-password", postData);
                 prepareJsonRequest(request, br);
                 br.getPage(request);
-                pwresp = hosterplugin.checkErrorsWebAPI(br, parent, null);
+                pwresp = hosterplugin.checkErrorsWebAPI(br, parentLink, null);
                 final Object errorO = pwresp.get("error");
                 if (errorO == null || Boolean.FALSE.equals(errorO)) {
                     logger.info("Pwloop: " + i + " | Correct password: " + passCode);
@@ -252,30 +258,24 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             continue;
         } while (true);
         final String authSk = PluginJSonUtils.getJson(this.br, "authSk");
-        // final String rootResourceId = (String) map.get("rootResourceId");
+        // final String rootResourceId = (String) json_root.get("rootResourceId");
         final String currentResourceId = (String) json_root.get("currentResourceId");
         /*
          * First find the base folder name: If there are multiple items as part of a folder, the first item is kind of a dummy item
          * containing the name of the root folder.
          */
-        String hashMain = null;
+        Map<String, Object> resourceCurrent = null;
         for (final String key : resources_map.keySet()) {
-            final Map<String, Object> ressource = (Map<String, Object>) resources_map.get(key);
-            final String type = (String) ressource.get("type");
-            if ("dir".equals(type) && ressource.get("parent") == null) {
-                hashMain = (String) ressource.get("hash");
+            final Map<String, Object> resource = (Map<String, Object>) resources_map.get(key);
+            final String type = (String) resource.get("type");
+            if ("dir".equals(type) && currentResourceId.equals(resource.get("id"))) {
+                resourceCurrent = resource;
                 break;
             }
         }
         String baseFolderName = null;
-        for (final String key : resources_map.keySet()) {
-            final Map<String, Object> ressource = (Map<String, Object>) resources_map.get(key);
-            final String type = (String) ressource.get("type");
-            final String id = (String) ressource.get("id");
-            if ("dir".equals(type) && StringUtils.equals(id, currentResourceId)) {
-                baseFolderName = (String) ressource.get("name");
-                break;
-            }
+        if (resourceCurrent != null) {
+            baseFolderName = (String) resourceCurrent.get("name");
         }
         if (StringUtils.isEmpty(relativeDownloadPath) && baseFolderName != null) {
             /* First time crawl of a possible folder structure -> Define root dir name */
@@ -286,28 +286,44 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             fp = FilePackage.getInstance();
             fp.setName(relativeDownloadPath);
         }
-        List<Object> ressources_list = new ArrayList<Object>();
+        List<Map<String, Object>> ressources_list = new ArrayList<Map<String, Object>>();
         /* First collect map items in list because API will return list later. */
         for (final String key : resources_map.keySet()) {
-            ressources_list.add(resources_map.get(key));
+            ressources_list.add((Map<String, Object>) resources_map.get(key));
         }
-        final int maxItemsPerPage = 40;
+        // final int maxItemsPerPage = 40;
         int page = 1;
+        String hashCurrent = null;
+        if (resourceCurrent != null) {
+            hashCurrent = (String) resourceCurrent.get("path");
+            if (hashCurrent == null) {
+                hashCurrent = (String) resourceCurrent.get("hash");
+            }
+        }
+        final HashSet<String> dupes = new HashSet<String>();
         int offset = 0;
         pagination: do {
-            logger.info("Crawling page: " + page);
-            boolean completed = false;
-            for (final Object ressourceO : ressources_list) {
-                final Map<String, Object> ressource = (Map<String, Object>) ressourceO;
+            int newItemsThisPage = 0;
+            for (final Map<String, Object> ressource : ressources_list) {
                 final String type = (String) ressource.get("type");
                 final String name = (String) ressource.get("name");
                 String hash = (String) ressource.get("hash");
                 final String path = (String) ressource.get("path");
+                if (resourceCurrent != null && !StringUtils.startsWithCaseInsensitive(path, (String) resourceCurrent.get("path"))) {
+                    continue;
+                }
+                final String resource_id = (String) ressource.get("id");
+                if (!dupes.add(resource_id)) {
+                    /* This should never happen */
+                    logger.info("Skipping dupe: " + resource_id);
+                    continue;
+                }
+                newItemsThisPage++;
                 final DownloadLink link;
                 if (type.equalsIgnoreCase("dir")) {
                     /* Folder */
                     final List<Object> children = (List<Object>) ressource.get("children");
-                    if ((children != null && !children.isEmpty()) || path == null || StringUtils.equals(path, hashMain + ":")) {
+                    if ((children != null && !children.isEmpty()) || path == null || StringUtils.equals(path, hashCurrent + ":")) {
                         /* Skip dummy entries - also do not increase our offset value! */
                         continue;
                     }
@@ -320,13 +336,9 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
                 } else {
                     /* File */
                     // final boolean antiFileSharing = ((Boolean) ressourceMeta.get("antiFileSharing")).booleanValue();
-                    final String resource_id = (String) ressource.get("id");
                     if (StringUtils.isEmpty(hash) && !StringUtils.isEmpty(path) && path.contains(":/")) {
                         /* Small workaround */
                         hash = path.split(":/")[0];
-                    }
-                    if (StringUtils.isEmpty(name) || StringUtils.isEmpty(hash) || StringUtils.isEmpty(resource_id)) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
                     link = createDownloadlink("http://yandexdecrypted.net/" + System.currentTimeMillis() + new Random().nextInt(10000000));
                     parseFilePropertiesWebsite(link, ressource);
@@ -367,30 +379,27 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
                 }
                 ret.add(link);
                 distribute(link);
-                offset += 1;
             }
+            offset += ressources_list.size();
             /* Determine if we've reached the end / crawled all items. */
-            if (page > 1) {
-                completed = Boolean.TRUE.equals(resources_map.get("completed"));
-            } else {
-                if (!completed) {
-                    completed = ressources_list.size() < maxItemsPerPage;
-                }
-            }
-            logger.info("Crawled page: " + page + " | Found items so far: " + ret.size());
-            if (completed) {
+            final Boolean completed = (Boolean) resources_map.get("completed");
+            logger.info("Crawled page: " + page + "| offset: " + offset + " | Found items so far: " + ret.size());
+            if (Boolean.TRUE.equals(completed)) {
                 logger.info("Stopping because: Reached last page");
                 break pagination;
             } else if (StringUtils.isEmpty(sk)) {
                 /* This should never happen */
                 logger.warning("Pagination failure: sk missing");
                 break pagination;
-            } else if (StringUtils.isEmpty(hashMain)) {
+            } else if (StringUtils.isEmpty(hashCurrent)) {
                 /* This should never happen */
                 logger.warning("Pagination failure: hashMain missing");
                 break pagination;
             } else if (!allowPagination) {
                 logger.info("Stopping because: Pagination is not allowed");
+                break pagination;
+            } else if (newItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find new items on current page");
                 break pagination;
             } else if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
@@ -399,10 +408,10 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             /* Continue to next page */
             final PostRequest request = br.createPostRequest("/public/api/fetch-list", (UrlQuery) null, null);
             prepareJsonRequest(request, br);
-            request.setPostDataString("%7B%22hash%22%3A%22" + Encoding.urlEncode(hashMain) + "%3A%22%2C%22offset%22%3A" + offset + "%2C%22withSizes%22%3Atrue%2C%22sk%22%3A%22" + sk + "%22%2C%22options%22%3A%7B%22hasExperimentVideoWithoutPreview%22%3Atrue%7D%7D");
+            request.setPostDataString("%7B%22hash%22%3A%22" + URLEncode.encodeURIComponent(hashCurrent) + "%22%2C%22offset%22%3A" + offset + "%2C%22withSizes%22%3Atrue%2C%22sk%22%3A%22" + sk + "%22%2C%22options%22%3A%7B%22hasExperimentVideoWithoutPreview%22%3Atrue%7D%7D");
             br.getPage(request);
-            resources_map = hosterplugin.checkErrorsWebAPI(br, parent, null);
-            ressources_list = (List<Object>) resources_map.get("resources");
+            resources_map = hosterplugin.checkErrorsWebAPI(br, parentLink, null);
+            ressources_list = (List<Map<String, Object>>) resources_map.get("resources");
             if (ressources_list == null) {
                 /* This should never happen */
                 logger.warning("Pagination failure: ressources missing");

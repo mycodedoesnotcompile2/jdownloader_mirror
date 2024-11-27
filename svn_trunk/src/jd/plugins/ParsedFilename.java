@@ -14,6 +14,7 @@ public class ParsedFilename {
     private final String                    extension;
     private final String                    extensionAdvanced;
     private final CompiledFiletypeExtension extCompiled;
+    private boolean                         isMultipartArchive = false;
 
     public static ParsedFilename parse(final String str) {
         return new ParsedFilename(str);
@@ -37,6 +38,7 @@ public class ParsedFilename {
                 for (final Pattern doubleDotExtensionPattern : doubleDotExtensionPatterns) {
                     extAdvanced = new Regex(filename, doubleDotExtensionPattern).getMatch(0);
                     if (extAdvanced != null) {
+                        isMultipartArchive = true;
                         break;
                     }
                 }
@@ -83,7 +85,6 @@ public class ParsedFilename {
     }
 
     public boolean isMultipartArchive() {
-        // TODO: Add functionality
-        return false;
+        return isMultipartArchive;
     }
 }

@@ -59,6 +59,53 @@ import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.table.JTableHeader;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -176,55 +223,6 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
-
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -233,13 +231,14 @@ import net.miginfocom.swing.MigLayout;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-            /**
-             * these patterns should split filename and fileextension (extension must include the point)
-             */
-            // multipart rar archives
-            Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
-            // normal files with extension
-            Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
+        /**
+         * these patterns should split filename and fileextension (extension must include the
+         * point)
+         */
+        // multipart rar archives
+        Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
+        // normal files with extension
+        Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
     private LazyHostPlugin         lazyP          = null;
     /**
      * Is true if the user has answered a captcha challenge. Does not say anything whether or not the answer was correct.
@@ -680,32 +679,72 @@ public abstract class PluginForHost extends Plugin {
         return copy;
     }
 
-    public boolean isAccountLoginCaptchaChallenge(final DownloadLink link, Challenge<?> c) {
-        return c.isCreatedInsideAccountChecker() || c.isAccountLogin() || Thread.currentThread() instanceof AccountCheckerThread || link == null || FilePackage.isDefaultFilePackage(link.getFilePackage());
+    @Deprecated
+    protected boolean isAccountLoginCaptchaChallenge(final DownloadLink link, final Challenge<?> c) {
+        return isAccountLoginCaptchaChallenge(c) || link == null || FilePackage.isDefaultFilePackage(link.getFilePackage());
     }
 
-    protected <T> T handleCaptchaChallenge(final DownloadLink link, Challenge<T> c) throws CaptchaException, PluginException, InterruptedException {
+    protected <ReturnType> ReturnType handleSkipException(final DownloadLink link, Challenge<ReturnType> c, SkipException e) throws PluginException, CaptchaException, InterruptedException {
+        LogSource.exception(logger, e);
+        if (link != null && !c.isAccountLogin()) {
+            switch (e.getSkipRequest()) {
+            case BLOCK_ALL_CAPTCHAS:
+                CaptchaBlackList.getInstance().add(new BlockAllDownloadCaptchasEntry());
+                HelpDialog.showCaptchaSkippedDialog();
+                break;
+            case BLOCK_HOSTER:
+                CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
+                HelpDialog.showCaptchaSkippedDialog();
+                break;
+            case BLOCK_PACKAGE:
+                CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByPackage(link.getParentNode()));
+                HelpDialog.showCaptchaSkippedDialog();
+                break;
+            case TIMEOUT:
+                onCaptchaTimeout(link, c);
+                // TIMEOUT may fallthrough to SINGLE
+            case SINGLE:
+                CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByLink(e.getSkipRequest(), link));
+                HelpDialog.showCaptchaSkippedDialog();
+                break;
+            default:
+                break;
+            }
+        }
+        switch (e.getSkipRequest()) {
+        case STOP_CURRENT_ACTION:
+            if (Thread.currentThread() instanceof SingleDownloadController) {
+                DownloadWatchDog.getInstance().stopDownloads();
+            }
+            break;
+        case REFRESH:
+            // we should forward the refresh request to a new pluginstructure soon. For now. the plugin will just retry
+            return c.getRefreshTrigger();
+        default:
+            break;
+        }
+        throw new CaptchaException(e.getSkipRequest());
+    }
+
+    public <T> T handleCaptchaChallenge(final DownloadLink link, Challenge<T> c) throws CaptchaException, PluginException, InterruptedException {
         if (c instanceof ImageCaptchaChallenge) {
             final File captchaFile = ((ImageCaptchaChallenge) c).getImageFile();
             cleanUpCaptchaFiles.addIfAbsent(captchaFile);
         }
-        if (Thread.currentThread() instanceof LinkCrawlerThread) {
-            logger.severe("PluginForHost.getCaptchaCode inside LinkCrawlerThread!?");
-        }
         c.setTimeout(getChallengeTimeout(c));
         invalidateLastChallengeResponse();
-        final CaptchaStepProgress progress = new CaptchaStepProgress(0, 1, null);
-        progress.setProgressSource(this);
-        progress.setDisplayInProgressColumnEnabled(false);
-        link.addPluginProgress(progress);
-        final boolean isAccountLoginCaptchaChallenge = isAccountLoginCaptchaChallenge(link, c);
+        PluginProgress progress = null;
         try {
-            if (isAccountLoginCaptchaChallenge) {
+            if (isAccountLoginCaptchaChallenge(link, c)) {
                 /**
                  * account login -> do not use anticaptcha services
                  */
                 c.setAccountLogin(true);
-            } else {
+            } else if (link != null) {
+                progress = new CaptchaStepProgress(0, 1, null);
+                progress.setProgressSource(this);
+                progress.setDisplayInProgressColumnEnabled(false);
+                link.addPluginProgress(progress);
                 final SingleDownloadController controller = link.getDownloadLinkController();
                 if (controller != null) {
                     setHasCaptcha(link, controller.getAccount(), true);
@@ -719,47 +758,35 @@ public abstract class PluginForHost extends Plugin {
             ChallengeResponseController.getInstance().handle(c);
             if (!c.isSolved()) {
                 throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            } else if (!c.isCaptchaResponseValid()) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA, "Captcha reponse value did not validate!");
+            } else {
+                return c.getResult().getValue();
             }
-            return c.getResult().getValue();
         } catch (InterruptedException e) {
             LogSource.exception(logger, e);
             throw e;
         } catch (SkipException e) {
-            LogSource.exception(logger, e);
-            if (getDownloadLink() != null && !isAccountLoginCaptchaChallenge) {
-                switch (e.getSkipRequest()) {
-                case BLOCK_ALL_CAPTCHAS:
-                    CaptchaBlackList.getInstance().add(new BlockAllDownloadCaptchasEntry());
-                    HelpDialog.showCaptchaSkippedDialog();
-                    break;
-                case BLOCK_HOSTER:
-                    CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByHost(link.getHost()));
-                    HelpDialog.showCaptchaSkippedDialog();
-                    break;
-                case BLOCK_PACKAGE:
-                    CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByPackage(link.getParentNode()));
-                    HelpDialog.showCaptchaSkippedDialog();
-                    break;
-                case TIMEOUT:
-                    onCaptchaTimeout(link, e.getChallenge());
-                    // TIMEOUT may fallthrough to SINGLE
-                case SINGLE:
-                    CaptchaBlackList.getInstance().add(new BlockDownloadCaptchasByLink(e.getSkipRequest(), link));
-                    HelpDialog.showCaptchaSkippedDialog();
-                    break;
-                case REFRESH:
-                    // we should forward the refresh request to a new pluginstructure soon. For now. the plugin will just retry
-                    return c.getRefreshTrigger();
-                case STOP_CURRENT_ACTION:
-                    if (Thread.currentThread() instanceof SingleDownloadController) {
-                        DownloadWatchDog.getInstance().stopDownloads();
+            final Thread thread = Thread.currentThread();
+            if (thread instanceof SingleDownloadController) {
+                return handleSkipException(getDownloadLink(), c, e);
+            }
+            if (thread instanceof LinkCrawlerThread) {
+                Plugin plugin = ((LinkCrawlerThread) thread).getCurrentPlugin();
+                while (plugin != null) {
+                    if (plugin instanceof PluginForDecrypt) {
+                        final PluginForDecrypt decryptPlugin = (PluginForDecrypt) plugin;
+                        return decryptPlugin.handleSkipException(c, e);
+                    } else {
+                        plugin = plugin.getParentPlugin();
                     }
-                    break;
                 }
             }
             throw new CaptchaException(e.getSkipRequest());
         } finally {
-            link.removePluginProgress(progress);
+            if (progress != null) {
+                link.removePluginProgress(progress);
+            }
         }
     }
 
@@ -1322,6 +1349,7 @@ public abstract class PluginForHost extends Plugin {
     }
 
     public void handle(final DownloadLink downloadLink, final Account account) throws Exception {
+        final Account previousAccount = setCurrentAccount(account);
         ACCOUNTTYPE accountType = null;
         try {
             waitForNextStartAllowed(downloadLink, account);
@@ -1352,6 +1380,7 @@ public abstract class PluginForHost extends Plugin {
                 e.printStackTrace();
             }
             finalHandle(downloadLink, account, this);
+            setCurrentAccount(previousAccount);
         }
     }
 
@@ -1664,23 +1693,6 @@ public abstract class PluginForHost extends Plugin {
         final DownloadLink ret = getDownloadLink();
         this.link = link;
         return ret;
-    }
-
-    protected Account getCurrentAccount() {
-        final Thread thread = Thread.currentThread();
-        if (thread instanceof SingleDownloadController) {
-            final Account account = ((SingleDownloadController) thread).getAccount();
-            if (account != null && StringUtils.equals(getHost(), account.getHosterByPlugin())) {
-                return account;
-            }
-        } else if (thread instanceof AccountCheckerThread) {
-            final AccountCheckJob job = ((AccountCheckerThread) thread).getJob();
-            final Account account = job != null ? job.getAccount() : null;
-            if (account != null && StringUtils.equals(getHost(), account.getHosterByPlugin())) {
-                return account;
-            }
-        }
-        return null;
     }
 
     public DownloadLink buildAccountCheckDownloadLink(final Account account) {
@@ -3335,6 +3347,10 @@ public abstract class PluginForHost extends Plugin {
                     public Icon getIcon(MultiHostHost mhost) {
                         final MultihosterHostStatus status = mhost.getStatus();
                         if (mhost.getUnavailableTimeMillis() > 0) {
+                            return icon_wait;
+                        } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
+                            return icon_wait;
+                        } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
                             return icon_wait;
                         } else if (status == MultihosterHostStatus.WORKING) {
                             return icon_okay;

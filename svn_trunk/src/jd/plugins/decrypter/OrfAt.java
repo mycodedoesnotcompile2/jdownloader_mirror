@@ -40,7 +40,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ORFMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50069 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 2, names = {}, urls = {})
 public class OrfAt extends PluginForDecrypt {
     public OrfAt(PluginWrapper wrapper) {
         super(wrapper);
@@ -697,7 +697,7 @@ public class OrfAt extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String videoSource = br.getRegex("data-ssr=\"true\">(.+)</script>").getMatch(0);
+        final String videoSource = br.getRegex("data-ssr=\"true\"[^>]*>(.+)</script>").getMatch(0);
         final String videoDurationStr = new Regex(videoSource, "duration=(\\d+)").getMatch(0);
         String encryptedID = null;
         if (videoDurationStr != null) {

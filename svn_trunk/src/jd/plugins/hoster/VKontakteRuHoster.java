@@ -77,11 +77,12 @@ import jd.utils.JDUtilities;
 import jd.utils.locale.JDL;
 
 @PluginDependencies(dependencies = { VKontakteRu.class })
-@HostPlugin(revision = "$Revision: 50200 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50230 $", interfaceVersion = 2, names = {}, urls = {})
 /* Most of all links are coming from a crawler plugin. */
 public class VKontakteRuHoster extends PluginForHost {
     /* Current main domain */
     private static final String DOMAIN                                                                      = "vk.com";
+    private static final String DOMAIN_VIDEO                                                                = "vkvideo.ru";
     private static final String TYPE_AUDIOLINK                                                              = "(?i)https?://vkontaktedecrypted\\.ru/audiolink/((?:\\-)?\\d+)_(\\d+)";
     /* TODO: Remove this */
     private static final String TYPE_VIDEOLINK_LEGACY                                                       = "(?i)https?://vkontaktedecrypted\\.ru/videolink/.+";
@@ -1306,27 +1307,33 @@ public class VKontakteRuHoster extends PluginForHost {
     }
 
     private boolean checkCookieLogin(final Browser br, final Account account) throws Exception {
-        br.getPage(getBaseURL());
-        handleTooManyRequests(this, br);
-        // non language, check
-        if (isLoggedinHTML(br)) {
-            logger.info("Cookie login successful");
-            // language set in user profile, so after 'login' OR 'login check' it could be changed!
-            setCookie(br, "remixlang", "3");
-            final String vkID = regExVKAccountID(br);
-            if (vkID != null) {
-                account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);
-            } else {
-                logger.warning("Failed to find vkID");
+        /* Important: Added cookies may only be valid for the main domain OR the main video domain. */
+        final String[] urls = new String[2];
+        urls[0] = getBaseURL();
+        urls[1] = getBaseURLVideo();
+        for (final String url : urls) {
+            br.getPage(url);
+            handleTooManyRequests(this, br);
+            // non language, check
+            if (isLoggedinHTML(br)) {
+                logger.info("Cookie login successful for: " + url);
+                // language set in user profile, so after 'login' OR 'login check' it could be changed!
+                setCookie(br, "remixlang", "3");
+                final String vkID = regExVKAccountID(br);
+                if (vkID != null) {
+                    account.setProperty(PROPERTY_ACCOUNT_VK_ID, vkID);
+                } else {
+                    logger.warning("Failed to find vkID");
+                }
+                /* Refresh timestamp */
+                account.saveCookies(br.getCookies(DOMAIN), "");
+                return true;
             }
-            /* Refresh timestamp */
-            account.saveCookies(br.getCookies(DOMAIN), "");
-            return true;
-        } else {
-            /* Delete cookies / Headers to perform a full login */
-            logger.info("Cookie login failed");
-            return false;
+            logger.info("Cookies invalid for: " + url);
         }
+        /* Delete cookies / Headers to perform a full login */
+        logger.info("Cookie login failed");
+        return false;
     }
 
     private static boolean isLoggedinHTML(final Browser br) {
@@ -1708,17 +1715,16 @@ public class VKontakteRuHoster extends PluginForHost {
         return getProtocol() + DOMAIN;
     }
 
+    public static String getBaseURLVideo() {
+        return getProtocol() + DOMAIN_VIDEO;
+    }
+
     @Override
     public void reset() {
     }
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-    }
-
-    @Override
-    public String getDescription() {
-        return "JDownloader's Vk Plugin helps downloading all sorts of media from vk.com.";
     }
 
     @Override

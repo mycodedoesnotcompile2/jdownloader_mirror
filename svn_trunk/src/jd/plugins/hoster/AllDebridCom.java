@@ -88,7 +88,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50187 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50228 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -272,16 +272,33 @@ public class AllDebridCom extends PluginForHost {
         final boolean filterJDownloaderUnsupportedStreamHosts = true;
         if (includeStreamingItems && filterJDownloaderUnsupportedStreamHosts && streamDomains.size() > 0) {
             /* Filter all stream items which are not supported by JDownloader in order to lower the size of our final list. */
-            final List<MultiHostHost> filteredresults = new ArrayList<MultiHostHost>();
+            final List<MultiHostHost> allowedresults = new ArrayList<MultiHostHost>();
             for (final MultiHostHost mhost : results) {
-                if (mhost.getStatus() == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED && streamDomains.contains(mhost.getDomain())) {
-                    logger.info("Ignore unsupported stream domain: " + mhost.getDomain());
+                boolean isStreamService = false;
+                for (final String domain : mhost.getDomains()) {
+                    if (streamDomains.contains(domain)) {
+                        isStreamService = true;
+                        break;
+                    }
+                }
+                if (!isStreamService) {
+                    /* This is not a stream service -> Allow it to be added to final list. */
+                    allowedresults.add(mhost);
+                    continue;
+                }
+                /* This is a streaming service -> Check if we want to add it to our final list. */
+                final MultihosterHostStatus status = mhost.getStatus();
+                final String domain = mhost.getDomain();
+                if (status == MultihosterHostStatus.DEACTIVATED_JDOWNLOADER_UNSUPPORTED) {
+                    logger.info("Ignore unsupported stream domain: " + domain);
+                } else if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
+                    logger.info("Ignore non working stream domain: " + domain);
                 } else {
-                    filteredresults.add(mhost);
+                    allowedresults.add(mhost);
                 }
             }
-            logger.info("Results initially: " + supportedhosts.size() + " | Results after filtering unsupported stream hosts: " + filteredresults.size());
-            ai.setMultiHostSupportV2(this, filteredresults);
+            logger.info("Results initially: " + supportedhosts.size() + " | Results after filtering unsupported stream hosts: " + allowedresults.size());
+            ai.setMultiHostSupportV2(this, allowedresults);
         }
         return ai;
     }

@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50079 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -160,7 +160,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         int numberofContinuousPagesWithoutAnyNewItems = 0;
         final int maxPagesWithoutNewItems = 15;
         do {
-            getPage(br, "https://" + this.getHost() + "/api/v1/" + portal + "/user/" + Encoding.urlEncode(userID) + "?o=" + offset);
+            getPage(br, "https://" + this.getHost() + "/api/v0/" + portal + "/user/" + Encoding.urlEncode(userID) + "?o=" + offset);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
             final List<HashMap<String, Object>> posts = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.LIST_HASHMAP);
             if (posts == null || posts.isEmpty()) {
                 if (ret.isEmpty()) {
@@ -328,7 +331,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(br, "https://" + this.getHost() + "/api/v1/" + portal + "/user/" + userID + "/post/" + postID);
+        getPage(br, "https://" + this.getHost() + "/api/v0/" + portal + "/user/" + userID + "/post/" + postID);
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* E.g. {"error":"Not Found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -667,13 +670,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
                     this.displayBubbleNotification(title, text);
                     this.sleep(retrySeconds * 1000, this.cl);
                     continue;
-                } else if (con.getResponseCode() == 200) {
+                } else {
                     br.followConnection();
                     errorRateLimit = false;
                     break;
-                } else {
-                    br.followConnection(true);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             } finally {
                 con.disconnect();
