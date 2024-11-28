@@ -53,7 +53,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DiskYandexNet;
 
-@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50244 $", interfaceVersion = 3, names = {}, urls = {})
 public class DiskYandexNetFolder extends PluginForDecrypt {
     public DiskYandexNetFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -291,8 +291,6 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
         for (final String key : resources_map.keySet()) {
             ressources_list.add((Map<String, Object>) resources_map.get(key));
         }
-        // final int maxItemsPerPage = 40;
-        int page = 1;
         String hashCurrent = null;
         if (resourceCurrent != null) {
             hashCurrent = (String) resourceCurrent.get("path");
@@ -301,6 +299,8 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
             }
         }
         final HashSet<String> dupes = new HashSet<String>();
+        final int maxItemsPerPage = 40;
+        int page = 1;
         int offset = 0;
         pagination: do {
             int newItemsThisPage = 0;
@@ -380,12 +380,17 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
                 ret.add(link);
                 distribute(link);
             }
-            offset += ressources_list.size();
             /* Determine if we've reached the end / crawled all items. */
             final Boolean completed = (Boolean) resources_map.get("completed");
-            logger.info("Crawled page: " + page + "| offset: " + offset + " | Found items so far: " + ret.size());
+            logger.info("Crawled page: " + page + "| offset: " + offset + " | New items this page: " + newItemsThisPage + " | Found items so far: " + ret.size());
             if (Boolean.TRUE.equals(completed)) {
                 logger.info("Stopping because: Reached last page");
+                break pagination;
+            } else if (!allowPagination) {
+                logger.info("Stopping because: Pagination is not allowed");
+                break pagination;
+            } else if (newItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find new items on current page");
                 break pagination;
             } else if (StringUtils.isEmpty(sk)) {
                 /* This should never happen */
@@ -395,28 +400,28 @@ public class DiskYandexNetFolder extends PluginForDecrypt {
                 /* This should never happen */
                 logger.warning("Pagination failure: hashMain missing");
                 break pagination;
-            } else if (!allowPagination) {
-                logger.info("Stopping because: Pagination is not allowed");
-                break pagination;
-            } else if (newItemsThisPage == 0) {
-                logger.info("Stopping because: Failed to find new items on current page");
-                break pagination;
             } else if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break pagination;
             }
             /* Continue to next page */
+            /*
+             * 2024-11-27: Website pagination is buggy: Every next page contains one overlapping item of the previous page but to keep the
+             * numbers flat we will try to paginate the same way the browser does.
+             */
+            // offset += ressources_list.size();
+            // offset += maxItemsPerPage;
+            if (newItemsThisPage < (maxItemsPerPage * 2)) {
+                offset += maxItemsPerPage;
+            } else {
+                offset += newItemsThisPage;
+            }
             final PostRequest request = br.createPostRequest("/public/api/fetch-list", (UrlQuery) null, null);
             prepareJsonRequest(request, br);
             request.setPostDataString("%7B%22hash%22%3A%22" + URLEncode.encodeURIComponent(hashCurrent) + "%22%2C%22offset%22%3A" + offset + "%2C%22withSizes%22%3Atrue%2C%22sk%22%3A%22" + sk + "%22%2C%22options%22%3A%7B%22hasExperimentVideoWithoutPreview%22%3Atrue%7D%7D");
             br.getPage(request);
             resources_map = hosterplugin.checkErrorsWebAPI(br, parentLink, null);
             ressources_list = (List<Map<String, Object>>) resources_map.get("resources");
-            if (ressources_list == null) {
-                /* This should never happen */
-                logger.warning("Pagination failure: ressources missing");
-                break pagination;
-            }
             page += 1;
             continue pagination;
         } while (!this.isAbort());

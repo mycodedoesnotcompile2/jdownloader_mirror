@@ -356,6 +356,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             return null;
         }
         final LogInterface logger = (multiHostPlugin != null && multiHostPlugin.getLogger() != null) ? multiHostPlugin.getLogger() : LogController.CL();
+        final boolean debugLogging = logger != null && (LogController.getInstance().isDebugMode() || DebugMode.TRUE_IN_IDE_ELSE_FALSE);
         final HostPluginController hpc = HostPluginController.getInstance();
         final HashMap<String, MultiHostHost> cleanList = new HashMap<String, MultiHostHost>();
         final HashMap<String, Set<LazyHostPlugin>> mapping = new HashMap<String, Set<LazyHostPlugin>>();
@@ -512,7 +513,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
                             continue;
                         }
                     } catch (final Throwable e) {
-                        if (logger != null) {
+                        if (debugLogging) {
                             logger.log(e);
                         }
                         otherIgnoreEntries.add(maindomainCleaned);
@@ -541,7 +542,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             } else {
                 /* Too many results and/or all results are for offline domains */
                 unassignedMultiHostSupport.add(maindomainCleaned);
-                if (best.size() > 1 && logger != null) {
+                if (debugLogging && best.size() > 1) {
                     logger.warning("Found more than one possible plugins for one domain: " + maindomainCleaned);
                     logger.log(new Exception("DEBUG: " + maindomainCleaned));
                 }
@@ -549,7 +550,7 @@ public class AccountInfo extends Property implements AccountTrafficView {
             }
             final boolean hostIsWorkingAccordingToMultihost = mhost.getStatus() == MultihosterHostStatus.WORKING || mhost.getStatus() == MultihosterHostStatus.WORKING_UNSTABLE;
             final boolean printNonWorkingHosts = true;
-            if (printNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
+            if (debugLogging && printNonWorkingHosts && !hostIsWorkingAccordingToMultihost) {
                 logger.info("Non working host: " + mhost);
             }
             final String pluginHost = finalplugin.getHost();
@@ -584,37 +585,40 @@ public class AccountInfo extends Property implements AccountTrafficView {
         for (final String item : alternativeDomainsOfFoundHits) {
             unassignedMultiHostSupport.remove(item);
         }
-        if (skipOfflineEntries && skippedOfflineEntries.size() > 0 && logger != null) {
-            logger.info("Found " + skippedOfflineEntries.size() + " offline entries");
-            for (final String host : skippedOfflineEntries) {
-                logger.info("Skipped offline entry: " + host);
+        if (debugLogging) {
+            // only log in dev/debug mode. avoid in normal usage
+            if (skipOfflineEntries && skippedOfflineEntries.size() > 0) {
+                logger.info("Found " + skippedOfflineEntries.size() + " offline entries");
+                for (final String host : skippedOfflineEntries) {
+                    logger.info("Skipped offline entry: " + host);
+                }
             }
-        }
-        if (skippedByPluginAllowHandleEntries.size() > 0 && logger != null) {
-            logger.info("Found " + skippedByPluginAllowHandleEntries.size() + " skippedbyPluginAllowHandle entries");
-            for (final String host : skippedByPluginAllowHandleEntries) {
-                logger.info("Skipped by allowHandle entry: " + host);
+            if (skippedByPluginAllowHandleEntries.size() > 0) {
+                logger.info("Found " + skippedByPluginAllowHandleEntries.size() + " skippedbyPluginAllowHandle entries");
+                for (final String host : skippedByPluginAllowHandleEntries) {
+                    logger.info("Skipped by allowHandle entry: " + host);
+                }
             }
-        }
-        if (skippedInvalidEntries.size() > 0 && logger != null) {
-            logger.info("Found " + skippedInvalidEntries.size() + " skippedInvalid entries");
-            for (final String host : skippedInvalidEntries) {
-                logger.info("Skipped invalid entry: " + host);
+            if (skippedInvalidEntries.size() > 0) {
+                logger.info("Found " + skippedInvalidEntries.size() + " skippedInvalid entries");
+                for (final String host : skippedInvalidEntries) {
+                    logger.info("Skipped invalid entry: " + host);
+                }
             }
-        }
-        /* Most importantly: Log items without result */
-        if (unassignedMultiHostSupport.size() > 0 && logger != null) {
-            logger.info("Found " + unassignedMultiHostSupport.size() + " unassigned entries");
-            for (final String host : unassignedMultiHostSupport) {
-                logger.info("Could not assign any host for: " + host);
+            /* Most importantly: Log items without result */
+            if (unassignedMultiHostSupport.size() > 0) {
+                logger.info("Found " + unassignedMultiHostSupport.size() + " unassigned entries");
+                for (final String host : unassignedMultiHostSupport) {
+                    logger.info("Could not assign any host for: " + host);
+                }
             }
-        }
-        if (otherIgnoreEntries.size() > 0 && logger != null) {
-            /* This array should usually be empty. */
-            logger.info("Found " + otherIgnoreEntries.size() + " other skipped entries");
-            for (final String item : otherIgnoreEntries) {
-                if (logger != null) {
-                    logger.info("Skipped _other_ entry: " + item);
+            if (otherIgnoreEntries.size() > 0) {
+                /* This array should usually be empty. */
+                logger.info("Found " + otherIgnoreEntries.size() + " other skipped entries");
+                for (final String item : otherIgnoreEntries) {
+                    if (logger != null) {
+                        logger.info("Skipped _other_ entry: " + item);
+                    }
                 }
             }
         }
@@ -625,9 +629,8 @@ public class AccountInfo extends Property implements AccountTrafficView {
             this.removeProperty(PROPERTY_MULTIHOST_SUPPORT);
             return null;
         }
-        /* Log final results if wanted. */
-        final boolean logValidResults = false;
-        if (logger != null && logValidResults) {
+        if (debugLogging && false) {
+            /* Log final results if wanted. */
             logger.info("Found real hosts: " + final_dupes.size());
             for (final String host : final_dupes) {
                 logger.finest("Found host: " + host);

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.controller.LazyPlugin;
@@ -41,15 +42,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50243 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50247 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
 public class MegaDebridEu extends PluginForHost {
-    private final String                 mName = "www.mega-debrid.eu";
-    private final String                 mProt = "https://";
-    private static MultiHosterManagement mhm   = new MultiHosterManagement("mega-debrid.eu");
+    private static MultiHosterManagement mhm = new MultiHosterManagement("mega-debrid.eu");
 
     public MegaDebridEu(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(mProt + mName + "/index.php");
+        this.enablePremium("https://" + getHost() + "/index.php");
     }
 
     @Override
@@ -63,12 +62,16 @@ public class MegaDebridEu extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return mProt + mName + "/index.php";
+        return "https://" + getHost() + "/index.php";
     }
 
     @Override
     public LazyPlugin.FEATURE[] getFeatures() {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.MULTIHOST };
+    }
+
+    private String getAPIBase() {
+        return "https://www.mega-debrid.eu/api.php";
     }
 
     @Override
@@ -82,14 +85,18 @@ public class MegaDebridEu extends PluginForHost {
             ac.setExpired(true);
         }
         // now it's time to get all supported hosts
-        br.getPage("/api.php?action=getHostersList");
+        br.getPage(getAPIBase() + "?action=getHostersList");
         Map<String, Object> results = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         if (!"ok".equalsIgnoreCase((String) results.get("response_code"))) {
             throw new AccountInvalidException();
         }
         List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) results.get("hosters");
         if (hosterlist == null) {
-            /* workaround for missing hosters entry. It is available when the session cookies are NOT available. */
+            /**
+             * workaround for missing hosters entry. It is available when the session cookies are NOT available. <br>
+             * See: https://board.jdownloader.org/showthread.php?p=541429#post541429s <br>
+             * 2024-11-27: Problem is solved according to support but we'll leave this workaround here anyways. <br>
+             */
             final Browser brc = createNewBrowserInstance();
             brc.getPage("https://www." + getHost() + "/api.php?action=getHostersList");
             results = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -120,7 +127,7 @@ public class MegaDebridEu extends PluginForHost {
 
     private Map<String, Object> login(final Account account) throws Exception {
         synchronized (account) {
-            br.getPage(mProt + mName + "/api.php?action=connectUser&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+            br.getPage(getAPIBase() + "?action=connectUser&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
             final Map<String, Object> entries = handleAPIErrors(br, account, null);
             final String token = (String) entries.get("token");
             if (StringUtils.isEmpty(token)) {
@@ -132,7 +139,17 @@ public class MegaDebridEu extends PluginForHost {
     }
 
     private Map<String, Object> handleAPIErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException ignore) {
+            /* This should never happen. */
+            if (link != null) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Invalid API response", 60 * 1000l);
+            } else {
+                throw new AccountUnavailableException("Invalid API response", 60 * 1000);
+            }
+        }
         final String response_code = entries.get("response_code").toString();
         if (response_code.equalsIgnoreCase("ok")) {
             /* No error */
@@ -171,13 +188,13 @@ public class MegaDebridEu extends PluginForHost {
             login(account);
             token = account.getStringProperty("token");
         }
-        br.postPage(mProt + mName + "/api.php?action=getLink&token=" + token, "link=" + url);
+        br.postPage(getAPIBase() + "?action=getLink&token=" + token, "link=" + url);
         final Map<String, Object> entries = handleAPIErrors(br, account, link);
         final String dllink = entries.get("debridLink").toString();
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, true, 0);
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
-            mhm.handleErrorGeneric(account, link, "unknown_dl_error", 50, 1 * 60 * 1000l);
+            mhm.handleErrorGeneric(account, link, "Unknown download error", 50, 1 * 60 * 1000l);
         }
         dl.startDownload();
     }

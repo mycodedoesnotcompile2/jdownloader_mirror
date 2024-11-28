@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50193 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50246 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -152,6 +152,7 @@ public class VKontakteRu extends PluginForDecrypt {
     public static final String  PATTERN_VIDEO_SINGLE_Z                    = "(?i)https?://[^/]+/.*?z=video(-?\\d+_\\d+).*?";
     private static final String PATTERN_CLIP_SINGLE_Z                     = "(?i)https?://[^/]+/.*?z=clip((?:\\-)?\\d+_\\d+).*?";
     private static final String PATTERN_VIDEO_SINGLE_ORIGINAL             = "(?i)https?://[^/]+/video((?:\\-)?\\d+_\\d+).*";
+    private static final String PATTERN_VIDEO_SINGLE_IN_PLAYLIST          = "(?i)https?://[^/]+/playlist/[^/]+/video(-?\\d+)_(\\d+).*";
     private static final String PATTERN_CLIP_SINGLE_ORIGINAL              = "(?i)https?://[^/]+/clip((?:\\-)?\\d+_\\d+).*";
     private static final String PATTERN_VIDEO_SINGLE_ORIGINAL_WITH_LISTID = "(?i)https?://[^/]+/video(-?\\d+_\\d+)\\?list=([a-z0-9]+)";
     private static final String PATTERN_VIDEO_SINGLE_ORIGINAL_LIST        = "(?i)https?://[^/]+/video(\\-)?\\d+_\\d+\\?list=[a-z0-9]+";
@@ -492,8 +493,7 @@ public class VKontakteRu extends PluginForDecrypt {
             }
             query.appendEncoded("module", "");
             query.appendEncoded("video", oid_and_id);
-            br.getHeaders().put("Origin", "https://" + this.getHost());
-            br.getHeaders().put("Referer", param.getCryptedUrl());
+            br.getHeaders().put("Origin", "https://" + br.getHost());
             this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
         } else if (listID != null) {
             final UrlQuery query = new UrlQuery();
@@ -505,13 +505,13 @@ public class VKontakteRu extends PluginForDecrypt {
             query.appendEncoded("list", listID);
             query.appendEncoded("module", module);
             // query.appendEncoded("playlist_id", "-12345678_-2");
-            query.appendEncoded("show_original", "");
+            // query.appendEncoded("show_original", "");
             query.appendEncoded("t", "");
             query.appendEncoded("video", oid_and_id);
-            br.getHeaders().put("Origin", "https://" + this.getHost());
-            br.getHeaders().put("Referer", param.getCryptedUrl());
+            getPage(param.getCryptedUrl());
+            br.getHeaders().put("Origin", "https://" + br.getHost());
             // br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            this.getPage(br, br.createPostRequest(getProtocol() + "vk.com/al_video.php?act=show", query));
+            this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
         } else {
             getPage(getProtocol() + "vk.com/video" + oid_and_id);
             allowJsonRequest = true;
@@ -528,8 +528,9 @@ public class VKontakteRu extends PluginForDecrypt {
         }
         if (allowJsonRequest) {
             final UrlQuery query = new UrlQuery();
-            query.appendEncoded("act", "show");
+            // query.appendEncoded("act", "show");
             query.appendEncoded("al", "1");
+            query.appendEncoded("autoplay", "1");
             query.appendEncoded("claim", "");
             query.appendEncoded("force_no_repeat", "true");
             query.appendEncoded("is_video_page", "true");
@@ -539,10 +540,10 @@ public class VKontakteRu extends PluginForDecrypt {
             query.appendEncoded("show_original", "");
             query.appendEncoded("t", "");
             query.appendEncoded("video", oid_and_id);
-            br.getHeaders().put("Origin", "https://" + this.getHost());
-            br.getHeaders().put("Referer", param.getCryptedUrl());
-            // br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            this.getPage(br, br.createPostRequest(getProtocol() + "vk.com/al_video.php?act=show", query));
+            br.getHeaders().put("Origin", "https://" + br.getHost());
+            // br.getHeaders().put("Referer", param.getCryptedUrl());
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            this.getPage(br, br.createPostRequest("/al_video.php?act=show", query));
         }
         final Map<String, Object> video = findVideoMap(this.br, id);
         if (video == null) {
@@ -812,28 +813,32 @@ public class VKontakteRu extends PluginForDecrypt {
         }
     }
 
-    private String[] findVideoIDs(final String parameter) {
+    private String[] findVideoIDs(final String url) {
         final String[] ids = new String[2];
         String ownerID = null;
         String contentID = null;
-        if (parameter.matches(PATTERN_VIDEO_SINGLE_EMBED) || parameter.matches(PATTERN_VIDEO_SINGLE_EMBED_HASH)) {
-            final Regex idsRegex = new Regex(parameter, "vk\\.com/video_ext\\.php\\?oid=((?:\\-)?\\d+)\\&id=(\\d+)");
+        final Regex single_in_playlist;
+        if ((single_in_playlist = new Regex(url, PATTERN_VIDEO_SINGLE_IN_PLAYLIST)).patternFind()) {
+            ownerID = single_in_playlist.getMatch(0);
+            contentID = single_in_playlist.getMatch(1);
+        } else if (url.matches(PATTERN_VIDEO_SINGLE_EMBED) || url.matches(PATTERN_VIDEO_SINGLE_EMBED_HASH)) {
+            final Regex idsRegex = new Regex(url, "vk\\.com/video_ext\\.php\\?oid=((?:\\-)?\\d+)\\&id=(\\d+)");
             ownerID = idsRegex.getMatch(0);
             contentID = idsRegex.getMatch(1);
-        } else if (parameter.matches(PATTERN_VIDEO_SINGLE_ORIGINAL) || parameter.matches(PATTERN_CLIP_SINGLE_ORIGINAL) || parameter.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_WITH_LISTID)) {
-            final Regex idsRegex = new Regex(parameter, "((?:\\-)?\\d+)_(\\d+)");
+        } else if (url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL) || url.matches(PATTERN_CLIP_SINGLE_ORIGINAL) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_WITH_LISTID)) {
+            final Regex idsRegex = new Regex(url, "((?:\\-)?\\d+)_(\\d+)");
             ownerID = idsRegex.getMatch(0);
             contentID = idsRegex.getMatch(1);
-        } else if (parameter.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_LIST)) {
-            final Regex idsRegex = new Regex(parameter, "((?:\\-)?\\d+)_(\\d+)\\?");
+        } else if (url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_LIST)) {
+            final Regex idsRegex = new Regex(url, "((?:\\-)?\\d+)_(\\d+)\\?");
             ownerID = idsRegex.getMatch(0);
             contentID = idsRegex.getMatch(1);
-        } else if (parameter.matches(PATTERN_VIDEO_SINGLE_Z)) {
-            final Regex idsRegex = new Regex(parameter, "z=video((?:\\-)?\\d+)_(\\d+)");
+        } else if (url.matches(PATTERN_VIDEO_SINGLE_Z)) {
+            final Regex idsRegex = new Regex(url, "z=video((?:\\-)?\\d+)_(\\d+)");
             ownerID = idsRegex.getMatch(0);
             contentID = idsRegex.getMatch(1);
-        } else if (parameter.matches(PATTERN_CLIP_SINGLE_Z)) {
-            final Regex idsRegex = new Regex(parameter, "z=clip((?:\\-)?\\d+)_(\\d+)");
+        } else if (url.matches(PATTERN_CLIP_SINGLE_Z)) {
+            final Regex idsRegex = new Regex(url, "z=clip((?:\\-)?\\d+)_(\\d+)");
             ownerID = idsRegex.getMatch(0);
             contentID = idsRegex.getMatch(1);
         }
@@ -3148,7 +3153,7 @@ public class VKontakteRu extends PluginForDecrypt {
     }
 
     private static boolean isSingleVideo(final String url) {
-        return url.matches(PATTERN_VIDEO_SINGLE_Z) || url.matches(PATTERN_CLIP_SINGLE_ORIGINAL) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL) || url.matches(PATTERN_CLIP_SINGLE_Z) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_WITH_LISTID) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_LIST) || url.matches(PATTERN_VIDEO_SINGLE_EMBED) || url.matches(PATTERN_VIDEO_SINGLE_EMBED_HASH);
+        return url.matches(PATTERN_VIDEO_SINGLE_Z) || url.matches(PATTERN_CLIP_SINGLE_ORIGINAL) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL) || url.matches(PATTERN_VIDEO_SINGLE_IN_PLAYLIST) || url.matches(PATTERN_CLIP_SINGLE_Z) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_WITH_LISTID) || url.matches(PATTERN_VIDEO_SINGLE_ORIGINAL_LIST) || url.matches(PATTERN_VIDEO_SINGLE_EMBED) || url.matches(PATTERN_VIDEO_SINGLE_EMBED_HASH);
     }
 
     private static boolean isSinglePicture(final String url) {

@@ -6,12 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.jdownloader.plugins.components.config.AppFrameIoConfig;
-import org.jdownloader.plugins.components.config.AppFrameIoConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.controlling.ProgressController;
 import jd.controlling.linkcrawler.LinkCrawlerThread;
 import jd.plugins.CryptedLink;
@@ -24,7 +18,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50231 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.jdownloader.plugins.components.config.AppFrameIoConfig;
+import org.jdownloader.plugins.components.config.AppFrameIoConfig.MODE;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50249 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
 public class AppFrameIo extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink parameter, ProgressController progress) throws Exception {
@@ -34,7 +34,7 @@ public class AppFrameIo extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Object root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
-        if (!(root instanceof List)) {
+        if (!(root instanceof List) || ((List) root).size() == 0) {
             /*
              * E.g. {"code":404,"errors":[{"code":404,"detail":"Could not find the requested resource","status":404,"title":"Not found"}],
              * "message":"Not found"}

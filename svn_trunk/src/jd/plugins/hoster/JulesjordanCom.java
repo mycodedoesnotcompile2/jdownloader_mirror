@@ -52,7 +52,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50229 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50245 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -268,9 +268,11 @@ public class JulesjordanCom extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
-            // br.getPage("https://www." + this.getHost() + "/trial/index.php");
-            br.getPage("https://www." + this.getHost() + "/members/");
-            br.setCookie(br.getHost(), "CookieScriptConsent", "{\"action\":\"accept\"}");
+            br.getPage("https://www." + this.getHost() + "/trial/index.php");
+            br.getPage("/members/");
+            // if (!br.getURL().matches(".*/members/?$") || true) {
+            // br.getPage("/auth.form");
+            // }
             final Form loginform = br.getFormbyActionRegex(".*auth\\.form.*");
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -283,9 +285,6 @@ public class JulesjordanCom extends PluginForHost {
             loginform.put("pwd", Encoding.urlEncode(account.getPass()));
             loginform.put("rmb", "y");
             br.getHeaders().put("Origin", "https://www." + this.getHost());
-            /* 2021-07-26: Without these headers we'll always get http response 500! */
-            br.getHeaders().put("Cache-Control", "max-age=0");
-            br.getHeaders().put("Content-Type", "application/x-www-form-urlencoded");
             br.submitForm(loginform);
             if (!isLoggedin(br)) {
                 if (br.containsHTML("captcha_x=1")) {
@@ -331,7 +330,7 @@ public class JulesjordanCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

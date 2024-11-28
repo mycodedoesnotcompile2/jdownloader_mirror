@@ -18,7 +18,7 @@ import jd.plugins.PluginForHost;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
-@HostPlugin(revision = "$Revision: 50112 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
+@HostPlugin(revision = "$Revision: 50249 $", interfaceVersion = 3, names = { "app.frame.io" }, urls = { "https://app\\.frame\\.io/reviews/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?" })
 public class AppFrameIo extends PluginForHost {
 
     public final static String PROPERTY_QUALITY = "selected_quality";
@@ -61,9 +61,10 @@ public class AppFrameIo extends PluginForHost {
         }
         final PluginForDecrypt decrypter = getNewPluginForDecryptInstance(getHost());
         final ArrayList<DownloadLink> results = decrypter.decryptLink(new CrawledLink(new CryptedLink(link)));
-        final String quality = link.getStringProperty(PROPERTY_QUALITY);
+        String quality = link.getStringProperty(PROPERTY_QUALITY);
         for (final DownloadLink result : results) {
-            if (quality.equals(result.getProperty(PROPERTY_QUALITY))) {
+            if (quality == null || quality.equals(result.getProperty(PROPERTY_QUALITY))) {
+                quality = result.getStringProperty(PROPERTY_QUALITY, null);
                 url = result.getStringProperty(PROPERTY_URL, null);
                 break;
             }
@@ -71,6 +72,7 @@ public class AppFrameIo extends PluginForHost {
         if (url != null) {
             basicLinkCheck(brc, brc.createHeadRequest(url), link, getFilename(link), ".mp4");
             link.setProperty(PROPERTY_URL, url);
+            link.setProperty(PROPERTY_QUALITY, quality);
             return AvailableStatus.TRUE;
         }
         throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);

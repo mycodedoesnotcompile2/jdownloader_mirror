@@ -53,7 +53,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50247 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -141,10 +141,10 @@ public class TorboxApp extends UseNet {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
+        this.login(account, false);
         final String directlinkproperty = this.getPropertyKey("directlink");
         String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String dllink;
-        this.login(account, false);
         if (storedDirecturl != null) {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
@@ -209,8 +209,6 @@ public class TorboxApp extends UseNet {
             query_requestdl.appendEncoded("zip", "false");
             final Request req_requestdl = br.createGetRequest(API_BASE + "/webdl/requestdl?" + query_requestdl.toString());
             dllink = this.callAPI(br, req_requestdl, account, link).toString();
-            /* Store directurl so we can re-use it next time. */
-            link.setProperty(directlinkproperty, dllink);
         }
         try {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
@@ -225,6 +223,10 @@ public class TorboxApp extends UseNet {
             } else {
                 throw e;
             }
+        }
+        if (storedDirecturl == null) {
+            /* Store directurl so we can re-use it next time. */
+            link.setProperty(directlinkproperty, dllink);
         }
         dl.startDownload();
     }
@@ -264,6 +266,8 @@ public class TorboxApp extends UseNet {
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
         final Map<String, Object> user = login(account, true);
+        final String premium_expires_at = (String) user.get("premium_expires_at");
+        final Object total_bytes_downloaded = user.get("total_bytes_downloaded");
         final Map<String, Object> user_settings = (Map<String, Object>) user.get("settings");
         /* Use shorter timeout than usually to make notification system work in a better way (see end of this function). */
         account.setRefreshTimeout(5 * 60 * 1000l);
@@ -279,7 +283,6 @@ public class TorboxApp extends UseNet {
             ai.setCreateTime(parseTimeStamp(created_at));
         }
         long premiumExpireTimestamp = -1;
-        final String premium_expires_at = (String) user.get("premium_expires_at");
         if (premium_expires_at != null) {
             premiumExpireTimestamp = parseTimeStamp(premium_expires_at);
         }
@@ -296,7 +299,6 @@ public class TorboxApp extends UseNet {
         } else {
             subscribedStr = "No";
         }
-        final Object total_bytes_downloaded = user.get("total_bytes_downloaded");
         final String totalBytesDownloadedText;
         if (total_bytes_downloaded instanceof Number) {
             final SIZEUNIT maxSizeUnit = (SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue();
@@ -342,8 +344,13 @@ public class TorboxApp extends UseNet {
                 throw ie;
             } catch (final Exception e) {
                 logger.log(e);
+                final String reason = e.getMessage();
+                String msg = "Failed to obtain Usenet information from API";
+                if (reason != null) {
+                    msg += " | API error: " + msg;
+                }
                 usenet.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
-                usenet.setStatusText("Failed to obtain Usenet information from API");
+                usenet.setStatusText(msg);
             }
         } else {
             /* Usenet not supported [anymore] */
@@ -361,14 +368,14 @@ public class TorboxApp extends UseNet {
                 logger.info("User has disabled notifications in web interface of " + getHost());
                 break notificationHandling;
             } else if (BubbleNotifyEnabledState.NEVER.equals(CFG_BUBBLE.CFG.getBubbleNotifyEnabledState())) {
-                logger.info("User has disabled BubbleNotifications in JDownloader settings");
+                logger.info("User has disabled BubbleNotifications globally in JDownloader settings");
                 break notificationHandling;
             }
             long highestNotificationTimestamp = 0;
             try {
-                final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 final Request req_notifications = br.createGetRequest(API_BASE + "/notifications/mynotifications");
                 final List<Map<String, Object>> notifications = (List<Map<String, Object>>) this.callAPI(br, req_notifications, account, null);
+                final long timestampNotificationsDisplayed = account.getLongProperty(PROPERTY_ACCOUNT_NOTIFICATIONS_DISPLAYED_UNTIL_TIMESTAMP, 0);
                 /* Note: 2024-06-13: There is no serverside limit of number of notofications that can be returned here. */
                 int numberofNotificationsActuallyDisplayed = 0;
                 for (final Map<String, Object> notification : notifications) {

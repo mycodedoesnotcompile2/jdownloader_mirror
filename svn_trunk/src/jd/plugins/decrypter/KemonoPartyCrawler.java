@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50243 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50244 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,6 +116,10 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
     private KemonoParty  hostPlugin   = null;
     private CryptedLink  cl           = null;
 
+    private String getApiBase() {
+        return "https://" + getHost() + "/api/v1";
+    }
+
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         cl = param;
         if (param.getCryptedUrl().matches(TYPE_PROFILE)) {
@@ -160,7 +164,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
         int numberofContinuousPagesWithoutAnyNewItems = 0;
         final int maxPagesWithoutNewItems = 15;
         do {
-            getPage(br, "https://" + this.getHost() + "/api/v0/" + portal + "/user/" + Encoding.urlEncode(userID) + "?o=" + offset);
+            getPage(br, this.getApiBase() + "/" + portal + "/user/" + Encoding.urlEncode(userID) + "?o=" + offset);
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
@@ -331,7 +335,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(br, "https://" + this.getHost() + "/api/v0/" + portal + "/user/" + userID + "/post/" + postID);
+        getPage(br, this.getApiBase() + "/" + portal + "/user/" + userID + "/post/" + postID);
         if (br.getHttpConnection().getResponseCode() == 404) {
             /* E.g. {"error":"Not Found"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
