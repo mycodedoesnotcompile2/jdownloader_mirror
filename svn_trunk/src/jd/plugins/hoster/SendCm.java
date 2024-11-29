@@ -49,7 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50069 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -193,7 +193,7 @@ public class SendCm extends XFileSharingProBasic {
              * Looks like this is supposed to help with Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
-            handleDownload(link, account, null, directurl, null);
+            handleDownload(link, account, null, directurl);
         } else {
             super.doFree(link, account);
         }
@@ -203,7 +203,7 @@ public class SendCm extends XFileSharingProBasic {
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             final String directurl = this.getDllinkAPI(link, account);
-            handleDownload(link, account, null, directurl, null);
+            handleDownload(link, account, null, directurl);
         } else {
             super.handlePremium(link, account);
         }

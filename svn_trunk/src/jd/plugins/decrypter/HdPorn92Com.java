@@ -22,14 +22,13 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
-@DecrypterPlugin(revision = "$Revision: 46773 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
+@DecrypterPlugin(revision = "$Revision: 50250 $", interfaceVersion = 2, names = { "hdporn92.com" }, urls = { "https?://(?:www\\.)?hdporn92\\.com/[A-Za-z0-9\\-]+/?" })
 public class HdPorn92Com extends antiDDoSForDecrypt {
     public HdPorn92Com(PluginWrapper wrapper) {
         super(wrapper);
@@ -46,17 +45,8 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
     }
 
     @Override
-    protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            /* define custom browser headers and language settings */
-        }
-        return prepBr;
-    }
-
-    @Override
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         getPage(param.getCryptedUrl());
         String encodedTitle = br.getRegex("<meta[^>]+property\\s*=\\s*\"og:title\"[^>]+content\\s*=\\s*\"([^\"]*)").getMatch(0);
         FilePackage fp = FilePackage.getInstance();
@@ -64,19 +54,19 @@ public class HdPorn92Com extends antiDDoSForDecrypt {
         String[] additionalServers = br.getRegex("<a\\s+class=\"button\"[^>]+href\\s*=\\s*\"([^\"]*)\"[^>]+>.*?Server \\d+").getColumn(0);
         if (additionalServers != null) {
             for (String server : additionalServers) {
-                decryptedLinks.add(createDownloadlink(server));
+                ret.add(createDownloadlink(server));
             }
         }
         additionalServers = br.getRegex("<a[^>]+href\\s*=\\s*\"([^\"]*)\"[^>]+rel\\s*=\\s*\"noopener\"").getColumn(0);
         if (additionalServers != null) {
             for (String server : additionalServers) {
-                decryptedLinks.add(createDownloadlink(server));
+                ret.add(createDownloadlink(server));
             }
         }
         String url = br.getRegex("<meta[^>]+itemprop\\s*=\\s*\"embedURL\"[^>]+content\\s*=\\s*\"([^\"]*)").getMatch(0);
-        decryptedLinks.add(createDownloadlink(url));
-        fp.addLinks(decryptedLinks);
+        ret.add(createDownloadlink(url));
+        fp.addLinks(ret);
         fp.setAllowInheritance(true);
-        return decryptedLinks;
+        return ret;
     }
 }

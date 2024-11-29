@@ -35,7 +35,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47380 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class MediadeliveryNet extends antiDDoSForHost {
     public MediadeliveryNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -48,8 +48,6 @@ public class MediadeliveryNet extends antiDDoSForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.VIDEO_STREAMING };
     }
 
-    /* Connection stuff */
-    private static final int   free_maxdownloads        = -1;
     public static final String PROPERTY_AUTHOR          = "user";
     public static final String PROPERTY_TITLE           = "title";
     public static final String PROPERTY_POSITION        = "position";
@@ -177,7 +175,7 @@ public class MediadeliveryNet extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return free_maxdownloads;
+        return Integer.MAX_VALUE;
     }
 
     @Override

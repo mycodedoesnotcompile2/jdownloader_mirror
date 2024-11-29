@@ -28,7 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49678 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50250 $", interfaceVersion = 3, names = {}, urls = {})
 public class MovingImageFansOrg extends PluginForDecrypt {
     public MovingImageFansOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,13 +65,13 @@ public class MovingImageFansOrg extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/external/(?:\\d+/)?[A-Za-z0-9]+");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/external/(?:\\d+/)?[A-Za-z0-9]{32}");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String contenturl = param.getCryptedUrl().replaceFirst("http://", "https://");
+        final String contenturl = param.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 400) {
             logger.info("Added URL expired and cannot be re-used");

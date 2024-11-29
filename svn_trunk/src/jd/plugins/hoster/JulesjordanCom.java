@@ -43,6 +43,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -52,7 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.JulesjordanComDecrypter;
 
-@HostPlugin(revision = "$Revision: 50245 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { JulesjordanComDecrypter.class })
 public class JulesjordanCom extends PluginForHost {
     public JulesjordanCom(PluginWrapper wrapper) {
@@ -198,7 +199,6 @@ public class JulesjordanCom extends PluginForHost {
 
     private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
         requestFileInformation(link, account, true);
-        handleGeneralErrors();
         if (dllink == null) {
             /*
              * If trailer download is possible but dllink == null in theory this would be a PLUGIN_DEFECT but I think that premiumonly
@@ -218,10 +218,6 @@ public class JulesjordanCom extends PluginForHost {
             }
         }
         dl.startDownload();
-    }
-
-    private void handleGeneralErrors() throws PluginException {
-        /* Fill me up */
     }
 
     public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
@@ -270,9 +266,6 @@ public class JulesjordanCom extends PluginForHost {
             logger.info("Performing full login");
             br.getPage("https://www." + this.getHost() + "/trial/index.php");
             br.getPage("/members/");
-            // if (!br.getURL().matches(".*/members/?$") || true) {
-            // br.getPage("/auth.form");
-            // }
             final Form loginform = br.getFormbyActionRegex(".*auth\\.form.*");
             if (loginform == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -290,9 +283,11 @@ public class JulesjordanCom extends PluginForHost {
                 if (br.containsHTML("captcha_x=1")) {
                     /* User entered invalid login-captcha */
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                } else if (br.getURL().matches("(?i).+/expired/?$")) {
+                } else if (br.getURL().matches("(?i).*/expired/?$")) {
                     /* Login is valid but account is not premium anymore. */
                     throw new AccountInvalidException("Account is expired");
+                } else if (br.getURL().matches("(?i).*/trial_pg/?$")) {
+                    throw new AccountUnavailableException("Age verification required", 2 * 60 * 60 * 1000);
                 } else {
                     throw new AccountInvalidException();
                 }
@@ -348,7 +343,11 @@ public class JulesjordanCom extends PluginForHost {
     }
 
     private boolean isMultihostDownloadAllowed(final DownloadLink dl) {
-        return isTrailerURL(dl.getPluginPatternMatcher());
+        if (isTrailerURL(dl.getPluginPatternMatcher())) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public static boolean isTrailerURL(final String inputurl) {
@@ -358,9 +357,9 @@ public class JulesjordanCom extends PluginForHost {
     public static String getURLName(final String inputurl) {
         final String url_name;
         if (isTrailerURL(inputurl)) {
-            url_name = new Regex(inputurl, "/([^/]+)\\.html$").getMatch(0);
+            url_name = new Regex(inputurl, "(?i)/([^/]+)\\.html$").getMatch(0);
         } else {
-            url_name = new Regex(inputurl, "/([^/]+\\.mp4)$").getMatch(0);
+            url_name = new Regex(inputurl, "(?i)/([^/]+\\.mp4)$").getMatch(0);
         }
         return url_name;
     }
@@ -373,7 +372,7 @@ public class JulesjordanCom extends PluginForHost {
         if (host == null) {
             return null;
         }
-        final String linkpart = new Regex(inputurl, "https?://[^/]+/[^/]+/(.+)").getMatch(0);
+        final String linkpart = new Regex(inputurl, "(?i)https?://[^/]+/[^/]+/(.+)").getMatch(0);
         return String.format("https://www.%s/trial/%s", host, linkpart);
     }
 
@@ -385,7 +384,7 @@ public class JulesjordanCom extends PluginForHost {
         if (host == null) {
             return null;
         }
-        final String linkpart = new Regex(inputurl, "https?://[^/]+/[^/]+/(.+)").getMatch(0);
+        final String linkpart = new Regex(inputurl, "(?i)https?://[^/]+/[^/]+/(.+)").getMatch(0);
         return String.format("https://www.%s/members/%s", host, linkpart);
     }
 

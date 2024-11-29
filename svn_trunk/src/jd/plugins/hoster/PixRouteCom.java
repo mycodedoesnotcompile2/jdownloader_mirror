@@ -30,7 +30,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48904 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class PixRouteCom extends XFileSharingProBasic {
     public PixRouteCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -121,7 +121,7 @@ public class PixRouteCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected void handleDownloadErrors(URLConnectionAdapter con, final DownloadLink link, final Account account) throws Exception {
+    protected void handleDownloadErrors(final URLConnectionAdapter con, final DownloadLink link, final Account account) throws Exception {
         /* 2019-07-03: Special */
         super.handleDownloadErrors(con, link, account);
         boolean specialOffline = false;
@@ -130,6 +130,7 @@ public class PixRouteCom extends XFileSharingProBasic {
             final String response_last_modified = con.getRequest().getResponseHeader("Last-Modified").toString();
             specialOffline = final_filesize == 40275 && response_last_modified.equalsIgnoreCase("Sun, 10 Mar 2019 14:07:34 GMT");
         } catch (final Exception e) {
+            return;
         }
         if (specialOffline) {
             /*

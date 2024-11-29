@@ -31,7 +31,6 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
-import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
@@ -44,7 +43,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -335,18 +334,8 @@ public class SubyShareCom extends XFileSharingProBasic {
                     }
                 }
                 waitTime(link, timeBefore);
-                final URLConnectionAdapter formCon = openAntiDDoSRequestConnection(br, br.createFormRequest(download2));
-                if (looksLikeDownloadableContent(formCon)) {
-                    /* Very rare case - e.g. tiny-files.com */
-                    handleDownload(link, account, dllink, formCon.getRequest());
+                if (this.tryDownload(link, account, download2)) {
                     return;
-                } else {
-                    br.followConnection(true);
-                    this.correctBR(br);
-                    try {
-                        formCon.disconnect();
-                    } catch (final Throwable e) {
-                    }
                 }
                 logger.info("Submitted Form download2");
                 checkErrors(br, correctedBR, link, account, true);
@@ -395,7 +384,6 @@ public class SubyShareCom extends XFileSharingProBasic {
             }
             captchaForm.put("code", code);
             logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
-            link.setProperty(PROPERTY_captcha_required, true);
         } else {
             super.handleCaptcha(link, br, captchaForm);
         }

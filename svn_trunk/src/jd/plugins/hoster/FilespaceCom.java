@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49414 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilespaceCom extends XFileSharingProBasic {
     public FilespaceCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -136,12 +136,7 @@ public class FilespaceCom extends XFileSharingProBasic {
         if (checkAll) {
             if (new Regex(correctedBR, "(?i)>[^<]*Wrong captcha[^<]*<").patternFind()) {
                 logger.warning("Wrong captcha (or wrong password as well)!");
-                /*
-                 * TODO: Find a way to avoid using a property for this or add the property in very plugin which overrides handleCaptcha e.g.
-                 * subyshare.com. If a dev forgets to set this, it will cause invalid errormessages on wrong captcha!
-                 */
-                final boolean websiteDidAskForCaptcha = link.getBooleanProperty(PROPERTY_captcha_required, false);
-                if (websiteDidAskForCaptcha) {
+                if (this.getChallengeRound() >= 1) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 } else {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server says 'wrong captcha' but never prompted for one");

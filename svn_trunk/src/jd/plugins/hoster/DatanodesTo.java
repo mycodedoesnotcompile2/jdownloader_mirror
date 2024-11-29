@@ -33,7 +33,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49085 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class DatanodesTo extends XFileSharingProBasic {
     public DatanodesTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -181,7 +181,6 @@ public class DatanodesTo extends XFileSharingProBasic {
             this.waitBeforeInteractiveCaptcha(link, rc2.getSolutionTimeout());
             final String captchaResponse = captchaHelper.getToken();
             captchaForm.put("g-recaptcha-response", Encoding.urlEncode(captchaResponse));
-            link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
         } else {
             super.handleCaptcha(link, br, captchaForm);
         }

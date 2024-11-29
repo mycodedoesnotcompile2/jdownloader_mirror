@@ -32,7 +32,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class XubsterCom extends XFileSharingProBasic {
     public XubsterCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -121,9 +121,7 @@ public class XubsterCom extends XFileSharingProBasic {
     public void handleCaptcha(final DownloadLink link, final Browser br, final Form captchaForm) throws Exception {
         if (br.getURL().contains("/login") && captchaForm.hasInputFieldByName("g-recaptcha-response") && captchaForm.containsHTML("recaptcha\\.com")) {
             /* 2020-11-13: Special - login reCaptchaV2 required */
-            if (handleRecaptchaV2(link, br, captchaForm)) {
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
-            }
+            handleRecaptchaV2(link, br, captchaForm);
         } else if (StringUtils.containsIgnoreCase(getCorrectBR(br), "/captchas/")) {
             /* 2021-08-23: Special */
             logger.info("Detected captcha method \"Standard captcha\" for this host");
@@ -151,7 +149,6 @@ public class XubsterCom extends XFileSharingProBasic {
             String code = getCaptchaCode("xfilesharingprobasic_special", captchaurl, link);
             captchaForm.put("code", code);
             logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
-            link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
         } else {
             super.handleCaptcha(link, br, captchaForm);
         }

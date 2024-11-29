@@ -18,7 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.DebugMode;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -27,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49416 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class XfilesharingCom extends XFileSharingProBasic {
     public XfilesharingCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -86,16 +85,6 @@ public class XfilesharingCom extends XFileSharingProBasic {
         } else {
             /* Free(anonymous) and unknown account type */
             return 1;
-        }
-    }
-
-    @Override
-    public boolean loginWebsite(final DownloadLink downloadLink, final Account account, final boolean force) throws Exception {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            /* 2019-05-29: Special and experimental */
-            return loginAPP(account, false);
-        } else {
-            return super.loginWebsite(downloadLink, account, force);
         }
     }
 

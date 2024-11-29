@@ -37,7 +37,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50137 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50257 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadyIo extends XFileSharingProBasic {
     public UploadyIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -146,25 +146,6 @@ public class UploadyIo extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         /* First bring up saved final links */
         if (this.attemptStoredDownloadurlDownload(link, account)) {
-            try {
-                if (dl.getConnection() != null) {
-                    fixFilename(dl.getConnection(), link);
-                } else {
-                    fixFilenameHLSDownload(link);
-                }
-            } catch (final Exception ignore) {
-                logger.log(ignore);
-            }
-            logger.info("Using stored directurl");
-            /* add a download slot */
-            controlMaxFreeDownloads(account, link, +1);
-            try {
-                /* start the dl */
-                dl.startDownload();
-            } finally {
-                /* remove download slot */
-                controlMaxFreeDownloads(account, link, -1);
-            }
             return;
         }
         requestFileInformationWebsite(link, account, true);
@@ -224,7 +205,7 @@ public class UploadyIo extends XFileSharingProBasic {
             checkErrorsLastResort(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        handleDownload(link, account, null, dllink, null);
+        handleDownload(link, account, null, dllink);
     }
 
     protected void waitBeforeInteractiveCaptcha(final DownloadLink link, final long waitMillis, final int captchaTimeoutMillis) throws PluginException {

@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49144 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
 public class DdownloadCom extends XFileSharingProBasic {
     public DdownloadCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -260,32 +260,38 @@ public class DdownloadCom extends XFileSharingProBasic {
         return fileInfo;
     }
 
-    // /** TODO: 2019-11-11: Use this once they've updated their API. 2019-11-27: They will not fix this issue as they're afraid of it being
-    // used by multihosts lol */
-    // @Override
-    // protected boolean allow_api_download_if_apikey_is_available(final Account account) {
-    // final boolean apikey_is_available = this.getAPIKey(account) != null;
-    // /* API download is available for premium accounts only. */
-    // return apikey_is_available && account != null && account.getType() == AccountType.PREMIUM;
-    // }
-    //
+    @Override
+    protected boolean allowAPIDownloadIfApikeyIsAvailable(final DownloadLink link, final Account account) {
+        /* 2024-11-28: Public file downloads via API were turned off by the admins. */
+        return false;
+    }
+
     @Override
     protected AccountInfo fetchAccountInfoAPI(final Browser br, final Account account) throws Exception {
         final Browser brc = br.cloneBrowser();
         final AccountInfo ai = super.fetchAccountInfoAPI(brc, account);
         /* Original XFS API ('API Mod') does not return trafficleft but theirs is modified and more useful! */
         /* 2019-11-27: Not sure but this must be the traffic you can buy via 'extend traffic': /?op=payments */
-        final String premium_extra_trafficStr = PluginJSonUtils.getJson(brc, "premium_traffic_left");
+        if (AccountType.PREMIUM != account.getType()) {
+            /* Not a premium accout -> No reason to look for additional traffic information */
+            /*
+             * They will return "traffic_left":"0" for free accounts which is wrong. It is unlimited on their website. By setting it to
+             * unlimited here it will be re-checked via website by our XFS template!
+             */
+            ai.setUnlimitedTraffic();
+            return ai;
+        }
         final String trafficleftStr = PluginJSonUtils.getJson(brc, "traffic_left");
         // final String trafficusedStr = PluginJSonUtils.getJson(brc, "traffic_used");
         /*
          * 2020-02-17: Their API has a bug where it randomly returns wrong values for some users and they did not fix it within 2 weeks:
          * https://board.jdownloader.org/showthread.php?t=82525&page=2
          */
-        /* 2020-06-29: API returns wrong trafficlaft values --> Don't trust it - obtain trafficleft value from website instead! */
-        final boolean trustAPITrafficLeft = false;
-        if (account.getType() != null && account.getType() == AccountType.PREMIUM && trafficleftStr != null && trafficleftStr.matches("\\d+")) {
+        /* 2020-06-29: API returns wrong trafficleft values --> Don't trust it - obtain trafficleft value from website instead! */
+        if (trafficleftStr != null && trafficleftStr.matches("\\d+")) {
+            final boolean trustAPITrafficLeft = false;
             long traffic_left = SizeFormatter.getSize(trafficleftStr + "MB");
+            final String premium_extra_trafficStr = PluginJSonUtils.getJson(brc, "premium_traffic_left");
             if (premium_extra_trafficStr != null && premium_extra_trafficStr.matches("\\d+")) {
                 final long premium_extra_traffic = SizeFormatter.getSize(premium_extra_trafficStr + "MB");
                 if (premium_extra_traffic > 0) {
@@ -296,6 +302,8 @@ public class DdownloadCom extends XFileSharingProBasic {
                         ai.setStatus("Premium account | Extra traffic available: " + SIZEUNIT.formatValue((SIZEUNIT) CFG_GUI.MAX_SIZE_UNIT.getValue(), premium_extra_traffic));
                     }
                 }
+            } else {
+                logger.warning("Detected invalid premium_traffic_left value");
             }
             if (trustAPITrafficLeft) {
                 logger.info("Trust API trafficleft value: " + traffic_left);
@@ -305,11 +313,7 @@ public class DdownloadCom extends XFileSharingProBasic {
                 ai.setUnlimitedTraffic();
             }
         } else {
-            /*
-             * They will return "traffic_left":"0" for free accounts which is wrong. It is unlimited on their website. By setting it to
-             * unlimited here it will be re-checked via website by our XFS template!
-             */
-            ai.setUnlimitedTraffic();
+            logger.warning("Detected invalid traffic_left value");
         }
         return ai;
     }
@@ -365,7 +369,7 @@ public class DdownloadCom extends XFileSharingProBasic {
          * too.
          */
         this.getPage("/?op=my_reports");
-        if (new Regex(correctedBR, ">\\s*?Please enter your e-mail").matches()) {
+        if (new Regex(correctedBR, "(?i)>\\s*?Please enter your e-mail").patternFind()) {
             final String accountErrorMsg;
             if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
                 accountErrorMsg = String.format("Ergänze deine E-Mail Adresse unter %s/?op=my_account um diesen Account verwenden zu können!", this.getHost());
@@ -379,13 +383,15 @@ public class DdownloadCom extends XFileSharingProBasic {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
+        super.resetDownloadlink(link);
+        if (link == null) {
+            return;
+        }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* 2019-11-11: Reset final downloadurls in dev mode. */
             link.removeProperty("freelink");
             link.removeProperty("freelink2");
             link.removeProperty("premlink");
-        } else {
-            super.resetDownloadlink(link);
         }
     }
 
@@ -403,7 +409,7 @@ public class DdownloadCom extends XFileSharingProBasic {
     @Override
     protected void checkErrors(final Browser br, final String html, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
         /* 2020-01-20: Special */
-        if (new Regex(html, ">\\s*This server is in maintenance mode").matches()) {
+        if (new Regex(html, "(?i)>\\s*This server is in maintenance mode").patternFind()) {
             /* <strong>Oops!</strong> This server is in maintenance mode. Refresh this page in some minutes. */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "This server is in maintenance mode", 15 * 60 * 1000l);
         } else if (br.getHttpConnection().getResponseCode() == 500) {

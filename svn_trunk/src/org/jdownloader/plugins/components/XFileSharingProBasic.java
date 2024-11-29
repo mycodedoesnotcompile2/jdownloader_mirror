@@ -49,6 +49,7 @@ import org.appwork.utils.encoding.URLEncode;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
 import org.jdownloader.captcha.v2.CaptchaHosterHelperInterface;
 import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
@@ -98,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50137 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50257 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -108,7 +109,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     // public static List<String[]> getPluginDomains() {
     // final List<String[]> ret = new ArrayList<String[]>();
     // // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-    // ret.add(new String[] { "imgdew.com" });
+    // ret.add(new String[] { "example.com" });
     // return ret;
     // }
     //
@@ -154,7 +155,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected WeakHashMap<Request, String>    correctedBrowserRequestMap                                        = new WeakHashMap<Request, String>();
     /* Don't touch the following! */
     private static Map<String, AtomicInteger> freeRunning                                                       = new HashMap<String, AtomicInteger>();
-    protected static final String             PROPERTY_captcha_required                                         = "captcha_requested_by_website";
     protected static final String             PROPERTY_ACCOUNT_apikey                                           = "apikey";
     private static final String               PROPERTY_PLUGIN_api_domain_with_protocol                          = "apidomain";
     protected static final String             PROPERTY_PLUGIN_REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP = "REPORT_FILE_AVAILABLECHECK_LAST_FAILURE_TIMESTAMP";
@@ -2191,25 +2191,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         /* First bring up saved final links */
         if (this.attemptStoredDownloadurlDownload(link, account)) {
-            try {
-                if (dl.getConnection() != null) {
-                    fixFilename(dl.getConnection(), link);
-                } else {
-                    fixFilenameHLSDownload(link);
-                }
-            } catch (final Exception ignore) {
-                logger.log(ignore);
-            }
-            logger.info("Using stored directurl");
-            /* add a download slot */
-            controlMaxFreeDownloads(account, link, +1);
-            try {
-                /* start the dl */
-                dl.startDownload();
-            } finally {
-                /* remove download slot */
-                controlMaxFreeDownloads(account, link, -1);
-            }
             return;
         }
         requestFileInformationWebsite(link, account, true);
@@ -2338,18 +2319,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     handlePassword(download2, link);
                     handleCaptcha(link, br, download2);
                     waitTime(link, timeBefore);
-                    final URLConnectionAdapter formCon = openAntiDDoSRequestConnection(br, br.createFormRequest(download2));
-                    if (looksLikeDownloadableContent(formCon)) {
-                        /* Very rare case - e.g. tiny-files.com */
-                        handleDownload(link, account, null, dllink, formCon.getRequest());
+                    if (this.tryDownload(link, account, download2)) {
                         return;
-                    } else {
-                        br.followConnection(true);
-                        this.correctBR(br);
-                        try {
-                            formCon.disconnect();
-                        } catch (final Throwable e) {
-                        }
                     }
                     logger.info("Submitted Form download2");
                     checkErrors(br, getCorrectBR(br), link, account, true);
@@ -2386,7 +2357,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             checkErrorsLastResort(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        handleDownload(link, account, officialDownloadURL, dllink, null);
+        handleDownload(link, account, officialDownloadURL, dllink);
     }
 
     /** Returns relative URL to embed content if available in current browsers' html code. */
@@ -2865,14 +2836,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 checkErrorsLastResort(brc, link, null);
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
         } else if (containsHCaptcha(getCorrectBR(br))) {
             if (handleHCaptcha(link, br, captchaForm)) {
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             }
         } else if (containsRecaptchaV2Class(getCorrectBR(br))) {
             if (handleRecaptchaV2(link, br, captchaForm)) {
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             }
         } else {
             if (containsPlainTextCaptcha(getCorrectBR(br))) {
@@ -2898,7 +2866,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
                 captchaForm.put("code", code.toString());
                 logger.info("Put captchacode " + code.toString() + " obtained by captcha metod \"plaintext captchas\" in captchaForm");
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             } else if (StringUtils.containsIgnoreCase(getCorrectBR(br), "/captchas/")) {
                 logger.info("Detected captcha method \"Standard captcha\" for this host");
                 final String[] sitelinks = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), "");
@@ -2926,7 +2893,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final String code = getCaptchaCode("xfilesharingprobasic", captchaurl, link);
                 captchaForm.put("code", code);
                 logger.info("Put captchacode " + code + " obtained by captcha metod \"Standard captcha\" in the form.");
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             } else if (new Regex(getCorrectBR(br), "(api\\.recaptcha\\.net|google\\.com/recaptcha/api/)").patternFind()) {
                 logger.info("Detected captcha method \"reCaptchaV1\" for this host");
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Website uses reCaptchaV1 which has been shut down by Google. Contact website owner!");
@@ -2947,7 +2913,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 final String chid = sm.getChallenge(code);
                 captchaForm.put("adcopy_challenge", chid);
                 captchaForm.put("adcopy_response", "manual_challenge");
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             } else if (br.containsHTML("id=\"capcode\" name= \"capcode\"")) {
                 logger.info("Detected captcha method \"keycaptcha\"");
                 String result = handleCaptchaChallenge(getDownloadLink(), new KeyCaptcha(this, br, getDownloadLink()).createChallenge(this));
@@ -2958,11 +2923,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                     throw new PluginException(LinkStatus.ERROR_FATAL);
                 }
                 captchaForm.put("capcode", result);
-                link.setProperty(PROPERTY_captcha_required, Boolean.TRUE);
             } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
             } else {
-                link.setProperty(PROPERTY_captcha_required, Boolean.FALSE);
+                /* No captcha */
             }
             /* Captcha END */
         }
@@ -3130,51 +3094,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (StringUtils.isEmpty(url)) {
             return false;
         }
-        boolean valid = false;
-        boolean throwException = false;
-        try {
-            final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, account), this.getMaxChunks(account));
-            if (dl.getConnection().getResponseCode() == 503) {
-                brc.followConnection(true);
-                throwException = true;
-                valid = true;
-                exception503ConnectionLimitReached();
-                return true;
-            } else if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                valid = true;
-                return true;
-            } else if (LinkCrawlerDeepInspector.looksLikeMpegURL(dl.getConnection())) {
-                /* HLS download */
-                try {
-                    dl.getConnection().disconnect();
-                } catch (final Throwable ignore) {
-                }
-                valid = true;
-                dl = new HLSDownloader(link, brc, url);
-                return true;
-            } else {
-                /* Remove property so we don't retry the same invalid directurl again next time. */
-                link.removeProperty(directurlproperty);
-                brc.followConnection(true);
-                throw new IOException();
-            }
-        } catch (final Exception e) {
-            if (throwException) {
-                throw e;
-            } else {
-                logger.log(e);
-                return false;
-            }
-        } finally {
-            if (!valid) {
-                try {
-                    dl.getConnection().disconnect();
-                } catch (Throwable ignore) {
-                }
-                this.dl = null;
-            }
-        }
+        logger.info("Attempting to re-use stored directurl: " + url);
+        return this.tryDownload(link, account, url);
     }
 
     protected boolean verifyURLFormat(final String url) {
@@ -4042,25 +3963,20 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 }
             } else if (new Regex(html, "(?i)>\\s*Wrong captcha").patternFind()) {
                 logger.warning("Wrong captcha (or wrong password as well)!");
-                /*
-                 * TODO: Find a way to avoid using a property for this or add the property in very plugin which overrides handleCaptcha e.g.
-                 * subyshare.com. If a dev forgets to set this, it will cause invalid errormessages on wrong captcha!
-                 */
-                final boolean websiteDidAskForCaptcha = link.getBooleanProperty(PROPERTY_captcha_required, false);
-                if (websiteDidAskForCaptcha) {
+                if (this.getChallengeRound() >= 1) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 } else {
-                    /* This should never happen. Either developer mistake or broken filehost website. */
+                    /* This should never happen. Either developer mistake, broken plugin or broken filehost website. */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server says 'wrong captcha' but never prompted for one");
                 }
-            } else if (new Regex(html, ">\\s*Skipped countdown\\s*<").patternFind()) {
+            } else if (new Regex(html, "(?i)>\\s*Skipped countdown\\s*<").patternFind()) {
                 /* 2019-08-28: e.g. "<br><b class="err">Skipped countdown</b><br>" */
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Fatal countdown error (countdown skipped)");
             }
         }
         /** Wait time reconnect handling */
         final String limitBasedOnNumberofFilesAndTime = new Regex(html, "(?i)>\\s*(You have reached the maximum limit \\d+ files in \\d+ hours)").getMatch(0);
-        final String preciseWaittime = new Regex(html, "((You have reached the download(\\-| )limit|You have to wait)[^<>]+)").getMatch(0);
+        final String preciseWaittime = new Regex(html, "(?i)((You have reached the download(\\-| )limit|You have to wait)[^<>]+)").getMatch(0);
         if (preciseWaittime != null) {
             /* Reconnect waittime with given (exact) waittime usually either up to the minute or up to the second. */
             final String tmphrs = new Regex(preciseWaittime, "(?i)\\s*(\\d+)\\s*hours?").getMatch(0);
@@ -5172,223 +5088,193 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    /**
-     * 2019-05-29: This is only EXPERIMENTAL! </br>
-     * App-login: https://play.google.com/store/apps/details?id=net.sibsoft.xfsuploader </br>
-     * Around 2016 this has been implemented for some XFS websites but was never really used.It will return an XML response. Fragments of it
-     * may still work for some XFS websites e.g. official DEMO website 'xfilesharing.com'.</br>
-     * The login-cookie we get is valid for the normal website as well! </br>
-     * Biggest disadvantage: Whenever a login-captcha is required (e.g. on too many wrong logins), this method will NOT work!!
-     */
-    @Deprecated
-    protected final boolean loginAPP(final Account account, boolean validateCookies) throws Exception {
-        synchronized (account) {
-            br.setHeader("User-Agent", "XFS-Mobile");
-            br.setHeader("Content-Type", "application/x-www-form-urlencoded");
-            /* Load cookies */
-            br.setCookiesExclusive(true);
-            final Cookies cookies = account.loadCookies("");
-            boolean isLoggedIN = false;
-            /* 2019-08-29: Cookies will become invalid very soon so let's always verify them! */
-            validateCookies = true;
-            if (cookies != null) {
-                br.setCookies(getMainPage(), cookies);
-                if (!validateCookies) {
-                    /* We trust these cookies as they're not that old --> Do not check them */
-                    return false;
-                }
-                logger.info("Verifying login-cookies");
-                getPage(getMainPage() + "/");
-                /* Missing login cookies? --> Login failed */
-                isLoggedIN = StringUtils.isEmpty(br.getCookie(getMainPage(), "xfss", Cookies.NOTDELETEDPATTERN));
-            }
-            if (isLoggedIN) {
-                /* No additional check required --> We know cookies are valid and we're logged in --> Done! */
-                logger.info("Successfully logged in via cookies");
-            } else {
-                account.clearCookies("");
-                logger.info("Performing full login");
-                br.clearCookies(getMainPage());
-                final Form loginform = new Form();
-                loginform.setMethod(MethodType.POST);
-                loginform.setAction(getMainPage());
-                loginform.put("op", "api_get_limits");
-                loginform.put("login", Encoding.urlEncode(account.getUser()));
-                loginform.put("password", Encoding.urlEncode(account.getPass()));
-                submitForm(loginform);
-                /*
-                 * Returns XML: ExtAllowed, ExtNotAllowed, MaxUploadFilesize, ServerURL[for uploads], SessionID[our login cookie], Error,
-                 * SiteName, LoginLogic
-                 */
-                /* Missing login cookies? --> Login failed */
-                if (StringUtils.isEmpty(br.getCookie(getMainPage(), "xfss", Cookies.NOTDELETEDPATTERN))) {
-                    if (getCorrectBR(br).contains("op=resend_activation")) {
-                        /* User entered correct logindata but has not activated his account ... */
-                        throw new AccountInvalidException("\r\nYour account has not yet been activated!\r\nActivate it via the URL you should have received via E-Mail and try again!");
-                    } else {
-                        throw new AccountInvalidException();
-                    }
-                }
-            }
-            // /* Returns balance, space, days(?premium days remaining?) - this call is not supported by all XFS sites - in this case
-            // it'll return 404. */
-            // final Form statsform = new Form();
-            // statsform.setMethod(MethodType.POST);
-            // statsform.setAction(getMainPage() + "/cgi-bin/uapi.cgi");
-            // statsform.put("op", "api_get_stat");
-            // submitForm(statsform);
-            // final String spaceUsed = br.getRegex("<space>(\\d+\\.\\d+GB)</space>").getMatch(0);
-            // final String balance = br.getRegex("<ballance>\\$(\\d+)</ballance>").getMatch(0);
-            // // final String days = br.getRegex("<days>(\\d+)</days>").getMatch(0);
-            // if (spaceUsed != null) {
-            // account.getAccountInfo().setUsedSpace(SizeFormatter.getSize(spaceUsed));
-            // }
-            // if (balance != null) {
-            // account.getAccountInfo().setAccountBalance(balance);
-            // }
-            account.saveCookies(br.getCookies(br.getHost()), "");
-            return true;
-        }
+    protected boolean tryDownload(final DownloadLink link, final Account account, final Form form) throws Exception {
+        return tryDownload(link, account, br.createFormRequest(form));
     }
 
-    protected boolean isAccountLoginVerificationEnabled(final Account account, final boolean verifiedLogin) {
-        return !verifiedLogin;
+    protected boolean tryDownload(final DownloadLink link, final Account account, final String url) throws Exception {
+        return tryDownload(link, account, br.createGetRequest(url));
+    }
+
+    protected boolean tryDownload(final DownloadLink link, final Account account, final String url, final boolean isFinalAttempt) throws Exception {
+        return tryDownload(link, account, br.createGetRequest(url), isFinalAttempt);
+    }
+
+    protected boolean tryDownload(final DownloadLink link, final Account account, final Request req) throws Exception {
+        return tryDownload(link, account, req, false);
+    }
+
+    /**
+     * Attempts download and only contains very rudimentary error handling. </br>
+     * Returns false if the download is impossible. </br>
+     * Returns true if the download is possible && done.
+     */
+    protected boolean tryDownload(final DownloadLink link, final Account account, final Request req, final boolean isFinalAttempt) throws Exception {
+        if (req == null) {
+            throw new IllegalArgumentException();
+        }
+        String url = req.getUrl();
+        if (url.startsWith("rtmp")) {
+            /* 2022-01-27: rtmp is not supported anymore */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming protocol rtmp");
+        }
+        url = fixProtocol(link, account, br, url);
+        if (!url.equals(req.getUrl())) {
+            logger.info("Final downloadlink was changed to: " + url);
+            req.setURL(new URL(url));
+        }
+        String hlsURL = null;
+        if (req.getRequestMethod() == RequestMethod.GET && url.contains(".m3u8")) {
+            hlsURL = url;
+        }
+        if (hlsURL == null) {
+            final boolean resume = this.isResumeable(link, account);
+            int maxChunks = getMaxChunks(account);
+            if (maxChunks > 1) {
+                logger.info("@Developer: fixme! maxChunks may not be fixed positive:" + maxChunks);
+                maxChunks = -maxChunks;
+            }
+            if (!resume) {
+                if (maxChunks != 1) {
+                    logger.info("@Developer: fixme! no resume allowed but maxChunks is not 1:" + maxChunks);
+                    maxChunks = 1;
+                }
+            }
+            /* Open connection */
+            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, req, resume, maxChunks);
+            if (LinkCrawlerDeepInspector.looksLikeMpegURL(dl.getConnection())) {
+                /* Unexpected HLS download */
+                hlsURL = dl.getConnection().getURL().toExternalForm();
+                try {
+                    dl.getConnection().disconnect();
+                } catch (final Throwable ignore) {
+                }
+            } else if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                runPostRequestTask(br);
+                this.correctBR(br);
+                if (isFinalAttempt) {
+                    handleDownloadErrors(dl.getConnection(), link, account);
+                    /* This code should never be reached */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                if (dl.getConnection().getResponseCode() == 503) {
+                    exception503ConnectionLimitReached();
+                    /* Unreachable code */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                dl = null;
+                return false;
+            }
+        }
+        if (hlsURL != null) {
+            final String finalDownloadlink = handleQualitySelectionHLS(this.br.cloneBrowser(), hlsURL);
+            checkFFmpeg(link, "Download a HLS Stream");
+            dl = new HLSDownloader(link, br, finalDownloadlink);
+            try {
+                fixFilenameHLSDownload(link);
+            } catch (final Exception e) {
+                logger.log(e);
+            }
+        } else {
+            /* Progressive download */
+            try {
+                fixFilename(dl.getConnection(), link);
+            } catch (final Exception ignore) {
+                logger.log(ignore);
+            }
+        }
+        /* Store URL for next download attempt */
+        this.storeDirecturl(link, account, dl.getConnection().getURL().toExternalForm());
+        /* add a download slot */
+        controlMaxFreeDownloads(account, link, +1);
+        try {
+            /* start the dl */
+            dl.startDownload();
+        } finally {
+            /* remove download slot */
+            controlMaxFreeDownloads(account, link, -1);
+        }
+        return true;
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         if (this.attemptStoredDownloadurlDownload(link, account)) {
-            /* Re-use stored directurl */
-            try {
-                if (dl.getConnection() != null) {
-                    fixFilename(dl.getConnection(), link);
-                } else {
-                    fixFilenameHLSDownload(link);
-                }
-            } catch (final Exception ignore) {
-                logger.log(ignore);
-            }
-            logger.info("Using stored directurl");
-            /* add a download slot */
-            controlMaxFreeDownloads(account, link, +1);
-            try {
-                /* start the dl */
-                dl.startDownload();
-            } finally {
-                /* remove download slot */
-                controlMaxFreeDownloads(account, link, -1);
-            }
             return;
         }
         resolveShortURL(this.br.cloneBrowser(), link, account);
         if (this.enableAccountApiOnlyMode()) {
             /* API-only mode */
-            handleDownload(link, account, null, this.getDllinkAPI(link, account), null);
-        } else {
-            /* Website/mixed mode */
-            final String contentURL = this.getNormalizedDownloadURL(link);
-            if (isFree(account)) {
-                /*
-                 * Perform linkcheck without logging in. TODO: Remove this and check for offline later as this would save one http request.
-                 */
-                requestFileInformationWebsite(link, account, true);
-                final boolean verifiedLogin = loginWebsite(link, account, false);
-                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(account));
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection();
-                    if (isAccountLoginVerificationEnabled(account, verifiedLogin) && !isLoggedin(this.br)) {
-                        /* Now we must be logged in -> Try again */
-                        loginWebsite(link, account, true);
-                        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, contentURL, this.isResumeable(link, account), this.getMaxChunks(account));
-                    }
-                }
-                if (this.looksLikeDownloadableContent(dl.getConnection())) {
-                    logger.info("Given contentURL redirected directly to file download");
-                    /* add a download slot */
-                    controlMaxFreeDownloads(account, link, +1);
-                    try {
-                        /* start the dl */
-                        dl.startDownload();
-                    } finally {
-                        /* remove download slot */
-                        controlMaxFreeDownloads(account, link, -1);
-                    }
-                    return;
-                }
-                br.followConnection();
-                dl = null;
-                if (isFree(account)) {
-                    doFree(link, account);
-                } else {
-                    /* Premium account */
-                    logger.info("Account type has changed from free to premium -> Jumping into premium handling");
-                    setBrowser(createNewBrowserInstance());
-                    handlePremium(link, account);
-                }
+            handleDownload(link, account, null, this.getDllinkAPI(link, account));
+            return;
+        }
+        /* Website/mixed mode */
+        final String contentURL = this.getNormalizedDownloadURL(link);
+        tryAPIDownload: if (this.allowAPIDownloadIfApikeyIsAvailable(link, account)) {
+            String directlinkFromAPI = null;
+            try {
+                directlinkFromAPI = this.getDllinkAPI(link, account);
+            } catch (final Throwable e) {
+                /* Do not throw Exception --> Fallback to website instead */
+                logger.log(e);
+                logger.warning("Error in API download handling in website mode");
+                break tryAPIDownload;
+            }
+            logger.info("Found directurl via API mode: " + directlinkFromAPI);
+            this.tryDownload(link, account, directlinkFromAPI, true);
+            return;
+        }
+        /* API failed/not supported -> Try website! */
+        String officialVideoDownloadURL = null;
+        requestFileInformationWebsite(link, account, true);
+        final boolean verifiedLogin = loginWebsite(link, account, false);
+        if (this.tryDownload(link, account, contentURL)) {
+            return;
+        }
+        if (!verifiedLogin && !isLoggedin(this.br)) {
+            /* Now we must be logged in -> Try again */
+            loginWebsite(link, account, true);
+            if (this.tryDownload(link, account, contentURL)) {
                 return;
             }
-            /* Premium download */
-            String dllink = null;
-            if (this.allowAPIDownloadIfApikeyIsAvailable(link, account)) {
-                try {
-                    dllink = this.getDllinkAPI(link, account);
-                } catch (final Throwable e) {
-                    /* Do not throw Exception --> Fallback to website instead */
-                    logger.log(e);
-                    logger.warning("Error in API download handling in website mode");
-                }
-            }
-            /* API failed/not supported? Try website! */
-            String officialVideoDownloadURL = null;
-            if (StringUtils.isEmpty(dllink)) {
-                /* TODO: Maybe skip this, check for offline later */
-                requestFileInformationWebsite(link, account, true);
-                br.setFollowRedirects(false);
-                final boolean verifiedLogin = loginWebsite(link, account, false);
-                getPage(contentURL);
-                if (isAccountLoginVerificationEnabled(account, verifiedLogin) && !isLoggedin(this.br)) {
-                    loginWebsite(link, account, true);
-                    getPage(contentURL);
-                }
-                /*
-                 * Check for final downloadurl here because if user/host has direct downloads enabled, PluginPatternMatcher will redirect to
-                 * our final downloadurl thus isLoggedin might return false although we are loggedin!
-                 */
-                officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
-                dllink = getDllink(link, account, br, getCorrectBR(br));
-                if (StringUtils.isEmpty(dllink) || StringUtils.isEmpty(officialVideoDownloadURL)) {
-                    final Form dlForm = findFormDownload2Premium(link, account, this.br);
-                    if (dlForm != null) {
-                        handlePassword(dlForm, link);
-                        final URLConnectionAdapter formCon = openAntiDDoSRequestConnection(br, br.createFormRequest(dlForm));
-                        if (looksLikeDownloadableContent(formCon)) {
-                            /* Sending the form already gives us the file -> Very rare case - e.g. tiny-files.com */
-                            handleDownload(link, account, null, dllink, formCon.getRequest());
-                            return;
-                        } else {
-                            br.followConnection(true);
-                            runPostRequestTask(br);
-                            this.correctBR(br);
-                        }
-                        checkErrors(br, getCorrectBR(br), link, account, true);
-                        if (StringUtils.isEmpty(officialVideoDownloadURL)) {
-                            officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
-                        }
-                        if (dllink == null) {
-                            dllink = getDllink(link, account, br, getCorrectBR(br));
-                        }
-                    }
-                }
-                if (StringUtils.isEmpty(dllink) && StringUtils.isEmpty(officialVideoDownloadURL)) {
-                    checkErrors(br, getCorrectBR(br), link, account, true);
-                    logger.warning("Failed to find Form download2");
-                    checkServerErrors(br, link, account);
-                    checkErrorsLastResort(br, link, account);
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
-            handleDownload(link, account, officialVideoDownloadURL, dllink, null);
         }
+        if (isFree(account)) {
+            /* Not a premium account -> Jump into free handling */
+            doFree(link, account);
+            return;
+        }
+        /*
+         * Check for final downloadurl here because if user/host has direct downloads enabled, PluginPatternMatcher will redirect to our
+         * final downloadurl thus isLoggedin might return false although we are loggedin!
+         */
+        officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
+        String dllink = getDllink(link, account, br, getCorrectBR(br));
+        if (StringUtils.isEmpty(dllink) || StringUtils.isEmpty(officialVideoDownloadURL)) {
+            final Form dlform = findFormDownload2Premium(link, account, this.br);
+            if (dlform != null) {
+                handlePassword(dlform, link);
+                if (this.tryDownload(link, account, dlform)) {
+                    return;
+                }
+                /* Important: Do not check for errors here! Only check for errors later if no download link was found!! */
+                // checkErrors(br, getCorrectBR(br), link, account, true);
+                if (StringUtils.isEmpty(officialVideoDownloadURL)) {
+                    officialVideoDownloadURL = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
+                }
+                if (dllink == null) {
+                    dllink = getDllink(link, account, br, getCorrectBR(br));
+                }
+            }
+        }
+        if (StringUtils.isEmpty(dllink) && StringUtils.isEmpty(officialVideoDownloadURL)) {
+            checkErrors(br, getCorrectBR(br), link, account, true);
+            logger.warning("Failed to find Form download2");
+            checkServerErrors(br, link, account);
+            checkErrorsLastResort(br, link, account);
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        handleDownload(link, account, officialVideoDownloadURL, dllink);
     }
 
     /**
@@ -5425,11 +5311,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         return dllink;
     }
 
-    protected void handleDownload(final DownloadLink link, final Account account, final String directurl, final Request req) throws Exception {
-        handleDownload(link, account, null, directurl, req);
-    }
-
-    protected void handleDownload(final DownloadLink link, final Account account, final String officialVideoDownloadURL, final String directurl, final Request req) throws Exception {
+    protected void handleDownload(final DownloadLink link, final Account account, final String officialVideoDownloadURL, final String directurl) throws Exception {
         final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
         String finalDownloadlink;
         if (!StringUtils.isEmpty(officialVideoDownloadURL) && (mode == null || mode == DownloadMode.ORIGINAL || mode == DownloadMode.AUTO || StringUtils.isEmpty(directurl))) {
@@ -5442,113 +5324,19 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (Encoding.isHtmlEntityCoded(finalDownloadlink)) {
             finalDownloadlink = Encoding.htmlOnlyDecode(finalDownloadlink);
         }
-        if (req != null && req.getHttpConnection() != null) {
-            req.getHttpConnection().disconnect();
-        }
-        final boolean resume = this.isResumeable(link, account);
-        int maxChunks = getMaxChunks(account);
-        if (maxChunks > 1) {
-            logger.info("@Developer: fixme! maxChunks may not be fixed positive:" + maxChunks);
-            maxChunks = -maxChunks;
-        }
-        if (!resume) {
-            if (maxChunks != 1) {
-                logger.info("@Developer: fixme! no resume allowed but maxChunks is not 1:" + maxChunks);
-                maxChunks = 1;
-            }
-        }
-        if (req != null) {
-            logger.info("Final downloadlink = Form download");
-            /*
-             * Save directurl before download-attempt as it should be valid even if it e.g. fails because of server issue 503 (= too many
-             * connections) --> Should work fine after the next try.
-             */
-            final String location = req.getLocation();
-            // TODO: add fixProtocol support
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, req, resume, maxChunks);
-            if (location != null) {
-                /* E.g. redirect to downloadurl --> We can save that URL */
-                storeDirecturl(link, account, location);
-            }
-            handleDownloadErrors(dl.getConnection(), link, account);
-            try {
-                fixFilename(dl.getConnection(), link);
-            } catch (final Exception ignore) {
-                logger.log(ignore);
-            }
-            /* add a download slot */
-            controlMaxFreeDownloads(account, link, +1);
-            try {
-                /* start the dl */
-                dl.startDownload();
-            } finally {
-                /* remove download slot */
-                controlMaxFreeDownloads(account, link, -1);
-            }
-        } else {
-            if (StringUtils.isEmpty(finalDownloadlink) || (!finalDownloadlink.startsWith("http") && !finalDownloadlink.startsWith("rtmp") && !finalDownloadlink.startsWith("/"))) {
-                logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
-                checkErrors(br, getCorrectBR(br), link, account, true);
-                checkServerErrors(br, link, account);
-                checkErrorsLastResort(br, link, account);
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            finalDownloadlink = fixProtocol(link, account, br, finalDownloadlink);
-            logger.info("Final downloadlink = " + finalDownloadlink + " starting the download...");
-            if (finalDownloadlink.startsWith("rtmp")) {
-                /* 2022-01-27: rtmp is not supported anymore */
-                throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming protocol rtmp");
-            } else if (finalDownloadlink.contains(".m3u8")) {
-                /* 2019-08-29: HLS download - more and more streaming-hosts use this */
-                finalDownloadlink = handleQualitySelectionHLS(this.br.cloneBrowser(), finalDownloadlink);
-                checkFFmpeg(link, "Download a HLS Stream");
-                dl = new HLSDownloader(link, br, finalDownloadlink);
-                try {
-                    fixFilenameHLSDownload(link);
-                } catch (final Exception e) {
-                    logger.log(e);
-                }
-                /* add a download slot */
-                controlMaxFreeDownloads(account, link, +1);
-                try {
-                    /* start the dl */
-                    dl.startDownload();
-                } finally {
-                    /* remove download slot */
-                    controlMaxFreeDownloads(account, link, -1);
-                }
-            } else {
-                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, finalDownloadlink, resume, maxChunks);
-                /*
-                 * Save directurl before download-attempt as it should be valid even if it e.g. fails because of server issue 503 (= too
-                 * many connections) --> Should work fine after the next try.
-                 */
-                storeDirecturl(link, account, dl.getConnection().getURL().toExternalForm());
-                handleDownloadErrors(dl.getConnection(), link, account);
-                try {
-                    fixFilename(dl.getConnection(), link);
-                } catch (final Exception e) {
-                    logger.log(e);
-                } /* add a download slot */
-                controlMaxFreeDownloads(account, link, +1);
-                try {
-                    /* start the dl */
-                    dl.startDownload();
-                } finally {
-                    /* remove download slot */
-                    controlMaxFreeDownloads(account, link, -1);
-                }
-            }
-        }
+        this.tryDownload(link, account, finalDownloadlink, true);
     }
 
     /** Returns user selected streaming quality. Returns BEST by default / no selection. */
     protected String handleQualitySelectionHLS(final Browser br, final String hlsMaster) throws Exception {
-        if (StringUtils.isEmpty(hlsMaster)) {
+        if (hlsMaster == null) {
             /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            throw new IllegalArgumentException();
         }
-        this.getPage(br, hlsMaster);
+        /* Access URL if it hasn't been accessed already. */
+        if (!StringUtils.equals(br.getURL(), hlsMaster)) {
+            this.getPage(br, hlsMaster);
+        }
         final List<HlsContainer> hlsQualities = HlsContainer.getHlsQualities(br);
         if (hlsQualities == null || hlsQualities.isEmpty()) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "HLS stream broken?");
@@ -5826,7 +5614,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                         /* {"server_time":"2023-11-30 15:53:33","status":404,"msg":"no file"} */
                         apiDownloadsPossible = true;
                     }
-                } catch (final Throwable e) {
+                } catch (final Exception e) {
                     logger.log(e);
                     logger.info("Exception occured API download check");
                 } finally {
@@ -6028,7 +5816,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          * wrong captcha. [PW protected + captcha protected download handling is not yet implemented serverside]
          */
         final long defaultWaitAccount = 3 * 60 * 1000;
-        final long defaultWaitLink = 3 * 60 * 1000;
+        final long defaultWaitMillis = 3 * 60 * 1000;
         Map<String, Object> entries = null;
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
@@ -6038,11 +5826,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             if (link == null) {
                 throw new AccountUnavailableException(errormessage, defaultWaitAccount);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, defaultWaitLink);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormessage, defaultWaitMillis);
             }
         }
-        final int statuscode = ((Number) entries.get("status")).intValue();
-        if (statuscode == 200) {
+        final int status = ((Number) entries.get("status")).intValue();
+        if (status == 200) {
             /* No error */
             return entries;
         }
@@ -6053,23 +5841,31 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
          */
         /* First check for specific error messages */
         if (errormsg != null) {
+            /* TODO: Check for more error messages e.g. {"msg":"Wrong auth","server_time":"2024-11-28 12:03:07","status":403} */
             if (errormsg.equalsIgnoreCase("This function not allowed in API")) {
                 /* API does not allow user to download so basically we can't use it -> Temp disable account. */
                 throw new AccountUnavailableException("API does not allow download | Contact support of this website", 5 * 60 * 1000l);
+            } else if (errormsg.equalsIgnoreCase("Wrong auth")) {
+                /* API does not allow user to download so basically we can't use it -> Temp disable account. */
+                throw new AccountInvalidException(errormsg);
+            }
+            if (errormsg.equalsIgnoreCase("no file")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
         }
-        if (statuscode == 403) {
+        /* Handle misc / response-code related errors */
+        if (status == 403) {
             /* Account related error */
             throw new AccountInvalidException(errormsg);
-        } else if (statuscode == 404) {
+        } else if (status == 404) {
             /* {"msg":"No file","server_time":"2019-10-31 17:23:17","status":404} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
-            logger.info("Unknown API error: " + statuscode);
+            final String msg = "Unknown API error with status " + status;
             if (link == null) {
-                throw new AccountUnavailableException(errormsg, defaultWaitAccount);
+                throw new AccountUnavailableException(msg, defaultWaitAccount);
             } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, defaultWaitLink);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, defaultWaitMillis);
             }
         }
     }

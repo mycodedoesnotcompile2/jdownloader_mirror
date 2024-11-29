@@ -43,18 +43,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
-import jd.controlling.packagecontroller.PackageController;
-import jd.parser.Regex;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.DownloadLinkStorable;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
-import jd.plugins.PluginForHost;
-import jd.utils.JDUtilities;
-
 import org.appwork.controlling.SingleReachableState;
 import org.appwork.exceptions.WTFException;
 import org.appwork.scheduler.DelayedRunnable;
@@ -98,6 +86,18 @@ import org.jdownloader.settings.CleanAfterDownloadAction;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.GeneralSettings.CreateFolderTrigger;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNodeFilter;
+import jd.controlling.packagecontroller.PackageController;
+import jd.parser.Regex;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.DownloadLinkStorable;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+import jd.plugins.PluginForHost;
+import jd.utils.JDUtilities;
 
 public class DownloadController extends PackageController<FilePackage, DownloadLink> {
     private final transient DownloadControllerEventSender eventSender         = new DownloadControllerEventSender();
@@ -153,24 +153,25 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             public void onShutdown(final ShutdownRequest shutdownRequest) {
                 final boolean idle = DownloadWatchDog.getInstance().isIdle();
                 saveDownloadLinks(true);
-                if (!idle) {
-                    int retry = 10;
-                    while (retry > 0) {
-                        if (DownloadWatchDog.getInstance().isIdle()) {
-                            /*
-                             * we wait till the DownloadWatchDog is finished or max 10 secs
-                             */
-                            break;
-                        }
-                        try {
-                            Thread.sleep(1000);
-                        } catch (final InterruptedException e) {
-                            break;
-                        }
-                        retry--;
-                    }
-                    saveDownloadLinks(true);
+                if (idle) {
+                    return;
                 }
+                int retry = 10;
+                while (retry > 0) {
+                    if (DownloadWatchDog.getInstance().isIdle()) {
+                        /*
+                         * we wait till the DownloadWatchDog is finished or max 10 secs
+                         */
+                        break;
+                    }
+                    try {
+                        Thread.sleep(1000);
+                    } catch (final InterruptedException e) {
+                        break;
+                    }
+                    retry--;
+                }
+                saveDownloadLinks(true);
             }
 
             @Override
@@ -355,42 +356,43 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
      * @return
      */
     public void addAllAt(final java.util.List<FilePackage> fps, final int index) {
-        if (fps != null && fps.size() > 0) {
-            QUEUE.add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    int counter = index;
-                    final boolean createFolder = CFG_GENERAL.CREATE_FOLDER_TRIGGER.getValue() == CreateFolderTrigger.ON_LINKS_ADDED;
-                    HashSet<String> created = new HashSet<String>();
-                    for (FilePackage fp : fps) {
-                        if (createFolder) {
-                            String folder = fp.getDownloadDirectory();
-                            if (created.add(folder)) {
-                                File folderFile = new File(folder);
-                                if (folderFile.exists()) {
-                                    /* folder already exists */
-                                    logger.info("Skip folder creation: " + folderFile + " already exists");
-                                } else {
-                                    /* folder does not exist */
-                                    try {
-                                        DownloadWatchDog.getInstance().validateDestination(folderFile);
-                                        if (folderFile.mkdirs()) {
-                                            logger.info("Create folder: " + folderFile);
-                                        } else {
-                                            logger.info("Could not create folder: " + folderFile);
-                                        }
-                                    } catch (BadDestinationException e) {
-                                        logger.info("Not allowed to create folder: " + e.getFile());
+        if (fps == null || fps.size() == 0) {
+            return;
+        }
+        QUEUE.add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                int counter = index;
+                final boolean createFolder = CFG_GENERAL.CREATE_FOLDER_TRIGGER.getValue() == CreateFolderTrigger.ON_LINKS_ADDED;
+                HashSet<String> created = new HashSet<String>();
+                for (FilePackage fp : fps) {
+                    if (createFolder) {
+                        String folder = fp.getDownloadDirectory();
+                        if (created.add(folder)) {
+                            File folderFile = new File(folder);
+                            if (folderFile.exists()) {
+                                /* folder already exists */
+                                logger.info("Skip folder creation: " + folderFile + " already exists");
+                            } else {
+                                /* folder does not exist */
+                                try {
+                                    DownloadWatchDog.getInstance().validateDestination(folderFile);
+                                    if (folderFile.mkdirs()) {
+                                        logger.info("Create folder: " + folderFile);
+                                    } else {
+                                        logger.info("Could not create folder: " + folderFile);
                                     }
+                                } catch (BadDestinationException e) {
+                                    logger.info("Not allowed to create folder: " + e.getFile());
                                 }
                             }
                         }
-                        addmovePackageAt(fp, counter++);
                     }
-                    return null;
+                    addmovePackageAt(fp, counter++);
                 }
-            });
-        }
+                return null;
+            }
+        });
     }
 
     public void addListener(final DownloadControllerListener l) {
@@ -652,211 +654,212 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
         }
     }
 
-    public LinkedList<FilePackage> loadFile(File file, boolean rescueMode) throws IOException {
+    public LinkedList<FilePackage> loadFile(final File file, final boolean rescueMode) throws IOException {
         logger.info("Load List: " + file);
+        if (file == null || !file.exists()) {
+            return null;
+        }
         LinkedList<FilePackage> ret = null;
-        if (file != null && file.exists()) {
-            FileInputStream fis = null;
-            ZipInputStream zis = null;
-            final SimpleMapper mapper = new SimpleMapper() {
-                @Override
-                protected JSonFactory newJsonFactory(String jsonString) {
-                    return new JSonFactory(jsonString) {
-                        @Override
-                        protected String dedupeString(String string) {
-                            return string;
-                        };
+        FileInputStream fis = null;
+        ZipInputStream zis = null;
+        final SimpleMapper mapper = new SimpleMapper() {
+            @Override
+            protected JSonFactory newJsonFactory(String jsonString) {
+                return new JSonFactory(jsonString) {
+                    @Override
+                    protected String dedupeString(String string) {
+                        return string;
                     };
+                };
+            }
+
+            @Override
+            protected void initMapper() {
+            }
+        };
+        try {
+            fis = new FileInputStream(file);
+            zis = new ZipInputStream(new BufferedInputStream(fis, 1 * 1024 * 1024));
+            /* lets restore the FilePackages from Json */
+            final HashMap<Integer, LoadedPackage> packageMap = new HashMap<Integer, LoadedPackage>();
+            DownloadControllerStorable dcs = null;
+            final TypeRef<DownloadLinkStorable> downloadLinkStorableTypeRef = new TypeRef<DownloadLinkStorable>() {
+            };
+            final TypeRef<FilePackageStorable> filePackageStorable = new TypeRef<FilePackageStorable>() {
+            };
+            final TypeRef<DownloadControllerStorable> downloadControllerStorable = new TypeRef<DownloadControllerStorable>() {
+            };
+            ZipEntry entry = null;
+            final ZipInputStream finalZis = zis;
+            final InputStream entryInputStream = new BufferedInputStream(new InputStream() {
+                @Override
+                public int read() throws IOException {
+                    return finalZis.read();
                 }
 
                 @Override
-                protected void initMapper() {
+                public int read(byte[] b, int off, int len) throws IOException {
+                    return finalZis.read(b, off, len);
+                }
+
+                @Override
+                public long skip(long n) throws IOException {
+                    return finalZis.skip(n);
+                }
+
+                @Override
+                public int available() throws IOException {
+                    return finalZis.available();
+                }
+
+                @Override
+                public boolean markSupported() {
+                    return false;
+                }
+
+                @Override
+                public void close() throws IOException {
+                }
+
+                @Override
+                public synchronized void mark(int readlimit) {
+                }
+            }, 1024) {
+                @Override
+                public void close() throws IOException {
                 }
             };
-            try {
-                fis = new FileInputStream(file);
-                zis = new ZipInputStream(new BufferedInputStream(fis, 1 * 1024 * 1024));
-                /* lets restore the FilePackages from Json */
-                final HashMap<Integer, LoadedPackage> packageMap = new HashMap<Integer, LoadedPackage>();
-                DownloadControllerStorable dcs = null;
-                final TypeRef<DownloadLinkStorable> downloadLinkStorableTypeRef = new TypeRef<DownloadLinkStorable>() {
+            int entries = 0;
+            final Pattern entryType = Pattern.compile("(\\d+)(?:_(\\d+))?|extraInfo", Pattern.CASE_INSENSITIVE);
+            final ByteArrayOutputStream bos = new ByteArrayOutputStream() {
+                @Override
+                public synchronized byte[] toByteArray() {
+                    return buf;
                 };
-                final TypeRef<FilePackageStorable> filePackageStorable = new TypeRef<FilePackageStorable>() {
-                };
-                final TypeRef<DownloadControllerStorable> downloadControllerStorable = new TypeRef<DownloadControllerStorable>() {
-                };
-                ZipEntry entry = null;
-                final ZipInputStream finalZis = zis;
-                final InputStream entryInputStream = new BufferedInputStream(new InputStream() {
-                    @Override
-                    public int read() throws IOException {
-                        return finalZis.read();
-                    }
-
-                    @Override
-                    public int read(byte[] b, int off, int len) throws IOException {
-                        return finalZis.read(b, off, len);
-                    }
-
-                    @Override
-                    public long skip(long n) throws IOException {
-                        return finalZis.skip(n);
-                    }
-
-                    @Override
-                    public int available() throws IOException {
-                        return finalZis.available();
-                    }
-
-                    @Override
-                    public boolean markSupported() {
-                        return false;
-                    }
-
-                    @Override
-                    public void close() throws IOException {
-                    }
-
-                    @Override
-                    public synchronized void mark(int readlimit) {
-                    }
-                }, 1024) {
-                    @Override
-                    public void close() throws IOException {
-                    }
-                };
-                int entries = 0;
-                final Pattern entryType = Pattern.compile("(\\d+)(?:_(\\d+))?|extraInfo", Pattern.CASE_INSENSITIVE);
-                final ByteArrayOutputStream bos = new ByteArrayOutputStream() {
-                    @Override
-                    public synchronized byte[] toByteArray() {
-                        return buf;
-                    };
-                };
-                final Charset UTF8 = Charset.forName("UTF-8");
-                while ((entry = zis.getNextEntry()) != null) {
-                    try {
-                        entries++;
-                        final Matcher entryName = entryType.matcher(entry.getName());
-                        if (entryName.matches()) {
-                            if (entryName.group(2) != null) {
-                                // \\d+_\\d+ DownloadLinkStorable
-                                final Integer packageIndex = Integer.valueOf(entryName.group(1));
-                                final int childIndex = Integer.parseInt(entryName.group(2));
-                                LoadedPackage loadedPackage = packageMap.get(packageIndex);
+            };
+            final Charset UTF8 = Charset.forName("UTF-8");
+            while ((entry = zis.getNextEntry()) != null) {
+                try {
+                    entries++;
+                    final Matcher entryName = entryType.matcher(entry.getName());
+                    if (entryName.matches()) {
+                        if (entryName.group(2) != null) {
+                            // \\d+_\\d+ DownloadLinkStorable
+                            final Integer packageIndex = Integer.valueOf(entryName.group(1));
+                            final int childIndex = Integer.parseInt(entryName.group(2));
+                            LoadedPackage loadedPackage = packageMap.get(packageIndex);
+                            if (loadedPackage == null) {
+                                loadedPackage = new LoadedPackage(null);
+                                packageMap.put(packageIndex, loadedPackage);
+                            }
+                            bos.reset();
+                            IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            final DownloadLinkStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), downloadLinkStorableTypeRef);
+                            if (storable != null) {
+                                loadedPackage.downloadLinks.add(new LoadedPackage.IndexedDownloadLink(childIndex, storable._getDownloadLink()));
+                            } else {
+                                throw new WTFException("restored a null DownloadLinkLinkStorable");
+                            }
+                        } else if (entryName.group(1) != null) {
+                            // \\d+ FilePackageStorable
+                            final Integer packageIndex = Integer.valueOf(entry.getName());
+                            bos.reset();
+                            IO.readStream((int) entry.getSize(), entryInputStream, bos);
+                            final FilePackageStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), filePackageStorable);
+                            if (storable != null) {
+                                final LoadedPackage loadedPackage = packageMap.get(packageIndex);
                                 if (loadedPackage == null) {
-                                    loadedPackage = new LoadedPackage(null);
-                                    packageMap.put(packageIndex, loadedPackage);
-                                }
-                                bos.reset();
-                                IO.readStream((int) entry.getSize(), entryInputStream, bos);
-                                final DownloadLinkStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), downloadLinkStorableTypeRef);
-                                if (storable != null) {
-                                    loadedPackage.downloadLinks.add(new LoadedPackage.IndexedDownloadLink(childIndex, storable._getDownloadLink()));
-                                } else {
-                                    throw new WTFException("restored a null DownloadLinkLinkStorable");
-                                }
-                            } else if (entryName.group(1) != null) {
-                                // \\d+ FilePackageStorable
-                                final Integer packageIndex = Integer.valueOf(entry.getName());
-                                bos.reset();
-                                IO.readStream((int) entry.getSize(), entryInputStream, bos);
-                                final FilePackageStorable storable = mapper.stringToObject(new String(bos.toByteArray(), 0, bos.size(), UTF8), filePackageStorable);
-                                if (storable != null) {
-                                    final LoadedPackage loadedPackage = packageMap.get(packageIndex);
-                                    if (loadedPackage == null) {
-                                        packageMap.put(packageIndex, new LoadedPackage(storable._getFilePackage()));
-                                    }
-                                } else {
-                                    throw new WTFException("restored a null FilePackageStorable");
+                                    packageMap.put(packageIndex, new LoadedPackage(storable._getFilePackage()));
                                 }
                             } else {
-                                // extraInfo
-                                dcs = mapper.inputStreamToObject(entryInputStream, downloadControllerStorable);
+                                throw new WTFException("restored a null FilePackageStorable");
                             }
-                        }
-                    } catch (Throwable e) {
-                        logger.log(e);
-                        if (entry != null) {
-                            logger.info("Entry:" + entry + "|EntryIndex:" + entries + "|Size:" + entry.getSize() + "|Compressed Size:" + entry.getCompressedSize());
-                        }
-                        if (rescueMode) {
-                            break;
                         } else {
-                            throw e;
+                            // extraInfo
+                            dcs = mapper.inputStreamToObject(entryInputStream, downloadControllerStorable);
                         }
                     }
-                }
-                if (entries == 0) {
-                    throw new WTFException("Empty/Invalid Zip:" + file + "|Size:" + file.length());
-                }
-                /* sort positions */
-                final List<Integer> packageIndices = new ArrayList<Integer>(packageMap.keySet());
-                Collections.sort(packageIndices);
-                /* build final ArrayList of CrawledPackage */
-                final List<FilePackage> ret2 = new ArrayList<FilePackage>(packageIndices.size());
-                for (final Integer packageIndex : packageIndices) {
-                    final LoadedPackage loadedPackage = packageMap.get(packageIndex);
-                    final FilePackage filePackage = loadedPackage.getLoadedPackage();
-                    if (filePackage != null) {
-                        ret2.add(filePackage);
+                } catch (Throwable e) {
+                    logger.log(e);
+                    if (entry != null) {
+                        logger.info("Entry:" + entry + "|EntryIndex:" + entries + "|Size:" + entry.getSize() + "|Compressed Size:" + entry.getCompressedSize());
+                    }
+                    if (rescueMode) {
+                        break;
                     } else {
-                        throw new WTFException("FilePackage at Index " + packageIndex + " is missing!");
+                        throw e;
                     }
                 }
-                if (dcs != null && JsonConfig.create(GeneralSettings.class).isConvertRelativePathsJDRoot()) {
-                    try {
-                        final String oldRootPath = dcs.getRootPath();
-                        if (!StringUtils.isEmpty(oldRootPath)) {
-                            final String newRoot = JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath();
-                            if (!oldRootPath.equals(newRoot)) {
-                                /*
-                                 * convert paths relative to JDownloader root,only in jared version
-                                 */
-                                for (final FilePackage pkg : ret2) {
-                                    if (!CrossSystem.isAbsolutePath(pkg.getDownloadDirectory())) {
-                                        /* no need to convert relative paths */
-                                        continue;
-                                    }
-                                    final String pkgPath = LinkTreeUtils.getDownloadDirectory(pkg).getAbsolutePath();
-                                    if (pkgPath.startsWith(oldRootPath + "/") || pkgPath.startsWith(oldRootPath + "\\")) {
-                                        /*
-                                         * folder is inside JDRoot, lets update it
-                                         */
-                                        String restPath = pkgPath.substring(oldRootPath.length());
-                                        // cut of leading path seperator
-                                        restPath = restPath.replaceFirst("^(/+|\\\\+)", "");
-                                        // fix path seperators
-                                        restPath = CrossSystem.fixPathSeparators(restPath);
-                                        final String newPath = new File(newRoot, restPath).getAbsolutePath();
-                                        if (!StringUtils.equals(pkgPath, newPath)) {
-                                            pkg.setDownloadDirectory(newPath);
-                                        }
+            }
+            if (entries == 0) {
+                throw new WTFException("Empty/Invalid Zip:" + file + "|Size:" + file.length());
+            }
+            /* sort positions */
+            final List<Integer> packageIndices = new ArrayList<Integer>(packageMap.keySet());
+            Collections.sort(packageIndices);
+            /* build final ArrayList of CrawledPackage */
+            final List<FilePackage> ret2 = new ArrayList<FilePackage>(packageIndices.size());
+            for (final Integer packageIndex : packageIndices) {
+                final LoadedPackage loadedPackage = packageMap.get(packageIndex);
+                final FilePackage filePackage = loadedPackage.getLoadedPackage();
+                if (filePackage != null) {
+                    ret2.add(filePackage);
+                } else {
+                    throw new WTFException("FilePackage at Index " + packageIndex + " is missing!");
+                }
+            }
+            if (dcs != null && JsonConfig.create(GeneralSettings.class).isConvertRelativePathsJDRoot()) {
+                try {
+                    final String oldRootPath = dcs.getRootPath();
+                    if (!StringUtils.isEmpty(oldRootPath)) {
+                        final String newRoot = JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath();
+                        if (!oldRootPath.equals(newRoot)) {
+                            /*
+                             * convert paths relative to JDownloader root,only in jared version
+                             */
+                            for (final FilePackage pkg : ret2) {
+                                if (!CrossSystem.isAbsolutePath(pkg.getDownloadDirectory())) {
+                                    /* no need to convert relative paths */
+                                    continue;
+                                }
+                                final String pkgPath = LinkTreeUtils.getDownloadDirectory(pkg).getAbsolutePath();
+                                if (pkgPath.startsWith(oldRootPath + "/") || pkgPath.startsWith(oldRootPath + "\\")) {
+                                    /*
+                                     * folder is inside JDRoot, lets update it
+                                     */
+                                    String restPath = pkgPath.substring(oldRootPath.length());
+                                    // cut of leading path seperator
+                                    restPath = restPath.replaceFirst("^(/+|\\\\+)", "");
+                                    // fix path seperators
+                                    restPath = CrossSystem.fixPathSeparators(restPath);
+                                    final String newPath = new File(newRoot, restPath).getAbsolutePath();
+                                    if (!StringUtils.equals(pkgPath, newPath)) {
+                                        pkg.setDownloadDirectory(newPath);
                                     }
                                 }
                             }
                         }
-                    } catch (final Throwable e) {
-                        /* this method can throw exceptions, eg in SVN */
-                        logger.log(e);
                     }
+                } catch (final Throwable e) {
+                    /* this method can throw exceptions, eg in SVN */
+                    logger.log(e);
                 }
-                ret = new LinkedList<FilePackage>(ret2);
-            } catch (final Throwable e) {
-                if (e instanceof IOException) {
-                    throw (IOException) e;
-                } else {
-                    throw new IOException(e);
+            }
+            ret = new LinkedList<FilePackage>(ret2);
+        } catch (final Throwable e) {
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            } else {
+                throw new IOException(e);
+            }
+        } finally {
+            try {
+                if (zis != null) {
+                    zis.close();
+                } else if (fis != null) {
+                    fis.close();
                 }
-            } finally {
-                try {
-                    if (zis != null) {
-                        zis.close();
-                    } else if (fis != null) {
-                        fis.close();
-                    }
-                } catch (final Throwable ignore) {
-                }
+            } catch (final Throwable ignore) {
             }
         }
         return ret;
@@ -873,90 +876,91 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     }
 
     public void checkPluginUpdates() {
-        if (DOWNLOADLIST_LOADED.isReached()) {
-            DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
-                @Override
-                public void execute(DownloadSession currentSession) {
-                    QUEUE.addWait(new QueueAction<Void, RuntimeException>() {
-                        private final PluginFinder finder = new PluginFinder(logger);
-
-                        @Override
-                        protected Void run() throws RuntimeException {
-                            getChildrenByFilter(new AbstractPackageChildrenNodeFilter<DownloadLink>() {
-                                @Override
-                                public int returnMaxResults() {
-                                    return 0;
-                                }
-
-                                private final void updatePluginInstance(DownloadLink link) {
-                                    final long currentDefaultVersion;
-                                    final String currentDefaultHost;
-                                    final PluginForHost defaultPlugin = link.getDefaultPlugin();
-                                    if (defaultPlugin != null) {
-                                        currentDefaultHost = defaultPlugin.getLazyP().getHost();
-                                        currentDefaultVersion = defaultPlugin.getLazyP().getVersion();
-                                    } else {
-                                        currentDefaultHost = null;
-                                        currentDefaultVersion = -1;
-                                    }
-                                    final PluginForHost newDefaultPlugin = finder.assignPlugin(link, true);
-                                    final long newDefaultVersion;
-                                    final String newDefaultHost;
-                                    if (newDefaultPlugin != null) {
-                                        newDefaultVersion = newDefaultPlugin.getLazyP().getVersion();
-                                        newDefaultHost = newDefaultPlugin.getLazyP().getHost();
-                                    } else {
-                                        newDefaultVersion = -1;
-                                        newDefaultHost = null;
-                                    }
-                                    if (newDefaultPlugin != null && (currentDefaultVersion != newDefaultVersion || !StringUtils.equals(currentDefaultHost, newDefaultHost))) {
-                                        logger.info("Update Plugin for: " + link.getName() + ":" + link.getHost() + ":" + currentDefaultVersion + " to " + newDefaultPlugin.getLazyP().getDisplayName() + ":" + newDefaultPlugin.getLazyP().getVersion());
-                                        if (link.getFinalLinkState() == FinalLinkState.PLUGIN_DEFECT) {
-                                            link.setFinalLinkState(null);
-                                        }
-                                    }
-                                }
-
-                                @Override
-                                public boolean acceptNode(final DownloadLink node) {
-                                    final SingleDownloadController controller = node.getDownloadLinkController();
-                                    if (controller != null) {
-                                        controller.getJobsAfterDetach().add(new DownloadWatchDogJob() {
-                                            @Override
-                                            public void execute(DownloadSession currentSession) {
-                                                updatePluginInstance(node);
-                                            }
-
-                                            @Override
-                                            public void interrupt() {
-                                            }
-
-                                            @Override
-                                            public boolean isHighPriority() {
-                                                return false;
-                                            }
-                                        });
-                                    } else {
-                                        updatePluginInstance(node);
-                                    }
-                                    return false;
-                                }
-                            });
-                            return null;
-                        }
-                    });
-                }
-
-                @Override
-                public void interrupt() {
-                }
-
-                @Override
-                public boolean isHighPriority() {
-                    return false;
-                }
-            });
+        if (!DOWNLOADLIST_LOADED.isReached()) {
+            return;
         }
+        DownloadWatchDog.getInstance().enqueueJob(new DownloadWatchDogJob() {
+            @Override
+            public void execute(DownloadSession currentSession) {
+                QUEUE.addWait(new QueueAction<Void, RuntimeException>() {
+                    private final PluginFinder finder = new PluginFinder(logger);
+
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        getChildrenByFilter(new AbstractPackageChildrenNodeFilter<DownloadLink>() {
+                            @Override
+                            public int returnMaxResults() {
+                                return 0;
+                            }
+
+                            private final void updatePluginInstance(DownloadLink link) {
+                                final long currentDefaultVersion;
+                                final String currentDefaultHost;
+                                final PluginForHost defaultPlugin = link.getDefaultPlugin();
+                                if (defaultPlugin != null) {
+                                    currentDefaultHost = defaultPlugin.getLazyP().getHost();
+                                    currentDefaultVersion = defaultPlugin.getLazyP().getVersion();
+                                } else {
+                                    currentDefaultHost = null;
+                                    currentDefaultVersion = -1;
+                                }
+                                final PluginForHost newDefaultPlugin = finder.assignPlugin(link, true);
+                                final long newDefaultVersion;
+                                final String newDefaultHost;
+                                if (newDefaultPlugin != null) {
+                                    newDefaultVersion = newDefaultPlugin.getLazyP().getVersion();
+                                    newDefaultHost = newDefaultPlugin.getLazyP().getHost();
+                                } else {
+                                    newDefaultVersion = -1;
+                                    newDefaultHost = null;
+                                }
+                                if (newDefaultPlugin != null && (currentDefaultVersion != newDefaultVersion || !StringUtils.equals(currentDefaultHost, newDefaultHost))) {
+                                    logger.info("Update Plugin for: " + link.getName() + ":" + link.getHost() + ":" + currentDefaultVersion + " to " + newDefaultPlugin.getLazyP().getDisplayName() + ":" + newDefaultPlugin.getLazyP().getVersion());
+                                    if (link.getFinalLinkState() == FinalLinkState.PLUGIN_DEFECT) {
+                                        link.setFinalLinkState(null);
+                                    }
+                                }
+                            }
+
+                            @Override
+                            public boolean acceptNode(final DownloadLink node) {
+                                final SingleDownloadController controller = node.getDownloadLinkController();
+                                if (controller != null) {
+                                    controller.getJobsAfterDetach().add(new DownloadWatchDogJob() {
+                                        @Override
+                                        public void execute(DownloadSession currentSession) {
+                                            updatePluginInstance(node);
+                                        }
+
+                                        @Override
+                                        public void interrupt() {
+                                        }
+
+                                        @Override
+                                        public boolean isHighPriority() {
+                                            return false;
+                                        }
+                                    });
+                                } else {
+                                    updatePluginInstance(node);
+                                }
+                                return false;
+                            }
+                        });
+                        return null;
+                    }
+                });
+            }
+
+            @Override
+            public void interrupt() {
+            }
+
+            @Override
+            public boolean isHighPriority() {
+                return false;
+            }
+        });
     }
 
     public void preProcessFilePackages(LinkedList<FilePackage> fps, boolean allowCleanup) {
@@ -969,36 +973,34 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
         boolean cleanupFileExists = JsonConfig.create(GeneralSettings.class).getCleanupFileExists();
         while (iterator.hasNext()) {
             final FilePackage fp = iterator.next();
-            if (fp.getChildren() != null) {
-                final List<DownloadLink> removeList = new ArrayList<DownloadLink>();
-                final Iterator<DownloadLink> it = fp.getChildren().iterator();
-                while (it.hasNext()) {
-                    final DownloadLink localLink = it.next();
-                    if (cleanupStartup) {
-                        if (FinalLinkState.CheckFinished(localLink.getFinalLinkState())) {
-                            logger.info("Remove " + localLink.getView().getDisplayName() + " because Finished and CleanupOnStartup!");
-                            removeList.add(localLink);
-                            continue;
-                        } else if (cleanupFileExists && FinalLinkState.FAILED_EXISTS.equals(localLink.getFinalLinkState())) {
-                            logger.info("Remove " + localLink.getView().getDisplayName() + " because FileExists and CleanupOnStartup!");
-                            removeList.add(localLink);
-                            continue;
-                        }
-                    }
-                    /*
-                     * reset not if already exist, offline or finished. plugin errors will be reset here because plugin can be fixed again
-                     */
-                    processFinalLinkState(localLink);
-                    pluginFinder.assignPlugin(localLink, true);
-                }
-                if (removeList.size() > 0) {
-                    fp.getChildren().removeAll(removeList);
-                }
-            }
             if (fp.getChildren() == null || fp.getChildren().size() == 0) {
                 /* remove empty packages */
                 iterator.remove();
                 continue;
+            }
+            final List<DownloadLink> removeList = new ArrayList<DownloadLink>();
+            final Iterator<DownloadLink> it = fp.getChildren().iterator();
+            while (it.hasNext()) {
+                final DownloadLink localLink = it.next();
+                if (cleanupStartup) {
+                    if (FinalLinkState.CheckFinished(localLink.getFinalLinkState())) {
+                        logger.info("Remove " + localLink.getView().getDisplayName() + " because Finished and CleanupOnStartup!");
+                        removeList.add(localLink);
+                        continue;
+                    } else if (cleanupFileExists && FinalLinkState.FAILED_EXISTS.equals(localLink.getFinalLinkState())) {
+                        logger.info("Remove " + localLink.getView().getDisplayName() + " because FileExists and CleanupOnStartup!");
+                        removeList.add(localLink);
+                        continue;
+                    }
+                }
+                /*
+                 * reset not if already exist, offline or finished. plugin errors will be reset here because plugin can be fixed again
+                 */
+                processFinalLinkState(localLink);
+                pluginFinder.assignPlugin(localLink, true);
+            }
+            if (removeList.size() > 0) {
+                fp.getChildren().removeAll(removeList);
             }
         }
     }
@@ -1040,173 +1042,174 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             } else {
                 bufferSize = 32768;
             }
-            if (packages != null && file != null) {
-                if (file.exists()) {
-                    if (file.isDirectory()) {
-                        throw new IOException("File " + file + " is a directory");
-                    }
-                    if (FileCreationManager.getInstance().delete(file, null) == false) {
-                        throw new IOException("Could not delete file " + file);
-                    }
-                } else {
-                    if (file.getParentFile().exists() == false && FileCreationManager.getInstance().mkdir(file.getParentFile()) == false) {
-                        throw new IOException("Could not create parentFolder for file " + file);
-                    }
+            if (packages == null || file == null) {
+                return false;
+            }
+            if (file.exists()) {
+                if (file.isDirectory()) {
+                    throw new IOException("File " + file + " is a directory");
                 }
-                /* prepare formatter(001,0001...) for package filenames in zipfiles */
-                final String packageFormat;
-                if (packages.size() >= 10) {
-                    packageFormat = String.format("%%0%dd", (int) Math.log10(packages.size()) + 1);
-                } else {
-                    packageFormat = "%02d";
+                if (FileCreationManager.getInstance().delete(file, null) == false) {
+                    throw new IOException("Could not delete file " + file);
                 }
-                final SimpleMapper mapper = new SimpleMapper() {
-                    @Override
-                    protected JSonFactory newJsonFactory(String jsonString) {
-                        return new JSonFactory(jsonString) {
-                            @Override
-                            protected String dedupeString(String string) {
-                                return string;
-                            }
-                        };
-                    }
-
-                    @Override
-                    protected void initMapper() {
-                    }
-
-                    @Override
-                    public boolean isPrettyPrintEnabled() {
-                        return false;
-                    }
-                };
-                boolean deleteFile = true;
-                ZipOutputStream zos = null;
-                FileOutputStream fos = null;
-                try {
-                    fos = new FileOutputStream(file) {
+            } else {
+                if (file.getParentFile().exists() == false && FileCreationManager.getInstance().mkdir(file.getParentFile()) == false) {
+                    throw new IOException("Could not create parentFolder for file " + file);
+                }
+            }
+            /* prepare formatter(001,0001...) for package filenames in zipfiles */
+            final String packageFormat;
+            if (packages.size() >= 10) {
+                packageFormat = String.format("%%0%dd", (int) Math.log10(packages.size()) + 1);
+            } else {
+                packageFormat = "%02d";
+            }
+            final SimpleMapper mapper = new SimpleMapper() {
+                @Override
+                protected JSonFactory newJsonFactory(String jsonString) {
+                    return new JSonFactory(jsonString) {
                         @Override
-                        public void close() throws IOException {
-                            try {
-                                if (getChannel().isOpen()) {
-                                    getChannel().force(true);
-                                }
-                            } finally {
-                                super.close();
-                            }
+                        protected String dedupeString(String string) {
+                            return string;
                         }
                     };
-                    zos = new ZipOutputStream(new BufferedOutputStream(fos, bufferSize));
-                    final ZipOutputStream finalZos = zos;
-                    final OutputStream entryOutputStream = new OutputStream() {
-                        @Override
-                        public void write(int b) throws IOException {
-                            finalZos.write(b);
-                        }
+                }
 
-                        @Override
-                        public void write(byte[] b, int off, int len) throws IOException {
-                            finalZos.write(b, off, len);
-                        }
+                @Override
+                protected void initMapper() {
+                }
 
-                        @Override
-                        public void close() throws IOException {
-                            finalZos.flush();
-                        }
-
-                        @Override
-                        public void flush() throws IOException {
-                            finalZos.flush();
-                        }
-                    };
-                    int packageIndex = 0;
-                    for (FilePackage pkg : packages) {
-                        final boolean readL = pkg.getModifyLock().readLock();
+                @Override
+                public boolean isPrettyPrintEnabled() {
+                    return false;
+                }
+            };
+            boolean deleteFile = true;
+            ZipOutputStream zos = null;
+            FileOutputStream fos = null;
+            try {
+                fos = new FileOutputStream(file) {
+                    @Override
+                    public void close() throws IOException {
                         try {
-                            final int childrenSize = pkg.getChildren().size();
-                            if (childrenSize > 0) {
-                                final String packageEntryID = String.format(packageFormat, packageIndex++);
-                                {
-                                    /* convert FilePackage to JSon */
-                                    final FilePackageStorable packageStorable = new FilePackageStorable(pkg, false);
-                                    final ZipEntry packageEntry = new ZipEntry(packageEntryID);
-                                    packageEntry.setMethod(ZipEntry.DEFLATED);
-                                    zos.putNextEntry(packageEntry);
-                                    mapper.writeObject(entryOutputStream, packageStorable);
-                                    zos.closeEntry();
-                                }
-                                final String childFormat;
-                                if (childrenSize >= 10) {
-                                    childFormat = String.format("%%0%dd", (int) Math.log10(childrenSize) + 1);
-                                } else {
-                                    childFormat = "%02d";
-                                }
-                                int childIndex = 0;
-                                for (final DownloadLink link : pkg.getChildren()) {
-                                    final DownloadLinkStorable linkStorable = new DownloadLinkStorable(link);
-                                    final String childEntryID = String.format(childFormat, childIndex++);
-                                    final ZipEntry linkEntry = new ZipEntry(packageEntryID + "_" + childEntryID);
-                                    linkEntry.setMethod(ZipEntry.DEFLATED);
-                                    zos.putNextEntry(linkEntry);
-                                    mapper.writeObject(entryOutputStream, linkStorable);
-                                    zos.closeEntry();
-                                }
+                            if (getChannel().isOpen()) {
+                                getChannel().force(true);
                             }
                         } finally {
-                            pkg.getModifyLock().readUnlock(readL);
+                            super.close();
                         }
                     }
-                    final DownloadControllerStorable dcs = new DownloadControllerStorable();
-                    try {
-                        /*
-                         * set current RootPath of JDownloader, so we can update it when user moves JDownloader folder
-                         */
-                        dcs.setRootPath(JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath());
-                    } catch (final Throwable e) {
-                        /* the method above can throw exceptions, eg in SVN */
-                        logger.log(e);
+                };
+                zos = new ZipOutputStream(new BufferedOutputStream(fos, bufferSize));
+                final ZipOutputStream finalZos = zos;
+                final OutputStream entryOutputStream = new OutputStream() {
+                    @Override
+                    public void write(int b) throws IOException {
+                        finalZos.write(b);
                     }
-                    final ZipEntry downloadControllerEntry = new ZipEntry("extraInfo");
-                    downloadControllerEntry.setMethod(ZipEntry.DEFLATED);
-                    zos.putNextEntry(downloadControllerEntry);
-                    JSonStorage.getMapper().writeObject(entryOutputStream, dcs);
-                    zos.closeEntry();
-                    zos.close();
-                    zos = null;
-                    fos = null;
-                    deleteFile = false;
+
+                    @Override
+                    public void write(byte[] b, int off, int len) throws IOException {
+                        finalZos.write(b, off, len);
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        finalZos.flush();
+                    }
+
+                    @Override
+                    public void flush() throws IOException {
+                        finalZos.flush();
+                    }
+                };
+                int packageIndex = 0;
+                for (FilePackage pkg : packages) {
+                    final boolean readL = pkg.getModifyLock().readLock();
                     try {
-                        final int keepXOld = Math.max(JsonConfig.create(GeneralSettings.class).getKeepXOldLists(), 0);
-                        while (downloadLists.size() > keepXOld) {
-                            final File remove = downloadLists.remove(downloadLists.size() - 1);
-                            if (remove != null) {
-                                final boolean delete = FileCreationManager.getInstance().delete(remove, null);
-                                if (LogController.getInstance().isDebugMode()) {
-                                    logger.info("Delete outdated DownloadList: " + remove + " " + delete);
-                                }
+                        final int childrenSize = pkg.getChildren().size();
+                        if (childrenSize > 0) {
+                            final String packageEntryID = String.format(packageFormat, packageIndex++);
+                            {
+                                /* convert FilePackage to JSon */
+                                final FilePackageStorable packageStorable = new FilePackageStorable(pkg, false);
+                                final ZipEntry packageEntry = new ZipEntry(packageEntryID);
+                                packageEntry.setMethod(ZipEntry.DEFLATED);
+                                zos.putNextEntry(packageEntry);
+                                mapper.writeObject(entryOutputStream, packageStorable);
+                                zos.closeEntry();
+                            }
+                            final String childFormat;
+                            if (childrenSize >= 10) {
+                                childFormat = String.format("%%0%dd", (int) Math.log10(childrenSize) + 1);
+                            } else {
+                                childFormat = "%02d";
+                            }
+                            int childIndex = 0;
+                            for (final DownloadLink link : pkg.getChildren()) {
+                                final DownloadLinkStorable linkStorable = new DownloadLinkStorable(link);
+                                final String childEntryID = String.format(childFormat, childIndex++);
+                                final ZipEntry linkEntry = new ZipEntry(packageEntryID + "_" + childEntryID);
+                                linkEntry.setMethod(ZipEntry.DEFLATED);
+                                zos.putNextEntry(linkEntry);
+                                mapper.writeObject(entryOutputStream, linkStorable);
+                                zos.closeEntry();
                             }
                         }
-                    } catch (final Throwable e) {
-                        logger.log(e);
                     } finally {
-                        downloadLists.add(0, file);
+                        pkg.getModifyLock().readUnlock(readL);
                     }
-                    return true;
+                }
+                final DownloadControllerStorable dcs = new DownloadControllerStorable();
+                try {
+                    /*
+                     * set current RootPath of JDownloader, so we can update it when user moves JDownloader folder
+                     */
+                    dcs.setRootPath(JDUtilities.getJDHomeDirectoryFromEnvironment().getAbsolutePath());
+                } catch (final Throwable e) {
+                    /* the method above can throw exceptions, eg in SVN */
+                    logger.log(e);
+                }
+                final ZipEntry downloadControllerEntry = new ZipEntry("extraInfo");
+                downloadControllerEntry.setMethod(ZipEntry.DEFLATED);
+                zos.putNextEntry(downloadControllerEntry);
+                JSonStorage.getMapper().writeObject(entryOutputStream, dcs);
+                zos.closeEntry();
+                zos.close();
+                zos = null;
+                fos = null;
+                deleteFile = false;
+                try {
+                    final int keepXOld = Math.max(JsonConfig.create(GeneralSettings.class).getKeepXOldLists(), 0);
+                    while (downloadLists.size() > keepXOld) {
+                        final File remove = downloadLists.remove(downloadLists.size() - 1);
+                        if (remove != null) {
+                            final boolean delete = FileCreationManager.getInstance().delete(remove, null);
+                            if (LogController.getInstance().isDebugMode()) {
+                                logger.info("Delete outdated DownloadList: " + remove + " " + delete);
+                            }
+                        }
+                    }
                 } catch (final Throwable e) {
                     logger.log(e);
                 } finally {
-                    try {
-                        if (zos != null) {
-                            zos.close();
-                        } else if (fos != null) {
-                            fos.close();
-                        }
-                    } catch (final Throwable e) {
-                        logger.log(e);
+                    downloadLists.add(0, file);
+                }
+                return true;
+            } catch (final Throwable e) {
+                logger.log(e);
+            } finally {
+                try {
+                    if (zos != null) {
+                        zos.close();
+                    } else if (fos != null) {
+                        fos.close();
                     }
-                    if (deleteFile && file.exists()) {
-                        FileCreationManager.getInstance().delete(file, null);
-                    }
+                } catch (final Throwable e) {
+                    logger.log(e);
+                }
+                if (deleteFile && file.exists()) {
+                    FileCreationManager.getInstance().delete(file, null);
                 }
             }
             return false;
@@ -1218,13 +1221,14 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     }
 
     private void saveDownloadLinks(final boolean ignoreShutDown) {
-        if (isSavingAllowed(ignoreShutDown)) {
-            /* save as new Json ZipFile */
-            try {
-                save(getPackagesCopy(), null);
-            } catch (Throwable e) {
-                logger.log(e);
-            }
+        if (!isSavingAllowed(ignoreShutDown)) {
+            return;
+        }
+        /* save as new Json ZipFile */
+        try {
+            save(getPackagesCopy(), null);
+        } catch (Throwable e) {
+            logger.log(e);
         }
     }
 
