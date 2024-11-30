@@ -4,9 +4,12 @@ import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.AbstractCustomValueGetter;
 import org.appwork.storage.config.annotations.CustomValueGetter;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
+import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.config.Order;
 import org.jdownloader.translate._JDT;
@@ -35,6 +38,10 @@ public interface UsenetAccountConfigInterface extends AccountConfigInterface {
 
         public String getSSLEnabled_label() {
             return _JDT.T.lit_ssl_enabled();
+        }
+
+        public String getConnections_label() {
+            return _GUI.T.PackagizerFilterRuleDialog_layoutDialogContent_chunks();
         }
     }
 
@@ -75,4 +82,13 @@ public interface UsenetAccountConfigInterface extends AccountConfigInterface {
     void setSSLEnabled(boolean b);
 
     boolean isSSLEnabled();
+
+    @DescriptionForConfigEntry("Max connections: Enter the (max) connections allowed by your Usenet provider")
+    @AboutConfig
+    @SpinnerValidator(min = 1, max = 1000, step = 1)
+    @DefaultIntValue(1)
+    @Order(40)
+    int getConnections();
+
+    void setConnections(int num);
 }

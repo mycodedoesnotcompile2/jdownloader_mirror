@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -32,7 +30,9 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48873 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class TerabytezOrg extends XFileSharingProBasic {
     public TerabytezOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -139,8 +139,8 @@ public class TerabytezOrg extends XFileSharingProBasic {
     private final String PROPERTY_XFS_FUID = "xfs_fuid";
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        final AvailableStatus status = super.requestFileInformationWebsite(link, account);
         specialLegacyHandlingYetiToXFS(br, link);
         return status;
     }

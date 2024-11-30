@@ -34,7 +34,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class UploadBoyCom extends XFileSharingProBasic {
     public UploadBoyCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -153,7 +153,7 @@ public class UploadBoyCom extends XFileSharingProBasic {
     @Override
     protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
         /* 2020-02-10: Special */
-        String dllink = new Regex(correctedBR, "(https?://[^/]+/d/[a-z0-9]{12}/[^<>\"\\']+)").getMatch(0);
+        String dllink = new Regex(getCorrectBR(br), "(https?://[^/]+/d/[a-z0-9]{12}/[^<>\"\\']+)").getMatch(0);
         if (StringUtils.isEmpty(dllink)) {
             dllink = super.getDllink(link, account, br, src);
         }

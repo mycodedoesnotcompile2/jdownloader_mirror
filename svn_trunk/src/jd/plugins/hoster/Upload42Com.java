@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -28,7 +25,10 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 42543 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class Upload42Com extends XFileSharingProBasic {
     public Upload42Com(final PluginWrapper wrapper) {
         super(wrapper);
@@ -110,7 +110,7 @@ public class Upload42Com extends XFileSharingProBasic {
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
             /* 2020-07-02: Special */
-            fileInfo[0] = new Regex(correctedBR, "<h2>File\\s*:?\\s*<font[^>]*>([^<>\"]+)<").getMatch(0);
+            fileInfo[0] = new Regex(getCorrectBR(br), "<h2>File\\s*:?\\s*<font[^>]*>([^<>\"]+)<").getMatch(0);
         }
         return fileInfo;
     }

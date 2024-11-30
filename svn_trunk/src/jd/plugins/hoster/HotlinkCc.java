@@ -19,10 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -39,7 +35,11 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideoHotlinkCc;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class HotlinkCc extends XFileSharingProBasic {
     public HotlinkCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -124,15 +124,15 @@ public class HotlinkCc extends XFileSharingProBasic {
             final Account account = AccountController.getInstance().getValidAccount(this.getHost());
             if (account != null && isPremium(account)) {
                 this.loginWebsite(link, account, false);
-                return requestFileInformationWebsite(link, account, false);
+                return requestFileInformationWebsite(link, account);
             } else {
-                return requestFileInformationWebsite(link, null, false);
+                return requestFileInformationWebsite(link, null);
             }
         }
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         final String apikey = getAPIKey();
         if (this.supportsAPISingleLinkcheck() && apikey != null) {
             /* API linkcheck */
@@ -140,7 +140,7 @@ public class HotlinkCc extends XFileSharingProBasic {
         } else {
             /* Website linkcheck */
             try {
-                final AvailableStatus status = super.requestFileInformationWebsite(link, null, false);
+                final AvailableStatus status = super.requestFileInformationWebsite(link, null);
                 /*
                  * Let's pretend we know that this status can change: Remove premiumonly flag if we're sure that this link (status) can be
                  * viewed by anyone.
@@ -285,10 +285,10 @@ public class HotlinkCc extends XFileSharingProBasic {
     public String[] scanInfo(final String[] fileInfo) {
         /* 2021-01-22: Prefer this as template will pickup filename without extension */
         super.scanInfo(fileInfo);
-        String filename = new Regex(correctedBR, "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
+        String filename = new Regex(getCorrectBR(br), "<i class=\"glyphicon glyphicon-download\"></i>([^<>\"]+)<").getMatch(0);
         if (StringUtils.isEmpty(filename)) {
             /* 2021-03-02 */
-            filename = new Regex(correctedBR, "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
+            filename = new Regex(getCorrectBR(br), "class=\"glyphicon glyphicon-play-circle\"[^>]*></i>([^<>\"]+)<").getMatch(0);
         }
         /* 2021-04-15: Important workaround or we might set video filenames without file-extension. */
         final boolean isVideoFile = br.containsHTML(">\\s*Select quality for download video|id=\"over_player_msg\"");

@@ -28,10 +28,8 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50261 $", interfaceVersion = 3, names = {}, urls = {})
 public class YouWatchOrg extends XFileSharingProBasic {
     public YouWatchOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,48 +133,48 @@ public class YouWatchOrg extends XFileSharingProBasic {
     protected boolean websiteSupportsHTTPS() {
         return false;
     }
-
-    @Override
-    protected String requestFileInformationVideoEmbed(final Browser br, final DownloadLink link, final Account account, final boolean findFilesize) throws Exception {
-        /*
-         * Some video sites contain their directurl right on the first page - let's use this as an indicator and assume that the file is
-         * online if we find a directurl. This also speeds-up linkchecking! Example: uqload.com
-         */
-        String dllink = getDllink(link, account, br, br.getRequest().getHtmlCode());
-        if (StringUtils.isEmpty(dllink)) {
-            if (br.getURL() != null && !br.getURL().contains("/embed")) {
-                final String embed_access = getMainPage() + "/embed-" + this.getFUIDFromURL(link) + ".html";
-                getPage(br, embed_access);
-                /**
-                 * 2019-07-03: Example response when embedding is not possible (deactivated or it is not a video-file): "Can't create video
-                 * code" OR "Video embed restricted for this user"
-                 */
-                final String iframeURL = br.getRegex("<iframe [^>]*src=\"(https?://[^/]+/embed-[a-z0-9]{12}[^\"]+)\"").getMatch(0);
-                if (iframeURL != null) {
-                    getPage(br, iframeURL);
-                }
-            }
-            /*
-             * Important: Do NOT use 404 as offline-indicator here as the website-owner could have simply disabled embedding while it was
-             * enabled before --> This would return 404 for all '/embed' URLs! Only rely on precise errormessages!
-             */
-            if (br.toString().equalsIgnoreCase("File was deleted")) {
-                /* Should be valid for all XFS hosts e.g. speedvideo.net, uqload.com */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            dllink = getDllink(link, account, br, br.toString());
-            // final String url_thumbnail = getVideoThumbnailURL(br.toString());
-        }
-        if (findFilesize && !StringUtils.isEmpty(dllink) && !dllink.contains(".m3u8")) {
-            /* Get- and set filesize from directurl */
-            final boolean dllink_is_valid = checkDirectLinkAndSetFilesize(link, dllink, true) != null;
-            /* Store directurl if it is valid */
-            if (dllink_is_valid) {
-                storeDirecturl(link, account, dllink);
-            }
-        }
-        return dllink;
-    }
+    // @Override
+    // protected String requestFileInformationVideoEmbed(final Browser br, final DownloadLink link, final Account account, final boolean
+    // findFilesize) throws Exception {
+    // /*
+    // * Some video sites contain their directurl right on the first page - let's use this as an indicator and assume that the file is
+    // * online if we find a directurl. This also speeds-up linkchecking! Example: uqload.com
+    // */
+    // String dllink = getDllink(link, account, br, br.getRequest().getHtmlCode());
+    // if (StringUtils.isEmpty(dllink)) {
+    // if (br.getURL() != null && !br.getURL().contains("/embed")) {
+    // final String embed_access = getMainPage() + "/embed-" + this.getFUIDFromURL(link) + ".html";
+    // getPage(br, embed_access);
+    // /**
+    // * 2019-07-03: Example response when embedding is not possible (deactivated or it is not a video-file): "Can't create video
+    // * code" OR "Video embed restricted for this user"
+    // */
+    // final String iframeURL = br.getRegex("<iframe [^>]*src=\"(https?://[^/]+/embed-[a-z0-9]{12}[^\"]+)\"").getMatch(0);
+    // if (iframeURL != null) {
+    // getPage(br, iframeURL);
+    // }
+    // }
+    // /*
+    // * Important: Do NOT use 404 as offline-indicator here as the website-owner could have simply disabled embedding while it was
+    // * enabled before --> This would return 404 for all '/embed' URLs! Only rely on precise errormessages!
+    // */
+    // if (br.toString().equalsIgnoreCase("File was deleted")) {
+    // /* Should be valid for all XFS hosts e.g. speedvideo.net, uqload.com */
+    // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+    // }
+    // dllink = getDllink(link, account, br, br.toString());
+    // // final String url_thumbnail = getVideoThumbnailURL(br.toString());
+    // }
+    // if (findFilesize && !StringUtils.isEmpty(dllink) && !dllink.contains(".m3u8")) {
+    // /* Get- and set filesize from directurl */
+    // final boolean dllink_is_valid = checkDirectLinkAndSetFilesize(link, dllink, true) != null;
+    // /* Store directurl if it is valid */
+    // if (dllink_is_valid) {
+    // storeDirecturl(link, account, dllink);
+    // }
+    // }
+    // return dllink;
+    // }
 
     @Override
     public String[] scanInfo(final String[] fileInfo) {

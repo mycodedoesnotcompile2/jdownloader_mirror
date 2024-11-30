@@ -35,7 +35,7 @@ import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 46545 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class ElitefileNet extends XFileSharingProBasic {
     public ElitefileNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -221,8 +221,8 @@ public class ElitefileNet extends XFileSharingProBasic {
             return ai;
         }
         /* 2019-07-11: It is not uncommon for XFS websites to display expire-dates even though the account is not premium anymore! */
-        String expireStr = new Regex(correctedBR, "(\\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \\d{4})").getMatch(0);
-        final String expireStrSpecial = new Regex(correctedBR, "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getMatch(0);
+        String expireStr = new Regex(getCorrectBR(br), "(\\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \\d{4})").getMatch(0);
+        final String expireStrSpecial = new Regex(getCorrectBR(br), "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})").getMatch(0);
         long expire_milliseconds = 0;
         long expire_milliseconds_from_expiredate = 0;
         long expire_milliseconds_precise_to_the_second = 0;
@@ -275,7 +275,7 @@ public class ElitefileNet extends XFileSharingProBasic {
                     }
                 }
                 /* Find html snippet which should contain our expiredate. */
-                final String preciseExpireHTML = new Regex(correctedBR, "<div[^>]*class=\"accexpire\"[^>]*>.*?</div>").getMatch(-1);
+                final String preciseExpireHTML = new Regex(getCorrectBR(br), "<div[^>]*class=\"accexpire\"[^>]*>.*?</div>").getMatch(-1);
                 String expireSecond = new Regex(preciseExpireHTML, "Premium(-| )Account expires?\\s*:\\s*(?:</span>)?\\s*(?:<span>)?\\s*([a-zA-Z0-9, ]+)\\s*</").getMatch(-1);
                 if (StringUtils.isEmpty(expireSecond)) {
                     /*

@@ -9,6 +9,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jd.PluginWrapper;
+import jd.controlling.proxy.ProxyController;
+import jd.http.Browser;
+import jd.http.BrowserSettingsThread;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.SocketConnectionFactory;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.utils.Files;
 import org.appwork.utils.Regex;
@@ -30,24 +47,7 @@ import org.jdownloader.plugins.components.usenet.UsenetServer;
 import org.jdownloader.plugins.config.AccountConfigInterface;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.controlling.proxy.ProxyController;
-import jd.http.Browser;
-import jd.http.BrowserSettingsThread;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.SocketConnectionFactory;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 50223 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 2, names = { "usenet" }, urls = { "usenet://.+" })
 public class UseNet extends PluginForHost {
     public UseNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,6 +78,7 @@ public class UseNet extends PluginForHost {
             @Override
             protected boolean useCustomUI(KeyHandler<?> h) {
                 if (UsenetAccountConfigInterface.class.isAssignableFrom(h.getDeclaringClass())) {
+
                     return true;
                 } else {
                     return false;
@@ -273,6 +274,7 @@ public class UseNet extends PluginForHost {
                 config.setHost(server.getHost());
                 config.setPort(server.getPort());
                 config.setSSLEnabled(server.isSSL());
+                config.setConnections(server.getConnections());
             }
             return server;
         }

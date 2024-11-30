@@ -24,6 +24,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -62,35 +90,7 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+@HostPlugin(revision = "$Revision: 50265 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -118,15 +118,16 @@ public class RealDebridCom extends PluginForHost {
         }
     }
 
-    private static MultiHosterManagement mhm               = new MultiHosterManagement("real-debrid.com");
-    private static final String          API               = "https://api.real-debrid.com";
-    private static final String          CLIENT_ID         = "NJ26PAPGHWGZY";
-    private static AtomicInteger         MAX_DOWNLOADS     = new AtomicInteger(Integer.MAX_VALUE);
-    private static AtomicInteger         RUNNING_DOWNLOADS = new AtomicInteger(0);
-    private final String                 mName             = "real-debrid.com";
-    private final String                 mProt             = "https://";
+    private static MultiHosterManagement mhm                      = new MultiHosterManagement("real-debrid.com");
+    private static final String          API                      = "https://api.real-debrid.com";
+    private static final String          CLIENT_ID                = "NJ26PAPGHWGZY";
+    private static AtomicInteger         MAX_DOWNLOADS            = new AtomicInteger(Integer.MAX_VALUE);
+    private static AtomicInteger         RUNNING_DOWNLOADS        = new AtomicInteger(0);
+    private final String                 mName                    = "real-debrid.com";
+    private final String                 mProt                    = "https://";
     private Browser                      apiBrowser;
-    private TokenResponse                currentToken      = null;
+    private TokenResponse                currentToken             = null;
+    private static final String          PROPERTY_INFRINGING_FILE = "INFRINGING_FILE_TS";
 
     public RealDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -269,7 +270,10 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (isDirectRealDebridDirectUrl(link)) {
+        if (link.hasProperty(PROPERTY_INFRINGING_FILE)) {
+            // blocked because file is infringing file
+            return false;
+        } else if (isDirectRealDebridDirectUrl(link)) {
             // generated links do not require an account to download
             return true;
         } else if (account == null) {
@@ -474,6 +478,8 @@ public class RealDebridCom extends PluginForHost {
             checkresp = callRestAPI(account, "/unrestrict/check", new UrlQuery().append("link", dllink, true).append("password", downloadPassword, true), CheckLinkResponse.TYPE);
         } catch (final APIException e) {
             switch (e.getError()) {
+            case INFRINGING_FILE:
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, null, e);
             case FILE_UNAVAILABLE:
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, null, e);
             default:
@@ -561,6 +567,9 @@ public class RealDebridCom extends PluginForHost {
             }
         } catch (final APIException e) {
             switch (e.getError()) {
+            case INFRINGING_FILE:
+                link.setProperty(PROPERTY_INFRINGING_FILE, Time.timestamp());
+                throw new PluginException(LinkStatus.ERROR_RETRY, e.getMessage(), e);
             case FILE_UNAVAILABLE:
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, _JDT.T.downloadlink_status_error_hoster_temp_unavailable(), 10 * 60 * 1000l, e);
             case UNSUPPORTED_HOSTER:
@@ -909,6 +918,7 @@ public class RealDebridCom extends PluginForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
+        link.removeProperty(PROPERTY_INFRINGING_FILE);
     }
 
     @Override

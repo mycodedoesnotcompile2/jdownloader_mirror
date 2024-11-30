@@ -20,9 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -34,7 +31,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class MyqloudOrg extends XFileSharingProBasic {
     public MyqloudOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -42,6 +42,12 @@ public class MyqloudOrg extends XFileSharingProBasic {
     }
 
     private boolean requiresAccountToDownload = false;
+
+    @Override
+    public void reset() {
+        super.reset();
+        requiresAccountToDownload = false;
+    }
 
     /**
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
@@ -127,14 +133,14 @@ public class MyqloudOrg extends XFileSharingProBasic {
         logger.info("Trying to find official video downloads");
         String dllink = null;
         /* Info in table. E.g. xvideosharing.com, watchvideo.us */
-        String[] videoQualityHTMLs = new Regex(correctedBR, "<tr><td>[^\r\t\n]+download_video\\(.*?</td></tr>").getColumn(-1);
+        String[] videoQualityHTMLs = new Regex(getCorrectBR(brc), "<tr><td>[^\r\t\n]+download_video\\(.*?</td></tr>").getColumn(-1);
         if (videoQualityHTMLs.length == 0) {
             /* Match on line - safe attempt but this may not include filesize! */
-            videoQualityHTMLs = new Regex(correctedBR, "download_video\\([^\r\t\n]+").getColumn(-1);
+            videoQualityHTMLs = new Regex(getCorrectBR(brc), "download_video\\([^\r\t\n]+").getColumn(-1);
         }
         if (videoQualityHTMLs.length == 0) {
             /* 2020-03-11: Special */
-            videoQualityHTMLs = new Regex(correctedBR, "<div class=\"badge-download high-quality.*?download icon-secondary").getColumn(-1);
+            videoQualityHTMLs = new Regex(getCorrectBR(brc), "<div class=\"badge-download high-quality.*?download icon-secondary").getColumn(-1);
         }
         /** TODO: Add quality selection: Low, Medium, Original Example: deltabit.co */
         /*
@@ -228,13 +234,7 @@ public class MyqloudOrg extends XFileSharingProBasic {
                 requiresAccountToDownload = true;
                 throw new AccountRequiredException();
             }
-            /* A lot of workarounds */
-            final String oldHTML = br.toString();
-            final String correctedBROld = this.correctedBR;
-            this.correctedBR = brc.toString();
-            /* Workaround: Set this htmlcode on our normal browser so captcha handling can do its job. */
-            br.getRequest().setHtmlCode(correctedBR);
-            checkErrors(br, correctedBR, link, account, false);
+            checkErrors(brc, getCorrectBR(brc), link, account, false);
             /* 2019-08-29: This Form may sometimes be given e.g. deltabit.co */
             Form download1 = brc.getFormByInputFieldKeyValue("op", "download1");
             if (download1 == null) {
@@ -252,9 +252,6 @@ public class MyqloudOrg extends XFileSharingProBasic {
                 }
                 this.waitTime(link, timebefore);
                 this.submitForm(brc, download1);
-                /* Workaround */
-                this.correctedBR = correctedBROld;
-                br.getRequest().setHtmlCode(oldHTML);
             }
             /*
              * 2019-10-04: TODO: Unsure whether we should use the general 'getDllink' method here as it contains a lot of RegExes (e.g. for

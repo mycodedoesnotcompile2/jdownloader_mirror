@@ -39,7 +39,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
-@HostPlugin(revision = "$Revision: 48924 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilefoxCc extends XFileSharingProBasic {
     public FilefoxCc(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,7 @@ public class FilefoxCc extends XFileSharingProBasic {
     public String[] scanInfo(final String[] fileInfo) {
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(correctedBR, "<p>([^<>\"]+)</p>\\s*?<p class=\"file\\-size\"").getMatch(0);
+            fileInfo[0] = new Regex(getCorrectBR(br), "<p>([^<>\"]+)</p>\\s*?<p class=\"file\\-size\"").getMatch(0);
         }
         return fileInfo;
     }
@@ -152,7 +152,7 @@ public class FilefoxCc extends XFileSharingProBasic {
         String dllink = super.getDllink(downloadLink, account, br, src);
         if (StringUtils.isEmpty(dllink)) {
             /* E.g. "https://sXX.filefox.cc/<hash>/<filename>" */
-            dllink = new Regex(correctedBR, "class\\s*=\\s*\"btn btn-default\"\\s*href\\s*=\\s*\"(https?[^\"]+)\"").getMatch(0);
+            dllink = new Regex(getCorrectBR(br), "class\\s*=\\s*\"btn btn-default\"\\s*href\\s*=\\s*\"(https?[^\"]+)\"").getMatch(0);
         }
         return dllink;
     }
@@ -162,7 +162,7 @@ public class FilefoxCc extends XFileSharingProBasic {
         final AccountInfo accInfo = super.fetchAccountInfoWebsite(account);
         if (account.getType() == AccountType.FREE) {
             /* 2020-08-17: Special */
-            final Regex expireRegex = new Regex(correctedBR, "Premium Account expires in (\\d+) days?, (\\d+) hours?");
+            final Regex expireRegex = new Regex(getCorrectBR(br), "Premium Account expires in (\\d+) days?, (\\d+) hours?");
             final String daysStr = expireRegex.getMatch(0);
             final String hoursStr = expireRegex.getMatch(1);
             if (daysStr != null && hoursStr != null) {

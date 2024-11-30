@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.Regex;
@@ -30,7 +27,10 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49247 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class UsersCloudCom extends XFileSharingProBasic {
     public UsersCloudCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -118,9 +118,9 @@ public class UsersCloudCom extends XFileSharingProBasic {
         /* 2019-1^0-30: Special - sometimes (e.g. for .zip files, NOT for .mp3 files) they have md5 hash available. */
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[2])) {
-            fileInfo[2] = new Regex(correctedBR, "<b>MD5\\s*:\\s*</b>\\s*([a-f0-9]{32})\\s*<").getMatch(0);
+            fileInfo[2] = new Regex(getCorrectBR(br), "<b>MD5\\s*:\\s*</b>\\s*([a-f0-9]{32})\\s*<").getMatch(0);
         }
-        final String betterFilesize = new Regex(correctedBR, "File size:\\s*([^<>\"]+)<").getMatch(0);
+        final String betterFilesize = new Regex(getCorrectBR(br), "File size:\\s*([^<>\"]+)<").getMatch(0);
         if (betterFilesize != null) {
             fileInfo[1] = betterFilesize;
         }

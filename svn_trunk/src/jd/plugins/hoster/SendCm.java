@@ -23,16 +23,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -49,7 +39,17 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigSendCm;
+import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -142,8 +142,8 @@ public class SendCm extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, Account account, final boolean isDownload) throws Exception {
-        final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, Account account) throws Exception {
+        final AvailableStatus status = super.requestFileInformationWebsite(link, account);
         // 2023-04-12: MD5 seems to be base64 encoded but doesn't match, maybe just fake info?!*/
         final String sha256 = br.getRegex("SHA-256\\s*:\\s*</b>\\s*([a-f0-9]{64})\\s*</span>").getMatch(0);
         if (sha256 != null) {
@@ -189,8 +189,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
-             * Looks like this is supposed to help with Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
+             * Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);

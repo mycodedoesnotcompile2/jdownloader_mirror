@@ -811,6 +811,31 @@ public abstract class Plugin implements ActionListener {
         return false;
     }
 
+    protected static enum PluginEnvironment {
+        UNKNOWN,
+        DOWNLOAD,
+        CRAWLER,
+        LINK_CHECK,
+        ACCOUNT_CHECK
+    }
+
+    protected final PluginEnvironment getPluginEnvironment() {
+        final Thread thread = Thread.currentThread();
+        if (thread instanceof SingleDownloadController) {
+            return PluginEnvironment.DOWNLOAD;
+        }
+        if (thread instanceof LinkCrawlerThread) {
+            return PluginEnvironment.CRAWLER;
+        }
+        if (thread instanceof LinkCrawlerThread) {
+            return PluginEnvironment.LINK_CHECK;
+        }
+        if (thread instanceof AccountCheckerThread) {
+            return PluginEnvironment.ACCOUNT_CHECK;
+        }
+        return PluginEnvironment.UNKNOWN;
+    }
+
     public abstract Matcher getMatcher();
 
     public void clean() {
@@ -1139,7 +1164,7 @@ public abstract class Plugin implements ActionListener {
      */
     public int getChallengeRound() {
         final List<Challenge<?>> challenges = this.challenges;
-        return challenges == null ? 0 : (challenges.size() - 1);
+        return challenges == null ? 0 : challenges.size();
     }
 
     /**

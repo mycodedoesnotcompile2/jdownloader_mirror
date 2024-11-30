@@ -18,10 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -31,7 +27,11 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50068 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class UbiqfileCom extends XFileSharingProBasic {
     public UbiqfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -131,7 +131,7 @@ public class UbiqfileCom extends XFileSharingProBasic {
             if (br.getURL() == null || !br.getURL().contains("/?op=my_account")) {
                 getPage(this.getMainPage() + "/?op=my_account");
             }
-            final String mail = new Regex(correctedBR, "name=\"usr_email\"[^<>]*?value=\"([^\"]+)\"").getMatch(0);
+            final String mail = new Regex(getCorrectBR(br), "name=\"usr_email\"[^<>]*?value=\"([^\"]+)\"").getMatch(0);
             if (mail != null) {
                 logger.info("Found users' mail: " + mail);
                 /* Special: See crawler plugin onlyspanking.video */
@@ -156,10 +156,10 @@ public class UbiqfileCom extends XFileSharingProBasic {
         /* 2019-06-27: Special */
         super.scanInfo(fileInfo);
         if (StringUtils.isEmpty(fileInfo[0])) {
-            fileInfo[0] = new Regex(this.correctedBR, "class=\"paneld\">([^<>\"]+)\\[\\d+\\.\\d+ [A-Za-z]{2,5}\\]</div>").getMatch(0);
+            fileInfo[0] = new Regex(this.getCorrectBR(br), "class=\"paneld\">([^<>\"]+)\\[\\d+\\.\\d+ [A-Za-z]{2,5}\\]</div>").getMatch(0);
             if (StringUtils.isEmpty(fileInfo[0])) {
                 /* Weak attempt!! */
-                fileInfo[0] = new Regex(this.correctedBR, "name=description content=\"Download File ([^<>\"]+)\"").getMatch(0);
+                fileInfo[0] = new Regex(this.getCorrectBR(br), "name=description content=\"Download File ([^<>\"]+)\"").getMatch(0);
             }
         }
         final String betterFilesize = br.getRegex("(?i)>\\s*Size\\s*:\\s*(\\d+[^<]+)</div>").getMatch(0);

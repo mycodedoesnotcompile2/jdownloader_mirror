@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50193 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50261 $", interfaceVersion = 3, names = {}, urls = {})
 public class CdVsCom extends PluginForDecrypt {
     public CdVsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,17 +84,23 @@ public class CdVsCom extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Object finallinkO = entries.get("url");
-        if (finallinkO == null) {
+        final Object urlsO = entries.get("urls");
+        final Object urlO = entries.get("url");
+        if (urlO == null && urlsO == null) {
             /* E.g. {"thumbnail":"\/assets\/img\/bg.jpg"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* Results mostly link to blogger.com and final files are then mostly hosted on Google Drive. */
-        final String finallink = finallinkO.toString();
-        if (finallink == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        /* Results mostly link to blogger.com and final files are then mostly hosted on Google Drive or to seaporn.net. */
+        if (urlsO != null) {
+            final List<String> urls = (List<String>) urlsO;
+            for (final String url : urls) {
+                ret.add(createDownloadlink(url));
+            }
         }
-        ret.add(createDownloadlink(finallink));
+        if (urlO != null) {
+            final String url = urlO.toString();
+            ret.add(createDownloadlink(url));
+        }
         return ret;
     }
 }

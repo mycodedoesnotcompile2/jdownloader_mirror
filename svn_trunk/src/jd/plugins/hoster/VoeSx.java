@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 49579 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50271 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -170,6 +170,9 @@ public class VoeSx extends XFileSharingProBasic {
             /* 2023-11-21 */
             hlsMaster = new Regex(src, "(?i)\"(https?://[^/]+/engine/hls[^\"]+)").getMatch(0);
         }
+        if (hlsMaster != null) {
+            return hlsMaster;
+        }
         String altSourceB64 = br.getRegex("let wc0 = '([^\\']+)").getMatch(0);
         if (altSourceB64 == null) {
             /* 2024-02-23 */
@@ -177,21 +180,32 @@ public class VoeSx extends XFileSharingProBasic {
             if (altSourceB64 == null) {
                 /* 2024-02-26 */
                 altSourceB64 = br.getRegex("let [a-f0-9]+ = '([^\\']+)").getMatch(0);
+                if (altSourceB64 == null) {
+                    /* 2024-11-29 */
+                    altSourceB64 = br.getRegex("(?i)(\"|')hls\\1\\s*:\\s*(\"|')([^\"']+)").getMatch(2);
+                }
             }
         }
-        if (altSourceB64 != null && hlsMaster == null) {
-            /* 2024-01-23 */
-            String json = Encoding.Base64Decode(altSourceB64);
-            if (json.startsWith("}")) {
-                /* 2024-02-26 */
-                json = new StringBuilder(json).reverse().toString();
-            }
-            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
+        if (altSourceB64 == null) {
+            return null;
+        }
+        String result = Encoding.Base64Decode(altSourceB64);
+        if (result.startsWith("}")) {
+            /* 2024-02-26 */
+            result = new StringBuilder(result).reverse().toString();
+        }
+        if (StringUtils.startsWithCaseInsensitive(result, "http")) {
+            /* Result is url */
+            hlsMaster = result;
+        } else {
+            /* Assume that result is json */
+            final Map<String, Object> entries = restoreFromString(result, TypeRef.MAP);
             hlsMaster = (String) entries.get("file");
         }
         if (hlsMaster != null) {
             return hlsMaster;
         } else {
+            /* Fallback */
             return super.getDllinkVideohost(link, account, br, src);
         }
     }
@@ -212,49 +226,43 @@ public class VoeSx extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         if (link.getPluginPatternMatcher().matches("(?i)https?://[^/]+/(e/|embed-).+")) {
-            this.requestFileInformationVideoEmbed(br, link, account, isDownload);
+            /* 2021-03-09: Special: New browser required else they won't let us stream some videos at all! */
+            final boolean embedOnly = br.containsHTML(">\\s*This video can be watched as embed only");
+            br.setFollowRedirects(true);
+            boolean fallBackFileName = true;
+            try {
+                getPage(this.getMainPage(link) + "/e/" + this.getFUIDFromURL(link));
+                if (this.isOffline(link, br)) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final String[] fileInfo = internal_getFileInfoArray();
+                scanInfo(br.getRequest().getHtmlCode(), fileInfo);
+                processFileInfo(fileInfo, br, link);
+                if (!StringUtils.isEmpty(fileInfo[0])) {
+                    /* Correct- and set filename */
+                    setFilename(fileInfo[0], link, br);
+                    fallBackFileName = false;
+                } else {
+                    /*
+                     * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or
+                     * not.
+                     */
+                    fallBackFileName = true;
+                }
+                final String dllink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
+                if (StringUtils.isEmpty(dllink) && embedOnly) {
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
+                }
+            } finally {
+                if (fallBackFileName) {
+                    this.setWeakFilename(link, br);
+                }
+            }
             return AvailableStatus.TRUE;
         } else {
-            return super.requestFileInformationWebsite(link, account, isDownload);
-        }
-    }
-
-    @Override
-    protected String requestFileInformationVideoEmbed(final Browser br, final DownloadLink link, final Account account, final boolean findFilesize) throws Exception {
-        /* 2021-03-09: Special: New browser required else they won't let us stream some videos at all! */
-        final boolean embedOnly = br.containsHTML(">\\s*This video can be watched as embed only");
-        br.setFollowRedirects(true);
-        boolean fallBackFileName = true;
-        try {
-            getPage(this.getMainPage(link) + "/e/" + this.getFUIDFromURL(link));
-            if (this.isOffline(link, br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final String[] fileInfo = internal_getFileInfoArray();
-            scanInfo(br.getRequest().getHtmlCode(), fileInfo);
-            processFileInfo(fileInfo, br, link);
-            if (!StringUtils.isEmpty(fileInfo[0])) {
-                /* Correct- and set filename */
-                setFilename(fileInfo[0], link, br);
-                fallBackFileName = false;
-            } else {
-                /*
-                 * Fallback. Do this again as now we got the html code available so we can e.g. know if this is a video-filehoster or not.
-                 */
-                fallBackFileName = true;
-            }
-            final String dllink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
-            if (StringUtils.isEmpty(dllink) && embedOnly) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "This video can be watched as embed only");
-            } else {
-                return dllink;
-            }
-        } finally {
-            if (fallBackFileName) {
-                this.setWeakFilename(link, br);
-            }
+            return super.requestFileInformationWebsite(link, account);
         }
     }
 

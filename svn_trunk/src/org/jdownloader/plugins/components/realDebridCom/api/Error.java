@@ -34,7 +34,9 @@ public enum Error {
     TORRENT_FILE_INVALID(30, "Torrent file invalid"),
     ACTION_ALREADY_DONE(31, "Action already done"),
     IMAGE_RESOLUTION_ERROR(32, "Image resolution error"),
+    INFRINGING_FILE(35, "Infringing file"),
     FAIR_USAGE_LIMIT_REACHED(36, "Fair usage limit reached"),
+    DISABLED_ENDPOINT(37, "Disabled endpoint"),
     // DUmmy Code:
     UNKNOWN(-99, "Unknown Error ID");
 

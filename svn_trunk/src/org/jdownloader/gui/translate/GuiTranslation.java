@@ -6411,6 +6411,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Port" })
     String UsenetConfigPanel_port();
 
+    @Default(lngs = { "en" }, values = { "Connections" })
+    String UsenetConfigPanel_connections();
+
     @Default(lngs = { "en" }, values = { "Server" })
     String UsenetConfigPanel_Server();
 

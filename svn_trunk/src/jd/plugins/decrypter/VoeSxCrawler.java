@@ -17,7 +17,9 @@ package jd.plugins.decrypter;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
@@ -25,16 +27,19 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
+import jd.nutils.encoding.Encoding;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
 import jd.plugins.Plugin;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50176 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50271 $", interfaceVersion = 3, names = {}, urls = {})
 public class VoeSxCrawler extends PluginForDecrypt {
     public VoeSxCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,7 +49,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
         final List<String[]> ret = new ArrayList<String[]>();
         ret.add(new String[] { "voe.sx", "voe-unblock.com", "voe-unblock.net", "voeunblock.com", "voeunblk.com", "voeunblck.com", "voe-un-block.com", "un-block-voe.net", "voeunbl0ck.com", "voeunblock1.com", "voeunblock2.com", "voeunblock3.com", "voeunblock4.com", "voeunblock5.com", "voeunblock6.com", "voeun-block.net", "v-o-e-unblock.com", "audaciousdefaulthouse.com", "launchreliantcleaverriver.com", "reputationsheriffkennethsand.com", "fittingcentermondaysunday.com", "housecardsummerbutton.com", "fraudclatterflyingcar.com", "bigclatterhomesguideservice.com", "uptodatefinishconferenceroom.com", "realfinanceblogcenter.com", "tinycat-voe-fashion.com", "20demidistance9elongations.com", "telyn610zoanthropy.com", "toxitabellaeatrebates306.com", "greaseball6eventual20.com", "745mingiestblissfully.com", "19turanosephantasia.com", "30sensualizeexpression.com", "321naturelikefurfuroid.com",
                 "449unceremoniousnasoseptal.com", "cyamidpulverulence530.com", "boonlessbestselling244.com", "antecoxalbobbing1010.com", "matriculant401merited.com", "scatch176duplicities.com", "35volitantplimsoles5.com", "tummulerviolableness.com", "tubelessceliolymph.com", "availedsmallest.com", "counterclockwisejacky.com", "monorhinouscassaba.com", "tummulerviolableness.com", "urochsunloath.com", "simpulumlamerop.com", "wolfdyslectic.com", "metagnathtuggers.com", "gamoneinterrupted.com", "chromotypic.com", "crownmakermacaronicism.com", "generatesnitrosate.com", "yodelswartlike.com", "figeterpiazine.com", "cigarlessarefy.com", "valeronevijao.com", "apinchcaseation.com", "nectareousoverelate.com", "phenomenalityuniform.com", "nonesnanking.com", "troyyourlead.com", "stevenimaginelittle.com", "edwardarriveoften.com", "lukecomparetwo.com", "bradleyviewdoctor.com", "jamiesamewalk.com",
-                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com", "loriwithinfamily.com", "roberteachfinal.com", "erikcoldperson.com", "jasminetesttry.com", "heatherdiscussionwhen.com", "robertplacespace.com", "alleneconomicmatter.com", "josephseveralconcern.com", "donaldlineelse.com", "bethshouldercan.com", "thomasalthoughhear.com", " richardstorehalf.com", "brittneystandardwestern.com" });
+                "seanshowcould.com", "sandrataxeight.com", "jayservicestuff.com", "graceaddresscommunity.com", "loriwithinfamily.com", "roberteachfinal.com", "erikcoldperson.com", "jasminetesttry.com", "heatherdiscussionwhen.com", "robertplacespace.com", "alleneconomicmatter.com", "josephseveralconcern.com", "donaldlineelse.com", "bethshouldercan.com", "thomasalthoughhear.com", " richardstorehalf.com", "brittneystandardwestern.com", "sandratableother.com" });
         return ret;
     }
 
@@ -61,6 +66,8 @@ public class VoeSxCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static Pattern PATTERN_FOLDER = Pattern.compile("/folder/([a-zA-Z0-9]+)");
+
     public static final String getDefaultAnnotationPatternPartVoeSx() {
         return "/(?:embed-|e/)?[a-z0-9]{12}(?:/[^/]+(?:\\.html)?)?";
     }
@@ -68,7 +75,7 @@ public class VoeSxCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + VoeSxCrawler.getDefaultAnnotationPatternPartVoeSx());
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(" + VoeSxCrawler.getDefaultAnnotationPatternPartVoeSx() + "|" + PATTERN_FOLDER.pattern() + ")");
         }
         return ret.toArray(new String[0]);
     }
@@ -80,62 +87,141 @@ public class VoeSxCrawler extends PluginForDecrypt {
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String contenturl = param.getCryptedUrl();
         final XFSConfigVideoVoeSx cfg = PluginJsonConfig.get(XFSConfigVideoVoeSx.class);
-        if (!cfg.isCrawlSubtitle()) {
-            /* User does not want subtitle -> Let hosterplugin do the linkcheck as crawler handling is not needed. */
-            ret.add(this.createDownloadlink(param.getCryptedUrl()));
-            return ret;
-        }
-        final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
-        final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), param.getCryptedUrl(), true);
-        try {
-            hosterPlugin.setDownloadLink(link);
-            final AvailableStatus status = hosterPlugin.requestFileInformation(link);
-            ret.add(link);
-            link.setAvailableStatus(status);
-            distribute(link);
-        } catch (Exception e) {
-            // prefer fresh instance
-            ret.add(this.createDownloadlink(param.getCryptedUrl()));
-            logger.log(e);
-            return ret;
-        }
-        final String videoFilename = link.getName();
-        final String packagename;
-        if (videoFilename.contains(".")) {
-            packagename = videoFilename.substring(0, videoFilename.lastIndexOf("."));
-        } else {
-            packagename = videoFilename;
-        }
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(packagename);
-        ret.add(link);
-        String[] subtitleHTMLs = br.getRegex("<track kind=\"(captions|subtitles)\"[^<]+/>").getColumn(-1);
-        if (subtitleHTMLs == null || subtitleHTMLs.length == 0) {
-            /* 2023-09-25 */
-            subtitleHTMLs = br.getRegex("<track[^<]+kind=\"(captions|subtitles)\"[^<]*/>").getColumn(-1);
-        }
-        if (subtitleHTMLs != null && subtitleHTMLs.length > 0) {
-            for (final String subtitleHTML : subtitleHTMLs) {
-                final String subtitleURL = new Regex(subtitleHTML, "src=\"([^\"]+\\.vtt)\"").getMatch(0);
-                final URL subtitleURLFull = br.getURL(subtitleURL);
-                final DownloadLink subtitle = createDownloadlink(subtitleURLFull.toString());
-                if (subtitleHTMLs.length == 1) {
-                    /* There is only one subtitle --> Set same title as video-file. */
-                    subtitle.setFinalFileName(packagename + ".vtt");
-                } else {
-                    /* There are multiple subtitles available -> Set different filename for each */
-                    subtitle.setFinalFileName(packagename + "_" + Plugin.getFileNameFromURL(subtitleURLFull));
-                }
-                subtitle.setAvailable(true);
-                ret.add(subtitle);
+        final boolean crawlSubtitle = cfg.isCrawlSubtitle();
+        final Regex regex_folder = new Regex(contenturl, PATTERN_FOLDER);
+        if (regex_folder.patternFind()) {
+            /* Folder */
+            final String folderID = regex_folder.getMatch(0);
+            br.getPage(contenturl);
+            if (br.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            logger.info("Found numberof subtitles: " + subtitleHTMLs.length);
+            final FilePackage fp = FilePackage.getInstance();
+            String title = br.getRegex("<h1[^>]*>([^<]+)</h1>").getMatch(0);
+            if (title != null) {
+                title = Encoding.htmlDecode(title).trim();
+                fp.setName(title);
+            } else {
+                /* Fallback */
+                fp.setName(folderID);
+            }
+            final HashSet<String> dupes = new HashSet<String>();
+            int currentpage = 1;
+            int maxPage = 1;
+            pagination: do {
+                int newItemsThisPage = 0;
+                final String[] fileIDs = br.getRegex("/([a-z0-9]{12})\"").getColumn(0);
+                if (fileIDs == null || fileIDs.length == 0) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                for (final String fileID : fileIDs) {
+                    if (!dupes.add(fileID)) {
+                        continue;
+                    }
+                    final String url = br.getURL("/" + fileID).toExternalForm();
+                    final DownloadLink link = this.createDownloadlink(url);
+                    String thisVideoTitle = br.getRegex("/" + fileID + "\"[^>]*>\\s*<h6[^>]*>([^<]+)</h6>").getMatch(0);
+                    if (thisVideoTitle != null) {
+                        thisVideoTitle = Encoding.htmlDecode(thisVideoTitle).trim();
+                        link.setName(this.correctOrApplyFileNameExtension(thisVideoTitle, ".mp4", null));
+                    } else {
+                        link.setName(fileID + ".mp4");
+                    }
+                    if (!crawlSubtitle) {
+                        /* User does not want subtitle -> Link does not need to be processed by this crawler again! */
+                        link.setAvailable(true);
+                    }
+                    link._setFilePackage(fp);
+                    ret.add(link);
+                    distribute(link);
+                    newItemsThisPage++;
+                }
+                /* Update max value on each page */
+                final String[] pages = br.getRegex("/folder/" + folderID + "\\?page=(\\d+)").getColumn(0);
+                if (pages != null && pages.length > 0) {
+                    for (final String pageStr : pages) {
+                        final int page = Integer.parseInt(pageStr);
+                        if (page > maxPage) {
+                            maxPage = page;
+                        }
+                    }
+                }
+                logger.info("Crawled page: " + currentpage + "/" + maxPage + " | New items this page: " + newItemsThisPage + " | Total so far: " + ret.size());
+                if (this.isAbort()) {
+                    logger.info("Stopping because: Aborted by user");
+                    break pagination;
+                } else if (currentpage == maxPage) {
+                    logger.info("Stopping because: Reached end");
+                    break pagination;
+                } else if (newItemsThisPage == 0) {
+                    logger.info("Stopping because: Failed to find any new items on current page");
+                    break pagination;
+                } else {
+                    /* Continue to next page */
+                    currentpage++;
+                    br.getPage("/folder/" + folderID + "?page=" + currentpage);
+                }
+            } while (!this.isAbort());
         } else {
-            logger.info("This item does not have any subtitles");
-        }
-        if (ret.size() > 0) {
-            fp.addLinks(ret);
+            /* File */
+            if (!crawlSubtitle) {
+                /* User does not want subtitle -> Let hosterplugin do the linkcheck as crawler handling is not needed. */
+                ret.add(this.createDownloadlink(param.getCryptedUrl()));
+                return ret;
+            }
+            final PluginForHost hosterPlugin = this.getNewPluginForHostInstance(this.getHost());
+            final DownloadLink link = new DownloadLink(hosterPlugin, this.getHost(), param.getCryptedUrl(), true);
+            try {
+                hosterPlugin.setDownloadLink(link);
+                final AvailableStatus status = hosterPlugin.requestFileInformation(link);
+                ret.add(link);
+                link.setAvailableStatus(status);
+                distribute(link);
+            } catch (Exception e) {
+                // prefer fresh instance
+                ret.add(this.createDownloadlink(param.getCryptedUrl()));
+                logger.log(e);
+                return ret;
+            }
+            final String videoFilename = link.getName();
+            final String packagename;
+            if (videoFilename.contains(".")) {
+                packagename = videoFilename.substring(0, videoFilename.lastIndexOf("."));
+            } else {
+                packagename = videoFilename;
+            }
+            final FilePackage fp = FilePackage.getInstance();
+            fp.setName(packagename);
+            ret.add(link);
+            String[] subtitleHTMLs = br.getRegex("<track kind=\"(captions|subtitles)\"[^<]+/>").getColumn(-1);
+            if (subtitleHTMLs == null || subtitleHTMLs.length == 0) {
+                /* 2023-09-25 */
+                subtitleHTMLs = br.getRegex("<track[^<]+kind=\"(captions|subtitles)\"[^<]*/>").getColumn(-1);
+            }
+            if (subtitleHTMLs != null && subtitleHTMLs.length > 0) {
+                for (final String subtitleHTML : subtitleHTMLs) {
+                    final String subtitleURL = new Regex(subtitleHTML, "src=\"([^\"]+\\.vtt)\"").getMatch(0);
+                    final URL subtitleURLFull = br.getURL(subtitleURL);
+                    final DownloadLink subtitle = createDownloadlink(subtitleURLFull.toString());
+                    if (subtitleHTMLs.length == 1) {
+                        /* There is only one subtitle --> Set same title as video-file. */
+                        subtitle.setFinalFileName(packagename + ".vtt");
+                    } else {
+                        /* There are multiple subtitles available -> Set different filename for each */
+                        subtitle.setFinalFileName(packagename + "_" + Plugin.getFileNameFromURL(subtitleURLFull));
+                    }
+                    subtitle.setAvailable(true);
+                    ret.add(subtitle);
+                }
+                logger.info("Found numberof subtitles: " + subtitleHTMLs.length);
+            } else {
+                logger.info("This item does not have any subtitles");
+            }
+            if (ret.size() > 0) {
+                fp.addLinks(ret);
+            }
         }
         return ret;
     }

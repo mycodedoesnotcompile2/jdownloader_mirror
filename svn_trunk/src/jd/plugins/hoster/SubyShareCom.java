@@ -23,15 +23,9 @@ import java.util.Locale;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
-import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
@@ -43,7 +37,12 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50253 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class SubyShareCom extends XFileSharingProBasic {
     public SubyShareCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,9 +81,9 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
         try {
-            final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
+            final AvailableStatus status = super.requestFileInformationWebsite(link, account);
             link.removeProperty(PROPERTY_FAKE_OFFLINE_STATUS);
             return status;
         } catch (final PluginException e) {
@@ -159,26 +158,29 @@ public class SubyShareCom extends XFileSharingProBasic {
     protected void checkErrors(final Browser br, final String correctedBR, final DownloadLink link, final Account account, final boolean checkAll) throws NumberFormatException, PluginException {
         super.checkErrors(br, correctedBR, link, account, checkAll);
         /* 2019-07-08: Special */
-        if (new Regex(correctedBR, "(?i)Sorry\\s*,\\s*we do not support downloading from Dedicated servers|Please download from your PC without using any above services|If this is our mistake\\s*,\\s*please contact").matches()) {
+        if (new Regex(correctedBR, "(?i)Sorry\\s*,\\s*we do not support downloading from Dedicated servers|Please download from your PC without using any above services|If this is our mistake\\s*,\\s*please contact").patternFind()) {
             final String errormsg = "VPN download prohibited by this filehost";
             if (account != null) {
                 throw new AccountUnavailableException(errormsg, 15 * 60 * 1000l);
             } else {
                 throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, errormsg);
             }
-        } else if (new Regex(correctedBR, "(?i)>\\s*The owner of this file blocked you to download it").matches()) {
+        } else if (new Regex(correctedBR, "(?i)>\\s*The owner of this file blocked you to download it").patternFind()) {
             /*
              * 2020-07-17: This may sometimes happen in premium mode - user is then supposed to contact the uploader to ask for permission
              * to download the file (WTF?!)
              */
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "The owner of this file blocked you to download it");
-        } else if (new Regex(correctedBR, "(?i)>\\s*You do no have enough traffic to download this file").matches()) {
+        } else if (new Regex(correctedBR, "(?i)>\\s*You do no have enough traffic to download this file").patternFind()) {
             /* 2023-01-25 */
             if (account != null) {
                 throw new AccountUnavailableException("Traffic limit reached", 5 * 60 * 1000);
             } else {
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Traffic limit reached", 5 * 60 * 1000);
             }
+        }
+        if (link != null && link.hasProperty(PROPERTY_FAKE_OFFLINE_STATUS)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "URL is referer protected or offline");
         }
     }
 
@@ -193,186 +195,14 @@ public class SubyShareCom extends XFileSharingProBasic {
     }
 
     @Override
-    public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
-        /* First bring up saved final links */
-        String dllink = checkDirectLink(link, account);
-        if (StringUtils.isEmpty(dllink)) {
-            if (link.hasProperty(PROPERTY_FAKE_OFFLINE_STATUS)) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "URL is referer protected or offline");
-            }
-            requestFileInformationWebsite(link, account, true);
-            int download1counter = 0;
-            final int download1max = 1;
-            do {
-                logger.info(String.format("Handling download1 loop %d / %d", download1counter + 1, download1max + 1));
-                /**
-                 * Try to find a downloadlink. Check different methods sorted from "usually available" to "rarely available" (e.g. there are
-                 * a lot of sites which support video embedding).
-                 */
-                dllink = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
-                /* Check for streaming/direct links on the first page. */
-                if (StringUtils.isEmpty(dllink)) {
-                    checkErrors(br, correctedBR, link, account, false);
-                    dllink = getDllink(link, account, br, correctedBR);
-                }
-                /* Do they support standard video embedding? */
-                if (StringUtils.isEmpty(dllink) && this.internal_isVideohosterEmbed(this.br)) {
-                    try {
-                        logger.info("Trying to get link via embed");
-                        dllink = requestFileInformationVideoEmbed(br.cloneBrowser(), link, account, false);
-                        if (StringUtils.isEmpty(dllink)) {
-                            logger.info("FAILED to get link via embed");
-                        } else {
-                            logger.info("Successfully found link via embed");
-                        }
-                    } catch (final InterruptedException e) {
-                        throw e;
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                        logger.info("Failed to get link via embed");
-                    }
-                }
-                /* Do they provide direct video URLs? */
-                if (StringUtils.isEmpty(dllink)) {
-                    /* Legacy - most XFS videohosts do not support this anymore! */
-                    try {
-                        logger.info("Trying to get link via vidembed");
-                        final Browser brv = br.cloneBrowser();
-                        getPage(brv, "/vidembed-" + this.getFUIDFromURL(link), false);
-                        dllink = brv.getRedirectLocation();
-                        if (StringUtils.isEmpty(dllink)) {
-                            logger.info("Failed to get link via vidembed because: " + br.toString());
-                        } else {
-                            logger.info("Successfully found link via vidembed");
-                        }
-                    } catch (final InterruptedException e) {
-                        throw e;
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                        logger.info("Failed to get link via vidembed");
-                    }
-                }
-                /* Do we have an imagehost? */
-                if (StringUtils.isEmpty(dllink) && this.isImagehoster()) {
-                    checkErrors(br, correctedBR, link, account, false);
-                    Form imghost_next_form = null;
-                    do {
-                        imghost_next_form = findImageForm(this.br);
-                        if (imghost_next_form != null) {
-                            /* end of backward compatibility */
-                            submitForm(imghost_next_form);
-                            checkErrors(br, correctedBR, link, account, false);
-                            dllink = getDllink(link, account, br, correctedBR);
-                            /* For imagehosts, filenames are often not given until we can actually see/download the image! */
-                            final String image_filename = regexImagehosterFilename(br);
-                            if (image_filename != null) {
-                                link.setName(Encoding.htmlOnlyDecode(image_filename));
-                            }
-                        }
-                    } while (imghost_next_form != null);
-                }
-                /* Check for errors and download1 Form. Only execute this once! */
-                if (StringUtils.isEmpty(dllink) && download1counter == 0) {
-                    /*
-                     * Check errors here because if we don't and a link is premiumonly, download1 Form will be present, plugin will send it
-                     * and most likely end up with error "Fatal countdown error (countdown skipped)"
-                     */
-                    checkErrors(br, correctedBR, link, account, false);
-                    final Form download1 = findFormDownload1Free(br);
-                    if (download1 != null) {
-                        logger.info("Found download1 Form");
-                        /* 2020-06-15: Special: Two captchas in the row possible! */
-                        this.handleCaptcha(link, br, download1);
-                        submitForm(download1);
-                        checkErrors(br, correctedBR, link, account, false);
-                        dllink = getDllink(link, account, br, correctedBR);
-                    } else {
-                        logger.info("Failed to find download1 Form");
-                    }
-                }
-                download1counter++;
-            } while (download1counter <= download1max && dllink == null);
-        }
-        if (StringUtils.isEmpty(dllink)) {
-            Form download2 = findFormDownload2Free(br);
-            if (download2 == null) {
-                /* Last chance - maybe our errorhandling kicks in here. */
-                checkErrors(br, correctedBR, link, account, false);
-                /* Okay we finally have no idea what happened ... */
-                logger.warning("Failed to find download2 Form");
-                checkErrorsLastResort(br, link, account);
-            }
-            logger.info("Found download2 Form");
-            /*
-             * E.g. html contains text which would lead to error ERROR_IP_BLOCKED --> We're not checking for it as there is a download Form
-             * --> Then when submitting it, html will contain another error e.g. 'Skipped countdown' --> In this case we want to prefer the
-             * first thrown Exception. Why do we not check errors before submitting download2 Form? Because html could contain faulty
-             * errormessages!
-             */
-            Exception exceptionBeforeDownload2Submit = null;
-            try {
-                checkErrors(br, correctedBR, link, account, false);
-            } catch (final Exception e) {
-                logger.log(e);
-                exceptionBeforeDownload2Submit = e;
-                logger.info("Found Exception before download2 Form submit");
-            }
-            /* Define how many forms deep do we want to try? */
-            final int download2start = 0;
-            final int download2max = 2;
-            for (int download2counter = download2start; download2counter <= download2max; download2counter++) {
-                logger.info(String.format("Download2 loop %d / %d", download2counter + 1, download2max + 1));
-                download2.remove(null);
-                final long timeBefore = System.currentTimeMillis();
-                handlePassword(download2, link);
-                handleCaptcha(link, br, download2);
-                /* 2019-02-08: MD5 can be on the subsequent pages - it is to be found very rare in current XFS versions */
-                if (link.getMD5Hash() == null) {
-                    final String md5hash = new Regex(correctedBR, "<b>\\s*MD5.*?</b>.*?nowrap>(.*?)<").getMatch(0);
-                    if (md5hash != null) {
-                        link.setMD5Hash(md5hash.trim());
-                    }
-                }
-                waitTime(link, timeBefore);
-                if (this.tryDownload(link, account, download2)) {
-                    return;
-                }
-                logger.info("Submitted Form download2");
-                checkErrors(br, correctedBR, link, account, true);
-                dllink = getDllinkViaOfficialVideoDownload(this.br.cloneBrowser(), link, account, false);
-                if (dllink == null) {
-                    dllink = getDllink(link, account, br, correctedBR);
-                }
-                download2 = findFormDownload2Free(br);
-                if (StringUtils.isEmpty(dllink) && (download2 != null || download2counter == download2max)) {
-                    logger.warning("Final downloadlink (String is \"dllink\") regex didn't match!");
-                    /* Check if maybe an error happened before stepping in download2 loop --> Throw that */
-                    if (download2counter == download2start + 1 && exceptionBeforeDownload2Submit != null) {
-                        logger.info("Throwing exceptionBeforeDownload2Submit");
-                        throw exceptionBeforeDownload2Submit;
-                    }
-                    checkErrorsLastResort(br, link, account);
-                } else if (StringUtils.isEmpty(dllink) && download2 != null) {
-                    invalidateLastChallengeResponse();
-                    continue;
-                } else {
-                    validateLastChallengeResponse();
-                    break;
-                }
-            }
-        }
-        handleDownload(link, account, dllink, null);
-    }
-
-    @Override
     public void handleCaptcha(final DownloadLink link, final Browser br, final Form captchaForm) throws Exception {
         /*
          * 2019-07-08: Special for two reasons: 1. Upper handling won't find the '/captchas/' URL. 2. These captchas are special: 6 digits
          * instead of 4 and colored (orange instead of black) - thus our standard XFS captcha-mathod won't be able to recognize them!
          */
-        if (StringUtils.containsIgnoreCase(correctedBR, "/captchas/")) {
+        if (StringUtils.containsIgnoreCase(getCorrectBR(br), "/captchas/")) {
             logger.info("Detected captcha method \"Standard captcha\" for this host");
-            final String captchaurl = new Regex(correctedBR, "(/captchas/[^<>\"\\']*)").getMatch(0);
+            final String captchaurl = new Regex(getCorrectBR(br), "(/captchas/[^<>\"\\']*)").getMatch(0);
             if (captchaurl == null) {
                 logger.warning("Standard captcha captchahandling broken!");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -405,15 +235,15 @@ public class SubyShareCom extends XFileSharingProBasic {
         /* 2020-02-17: Special */
         boolean pwprotected = super.isPasswordProtectedHTML(br, pwForm);
         if (!pwprotected) {
-            pwprotected = br.containsHTML("(?i)><b>Password</b>");
+            pwprotected = br.containsHTML("><b>\\s*Password\\s*</b>");
         }
         return pwprotected;
     }
 
     @Override
     protected void sendRequest(Browser br, final Request request) throws Exception {
-        final boolean correctBr = wasCorrectBrowserFlagSet(br);
         super.sendRequest(br, request);
+        final boolean correctBr = wasCorrectBrowserFlagSet(br);
         handleAntiDdosChallenge(br, RequestMethod.GET.equals(request.getRequestMethod()) ? request.getUrl() : null);
         if (correctBr) {
             correctBR(br);
@@ -422,44 +252,46 @@ public class SubyShareCom extends XFileSharingProBasic {
 
     private void handleAntiDdosChallenge(final Browser br, String targetPage) throws PluginException, IOException {
         final String checkddosPage = "/checkddos.php";
+        if (!br.getURL().contains(checkddosPage)) {
+            /* Do nothing */
+            return;
+        }
+        /* 2021-03-08 */
+        if (targetPage != null) {
+            targetPage = br.getURL(targetPage).toString();
+        }
+        // throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Antiddos check triggered", 2 * 60 * 1000l);
+        final Form form = br.getFormbyProperty("id", "checkDDOS");
+        if (form == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else if (!form.hasInputFieldByName("b")) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        String calcChallenge = br.getRegex("(?i)Verify\\s*:\\s*</span>\\s*<strong>([0-9\\-\\+\\*x ]+)=\\?</strong>").getMatch(0);
+        calcChallenge = calcChallenge.trim().toLowerCase(Locale.ENGLISH);
+        /* E.g. "3 x 3" -> "3 * 3" */
+        calcChallenge = calcChallenge.replace("x", "*");
+        final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
+        try {
+            final ScriptEngine engine = manager.getEngineByName("javascript");
+            final String js = "var res = " + calcChallenge + ";";
+            engine.eval(js);
+            final String res = engine.get("res").toString();
+            form.put("b", res);
+        } catch (final Exception e) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+        }
+        br.submitForm(form);
         if (br.getURL().contains(checkddosPage)) {
-            /* 2021-03-08 */
-            if (targetPage != null) {
-                targetPage = br.getURL(targetPage).toString();
-            }
-            // throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Antiddos check triggered", 2 * 60 * 1000l);
-            final Form form = br.getFormbyProperty("id", "checkDDOS");
-            if (form == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else if (!form.hasInputFieldByName("b")) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            String calcChallenge = br.getRegex("(?i)Verify\\s*:\\s*</span>\\s*<strong>([0-9\\-\\+\\*x ]+)=\\?</strong>").getMatch(0);
-            calcChallenge = calcChallenge.trim().toLowerCase(Locale.ENGLISH);
-            /* E.g. "3 x 3" -> "3 * 3" */
-            calcChallenge = calcChallenge.replace("x", "*");
-            final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
-            try {
-                final ScriptEngine engine = manager.getEngineByName("javascript");
-                final String js = "var res = " + calcChallenge + ";";
-                engine.eval(js);
-                final String res = engine.get("res").toString();
-                form.put("b", res);
-            } catch (final Exception e) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
-            }
-            br.submitForm(form);
-            if (br.getURL().contains(checkddosPage)) {
-                logger.warning("Failed to solve challenge(?)");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            } else {
-                logger.info("Checkddos challenge solved successfully");
-                if (br.getURL().matches("^https?://[^/]+/?$")) {
-                    logger.info("Redirect to mainpage happened");
-                    if (targetPage != null && !targetPage.equalsIgnoreCase(br.getURL())) {
-                        logger.info("Trying to correct bad redirect to mainpage to: " + targetPage);
-                        br.getPage(targetPage);
-                    }
+            logger.warning("Failed to solve challenge(?)");
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        } else {
+            logger.info("Checkddos challenge solved successfully");
+            if (br.getURL().matches("^https?://[^/]+/?$")) {
+                logger.info("Redirect to mainpage happened");
+                if (targetPage != null && !targetPage.equalsIgnoreCase(br.getURL())) {
+                    logger.info("Trying to correct bad redirect to mainpage to: " + targetPage);
+                    br.getPage(targetPage);
                 }
             }
         }

@@ -18,9 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -33,7 +30,10 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47633 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class DepicMe extends XFileSharingProBasic {
     public DepicMe(final PluginWrapper wrapper) {
         super(wrapper);
@@ -141,8 +141,8 @@ public class DepicMe extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        super.requestFileInformationWebsite(link, account, isDownload);
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        super.requestFileInformationWebsite(link, account);
         String dllink = getDllink(link, account, br, getCorrectBR(br));
         if (!StringUtils.isEmpty(dllink)) {
             /*

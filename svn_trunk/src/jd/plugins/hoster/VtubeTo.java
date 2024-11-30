@@ -18,8 +18,6 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,7 +29,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49225 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
+@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
 public class VtubeTo extends XFileSharingProBasic {
     public VtubeTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -133,8 +133,8 @@ public class VtubeTo extends XFileSharingProBasic {
     }
 
     @Override
-    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account, final boolean isDownload) throws Exception {
-        final AvailableStatus status = super.requestFileInformationWebsite(link, account, isDownload);
+    public AvailableStatus requestFileInformationWebsite(final DownloadLink link, final Account account) throws Exception {
+        final AvailableStatus status = super.requestFileInformationWebsite(link, account);
         if (status == AvailableStatus.TRUE) {
             /**
              * 2023-06-06: Special offline check: Some items look like they're online but they are offline -> Check thumbnailURL to find the

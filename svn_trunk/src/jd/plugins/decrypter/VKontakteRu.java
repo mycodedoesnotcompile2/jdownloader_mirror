@@ -72,7 +72,7 @@ import jd.plugins.hoster.VKontakteRuHoster;
 import jd.plugins.hoster.VKontakteRuHoster.Quality;
 import jd.plugins.hoster.VKontakteRuHoster.QualitySelectionMode;
 
-@DecrypterPlugin(revision = "$Revision: 50246 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50259 $", interfaceVersion = 2, names = {}, urls = {})
 public class VKontakteRu extends PluginForDecrypt {
     public VKontakteRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -3211,6 +3211,9 @@ public class VKontakteRu extends PluginForDecrypt {
         } else if (br.getURL().matches("https?://[^/]+/login\\?.*")) {
             /* Generic "you need to be logged in to view this link" thing. */
             throw new AccountRequiredException();
+        } else if (br.getURL().matches("https?://[^/]+/challenge\\.html.*")) {
+            /* Generic "you need to be logged in to view this link" thing. */
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Anti bot challenge");
         }
         final String htmlrefresh = br.getRequest().getHTMLRefresh();
         if (StringUtils.containsIgnoreCase(htmlrefresh, "badbrowser.php")) {
