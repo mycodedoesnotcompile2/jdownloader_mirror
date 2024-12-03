@@ -54,7 +54,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PinterestCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49205 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50275 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PinterestCom.class })
 public class PinterestComDecrypter extends PluginForDecrypt {
     public PinterestComDecrypter(PluginWrapper wrapper) {
@@ -147,13 +147,38 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String json = br.getRegex("<script id=\"__PWS_INITIAL_PROPS__\" type=\"application/json\">(\\{.*?)</script>").getMatch(0);
-        final Map<String, Object> root = restoreFromString(json, TypeRef.MAP);
-        final Map<String, Object> initialReduxState = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "initialReduxState");
-        final Map<String, Object> resources = (Map<String, Object>) initialReduxState.get("resources");
+        final String[] jsons = br.getRegex("<script[^>]*type=\"application/json\">(.*?)</script>").getColumn(0);
+        Map<String, Object> initialReduxState = null;
+        Map<String, Object> resources = null;
+        Map<String, Object> resourcesBoardResource = null;
+        for (final String json : jsons) {
+            final Object rootO = restoreFromString(json, TypeRef.OBJECT);
+            if (!(rootO instanceof Map)) {
+                /* Skip invalid items */
+                continue;
+            }
+            final Map<String, Object> root = (Map<String, Object>) rootO;
+            final Map<String, Object> resource = (Map<String, Object>) root.get("resource");
+            initialReduxState = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "initialReduxState");
+            if (initialReduxState != null) {
+                /* Logged out state. When user is logged in, initialReduxState is also available but contains mostly empty maps. */
+                resources = (Map<String, Object>) initialReduxState.get("resources");
+                resourcesBoardResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resources, "BoardResource/{0}/data");
+            } else if (resource != null) {
+                /* Logged in state */
+                final String resource_name = resource.get("name").toString();
+                if (resource_name.equalsIgnoreCase("BoardResource")) {
+                    resourcesBoardResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "resource_response/data");
+                    logger.info("Found json in logged in state");
+                    if (account == null) {
+                        logger.warning("Found json in logged in state WHILE NOT LOGGED IN");
+                    }
+                    break;
+                }
+            }
+        }
         // final Map<String, Object> resourcesUserResource = (Map<String, Object>) resources.get("UserResource");
         int expectedNumberofItems = 0;
-        final Map<String, Object> resourcesBoardResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resources, "BoardResource/{0}/data");
         if (resourcesBoardResource != null) {
             /* This is a board -> Crawl all PINs from this board */
             currentBoardSlug = "";
@@ -197,7 +222,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
             final int sectionlessBoardPinCount = boardTotalPinCount - boardSectionsPIN_IDs.size();
             if (sectionlessBoardPinCount > 0) {
                 /* Crawl all loose/sectionless PINs */
-                logger.info("Crawling all sectionless PINs of board" + boardName + " --> Number of sectionless items: " + sectionlessBoardPinCount);
+                logger.info("Crawling all sectionless PINs of board \"" + boardName + "\" --> Number of sectionless items: " + sectionlessBoardPinCount);
                 this.displayBubbleNotification("Board " + boardName + " | Sectionless PINs", "Crawling " + sectionlessBoardPinCount + " sectionless PINs of board " + boardName);
                 expectedNumberofItems += sectionlessBoardPinCount;
                 final int maxItemsPerPage = 15;
@@ -209,6 +234,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 postDataOptions.put("is_react", true);
                 postDataOptions.put("prepend", false);
                 postDataOptions.put("page_size", maxItemsPerPage);
+                postDataOptions.put("board_feed_ranking_group", "");
                 final Map<String, Object> postData = new HashMap<String, Object>();
                 postData.put("options", postDataOptions);
                 postData.put("context", new HashMap<String, Object>());
@@ -222,7 +248,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                     fp.setComment(boardDescription);
                 }
                 fp.setPackageKey("pinterest://board/" + boardID);
-                /* Grab prefetched data which isn't always available (e.g. unaailable when logged in). */
+                /* Grab prefetched data which isn't always available (e.g. unavailable when logged in). */
                 final Map<String, Object> resourcesBoardFeedResource = (Map<String, Object>) JavaScriptEngineFactory.walkJson(resources, "BoardFeedResource/{0}");
                 ret.addAll(this.crawlPaginationGeneric("BoardFeedResource", resourcesBoardFeedResource, postData, boardTotalPinCount, fp, true));
             } else {
@@ -250,7 +276,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final String username = usermap.get("username").toString();
-                final String userID = usermap.get("id").toString();
+                // final String userID = usermap.get("id").toString();
                 final int userPinCount = ((Integer) usermap.get("pin_count")).intValue();
                 final int userBoardCount = ((Integer) usermap.get("board_count")).intValue();
                 if (userPinCount > 0) {
@@ -352,6 +378,13 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 if (nextbookmark != null) {
                     postDataOptions.put("bookmarks", new String[] { nextbookmark });
                 }
+                br.getHeaders().put("Accept", "application/json, text/javascript, */*, q=0.01");
+                br.getHeaders().put("Referer", "https://de.pinterest.com/");
+                // br.getHeaders().put("x-app-version", "d406622");
+                // br.getHeaders().put("x-pinterest-appstate", "background");
+                br.getHeaders().put("x-pinterest-pws-handler", "www/[username]/[slug].js");
+                // br.getHeaders().put("x-pinterest-source-url", "/username/boardname/");
+                br.getHeaders().put("x-requested-with", "XMLHttpRequest");
                 br.getPage("/resource/" + resourceType + "/get/?source_url=" + Encoding.urlEncode(source_url) + "&data=" + URLEncode.encodeURIComponent(JSonStorage.serializeToJson(postData)) + "&_=" + System.currentTimeMillis());
                 final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> resource_response = (Map<String, Object>) entries.get("resource_response");
@@ -660,7 +693,7 @@ public class PinterestComDecrypter extends PluginForDecrypt {
                 numberofNewItemsThisPage++;
             }
             processedPINCounter += pins.size();
-            logger.info("Crawled section " + sectionID + " page: " + pageCounter + "Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter);
+            logger.info("Crawled section " + sectionID + " page: " + pageCounter + " | Processed items on this page: " + numberofNewItemsThisPage + " | Processed PINs so far: " + processedPINCounter);
             if (this.isAbort()) {
                 logger.info("Crawler aborted by user");
                 throw new InterruptedException();

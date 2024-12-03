@@ -540,7 +540,19 @@ public abstract class Plugin implements ActionListener {
      */
     public static String getFileNameFromConnection(final URLConnectionAdapter urlConnection) {
         final Plugin plugin = getCurrentActivePlugin();
-        return FILENAME_SOURCE.CONNECTION.getFilename(plugin, null, null, null, urlConnection);
+        return getFileNameFromSource(plugin, FILENAME_SOURCE.CONNECTION, null, null, null, urlConnection);
+    }
+
+    protected static String getFileNameFromSource(Plugin plugin, FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+        if (plugin != null) {
+            return plugin.getFileNameFromSource(source, link, customName, customExtension, con);
+        } else {
+            return source.getFilename(null, link, customName, customExtension, con);
+        }
+    }
+
+    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+        return source.getFilename(this, link, customName, customExtension, con);
     }
 
     protected String getExtensionFromConnection(URLConnectionAdapter connection) {

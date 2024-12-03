@@ -53,11 +53,18 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49519 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50275 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://upstore.net/premium/");
+        this.enablePremium("https://" + getHost() + "/premium/");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -67,7 +74,7 @@ public class UpstoRe extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://upstore.net/terms/";
+        return "https://" + getHost() + "/terms/";
     }
 
     public static List<String[]> getPluginDomains() {
@@ -100,7 +107,6 @@ public class UpstoRe extends antiDDoSForHost {
     /* Constants (limits) */
     private static final long          FREE_RECONNECTWAIT            = 1 * 60 * 60 * 1000L;
     private static final long          FREE_RECONNECTWAIT_ADDITIONAL = 60 * 1000l;
-    private final String               INVALIDLINKS                  = "(?i)https?://[^/]+/(faq|privacy|terms|d/|aff|login|account|dmca|imprint|message|panel|premium|contacts)";
     private static Map<String, Long>   blockedIPsMap                 = new HashMap<String, Long>();
     private static final String        PROPERTY_last_blockedIPsMap   = "UPSTORE_last_blockedIPsMap";
     /* Don't touch the following! */
@@ -164,11 +170,10 @@ public class UpstoRe extends antiDDoSForHost {
                 link.setName(fid);
             }
         }
-        this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        if (contenturl.matches(INVALIDLINKS)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid fileID");
         }
+        this.setBrowserExclusive();
         getPage(contenturl);
         if (isOffline1()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -348,9 +353,9 @@ public class UpstoRe extends antiDDoSForHost {
             }
         }
         link.setProperty(directurlproperty, dl.getConnection().getURL().toExternalForm());
+        /* Add a download slot */
+        controlMaxFreeDownloads(null, link, +1);
         try {
-            /* Add a download slot */
-            controlMaxFreeDownloads(null, link, +1);
             /* Start download */
             dl.startDownload();
         } finally {
@@ -535,7 +540,6 @@ public class UpstoRe extends antiDDoSForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        br.setFollowRedirects(true);
         this.login(account, true);
         // Make sure that the language is correct
         getPage((br.getHttpConnection() == null ? "https://" + this.getHost() : "") + "/?lang=en");
@@ -581,40 +585,39 @@ public class UpstoRe extends antiDDoSForHost {
         }
     }
 
-    private final String premDlLimit = "It is strange, but you have reached a download limit for today";
-
-    private AccountInfo trafficLeft(Account account) throws PluginException {
-        synchronized (account) {
-            AccountInfo ai = account.getAccountInfo();
-            String maxLimit = br.getRegex(premDlLimit + " \\((\\d+ (MB|GB|TB))\\)").getMatch(0);
-            if (maxLimit != null) {
-                ai.setTrafficMax(SizeFormatter.getSize(maxLimit));
+    private void checkForErrorNoTrafficLeft(final Browser br, final Account account) throws PluginException {
+        final String premDlLimit = "It is strange, but you have reached a download limit for today";
+        if (br.containsHTML(premDlLimit)) {
+            synchronized (account) {
+                AccountInfo ai = account.getAccountInfo();
+                String maxLimit = br.getRegex(premDlLimit + " \\((\\d+ (MB|GB|TB))\\)").getMatch(0);
+                if (maxLimit != null) {
+                    ai.setTrafficMax(SizeFormatter.getSize(maxLimit));
+                }
+                ai.setTrafficLeft(0);
+                account.setAccountInfo(ai);
             }
-            ai.setTrafficLeft(0);
-            account.setAccountInfo(ai);
+            throw new AccountUnavailableException("Downloadlimit reached", 5 * 60 * 1000);
         }
-        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Downloadlimit reached", PluginException.VALUE_ID_PREMIUM_TEMP_DISABLE);
     }
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link);
         this.login(account, false);
-        br.setFollowRedirects(false);
-        getPage(this.getInternalContentURL(link));
-        if (br.containsHTML(premDlLimit)) {
-            trafficLeft(account);
+        final String contenturl = getInternalContentURL(link);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, contenturl, true, 0);
+        if (this.looksLikeDownloadableContent(dl.getConnection())) {
+            dl.startDownload();
+            return;
         }
-        // Directdownload enabled?
-        String dllink = br.getRedirectLocation();
-        // No directdownload? Let's "click" on download
-        if (dllink == null) {
-            postPage("/load/premium/", "js=1&hash=" + this.getFID(link));
-            if (br.containsHTML(premDlLimit)) {
-                trafficLeft(account);
-            }
-            dllink = br.getRegex("\"ok\"\\s*:\\s*\"(https?:[^<>\"]*?)\"").getMatch(0);
-        }
+        /* No direct download. */
+        dl = null;
+        br.followConnection();
+        checkForErrorNoTrafficLeft(br, account);
+        postPage("/load/premium/", "js=1&hash=" + this.getFID(link));
+        checkForErrorNoTrafficLeft(br, account);
+        String dllink = br.getRegex("\"ok\"\\s*:\\s*\"(https?:[^<>\"]*?)\"").getMatch(0);
         if (dllink == null) {
             handleErrorsJson();
             if (!this.isLoggedinHTML(br)) {

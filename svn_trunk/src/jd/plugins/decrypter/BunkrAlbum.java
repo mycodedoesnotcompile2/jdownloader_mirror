@@ -53,7 +53,7 @@ import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 49995 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -265,7 +265,7 @@ public class BunkrAlbum extends PluginForDecrypt {
             dl.setAvailable(setOnlineStatus.booleanValue());
         }
         dl.setDefaultPlugin(plugin);
-        final String filenameFromURL = getFileNameFromURL(new URL(url));
+        final String filenameFromURL = Bunkr.getNameFromURL(this, url);
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             final String fileExtensionNow = Plugin.getFileNameExtensionFromString(filename);

@@ -20,6 +20,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
@@ -36,20 +44,13 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.ffmpeg.json.StreamInfo;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 50207 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50275 $", interfaceVersion = 2, names = {}, urls = {})
 public class ImDbCom extends PluginForHost {
     private String              dllink         = null;
     private boolean             mature_content = false;
     private static final String IDREGEX        = "(vi\\d+)$";
     public static final String  TYPE_VIDEO     = "(?i)/(video|videoplayer)/(?:([\\w\\-]+)/)?vi(\\d+)";
-    public static final String  TYPE_PHOTO     = "(?i)/[A-Za-z]+/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)";
+    public static final Pattern TYPE_PHOTO     = Pattern.compile("/[A-Za-z]+/[a-z]{2}(\\d+)/mediaviewer/rm(\\d+)", Pattern.CASE_INSENSITIVE);
 
     public ImDbCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -90,7 +91,7 @@ public class ImDbCom extends PluginForHost {
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "(";
             regex += TYPE_VIDEO + "|";
-            regex += TYPE_PHOTO + "";
+            regex += TYPE_PHOTO.pattern() + "";
             regex += ")";
             ret.add(regex);
         }

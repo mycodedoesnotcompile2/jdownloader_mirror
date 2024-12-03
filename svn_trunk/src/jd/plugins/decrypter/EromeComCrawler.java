@@ -20,9 +20,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.jdownloader.plugins.components.config.EromeComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -37,7 +34,10 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49038 $", interfaceVersion = 3, names = {}, urls = {})
+import org.jdownloader.plugins.components.config.EromeComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
 public class EromeComCrawler extends PluginForDecrypt {
     public EromeComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,7 @@ public class EromeComCrawler extends PluginForDecrypt {
     }
 
     public static void setRequestIntervalLimitGlobal() {
-        Browser.setRequestIntervalLimitGlobal("erome.com", 1500);
+        Browser.setRequestIntervalLimitGlobal("erome.com", 3000);
     }
 
     @Override
@@ -238,6 +238,6 @@ public class EromeComCrawler extends PluginForDecrypt {
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
-        return 2;
+        return 1;
     }
 }

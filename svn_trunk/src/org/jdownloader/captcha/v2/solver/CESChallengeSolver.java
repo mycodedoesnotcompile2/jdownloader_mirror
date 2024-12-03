@@ -1,5 +1,10 @@
 package org.jdownloader.captcha.v2.solver;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
+import jd.http.Browser;
+
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -12,10 +17,6 @@ import org.jdownloader.captcha.v2.challenge.stringcaptcha.BasicCaptchaChallenge;
 import org.jdownloader.captcha.v2.solver.jac.SolverException;
 import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.plugins.SkipReason;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.gui.swing.jdgui.components.premiumbar.ServicePanel;
 
 public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
     protected final static CaptchaSettings SETTINGS = JsonConfig.create(CaptchaSettings.class);
@@ -55,6 +56,10 @@ public abstract class CESChallengeSolver<T> extends ChallengeSolver<T> {
         } finally {
             cesJob.hideBubble();
         }
+    }
+
+    protected Browser createNewBrowserInstance() {
+        return new Browser();
     }
 
     protected void solveCES(CESSolverJob<T> job) throws InterruptedException, SolverException {

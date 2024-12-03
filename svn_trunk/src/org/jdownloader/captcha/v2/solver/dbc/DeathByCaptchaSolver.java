@@ -11,6 +11,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jd.http.Browser;
+import jd.http.requests.FormData;
+import jd.http.requests.PostFormDataRequest;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -38,10 +42,6 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
 import org.jdownloader.settings.staticreferences.CFG_DBC;
-
-import jd.http.Browser;
-import jd.http.requests.FormData;
-import jd.http.requests.PostFormDataRequest;
 
 public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
     private DeathByCaptchaSettings            config;
@@ -322,8 +322,8 @@ public class DeathByCaptchaSolver extends CESChallengeSolver<String> {
         if (StringUtils.containsIgnoreCase(json, "<htm")) {
             throw new IOException("Invalid server response");
         }
-        final Map<String, Object> map = JSonStorage.restoreFromString(json, TypeRef.HASHMAP);
-        if (Integer.valueOf(255).equals(map.get("status"))) {
+        final Map<String, Object> map = JSonStorage.restoreFromString(json, TypeRef.MAP);
+        if (((Number) (map.get("status"))).intValue() == 255) {
             throw new IOException(String.valueOf(map.get("error")));
         }
         return JSonStorage.restoreFromString(json, DBCGetUserResponse.TYPE);

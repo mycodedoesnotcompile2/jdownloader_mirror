@@ -21,11 +21,11 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 46514 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50275 $", interfaceVersion = 3, names = {}, urls = {})
 public class BoundhubCom extends KernelVideoSharingComV2 {
     public BoundhubCom(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.boundhub.com/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     /** Add all KVS hosts to this list that fit the main template without the need of ANY changes to this class. */

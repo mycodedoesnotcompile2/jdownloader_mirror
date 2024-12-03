@@ -99,7 +99,7 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50267 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50277 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3024,7 +3024,13 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return false;
         }
         logger.info("Attempting to re-use stored directurl: " + url);
-        return this.tryDownload(link, account, br.createGetRequest(url), false);
+        if (!this.tryDownload(link, account, br.createGetRequest(url), false)) {
+            /* Delete stored direct-URL so it will not be re-used next time. */
+            link.removeProperty(directurlproperty);
+            return false;
+        } else {
+            return true;
+        }
     }
 
     protected boolean verifyURLFormat(final String url) {
@@ -5005,6 +5011,12 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
+    @Override
+    protected void throwFinalConnectionException(Browser br, URLConnectionAdapter con) throws PluginException, IOException {
+        /* This code should never be reached */
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+    }
+
     /**
      * Attempts download and only contains very rudimentary error handling. </br> Returns false if the download is impossible. </br> Returns
      * true if the download is possible && done.
@@ -5013,7 +5025,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (req == null) {
             throw new IllegalArgumentException();
         }
-        String url = req.getUrl();
+        final String url_original = req.getUrl();
+        String url = url_original;
         if (url.startsWith("rtmp")) {
             /* 2022-01-27: rtmp is not supported anymore */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported streaming protocol rtmp");
@@ -5056,13 +5069,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
                 this.correctBR(br);
                 if (isFinalAttempt) {
                     handleDownloadErrors(dl.getConnection(), link, account);
-                    /* This code should never be reached */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    throwFinalConnectionException(br, dl.getConnection());
                 }
                 if (dl.getConnection().getResponseCode() == 503) {
                     exception503ConnectionLimitReached();
-                    /* Unreachable code */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    throwFinalConnectionException(br, dl.getConnection());
                 }
                 dl.close();
                 dl = null;

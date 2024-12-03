@@ -4,6 +4,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import jd.http.Browser;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.Storable;
 import org.appwork.storage.TypeRef;
@@ -24,8 +26,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
-
-import jd.http.Browser;
 
 public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     private static final AntiCaptchaComSolver INSTANCE = new AntiCaptchaComSolver();
@@ -102,7 +102,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -160,7 +160,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -207,7 +207,7 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
         checkInterruption();
         try {
             job.getChallenge().sendStatsSolving(this);
-            Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             br.setReadTimeout(5 * 60000);
             // Put your CAPTCHA image file, file object, input stream,
             // or vector of bytes here:
@@ -315,11 +315,11 @@ public class AntiCaptchaComSolver extends AbstractAntiCaptchaComSolver<String> {
     public AntiCaptchaComAccount loadAccount() {
         final AntiCaptchaComAccount ret = new AntiCaptchaComAccount();
         try {
-            final Browser br = new Browser();
+            final Browser br = createNewBrowserInstance();
             final HashMap<String, Object> dataMap = new HashMap<String, Object>();
             dataMap.put("clientKey", config.getApiKey());
             final String json = br.postPageRaw(URLHelper.parseLocation(new URL(config.getApiBase()), "/getBalance"), JSonStorage.serializeToJson(dataMap));
-            final HashMap<String, Object> response = JSonStorage.restoreFromString(json, TypeRef.HASHMAP);
+            final Map<String, Object> response = JSonStorage.restoreFromString(json, TypeRef.MAP);
             errorHandling(null, response);
             ret.setBalance(((Number) response.get("balance")).doubleValue());
         } catch (Exception e) {

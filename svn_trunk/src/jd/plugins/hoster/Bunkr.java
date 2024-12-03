@@ -9,11 +9,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.BunkrConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,7 +26,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BunkrAlbum;
 
-@HostPlugin(revision = "$Revision: 49755 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.BunkrConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@HostPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { BunkrAlbum.class })
 public class Bunkr extends PluginForHost {
     public Bunkr(PluginWrapper wrapper) {
@@ -152,7 +152,7 @@ public class Bunkr extends PluginForHost {
     }
 
     private String getFilenameFromURL(final DownloadLink link) {
-        String filenameFromURL = getFilenameFromURL(link.getPluginPatternMatcher());
+        String filenameFromURL = getNameFromURL(this, link.getPluginPatternMatcher());
         if (filenameFromURL != null) {
             return filenameFromURL;
         } else {
@@ -160,13 +160,17 @@ public class Bunkr extends PluginForHost {
         }
     }
 
-    private String getFilenameFromURL(final String url) {
+    public static String getNameFromURL(Plugin plugin, final String url) {
         String filenameFromURL = new Regex(url, BunkrAlbum.PATTERN_SINGLE_FILE).getMatch(2);
         if (filenameFromURL == null) {
+            // name via n parameter from download URLs
+            filenameFromURL = new Regex(url, "(?:\\?|&)n=([^&#]+)").getMatch(0);
+        }
+        if (filenameFromURL == null) {
             try {
-                filenameFromURL = getFileNameFromURL(new URL(url));
+                filenameFromURL = Plugin.getFileNameFromURL(new URL(url));
             } catch (MalformedURLException e) {
-                logger.log(e);
+                plugin.getLogger().log(e);
             }
         }
         if (filenameFromURL != null) {
@@ -230,6 +234,17 @@ public class Bunkr extends PluginForHost {
         return requestFileInformation(link, false);
     }
 
+    @Override
+    protected String getFileNameFromSource(FILENAME_SOURCE source, DownloadLink link, String customName, String customExtension, URLConnectionAdapter con) {
+        if (source == FILENAME_SOURCE.URL && con != null) {
+            final String ret = getNameFromURL(this, con.getURL().toExternalForm());
+            if (ret != null) {
+                return ret;
+            }
+        }
+        return super.getFileNameFromSource(source, link, customName, customExtension, con);
+    }
+
     private AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         this.setBrowserExclusive();
         final String contenturl = this.getContentURL(link);
@@ -254,7 +269,7 @@ public class Bunkr extends PluginForHost {
                 }
                 handleConnectionErrors(link, br, con);
                 final String filenameFromHeader = Plugin.getFileNameFromDispositionHeader(con);
-                final String filenameFromDirecturl = Plugin.getFileNameFromURL(new URL(lastGrabbedDirecturl));
+                final String filenameFromDirecturl = getNameFromURL(this, lastGrabbedDirecturl);
                 if (filenameFromHeader != null) {
                     setFilename(link, filenameFromHeader, true, true);
                 } else if (filenameFromDirecturl != null) {
@@ -503,7 +518,7 @@ public class Bunkr extends PluginForHost {
         }
         if (directurl != null) {
             directurl = Encoding.htmlOnlyDecode(directurl);
-            final String filename = getFilenameFromURL(directurl);
+            final String filename = getNameFromURL(this, directurl);
             if (filename != null) {
                 setFilename(link, filename, true, true);
             }

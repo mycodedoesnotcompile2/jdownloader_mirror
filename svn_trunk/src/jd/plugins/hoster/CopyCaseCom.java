@@ -33,7 +33,7 @@ import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50172 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50277 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -266,49 +266,64 @@ public class CopyCaseCom extends PluginForHost {
                 }
             }
             logger.info("Performing full login");
-            final Map<String, Object> postData = new HashMap<String, Object>();
-            postData.put("email", account.getUser());
-            postData.put("password", account.getPass());
             final Browser brc = br.cloneBrowser();
+            Browser captchabr = null;
             brc.setAllowedResponseCodes(422);
-            // Recaptcha now required for login
-            final Browser brc2 = br.cloneBrowser();
-            brc2.getPage("https://copycase.com/login");
-            final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, brc2, "6LcjZ0EgAAAAAAZRgmPrZBH7aVM09gggWOzKNFIp") {
-                @Override
-                public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
-                    return org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE.INVISIBLE;
+            Map<String, Object> resp = null;
+            boolean twoFARequired = false;
+            boolean captchaRequired = false;
+            while (true) {
+                final Map<String, Object> postData = new HashMap<String, Object>();
+                postData.put("email", account.getUser());
+                postData.put("password", account.getPass());
+                if (captchaRequired || (resp != null && Boolean.TRUE.equals(resp.get("captcha")))) {
+                    captchaRequired = true;
+                    if (captchabr == null) {
+                        captchabr = br.cloneBrowser();
+                        captchabr.getPage("https://copycase.com/login");
+                    }
+                    final CaptchaHelperHostPluginRecaptchaV2 rc2 = new CaptchaHelperHostPluginRecaptchaV2(this, captchabr, "6LcjZ0EgAAAAAAZRgmPrZBH7aVM09gggWOzKNFIp") {
+                        @Override
+                        public org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE getType() {
+                            return org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2.TYPE.INVISIBLE;
+                        }
+                    };
+                    final String recaptchaV2Response = rc2.getToken();
+                    if (StringUtils.isEmpty(recaptchaV2Response)) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                    }
+                    postData.put("g-recaptcha-response", recaptchaV2Response);
                 }
-            };
-            final String recaptchaV2Response = rc2.getToken();
-            postData.put("g-recaptcha-response", recaptchaV2Response);
-
-            Map<String, Object> resp = this.callAPI(brc, null, account, brc.createPostRequest(getAPIBase() + "/auth/login", JSonStorage.serializeToJson(postData)), true);
-            final String status = (String) resp.get("status");
-            boolean required2FALogin = false;
-            if (StringUtils.equalsIgnoreCase(status, "two_factor_auth")) {
-                /* Ask user for 2FA login code and try again. */
-                logger.info("2FA code required");
-                required2FALogin = true;
-                final String twoFACode = this.getTwoFACode(account, "\\d{6}");
-                logger.info("Submitting 2FA code");
-                postData.put("auth_code", twoFACode);
-                resp = this.callAPI(brc, null, account, brc.createPostRequest(getAPIBase() + "/auth/login", JSonStorage.serializeToJson(postData)), true);
-                // Can return: {"status":"incorrect_auth_code"}
-            }
-            /* No exception -> Looks like login was successful */
-            final String token = (String) resp.get("token");
-            if (StringUtils.isEmpty(token)) {
-                if (required2FALogin) {
+                if (twoFARequired || (resp != null && StringUtils.equalsIgnoreCase(StringUtils.valueOfOrNull(resp.get("status")), "two_factor_auth"))) {
+                    twoFARequired = true;
+                    /* Ask user for 2FA login code and try again. */
+                    logger.info("2FA code required");
+                    final String twoFACode = this.getTwoFACode(account, "\\d{6}");
+                    logger.info("Submitting 2FA code");
+                    postData.put("auth_code", twoFACode);
+                }
+                resp = this.callAPI(brc, null, account, brc.createPostRequest(getAPIBase() + "/auth/login", JSonStorage.serializeToJson(postData)), false);
+                final String token = (String) resp.get("token");
+                if (StringUtils.isNotEmpty(token)) {
+                    account.setProperty(PROPERTY_ACCOUNT_TOKEN, token);
+                    br.getHeaders().put("Authorization", "Bearer " + token);
+                    return null;
+                } else if (StringUtils.equalsIgnoreCase(StringUtils.valueOfOrNull(resp.get("status")), "two_factor_auth") && !twoFARequired) {
+                    twoFARequired = true;
+                    // retry with 2fa
+                    continue;
+                } else if ((Boolean.TRUE.equals(resp.get("captcha")) || brc.containsHTML("g-recaptcha-response")) && !captchaRequired) {
+                    captchaRequired = true;
+                    // retry with captcha
+                    continue;
+                } else if (StringUtils.equalsIgnoreCase(StringUtils.valueOfOrNull(resp.get("status")), "incorrect_auth_code")) {
                     throw new AccountInvalidException(org.jdownloader.gui.translate._GUI.T.jd_gui_swing_components_AccountDialog_2FA_login_invalid());
+                } else if (StringUtils.equalsIgnoreCase(StringUtils.valueOfOrNull(resp.get("status")), "failed")) {
+                    throw new AccountInvalidException();
                 } else {
-                    /* This should never happen */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            account.setProperty(PROPERTY_ACCOUNT_TOKEN, token);
-            br.getHeaders().put("Authorization", "Bearer " + token);
-            return null;
         }
     }
 
@@ -380,7 +395,7 @@ public class CopyCaseCom extends PluginForHost {
         } else {
             /* Not all premium accounts have an expire date. */
             if (premium_expire_at != null) {
-                ai.setValidUntil(TimeFormatter.getMilliSeconds(premium_expire_at, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH));
+                ai.setValidUntil(TimeFormatter.getMilliSeconds(fixDateString(premium_expire_at), "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH));
             }
             account.setType(AccountType.PREMIUM);
             final String premium_package = (String) user.get("premium_package");
@@ -397,6 +412,10 @@ public class CopyCaseCom extends PluginForHost {
             ai.setUnlimitedTraffic();
         }
         return ai;
+    }
+
+    private String fixDateString(final String dateStr) {
+        return dateStr.replaceFirst("(\\.\\d{4,6})", ".000");
     }
 
     @Override

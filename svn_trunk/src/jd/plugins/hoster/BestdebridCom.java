@@ -21,12 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -46,7 +40,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50246 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50278 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -278,7 +278,7 @@ public class BestdebridCom extends PluginForHost {
     }
 
     private Map<String, Object> handleAPIErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
-        Map<String, Object> entries = null;
+        final Map<String, Object> entries;
         try {
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         } catch (final JSonMapperException ignore) {
@@ -308,7 +308,7 @@ public class BestdebridCom extends PluginForHost {
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (str.matches("[a-zA-Z0-9]{25,}")) {
+        } else if (str.matches("[a-zA-Z0-9_/\\+\\=\\-]+")) {
             return true;
         } else {
             return false;
@@ -317,7 +317,7 @@ public class BestdebridCom extends PluginForHost {
 
     @Override
     protected String getAPILoginHelpURL() {
-        return "https://" + getHost() + "/profile";
+        return "https://" + getHost() + "/en/profile";
     }
 
     @Override

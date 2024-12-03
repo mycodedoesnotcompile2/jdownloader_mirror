@@ -5,9 +5,16 @@ import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.swing.Icon;
 import javax.swing.JLabel;
+
+import jd.gui.swing.jdgui.views.settings.components.Checkbox;
+import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
+import jd.gui.swing.jdgui.views.settings.components.TextInput;
+import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
+import jd.http.Browser;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -20,12 +27,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_ANTICAPTCHA_COM;
-
-import jd.gui.swing.jdgui.views.settings.components.Checkbox;
-import jd.gui.swing.jdgui.views.settings.components.SettingsButton;
-import jd.gui.swing.jdgui.views.settings.components.TextInput;
-import jd.gui.swing.jdgui.views.settings.panels.anticaptcha.AbstractCaptchaSolverConfigPanel;
-import jd.http.Browser;
 
 public final class AntiCaptchaComConfigPanel extends AbstractCaptchaSolverConfigPanel {
     /**
@@ -77,8 +78,8 @@ public final class AntiCaptchaComConfigPanel extends AbstractCaptchaSolverConfig
                         HashMap<String, Object> dataMap = new HashMap<String, Object>();
                         dataMap.put("clientKey", apiKey.getText());
                         String json = br.postPageRaw(URLHelper.parseLocation(new URL(service.getConfig().getApiBase()), "/getBalance"), JSonStorage.serializeToJson(dataMap));
-                        HashMap<String, Object> response = JSonStorage.restoreFromString(json, TypeRef.HASHMAP);
-                        if (Integer.valueOf(0).equals(response.get("errorId"))) {
+                        Map<String, Object> response = JSonStorage.restoreFromString(json, TypeRef.MAP);
+                        if (((Number) (response.get("errorId"))).intValue() == 0) {
                             jd.gui.UserIO.getInstance().requestMessageDialog("anti-captcha.com message ", "Account OK\n Balance: $" + response.get("balance"));
                         } else {
                             jd.gui.UserIO.getInstance().requestMessageDialog("anti-captcha.com Error", "Account error\n" + response.get("errorDescription"));

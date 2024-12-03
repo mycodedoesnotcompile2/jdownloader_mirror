@@ -21,11 +21,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.MotherlessComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -40,7 +35,12 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.MotherLessCom;
 
-@DecrypterPlugin(revision = "$Revision: 49829 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.MotherlessComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@DecrypterPlugin(revision = "$Revision: 50277 $", interfaceVersion = 3, names = {}, urls = {})
 public class MotherLessComCrawler extends PluginForDecrypt {
     public MotherLessComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,7 +142,8 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlUser(final CryptedLink param) throws IOException, PluginException {
-        return this.crawlGallery(param);
+        br.getPage(param.getCryptedUrl());
+        return this.crawlPage(param, -1);
     }
 
     private ArrayList<DownloadLink> crawlSubGalleries(final CryptedLink param) throws IOException, PluginException {
@@ -168,7 +169,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         for (final String subGalURL : subGalsDeduped) {
             logger.info("Crawling subGallery " + counter + "/" + subGalURLs.length + " | URL: " + subGalURL);
             br.getPage(subGalURL);
-            ret.addAll(crawlGallery(param));
+            ret.addAll(crawlPage(param, -1));
             if (this.isAbort()) {
                 break;
             }
@@ -190,7 +191,8 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlGallery(final CryptedLink param) throws IOException, PluginException {
-        return crawlGallery(param, -1);
+        br.getPage(param.getCryptedUrl());
+        return crawlPage(param, -1);
     }
 
     /**
@@ -198,8 +200,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
      *
      * @throws PluginException
      */
-    private ArrayList<DownloadLink> crawlGallery(final CryptedLink param, final int maxItemsLimit) throws IOException, PluginException {
-        br.getPage(param.getCryptedUrl());
+    private ArrayList<DownloadLink> crawlPage(final CryptedLink param, final int maxItemsLimit) throws IOException, PluginException {
         if (MotherLessCom.isOffline(br)) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -229,8 +230,7 @@ public class MotherLessComCrawler extends PluginForDecrypt {
         // }
         /**
          * Find number of pages to walk through. Website displays max 6 pages so for galleries containing more than 6 pages this value will
-         * be updated after each loop! </br>
-         * Example with a lot of pages: https://motherless.com/GIAEE5076
+         * be updated after each loop! </br> Example with a lot of pages: https://motherless.com/GIAEE5076
          */
         int maxPage = getMaxPage(br);
         final HashSet<String> pages = new HashSet<String>();
@@ -390,13 +390,13 @@ public class MotherLessComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlGroupImagesAndVideos(final CryptedLink param) throws IOException, PluginException {
-        return this.crawlGallery(param, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit());
+        br.getPage(param.getCryptedUrl());
+        return this.crawlPage(param, PluginJsonConfig.get(MotherlessComConfig.class).getGroupCrawlerLimit());
     }
 
     /**
-     * Returns max page number for pagination according to current html code. </br>
-     * This can vary e.g. on first page it looks like last page is number 6 but once we are on page 4 the highest page number visible
-     * changes to 8.
+     * Returns max page number for pagination according to current html code. </br> This can vary e.g. on first page it looks like last page
+     * is number 6 but once we are on page 4 the highest page number visible changes to 8.
      */
     private int getMaxPage(final Browser br) throws MalformedURLException {
         final String[] pageURLs = br.getRegex("<a href=\"([^\"]+page=\\d+[^\"]*)\"").getColumn(0);
