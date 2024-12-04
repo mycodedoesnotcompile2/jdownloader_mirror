@@ -118,16 +118,16 @@ public class NewRuleAction extends AbstractAddAction {
 
     /** Returns true if new rule creation is allowed according to some factors given inside given LazyHostPlugin instance. */
     public static boolean allowAccountUsageRuleCreation(final LazyHostPlugin plg) {
-        if (!plg.isPremium()) {
+        if (plg.hasFeature(FEATURE.USENET) && !plg.hasFeature(FEATURE.MULTIHOST)) {
+            /* Special case: usenet plugin */
+            return true;
+        } else if (!plg.isPremium()) {
             return false;
         } else if (plg.hasFeature(FEATURE.MULTIHOST)) {
             /*
              * Do not allow users to create account usage rules for multihosts as those usually don't host any files thus creating a rule
              * doesn't make any sense.
              */
-            return false;
-        } else if (plg.hasFeature(FEATURE.USENET)) {
-            /* Do not allow users to create account usage rules for Usenet services as Usenet can't be used without account anyways. */
             return false;
         } else if (plg.hasFeature(FEATURE.INTERNAL)) {
             /* Do not allow users to create account usage rules for internal plugins. */

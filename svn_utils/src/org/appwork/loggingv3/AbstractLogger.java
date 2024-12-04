@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -36,6 +36,7 @@ package org.appwork.loggingv3;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.logging2.LogInterface;
 
@@ -45,7 +46,9 @@ import org.appwork.utils.logging2.LogInterface;
  *
  */
 public abstract class AbstractLogger implements LogInterface {
-    private static final Method TO_STACKTRACE = getToStackTraceMethod();
+    @AWTestValidateClassReference
+    public static final String  CLASS_ORG_APPWORK_UTILS_EXCEPTIONS = "org.appwork.utils.Exceptions";
+    private static final Method TO_STACKTRACE                      = getToStackTraceMethod();
 
     protected StackTraceElement getThrownAt() {
         final Exception e = new Exception();
@@ -73,7 +76,7 @@ public abstract class AbstractLogger implements LogInterface {
      */
     private static Method getToStackTraceMethod() {
         try {
-            final Method ret = Class.forName("org.appwork.utils.Exceptions").getMethod("getStackTrace", new Class[] { Throwable.class });
+            final Method ret = Class.forName(CLASS_ORG_APPWORK_UTILS_EXCEPTIONS).getMethod("getStackTrace", new Class[] { Throwable.class });
             if (ret.getReturnType() != String.class) {
                 throw new Exception("org.appwork.utils.Exceptions.getStacktrace does not return String");
             } else {

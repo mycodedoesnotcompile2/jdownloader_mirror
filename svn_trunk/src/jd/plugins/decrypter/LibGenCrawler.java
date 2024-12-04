@@ -29,6 +29,7 @@ import org.appwork.utils.parser.UrlQuery;
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.parser.html.HTMLParser;
@@ -42,7 +43,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.LibGenInfo;
 
-@DecrypterPlugin(revision = "$Revision: 49642 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50284 $", interfaceVersion = 2, names = {}, urls = {})
 public class LibGenCrawler extends PluginForDecrypt {
     public LibGenCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -78,7 +79,6 @@ public class LibGenCrawler extends PluginForDecrypt {
         deadDomains.add("gen.lib.rus.ec");
         deadDomains.add("libgen.io");
         deadDomains.add("booksdl.org");
-        deadDomains.add("library.lol");
         deadDomains.add("libgen.fun");
         return deadDomains;
     }
@@ -214,14 +214,45 @@ public class LibGenCrawler extends PluginForDecrypt {
             boolean accessedContenturl = false;
             if (md5 == null) {
                 logger.info("Maybe unsupported link -> Open it and check if we find an md5 value somewhere in html code.");
-                br.getPage(contenturl);
+                final URLConnectionAdapter con = br.openGetConnection(contenturl);
+                if (this.looksLikeDownloadableContent(con)) {
+                    /* Direct URL */
+                    final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(con.getURL().toExternalForm()));
+                    final String fname = getFileNameFromConnection(con);
+                    if (fname != null) {
+                        direct.setFinalFileName(fname);
+                    }
+                    if (con.getCompleteContentLength() > 0) {
+                        /* Set ilesize on result now that we know it. */
+                        if (con.isContentDecoded()) {
+                            direct.setDownloadSize(con.getCompleteContentLength());
+                        } else {
+                            direct.setVerifiedFileSize(con.getCompleteContentLength());
+                        }
+                    }
+                    direct.setAvailable(true);
+                    ret.add(direct);
+                    try {
+                        con.disconnect();
+                    } catch (final Throwable e) {
+                    }
+                    return ret;
+                }
+                br.followConnection();
                 accessedContenturl = true;
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
+                final String directURL = br.getRegex("id=\"download\">\\s*<h2><a href=\"(https?://[^\"]+)\"").getMatch(0);
+                if (directURL != null) {
+                    final DownloadLink direct = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(directURL));
+                    direct.setAvailable(true);
+                    ret.add(direct);
+                    return ret;
+                }
                 final String[] urls = HTMLParser.getHttpLinks(br.getRequest().getHtmlCode(), br.getURL());
                 for (final String url : urls) {
-                    md5 = new Regex(url, "md5=([a-f0-9]{32})").getMatch(0);
+                    md5 = new Regex(url, "(?i)md5=([a-f0-9]{32})").getMatch(0);
                     if (md5 != null) {
                         break;
                     }

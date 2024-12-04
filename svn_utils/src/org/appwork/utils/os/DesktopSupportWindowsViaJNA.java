@@ -5,18 +5,29 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 
+import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.exceptions.WTFException;
 import org.appwork.jna.windows.Iphlpapi;
 import org.appwork.jna.windows.MIB_TCPROW2;
 import org.appwork.jna.windows.MIB_TCPTABLE2;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.testframework.AWTestValidateClassReference;
 
 import com.sun.jna.Memory;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinError;
 import com.sun.jna.ptr.IntByReference;
 
+@BuildDecisionRequired(tags = { DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES, DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO }, imports = { DesktopSupportWindowsViaJNA.ORG_APPWORK_UTILS_OS_DESKTOP_SUPPORT_WINDOWS_VIA_JNA, "" }, dependsOn = { org.appwork.JNAHelper.JNA_HELPER_USE_JNA, "" })
 public class DesktopSupportWindowsViaJNA extends DesktopSupportWindows {
+  
+    @AWTestValidateClassReference
+    static final String        ORG_APPWORK_UTILS_OS_DESKTOP_SUPPORT_WINDOWS_VIA_JNA = "org.appwork.utils.os.DesktopSupportWindowsViaJNA";
+  
+    public static final String DESKTOP_SUPPORT_WINDOWS_VIA_JNA_NO                   = "DesktopSupportWindowsViaJNA.no";
+ 
+    public static final String DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES                  = "DesktopSupportWindowsViaJNA.yes";
+
     public DesktopSupportWindowsViaJNA() {
         // TODO Auto-generated constructor stub
     }

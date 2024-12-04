@@ -22,16 +22,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.OdyseeComConfig;
-import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
@@ -45,7 +35,17 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50089 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.OdyseeComConfig;
+import org.jdownloader.plugins.components.config.OdyseeComConfig.PreferredStreamQuality;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50288 $", interfaceVersion = 3, names = {}, urls = {})
 public class OdyseeCom extends PluginForHost {
     public OdyseeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +80,7 @@ public class OdyseeCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(@[^:]+:[a-z0-9]+/([^/:]+:[a-z0-9\\-]+)|[^/:]+:[a-z0-9\\-]+|\\$/embed/[^/]+/[a-z0-9\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(@?[^:]+:[a-z0-9]+(?:/([^/:]{2,}:[a-z0-9\\-]+))?|\\$/(?:embed|download)/[^/]+/[a-z0-9\\-]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -106,9 +106,10 @@ public class OdyseeCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        String fid = new Regex(link.getPluginPatternMatcher(), "embed/([^/]+/[a-z0-9\\-]+)").getMatch(0);
+        String fid = new Regex(link.getPluginPatternMatcher(), "(?:embed|download)/([^/]+/[a-z0-9\\-]+)").getMatch(0);
         if (fid != null) {
             // https://odysee.com/$/embed/xxxxx-xxxxxx/id
+            // https://odysee.com/$/download/xxxxx-xxxxxx/id
             return fid.replace("/", "#");
         }
         fid = new Regex(link.getPluginPatternMatcher(), "/(@[^:]+:[^/]+/[^/:]+:[a-z0-9\\-]+)").getMatch(0);
@@ -118,7 +119,7 @@ public class OdyseeCom extends PluginForHost {
         }
         fid = new Regex(link.getPluginPatternMatcher(), "/([^/:]+:[a-z0-9\\-]+)").getMatch(0);
         if (fid != null) {
-            // https://odysee.com/xxxxx-xxxxxx/id
+            // https://odysee.com/xxxxx-xxxxxx:id
             return fid.replace(":", "#");
         }
         fid = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/(.+)").getMatch(0);
@@ -141,41 +142,55 @@ public class OdyseeCom extends PluginForHost {
         if (Encoding.isUrlCoded(urlpart)) {
             urlpart = Encoding.htmlDecode(urlpart);
         }
-        String resolveString = "lbry://" + urlpart.replace(":", "#");
+        final String resolveString = "lbry://" + urlpart.replace(":", "#");
         br.postPageRaw("https://api.na-backend.odysee.com/api/v1/proxy?m=resolve", "{\"jsonrpc\":\"2.0\",\"method\":\"resolve\",\"params\":{\"urls\":[\"" + resolveString + "\"],\"include_purchase_receipt\":true,\"include_is_my_output\":true}}");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("result");
-        entries = (Map<String, Object>) entries.get(resolveString);
-        if (entries.containsKey("error")) {
+        final Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> result = (Map<String, Object>) entries.get("result");
+        final Map<String, Object> videodata = (Map<String, Object>) result.get(resolveString);
+        if (videodata.containsKey("error")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final long uploadTimestamp = ((Number) entries.get("timestamp")).longValue();
-        final String claimID = (String) entries.get("claim_id");
-        final String slug = (String) entries.get("name");
+        final long uploadTimestamp = ((Number) videodata.get("timestamp")).longValue();
+        final String claimID = (String) videodata.get("claim_id");
+        final String slug = (String) videodata.get("name");
         // final Map<String, Object> channel = (Map<String, Object>) entries.get("signing_channel");
         final String username = slug;// new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
-        final Map<String, Object> videoInfo = (Map<String, Object>) entries.get("value");
-        String filename = (String) videoInfo.get("title");
+        final Map<String, Object> videoInfo = (Map<String, Object>) videodata.get("value");
+        String title = (String) videoInfo.get("title");
+        if (StringUtils.isEmpty(title)) {
+            /* Fallback */
+            title = resolveString;
+        }
         final String stream_type = (String) videoInfo.get("stream_type");
         if (stream_type == null) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final boolean directDownload = "document".equals(stream_type) || "image".equals(stream_type);
-        if (!StringUtils.isEmpty(username) && !StringUtils.isEmpty(filename)) {
-            final String dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(new Date(uploadTimestamp * 1000l));
-            final String ext;
-            if ("document".equals(stream_type)) {
-                ext = ".txt";
-            } else if ("image".equals(stream_type)) {
-                ext = ".jpg";
-            } else {
-                /* Assume we have a video. */
-                ext = ".mp4";
-            }
-            link.setFinalFileName(dateFormatted + "_" + username + " - " + filename + ext);
+        final String dateFormatted = new SimpleDateFormat("yyyy-MM-dd").format(new Date(uploadTimestamp * 1000l));
+        final String sourceExt = getFileNameExtensionFromString((String) JavaScriptEngineFactory.walkJson(videoInfo, "source/name"));
+        final String ext;
+        final boolean directDownload;
+        if ("audio".equals(stream_type)) {
+            directDownload = true;
+            ext = ".mp3";
+        } else if ("document".equals(stream_type)) {
+            directDownload = true;
+            ext = ".txt";
+        } else if ("image".equals(stream_type)) {
+            directDownload = true;
+            ext = ".jpg";
+        } else {
+            directDownload = false;
+            /* Assume we have a video. */
+            ext = ".mp4";
+        }
+        final String fileName = applyFilenameExtension(title + ext, sourceExt);
+        if (!StringUtils.isEmpty(username)) {
+            link.setFinalFileName(dateFormatted + "_" + username + " - " + fileName);
+        } else {
+            link.setFinalFileName(dateFormatted + " - " + fileName);
         }
         final String description = (String) videoInfo.get("description");
         if (!StringUtils.isEmpty(description)) {
@@ -309,11 +324,6 @@ public class OdyseeCom extends PluginForHost {
         dl.startDownload();
     }
 
-    @Override
-    public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
-        return false;
-    }
-
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty, final boolean resumable, final int maxchunks) throws Exception {
         final String url = link.getStringProperty(directlinkproperty);
         if (StringUtils.isEmpty(url)) {
@@ -382,6 +392,11 @@ public class OdyseeCom extends PluginForHost {
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean hasCaptcha(final DownloadLink link, final jd.plugins.Account acc) {
+        return false;
     }
 
     @Override

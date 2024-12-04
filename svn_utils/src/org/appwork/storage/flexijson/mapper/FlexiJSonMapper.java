@@ -1325,19 +1325,31 @@ public class FlexiJSonMapper {
         return true;
     }
 
+    private boolean referencesEnabled = false;
+
+    public boolean isReferencesEnabled() {
+        return referencesEnabled;
+    }
+
+    public void setReferencesEnabled(boolean referencesEnabled) {
+        this.referencesEnabled = referencesEnabled;
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     public Object jsonToObject(FlexiJSonNode json, CompiledType cType, final Setter setter) throws FlexiMapperException {
         boolean clearContext = initContext(cType);
         try {
-            if (setter != null && json instanceof FlexiJSonValue && ((FlexiJSonValue) json).getType() == ValueType.STRING) {
-                List<FlexiVariableAccess> access;
-                try {
-                    access = ClassCache.getClassCache(setter.getMethod().getDeclaringClass()).getAnnotations(setter.getKey(), FlexiVariableAccess.class);
-                    json = this.resolveValue(json, cType, access, null);
-                } catch (final NoSuchMethodException e) {
-                    throw new FlexiMapperException(json, cType, null, e);
-                } catch (CannotResolvePathException e) {
-                    throw new FlexiMapperException(json, cType, null, e);
+            if (isReferencesEnabled()) {
+                if (setter != null && json instanceof FlexiJSonValue && ((FlexiJSonValue) json).getType() == ValueType.STRING) {
+                    List<FlexiVariableAccess> access;
+                    try {
+                        access = ClassCache.getClassCache(setter.getMethod().getDeclaringClass()).getAnnotations(setter.getKey(), FlexiVariableAccess.class);
+                        json = this.resolveValue(json, cType, access, null);
+                    } catch (final NoSuchMethodException e) {
+                        throw new FlexiMapperException(json, cType, null, e);
+                    } catch (CannotResolvePathException e) {
+                        throw new FlexiMapperException(json, cType, null, e);
+                    }
                 }
             }
             cType = this.guessTypeForObject(json, cType, setter);

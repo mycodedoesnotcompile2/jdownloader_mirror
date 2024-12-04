@@ -7,6 +7,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
@@ -24,16 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50277 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50283 $", interfaceVersion = 2, names = {}, urls = {})
 public class CopyCaseCom extends PluginForHost {
     public CopyCaseCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,7 +141,7 @@ public class CopyCaseCom extends PluginForHost {
         }
         if (!link.isNameSet()) {
             /* Set fallback-filename */
-            final String urlFileName = new Regex(link.getPluginPatternMatcher(), "/(?:file|download)/[a-zA-Z0-9]{16}/([^/]+)").getMatch(0);
+            final String urlFileName = new Regex(link.getPluginPatternMatcher(), "(?i)/(?:file|download)/[a-zA-Z0-9]{16}/([^/]+)").getMatch(0);
             if (urlFileName != null) {
                 link.setName(URLEncode.decodeURIComponent(urlFileName));
             } else {
@@ -368,6 +368,7 @@ public class CopyCaseCom extends PluginForHost {
                 throw new AccountInvalidException(error);
             }
         }
+        /* No error */
         return resp;
     }
 
@@ -425,7 +426,7 @@ public class CopyCaseCom extends PluginForHost {
 
     @Override
     public boolean hasCaptcha(final DownloadLink link, final Account acc) {
-        /* 2023-02-28: No captchas at all */
+        /* 2023-02-28: No captchas at all, only for login. */
         return false;
     }
 

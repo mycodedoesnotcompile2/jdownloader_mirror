@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
@@ -43,9 +43,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.PluginForHost;
 import jd.plugins.hoster.PCloudCom;
 
-@DecrypterPlugin(revision = "$Revision: 48606 $", interfaceVersion = 2, names = { "pcloud.com" }, urls = { "https?://(?:[a-z0-9]+\\.pcloud\\.(?:com|link)/#page=publink\\&code=|[a-z0-9]+\\.pcloud\\.(?:com|link)/publink/show\\?code=|pc\\.cd/)([A-Za-z0-9]+).*" })
+@DecrypterPlugin(revision = "$Revision: 50284 $", interfaceVersion = 2, names = {}, urls = {})
 public class PCloudComFolder extends PluginForDecrypt {
     public PCloudComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,23 +68,48 @@ public class PCloudComFolder extends PluginForDecrypt {
         br.getHeaders().put("Accept-Charset", null);
     }
 
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "pcloud.com", "pcloud.link", "pc.cd" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:publink/show\\?code=|#page=publink\\&code=)([a-zA-Z0-9]+)");
+        }
+        return ret.toArray(new String[0]);
+    }
+
     private static final String DOWNLOAD_ZIP   = "DOWNLOAD_ZIP_2";
     long                        totalSize      = 0;
     private String              foldercode     = null;
     private Map<String, Object> emptyFolderMap = new HashMap<String, Object>();
+    PluginForHost               plg            = null;
 
     @SuppressWarnings({ "deprecation", "unchecked" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         emptyFolderMap.clear();
-        final String parameter = param.getCryptedUrl();
-        foldercode = new Regex(parameter, "(?i)code=([A-Za-z0-9]+)").getMatch(0);
+        final String contenturl = param.getCryptedUrl();
+        foldercode = new Regex(contenturl, "(?i)code=([A-Za-z0-9]+)").getMatch(0);
         if (foldercode == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         String passCode = param.getDecrypterPassword();
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String fid = getFID(parameter);
+        final String fid = getFID(contenturl);
         int attempt = 0;
         Map<String, Object> entries = null;
         boolean passwordSuccess = false;
@@ -96,10 +122,10 @@ public class PCloudComFolder extends PluginForDecrypt {
             final UrlQuery query = new UrlQuery();
             query.add("code", fid);
             if (passCode != null) {
-                query.add("linkpassword", Encoding.urlEncode(passCode));
+                query.appendEncoded("linkpassword", passCode);
             }
-            br.getPage("https://" + PCloudCom.getAPIDomain(new URL(parameter).getHost()) + "/showpublink?" + query);
-            entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
+            br.getPage("https://" + PCloudCom.getAPIDomain(new URL(contenturl).getHost()) + "/showpublink?" + query);
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             result = ((Number) entries.get("result")).intValue();
             if (result == PCloudCom.STATUS_CODE_DOWNLOAD_PASSWORD_REQUIRED || result == PCloudCom.STATUS_CODE_DOWNLOAD_PASSWORD_INVALID) {
                 if (passCode != null) {
@@ -131,7 +157,7 @@ public class PCloudComFolder extends PluginForDecrypt {
         }
         final String folderNameMain = (String) metadata.get("name");
         /* This will skip empty folders */
-        addFolder(ret, metadata, null, parameter, null);
+        addFolder(ret, metadata, null, contenturl, null);
         if (ret.size() > 1 && SubConfiguration.getConfig(this.getHost()).getBooleanProperty(DOWNLOAD_ZIP, false)) {
             /* = all files (links) of the folder as .zip archive */
             final DownloadLink main = createDownloadlink("http://pclouddecrypted.com/" + System.currentTimeMillis() + new Random().nextInt(100000));
@@ -150,12 +176,12 @@ public class PCloudComFolder extends PluginForDecrypt {
         }
         /* Set additional properties */
         for (final DownloadLink thisresult : ret) {
-            thisresult.setProperty("mainlink", parameter);
+            thisresult.setProperty("mainlink", contenturl);
             if (passCode != null) {
                 thisresult.setDownloadPassword(passCode, true);
             }
         }
-        final String desiredFolderID = new Regex(parameter, "folder=(\\d+)").getMatch(0);
+        final String desiredFolderID = new Regex(contenturl, "(?i)folder=(\\d+)").getMatch(0);
         if (desiredFolderID != null && emptyFolderMap.containsKey(desiredFolderID)) {
             logger.info("Desired folder is empty -> Ignore everything else we crawled and throw exception");
             throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER, "EMPTY_FOLDER_" + emptyFolderMap.get(desiredFolderID));
@@ -175,9 +201,13 @@ public class PCloudComFolder extends PluginForDecrypt {
         return ret;
     }
 
-    /** Recursive function to crawl all folders/subfolders */
+    /**
+     * Recursive function to crawl all folders/subfolders
+     *
+     * @throws PluginException
+     */
     @SuppressWarnings("unchecked")
-    private void addFolder(final ArrayList<DownloadLink> results, final Map<String, Object> entries, final String lastFpname, final String containerURL, String path) {
+    private void addFolder(final ArrayList<DownloadLink> results, final Map<String, Object> entries, final String lastFpname, final String containerURL, String path) throws PluginException {
         List<Map<String, Object>> ressourcelist_temp = null;
         final boolean isFolder = ((Boolean) entries.get("isfolder"));
         if (isFolder) {
@@ -202,17 +232,30 @@ public class PCloudComFolder extends PluginForDecrypt {
         }
     }
 
-    private DownloadLink addSingleItem(final Map<String, Object> entries, final String path) {
-        final String parentfolderid = Long.toString(((Number) entries.get("parentfolderid")).longValue());
-        final DownloadLink file = createDownloadlink("http://pclouddecrypted.com/" + System.currentTimeMillis() + new Random().nextInt(100000));
+    private void ensureInitHosterplugin() throws PluginException {
+        if (this.plg == null) {
+            plg = this.getNewPluginForHostInstance(this.getHost());
+        }
+    }
+
+    private DownloadLink addSingleItem(final Map<String, Object> entries, final String path) throws PluginException {
+        ensureInitHosterplugin();
+        /* For single loose files, parentfolderid may not be given. */
+        final Object parentfolderid = entries.get("parentfolderid");
+        final String fileid = Long.toString(((Number) entries.get("fileid")).longValue());
+        final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
+        final DownloadLink file = createDownloadlink(parentfolderid + "_" + fileid);
+        file.setDefaultPlugin(plg);
+        file.setHost(this.getHost());
         final long filesize = ((Number) entries.get("size")).longValue();
         String filename = entries.get("name").toString();
-        final String fileid = Long.toString(((Number) entries.get("fileid")).longValue());
         totalSize += filesize;
         file.setProperty("plain_name", filename);
         file.setProperty("plain_size", filesize);
         file.setProperty("plain_fileid", fileid);
-        file.setProperty("plain_parentfolderid", parentfolderid);
+        if (parentfolderid != null) {
+            file.setProperty("plain_parentfolderid", parentfolderid);
+        }
         file.setProperty("plain_code", foldercode);
         file.setAvailable(true);
         if (path != null) {

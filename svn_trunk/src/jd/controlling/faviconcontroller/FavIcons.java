@@ -800,7 +800,7 @@ public class FavIcons {
                 con = favBr.openGetConnection(url);
                 /* we use bufferedinputstream to reuse it later if needed */
                 bytes = IO.readStream(-1, con.getInputStream());
-                if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text") || con.getCompleteContentLength() <= 0) {
+                if (!con.isOK() || StringUtils.containsIgnoreCase(con.getContentType(), "text") || bytes == null || bytes.length == 0) {
                     return null;
                 }
                 try {

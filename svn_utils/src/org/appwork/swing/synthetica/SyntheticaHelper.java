@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -56,6 +56,7 @@ import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.components.ExtPasswordField;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.txtresource.TranslationFactory;
 import org.appwork.utils.Application;
 import org.appwork.utils.IO;
@@ -65,7 +66,13 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
 
 public class SyntheticaHelper {
+    /**
+     *
+     */
+    @AWTestValidateClassReference(classpath = "syntheticaSimple2D\\.jar")
+    private static final String     DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_SIMPLE2D_LOOK_AND_FEEL = "de.javasoft.plaf.synthetica.SyntheticaSimple2DLookAndFeel";
     public final SyntheticaSettings config;
+    public static Boolean           IS_SYNTHETICA                                                 = null;
 
     /**
      *
@@ -73,6 +80,9 @@ public class SyntheticaHelper {
     public SyntheticaHelper() {
         this(JsonConfig.create(SyntheticaSettings.class));
     }
+
+    @AWTestValidateClassReference(classpath = "synthetica\\.jar")
+    public static final String CLASS_DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_LOOK_AND_FEEL = "de.javasoft.plaf.synthetica.SyntheticaLookAndFeel";
 
     /**
      * @param create
@@ -136,7 +146,7 @@ public class SyntheticaHelper {
      *
      */
     public void load() throws IOException {
-        load("de.javasoft.plaf.synthetica.SyntheticaSimple2DLookAndFeel");
+        load(DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_SIMPLE2D_LOOK_AND_FEEL);
     }
 
     public void load(final String laf) throws IOException {
@@ -187,7 +197,7 @@ public class SyntheticaHelper {
             setLicense(license);
             final Class<?> synthetica;
             try {
-                synthetica = getClass().forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel");
+                synthetica = getClass().forName(CLASS_DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_LOOK_AND_FEEL);
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
                 return;
@@ -300,6 +310,32 @@ public class SyntheticaHelper {
     }
 
     /**
+     * check if the synthetica look and feel is used. make sure not to call this before you set the final look and feel! Else all calls will
+     * return the wrong results.
+     *
+     * @return
+     */
+    public static boolean isSyntheticaLookAndFeel() {
+        Boolean ret = SyntheticaHelper.IS_SYNTHETICA;
+        if (ret != null) {
+            return ret;
+        }
+        try {
+            final Class<? extends LookAndFeel> lafClass = UIManager.getLookAndFeel().getClass();
+            final Class<?> cls = Class.forName(CLASS_DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_LOOK_AND_FEEL, false, Application.class.getClassLoader());
+            ret = cls != null && cls.isAssignableFrom(lafClass);
+        } catch (final Throwable e) {
+        } finally {
+            if (ret != null) {
+                SyntheticaHelper.IS_SYNTHETICA = ret;
+            } else {
+                SyntheticaHelper.IS_SYNTHETICA = Boolean.FALSE;
+            }
+        }
+        return SyntheticaHelper.IS_SYNTHETICA;
+    }
+
+    /**
      * @param jButton
      * @return
      */
@@ -336,7 +372,7 @@ public class SyntheticaHelper {
             return false;
         }
         try {
-            final Class<?> synthetica = Class.forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel", false, SyntheticaHelper.class.getClassLoader());
+            final Class<?> synthetica = Class.forName(CLASS_DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_LOOK_AND_FEEL, false, SyntheticaHelper.class.getClassLoader());
             final LookAndFeel laf = UIManager.getLookAndFeel();
             return synthetica.isAssignableFrom(laf.getClass());
         } catch (ClassNotFoundException e) {

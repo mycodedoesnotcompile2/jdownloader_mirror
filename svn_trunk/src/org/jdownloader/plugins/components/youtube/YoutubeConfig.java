@@ -390,34 +390,6 @@ public interface YoutubeConfig extends PluginConfigInterface {
 
     void setProcessPlaylistItemsInReverseOrder(boolean b);
 
-    public static enum PlaylistDupeMode implements LabelInterface {
-        AUTO {
-            @Override
-            public String getLabel() {
-                return "Auto";
-            }
-        },
-        AVOID_DUPLICATES {
-            @Override
-            public String getLabel() {
-                return "Avoid duplicates: allow each video only once in linkgrabber";
-            }
-        },
-        ALLOW_DUPLICATES {
-            @Override
-            public String getLabel() {
-                return "Allow duplicates: permit the same video individually and in playlists";
-            }
-        };
-    }
-
-    @AboutConfig
-    @DescriptionForConfigEntry("Dupe check behavior for playlist items")
-    @DefaultEnumValue("AUTO")
-    YoutubeConfig.PlaylistDupeMode getPlaylistDupeMode();
-
-    void setPlaylistDupeMode(YoutubeConfig.PlaylistDupeMode mode);
-
     @AboutConfig
     @DefaultFactory(DefaultConvertSubtitleVariantMode.class)
     YoutubeConfig.SubtitleVariantMode getSubtitleVariantMode();

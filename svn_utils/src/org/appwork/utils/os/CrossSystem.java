@@ -59,9 +59,10 @@ import java.util.regex.Pattern;
 
 import javax.swing.KeyStroke;
 
-import org.appwork.JNAHelper;
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
@@ -742,12 +743,13 @@ public class CrossSystem {
                 switch (getOSFamily()) {
                 case WINDOWS:
                     try {
-                        if (JNAHelper.isJNAAvailable()) {
-                            ret = new DesktopSupportWindowsViaJNA();
+                        if (BuildDecisions.contains(DesktopSupportWindowsViaJNA.DESKTOP_SUPPORT_WINDOWS_VIA_JNA_YES)) {
+                            ret = new org.appwork.utils.os.DesktopSupportWindowsViaJNA();
                         } else {
                             ret = new DesktopSupportWindows();
                         }
                     } catch (final Exception e) {
+                        DebugMode.debugger(e);
                         ret = new DesktopSupportWindows();
                     }
                     break;

@@ -3,18 +3,32 @@ package org.appwork.serializer;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.appwork.builddecision.BuildDecisionRequired;
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.commonInterface.SerializerException;
 import org.appwork.storage.commonInterface.SerializerInterface;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.reflection.Clazz;
 
+@BuildDecisionRequired(tags = { Deser.DESER_SIMPLE, Deser.DESER_FLEXI }, imports = { Deser.CLASS_SIMPLE, Deser.CLASS_FLEXI })
 public class Deser {
+    @AWTestValidateClassReference
+    protected static final String                   CLASS_FLEXI          = "org.appwork.storage.flexijson.FlexiSerializer";
+    @AWTestValidateClassReference
+    protected static final String                   CLASS_SIMPLE         = "org.appwork.storage.SimpleSerializer";
+    public static final String                      DESER_FLEXI          = "Deser-Flexi";
+    public static final String                      DESER_SIMPLE         = "Deser-Simple";
     private static final String                     AWU_SERIALIZER_CLASS = "AWU_SERIALIZER_CLASS";
     private static SerializerInterface              SERIALIZER           = createDefaultSerializer();
     private static ThreadLocal<SerializerInterface> THREAD_SERIALIZER    = new ThreadLocal<SerializerInterface>();
 
     public static SerializerInterface createDefaultSerializer() {
-        final String cls = System.getProperty(AWU_SERIALIZER_CLASS, "org.appwork.storage.SimpleSerializer");
+        String def = CLASS_SIMPLE;
+        if (BuildDecisions.contains(DESER_FLEXI)) {
+            def = CLASS_FLEXI;
+        }
+        final String cls = System.getProperty(AWU_SERIALIZER_CLASS, def);
         try {
             return (SerializerInterface) Class.forName(cls).newInstance();
         } catch (InstantiationException e) {

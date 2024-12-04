@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -70,6 +70,7 @@ import org.appwork.storage.flexijson.InvalidPathException;
 import org.appwork.storage.flexijson.JSPath;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.Getter;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.ConcatIterator;
 import org.appwork.utils.DebugMode;
@@ -109,6 +110,17 @@ import org.appwork.utils.reflection.Clazz;
 @ApiDoc("A Condition Object. See the WIKI for more details.")
 @StorableExample("{\"$eq\":\"MyValue\"}")
 public class Condition<MatcherType> extends LinkedHashMap<String, Object> implements Storable {
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    public static final String CLASS_ORG_APPWORK_STORAGE_COMMON_INTERFACE_SERIALIZER_INTERFACE = "org.appwork.storage.commonInterface.SerializerInterface";
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    public static final String CLASS_ORG_APPWORK_SERIALIZER_DESER                              = "org.appwork.serializer.Deser";
+
     public static Condition<Object> C() {
         return new Condition<Object>();
     }
@@ -3014,8 +3026,8 @@ public class Condition<MatcherType> extends LinkedHashMap<String, Object> implem
      */
     private static String debugToString(Object obj) {
         try {
-            Class<?> deser = Class.forName("org.appwork.serializer.Deser");
-            Class<?> serializerInterface = Class.forName("org.appwork.storage.commonInterface.SerializerInterface");
+            Class<?> deser = Class.forName(CLASS_ORG_APPWORK_SERIALIZER_DESER);
+            Class<?> serializerInterface = Class.forName(CLASS_ORG_APPWORK_STORAGE_COMMON_INTERFACE_SERIALIZER_INTERFACE);
             Method method = deser.getMethod("get", new Class[] {});
             method.setAccessible(true);
             Object serializer = method.invoke(method, new Object[] {});

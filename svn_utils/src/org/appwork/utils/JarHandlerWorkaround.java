@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -37,12 +37,19 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.testframework.AWTestValidateClassReference;
+
 /**
  * @author daniel
  *
  */
 public class JarHandlerWorkaround {
-    private final static AtomicBoolean INIT = new AtomicBoolean(false);
+    /**
+     *
+     */
+    @AWTestValidateClassReference
+    private static final String        CLASS_ORG_APPWORK_UTILS_JAR_HANDLER_WORKAROUND_ORACLE = "org.appwork.utils.JarHandlerWorkaroundOracle";
+    private final static AtomicBoolean INIT                                                  = new AtomicBoolean(false);
 
     // set custom jarHandler for http://bugs.java.com/view_bug.do?bug_id=6390779 , https://bugs.openjdk.org/browse/JDK-6390779
     public static void init() {
@@ -54,7 +61,7 @@ public class JarHandlerWorkaround {
                     final Class<?> sunJarURLConnection = Class.forName("sun.net.www.protocol.jar.JarURLConnection");
                     final Class<?> sunParseUtil = Class.forName("sun.net.www.ParseUtil");
                     if (sunJarHandler != null && sunJarURLConnection != null && sunParseUtil != null) {
-                        final Class<?> oracleWorkaround = Class.forName("org.appwork.utils.JarHandlerWorkaroundOracle");
+                        final Class<?> oracleWorkaround = Class.forName(CLASS_ORG_APPWORK_UTILS_JAR_HANDLER_WORKAROUND_ORACLE);
                         final Method init = oracleWorkaround.getMethod("init", new Class[0]);
                         init.invoke(null, new Object[0]);
                     }

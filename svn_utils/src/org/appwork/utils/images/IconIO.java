@@ -74,10 +74,12 @@ import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 
+import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.swing.components.IDIcon;
 import org.appwork.swing.components.IconIdentifier;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
@@ -87,12 +89,20 @@ import org.appwork.utils.images.svg.NoSVGSupportFactory;
 import org.appwork.utils.images.svg.SVGFactory;
 import org.appwork.utils.net.Base64OutputStream;
 
+@BuildDecisionRequired(tags = { IconIO.SVG_JSVG, IconIO.SVG_SALAMANDER, IconIO.SVG_NONE }, imports = { IconIO.CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_WEISJ_JSVG_FACTORY, IconIO.CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_KIT_FOX_FACTORY, "" })
 public class IconIO {
-    public static final String                       SVG_FACTORY_KEY = "SVG_FACTORY";
-    private static final AtomicReference<SVGFactory> SVG_FACTORY     = new AtomicReference<SVGFactory>();
+    @AWTestValidateClassReference
+    protected static final String                    CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_KIT_FOX_FACTORY    = "org.appwork.utils.images.svg.KitFoxFactory";
+    @AWTestValidateClassReference
+    protected static final String                    CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_WEISJ_JSVG_FACTORY = "org.appwork.utils.images.svg.WeisjJSVGFactory";
+    public static final String                       SVG_NONE                                              = "SVG-NONE";
+    public static final String                       SVG_SALAMANDER                                        = "SVG-SALAMANDER";
+    public static final String                       SVG_JSVG                                              = "SVG-JSVG";
+    public static final String                       SVG_FACTORY_KEY                                       = "SVG_FACTORY";
+    private static final AtomicReference<SVGFactory> SVG_FACTORY                                           = new AtomicReference<SVGFactory>();
     private static Boolean                           ICO_SUPPORTED;
     private volatile static Method                   ICO_DECODER;
-    private volatile static List<IconExeHandler>     CUSTOM_HANDLER  = new ArrayList<IconExeHandler>();
+    private volatile static List<IconExeHandler>     CUSTOM_HANDLER                                        = new ArrayList<IconExeHandler>();
 
     public static void addHandler(IconExeHandler handler) {
         ArrayList<IconExeHandler> newList = new ArrayList<IconExeHandler>();
@@ -239,7 +249,7 @@ public class IconIO {
         if (fromSysProp != null && StringUtils.isEmpty(fromSysProp)) {
             return null;
         }
-        final List<String> clazzes = Arrays.asList(fromSysProp, "org.appwork.utils.images.svg.WeisjJSVGFactory", "org.appwork.utils.images.svg.KitFoxFactory");
+        final List<String> clazzes = Arrays.asList(fromSysProp, CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_WEISJ_JSVG_FACTORY, CLASS_ORG_APPWORK_UTILS_IMAGES_SVG_KIT_FOX_FACTORY);
         for (final String clazz : clazzes) {
             if (StringUtils.isNotEmpty(clazz)) {
                 try {

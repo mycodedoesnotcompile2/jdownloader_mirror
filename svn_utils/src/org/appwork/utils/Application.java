@@ -77,10 +77,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import javax.swing.LookAndFeel;
-import javax.swing.UIManager;
-
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.exceptions.WTFException;
+import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.os.CrossSystem;
 
@@ -91,19 +90,21 @@ import org.appwork.utils.os.CrossSystem;
  *
  */
 public class Application {
-    private static Boolean              IS_JARED      = null;
-    private static String               APP_FOLDER    = ".appwork";
+    /**
+     *
+     */
+    private static Boolean              IS_JARED   = null;
+    private static String               APP_FOLDER = ".appwork";
     private static String               ROOT;
-    public final static long            JAVA16        = JVMVersion.JAVA16;
-    public final static long            JAVA17        = JVMVersion.JAVA17;
-    public final static long            JAVA18        = JVMVersion.JAVA18;
-    public final static long            JAVA19        = JVMVersion.JAVA19;
-    private static Boolean              IS_SYNTHETICA = null;
-    private static Boolean              JVM64BIT      = null;
-    private static boolean              REDIRECTED    = false;
+    public final static long            JAVA16     = JVMVersion.JAVA16;
+    public final static long            JAVA17     = JVMVersion.JAVA17;
+    public final static long            JAVA18     = JVMVersion.JAVA18;
+    public final static long            JAVA19     = JVMVersion.JAVA19;
+    private static Boolean              JVM64BIT   = null;
+    private static boolean              REDIRECTED = false;
     public static PauseableOutputStream STD_OUT;
     public static PauseableOutputStream ERR_OUT;
-    private static boolean              DID_INIT      = false;
+    private static boolean              DID_INIT   = false;
     private static PrintStream          ORG_STD_OUT;
 
     public static PrintStream getSystemStdOut() {
@@ -136,9 +137,9 @@ public class Application {
         System.setProperty("java.rmi.server.useCodebaseOnly", "true");
     }
 
-    public static void addStreamCopy(File file, org.appwork.utils.Application.PauseableOutputStream stream) {
+    public static void addStreamCopy(File file, final org.appwork.utils.Application.PauseableOutputStream stream) {
         int i = 0;
-        File orgFile = file;
+        final File orgFile = file;
         while (true) {
             try {
                 if (file.exists()) {
@@ -146,10 +147,10 @@ public class Application {
                 }
                 stream.addBranch(new BufferedOutputStream(new FileOutputStream(file)));
                 break;
-            } catch (FileNotFoundException e1) {
+            } catch (final FileNotFoundException e1) {
                 i++;
                 e1.printStackTrace();
-                String extension = org.appwork.utils.Files.getExtension(orgFile.getName());
+                final String extension = org.appwork.utils.Files.getExtension(orgFile.getName());
                 if (extension != null) {
                     file = new File(orgFile.getParentFile(), orgFile.getName().substring(0, orgFile.getName().length() - extension.length() - 1) + "." + i + "." + extension);
                 } else {
@@ -179,7 +180,7 @@ public class Application {
             Method method = null;
             try {
                 method = cl.getClass().getMethod("addURL", new Class[] { URL.class });
-            } catch (NoSuchMethodException e) {
+            } catch (final NoSuchMethodException e) {
                 method = URLClassLoader.class.getDeclaredMethod("addURL", new Class[] { URL.class });
             }
             method.setAccessible(true);
@@ -253,7 +254,7 @@ public class Application {
      * @param version
      * @return
      */
-    public static long parseJavaVersionString(String version) {
+    public static long parseJavaVersionString(final String version) {
         return JVMVersion.parseJavaVersionString(version);
     }
 
@@ -280,11 +281,11 @@ public class Application {
                 final Class<?> loadClass = Class.forName(resourceLookupClass);
                 final ResourceLookup ret = (ResourceLookup) loadClass.newInstance();
                 return ret;
-            } catch (ClassNotFoundException e) {
+            } catch (final ClassNotFoundException e) {
                 throw new WTFException("ResourceLookupClass:" + resourceLookupClass, e);
-            } catch (InstantiationException e) {
+            } catch (final InstantiationException e) {
                 throw new WTFException("ResourceLookupClass:" + resourceLookupClass, e);
-            } catch (IllegalAccessException e) {
+            } catch (final IllegalAccessException e) {
                 throw new WTFException("ResourceLookupClass:" + resourceLookupClass, e);
             }
         }
@@ -451,7 +452,7 @@ public class Application {
     }
 
     @Deprecated
-    public static java.io.File urlToFile(URL loc) throws URISyntaxException {
+    public static java.io.File urlToFile(final URL loc) throws URISyntaxException {
         if (loc == null) {
             throw new IllegalArgumentException("loc is null");
         }
@@ -463,7 +464,7 @@ public class Application {
             if (!appRoot.exists()) {
                 appRoot = null;
             }
-        } catch (java.io.UnsupportedEncodingException e) {
+        } catch (final java.io.UnsupportedEncodingException e) {
         }
         if (appRoot == null) {
             appRoot = new File(path);
@@ -550,7 +551,7 @@ public class Application {
         final String tmpPrefix = prefix + random;
         try {
             return File.createTempFile(tmpPrefix, suffix, tmp);
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new IOException("failed to create tmpFile!prefix:" + tmpPrefix + "|suffix:" + suffix + "|tmp:" + tmp, e);
         }
     }
@@ -634,7 +635,7 @@ public class Application {
         final StringBuilder sb = new StringBuilder();
         try {
             final List<String> lst = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            for (String key : lst) {
+            for (final String key : lst) {
                 if (blackList != null && blackList.contains("jvm_" + key)) {
                     continue;
                 } else {
@@ -643,7 +644,7 @@ public class Application {
                     sb.setLength(0);
                 }
             }
-        } catch (Throwable e) {
+        } catch (final Throwable e) {
             logger.log(e);
         }
         while (propertiesKey.hasMoreElements()) {
@@ -691,9 +692,9 @@ public class Application {
             }
         }
         try {
-            Map<String, String> mani = Application.getManifest();
+            final Map<String, String> mani = Application.getManifest();
             if (mani != null && mani.size() > 0) {
-                for (Entry<String, String> es : mani.entrySet()) {
+                for (final Entry<String, String> es : mani.entrySet()) {
                     logger.info(es.getKey() + ": " + es.getValue());
                 }
             }
@@ -705,7 +706,7 @@ public class Application {
                         logger.info(jarFile + "- lastModified: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(new Date(jarFile.lastModified())));
                     }
                 }
-            } catch (Exception ignore) {
+            } catch (final Exception ignore) {
                 // ide
             }
             final String moduleName = System.getProperty("exe4j.moduleName");
@@ -730,22 +731,22 @@ public class Application {
         /**
          * @param out
          */
-        public PauseableOutputStream(OutputStream out) {
+        public PauseableOutputStream(final OutputStream out) {
             this._out = out;
         }
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(int)
          */
         @Override
-        public void write(int paramInt) throws IOException {
-            if (branches.size() > 0) {
-                for (OutputStream os : this.branches) {
+        public void write(final int paramInt) throws IOException {
+            if (this.branches.size() > 0) {
+                for (final OutputStream os : this.branches) {
                     try {
                         os.write(paramInt);
-                    } catch (Throwable e) {
+                    } catch (final Throwable e) {
                     }
                 }
             }
@@ -759,16 +760,16 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[])
          */
         @Override
-        public void write(byte[] b) throws IOException {
-            if (branches.size() > 0) {
+        public void write(final byte[] b) throws IOException {
+            if (this.branches.size() > 0) {
                 for (final OutputStream os : this.branches) {
                     try {
                         os.write(b);
-                    } catch (Throwable e) {
+                    } catch (final Throwable e) {
                     }
                 }
             }
@@ -782,16 +783,16 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#write(byte[], int, int)
          */
         @Override
-        public void write(byte[] buff, int off, int len) throws IOException {
-            if (branches.size() > 0) {
-                for (OutputStream os : this.branches) {
+        public void write(final byte[] buff, final int off, final int len) throws IOException {
+            if (this.branches.size() > 0) {
+                for (final OutputStream os : this.branches) {
                     try {
                         os.write(buff, off, len);
-                    } catch (Throwable e) {
+                    } catch (final Throwable e) {
                     }
                 }
             }
@@ -805,15 +806,15 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#flush()
          */
         @Override
         public void flush() throws IOException {
-            for (OutputStream os : this.branches) {
+            for (final OutputStream os : this.branches) {
                 try {
                     os.flush();
-                } catch (Throwable e) {
+                } catch (final Throwable e) {
                 }
             }
             final ByteArrayOutputStream buffer = this.buffer.get();
@@ -826,16 +827,16 @@ public class Application {
 
         /*
          * (non-Javadoc)
-         * 
+         *
          * @see java.io.OutputStream#close()
          */
         @Override
         public void close() throws IOException {
             try {
-                for (OutputStream os : this.branches) {
+                for (final OutputStream os : this.branches) {
                     try {
                         os.close();
-                    } catch (Throwable e) {
+                    } catch (final Throwable e) {
                     }
                 }
                 final ByteArrayOutputStream buffer = this.buffer.get();
@@ -849,14 +850,14 @@ public class Application {
         }
 
         public boolean enableBuffer() throws IOException {
-            return setBufferEnabled(true);
+            return this.setBufferEnabled(true);
         }
 
         public boolean disableBuffer(final boolean dropBufferedData) throws IOException {
             if (dropBufferedData) {
                 this.buffer.set(null);
             }
-            return setBufferEnabled(false);
+            return this.setBufferEnabled(false);
         }
 
         /**
@@ -866,7 +867,7 @@ public class Application {
          * @return
          * @throws IOException
          */
-        public boolean setBufferEnabled(boolean b) throws IOException {
+        public boolean setBufferEnabled(final boolean b) throws IOException {
             if (b) {
                 if (this.buffer.compareAndSet(null, new ByteArrayOutputStream())) {
                     return false;
@@ -889,23 +890,23 @@ public class Application {
         /**
          * @param bufferedOutputStream
          */
-        public boolean addBranch(OutputStream os) {
-            return os != null && branches.addIfAbsent(os);
+        public boolean addBranch(final OutputStream os) {
+            return os != null && this.branches.addIfAbsent(os);
         }
 
-        public boolean removeBranch(OutputStream os) {
-            return os != null && branches.remove(os);
+        public boolean removeBranch(final OutputStream os) {
+            return os != null && this.branches.remove(os);
         }
 
         /**
          * @param branches2
          */
-        public void setBranches(List<OutputStream> branches) {
+        public void setBranches(final List<OutputStream> branches) {
             if (branches == null || branches.size() == 0) {
                 this.branches.clear();
             } else {
                 for (final OutputStream os : branches) {
-                    addBranch(os);
+                    this.addBranch(os);
                 }
                 this.branches.retainAll(branches);
             }
@@ -914,16 +915,16 @@ public class Application {
         /**
          * @param outputStream
          */
-        public void setBranch(OutputStream outputStream) {
+        public void setBranch(final OutputStream outputStream) {
             if (outputStream == null) {
                 this.branches.clear();
             } else {
-                setBranches(Arrays.asList(new OutputStream[] { outputStream }));
+                this.setBranches(Arrays.asList(new OutputStream[] { outputStream }));
             }
         }
     }
 
-    private static String getCharSet(PrintStream ps) {
+    private static String getCharSet(final PrintStream ps) {
         try {
             final Field field = ReflectionUtils.getField(ps.getClass(), "charOut", ps, Writer.class);
             final Writer writer = (Writer) field.get(ps);
@@ -933,7 +934,7 @@ public class Application {
                     return Charset.forName(charSet).name();
                 }
             }
-        } catch (Throwable ignore) {
+        } catch (final Throwable ignore) {
         }
         return Charset.defaultCharset().name();
     }
@@ -1004,7 +1005,7 @@ public class Application {
      * @param string
      * @return
      */
-    public static File generateNumberedTempResource(String string) {
+    public static File generateNumberedTempResource(final String string) {
         return Application.generateNumbered(Application.getTempResource(string));
     }
 
@@ -1014,16 +1015,16 @@ public class Application {
      * @param string
      * @return
      */
-    public static File generateNumberedResource(String string) {
+    public static File generateNumberedResource(final String string) {
         return Application.generateNumbered(Application.getResource(string));
     }
 
     /**
      * @param resource
      */
-    private static File generateNumbered(File orgFile) {
+    private static File generateNumbered(final File orgFile) {
         int i = 0;
-        String extension = Files.getExtension(orgFile.getName());
+        final String extension = Files.getExtension(orgFile.getName());
         File file = null;
         while (file == null || file.exists()) {
             i++;
@@ -1037,32 +1038,6 @@ public class Application {
     }
 
     /**
-     * check if the synthetica look and feel is used. make sure not to call this before you set the final look and feel! Else all calls will
-     * return the wrong results.
-     *
-     * @return
-     */
-    public static boolean isSyntheticaLookAndFeel() {
-        Boolean ret = IS_SYNTHETICA;
-        if (ret != null) {
-            return ret;
-        }
-        try {
-            final Class<? extends LookAndFeel> lafClass = UIManager.getLookAndFeel().getClass();
-            Class<?> cls = Class.forName("de.javasoft.plaf.synthetica.SyntheticaLookAndFeel", false, Application.class.getClassLoader());
-            ret = cls != null && cls.isAssignableFrom(lafClass);
-        } catch (Throwable e) {
-        } finally {
-            if (ret != null) {
-                IS_SYNTHETICA = ret;
-            } else {
-                IS_SYNTHETICA = Boolean.FALSE;
-            }
-        }
-        return IS_SYNTHETICA;
-    }
-
-    /**
      * This should always run as very first action in an application
      */
     private synchronized static void ensureFrameWorkInit() {
@@ -1070,6 +1045,29 @@ public class Application {
             return;
         } else {
             DID_INIT = true;
+            BuildDecisions.status(LogV3.defaultLogger());
+            // do not run in Tests
+            if (BuildDecisions.isEnabled() && !isJared(null)) {
+                if (System.getProperty("BUILD_DECISIONS_DIRECT") != null) {
+                    BuildDecisions.validate();
+                } else {
+                    new Thread("BuildDecisions Check") {
+                        {
+                            setDaemon(true);
+                        }
+
+                        public void run() {
+                            try {
+                                Thread.sleep(10000);
+                            } catch (InterruptedException e) {
+                                // cannot happen
+                                LogV3.log(e);
+                            }
+                            BuildDecisions.validate();
+                        };
+                    }.start();
+                }
+            }
             org.appwork.shutdown.ShutdownController.getInstance();
         }
     }
@@ -1090,7 +1088,7 @@ public class Application {
             } else {
                 return Long.parseLong(value);
             }
-        } catch (NumberFormatException e) {
+        } catch (final NumberFormatException e) {
             return -1;
         }
     }
@@ -1099,7 +1097,7 @@ public class Application {
         return getManifestEntry("hotfix-base");
     }
 
-    public static String getManifestEntry(String key) {
+    public static String getManifestEntry(final String key) {
         final Map<String, String> mf = getManifest();
         if (mf == null) {
             return null;
@@ -1121,7 +1119,7 @@ public class Application {
             } else {
                 return Integer.parseInt(value);
             }
-        } catch (NumberFormatException e) {
+        } catch (final NumberFormatException e) {
             return -1;
         }
     }
@@ -1142,7 +1140,7 @@ public class Application {
             if (applicationJar.isFile()) {
                 jars.add(applicationJar);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             // IDE
         }
         if (jars.size() == 0) {
@@ -1163,7 +1161,7 @@ public class Application {
 
     public static HashMap<String, String> readManifests(final List<File> jars) {
         final HashMap<String, String> manifestMap = new HashMap<String, String>();
-        NEXT_FILE: for (File jar : jars) {
+        NEXT_FILE: for (final File jar : jars) {
             try {
                 final ZipFile zip = new ZipFile(jar);
                 try {
@@ -1171,12 +1169,12 @@ public class Application {
                     if (manifestEntry != null) {
                         final String manifest = IO.readStreamToString(zip.getInputStream(manifestEntry), -1, true);
                         manifestMap.clear();
-                        for (String line : manifest.split("[\r\n]+")) {
+                        for (final String line : manifest.split("[\r\n]+")) {
                             if (StringUtils.isNotEmpty(line)) {
                                 final int index = line.indexOf(":");
                                 if (index > 0) {
-                                    String key = line.substring(0, index).trim();
-                                    String value = line.substring(index + 1).trim();
+                                    final String key = line.substring(0, index).trim();
+                                    final String value = line.substring(index + 1).trim();
                                     manifestMap.put(key.toLowerCase(Locale.ROOT), value);
                                 }
                             }
@@ -1190,10 +1188,10 @@ public class Application {
                 } finally {
                     try {
                         zip.close();
-                    } catch (IOException e) {
+                    } catch (final IOException e) {
                     }
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
             }
         }
         return manifestMap;
@@ -1206,7 +1204,7 @@ public class Application {
      * @param string
      * @return
      */
-    public static File getTempUniqueResource(String postFix) {
+    public static File getTempUniqueResource(final String postFix) {
         File file = null;
         while (file == null || file.exists()) {
             file = Application.getResource("tmp/path_" + UniqueAlltimeID.next() + postFix);
@@ -1234,7 +1232,7 @@ public class Application {
                 final ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(threadMXBean.isObjectMonitorUsageSupported(), threadMXBean.isSynchronizerUsageSupported());
                 // Use StringBuilder for efficient string building
                 sb.append("=== Enhanced Thread Dump ===\r\n\r\n");
-                for (ThreadInfo threadInfo : threadInfos) {
+                for (final ThreadInfo threadInfo : threadInfos) {
                     sb.append("Thread Name: ").append(threadInfo.getThreadName()).append("\r\n");
                     sb.append("Thread ID: ").append(threadInfo.getThreadId()).append("\r\n");
                     sb.append("Thread State: ").append(threadInfo.getThreadState()).append("\r\n");
@@ -1242,7 +1240,7 @@ public class Application {
                         try {
                             sb.append("Thread Daemon: ").append(ReflectionUtils.invoke(ThreadInfo.class, "isDaemon", threadInfo, boolean.class)).append("\r\n");
                             sb.append("Thread Priority: ").append(ReflectionUtils.invoke(ThreadInfo.class, "getPriority", threadInfo, int.class)).append("\r\n");
-                        } catch (InvocationTargetException e) {
+                        } catch (final InvocationTargetException e) {
                         }
                     }
                     // Blocked and waited time
@@ -1279,7 +1277,7 @@ public class Application {
                         }
                     }
                     sb.append("  Stack Trace:\r\n");
-                    for (StackTraceElement element : threadInfo.getStackTrace()) {
+                    for (final StackTraceElement element : threadInfo.getStackTrace()) {
                         sb.append("    at ").append(element).append("\r\n");
                     }
                     sb.append("\r\n");
@@ -1290,12 +1288,12 @@ public class Application {
                     if (threadMXBean.isSynchronizerUsageSupported()) {
                         deadlockedThreads = threadMXBean.findDeadlockedThreads();
                     }
-                } catch (UnsupportedOperationException e) {
+                } catch (final UnsupportedOperationException e) {
                 }
                 if (deadlockedThreads != null) {
                     sb.append("=== Deadlock Detected ===\r\n\r\n");
                     final ThreadInfo[] deadlockedThreadInfos = threadMXBean.getThreadInfo(deadlockedThreads);
-                    for (ThreadInfo deadlockThreadInfo : deadlockedThreadInfos) {
+                    for (final ThreadInfo deadlockThreadInfo : deadlockedThreadInfos) {
                         sb.append("Thread Name: ").append(deadlockThreadInfo.getThreadName()).append("\r\n");
                         sb.append("Thread ID: ").append(deadlockThreadInfo.getThreadId()).append("\r\n");
                         sb.append("Thread State: ").append(deadlockThreadInfo.getThreadState()).append("\r\n");
@@ -1320,7 +1318,7 @@ public class Application {
                     threadMXBean.setThreadContentionMonitoringEnabled(originalContentionMonitoring.booleanValue());
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             sb.append("\r\nException during ThreadDump: \r\n" + Exceptions.getStackTrace(e));
         }
         sb.append("=== Basic Thread Dump ===\r\n\r\n");

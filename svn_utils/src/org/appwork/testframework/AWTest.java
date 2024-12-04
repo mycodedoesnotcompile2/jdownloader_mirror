@@ -56,6 +56,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.swing.Icon;
 
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.simple.LogRecord2;
@@ -133,10 +134,10 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             this(MODE.INSTANCEOF);
         }
 
-        public AssertAnException(MODE mode) throws Exception {
+        public AssertAnException(final MODE mode) throws Exception {
             this.mode = mode != null ? mode : MODE.INSTANCEOF;
             this.expectedExceptionType = CompiledType.create(((ParameterizedType) this.getClass().getGenericSuperclass()).getActualTypeArguments()[0]);
-            checkAssert();
+            this.checkAssert();
         }
 
         protected abstract void run() throws Exception;
@@ -145,7 +146,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             try {
                 this.run();
             } catch (final Exception e) {
-                if (validateException(e)) {
+                if (this.validateException(e)) {
                     LogV3.info("Exception as expected: " + Exceptions.toCauseChainClassString(e, true) + " - " + e.getMessage());
                     // fine;
                     return;
@@ -157,13 +158,13 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
         }
 
         protected boolean validateException(final Exception e) {
-            switch (mode) {
+            switch (this.mode) {
             case INSTANCEOF:
-                return CompiledType.create(e.getClass()).isInstanceOf(expectedExceptionType.raw);
+                return CompiledType.create(e.getClass()).isInstanceOf(this.expectedExceptionType.raw);
             case CONTAINS:
-                return Exceptions.containsInstanceOf(e, (Class<? extends Throwable>) expectedExceptionType.raw);
+                return Exceptions.containsInstanceOf(e, (Class<? extends Throwable>) this.expectedExceptionType.raw);
             default:
-                throw new WTFException("Unsupported mode:" + mode);
+                throw new WTFException("Unsupported mode:" + this.mode);
             }
         }
     }
@@ -296,7 +297,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
          * @param object2
          * @throws Exception
          */
-        public void isNot(Object obj) throws Exception {
+        public void isNot(final Object obj) throws Exception {
             assertEqualsNot(this.object, obj);
         }
     }
@@ -678,9 +679,9 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
             if (entry == null) {
                 throw new Exception("Path in Zip is missing: " + zip + "!" + path);
             }
-            File tmp = Application.getResource("tmp/image" + UniqueAlltimeID.next() + "." + Files.getExtension(path, true));
+            final File tmp = Application.getResource("tmp/image" + UniqueAlltimeID.next() + "." + Files.getExtension(path, true));
             IO.secureWrite(tmp, IO.readStream(-1, zipFile.getInputStream(entry)));
-            Icon icon = org.appwork.resources.Theme.getFACTORY().urlToIcon(tmp.toURL(), -1, -1);
+            final Icon icon = org.appwork.resources.Theme.getFACTORY().urlToIcon(tmp.toURL(), -1, -1);
             tmp.delete();
             tmp.deleteOnExit();
             if (icon.getIconWidth() < w || icon.getIconHeight() < h) {
@@ -724,6 +725,7 @@ public abstract class AWTest implements PostBuildTestInterface, TestInterface {
     }
 
     public static void run() {
+        BuildDecisions.setEnabled(false);
         IDETestRunner.run(getTestClass());
         LogV3.disableSysout();
     }

@@ -151,6 +151,9 @@ public class DebugMode {
      * @param e
      */
     public static void debugger(Exception e) {
+        if (e != null) {
+            LogV3.log(e);
+        }
         debugger(e != null, e);
     }
 

@@ -24,14 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.Time;
-import org.appwork.utils.net.HTTPHeader;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -55,7 +47,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.GoFileIoCrawler;
 
-@HostPlugin(revision = "$Revision: 49290 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.Time;
+import org.appwork.utils.net.HTTPHeader;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50290 $", interfaceVersion = 3, names = { "gofile.io" }, urls = { "" })
 public class GofileIo extends PluginForHost {
     public GofileIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -120,12 +120,12 @@ public class GofileIo extends PluginForHost {
                 return token;
             } else {
                 final Browser brc = br.cloneBrowser();
-                final GetRequest req = brc.createGetRequest("https://" + plugin.getHost() + "/dist/js/alljs.js");
+                final GetRequest req = brc.createGetRequest("https://" + plugin.getHost() + "/dist/js/global.js");
                 GofileIo.getPage(plugin, brc, req);
                 token = brc.getRegex("websiteToken\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
                 if (token == null) {
-                    /* 2024-01-26 */
-                    token = brc.getRegex("fetchData\\.wt\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
+                    /* 2024-01-26 / 2024-12-03 */
+                    token = brc.getRegex("(?:fetchData|appdata)\\.wt\\s*(?::|=)\\s*\"(.*?)\"").getMatch(0);
                     if (token == null) {
                         /* 2024-03-11 */
                         token = brc.getRegex("wt\\s*:\\s*\"([^\"]+)").getMatch(0);
@@ -292,7 +292,7 @@ public class GofileIo extends PluginForHost {
                         link.setVerifiedFileSize(con.getCompleteContentLength());
                     }
                 }
-                final String serverFilename = Plugin.getFileNameFromDispositionHeader(con);
+                final String serverFilename = getFileNameFromConnection(con);
                 if (serverFilename != null) {
                     link.setFinalFileName(serverFilename);
                 }

@@ -45,6 +45,7 @@ import org.appwork.storage.SimpleTypeRef;
 import org.appwork.storage.Storable;
 import org.appwork.storage.flexijson.FlexiJSonObject;
 import org.appwork.storage.flexijson.FlexiSerializer;
+import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.FlexiMapperException;
 import org.appwork.storage.flexijson.mapper.ReferenceLoopException;
 import org.appwork.storage.flexijson.mapper.interfacestorage.FlexiVariableAccess;
@@ -211,7 +212,17 @@ public class FlexiVariablesTest extends AWTest {
     @Override
     public void runTest() throws Exception {
         // TODO: Test FlexiInterface
-        FlexiSerializer.setAsDefault();
+        Deser.set(new FlexiSerializer() {
+            /**
+             * @see org.appwork.storage.flexijson.FlexiSerializer#getMapper(java.lang.Object[])
+             */
+            @Override
+            protected FlexiJSonMapper getMapper(Object... context) {
+                FlexiJSonMapper ret = super.getMapper(context);
+                ret.setReferencesEnabled(true);
+                return ret;
+            }
+        });
         Container c = new Container();
         HashMap<String, Object> vars = new HashMap<String, Object>();
         vars.put("a", "AAA");

@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -40,19 +41,43 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PCloudComFolder;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 48606 $", interfaceVersion = 2, names = { "pcloud.com" }, urls = { "https?://pclouddecrypted\\.com/\\d+" })
+@HostPlugin(revision = "$Revision: 50284 $", interfaceVersion = 2, names = {}, urls = {})
+@PluginDependencies(dependencies = { PCloudComFolder.class })
 public class PCloudCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public PCloudCom(PluginWrapper wrapper) {
         super(wrapper);
         setConfigElements();
-        this.enablePremium("https://my.pcloud.com/#page=register");
+        this.enablePremium("https://my." + getHost() + "/#page=register");
+    }
+
+    private static List<String[]> getPluginDomains() {
+        return PCloudComFolder.getPluginDomains();
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            /* No regex needed */
+            ret.add("");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override
@@ -162,7 +187,8 @@ public class PCloudCom extends PluginForHost {
         final String filename = link.getStringProperty("plain_name");
         final String filesize = link.getStringProperty("plain_size");
         if (filename == null || filesize == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         link.setFinalFileName(filename);
         link.setDownloadSize(Long.parseLong(filesize));

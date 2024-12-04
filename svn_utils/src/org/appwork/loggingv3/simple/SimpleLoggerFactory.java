@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -47,7 +47,6 @@ import org.appwork.loggingv3.PreInitLoggerFactory;
 import org.appwork.loggingv3.simple.sink.LogToFileSink;
 import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.loggingv3.simple.sink.Sink;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.reflection.Clazz;
 
@@ -60,63 +59,62 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     protected final CopyOnWriteArrayList<Sink> sinks = new CopyOnWriteArrayList<Sink>();
 
     public List<Sink> getSinks() {
-        return Collections.unmodifiableList(sinks);
+        return Collections.unmodifiableList(this.sinks);
     }
 
     protected final HashMap<String, LoggerToSink> logger = new HashMap<String, LoggerToSink>();
     protected LogToFileSink                       sinkToFile;
 
     public LogToFileSink getSinkToFile() {
-        return sinkToFile;
+        return this.sinkToFile;
     }
 
-    public void setSinkToFile(LogToFileSink sinkToFile) {
-        removeSink(this.sinkToFile);
+    public void setSinkToFile(final LogToFileSink sinkToFile) {
+        this.removeSink(this.sinkToFile);
         this.sinkToFile = sinkToFile;
-        addSink(sinkToFile);
+        this.addSink(sinkToFile);
     }
 
     public LogToStdOutSink getSinkToConsole() {
-        return sinkToConsole;
+        return this.sinkToConsole;
     }
 
-    public void setSinkToConsole(LogToStdOutSink sinkToConsole) {
-        removeSink(this.sinkToConsole);
+    public void setSinkToConsole(final LogToStdOutSink sinkToConsole) {
+        this.removeSink(this.sinkToConsole);
         this.sinkToConsole = sinkToConsole;
-        addSink(sinkToConsole);
+        this.addSink(sinkToConsole);
     }
 
     protected LogToStdOutSink sinkToConsole;
 
     public SimpleLoggerFactory() {
- 
     }
 
     public SimpleLoggerFactory initDefaults() {
-        sinkToConsole = new LogToStdOutSink();
+        this.sinkToConsole = new LogToStdOutSink();
         // do not add a file sink by default. Else every application that uses the lib, will create log files. this must be enabled in the
         // application itself, usually by overwriting the facrory and put its path in the properties
         // addSink(sinkToFile);
-        addSink(sinkToConsole);
+        this.addSink(this.sinkToConsole);
         return this;
     }
 
     @Override
-    public LogInterface getLogger(Object context) {
+    public LogInterface getLogger(final Object context) {
         if (context == null) {
-            return getDefaultLogger();
+            return this.getDefaultLogger();
         } else {
             if (context instanceof LogInterface) {
                 return (LogInterface) context;
             } else if (context instanceof LoggerProvider) {
                 return ((LoggerProvider) context).getLogger();
             } else {
-                synchronized (logger) {
+                synchronized (this.logger) {
                     final String id = context.toString();
-                    LoggerToSink ret = logger.get(id);
+                    LoggerToSink ret = this.logger.get(id);
                     if (ret == null) {
-                        logger.put(id, ret = createLogger(context));
-                        ret.info("Created Logger " + logger.size() + ": " + context);
+                        this.logger.put(id, ret = this.createLogger(context));
+                        ret.info("Created Logger " + this.logger.size() + ": " + context);
                     }
                     return ret;
                 }
@@ -124,27 +122,27 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
         }
     }
 
-    protected LoggerToSink createLogger(Object name) {
+    protected LoggerToSink createLogger(final Object name) {
         return new LoggerToSink(this);
     }
 
     @Override
     public LogInterface getDefaultLogger() {
-        return getLogger(LogV3.class.getSimpleName());
+        return this.getLogger(LogV3.class.getSimpleName());
     }
 
     /**
      * @param logToFileSink
      */
-    public boolean addSink(Sink sink) {
-        return sink != null && sinks.addIfAbsent(sink);
+    public boolean addSink(final Sink sink) {
+        return sink != null && this.sinks.addIfAbsent(sink);
     }
 
     /**
      * @param logToFileSink
      */
-    public boolean removeSink(Sink sink) {
-        return sink != null && sinks.remove(sink);
+    public boolean removeSink(final Sink sink) {
+        return sink != null && this.sinks.remove(sink);
     }
 
     private volatile HashSet<LogVetoListener> vetoListener;
@@ -154,10 +152,10 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
             if (logVetoListener != null) {
                 final HashSet<LogVetoListener> newList = new HashSet<LogVetoListener>();
                 if (this.vetoListener != null) {
-                    newList.addAll(vetoListener);
+                    newList.addAll(this.vetoListener);
                 }
                 final boolean ret = newList.add(logVetoListener);
-                vetoListener = newList;
+                this.vetoListener = newList;
                 return ret;
             } else {
                 return false;
@@ -167,14 +165,14 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
 
     public boolean removeVetoListener(final LogVetoListener logVetoListener) {
         synchronized (this) {
-            if (vetoListener != null && logVetoListener != null) {
+            if (this.vetoListener != null && logVetoListener != null) {
                 final HashSet<LogVetoListener> newList = new HashSet<LogVetoListener>();
-                newList.addAll(vetoListener);
+                newList.addAll(this.vetoListener);
                 final boolean ret = newList.remove(logVetoListener);
                 if (newList.size() == 0) {
-                    vetoListener = null;
+                    this.vetoListener = null;
                 } else {
-                    vetoListener = newList;
+                    this.vetoListener = newList;
                 }
                 return ret;
             } else {
@@ -184,9 +182,9 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     @Override
-    public void publish(LogRecord2 record) {
+    public void publish(final LogRecord2 record) {
         final Set<LogVetoListener> vetoListener = this.vetoListener;
-        sinks: for (final Sink sink : sinks) {
+        sinks: for (final Sink sink : this.sinks) {
             if (vetoListener != null) {
                 for (final LogVetoListener veto : vetoListener) {
                     if (veto.blockLogPublishing(this, sink, record)) {
@@ -199,11 +197,10 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     @Override
-    public SimpleLoggerFactory setFactory(LogV3Factory previousFactory) {
+    public SimpleLoggerFactory setFactory(final LogV3Factory previousFactory) {
         if (previousFactory instanceof PreInitLoggerFactory) {
             // forward cached entries
             for (final LogRecord2 c : ((PreInitLoggerFactory) previousFactory).getCached()) {
-                DebugMode.debugger();
                 this.publish(c);
             }
         }
@@ -214,8 +211,8 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
      * @param sinkToConsole2
      * @return
      */
-    public boolean hasSink(Sink sink) {
-        return sink != null && sinks.contains(sink);
+    public boolean hasSink(final Sink sink) {
+        return sink != null && this.sinks.contains(sink);
     }
 
     /**
@@ -223,8 +220,8 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
      * @param class1
      * @return
      */
-    public <T extends Sink> T getSinkByClass(Class<T> class1) {
-        for (Sink sink : sinks) {
+    public <T extends Sink> T getSinkByClass(final Class<T> class1) {
+        for (final Sink sink : this.sinks) {
             if (Clazz.isInstanceof(sink.getClass(), class1)) {
                 return (T) sink;
             }

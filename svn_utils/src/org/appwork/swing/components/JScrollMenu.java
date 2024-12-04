@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -48,7 +48,7 @@ import javax.swing.UIManager;
 import javax.swing.plaf.MenuItemUI;
 import javax.swing.plaf.PopupMenuUI;
 
-import org.appwork.utils.Application;
+import org.appwork.swing.synthetica.SyntheticaHelper;
 
 /**
  * Source: http://stackoverflow.com/questions/9288350/adding-vertical-scroll-to-a-jpopupmenu
@@ -99,7 +99,7 @@ public class JScrollMenu extends JMenu {
     @Override
     public Dimension getPreferredSize() {
         Dimension ret = super.getPreferredSize();
-        if (Application.isSyntheticaLookAndFeel()) {
+        if (SyntheticaHelper.isSyntheticaLookAndFeel()) {
             if (getMenuComponentCount() > 0) {
                 // seems like somehow synthetica does not respect the arrow for this class
                 ret.width += 10;

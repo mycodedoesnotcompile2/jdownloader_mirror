@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -40,18 +40,23 @@ import java.net.URLStreamHandlerFactory;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.testframework.AWTestValidateClassReference;
+
 /**
  * @author daniel
  *
  */
 public class JarHandlerWorkaroundOracle {
-    private static final AtomicBoolean INIT = new AtomicBoolean(false);
+
+    @AWTestValidateClassReference
+    public static final String         CLASS_ORG_APPWORK_UTILS_ORACLE_WORKAROUND_JAR_HANDLER = "org.appwork.utils.OracleWorkaroundJarHandler";
+    private static final AtomicBoolean INIT                                                  = new AtomicBoolean(false);
 
     // add custom jarHandler for http://bugs.java.com/view_bug.do?bug_id=6390779
     public static void init() {
         if (INIT.compareAndSet(false, true)) {
             try {
-                final Class<java.net.URLStreamHandler> oracleWorkaroundJarHandler = (Class<URLStreamHandler>) Class.forName("org.appwork.utils.OracleWorkaroundJarHandler");
+                final Class<java.net.URLStreamHandler> oracleWorkaroundJarHandler = (Class<URLStreamHandler>) Class.forName(CLASS_ORG_APPWORK_UTILS_ORACLE_WORKAROUND_JAR_HANDLER);
                 {
                     URL.setURLStreamHandlerFactory(new URLStreamHandlerFactory() {
                         @Override

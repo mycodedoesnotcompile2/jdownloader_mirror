@@ -32,47 +32,28 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork;
+package org.appwork.builddecision;
 
-import org.appwork.builddecision.BuildDecisionRequired;
-import org.appwork.testframework.AWTestValidateClassReference;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+@Retention(RUNTIME)
+@Target(TYPE)
 /**
  * @author thomas
- * @date 19.11.2024
+ * @date Nov 27, 2024
  *
  */
-@BuildDecisionRequired(tags = { JNAHelper.JNA_HELPER_USE_JNA, JNAHelper.JNA_HELPER_NO_JNA }, imports = { JNAHelper.CLASS_COM_SUN_JNA_NATIVE + ";" + JNAHelper.CLASS_COM_SUN_JNA_PLATFORM_FILE_UTILS, "" })
-public class JNAHelper {
-    /**
-     *
-     */
-    public static final String JNA_HELPER_NO_JNA                     = "JNAHelper.noJNA";
-    /**
-     *
-     */
-    @AWTestValidateClassReference(classpath = ".*/?jna[_-]platform\\.jar")
-    public static final String CLASS_COM_SUN_JNA_PLATFORM_FILE_UTILS = "com.sun.jna.platform.FileUtils";
-    /**
-     *
-     */
-    @AWTestValidateClassReference(classpath = ".*/?jna\\.jar")
-    public static final String CLASS_COM_SUN_JNA_NATIVE              = "com.sun.jna.Native";
-    /**
-     *
-     */
-    public static final String JNA_HELPER_USE_JNA                    = "JNAHelper.useJNA";
+// @BuildDecisionRequired(id = "IncludeJNA", requiredClass = { "com.sun.jna.Native" })
+public @interface BuildDecisionRequired {
+    String[] tags();
 
-    /**
-     * @return
-     */
-    public static boolean isJNAAvailable() {
-        try {
-            // Try to load the JNA class
-            Class.forName(CLASS_COM_SUN_JNA_NATIVE, false, JNAHelper.class.getClassLoader());
-            return true;
-        } catch (final Exception e) {
-            return false;
-        }
-    }
+    String[] imports() default "";
+
+    String[] dependsOn() default "";
+
+    String msg() default "";
 }
