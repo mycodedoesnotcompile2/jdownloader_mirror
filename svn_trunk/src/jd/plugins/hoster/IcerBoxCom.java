@@ -26,7 +26,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.antiDDoSForHost;
+import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
@@ -39,12 +39,14 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
 /**
@@ -52,11 +54,10 @@ import jd.plugins.components.PluginJSonUtils;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
-public class IcerBoxCom extends antiDDoSForHost {
-    private final String language = System.getProperty("user.language");
-    private final String baseURL  = "https://icerbox.com";
-    private final String apiURL   = "https://icerbox.com/api/v1";
+@HostPlugin(revision = "$Revision: 50291 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+public class IcerBoxCom extends PluginForHost {
+    private final String baseURL = "https://icerbox.com";
+    private final String apiURL  = "https://icerbox.com/api/v1";
 
     public IcerBoxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,13 +65,21 @@ public class IcerBoxCom extends antiDDoSForHost {
     }
 
     @Override
-    public String getAGBLink() {
-        return baseURL + "/tos";
+    public LazyPlugin.FEATURE[] getFeatures() {
+        return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.USERNAME_IS_EMAIL };
     }
 
     @Override
-    public void correctDownloadLink(final DownloadLink link) {
-        link.setUrlDownload(link.getDownloadURL().replaceFirst("(?i)http://", "https://"));
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        br.addAllowedResponseCodes(500);
+        return br;
+    }
+
+    @Override
+    public String getAGBLink() {
+        return baseURL + "/tos";
     }
 
     private void setConstants(final Account account) {
@@ -79,44 +88,18 @@ public class IcerBoxCom extends antiDDoSForHost {
                 // free account
                 chunks = 1;
                 resumes = false;
-                isFree = true;
-                directlinkproperty = "freelink2";
             } else {
                 // premium account
                 chunks = 0;
                 resumes = true;
-                isFree = false;
-                directlinkproperty = "premlink";
             }
-            logger.finer("setConstants = " + account.getUser() + " @ Account Download :: isFree = " + isFree + ", upperChunks = " + chunks + ", Resumes = " + resumes);
+            logger.finer("setConstants = " + account.getUser() + " @ Account Download :: isFree = null, upperChunks = " + chunks + ", Resumes = " + resumes);
         } else {
             // free non account
             chunks = 1;
             resumes = false;
-            isFree = true;
-            directlinkproperty = "freelink";
-            logger.finer("setConstants = Guest Download :: isFree = " + isFree + ", upperChunks = " + chunks + ", Resumes = " + resumes);
+            logger.finer("setConstants = Guest Download :: isFree = null, upperChunks = " + chunks + ", Resumes = " + resumes);
         }
-    }
-
-    private boolean freedl = false;
-
-    @Override
-    protected boolean useRUA() {
-        if (freedl) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    protected Browser prepBrowser(final Browser prepBr, final String host) {
-        if (!(browserPrepped.containsKey(prepBr) && browserPrepped.get(prepBr) == Boolean.TRUE)) {
-            super.prepBrowser(prepBr, host);
-            prepBr.addAllowedResponseCodes(500);
-        }
-        return prepBr;
     }
 
     @Override
@@ -145,7 +128,7 @@ public class IcerBoxCom extends antiDDoSForHost {
     public boolean checkLinks(final DownloadLink[] urls) {
         boolean okay = true;
         try {
-            final Browser br = new Browser();
+            final Browser br = this.createNewBrowserInstance();
             br.getHeaders().put("Accept", "application/json");
             final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
             int index = 0;
@@ -169,8 +152,8 @@ public class IcerBoxCom extends antiDDoSForHost {
                         atLeastOneDL = true;
                     }
                 }
-                getPage(br, apiURL + "/files?ids=" + sb);
-                if (br.containsHTML("(?i)In these moments we are upgrading the site system")) {
+                br.getPage(apiURL + "/files?ids=" + sb);
+                if (br.containsHTML("In these moments we are upgrading the site system")) {
                     for (final DownloadLink dl : links) {
                         dl.getLinkStatus().setStatusText("Hoster is in maintenance mode. Try again later");
                         dl.setAvailableStatus(AvailableStatus.UNCHECKABLE);
@@ -218,7 +201,7 @@ public class IcerBoxCom extends antiDDoSForHost {
                         dl.setMD5Hash(md5);
                     }
                     if (Boolean.TRUE.equals(free_available)) {
-                        dl.setProperty("premiumRequired", Property.NULL);
+                        dl.removeProperty("premiumRequired");
                     } else {
                         dl.setProperty("premiumRequired", true);
                     }
@@ -234,6 +217,7 @@ public class IcerBoxCom extends antiDDoSForHost {
                 }
             }
         } catch (final Exception e) {
+            logger.log(e);
             return false;
         }
         return okay;
@@ -249,10 +233,10 @@ public class IcerBoxCom extends antiDDoSForHost {
     }
 
     @Override
-    public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
+    public void handleFree(final DownloadLink link) throws Exception, PluginException {
         setConstants(null);
         if (useAPI()) {
-            handleDownload_API(downloadLink, null);
+            handleDownload_API(link, null);
         } else {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -276,17 +260,14 @@ public class IcerBoxCom extends antiDDoSForHost {
 
     private AccountInfo fetchAccountInfoApi(final Account account) throws Exception {
         synchronized (account) {
-            if (inValidate(account.getUser()) || !account.getUser().matches(".+@.+")) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nYou haven't provided a valid username (must be email address)!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
             final AccountInfo ai = new AccountInfo();
-            final Browser ajax = new Browser();
+            final Browser ajax = this.createNewBrowserInstance();
             ajax.getHeaders().put("Accept", "application/json");
             String token = account.getStringProperty("token", null);
             if (StringUtils.isNotEmpty(token)) {
                 logger.info("Validating stored logintoken");
                 ajax.getHeaders().put("Authorization", "Bearer " + token);
-                getPage(ajax, apiURL + "/user/account");
+                ajax.getPage(apiURL + "/user/account");
                 if (ajax.containsHTML("\"token_invalid\"") || ajax.getRequest().getHttpConnection().getResponseCode() != 200 || ajax.getHostCookie("ddl", Cookies.NOTDELETEDPATTERN) == null) {
                     token = null;
                     /* Do not retry with this known to be invalid token. */
@@ -298,12 +279,12 @@ public class IcerBoxCom extends antiDDoSForHost {
             }
             if (StringUtils.isEmpty(token)) {
                 logger.info("Performing full login");
-                postPage(ajax, apiURL + "/auth/login", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
+                ajax.postPage(apiURL + "/auth/login", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()));
                 handleApiErrors(ajax, account, null);
                 // recaptcha can happen here on brute force attack
                 if (ajax.getHttpConnection().getResponseCode() == 429) {
                     final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, ajax, "6LcKRRITAAAAAExk3Pb2MfEBMP7HGTk8HG4cRBXv").getToken();
-                    postPage(ajax, apiURL + "/auth/login", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response));
+                    ajax.postPage(apiURL + "/auth/login", "email=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&g-recaptcha-response=" + Encoding.urlEncode(recaptchaV2Response));
                     handleApiErrors(ajax, account, null);
                     if (ajax.getHttpConnection().getResponseCode() == 429 || ajax.getHttpConnection().getResponseCode() == 422) {
                         throw new PluginException(LinkStatus.ERROR_CAPTCHA);
@@ -318,7 +299,7 @@ public class IcerBoxCom extends antiDDoSForHost {
                 }
                 account.setProperty("token", token);
                 ajax.getHeaders().put("Authorization", "Bearer " + token);
-                getPage(ajax, apiURL + "/user/account");
+                ajax.getPage(apiURL + "/user/account");
                 final String err = PluginJSonUtils.getJsonValue(ajax, "err");
                 if (StringUtils.equals("PASSWORD_RENEW", err)) {
                     throw new PluginException(LinkStatus.ERROR_PREMIUM, "Password expired. Enter your Account page and change it.", PluginException.VALUE_ID_PREMIUM_DISABLE);
@@ -360,39 +341,27 @@ public class IcerBoxCom extends antiDDoSForHost {
     }
 
     private void handleDownload_API(final DownloadLink link, final Account account) throws Exception {
-        // prevent more than one download starting at a time, so that we don't perform relogin multiple times within synchronised queues
-        synchronized (account) {
-            requestFileInformationApi(link);
-            dllink = checkDirectLink(link, directlinkproperty);
-            if (inValidate(dllink)) {
-                // links that require premium...
-                if (link.getBooleanProperty("premiumRequired", false) && account == null) {
-                    throw new AccountRequiredException();
-                }
-                br = new Browser();
-                br.getHeaders().put("Accept", "application/json");
-                if (account != null && account.getType() == AccountType.PREMIUM) {
-                    final String token = account.getStringProperty("token", null);
-                    if (token == null) {
-                        // this should not happen.
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    final String req = apiURL + "/dl/ticket";
-                    br.getHeaders().put("Authorization", "Bearer " + token);
-                    postPage(req, "file=" + getFID(link));
-                    dllink = PluginJSonUtils.getJsonValue(br, "url");
-                } else {
-                    // currently only premium accounts can download... pointless making other download support at this time
-                    throw new AccountRequiredException();
-                }
-                handleApiErrors(br, account, link);
-                if (inValidate(dllink)) {
-                    if (br.toString().matches("Connect failed: Can't connect to local MySQL server.+")) {
-                        throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                }
+        /* links that require premium when we don't have a premium account. */
+        if (link.hasProperty("premiumRequired") && (account == null || AccountType.FREE.equals(account.getType()))) {
+            throw new AccountRequiredException();
+        }
+        requestFileInformationApi(link);
+        final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
+        dllink = checkDirectLink(link, directlinkproperty);
+        if (StringUtils.isEmpty(dllink)) {
+            br.getHeaders().put("Accept", "application/json");
+            final String token = account.getStringProperty("token", null);
+            if (token == null) {
+                // this should not happen.
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final String url = apiURL + "/dl/ticket";
+            br.getHeaders().put("Authorization", "Bearer " + token);
+            br.postPage(url, "file=" + getFID(link));
+            dllink = PluginJSonUtils.getJsonValue(br, "url");
+            handleApiErrors(br, account, link);
+            if (StringUtils.isEmpty(dllink)) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
         dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, resumes, chunks);
@@ -413,27 +382,20 @@ public class IcerBoxCom extends antiDDoSForHost {
         }
     }
 
-    private void handleApiErrors(final Browser br, final Account account, final DownloadLink downloadLink) throws Exception {
+    private void handleApiErrors(final Browser br, final Account account, final DownloadLink link) throws Exception {
         final int resCode = br.getHttpConnection().getResponseCode();
-        if (resCode == 401 && downloadLink == null) {
+        if (resCode == 401 && link == null) {
             br.followConnection();
-            // invalid user/pass
-            if ("de".equalsIgnoreCase(language)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername, Passwort oder login Captcha!\r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen? Versuche folgendes:\r\n1. Falls dein Passwort Sonderzeichen enthält, ändere es (entferne diese) und versuche es erneut!\r\n2. Gib deine Zugangsdaten per Hand (ohne kopieren/einfügen) ein.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else if ("pl".equalsIgnoreCase(language)) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBłędny użytkownik/hasło lub kod Captcha wymagany do zalogowania!\r\nUpewnij się, że prawidłowo wprowadziłes hasło i nazwę użytkownika. Dodatkowo:\r\n1. Jeśli twoje hasło zawiera znaki specjalne, zmień je (usuń) i spróbuj ponownie!\r\n2. Wprowadź hasło i nazwę użytkownika ręcznie bez użycia opcji Kopiuj i Wklej.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password or login captcha!\r\nYou're sure that the username and password you entered are correct? Some hints:\r\n1. If your password contains special characters, change it (remove them) and try again!\r\n2. Type in your username/password by hand without copy & paste.", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
+            throw new AccountInvalidException();
         } else if (resCode == 403 || resCode == 401) {
             br.followConnection();
-            if (account != null && downloadLink == null) {
+            if (account != null && link == null) {
                 // banned user within login only
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nYour account has been banned!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                throw new AccountInvalidException("Your account has been banned!");
             }
             // admin states that download routine can throw this as well.
             // we will invalidate the session token, throw temp hoster unvail, and relogin.
-            else if (account != null && downloadLink != null) {
+            else if (account != null && link != null) {
                 if (br.containsHTML("Download this file will exceed your bandwidth")) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Not enough traffic left!", 1 * 60 * 60 * 1000l);
                 }
@@ -452,40 +414,39 @@ public class IcerBoxCom extends antiDDoSForHost {
     }
 
     private String checkDirectLink(final DownloadLink downloadLink, final String property) {
-        if (property != null) {
-            final String dllink = downloadLink.getStringProperty(property);
-            if (dllink != null) {
-                URLConnectionAdapter con = null;
-                try {
-                    final Browser br2 = br.cloneBrowser();
-                    br2.setFollowRedirects(true);
-                    con = br2.openHeadConnection(dllink);
-                    if (!con.isOK() || con.getContentType().contains("text") || con.getCompleteContentLength() <= 0) {
-                        throw new IOException();
-                    } else {
-                        return dllink;
-                    }
-                } catch (final Exception e) {
-                    logger.log(e);
-                    downloadLink.setProperty(property, Property.NULL);
-                    return null;
-                } finally {
-                    try {
-                        con.disconnect();
-                    } catch (final Throwable e) {
-                    }
-                }
+        if (property == null) {
+            return null;
+        }
+        final String dllink = downloadLink.getStringProperty(property);
+        if (dllink == null) {
+            return null;
+        }
+        URLConnectionAdapter con = null;
+        try {
+            final Browser br2 = br.cloneBrowser();
+            br2.setFollowRedirects(true);
+            con = br2.openHeadConnection(dllink);
+            if (!this.looksLikeDownloadableContent(con)) {
+                throw new IOException();
+            } else {
+                return dllink;
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            downloadLink.setProperty(property, Property.NULL);
+            return null;
+        } finally {
+            try {
+                con.disconnect();
+            } catch (final Throwable e) {
             }
         }
-        return null;
     }
 
     private AvailableStatus requestFileInformationApi(final DownloadLink link) throws IOException, PluginException {
         final boolean checked = checkLinks(new DownloadLink[] { link });
         // we can't throw exception in checklinks! This is needed to prevent multiple captcha events!
-        if (!checked && hasAntiddosCaptchaRequirement()) {
-            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-        } else if (!checked || !link.isAvailabilityStatusChecked()) {
+        if (!checked || !link.isAvailabilityStatusChecked()) {
             link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
         } else if (!link.isAvailable()) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -517,25 +478,36 @@ public class IcerBoxCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public void resetDownloadlink(final DownloadLink link) {
-        if (link != null) {
-            link.setProperty("apiInfo", Property.NULL);
-            link.setProperty("freelink2", Property.NULL);
-            link.setProperty("freelink", Property.NULL);
-            link.setProperty("premlink", Property.NULL);
-            link.setProperty("premiumRequired", Property.NULL);
+        if (link == null) {
+            return;
         }
+        link.setProperty("apiInfo", Property.NULL);
+        link.setProperty("freelink2", Property.NULL);
+        link.setProperty("freelink", Property.NULL);
+        link.setProperty("premlink", Property.NULL);
+        link.setProperty("premiumRequired", Property.NULL);
     }
 
-    private String  dllink             = null;
-    private String  directlinkproperty = null;
-    private int     chunks             = 0;
-    private boolean resumes            = true;
-    private boolean isFree             = true;
+    private String  dllink  = null;
+    private int     chunks  = 0;
+    private boolean resumes = true;
+
+    protected String getDownloadModeDirectlinkProperty(final Account account) {
+        if (AccountType.PREMIUM.equals(account.getType())) {
+            /* Premium account */
+            return "premlink";
+        } else if (AccountType.FREE.equals(account.getType())) {
+            return "freelink2";
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return "freelink";
+        }
+    }
 
     public boolean hasCaptcha(final DownloadLink downloadLink, final jd.plugins.Account acc) {
         if (acc == null) {
@@ -548,15 +520,23 @@ public class IcerBoxCom extends antiDDoSForHost {
             return false;
         }
     }
-
-    public boolean hasAutoCaptcha() {
-        return false;
-    }
+    // @Override
+    // public boolean enoughTrafficFor(final DownloadLink link, final Account account) throws Exception {
+    // final String directlinkproperty = getDownloadModeDirectlinkProperty(account);
+    // final String dllink = link.getStringProperty(directlinkproperty);
+    // /*
+    // * E.g. account doesn't have enough traffic left but we still got a stored directurl from a previous downloadstart --> Allow
+    // * download attempt anyways as we can be quite sure that it will still be valid.
+    // */
+    // if (StringUtils.isNotEmpty(dllink)) {
+    // return true;
+    // } else {
+    // return super.enoughTrafficFor(link, account);
+    // }
+    // }
 
     @Override
-    protected void runPostRequestTask(final Browser ibr) throws PluginException {
-        if (ibr.containsHTML("(?i)>\\s*OUR WEBSITE IS UNDER CONSTRUCTION\\s*</strong>")) {
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Website Under Construction!", 15 * 60 * 1000l);
-        }
+    public boolean hasAutoCaptcha() {
+        return false;
     }
 }

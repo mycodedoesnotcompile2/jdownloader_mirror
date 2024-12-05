@@ -2532,112 +2532,113 @@ public abstract class PluginForHost extends Plugin {
                 parent.add(changeURLMenuItem);
             }
         }
-        if (allPvs.size() == 1) {
-            final JMenu setVariants = new JMenu(_GUI.T.PluginForHost_extendLinkgrabberContextMenu_generic_convert());
-            setVariants.setIcon(DomainInfo.getInstance(getHost()).getFavIcon());
-            setVariants.setEnabled(false);
-            final JMenu addVariants = new JMenu("Add converted variant...");
-            addVariants.setIcon(new BadgeIcon(DomainInfo.getInstance(getHost()), new AbstractIcon(IconKey.ICON_ADD, 16), 4, 4));
-            addVariants.setEnabled(false);
-            // setVariants.setVisible(false);
-            // addVariants.setVisible(false);
-            new Thread("Collect Variants") {
-                public void run() {
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e1) {
-                        e1.printStackTrace();
+        if (allPvs.size() != 1) {
+            return;
+        }
+        final JMenu setVariants = new JMenu(_GUI.T.PluginForHost_extendLinkgrabberContextMenu_generic_convert());
+        setVariants.setIcon(DomainInfo.getInstance(getHost()).getFavIcon());
+        setVariants.setEnabled(false);
+        final JMenu addVariants = new JMenu("Add converted variant...");
+        addVariants.setIcon(new BadgeIcon(DomainInfo.getInstance(getHost()), new AbstractIcon(IconKey.ICON_ADD, 16), 4, 4));
+        addVariants.setEnabled(false);
+        // setVariants.setVisible(false);
+        // addVariants.setVisible(false);
+        new Thread("Collect Variants") {
+            public void run() {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+                HashSet<GenericVariants> map = new HashSet<GenericVariants>();
+                final ArrayList<GenericVariants> list = new ArrayList<GenericVariants>();
+                for (CrawledLink cl : pv.getChildren()) {
+                    if (cl.getDownloadLink() == null || !cl.getDownloadLink().getBooleanProperty("GENERIC_VARIANTS", false) || !cl.getDownloadLink().hasVariantSupport()) {
+                        continue;
                     }
-                    HashSet<GenericVariants> map = new HashSet<GenericVariants>();
-                    final ArrayList<GenericVariants> list = new ArrayList<GenericVariants>();
-                    for (CrawledLink cl : pv.getChildren()) {
-                        if (cl.getDownloadLink() == null || !cl.getDownloadLink().getBooleanProperty("GENERIC_VARIANTS", false) || !cl.getDownloadLink().hasVariantSupport()) {
-                            continue;
-                        }
-                        List<GenericVariants> v = cl.getDownloadLink().getVariants(GenericVariants.class);
-                        if (v != null) {
-                            for (LinkVariant lv : v) {
-                                if (lv instanceof GenericVariants) {
-                                    if (map.add((GenericVariants) lv)) {
-                                        list.add((GenericVariants) lv);
-                                    }
+                    List<GenericVariants> v = cl.getDownloadLink().getVariants(GenericVariants.class);
+                    if (v != null) {
+                        for (LinkVariant lv : v) {
+                            if (lv instanceof GenericVariants) {
+                                if (map.add((GenericVariants) lv)) {
+                                    list.add((GenericVariants) lv);
                                 }
                             }
                         }
                     }
-                    if (list.size() == 0) {
-                        return;
+                }
+                if (list.size() == 0) {
+                    return;
+                }
+                Collections.sort(list, new Comparator<GenericVariants>() {
+                    @Override
+                    public int compare(GenericVariants o1, GenericVariants o2) {
+                        return o1.name().compareTo(o2.name());
                     }
-                    Collections.sort(list, new Comparator<GenericVariants>() {
-                        @Override
-                        public int compare(GenericVariants o1, GenericVariants o2) {
-                            return o1.name().compareTo(o2.name());
-                        }
-                    });
-                    new EDTRunner() {
-                        @Override
-                        protected void runInEDT() {
-                            setVariants.setEnabled(true);
-                            addVariants.setEnabled(true);
-                            setVariants.setVisible(true);
-                            addVariants.setVisible(true);
-                            for (final GenericVariants gv : list) {
-                                setVariants.add(new JMenuItem(new BasicAction() {
-                                    {
-                                        setName(gv._getName(link));
-                                    }
+                });
+                new EDTRunner() {
+                    @Override
+                    protected void runInEDT() {
+                        setVariants.setEnabled(true);
+                        addVariants.setEnabled(true);
+                        setVariants.setVisible(true);
+                        addVariants.setVisible(true);
+                        for (final GenericVariants gv : list) {
+                            setVariants.add(new JMenuItem(new BasicAction() {
+                                {
+                                    setName(gv._getName(link));
+                                }
 
-                                    @Override
-                                    public void actionPerformed(ActionEvent e) {
-                                        java.util.List<CheckableLink> checkableLinks = new ArrayList<CheckableLink>(1);
-                                        for (CrawledLink cl : pv.getChildren()) {
-                                            // List<GenericVariants> variants = new ArrayList<GenericVariants>();
-                                            for (LinkVariant v : getVariantsByLink(cl.getDownloadLink())) {
-                                                if (v.equals(gv)) {
-                                                    LinkCollector.getInstance().setActiveVariantForLink(cl, gv);
-                                                    checkableLinks.add(cl);
-                                                    break;
-                                                }
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    java.util.List<CheckableLink> checkableLinks = new ArrayList<CheckableLink>(1);
+                                    for (CrawledLink cl : pv.getChildren()) {
+                                        // List<GenericVariants> variants = new ArrayList<GenericVariants>();
+                                        for (LinkVariant v : getVariantsByLink(cl.getDownloadLink())) {
+                                            if (v.equals(gv)) {
+                                                LinkCollector.getInstance().setActiveVariantForLink(cl, gv);
+                                                checkableLinks.add(cl);
+                                                break;
                                             }
                                         }
-                                        LinkChecker<CheckableLink> linkChecker = new LinkChecker<CheckableLink>(true);
-                                        linkChecker.check(checkableLinks);
                                     }
-                                }));
-                                addVariants.add(new JMenuItem(new BasicAction() {
-                                    {
-                                        setName(gv._getName(link));
-                                    }
+                                    LinkChecker<CheckableLink> linkChecker = new LinkChecker<CheckableLink>(true);
+                                    linkChecker.check(checkableLinks);
+                                }
+                            }));
+                            addVariants.add(new JMenuItem(new BasicAction() {
+                                {
+                                    setName(gv._getName(link));
+                                }
 
-                                    @Override
-                                    public void actionPerformed(ActionEvent e) {
-                                        java.util.List<CheckableLink> checkableLinks = new ArrayList<CheckableLink>(1);
-                                        for (CrawledLink cl : pv.getChildren()) {
-                                            List<GenericVariants> variants = new ArrayList<GenericVariants>();
-                                            for (LinkVariant v : getVariantsByLink(cl.getDownloadLink())) {
-                                                if (v.equals(gv)) {
-                                                    CrawledLink newLink = LinkCollector.getInstance().addAdditional(cl, gv);
-                                                    if (newLink != null) {
-                                                        checkableLinks.add(newLink);
-                                                    } else {
-                                                        Toolkit.getDefaultToolkit().beep();
-                                                    }
-                                                    break;
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    java.util.List<CheckableLink> checkableLinks = new ArrayList<CheckableLink>(1);
+                                    for (CrawledLink cl : pv.getChildren()) {
+                                        List<GenericVariants> variants = new ArrayList<GenericVariants>();
+                                        for (LinkVariant v : getVariantsByLink(cl.getDownloadLink())) {
+                                            if (v.equals(gv)) {
+                                                CrawledLink newLink = LinkCollector.getInstance().addAdditional(cl, gv);
+                                                if (newLink != null) {
+                                                    checkableLinks.add(newLink);
+                                                } else {
+                                                    Toolkit.getDefaultToolkit().beep();
                                                 }
+                                                break;
                                             }
                                         }
-                                        LinkChecker<CheckableLink> linkChecker = new LinkChecker<CheckableLink>(true);
-                                        linkChecker.check(checkableLinks);
                                     }
-                                }));
-                            }
+                                    LinkChecker<CheckableLink> linkChecker = new LinkChecker<CheckableLink>(true);
+                                    linkChecker.check(checkableLinks);
+                                }
+                            }));
                         }
-                    };
+                    }
                 };
-            }.start();
-            parent.add(setVariants);
-            parent.add(addVariants);
-        }
+            };
+        }.start();
+        parent.add(setVariants);
+        parent.add(addVariants);
     }
 
     public void extendDownloadsTableContextMenu(JComponent parent, PluginView<DownloadLink> pv, Collection<PluginView<DownloadLink>> views) {
@@ -3308,8 +3309,7 @@ public abstract class PluginForHost extends Plugin {
                         if (mhost.getUnavailableTimeMillis() > 0) {
                             return mhost.getUnavailableStatusText();
                         } else if (!mhost.isUnlimitedLinks() && mhost.getLinksLeft() <= 0) {
-                            // TODO: Add translation
-                            return "No links left";
+                            return _GUI.T.account_error_no_links_left();
                         } else if (!mhost.isUnlimitedTraffic() && mhost.getTrafficLeft() <= 0) {
                             return _GUI.T.account_error_no_traffic_left();
                         } else if (text != null) {

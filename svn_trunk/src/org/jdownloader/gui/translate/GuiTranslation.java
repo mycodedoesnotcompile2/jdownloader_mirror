@@ -6981,6 +6981,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en", "de" }, values = { "No traffic left", "Kein Traffic übrig" })
     String account_error_no_traffic_left();
 
+    @Default(lngs = { "en", "de" }, values = { "Reached links limit", "Link Limit erreicht" })
+    String account_error_no_links_left();
+
     @Default(lngs = { "en", "de" }, values = { "Multihoster detail overview table", "Multihoster Detailübersicht" })
     String multihost_detailed_host_do_not_show_again_info_about_multi_host_overview_table_title();
 

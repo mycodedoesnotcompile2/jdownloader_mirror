@@ -51,11 +51,11 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49213 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50291 $", interfaceVersion = 3, names = {}, urls = {})
 public class EPornerCom extends PluginForHost {
     public EPornerCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.eporner.com/");
+        this.enablePremium("https://www." + getHost() + "/");
     }
 
     @Override
@@ -97,7 +97,7 @@ public class EPornerCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.eporner.com/terms/";
+        return "https://www." + getHost() + "/terms/";
     }
 
     private final Pattern      PATTERN_VIDEO           = Pattern.compile("(?i)https?://[^/]+/(?:hd\\-porn/|video-)(\\w+)(/([^/]+))?");
@@ -108,7 +108,7 @@ public class EPornerCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override
@@ -487,49 +487,43 @@ public class EPornerCom extends PluginForHost {
 
     private boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                if (cookies != null) {
-                    logger.info("Attempting cookie login");
-                    this.br.setCookies(this.getHost(), cookies);
-                    if (!force) {
-                        /* Do not validate cookies. */
-                        return false;
-                    }
-                    br.getPage("https://" + this.getHost() + "/");
-                    if (this.isLoggedin()) {
-                        logger.info("Cookie login successful");
-                        /* Refresh cookie timestamp */
-                        account.saveCookies(br.getCookies(br.getHost()), "");
-                        return true;
-                    } else {
-                        logger.info("Cookie login failed");
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                this.br.setCookies(this.getHost(), cookies);
+                if (!force) {
+                    /* Do not validate cookies. */
+                    return false;
                 }
-                logger.info("Performing full login");
-                final Form loginform = new Form();
-                loginform.setMethod(MethodType.POST);
-                loginform.setAction("https://www." + this.getHost() + "/xhr/login/");
-                loginform.put("xhr", "1");
-                loginform.put("act", "login");
-                loginform.put("login", Encoding.urlEncode(account.getUser()));
-                loginform.put("haslo", Encoding.urlEncode(account.getPass()));
-                loginform.put("ref", "/");
-                br.submitForm(loginform);
-                /* 2020-05-26: E.g. login failed: {"status":0,"msg_head":"Login failed.","msg_body":"Bad login\/password"} */
-                br.getPage("/");
-                if (!isLoggedin()) {
-                    throw new AccountInvalidException();
-                }
-                account.saveCookies(this.br.getCookies(br.getHost()), "");
-                return true;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
+                br.getPage("https://" + this.getHost() + "/");
+                if (this.isLoggedin()) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return true;
+                } else {
+                    logger.info("Cookie login failed");
                     account.clearCookies("");
                 }
-                throw e;
             }
+            logger.info("Performing full login");
+            final Form loginform = new Form();
+            loginform.setMethod(MethodType.POST);
+            loginform.setAction("https://www." + this.getHost() + "/xhr/login/");
+            loginform.put("xhr", "1");
+            loginform.put("act", "login");
+            loginform.put("login", Encoding.urlEncode(account.getUser()));
+            loginform.put("haslo", Encoding.urlEncode(account.getPass()));
+            loginform.put("ref", "/");
+            br.submitForm(loginform);
+            /* 2020-05-26: E.g. login failed: {"status":0,"msg_head":"Login failed.","msg_body":"Bad login\/password"} */
+            br.getPage("/");
+            if (!isLoggedin()) {
+                throw new AccountInvalidException();
+            }
+            account.saveCookies(this.br.getCookies(br.getHost()), "");
+            return true;
         }
     }
 
@@ -555,7 +549,7 @@ public class EPornerCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

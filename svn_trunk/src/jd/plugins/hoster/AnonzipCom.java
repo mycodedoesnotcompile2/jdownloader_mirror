@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 48965 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50295 $", interfaceVersion = 2, names = {}, urls = {})
 public class AnonzipCom extends YetiShareCore {
     public AnonzipCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -100,5 +100,11 @@ public class AnonzipCom extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
+    }
+
+    @Override
+    protected boolean requiresWWW() {
+        /* 2024-12-04 */
+        return false;
     }
 }

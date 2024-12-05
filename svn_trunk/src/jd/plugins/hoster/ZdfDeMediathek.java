@@ -52,7 +52,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
+@HostPlugin(revision = "$Revision: 50291 $", interfaceVersion = 3, names = { "zdf.de" }, urls = { "decryptedmediathek://.+" })
 public class ZdfDeMediathek extends PluginForHost {
     public static final String PROPERTY_hlsBandwidth     = "hlsBandwidth";
     public static final String PROPERTY_streamingType    = "streamingType";
@@ -85,7 +85,7 @@ public class ZdfDeMediathek extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "http://zdf.de";
+        return "http://" + getHost();
     }
 
     public static Browser prepBR(final Browser br) {
@@ -563,43 +563,43 @@ public class ZdfDeMediathek extends PluginForHost {
 
         void setAddUnknownQualitiesEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(30)
         boolean isGrabHLS170pVideoEnabled();
 
         void setGrabHLS170pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(40)
         boolean isGrabHLS270pVideoEnabled();
 
         void setGrabHLS270pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(50)
         boolean isGrabHLS360pVideoEnabled();
 
         void setGrabHLS360pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(60)
         boolean isGrabHLS480pVideoEnabled();
 
         void setGrabHLS480pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(70)
         boolean isGrabHLS570pVideoEnabled();
 
         void setGrabHLS570pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(80)
         boolean isGrabHLS720pVideoEnabled();
 
         void setGrabHLS720pVideoEnabled(boolean b);
 
-        @DefaultBooleanValue(true)
+        @DefaultBooleanValue(false)
         @Order(81)
         boolean isGrabHLS1080pVideoEnabled();
 
