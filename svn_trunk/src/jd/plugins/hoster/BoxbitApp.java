@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -103,7 +103,6 @@ public class BoxbitApp extends PluginForHost {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -206,7 +205,6 @@ public class BoxbitApp extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         handleDL(account, link);
     }
 

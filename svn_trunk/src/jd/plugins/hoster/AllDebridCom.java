@@ -88,7 +88,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50228 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -753,7 +753,6 @@ public class AllDebridCom extends PluginForHost {
     }
 
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         final String directlinkproperty = getDirectLinkProperty(link, account);
         final String pawsProperty = getDirectLinkProperty(link, account) + "_paws";
         /* Try to re-use previously generated directurl */
@@ -1189,7 +1188,6 @@ public class AllDebridCom extends PluginForHost {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }

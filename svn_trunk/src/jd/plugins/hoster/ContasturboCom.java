@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49966 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
 public class ContasturboCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("contasturbo.com");
 
@@ -171,7 +171,6 @@ public class ContasturboCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         final String url = Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
         br.postPage("https://www." + this.getHost() + "/api/ext/linkRequest/", "links=" + url);
@@ -197,8 +196,7 @@ public class ContasturboCom extends PluginForHost {
         if (account == null || account.getType() != AccountType.PREMIUM) {
             return false;
         } else {
-            mhm.runCheck(account, link);
-            return true;
+            return super.canHandle(link, account);
         }
     }
 

@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -27,6 +28,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
@@ -46,6 +48,7 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -57,7 +60,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50093 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -101,16 +104,6 @@ public class DebridLinkCom extends PluginForHost {
     @Override
     public String getAGBLink() {
         return "https://" + getHost() + "/tos";
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        /* 2024-07-03: Changed main domain from debrid-link.fr to debrid-link.com */
-        if (host == null || host.equalsIgnoreCase("debrid-link.fr")) {
-            return this.getHost();
-        } else {
-            return super.rewriteHost(host);
-        }
     }
 
     private String getApiBase() {
@@ -184,6 +177,7 @@ public class DebridLinkCom extends PluginForHost {
         if (!StringUtils.isEmpty(registerDate)) {
             ac.setCreateTime(TimeFormatter.getMilliSeconds(registerDate, "yyyy-MM-dd", Locale.ENGLISH));
         }
+        ac.setAccountBalance(((Number) entries.get("pts")).longValue());
         /* Update list of supported hosts */
         /* https://debrid-link.com/api_doc/v2/downloader-regex */
         br.getPage(this.getApiBase() + "/downloader/hosts?keys=status%2CisFree%2Cname%2Cdomains");
@@ -193,7 +187,6 @@ public class DebridLinkCom extends PluginForHost {
         final Map<String, Object> resp_downloader_limits_all = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> resp_downloader_limits_all_value = (Map<String, Object>) resp_downloader_limits_all.get("value");
         final List<Map<String, Object>> resp_downloader_limits_all_value_hosters = (List<Map<String, Object>>) resp_downloader_limits_all_value.get("hosters");
-        final AccountInfo dummyAccInfo = new AccountInfo();
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final Map<String, Object> hosterinfo : hosters) {
             final String hostname = hosterinfo.get("name").toString();
@@ -431,78 +424,122 @@ public class DebridLinkCom extends PluginForHost {
 
     /** List of errors: https://debrid-link.com/api_doc/v2/errors */
     private Map<String, Object> errHandling(final Account account, final DownloadLink link) throws PluginException, InterruptedException {
+        Map<String, Object> entries = null;
         try {
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            final boolean success = ((Boolean) entries.get("success")).booleanValue();
-            if (success) {
-                /* No error */
-                return entries;
-            }
-            String error = (String) entries.get("error");
-            if (error == null) {
-                /* Fallback */
-                error = "Unknown error";
-            }
-            /* First handle account errors */
-            if ("badToken".equals(error)) {
-                /**
-                 * E.g. if user revokes access via debrid-link website. Delete access_token so next time we can try to refresh session.
-                 */
-                account.removeProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
-                throw new AccountUnavailableException("Session expired", 1 * 60 * 1000l);
-            } else if ("serverNotAllowed".equals(error)) {
-                /** Temporary IP (account) ban (used used a VPN/Proxy which is not allowed) */
-                throw new AccountUnavailableException("Dedicated Server/VPN/Proxy detected, account disabled!", 10 * 60 * 1000l);
-            } else if ("disabledServerHost".equals(error)) {
-                /** Happens if downloading from single hosts is not allowed via VPN/proxy. */
-                mhm.putError(account, link, 5 * 60 * 1000l, "Host prohibits VPN/Proxy usage");
-            } else if ("fileNotAvailable".equals(error)) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "The file seem to be temporarily unavailable on the host side", 30 * 60 * 1000l);
-            } else if ("floodDetected".equals(error)) {
-                throw new AccountUnavailableException("API Flood, will retry in 1 hour!", 30 * 60 * 1001l);
-            } else if ("accountLocked".equals(error)) {
-                throw new AccountUnavailableException("Account locked", 30 * 60 * 1001l);
-            } else if ("fileNotFound".equals(error)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else if ("notDebrid".equals(error)) {
-                mhm.putError(account, link, 2 * 60 * 1000l, "Disabled filehost: server error notDebrid");
-            } else if ("disabledHost".equals(error)) {
-                /* The filehoster is disabled */
-                mhm.putError(account, link, 5 * 60 * 1000l, "Disabled filehost");
-            } else if ("notFreeHost".equals(error)) {
-                mhm.putError(account, link, 5 * 60 * 1000l, "Disabled filehost as it is only available for premium users");
-            } else if ("maintenanceHost".equals(error) || "noServerHost".equals(error)) {
-                /* Some generic "Host currently doesn't work" traits! */
-                mhm.putError(account, link, 2 * 60 * 1000l, error);
-            } else if ("maxLinkHost".equals(error)) {
-                mhm.putError(account, link, 2 * 60 * 1000l, "Daily max links limit reached for this host");
-            } else if ("maxDataHost".equals(error)) {
-                mhm.putError(account, link, 2 * 60 * 1000l, "Daily traffic limit reached for this host");
-            } else if ("maxLink".equals(error)) {
-                throw new AccountUnavailableException("Download limit reached: Max links per day", 10 * 60 * 1001l);
-            } else if ("maxData".equals(error)) {
-                throw new AccountUnavailableException("Download limit reached: Max traffic per day", 10 * 60 * 1001l);
-            } else if ("freeServerOverload".equals(error)) {
-                /* I assume this means free account downloads from this host are not possible at the moment? */
-                mhm.putError(account, link, 10 * 60 * 1000l, "Free account downloads not possible at the moment");
-            } else if (isErrorPasswordRequiredOrWrong(error)) {
-                /* This error will usually be handled outside of here! */
-                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-            } else if ("maxSimultaneousFilesHost".equals(error)) {
-                mhm.putError(account, link, 3 * 60 * 1000l, "Too many simultaneous downloads over this host via debrid-link");
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException jme) {
+            final String errortext = "Bad API response";
+            if (link != null) {
+                mhm.handleErrorGeneric(account, link, errortext, 50, 5 * 60 * 1000l);
             } else {
-                if (link != null) {
-                    mhm.handleErrorGeneric(account, link, error, 50);
-                } else {
-                    throw new AccountUnavailableException("Unknown error: " + error, 5 * 60 * 1001l);
-                }
+                throw Exceptions.addSuppressed(new AccountUnavailableException(errortext, 1 * 60 * 1000l), jme);
             }
-        } catch (final JSonMapperException parserFailure) {
-            logger.exception("Json parsing failed -> Probably HTML response", parserFailure);
-            throw parserFailure;
+        }
+        final boolean success = ((Boolean) entries.get("success")).booleanValue();
+        if (success) {
+            /* No error */
+            return entries;
+        }
+        final String errorkey = (String) entries.get("error");
+        /* List of error key to message obtained from: https://debrid-link.com/api_doc/v2/errors */
+        final Map<String, String> errorKeyToMessageMap = new HashMap<>();
+        errorKeyToMessageMap.put("access_denied", "The resource owner denied the request for authorization. (Invalid scope or something else)");
+        errorKeyToMessageMap.put("accountLocked", "User account is currently locked");
+        errorKeyToMessageMap.put("authorization_pending", "The end user hasn't yet completed the user-interaction steps");
+        errorKeyToMessageMap.put("badArguments", "The request is malformed, a required parameter is missing or a parameter has an invalid value.");
+        errorKeyToMessageMap.put("badFilePassword", "The password for the link is invalid or empty.");
+        errorKeyToMessageMap.put("badFileUrl", "The link format is not valid.");
+        errorKeyToMessageMap.put("badId", "Resources ID(s) not found");
+        errorKeyToMessageMap.put("badSign", "Check the sign parameter");
+        errorKeyToMessageMap.put("badToken", "The session does not exist or expired. For OAuth2, you should try to refresh the access_token if you have a refresh_token. For token/key auth, you must create a new one.");
+        errorKeyToMessageMap.put("captchaRequired", "Max attempts to login user. IP locked for next 24 hours");
+        errorKeyToMessageMap.put("disabledServerHost", "Server / VPN are not allowed on this host");
+        errorKeyToMessageMap.put("expired_token", "The 'device_code' has expired, and the device authorization session has concluded");
+        errorKeyToMessageMap.put("fileNotAvailable", "This file seems to be temporarily unavailable on the host side.");
+        errorKeyToMessageMap.put("fileNotFound", "The filehoster returned a 'file not found' error.");
+        errorKeyToMessageMap.put("floodDetected", "API rate limit reached for the endpoint, retry after 1 hour");
+        errorKeyToMessageMap.put("freeServerOverload", "No server available for free users");
+        errorKeyToMessageMap.put("hidedToken", "The token is not enabled. Redirect the user to 'validTokenUrl'");
+        errorKeyToMessageMap.put("hostNotValid", "The filehoster is not supported");
+        errorKeyToMessageMap.put("internalError", "Internal error, retry later");
+        errorKeyToMessageMap.put("invalid_client", "The client_id is invalid");
+        errorKeyToMessageMap.put("invalid_request", "The request is malformed, a required parameter is missing or a parameter has an invalid value");
+        errorKeyToMessageMap.put("invalid_scope", "The scope is malformed or invalid");
+        errorKeyToMessageMap.put("maintenanceHost", "The filehoster is in maintenance");
+        errorKeyToMessageMap.put("maxAttempts", "Max attempts to login user. IP locked for next 24 hours");
+        errorKeyToMessageMap.put("maxData", "Limitation of data per day reached");
+        errorKeyToMessageMap.put("maxDataHost", "Limitation of data per day for this host reached");
+        errorKeyToMessageMap.put("maxLink", "Limitation of number of links per day reached");
+        errorKeyToMessageMap.put("maxLinkHost", "Limitation of number of links per day for this host reached");
+        errorKeyToMessageMap.put("maxTorrent", "Limitation of torrents per day reached");
+        errorKeyToMessageMap.put("notAddTorrent", "Unable to add the torrent, check the URL");
+        errorKeyToMessageMap.put("notDebrid", "Unable to generate link, maybe the host is down");
+        errorKeyToMessageMap.put("notFreeHost", "This filehoster is not available for free members");
+        errorKeyToMessageMap.put("serverNotAllowed", "Server / VPN are not allowed by default. The user must contact us");
+        errorKeyToMessageMap.put("server_error", "Internal error, retry later");
+        errorKeyToMessageMap.put("torrentTooBig", "The torrent is too big or has too many files");
+        errorKeyToMessageMap.put("unauthorized_client", "The client is not authorized to request an authorization code using this method");
+        errorKeyToMessageMap.put("unknowR", "Endpoint not found");
+        errorKeyToMessageMap.put("unsupported_grant_type", "Authorization grant is not supported");
+        errorKeyToMessageMap.put("unsupported_response_type", "response_type is not supported");
+        final String message;
+        if (errorKeyToMessageMap.containsKey(errorkey)) {
+            message = errorKeyToMessageMap.get(errorkey);
+        } else {
+            /* Fallback: Use error key as message */
+            logger.info("Detected unexpected error key: " + errorkey);
+            message = errorkey;
+        }
+        final HashSet<String> accountErrorsPermanent = new HashSet<String>();
+        accountErrorsPermanent.add("badToken");
+        final HashSet<String> accountErrorsTemporary = new HashSet<String>();
+        accountErrorsTemporary.add("serverNotAllowed");
+        accountErrorsTemporary.add("floodDetected");
+        accountErrorsTemporary.add("accountLocked");
+        accountErrorsTemporary.add("maxLink");
+        accountErrorsTemporary.add("maxData");
+        final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
+        downloadErrorsHostUnavailable.add("notDebrid");
+        downloadErrorsHostUnavailable.add("hostNotValid");
+        downloadErrorsHostUnavailable.add("notFreeHost");
+        downloadErrorsHostUnavailable.add("maintenanceHost");
+        downloadErrorsHostUnavailable.add("noServerHost");
+        downloadErrorsHostUnavailable.add("maxLinkHost");
+        downloadErrorsHostUnavailable.add("maxDataHost");
+        downloadErrorsHostUnavailable.add("disabledServerHost");
+        downloadErrorsHostUnavailable.add("freeServerOverload");
+        final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
+        downloadErrorsFileUnavailable.add("fileNotAvailable");
+        downloadErrorsFileUnavailable.add("badFileUrl");
+        downloadErrorsFileUnavailable.add("badFilePassword");
+        if ("fileNotFound".equals(errorkey)) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, message);
+        } else if (accountErrorsPermanent.contains(errorkey)) {
+            /**
+             * E.g. if user revokes access via debrid-link website.
+             */
+            account.removeProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN);
+            throw new AccountInvalidException(message);
+        } else if (accountErrorsTemporary.contains(errorkey)) {
+            throw new AccountUnavailableException(message, 5 * 60 * 1000);
+        } else if (downloadErrorsHostUnavailable.contains(errorkey)) {
+            mhm.putError(account, link, 5 * 60 * 1000l, message);
+        } else if (downloadErrorsFileUnavailable.contains(errorkey)) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
+        } else {
+            /*
+             * Unknown/Generic error --> Assume it is a download issue but display it as temp. account issue if no DownloadLink is given.
+             */
+            logger.info("Unknown API error: " + errorkey);
+            if (link != null) {
+                mhm.handleErrorGeneric(account, link, message, 50);
+            } else {
+                /* Temp disable account */
+                throw new AccountUnavailableException(message, 5 * 60 * 1000);
+            }
         }
         /* This code should never be reached. */
-        return null;
+        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, message);
     }
 
     private boolean isErrorPasswordRequiredOrWrong(final String str) {
@@ -530,14 +567,12 @@ public class DebridLinkCom extends PluginForHost {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
             boolean enteredCorrectPassword = false;
@@ -573,11 +608,7 @@ public class DebridLinkCom extends PluginForHost {
             Map<String, Object> entries = this.errHandling(account, link);
             entries = (Map<String, Object>) entries.get("value");
             link.setProperty(PROPERTY_MAXCHUNKS, entries.get("chunk"));
-            final String dllink = (String) entries.get("downloadUrl");
-            if (dllink == null) {
-                logger.warning("Failed to find dllink");
-                mhm.handleErrorGeneric(account, link, "dllinknull", 50, 5 * 60 * 1000l);
-            }
+            final String dllink = entries.get("downloadUrl").toString();
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), getMaxChunks(link));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);

@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
     private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
@@ -95,7 +95,6 @@ public class CboxeraCom extends PluginForHost {
             /* without account its not possible to download the link */
             return false;
         }
-        mhm.runCheck(account, link);
         return super.canHandle(link, account);
     }
 
@@ -135,7 +134,6 @@ public class CboxeraCom extends PluginForHost {
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         prepBR(this.br);
-        mhm.runCheck(account, link);
         handleDL(account, link);
     }
 

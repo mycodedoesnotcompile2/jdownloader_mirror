@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookies;
@@ -42,13 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50242 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -82,7 +82,6 @@ public class CooldebridCom extends PluginForHost {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -104,7 +103,6 @@ public class CooldebridCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
             final Form dlform = new Form();

@@ -53,7 +53,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50247 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -114,7 +114,6 @@ public class TorboxApp extends UseNet {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -149,7 +148,6 @@ public class TorboxApp extends UseNet {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            mhm.runCheck(account, link);
             logger.info("Creating or finding internal file_id");
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));

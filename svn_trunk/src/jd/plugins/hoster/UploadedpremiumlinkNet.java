@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50206 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50300 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -95,7 +95,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         if (account == null) {
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -112,7 +111,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         String passCode = link.getDownloadPassword();
         if (link.hasProperty(PROPERTY_UPLOADEDPREMIUMLINK_PASSWORD_REQUIRED) && passCode == null) {
             passCode = getUserInput("Password?", link);
@@ -182,10 +180,15 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             final String customStatusText = (String) hoster.get("StatusText");
             final MultiHostHost mhost = new MultiHostHost(primary_domain);
             mhost.addDomains(domains);
+            final boolean isWorking;
             if (hoster.get("status").toString().equalsIgnoreCase("offline")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+                isWorking = false;
             } else if (account.getType() == AccountType.FREE && !hoster.get("type").toString().equalsIgnoreCase("free")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
+                isWorking = false;
+            } else {
+                isWorking = true;
             }
             final long daily_quota_total = ((Number) hoster.get("daily_quota_total")).longValue();
             final long daily_quota_left = ((Number) hoster.get("daily_quota_left")).longValue();
@@ -201,17 +204,20 @@ public class UploadedpremiumlinkNet extends PluginForHost {
                 mhost.setTrafficLeft(0);
                 mhost.setLinksLeft(0);
             }
+            String statustext;
             if (customStatusText != null) {
-                mhost.setStatusText(customStatusText);
+                statustext = customStatusText;
             } else {
-                final String statustext;
                 if (weekly_percentage_used == 0) {
                     statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
                 } else {
                     statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
                 }
-                mhost.setStatusText(statustext);
             }
+            if (!isWorking) {
+                statustext = mhost.getStatus().getLabel() + " | " + statustext;
+            }
+            mhost.setStatusText(statustext);
             supportedhosts.add(mhost);
         }
         ai.setMultiHostSupportV2(this, supportedhosts);

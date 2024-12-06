@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -315,7 +315,6 @@ public abstract class HighWayCore extends UseNet {
                 }
             }
         }
-        getMultiHosterManagement().runCheck(account, link);
         return super.canHandle(link, account);
     }
 
@@ -391,7 +390,6 @@ public abstract class HighWayCore extends UseNet {
             super.handleMultiHost(link, account);
             return;
         } else {
-            getMultiHosterManagement().runCheck(account, link);
             boolean resume = this.isResumeable(link, account);
             final int maxChunks = this.getMaxChunks(link, account);
             int statuscode;
