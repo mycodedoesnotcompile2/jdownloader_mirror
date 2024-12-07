@@ -46,7 +46,6 @@ import org.jdownloader.controlling.contextmenu.gui.ExtPopupMenu;
 import org.jdownloader.controlling.contextmenu.gui.MenuBuilder;
 import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
@@ -310,7 +309,4 @@ public class CustomizeableActionBar extends MigPanel implements PropertyChangeLi
         };
     }
 
-    protected SelectionInfo<?, ?> getCurrentSelection() {
-        return null;
-    }
 }

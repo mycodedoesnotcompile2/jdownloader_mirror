@@ -46,7 +46,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "rapidb.it" }, urls = { "" })
 public class RapidbIt extends PluginForHost {
     private final String                 API_BASE                    = "https://rapidb.it/api";
     private static MultiHosterManagement mhm                         = new MultiHosterManagement("rapidb.it");
@@ -101,16 +101,6 @@ public class RapidbIt extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
         return true;
     }
@@ -143,7 +133,6 @@ public class RapidbIt extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
             String file_id = getMultihosterFileID(link);
@@ -369,10 +358,6 @@ public class RapidbIt extends PluginForHost {
                 throw new AccountInvalidException("Error " + errorcode);
             }
         }
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

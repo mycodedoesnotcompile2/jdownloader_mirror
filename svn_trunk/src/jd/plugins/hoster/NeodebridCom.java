@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50215 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "neodebrid.com" }, urls = { "https?://(?:www\\.)?neodebrid\\.com/dl/([A-Z0-9]+)" })
 public class NeodebridCom extends PluginForHost {
     /** Tags: cocoleech.com */
     private static final String          API_BASE                   = "https://neodebrid.com/api/v2";
@@ -123,16 +123,6 @@ public class NeodebridCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return true;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
         handleDLSelfhosted(null, link);
@@ -191,7 +181,6 @@ public class NeodebridCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         String dllink = checkDirectLink(link, this.getHost() + "directlink");
         if (dllink == null) {
             if (account.getType() == AccountType.FREE && !api_supports_free_accounts) {
@@ -500,13 +489,5 @@ public class NeodebridCom extends PluginForHost {
         if (br.containsHTML("Error: Maximum filesize for free users")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Max freeuser filesize reached");
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

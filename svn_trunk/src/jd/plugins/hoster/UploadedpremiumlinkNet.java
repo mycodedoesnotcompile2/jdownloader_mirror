@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50300 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -88,15 +88,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -357,13 +348,5 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

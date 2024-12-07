@@ -37,6 +37,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -102,22 +118,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 public class YoutubeHelper {
     static {
         final YoutubeConfig cfg = PluginJsonConfig.get(YoutubeConfig.class);
@@ -171,18 +171,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-                                                                       @Override
-                                                                       public boolean add(final YoutubeReplacer e) {
-                                                                           for (final String tag : e.getTags()) {
-                                                                               if (REPLACER_MAP.put(tag, e) != null) {
-                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                                                                                       throw new WTFException("Duplicate error:" + tag);
-                                                                                   }
-                                                                               }
-                                                                           }
-                                                                           return super.add(e);
-                                                                       };
-                                                                   };
+        @Override
+        public boolean add(final YoutubeReplacer e) {
+            for (final String tag : e.getTags()) {
+                if (REPLACER_MAP.put(tag, e) != null) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        throw new WTFException("Duplicate error:" + tag);
+                    }
+                }
+            }
+            return super.add(e);
+        };
+    };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -2637,12 +2637,12 @@ public class YoutubeHelper {
         final Map<String, Object> post = new LinkedHashMap<String, Object>();
         final Map<String, Object> client = new LinkedHashMap<String, Object>();
         client.put("clientName", "IOS");
-        client.put("clientVersion", "19.29.1");
+        client.put("clientVersion", "19.45.4");
         client.put("deviceMake", "Apple");
         client.put("deviceModel", "iPhone16,2");
-        client.put("userAgent", "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)");
+        client.put("userAgent", "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)");
         client.put("osName", "iPhone");
-        client.put("osVersion", "17.5.1.21F90");
+        client.put("osVersion", "18.1.0.22B83");
         client.put("hl", "en");
         client.put("timeZone", "UTC");
         client.put("utcOffsetMinutes", 0);
@@ -2701,7 +2701,7 @@ public class YoutubeHelper {
             clientNameID = 85;
         } else {
             client.put("clientName", "TVHTML5");
-            client.put("clientVersion", "7.20240724.13.00");
+            client.put("clientVersion", "7.20241201.18.00");
             clientNameID = 7;
         }
         client.put("hl", "en");

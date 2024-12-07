@@ -37,7 +37,6 @@ import org.jdownloader.controlling.contextmenu.MenuItemData;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.helpdialogs.HelpDialog;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.HeaderScrollPane;
 import org.jdownloader.gui.views.downloads.bottombar.CustomizeableActionBar;
 import org.jdownloader.gui.views.downloads.table.HorizontalScrollbarAction;
@@ -151,9 +150,6 @@ public class LinkGrabberPanel extends SwitchPanel implements LinkCollectorListen
             }
         });
         rightBar = new CustomizeableActionBar(MenuManagerLinkgrabberTabBottombar.getInstance()) {
-            protected SelectionInfo<?, ?> getCurrentSelection() {
-                return table.getSelectionInfo(true, true);
-            }
 
             protected MenuContainerRoot prepare(MenuContainerRoot menuData) {
                 MenuContainerRoot ret = new MenuContainerRoot();
@@ -178,9 +174,6 @@ public class LinkGrabberPanel extends SwitchPanel implements LinkCollectorListen
             }
         };
         leftBar = new CustomizeableActionBar(MenuManagerLinkgrabberTabBottombar.getInstance()) {
-            protected SelectionInfo<?, ?> getCurrentSelection() {
-                return table.getSelectionInfo(true, true);
-            }
 
             protected MenuContainerRoot prepare(MenuContainerRoot menuData) {
                 MenuContainerRoot ret = new MenuContainerRoot();

@@ -2,16 +2,14 @@ package org.jdownloader.extensions.eventscripter;
 
 import java.awt.event.ActionEvent;
 
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-
 import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.extensions.ExtensionController;
 import org.jdownloader.extensions.LazyExtension;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.downloads.DownloadsView;
-import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
+import org.jdownloader.gui.views.downloads.contextmenumanager.MenuManagerDownloadTableContext;
+import org.jdownloader.gui.views.linkgrabber.contextmenu.MenuManagerLinkgrabberTableContext;
 
 public class GenericEventScriptTriggerContextMenuAction extends CustomizableTableContextAppAction {
     public GenericEventScriptTriggerContextMenuAction() {
@@ -20,17 +18,16 @@ public class GenericEventScriptTriggerContextMenuAction extends CustomizableTabl
     }
 
     @Override
-    public void actionPerformed(ActionEvent e) {
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, SelectionInfo selectionInfo) {
         final LazyExtension extension = ExtensionController.getInstance().getExtension(EventScripterExtension.class);
         if (extension != null && extension._isEnabled()) {
-            final SelectionInfo selection = getSelection();
             final EventScripterExtension ext = ((EventScripterExtension) extension._getExtension());
-            final View view = MainTabbedPane.getInstance().getSelectedView();
-            if (view instanceof DownloadsView) {
-                ext.triggerAction(getName(), getIconKey(), getShortCutString(), EventTrigger.DOWNLOAD_TABLE_CONTEXT_MENU_BUTTON, selection);
-            } else if (view instanceof LinkGrabberView) {
-                ext.triggerAction(getName(), getIconKey(), getShortCutString(), EventTrigger.LINKGRABBER_TABLE_CONTEXT_MENU_BUTTON, selection);
+            if (getMenuItemData()._getRoot() == MenuManagerDownloadTableContext.getInstance().getMenuData()) {
+                ext.triggerAction(getName(), getIconKey(), getShortCutString(), EventTrigger.DOWNLOAD_TABLE_CONTEXT_MENU_BUTTON, selectionInfo);
+            } else if (getMenuItemData()._getRoot() == MenuManagerLinkgrabberTableContext.getInstance().getMenuData()) {
+                ext.triggerAction(getName(), getIconKey(), getShortCutString(), EventTrigger.LINKGRABBER_TABLE_CONTEXT_MENU_BUTTON, selectionInfo);
             }
         }
     }
+
 }

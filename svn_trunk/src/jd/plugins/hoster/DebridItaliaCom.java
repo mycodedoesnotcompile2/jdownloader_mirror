@@ -48,7 +48,7 @@ import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.Downloadable;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "debriditalia.com" }, urls = { "https?://\\w+\\.debriditalia\\.com/dl/\\d+/.+" })
 public class DebridItaliaCom extends antiDDoSForHost {
     public DebridItaliaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -148,7 +148,6 @@ public class DebridItaliaCom extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         showMessage(link, "Generating link");
         /* since no requests are done with this.br we need to manually set so checkdirectlink is correct */
         prepBrowser(br, "https://" + this.getHost());
@@ -402,11 +401,7 @@ public class DebridItaliaCom extends antiDDoSForHost {
         if (isDirectLink(link)) {
             /* Generated links do not require an account to download */
             return true;
-        } else if (account == null) {
-            // no non account handleMultiHost support.
-            return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }

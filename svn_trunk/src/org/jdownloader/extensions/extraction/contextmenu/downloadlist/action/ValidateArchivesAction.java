@@ -14,6 +14,7 @@ import org.jdownloader.extensions.extraction.gui.DummyArchiveDialog;
 import org.jdownloader.extensions.extraction.multi.CheckException;
 import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.SelectionInfo;
 
 public class ValidateArchivesAction extends AbstractExtractionContextAction {
 
@@ -24,46 +25,41 @@ public class ValidateArchivesAction extends AbstractExtractionContextAction {
     }
 
     @Override
-    protected void onAsyncInitDone() {
-        final List<Archive> lArchives = getArchives();
-        if (lArchives != null && lArchives.size() > 0) {
-            if (lArchives.size() > 1) {
+    protected void onAsyncInitDone(List<Archive> archives, SelectionInfo<?, ?> selectionInfo) {
+        if (archives != null && archives.size() > 0) {
+            if (archives.size() > 1) {
                 setName(T.T.ValidateArchiveAction_ValidateArchiveAction_multi());
             } else {
-                setName(T.T.ValidateArchiveAction_ValidateArchiveAction(lArchives.get(0).getName()));
+                setName(T.T.ValidateArchiveAction_ValidateArchiveAction(archives.get(0).getName()));
             }
         }
-        super.onAsyncInitDone();
+        super.onAsyncInitDone(archives, selectionInfo);
     }
 
-    public void actionPerformed(ActionEvent e) {
-        final List<Archive> lArchives = getArchives();
-        if (!isEnabled() || lArchives == null) {
-            return;
-        } else {
-            new Thread("ValidateArchivesAction") {
-                {
-                    setDaemon(true);
-                }
+    @Override
+    protected void onActionPerformed(ActionEvent e, final List<Archive> archives, SelectionInfo<?, ?> selectionInfo) {
+        new Thread("ValidateArchivesAction") {
+            {
+                setDaemon(true);
+            }
 
-                public void run() {
-                    try {
-                        for (Archive archive : lArchives) {
+            public void run() {
+                try {
+                    for (Archive archive : archives) {
+                        try {
+                            DummyArchive da = ArchiveValidator.EXTENSION.createDummyArchive(archive);
+                            DummyArchiveDialog d = new DummyArchiveDialog(da);
                             try {
-                                DummyArchive da = ArchiveValidator.EXTENSION.createDummyArchive(archive);
-                                DummyArchiveDialog d = new DummyArchiveDialog(da);
-                                try {
-                                    Dialog.getInstance().showDialog(d);
-                                } catch (DialogCanceledException e) {
-                                }
-                            } catch (CheckException e1) {
-                                Dialog.getInstance().showExceptionDialog("Error", "Cannot Check Archive", e1);
+                                Dialog.getInstance().showDialog(d);
+                            } catch (DialogCanceledException e) {
                             }
+                        } catch (CheckException e1) {
+                            Dialog.getInstance().showExceptionDialog("Error", "Cannot Check Archive", e1);
                         }
-                    } catch (DialogClosedException e1) {
                     }
-                };
-            }.start();
-        }
+                } catch (DialogClosedException e1) {
+                }
+            };
+        }.start();
     }
 }

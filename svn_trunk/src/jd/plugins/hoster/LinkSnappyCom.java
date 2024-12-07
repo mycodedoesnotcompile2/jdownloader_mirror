@@ -73,7 +73,7 @@ import jd.plugins.components.MultiHosterManagement;
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -435,7 +435,6 @@ public class LinkSnappyCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.loginAPI(account, false);
         if (attemptStoredDownloadurlDownload(link, account)) {
             logger.info("Using previously generated final downloadurl");
@@ -789,27 +788,9 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         /* This should never get called. */
         throw new AccountRequiredException();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

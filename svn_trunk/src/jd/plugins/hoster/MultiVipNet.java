@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,12 +42,13 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "multivip.net" }, urls = { "" })
 public class MultiVipNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            APIKEY             = "jd2";
@@ -80,22 +82,6 @@ public class MultiVipNet extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        } else {
-            /* First check if the file is too big */
-            final long max_downloadable_filesize = account.getLongProperty("max_downloadable_filesize", 0);
-            if (max_downloadable_filesize > 0 && link.getDownloadSize() > max_downloadable_filesize) {
-                return false;
-            }
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -257,21 +243,27 @@ public class MultiVipNet extends PluginForHost {
             throw new AccountInvalidException(error_txt);
         }
         final String expire = PluginJSonUtils.getJsonValue(br, "diedate");
-        final String max_downloadable_filesize = PluginJSonUtils.getJsonValue(br, "limit");
+        final String max_downloadable_filesize_kb = PluginJSonUtils.getJsonValue(br, "limit");
+        final long max_downloadable_filesize_bytes = Long.parseLong(max_downloadable_filesize_kb) * 1024;
         final String traffic_left_kb = PluginJSonUtils.getJsonValue(br, "points");
         ai.setValidUntil(Long.parseLong(expire) * 1000);
         ai.setTrafficLeft(Long.parseLong(traffic_left_kb) * 1024);
-        account.setProperty("max_downloadable_filesize", Long.parseLong(max_downloadable_filesize) * 1024);
         br.getPage("/api.php?apipass=" + APIKEY + "&do=getlist");
-        final ArrayList<String> supportedhosts = new ArrayList<String>();
+        final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final String[] hostDomains = br.getRegex("\"allow\":\\[(.*?)\\]").getColumn(0);
         for (final String domains : hostDomains) {
+            final MultiHostHost mhost = new MultiHostHost();
             final String[] realDomains = new Regex(domains, "\"(.*?)\"").getColumn(0);
             for (final String realDomain : realDomains) {
-                supportedhosts.add(realDomain);
+                mhost.addDomain(realDomain);
             }
+            if (max_downloadable_filesize_bytes > 0) {
+                mhost.setTrafficLeft(max_downloadable_filesize_bytes);
+                mhost.setTrafficMax(max_downloadable_filesize_bytes);
+            }
+            supportedhosts.add(mhost);
         }
-        if (max_downloadable_filesize.equals("0")) {
+        if (max_downloadable_filesize_kb.equals("0")) {
             /* Premium keys have no max downloadable filesize limit */
             account.setType(AccountType.PREMIUM);
             ai.setStatus("Premium Vip key");
@@ -284,7 +276,7 @@ public class MultiVipNet extends PluginForHost {
             account.setType(AccountType.FREE);
             ai.setStatus("Free Vip key");
         }
-        ai.setMultiHostSupport(this, supportedhosts);
+        ai.setMultiHostSupportV2(this, supportedhosts);
         return ai;
     }
 
@@ -321,13 +313,5 @@ public class MultiVipNet extends PluginForHost {
     @Override
     public int getMaxSimultanDownload(final DownloadLink link, final Account account) {
         return maxPrem.get();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

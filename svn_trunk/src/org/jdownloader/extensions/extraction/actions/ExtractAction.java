@@ -9,6 +9,8 @@ import java.util.List;
 
 import javax.swing.filechooser.FileFilter;
 
+import jd.gui.UserIO;
+
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.swing.components.ExtMergedIcon;
 import org.appwork.uio.UIOManager;
@@ -30,9 +32,8 @@ import org.jdownloader.extensions.extraction.multi.ArchiveException;
 import org.jdownloader.extensions.extraction.translate.T;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.views.DownloadFolderChooserDialog;
+import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.images.AbstractIcon;
-
-import jd.gui.UserIO;
 
 public class ExtractAction extends AbstractExtractionContextAction {
     /**
@@ -96,6 +97,7 @@ public class ExtractAction extends AbstractExtractionContextAction {
         return true;
     }
 
+    @Override
     public void actionPerformed(ActionEvent e) {
         new Thread("Extracting") {
             public void run() {
@@ -278,5 +280,9 @@ public class ExtractAction extends AbstractExtractionContextAction {
                 }
             }
         }.start();
+    }
+
+    @Override
+    protected void onActionPerformed(ActionEvent e, List<Archive> archives, SelectionInfo<?, ?> selectionInfo) {
     }
 }

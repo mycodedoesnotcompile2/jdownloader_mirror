@@ -11,6 +11,16 @@ import javax.swing.Box;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.gui.swing.jdgui.interfaces.SwitchPanel;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLinkProperty;
+import jd.plugins.FilePackage;
+import jd.plugins.FilePackageProperty;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -23,7 +33,6 @@ import org.jdownloader.extensions.extraction.ExtractionEvent;
 import org.jdownloader.extensions.extraction.ExtractionListener;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.downloads.bottombar.CustomizeableActionBar;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
@@ -31,16 +40,6 @@ import org.jdownloader.gui.views.downloads.table.HorizontalScrollbarAction;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.gui.swing.jdgui.interfaces.SwitchPanel;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLinkProperty;
-import jd.plugins.FilePackage;
-import jd.plugins.FilePackageProperty;
-import net.miginfocom.swing.MigLayout;
 
 public class DownloadsPanel extends SwitchPanel implements DownloadControllerListener, GenericConfigEventListener<Boolean>, ExtractionListener {
 
@@ -87,11 +86,6 @@ public class DownloadsPanel extends SwitchPanel implements DownloadControllerLis
 
         HorizontalScrollbarAction.setup(CFG_GUI.HORIZONTAL_SCROLLBARS_IN_DOWNLOAD_TABLE_ENABLED, table);
         bottomBar = new CustomizeableActionBar(MenuManagerDownloadTabBottomBar.getInstance()) {
-            protected SelectionInfo<?, ?> getCurrentSelection() {
-
-                return table.getSelectionInfo(true, true);
-
-            }
 
             @Override
             public void updateGui() {

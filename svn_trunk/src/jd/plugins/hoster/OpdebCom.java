@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "opdeb.com" }, urls = { "" })
 public class OpdebCom extends PluginForHost {
     private static final String          API_BASE = "https://opdeb.com/apiv1";
     private static MultiHosterManagement mhm      = new MultiHosterManagement("opdeb.com");
@@ -90,16 +90,6 @@ public class OpdebCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         final String directlinkproperty = this.getHost() + "directlink";
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
@@ -108,7 +98,6 @@ public class OpdebCom extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            mhm.runCheck(account, link);
             this.login(account, false);
             final String ipValueFromAccount = account.getStringProperty("ip_linked");
             final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
@@ -291,13 +280,5 @@ public class OpdebCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

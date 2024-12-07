@@ -30,28 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.Icon;
 import javax.swing.JScrollPane;
 
-import jd.PluginWrapper;
-import jd.config.Property;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.http.Browser;
-import jd.http.Cookies;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginConfigPanelNG;
-import jd.plugins.PluginException;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.components.PluginJSonUtils;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
@@ -77,7 +55,29 @@ import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
+import jd.PluginWrapper;
+import jd.config.Property;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.http.Browser;
+import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginConfigPanelNG;
+import jd.plugins.PluginException;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.components.PluginJSonUtils;
+
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "offcloud.com" }, urls = { "" })
 public class OffCloudCom extends UseNet {
     /** Using API: https://github.com/offcloud/offcloud-api */
     /* Properties */
@@ -152,10 +152,6 @@ public class OffCloudCom extends UseNet {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        }
         /* Make sure that we do not start more than the allowed number of max simultan downloads for the current host. */
         synchronized (hostRunningDlsNumMap) {
             final String currentHost = link.getHost();
@@ -171,7 +167,6 @@ public class OffCloudCom extends UseNet {
                 }
             }
         }
-        mhm.runCheck(account, link);
         return super.canHandle(link, account);
     }
 
@@ -195,7 +190,6 @@ public class OffCloudCom extends UseNet {
             super.handleMultiHost(link, account);
             return;
         }
-        mhm.runCheck(account, link);
         /*
          * When JD is started the first time and the user starts downloads right away, a full login might not yet have happened but it is
          * needed to get the individual host limits.
@@ -951,7 +945,7 @@ public class OffCloudCom extends UseNet {
             case 15:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This cann be considered as a small workaround.
                  */
@@ -961,7 +955,7 @@ public class OffCloudCom extends UseNet {
             case 16:
                 /*
                  * Current host is only supported via cloud downloading --> Add to Cloud-Array and try again
-                 * 
+                 *
                  * This should only happen if e.g. a user starts JD and starts downloads right away before the cloudOnlyHosts array gets
                  * updated. This extra errorhandling can be considered as a small workaround.
                  */
@@ -1272,10 +1266,6 @@ public class OffCloudCom extends UseNet {
 
     private final String getDirectlinkproperty() {
         return this.getHost() + "directlink";
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

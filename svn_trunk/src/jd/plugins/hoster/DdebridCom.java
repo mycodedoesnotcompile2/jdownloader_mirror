@@ -43,7 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "ddebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "ddebrid.com" }, urls = { "" })
 public class DdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://ddebrid.com/api";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("ddebrid.com");
@@ -74,16 +74,6 @@ public class DdebridCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -140,7 +130,6 @@ public class DdebridCom extends PluginForHost {
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         prepBR(this.br);
-        mhm.runCheck(account, link);
         handleDL(account, link);
     }
 
@@ -317,13 +306,5 @@ public class DdebridCom extends PluginForHost {
                 }
             }
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

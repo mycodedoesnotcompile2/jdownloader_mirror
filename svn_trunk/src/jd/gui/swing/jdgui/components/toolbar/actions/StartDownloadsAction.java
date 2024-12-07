@@ -38,6 +38,8 @@ import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
 import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.ConfirmLinksContextAction;
@@ -73,18 +75,29 @@ public class StartDownloadsAction extends AbstractToolBarAction implements Downl
 
     public void actionPerformed(final ActionEvent e) {
         if (JDGui.getInstance().isCurrentPanel(Panels.LINKGRABBER)) {
-            final SelectionInfo<CrawledPackage, CrawledLink> selection = LinkGrabberTable.getInstance().getSelectionInfo(false, true);
             TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
                 @Override
                 protected Void run() throws RuntimeException {
                     switch (CFG_GUI.CFG.getStartButtonActionInLinkgrabberContext()) {
                     case ADD_ALL_LINKS_AND_START_DOWNLOADS:
-                        final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
-                        cls.setAutoStartDownloads(true);
-                        cls.setClearLinkgrabberlistOnConfirm(false);
-                        cls.setSwitchToDownloadlistOnConfirm(true);
-                        cls.setForceDownloads(false);
-                        ConfirmLinksContextAction.confirmSelection(selection, cls);
+                        LinkGrabberTable.getInstance().getSelectionInfo(new SelectionInfoCallback<CrawledPackage, CrawledLink>() {
+
+                            @Override
+                            public void onSelectionInfo(SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
+                                final ConfirmLinksSettings cls = new ConfirmLinksSettings(MoveLinksMode.MANUAL);
+                                cls.setAutoStartDownloads(true);
+                                cls.setClearLinkgrabberlistOnConfirm(false);
+                                cls.setSwitchToDownloadlistOnConfirm(true);
+                                cls.setForceDownloads(false);
+                                ConfirmLinksContextAction.confirmSelection(selectionInfo, cls);
+                            }
+
+                            @Override
+                            public boolean isCancelled() {
+                                return false;
+                            }
+                        }, SelectionType.ALL);
+
                         break;
                     case START_DOWNLOADS_ONLY:
                         DownloadWatchDog.getInstance().startDownloads();

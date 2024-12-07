@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50247 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "mega-debrid.eu" }, urls = { "" })
 public class MegaDebridEu extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("mega-debrid.eu");
 
@@ -207,13 +207,5 @@ public class MegaDebridEu extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

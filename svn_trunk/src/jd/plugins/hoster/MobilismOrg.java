@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "mobilism.org" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "mobilism.org" }, urls = { "" })
 public class MobilismOrg extends antiDDoSForHost {
     /* Tags: Script vinaget.us */
     private static final String          WEBSITE_BASE        = "https://mblservices.org";
@@ -80,16 +80,6 @@ public class MobilismOrg extends antiDDoSForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -136,7 +126,6 @@ public class MobilismOrg extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         /* 2021-02-23: Allow re-using previously generated directURLs */
         final boolean forceNewLinkGeneration = false;

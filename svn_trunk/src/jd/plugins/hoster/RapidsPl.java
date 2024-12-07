@@ -50,7 +50,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "rapids.pl" }, urls = { "" })
 public class RapidsPl extends PluginForHost {
     /* API documentation: https://new.rapids.pl/api */
     private static final String  API_BASE            = "https://api.rapids.pl/api";
@@ -87,15 +87,6 @@ public class RapidsPl extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            /* Without account its not possible to download the link */
-            return false;
-        }
-        return super.canHandle(link, account);
     }
 
     @Override
@@ -427,13 +418,5 @@ public class RapidsPl extends PluginForHost {
         } else {
             throw new AccountUnavailableException(errormsg, 3 * 60 * 1000);
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

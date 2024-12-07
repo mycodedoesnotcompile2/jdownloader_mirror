@@ -4,6 +4,12 @@ import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.WarnLevel;
+
 import org.appwork.swing.exttable.ExtTableEvent;
 import org.appwork.swing.exttable.ExtTableListener;
 import org.appwork.swing.exttable.ExtTableModelEventWrapper;
@@ -13,7 +19,7 @@ import org.appwork.utils.swing.dialog.Dialog;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
 import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.controlling.contextmenu.ActionContext;
-import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
+import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.DummyArchive;
@@ -23,17 +29,13 @@ import org.jdownloader.extensions.extraction.contextmenu.downloadlist.ArchiveVal
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.downloads.action.ByPassDialogSetup;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
 
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.WarnLevel;
-
-public class RemoveIncompleteArchives extends CustomizableAppAction implements ExtTableListener, ActionContext, ExtTableModelListener {
+public class RemoveIncompleteArchives extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements ExtTableListener, ActionContext, ExtTableModelListener {
 
     /**
      *
@@ -49,36 +51,34 @@ public class RemoveIncompleteArchives extends CustomizableAppAction implements E
         initIncludeSelectionSupport();
     }
 
-    @Override
-    public void initContextDefaults() {
-        super.initContextDefaults();
-    }
-
     protected void initIncludeSelectionSupport() {
         addContextSetup(includedSelection = new IncludedSelectionSetup(LinkGrabberTable.getInstance(), this, this));
     }
 
-    public void actionPerformed(ActionEvent e) {
+    @Override
+    protected void getSelection(final SelectionInfoCallback<CrawledPackage, CrawledLink> callback, final SelectionType selectionType) {
+        LinkGrabberTable.getInstance().getSelectionInfo(callback, selectionType);
+    }
+
+    @Override
+    protected SelectionType getSelectionType() {
+        return includedSelection.getSelectionType();
+    }
+
+    @Override
+    protected void onActionPerformed(ActionEvent e, final SelectionType selectionType, final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
         if (isEnabled()) {
-            final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo;
-            switch (includedSelection.getSelectionType()) {
-            case NONE:
-                selectionInfo = null;
-                return;
+            switch (selectionType) {
             case SELECTED:
-                selectionInfo = LinkGrabberTable.getInstance().getSelectionInfo();
                 break;
             case UNSELECTED:
-                selectionInfo = LinkGrabberTable.getInstance().getSelectionInfo();
                 if (selectionInfo.getUnselectedChildren() == null) {
                     return;
                 }
                 break;
             case ALL:
-                selectionInfo = LinkGrabberTable.getInstance().getSelectionInfo(false, true);
                 break;
             default:
-                selectionInfo = null;
                 return;
             }
             Thread thread = new Thread() {
@@ -86,7 +86,7 @@ public class RemoveIncompleteArchives extends CustomizableAppAction implements E
                 public void run() {
                     try {
                         final List<Archive> archives;
-                        switch (includedSelection.getSelectionType()) {
+                        switch (selectionType) {
                         case NONE:
                             archives = new ArrayList<Archive>();
                             return;

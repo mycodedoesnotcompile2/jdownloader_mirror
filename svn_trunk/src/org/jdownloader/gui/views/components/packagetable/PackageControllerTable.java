@@ -40,7 +40,6 @@ import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.ExtComponentRowHighlighter;
 import org.appwork.swing.exttable.ExtOverlayRowHighlighter;
 import org.appwork.swing.exttable.ExtTable;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.event.queue.Queue;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.os.CrossSystem;
@@ -206,19 +205,39 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
         }
     }
 
-    @Deprecated
-    public SelectionInfo<ParentType, ChildrenType> getSelectionInfo() {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !SwingUtilities.isEventDispatchThread()) {
-            new Exception("This should be done via callback to avoid edt<->queue deadlocks").printStackTrace();
-        }
-        return getSelectionInfo(true, true);
+    public enum SelectionType {
+        SELECTED,
+        UNSELECTED,
+        ALL,
+        BACKEND,
+        NONE;
     }
 
-    public void getSelectionInfo(final SelectionInfoCallback<ParentType, ChildrenType> callback) {
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && !SwingUtilities.isEventDispatchThread()) {
-            new Exception("This should be done via callback to avoid edt<->queue deadlocks").printStackTrace();
+    public void getSelectionInfo(final SelectionInfoCallback<ParentType, ChildrenType> callback, final SelectionType selectionType) {
+        final boolean[] selectionInfoParam = new boolean[2];
+        switch (selectionType) {
+        case UNSELECTED:
+        case SELECTED:
+            selectionInfoParam[0] = true;
+            selectionInfoParam[1] = true;
+            break;
+        case ALL:
+            selectionInfoParam[0] = false;
+            selectionInfoParam[1] = true;
+            break;
+        case BACKEND:
+            selectionInfoParam[0] = false;
+            selectionInfoParam[1] = false;
+            break;
+        case NONE:
+        default:
+            final EmptySelectionInfo<ParentType, ChildrenType> selectionInfo = new EmptySelectionInfo<ParentType, ChildrenType>(getController());
+            if (!callback.isCancelled()) {
+                callback.onSelectionInfo(selectionInfo);
+            }
+            return;
         }
-        getSelectionInfo(callback, true, true);
+        getSelectionInfo(callback, selectionInfoParam[0], selectionInfoParam[1]);
     }
 
     protected volatile WeakReference<AbstractNode> contextMenuTrigger = new WeakReference<AbstractNode>(null);
@@ -270,6 +289,15 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
 
     public static interface SelectionInfoCallback<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> {
         void onSelectionInfo(SelectionInfo<PackageType, ChildrenType> selectionInfo);
+
+        boolean isCancelled();
+    }
+
+    public static interface EDTSelectionInfoCallback<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends SelectionInfoCallback<PackageType, ChildrenType> {
+    }
+
+    public static interface QueueSelectionInfoCallback<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends SelectionInfoCallback<PackageType, ChildrenType> {
+        public Queue getQueue();
     }
 
     private static interface LegacyBlockingSelectionInfoCallback<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends SelectionInfoCallback<PackageType, ChildrenType> {
@@ -282,6 +310,37 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
     /** access within EDT only **/
     protected volatile SelectionInfoCache all_TableData                = null;
 
+    protected void onSelectionInfoCallback(final SelectionInfoCallback<ParentType, ChildrenType> callback, final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+        if (callback instanceof QueueSelectionInfoCallback) {
+            final QueueSelectionInfoCallback<ParentType, ChildrenType> qcallback = (QueueSelectionInfoCallback<ParentType, ChildrenType>) callback;
+            Queue queue = qcallback.getQueue();
+            if (queue == null) {
+                queue = getModel().getController().getQueue();
+            }
+            if (Thread.currentThread() != queue.getQueueThread()) {
+                queue.add(new ReadOnlyQueueAction<Void, RuntimeException>(Queue.QueuePriority.HIGH) {
+                    @Override
+                    protected Void run() throws RuntimeException {
+                        callback.onSelectionInfo(selectionInfo);
+                        return null;
+                    }
+                });
+                return;
+            }
+        }
+        if (callback instanceof EDTSelectionInfoCallback && !SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    callback.onSelectionInfo(selectionInfo);
+                }
+            });
+            return;
+        }
+        callback.onSelectionInfo(selectionInfo);
+    }
+
     public void getSelectionInfo(final SelectionInfoCallback<ParentType, ChildrenType> callback, final boolean selectionOnly, final boolean useTableModelData) {
         // invokeLater in EventDispatchThread as SelectionModels might not be updated yet
         final boolean invokeLater = SwingUtilities.isEventDispatchThread() && !(callback instanceof LegacyBlockingSelectionInfoCallback);
@@ -289,6 +348,9 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
             new EDTHelper<Void>() {
                 @Override
                 public Void edtRun() {
+                    if (callback.isCancelled()) {
+                        return null;
+                    }
                     final long currentSelectionVersion = selectionVersion.get();
                     if (useTableModelData) {
                         SelectionInfoCache lselectionOnly_TableData = selectionOnly_TableData;
@@ -297,13 +359,13 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
                         if (lselectionOnly_TableData != null && lselectionOnly_TableData.getSelectionVersion() == currentSelectionVersion && lselectionOnly_TableData.getDataVersion() == dataVersion) {
                             SelectionInfo<ParentType, ChildrenType> ret = lselectionOnly_TableData.getSelectionInfo();
                             if (ret.getRawContext() == contextMenuTrigger) {
-                                callback.onSelectionInfo(ret);
+                                onSelectionInfoCallback(callback, ret);
                                 return null;
                             }
                             if (ret instanceof PackageControllerTableModelSelectionOnlySelectionInfo) {
                                 ret = new PackageControllerTableModelSelectionOnlySelectionInfo(contextMenuTrigger, (PackageControllerTableModelSelectionOnlySelectionInfo<?, ?>) ret);
                                 selectionOnly_TableData = new SelectionInfoCache(currentSelectionVersion, dataVersion, ret);
-                                callback.onSelectionInfo(ret);
+                                onSelectionInfoCallback(callback, ret);
                                 return null;
                             }
                         }
@@ -314,15 +376,15 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
                             selectionInfo = new PackageControllerTableModelSelectionOnlySelectionInfo<ParentType, ChildrenType>(contextMenuTrigger, getModel());
                         }
                         selectionOnly_TableData = lselectionOnly_TableData = new SelectionInfoCache(currentSelectionVersion, dataVersion, selectionInfo);
-                        callback.onSelectionInfo(selectionInfo);
+                        onSelectionInfoCallback(callback, selectionInfo);
                     } else {
                         SelectionInfoCache lselectionOnly_ControllerData = selectionOnly_ControllerData;
                         if (lselectionOnly_ControllerData != null && lselectionOnly_ControllerData.getSelectionVersion() == currentSelectionVersion) {
-                            callback.onSelectionInfo(selectionOnly_ControllerData.getSelectionInfo());
+                            onSelectionInfoCallback(callback, selectionOnly_ControllerData.getSelectionInfo());
                         } else if (getSelectionModel().isSelectionEmpty()) {
                             final SelectionInfo<ParentType, ChildrenType> selectionInfo = new EmptySelectionInfo<ParentType, ChildrenType>(getController());
                             selectionOnly_ControllerData = lselectionOnly_ControllerData = new SelectionInfoCache(currentSelectionVersion, -1, selectionInfo);
-                            callback.onSelectionInfo(selectionInfo);
+                            onSelectionInfoCallback(callback, selectionInfo);
                         } else {
                             throw new WTFException("You really want an unfiltered filtered view?!");
                         }
@@ -335,14 +397,17 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
                 new EDTHelper<Void>() {
                     @Override
                     public Void edtRun() {
+                        if (callback.isCancelled()) {
+                            return null;
+                        }
                         final long dataVersion = tableModel.getTableDataVersion();
                         SelectionInfoCache lall_TableData = all_TableData;
                         if (lall_TableData != null && lall_TableData.getDataVersion() == dataVersion) {
-                            callback.onSelectionInfo(lall_TableData.getSelectionInfo());
+                            onSelectionInfoCallback(callback, lall_TableData.getSelectionInfo());
                         } else {
                             final SelectionInfo<ParentType, ChildrenType> selectionInfo = new PackageControllerTableModelSelectionInfo<ParentType, ChildrenType>(null, getModel());
                             all_TableData = lall_TableData = new SelectionInfoCache(-1, dataVersion, selectionInfo);
-                            callback.onSelectionInfo(selectionInfo);
+                            onSelectionInfoCallback(callback, selectionInfo);
                         }
                         return null;
                     }
@@ -351,8 +416,11 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
                 getModel().getController().getQueue().add(new ReadOnlyQueueAction<Void, RuntimeException>(Queue.QueuePriority.HIGH) {
                     @Override
                     protected Void run() throws RuntimeException {
+                        if (callback.isCancelled()) {
+                            return null;
+                        }
                         final SelectionInfo<ParentType, ChildrenType> selectionInfo = getModel().getController().getSelectionInfo();
-                        callback.onSelectionInfo(selectionInfo);
+                        onSelectionInfoCallback(callback, selectionInfo);
                         return null;
                     }
                 });
@@ -365,6 +433,12 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
         final AtomicReference<Object> ret = new AtomicReference<Object>();
         ret.set(ret);// help value to differ between result that may also be null
         final LegacyBlockingSelectionInfoCallback<ParentType, ChildrenType> callback = new LegacyBlockingSelectionInfoCallback<ParentType, ChildrenType>() {
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
             @Override
             public void onSelectionInfo(SelectionInfo<ParentType, ChildrenType> selectionInfo) {
                 synchronized (ret) {
@@ -440,47 +514,73 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
     }
 
     protected void updateMoveActions() {
-        final SelectionInfo<ParentType, ChildrenType> selectionInfo = getSelectionInfo(true, true);
-        final boolean moveUpPossible = moveUpPossible(selectionInfo);
-        final boolean moveDownPossible = moveDownPossible(selectionInfo);
-        new EDTRunner() {
+        getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
             @Override
-            protected void runInEDT() {
-                moveTopAction.setEnabled(moveUpPossible);
-                moveUpAction.setEnabled(moveUpPossible);
-                moveDownAction.setEnabled(moveDownPossible);
-                moveBottomAction.setEnabled(moveDownPossible);
+            public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                final boolean moveUpPossible = moveUpPossible(selectionInfo);
+                final boolean moveDownPossible = moveDownPossible(selectionInfo);
+                new EDTRunner() {
+                    @Override
+                    protected void runInEDT() {
+                        moveTopAction.setEnabled(moveUpPossible);
+                        moveUpAction.setEnabled(moveUpPossible);
+                        moveDownAction.setEnabled(moveDownPossible);
+                        moveBottomAction.setEnabled(moveDownPossible);
+                    }
+                };
+
             }
-        };
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+        }, SelectionType.SELECTED);
     }
 
     @Override
     public void onShortcutSelectAll() {
         if (!CFG_GUI.CFG.isTwoStepCtrlASelectionEnabled()) {
-            super.onShortcutSelectAll();
+            superOnShortcutSelectAll();
         } else {
-            final ArrayList<AbstractNode> toSelect = new ArrayList<AbstractNode>();
-            final SelectionInfo<ParentType, ChildrenType> selection = getSelectionInfo(true, true);
-            final PackageControllerTableModelData<ParentType, ChildrenType> tableData = tableModel.getTableData();
-            for (final PackageView<ParentType, ChildrenType> packageView : selection.getPackageViews()) {
-                List<AbstractNode> visibleChildren = null;
-                if (packageView.isExpanded()) {
-                    visibleChildren = ((SelectionOnlyPackageView) packageView).getVisibleChildren();
+            getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
+                @Override
+                public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                    final ArrayList<AbstractNode> toSelect = new ArrayList<AbstractNode>();
+
+                    final PackageControllerTableModelData<ParentType, ChildrenType> tableData = tableModel.getTableData();
+                    for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
+                        List<AbstractNode> visibleChildren = null;
+                        if (packageView.isExpanded()) {
+                            visibleChildren = ((SelectionOnlyPackageView) packageView).getVisibleChildren();
+                        }
+                        if (!tableData.isHideSingleChildPackages() || (visibleChildren != null && (visibleChildren.size() > 1 || (visibleChildren.size() == 1 && !tableData.isHiddenPackageSingleChildIndex(tableData.getRowforObject(packageView.getPackage(), tableModel.getController())))))) {
+                            toSelect.add(packageView.getPackage());
+                        }
+                        if (visibleChildren != null) {
+                            toSelect.addAll(visibleChildren);
+                        }
+                    }
+                    final boolean selectall = selectionInfo.getRawSelection().size() == toSelect.size();
+                    if (selectall) {
+                        superOnShortcutSelectAll();
+                    } else {
+                        getModel().setSelectedObjects(toSelect);
+                    }
                 }
-                if (!tableData.isHideSingleChildPackages() || (visibleChildren != null && (visibleChildren.size() > 1 || (visibleChildren.size() == 1 && !tableData.isHiddenPackageSingleChildIndex(tableData.getRowforObject(packageView.getPackage(), tableModel.getController())))))) {
-                    toSelect.add(packageView.getPackage());
+
+                @Override
+                public boolean isCancelled() {
+                    return false;
                 }
-                if (visibleChildren != null) {
-                    toSelect.addAll(visibleChildren);
-                }
-            }
-            final boolean selectall = selection.getRawSelection().size() == toSelect.size();
-            if (selectall) {
-                super.onShortcutSelectAll();
-            } else {
-                getModel().setSelectedObjects(toSelect);
-            }
+            }, SelectionType.SELECTED);
         }
+    }
+
+    protected void superOnShortcutSelectAll() {
+        super.onShortcutSelectAll();
     }
 
     protected boolean updateMoveButtonEnabledStatus() {
@@ -608,31 +708,41 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
             }
 
             public void actionPerformed(ActionEvent e) {
-                final SelectionInfo<ParentType, ChildrenType> selectionInfo = getSelectionInfo(true, true);
-                getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
                     @Override
-                    protected Void run() throws RuntimeException {
-                        final boolean moveUpPossible = moveUpPossible(selectionInfo);
-                        if (moveUpPossible) {
-                            final PackageController<ParentType, ChildrenType> pc = getController();
-                            final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
-                            for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
-                                if (packageView.isPackageSelected()) {
-                                    selectedPackages.add(packageView.getPackage());
+                    public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                        getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                            @Override
+                            protected Void run() throws RuntimeException {
+                                final boolean moveUpPossible = moveUpPossible(selectionInfo);
+                                if (moveUpPossible) {
+                                    final PackageController<ParentType, ChildrenType> pc = getController();
+                                    final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
+                                    for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
+                                        if (packageView.isPackageSelected()) {
+                                            selectedPackages.add(packageView.getPackage());
+                                        }
+                                    }
+                                    if (selectedPackages.size() > 0) {
+                                        /* move package to top of list */
+                                        pc.move(selectedPackages, null);
+                                    } else if (selectionInfo.getPackageViews().size() > 0) {
+                                        final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
+                                        /* move children to top of package */
+                                        pc.move(selectionInfo.getChildren(), packageView.getPackage(), null);
+                                    }
                                 }
+                                return null;
                             }
-                            if (selectedPackages.size() > 0) {
-                                /* move package to top of list */
-                                pc.move(selectedPackages, null);
-                            } else if (selectionInfo.getPackageViews().size() > 0) {
-                                final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
-                                /* move children to top of package */
-                                pc.move(selectionInfo.getChildren(), packageView.getPackage(), null);
-                            }
-                        }
-                        return null;
+                        });
                     }
-                });
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                }, SelectionType.SELECTED);
             }
         };
         moveUpAction = new AppAction() {
@@ -647,60 +757,71 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
             }
 
             public void actionPerformed(ActionEvent e) {
-                final SelectionInfo<ParentType, ChildrenType> selectionInfo = getSelectionInfo(true, true);
-                getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
                     @Override
-                    protected Void run() throws RuntimeException {
-                        final boolean moveUpPossible = moveUpPossible(selectionInfo);
-                        if (moveUpPossible) {
-                            final PackageController<ParentType, ChildrenType> pc = getController();
-                            final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
-                            for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
-                                if (packageView.isPackageSelected()) {
-                                    selectedPackages.add(packageView.getPackage());
-                                }
-                            }
-                            if (selectedPackages.size() > 0) {
-                                ParentType after = null;
-                                final boolean readL = pc.readLock();
-                                try {
-                                    try {
-                                        final ParentType pkg = selectedPackages.get(0);
-                                        final int index = pc.indexOf(pkg) - 2;
-                                        if (index >= 0) {
-                                            /* move after this element */
-                                            after = pc.getPackages().get(index);
-                                        } /* else move to top */
-                                    } catch (final Throwable e) {
-                                        LogController.CL().log(e);
+                    public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                        getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                            @Override
+                            protected Void run() throws RuntimeException {
+                                final boolean moveUpPossible = moveUpPossible(selectionInfo);
+                                if (moveUpPossible) {
+                                    final PackageController<ParentType, ChildrenType> pc = getController();
+                                    final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
+                                    for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
+                                        if (packageView.isPackageSelected()) {
+                                            selectedPackages.add(packageView.getPackage());
+                                        }
                                     }
-                                } finally {
-                                    pc.readUnlock(readL);
+                                    if (selectedPackages.size() > 0) {
+                                        ParentType after = null;
+                                        final boolean readL = pc.readLock();
+                                        try {
+                                            try {
+                                                final ParentType pkg = selectedPackages.get(0);
+                                                final int index = pc.indexOf(pkg) - 2;
+                                                if (index >= 0) {
+                                                    /* move after this element */
+                                                    after = pc.getPackages().get(index);
+                                                } /* else move to top */
+                                            } catch (final Throwable e) {
+                                                LogController.CL().log(e);
+                                            }
+                                        } finally {
+                                            pc.readUnlock(readL);
+                                        }
+                                        pc.move(selectedPackages, after);
+                                    } else if (selectionInfo.getPackageViews().size() > 0) {
+                                        final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
+                                        ChildrenType after = null;
+                                        final ParentType pkg = packageView.getPackage();
+                                        final boolean readL = pkg.getModifyLock().readLock();
+                                        try {
+                                            final ChildrenType child = packageView.getChildren().get(0);
+                                            final int index = pkg.indexOf(child) - 2;
+                                            if (index >= 0) {
+                                                /* move after this element */
+                                                after = pkg.getChildren().get(index);
+                                            } /* else move to top */
+                                        } catch (final Throwable e) {
+                                            LogController.CL().log(e);
+                                        } finally {
+                                            pkg.getModifyLock().readUnlock(readL);
+                                        }
+                                        pc.move(selectionInfo.getChildren(), pkg, after);
+                                    }
                                 }
-                                pc.move(selectedPackages, after);
-                            } else if (selectionInfo.getPackageViews().size() > 0) {
-                                final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
-                                ChildrenType after = null;
-                                final ParentType pkg = packageView.getPackage();
-                                final boolean readL = pkg.getModifyLock().readLock();
-                                try {
-                                    final ChildrenType child = packageView.getChildren().get(0);
-                                    final int index = pkg.indexOf(child) - 2;
-                                    if (index >= 0) {
-                                        /* move after this element */
-                                        after = pkg.getChildren().get(index);
-                                    } /* else move to top */
-                                } catch (final Throwable e) {
-                                    LogController.CL().log(e);
-                                } finally {
-                                    pkg.getModifyLock().readUnlock(readL);
-                                }
-                                pc.move(selectionInfo.getChildren(), pkg, after);
+                                return null;
                             }
-                        }
-                        return null;
+                        });
                     }
-                });
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                }, SelectionType.SELECTED);
+
             };
         };
         moveDownAction = new AppAction() {
@@ -715,55 +836,66 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
             }
 
             public void actionPerformed(ActionEvent e) {
-                final SelectionInfo<ParentType, ChildrenType> selectionInfo = getSelectionInfo(true, true);
-                getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
                     @Override
-                    protected Void run() throws RuntimeException {
-                        final boolean moveDownPossible = moveDownPossible(selectionInfo);
-                        if (moveDownPossible) {
-                            final PackageController<ParentType, ChildrenType> pc = getController();
-                            final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
-                            for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
-                                if (packageView.isPackageSelected()) {
-                                    selectedPackages.add(packageView.getPackage());
-                                }
-                            }
-                            if (selectedPackages.size() > 0) {
-                                ParentType after = null;
-                                final boolean readL = pc.readLock();
-                                try {
-                                    try {
-                                        final ParentType pkg = selectedPackages.get(selectedPackages.size() - 1);
-                                        final int index = Math.min(pc.getPackages().size() - 1, pc.indexOf(pkg) + 1);
-                                        after = pc.getPackages().get(index);
-                                    } catch (final Throwable e) {
-                                        LogController.CL().log(e);
+                    public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                        getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                            @Override
+                            protected Void run() throws RuntimeException {
+                                final boolean moveDownPossible = moveDownPossible(selectionInfo);
+                                if (moveDownPossible) {
+                                    final PackageController<ParentType, ChildrenType> pc = getController();
+                                    final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
+                                    for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
+                                        if (packageView.isPackageSelected()) {
+                                            selectedPackages.add(packageView.getPackage());
+                                        }
                                     }
-                                } finally {
-                                    pc.readUnlock(readL);
+                                    if (selectedPackages.size() > 0) {
+                                        ParentType after = null;
+                                        final boolean readL = pc.readLock();
+                                        try {
+                                            try {
+                                                final ParentType pkg = selectedPackages.get(selectedPackages.size() - 1);
+                                                final int index = Math.min(pc.getPackages().size() - 1, pc.indexOf(pkg) + 1);
+                                                after = pc.getPackages().get(index);
+                                            } catch (final Throwable e) {
+                                                LogController.CL().log(e);
+                                            }
+                                        } finally {
+                                            pc.readUnlock(readL);
+                                        }
+                                        pc.move(selectedPackages, after);
+                                    } else if (selectionInfo.getPackageViews().size() > 0) {
+                                        final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
+                                        ChildrenType after = null;
+                                        final ParentType pkg = packageView.getPackage();
+                                        final boolean readL = pkg.getModifyLock().readLock();
+                                        try {
+                                            /* move after after element or max at bottom */
+                                            final ChildrenType child = selectionInfo.getChildren().get(selectionInfo.getChildren().size() - 1);
+                                            final int index = Math.min(pkg.getChildren().size() - 1, pkg.indexOf(child) + 1);
+                                            after = pkg.getChildren().get(index);
+                                        } catch (final Throwable e) {
+                                            LogController.CL().log(e);
+                                        } finally {
+                                            pkg.getModifyLock().readUnlock(readL);
+                                        }
+                                        pc.move(packageView.getChildren(), pkg, after);
+                                    }
                                 }
-                                pc.move(selectedPackages, after);
-                            } else if (selectionInfo.getPackageViews().size() > 0) {
-                                final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
-                                ChildrenType after = null;
-                                final ParentType pkg = packageView.getPackage();
-                                final boolean readL = pkg.getModifyLock().readLock();
-                                try {
-                                    /* move after after element or max at bottom */
-                                    final ChildrenType child = selectionInfo.getChildren().get(selectionInfo.getChildren().size() - 1);
-                                    final int index = Math.min(pkg.getChildren().size() - 1, pkg.indexOf(child) + 1);
-                                    after = pkg.getChildren().get(index);
-                                } catch (final Throwable e) {
-                                    LogController.CL().log(e);
-                                } finally {
-                                    pkg.getModifyLock().readUnlock(readL);
-                                }
-                                pc.move(packageView.getChildren(), pkg, after);
+                                return null;
                             }
-                        }
-                        return null;
+                        });
                     }
-                });
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                }, SelectionType.SELECTED);
+
             }
         };
         moveBottomAction = new AppAction() {
@@ -778,49 +910,60 @@ public abstract class PackageControllerTable<ParentType extends AbstractPackageN
             }
 
             public void actionPerformed(ActionEvent e) {
-                final SelectionInfo<ParentType, ChildrenType> selectionInfo = getSelectionInfo(true, true);
-                getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+
                     @Override
-                    protected Void run() throws RuntimeException {
-                        if (moveDownPossible(selectionInfo)) {
-                            final PackageController<ParentType, ChildrenType> pc = getController();
-                            final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
-                            for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
-                                if (packageView.isPackageSelected()) {
-                                    selectedPackages.add(packageView.getPackage());
-                                }
-                            }
-                            if (selectedPackages.size() > 0) {
-                                ParentType after = null;
-                                final boolean readL = pc.readLock();
-                                try {
-                                    try {
-                                        after = pc.getPackages().get(pc.getPackages().size() - 1);
-                                    } catch (final Throwable e) {
-                                        LogController.CL().log(e);
+                    public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                        getController().getQueue().add(new QueueAction<Void, RuntimeException>() {
+                            @Override
+                            protected Void run() throws RuntimeException {
+                                if (moveDownPossible(selectionInfo)) {
+                                    final PackageController<ParentType, ChildrenType> pc = getController();
+                                    final ArrayList<ParentType> selectedPackages = new ArrayList<ParentType>();
+                                    for (final PackageView<ParentType, ChildrenType> packageView : selectionInfo.getPackageViews()) {
+                                        if (packageView.isPackageSelected()) {
+                                            selectedPackages.add(packageView.getPackage());
+                                        }
                                     }
-                                } finally {
-                                    pc.readUnlock(readL);
+                                    if (selectedPackages.size() > 0) {
+                                        ParentType after = null;
+                                        final boolean readL = pc.readLock();
+                                        try {
+                                            try {
+                                                after = pc.getPackages().get(pc.getPackages().size() - 1);
+                                            } catch (final Throwable e) {
+                                                LogController.CL().log(e);
+                                            }
+                                        } finally {
+                                            pc.readUnlock(readL);
+                                        }
+                                        pc.move(selectedPackages, after);
+                                    } else if (selectionInfo.getPackageViews().size() > 0) {
+                                        final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
+                                        ChildrenType after = null;
+                                        final ParentType pkg = packageView.getPackage();
+                                        final boolean readL = pkg.getModifyLock().readLock();
+                                        try {
+                                            after = pkg.getChildren().get(pkg.getChildren().size() - 1);
+                                        } catch (final Throwable e) {
+                                            LogController.CL().log(e);
+                                        } finally {
+                                            pkg.getModifyLock().readUnlock(readL);
+                                        }
+                                        pc.move(packageView.getChildren(), pkg, after);
+                                    }
                                 }
-                                pc.move(selectedPackages, after);
-                            } else if (selectionInfo.getPackageViews().size() > 0) {
-                                final PackageView<ParentType, ChildrenType> packageView = selectionInfo.getPackageViews().get(0);
-                                ChildrenType after = null;
-                                final ParentType pkg = packageView.getPackage();
-                                final boolean readL = pkg.getModifyLock().readLock();
-                                try {
-                                    after = pkg.getChildren().get(pkg.getChildren().size() - 1);
-                                } catch (final Throwable e) {
-                                    LogController.CL().log(e);
-                                } finally {
-                                    pkg.getModifyLock().readUnlock(readL);
-                                }
-                                pc.move(packageView.getChildren(), pkg, after);
+                                return null;
                             }
-                        }
-                        return null;
+                        });
                     }
-                });
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+                }, SelectionType.SELECTED);
+
             }
         };
         moveDownAction.setEnabled(false);

@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50228 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
 public class EsouboryCz extends PluginForHost {
     public EsouboryCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,14 +80,6 @@ public class EsouboryCz extends PluginForHost {
     /* 2018-12-27: API for selfhosted content is broken */
     private static final boolean         USE_API_FOR_SELFHOSTED_CONTENT = true;
     private static MultiHosterManagement mhm                            = new MultiHosterManagement("esoubory.cz");
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        }
-        return super.canHandle(link, account);
-    }
 
     private String getLinkpart(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), "/([a-f0-9]{8}/[a-z0-9\\-]+)(?:/?|\\.html)").getMatch(0);
@@ -436,19 +428,9 @@ public class EsouboryCz extends PluginForHost {
         }
         return null;
     }
-    
+
     @Override
     public boolean hasCaptcha(DownloadLink link, Account acc) {
-
-            return false;
-    
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        return false;
     }
 }

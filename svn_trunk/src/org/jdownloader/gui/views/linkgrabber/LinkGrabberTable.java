@@ -55,7 +55,7 @@ import org.appwork.swing.exttable.ExtOverlayRowHighlighter;
 import org.appwork.swing.exttable.ExtTable;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.event.queue.Queue;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.Dialog;
@@ -285,13 +285,13 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
 
     @Override
     protected boolean onShortcutDelete(final java.util.List<AbstractNode> selectedObjects, final KeyEvent evt, final boolean direct) {
-        final SelectionInfo<CrawledPackage, CrawledLink> selection = getSelectionInfo();
-        TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
+        getSelectionInfo(new QueueSelectionInfoCallback<CrawledPackage, CrawledLink>() {
+
             @Override
-            protected Void run() throws RuntimeException {
+            public void onSelectionInfo(final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
                 final List<CrawledLink> nodesToDelete = new ArrayList<CrawledLink>();
                 boolean containsOnline = false;
-                for (final CrawledLink dl : selection.getChildren()) {
+                for (final CrawledLink dl : selectionInfo.getChildren()) {
                     final CrawledPackage parentNode = dl.getParentNode();
                     if (parentNode != null) {
                         nodesToDelete.add(dl);
@@ -303,10 +303,21 @@ public class LinkGrabberTable extends PackageControllerTable<CrawledPackage, Cra
                         }
                     }
                 }
-                LinkCollector.requestDeleteLinks(nodesToDelete, containsOnline, _GUI.T.GenericDeleteSelectedToolbarAction_updateName_object_selected_all(), evt.isControlDown(), false, false, false, false);
-                return null;
+                if (nodesToDelete.size() > 0) {
+                    LinkCollector.requestDeleteLinks(nodesToDelete, containsOnline, _GUI.T.GenericDeleteSelectedToolbarAction_updateName_object_selected_all(), evt.isControlDown(), false, false, false, false);
+                }
             }
-        });
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            @Override
+            public Queue getQueue() {
+                return TaskQueue.getQueue();
+            }
+        }, SelectionType.SELECTED);
         return true;
     }
 

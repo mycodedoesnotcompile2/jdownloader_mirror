@@ -184,7 +184,6 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        this.getMultiHosterManagement().runCheck(account, link);
         final String directlinkproperty = this.getDikrectlinkproperty();
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
         String dllink = null;
@@ -250,21 +249,6 @@ public abstract class Tb7AndXt7PlCORE extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account != null) {
-            getMultiHosterManagement().runCheck(account, link);
-            return super.canHandle(link, account);
-        } else {
-            /* Download without account is not possible */
-            return false;
-        }
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

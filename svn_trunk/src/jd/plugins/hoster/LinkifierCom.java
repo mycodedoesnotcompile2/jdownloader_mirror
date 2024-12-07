@@ -29,7 +29,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linkifier.com" }, urls = { "" })
 public class LinkifierCom extends PluginForHost {
     private static MultiHosterManagement mhm      = new MultiHosterManagement("linkifier.com");
     private static final String          API_KEY  = "d046c4309bb7cabd19f49118a2ab25e0";
@@ -116,16 +116,6 @@ public class LinkifierCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null || account.getType() != AccountType.PREMIUM) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public AvailableStatus requestFileInformation(DownloadLink parameter) throws Exception {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -137,7 +127,6 @@ public class LinkifierCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, Account account) throws Exception {
-        mhm.runCheck(account, link);
         final HashMap<String, Object> downloadJson = new HashMap<String, Object>();
         downloadJson.put("login", account.getUser());
         downloadJson.put("md5Pass", Hash.getMD5(account.getPass()));
@@ -248,10 +237,6 @@ public class LinkifierCom extends PluginForHost {
                 throw e;
             }
         }
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

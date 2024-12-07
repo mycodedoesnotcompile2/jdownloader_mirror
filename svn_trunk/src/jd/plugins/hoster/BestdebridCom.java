@@ -21,6 +21,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -40,13 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50278 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "bestdebrid.com" }, urls = { "" })
 public class BestdebridCom extends PluginForHost {
     private static final String          API_BASE            = "https://bestdebrid.com/api/v1";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("bestdebrid.com");
@@ -88,16 +88,6 @@ public class BestdebridCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink downloadLink, final Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        } else {
-            return true;
-        }
     }
 
     @Override
@@ -318,13 +308,5 @@ public class BestdebridCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         return "https://" + getHost() + "/en/profile";
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

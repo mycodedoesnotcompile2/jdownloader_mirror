@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -96,16 +96,6 @@ public class JubaGetCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -119,7 +109,6 @@ public class JubaGetCom extends PluginForHost {
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         if (!attemptStoredDownloadurlDownload(link)) {
-            mhm.runCheck(account, link);
             login(account, true, "https://" + this.getHost() + "/generator");
             final String csrftoken = br.getRegex("<meta name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);
             final UrlQuery query = new UrlQuery();
@@ -323,13 +312,5 @@ public class JubaGetCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

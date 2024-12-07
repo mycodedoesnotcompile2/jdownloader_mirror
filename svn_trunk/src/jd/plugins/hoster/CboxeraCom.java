@@ -46,14 +46,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cboxera.com" }, urls = { "" })
 public class CboxeraCom extends PluginForHost {
     private static final String          API_BASE            = "https://api.cboxera.com";
     /* 2020-03-24: Static implementation as key is nowhere to be found via API request. */
     private static final String          RECAPTCHAv2_SITEKEY = "6Ldq4FwUAAAAAJ81U4lQEvQXps384V7eCWJWxdjf";
     private static MultiHosterManagement mhm                 = new MultiHosterManagement("cboxera.com");
     /* Connection limits: 2020-03-24: According to API docs "Max Connections: 15 per user/minute" --> WTF --> Set it to unlimited for now */
-    private static final int             defaultMAXDOWNLOADS = -1;
     private static final int             defaultMAXCHUNKS    = 0;
     private static final boolean         defaultRESUME       = true;
     private static final String          PROPERTY_logintoken = "token";
@@ -87,15 +86,6 @@ public class CboxeraCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        }
-        return super.canHandle(link, account);
     }
 
     @Override
@@ -179,12 +169,8 @@ public class CboxeraCom extends PluginForHost {
         final String trafficleft = (String) subscription.get("bw_limit");
         if (!is_premium) {
             account.setType(AccountType.FREE);
-            ai.setStatus("Free account");
-            account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
         } else {
             account.setType(AccountType.PREMIUM);
-            ai.setStatus("Premium account");
-            account.setMaxSimultanDownloads(defaultMAXDOWNLOADS);
             final long premium_days_left = JavaScriptEngineFactory.toLong(subscription.get("days"), -1);
             final long validuntil = System.currentTimeMillis() + premium_days_left * 24 * 60 * 60 * 1000l;
             ai.setValidUntil(validuntil, this.br);
@@ -315,13 +301,5 @@ public class CboxeraCom extends PluginForHost {
         } catch (final Throwable e) {
         }
         return errormsg;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

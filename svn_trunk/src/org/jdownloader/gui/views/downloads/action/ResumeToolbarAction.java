@@ -2,6 +2,12 @@ package org.jdownloader.gui.views.downloads.action;
 
 import java.awt.event.ActionEvent;
 
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.gui.swing.jdgui.MainTabbedPane;
+import jd.gui.swing.jdgui.interfaces.View;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+
 import org.appwork.swing.exttable.ExtTableEvent;
 import org.appwork.swing.exttable.ExtTableListener;
 import org.appwork.utils.swing.EDTRunner;
@@ -11,15 +17,10 @@ import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.downloads.DownloadsView;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.downloads.table.DownloadsTableModel;
-
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
 
 public class ResumeToolbarAction extends AbstractToolBarAction implements ExtTableListener {
     /**
@@ -40,10 +41,15 @@ public class ResumeToolbarAction extends AbstractToolBarAction implements ExtTab
         if (isEnabled()) {
             DownloadsTable.getInstance().getSelectionInfo(new SelectionInfoCallback<FilePackage, DownloadLink>() {
                 @Override
+                public boolean isCancelled() {
+                    return false;
+                }
+
+                @Override
                 public void onSelectionInfo(SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
                     DownloadWatchDog.getInstance().resume(selectionInfo.getChildren());
                 }
-            });
+            }, SelectionType.SELECTED);
         }
     }
 
@@ -61,6 +67,11 @@ public class ResumeToolbarAction extends AbstractToolBarAction implements ExtTab
     private void updateState() {
         DownloadsTable.getInstance().getSelectionInfo(new SelectionInfoCallback<FilePackage, DownloadLink>() {
             @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            @Override
             public void onSelectionInfo(final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
                 new EDTRunner() {
                     @Override
@@ -69,7 +80,7 @@ public class ResumeToolbarAction extends AbstractToolBarAction implements ExtTab
                     }
                 };
             }
-        });
+        }, SelectionType.SELECTED);
     }
 
     @Override

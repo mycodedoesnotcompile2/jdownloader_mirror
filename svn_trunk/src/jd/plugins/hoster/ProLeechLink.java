@@ -48,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "proleech.link" }, urls = { "" })
 public class ProLeechLink extends antiDDoSForHost {
     public ProLeechLink(PluginWrapper wrapper) {
         super(wrapper);
@@ -594,7 +594,6 @@ public class ProLeechLink extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         /* 2019-11-11: Login is not required to check previously generated directurls */
         // login(account, null, false);
         final String directurlproperty = getHost();
@@ -1191,25 +1190,7 @@ public class ProLeechLink extends antiDDoSForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink link) throws Exception {
         throw new AccountRequiredException();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "conexaomega.com" }, urls = { "" })
 public class ConexaomegaCom extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            COOKIE_HOST        = "https://conexaomega.com";
@@ -140,11 +140,6 @@ public class ConexaomegaCom extends PluginForHost {
     }
 
     @Override
-    public int getMaxSimultanFreeDownloadNum() {
-        return 0;
-    }
-
-    @Override
     public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_ONLY);
     }
@@ -215,13 +210,5 @@ public class ConexaomegaCom extends PluginForHost {
 
     private void showMessage(final DownloadLink link, final String message) {
         link.getLinkStatus().setStatusText(message);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

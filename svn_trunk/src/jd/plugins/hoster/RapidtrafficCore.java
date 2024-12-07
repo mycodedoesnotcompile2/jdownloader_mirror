@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapidtrafficCore extends PluginForHost {
     protected abstract MultiHosterManagement getMultiHosterManagement();
 
@@ -206,7 +206,6 @@ public abstract class RapidtrafficCore extends PluginForHost {
 
     /** no override to keep plugin compatible to old stable */
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        getMultiHosterManagement().runCheck(account, link);
         boolean resume = true;
         showMessage(link, "Phase 1/4: Login");
         login(account, true);
@@ -322,24 +321,6 @@ public abstract class RapidtrafficCore extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            getMultiHosterManagement().runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

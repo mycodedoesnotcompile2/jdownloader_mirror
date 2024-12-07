@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linkgen.vip" }, urls = { "" })
 public class LinkgenVip extends PluginForHost {
     /* Connection limits */
     private static MultiHosterManagement mhm = new MultiHosterManagement("linkgen.vip");
@@ -74,16 +74,6 @@ public class LinkgenVip extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -133,7 +123,6 @@ public class LinkgenVip extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         final String directlinkproperty = this.getHost() + "_directlink";
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
         final String dllink;
@@ -345,13 +334,5 @@ public class LinkgenVip extends PluginForHost {
 
     private boolean isLoggedin(final Browser br) {
         return br.containsHTML("logout.php");
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

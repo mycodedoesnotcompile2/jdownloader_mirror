@@ -37,7 +37,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "contasturbo.com" }, urls = { "" })
 public class ContasturboCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("contasturbo.com");
 
@@ -189,23 +189,6 @@ public class ContasturboCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null || account.getType() != AccountType.PREMIUM) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

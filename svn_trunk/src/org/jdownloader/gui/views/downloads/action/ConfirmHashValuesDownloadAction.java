@@ -21,10 +21,12 @@ import org.jdownloader.controlling.contextmenu.CustomizableTableContextAppAction
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
 
-public class ConfirmHashValuesDownloadAction extends CustomizableTableContextAppAction implements ActionContext, ExtTableListener, ExtTableModelListener {
+public class ConfirmHashValuesDownloadAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext, ExtTableListener, ExtTableModelListener {
     private IncludedSelectionSetup includedSelection;
 
     public ConfirmHashValuesDownloadAction() {
@@ -35,41 +37,33 @@ public class ConfirmHashValuesDownloadAction extends CustomizableTableContextApp
     }
 
     @Override
-    protected void initTableContext(boolean empty, boolean selection) {
-        super.initTableContext(empty, selection);
+    protected void getSelection(final SelectionInfoCallback<FilePackage, DownloadLink> callback, final SelectionType selectionType) {
+        DownloadsTable.getInstance().getSelectionInfo(callback, selectionType);
     }
 
     @Override
-    public void initContextDefaults() {
-        super.initContextDefaults();
+    protected SelectionType getSelectionType() {
+        return includedSelection.getSelectionType();
     }
 
     @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
-    }
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        final SelectionInfo<FilePackage, DownloadLink> selection = getSelection();
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
         final List<DownloadLink> links;
-        switch (includedSelection.getSelectionType()) {
+        switch (selectionType) {
         case NONE:
-            links = null;
             return;
         case SELECTED:
-            links = selection.getChildren();
+            links = selectionInfo.getChildren();
             break;
         case UNSELECTED:
-            if (selection.getUnselectedChildren() != null) {
-                links = selection.getUnselectedChildren();
+            if (selectionInfo.getUnselectedChildren() != null) {
+                links = selectionInfo.getUnselectedChildren();
             } else {
                 links = null;
             }
             break;
-        case ALL:
         default:
-            links = DownloadsTable.getInstance().getSelectionInfo(false, true).getChildren();
+            links = selectionInfo.getChildren();
             break;
         }
         if (links == null || links.size() == 0) {

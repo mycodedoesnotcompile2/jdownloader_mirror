@@ -47,7 +47,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50297 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
+@HostPlugin(revision = "$Revision: 50301 $", interfaceVersion = 3, names = { "icerbox.com" }, urls = { "https?://(?:www\\.)?icerbox\\.com/([A-Z0-9]{8})" })
 public class IcerBoxCom extends PluginForHost {
     private final String baseURL = "https://icerbox.com";
     private final String apiURL  = "https://icerbox.com/api/v1";
@@ -316,7 +316,7 @@ public class IcerBoxCom extends PluginForHost {
             br.getHeaders().put("Accept", "application/json");
             br.getHeaders().put("Authorization", "Bearer " + token);
             final UrlQuery query = new UrlQuery();
-            query.appendEncoded("file", getFID(link) + "x");
+            query.appendEncoded("file", getFID(link));
             br.postPage(url, query);
             final Map<String, Object> entries = handleApiErrors(br, account, link);
             dllink = entries.get("url").toString();

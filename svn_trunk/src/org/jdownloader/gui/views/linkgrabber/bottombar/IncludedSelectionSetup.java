@@ -5,14 +5,19 @@ import org.appwork.swing.exttable.ExtTableModelListener;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.controlling.contextmenu.Customizer;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
-import org.jdownloader.gui.views.linkgrabber.bottombar.GenericDeleteFromLinkgrabberAction.SelectionType;
 import org.jdownloader.translate._JDT;
 
 public class IncludedSelectionSetup implements ActionContext {
-    private boolean                           includeUnselectedLinks   = false;
-    private boolean                           includeSelectedLinks     = true;
-    private final PackageControllerTable      table;
+    private boolean                      includeUnselectedLinks = false;
+    private boolean                      includeSelectedLinks   = true;
+    private final PackageControllerTable table;
+
+    public PackageControllerTable getTable() {
+        return table;
+    }
+
     private final PackageControllerTableModel model;
     private ExtTableModelListener             modelListener;
     private ExtTableListener                  tableListener;
@@ -50,8 +55,12 @@ public class IncludedSelectionSetup implements ActionContext {
             model.getEventSender().removeListener(modelListener);
             break;
         case NONE:
+        case BACKEND:
             table.getEventSender().removeListener(tableListener);
             model.getEventSender().removeListener(modelListener);
+            break;
+        default:
+            break;
         }
     }
 

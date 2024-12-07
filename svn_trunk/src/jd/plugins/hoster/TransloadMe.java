@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "transload.me" }, urls = { "" })
 public class TransloadMe extends PluginForHost {
     private static final String          API_BASE                     = "https://api.transload.me/";
     private static final String          NORESUME                     = "transload_me_NORESUME";
@@ -86,16 +86,6 @@ public class TransloadMe extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -110,7 +100,6 @@ public class TransloadMe extends PluginForHost {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         String dllink = checkDirectLink(link, this.getHost() + "directlink");
         if (dllink == null) {
-            mhm.runCheck(account, link);
             dllink = generateDownloadlinkAPI(account, link);
             if (dllink == null) {
                 /* Should never happen */
@@ -329,13 +318,5 @@ public class TransloadMe extends PluginForHost {
             logger.info(this.getHost() + ": Exception: statusCode: " + statuscode + " statusMessage: " + statusMessage);
             throw e;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

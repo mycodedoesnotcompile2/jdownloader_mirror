@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.downloadcontroller.DownloadLinkCandidate;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
 import jd.controlling.downloadcontroller.DownloadWatchDog;
@@ -39,8 +40,6 @@ import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.reconnect.Reconnecter;
 import jd.controlling.reconnect.ReconnecterEvent;
 import jd.controlling.reconnect.ReconnecterListener;
-import jd.gui.swing.jdgui.MainTabbedPane;
-import jd.gui.swing.jdgui.interfaces.View;
 import jd.plugins.AddonPanel;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -98,12 +97,8 @@ import org.jdownloader.gui.mainmenu.container.OptionalContainer;
 import org.jdownloader.gui.toolbar.MenuManagerMainToolbar;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.downloads.DownloadsView;
 import org.jdownloader.gui.views.downloads.MenuManagerDownloadTabBottomBar;
 import org.jdownloader.gui.views.downloads.contextmenumanager.MenuManagerDownloadTableContext;
-import org.jdownloader.gui.views.downloads.table.DownloadsTable;
-import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
-import org.jdownloader.gui.views.linkgrabber.LinkGrabberView;
 import org.jdownloader.gui.views.linkgrabber.bottombar.MenuManagerLinkgrabberTabBottombar;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.MenuManagerLinkgrabberTableContext;
 
@@ -789,19 +784,10 @@ public class EventScripterExtension extends AbstractExtension<EventScripterConfi
                     props.put("icon", iconKey);
                     props.put("shortCutString", shortCutString);
                     props.put("menu", downloadTableContextMenuButton.name());
-                    final View view = MainTabbedPane.getInstance().getSelectedView();
-                    if (view instanceof DownloadsView) {
-                        if (downloadTableContextMenuButton == EventTrigger.DOWNLOAD_TABLE_CONTEXT_MENU_BUTTON) {
-                            props.put("dlSelection", new DownloadlistSelectionSandbox(selectionInfo));
-                        } else {
-                            props.put("dlSelection", new DownloadlistSelectionSandbox(DownloadsTable.getInstance().getSelectionInfo()));
-                        }
-                    } else if (view instanceof LinkGrabberView) {
-                        if (downloadTableContextMenuButton == EventTrigger.LINKGRABBER_TABLE_CONTEXT_MENU_BUTTON) {
-                            props.put("lgSelection", new LinkgrabberSelectionSandbox(selectionInfo));
-                        } else {
-                            props.put("lgSelection", new LinkgrabberSelectionSandbox(LinkGrabberTable.getInstance().getSelectionInfo()));
-                        }
+                    if (selectionInfo != null && selectionInfo.getController() == DownloadController.getInstance()) {
+                        props.put("dlSelection", new DownloadlistSelectionSandbox(selectionInfo));
+                    } else if (selectionInfo != null && selectionInfo.getController() == LinkCollector.getInstance()) {
+                        props.put("lgSelection", new LinkgrabberSelectionSandbox(selectionInfo));
                     }
                     runScript(script, props);
                 } catch (Throwable e) {

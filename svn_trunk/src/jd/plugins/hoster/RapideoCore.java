@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class RapideoCore extends PluginForHost {
     public RapideoCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -708,7 +708,6 @@ public abstract class RapideoCore extends PluginForHost {
             logger.info("Re-using stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            mhm.runCheck(account, link);
             final ENDPOINT_TYPE accesstype = getEndpointType();
             if (accesstype == ENDPOINT_TYPE.APIv1) {
                 dllink = getDirecturlAPIv1(link, account);
@@ -751,23 +750,5 @@ public abstract class RapideoCore extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         throw new AccountRequiredException();
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            getMultiHosterManagement().runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

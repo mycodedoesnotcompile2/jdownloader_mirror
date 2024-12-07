@@ -39,6 +39,8 @@ import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.components.packagetable.dragdrop.PackageControllerTableTransferHandler;
 import org.jdownloader.gui.views.downloads.table.DownloadsTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
@@ -158,41 +160,59 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         super.requestUpdate(requestor);
     }
 
+    public <ParentType extends AbstractPackageNode<ChildrenType, ParentType>, ChildrenType extends AbstractPackageChildrenNode<ParentType>> SelectionInfoCallback<ParentType, ChildrenType> getCallback(final PackageControllerTable<ParentType, ChildrenType> table) {
+        return new SelectionInfoCallback<ParentType, ChildrenType>() {
+
+            @Override
+            public void onSelectionInfo(SelectionInfo<ParentType, ChildrenType> selectionInfo) {
+                final StringBuilder sb = new StringBuilder();
+                if (isSmartSelection()) {
+                    int children = 0;
+                    for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
+                        final List<ChildrenType> childs = pv.getChildren();
+                        children += childs.size();
+                        if (children > 1) {
+                            break;
+                        }
+                    }
+                    final boolean contentPermission = children == 1;
+                    for (final PackageView<ParentType, ChildrenType> pv : selectionInfo.getPackageViews()) {
+                        final ParentType pkg = pv.getPackage();
+                        add(sb, pkg, false);
+                        final List<ChildrenType> childs = pv.getChildren();
+                        for (final ChildrenType c : childs) {
+                            add(sb, c, contentPermission);
+                        }
+                    }
+                } else {
+                    final List<AbstractNode> selection = selectionInfo.getRawSelection();
+                    final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
+                    for (final AbstractNode pv : selection) {
+                        add(sb, pv, contentPermission);
+                    }
+                }
+                final TransferHandler transferHandler = table.getTransferHandler();
+                if (transferHandler instanceof PackageControllerTableTransferHandler) {
+                    ((PackageControllerTableTransferHandler) transferHandler).setTransferableStringContent(sb.toString());
+                    transferHandler.getCopyAction().actionPerformed(new ActionEvent(table, ActionEvent.ACTION_FIRST, "copy"));
+                } else {
+                    ClipboardMonitoring.getINSTANCE().setCurrentContent(sb.toString());
+                }
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+        };
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
-        final StringBuilder sb = new StringBuilder();
-        final SelectionInfo<?, ?> selectionInfo = getTable().getSelectionInfo();
-        if (isSmartSelection()) {
-            int children = 0;
-            for (final PackageView<?, ?> pv : selectionInfo.getPackageViews()) {
-                final List<AbstractNode> childs = (List<AbstractNode>) pv.getChildren();
-                children += childs.size();
-                if (children > 1) {
-                    break;
-                }
-            }
-            final boolean contentPermission = children == 1;
-            for (final PackageView<?, ?> pv : selectionInfo.getPackageViews()) {
-                final AbstractPackageNode<?, ?> pkg = pv.getPackage();
-                add(sb, pkg, false);
-                final List<AbstractNode> childs = (List<AbstractNode>) pv.getChildren();
-                for (final AbstractNode c : childs) {
-                    add(sb, c, contentPermission);
-                }
-            }
-        } else {
-            final List<AbstractNode> selection = selectionInfo.getRawSelection();
-            final boolean contentPermission = selection.size() == 1 && selection.get(0) instanceof AbstractPackageChildrenNode;
-            for (final AbstractNode pv : selection) {
-                add(sb, pv, contentPermission);
-            }
-        }
-        final TransferHandler transferHandler = getTable().getTransferHandler();
-        if (transferHandler instanceof PackageControllerTableTransferHandler) {
-            ((PackageControllerTableTransferHandler) transferHandler).setTransferableStringContent(sb.toString());
-            transferHandler.getCopyAction().actionPerformed(new ActionEvent(getTable(), ActionEvent.ACTION_FIRST, "copy"));
-        } else {
-            ClipboardMonitoring.getINSTANCE().setCurrentContent(sb.toString());
+        if (MainTabbedPane.getInstance().isDownloadView()) {
+            DownloadsTable.getInstance().getSelectionInfo(getCallback(DownloadsTable.getInstance()), SelectionType.SELECTED);
+        } else if (MainTabbedPane.getInstance().isLinkgrabberView()) {
+            LinkGrabberTable.getInstance().getSelectionInfo(getCallback(LinkGrabberTable.getInstance()), SelectionType.SELECTED);
         }
     }
 
@@ -422,13 +442,4 @@ public class CopyGenericContextAction extends CustomizableTableContextAppAction 
         return StringUtils.valueOrEmpty(StringUtils.valueOfOrNull(comment));
     }
 
-    private final PackageControllerTable<?, ?> getTable() {
-        if (MainTabbedPane.getInstance().isDownloadView()) {
-            return DownloadsTable.getInstance();
-        } else if (MainTabbedPane.getInstance().isLinkgrabberView()) {
-            return LinkGrabberTable.getInstance();
-        } else {
-            return null;
-        }
-    }
 }

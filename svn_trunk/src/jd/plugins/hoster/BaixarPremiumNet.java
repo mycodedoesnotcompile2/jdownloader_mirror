@@ -38,7 +38,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "baixarpremium.net" }, urls = { "" })
 public class BaixarPremiumNet extends PluginForHost {
     private static HashMap<Account, HashMap<String, Long>> hostUnavailableMap = new HashMap<Account, HashMap<String, Long>>();
     private static final String                            NICE_HOST          = "baixarpremium.net";
@@ -318,13 +318,5 @@ public class BaixarPremiumNet extends PluginForHost {
             logger.info(NICE_HOST + ": " + error + " -> Disabling current host");
             tempUnavailableHoster(disableTime);
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

@@ -62,7 +62,7 @@ import jd.utils.locale.JDL;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "grab8.com", "prem.link" }, urls = { "https?://(?:\\w+\\.)?grab8.com/dl\\.php\\?id=(\\d+)", "https?://(?:\\w+\\.)?prem.link/dl\\.php\\?id=(\\d+)" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "grab8.com", "prem.link" }, urls = { "https?://(?:\\w+\\.)?grab8.com/dl\\.php\\?id=(\\d+)", "https?://(?:\\w+\\.)?prem.link/dl\\.php\\?id=(\\d+)" })
 public class Grab8Com extends antiDDoSForHost {
     private static final String          CLEAR_DOWNLOAD_HISTORY         = "CLEAR_DOWNLOAD_HISTORY";
     private final boolean                default_clear_download_history = false;
@@ -173,16 +173,6 @@ public class Grab8Com extends antiDDoSForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -202,7 +192,6 @@ public class Grab8Com extends antiDDoSForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         setConstants(account, link);
         login(account, true, false);
         final String url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
@@ -804,13 +793,5 @@ public class Grab8Com extends antiDDoSForHost {
 
     public void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), CLEAR_DOWNLOAD_HISTORY, JDL.L("plugins.hoster.grab8com.clear_serverside_download_history", "Delete downloaded link entry from the grab8 download history after successful download?\r\n<html><b>Note that this does NOT delete the complete download history but only the entry of the SUCCESSFULLY downloaded link!</b></hml>")).setDefaultValue(default_clear_download_history));
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

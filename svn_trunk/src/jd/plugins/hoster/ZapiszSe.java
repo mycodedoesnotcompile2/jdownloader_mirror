@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "zapisz.se" }, urls = { "https?://zapisz\\.se/files/(\\d+)/([^/]+)?/?" })
 public class ZapiszSe extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://zapisz.se";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("zapisz.se");
@@ -89,16 +89,6 @@ public class ZapiszSe extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         /* Account required to download any content of this website. */
         throw new AccountRequiredException();
@@ -127,7 +117,6 @@ public class ZapiszSe extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.loginWebsite(account, false);
         final String directlinkproperty = this.getHost() + "directlink";
         final String storedDirecturl = link.getStringProperty(directlinkproperty);
@@ -293,13 +282,5 @@ public class ZapiszSe extends PluginForHost {
 
     private boolean isLoggedIN(final Browser br) throws PluginException {
         return br.containsHTML("/logout\\.html");
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

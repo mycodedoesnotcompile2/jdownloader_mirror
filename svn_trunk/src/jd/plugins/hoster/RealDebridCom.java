@@ -24,34 +24,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import jd.PluginWrapper;
-import jd.config.ConfigContainer;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.SkipException;
-import jd.http.Browser;
-import jd.http.Request;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountRequiredException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.CaptchaException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.Plugin;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.HashInfo;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.JSonStorage;
@@ -90,7 +62,35 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 50265 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
+import jd.PluginWrapper;
+import jd.config.ConfigContainer;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.SkipException;
+import jd.http.Browser;
+import jd.http.Request;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.CaptchaException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.HashInfo;
+
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "real-debrid.com" }, urls = { "https?://(?:\\w+(?:\\.download)?\\.)?(?:real\\-debrid\\.com|rdb\\.so|rdeb\\.io)/dl?/\\w+(?:/.+)?" })
 public class RealDebridCom extends PluginForHost {
     private static final String CLIENT_SECRET_KEY = "client_secret";
     private static final String CLIENT_ID_KEY     = "client_id";
@@ -280,7 +280,6 @@ public class RealDebridCom extends PluginForHost {
             // no non account handleMultiHost support.
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -513,7 +512,6 @@ public class RealDebridCom extends PluginForHost {
     /** no override to keep plugin compatible to old stable */
     public void handleMultiHost(final int startTaskIndex, final DownloadLink link, final Account account) throws Exception {
         try {
-            mhm.runCheck(account, link);
             showMessage(link, "Task " + (startTaskIndex + 1) + ": Generating Link");
             /* request Download */
             final String dllink = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
@@ -910,10 +908,6 @@ public class RealDebridCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
     }
 
     @Override

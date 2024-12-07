@@ -43,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = { "multishare.cz" }, urls = { "https?://[\\w\\.]*?multishare\\.cz/((?:[a-z]{2}/)?stahnout/[0-9]+/|html/mms_process\\.php\\?(&?u_ID=\\d+|&?u_hash=[a-f0-9]+|(&?link=https?%3A%2F%2F[^&\\?]+|&?fid=\\d+)){3})" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 2, names = { "multishare.cz" }, urls = { "https?://[\\w\\.]*?multishare\\.cz/((?:[a-z]{2}/)?stahnout/[0-9]+/|html/mms_process\\.php\\?(&?u_ID=\\d+|&?u_hash=[a-f0-9]+|(&?link=https?%3A%2F%2F[^&\\?]+|&?fid=\\d+)){3})" })
 public class MultiShareCz extends antiDDoSForHost {
     public MultiShareCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,6 @@ public class MultiShareCz extends antiDDoSForHost {
         return br;
     }
 
-    private final String                 mhLink     = "(?i)https?://[\\w\\.]*?multishare\\.cz/html/mms_process\\.php\\?.+";
     private Account                      currentAcc = null;
     private static MultiHosterManagement mhm        = new MultiHosterManagement("multishare.cz");
 
@@ -124,7 +123,7 @@ public class MultiShareCz extends antiDDoSForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        if (link.getPluginPatternMatcher().matches(mhLink)) {
+        if (this.canHandle(link.getPluginPatternMatcher())) {
             dlGeneratedMhLink(link);
             return;
         }
@@ -152,7 +151,7 @@ public class MultiShareCz extends antiDDoSForHost {
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         setConstants(account);
-        if (link.getPluginPatternMatcher().matches(mhLink)) {
+        if (this.canHandle(link.getPluginPatternMatcher())) {
             dlGeneratedMhLink(link);
             return;
         }
@@ -221,7 +220,6 @@ public class MultiShareCz extends antiDDoSForHost {
 
     /** no override to keep plugin compatible to old stable */
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.setBrowserExclusive();
         /* login to get u_ID and u_HASH */
         getPage("https://www." + account.getHoster() + "/api/?sub=download-link&login=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&link=" + Encoding.urlEncode(link.getDownloadURL()));
@@ -288,7 +286,7 @@ public class MultiShareCz extends antiDDoSForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
-        if (link.getPluginPatternMatcher().matches(mhLink)) {
+        if (this.canHandle(link.getPluginPatternMatcher())) {
             return requestFileInformationMh(link);
         }
         this.setBrowserExclusive();
@@ -327,24 +325,11 @@ public class MultiShareCz extends antiDDoSForHost {
 
     @Override
     public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (account == null) {
-            if (link.getPluginPatternMatcher().matches(mhLink)) {
-                // multihoster link
-                return true;
-            }
+        if (account == null && this.canHandle(link.getPluginPatternMatcher())) {
             /* without account its not possible to download the link */
             return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

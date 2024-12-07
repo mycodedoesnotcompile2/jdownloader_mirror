@@ -46,7 +46,7 @@ import jd.plugins.MultiHostHost;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "mydebrid.com" }, urls = { "" })
 public class MydebridCom extends antiDDoSForHost {
     /* Documentation: https://api.mydebrid.com/v1/ */
     private static final String                  API_BASE             = "https://api.mydebrid.com/v1";
@@ -80,16 +80,6 @@ public class MydebridCom extends antiDDoSForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -312,13 +302,5 @@ public class MydebridCom extends antiDDoSForHost {
         }
         /* This code should never be reached */
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

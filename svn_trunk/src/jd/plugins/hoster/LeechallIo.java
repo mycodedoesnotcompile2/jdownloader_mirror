@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -101,16 +101,6 @@ public class LeechallIo extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -123,7 +113,6 @@ public class LeechallIo extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         final String directurlproperty = this.getHost() + "_directurl";
         final String storedDirecturl = link.getStringProperty(directurlproperty);
@@ -446,13 +435,5 @@ public class LeechallIo extends PluginForHost {
             }
         }
         return entries;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

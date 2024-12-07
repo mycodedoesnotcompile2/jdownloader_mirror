@@ -38,7 +38,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "conexaomega.com.br" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "conexaomega.com.br" }, urls = { "" })
 public class ConexaomegaComBr extends antiDDoSForHost {
     /* Tags: conexaomega.com.br, megarapido.net, superdown.com.br */
     private static final String                            DOMAIN                       = "http://conexaomega.com.br/";
@@ -89,15 +89,6 @@ public class ConexaomegaComBr extends antiDDoSForHost {
     }
 
     @Override
-    public boolean canHandle(DownloadLink link, Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        }
-        return super.canHandle(link, account);
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -116,7 +107,6 @@ public class ConexaomegaComBr extends antiDDoSForHost {
     @SuppressWarnings("deprecation")
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        this.br = new Browser();
         setConstants(account, link);
         synchronized (hostUnavailableMap) {
             HashMap<String, Long> unavailableMap = hostUnavailableMap.get(account);
@@ -213,7 +203,6 @@ public class ConexaomegaComBr extends antiDDoSForHost {
             }
         }
         setConstants(account, null);
-        this.br = new Browser();
         final AccountInfo ai = new AccountInfo();
         login(account, true);
         if (!this.br.getURL().contains("/minha_conta.php")) {
@@ -250,7 +239,6 @@ public class ConexaomegaComBr extends antiDDoSForHost {
             try {
                 /* Load cookies */
                 br.setCookiesExclusive(true);
-                br = new Browser();
                 final Cookies cookies = account.loadCookies("");
                 if (cookies != null) {
                     /* Re-use cookies whenever possible to avoid login captcha prompts. */
@@ -266,8 +254,7 @@ public class ConexaomegaComBr extends antiDDoSForHost {
                             return;
                         }
                     }
-                    /* Clear cookies/headers to prevent unknown errors as we'll perform a full login below now. */
-                    br = new Browser();
+                    br.clearCookies(null);
                 }
                 super.getPage(br, "https://www." + getHost() + "/login");
                 String postData = "lembrar=on&email=" + Encoding.urlEncode(currAcc.getUser()) + "&senha=" + Encoding.urlEncode(currAcc.getPass());
@@ -379,13 +366,5 @@ public class ConexaomegaComBr extends antiDDoSForHost {
             logger.info(NICE_HOST + ": " + error + " -> Disabling current host");
             tempUnavailableHoster(waittime);
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

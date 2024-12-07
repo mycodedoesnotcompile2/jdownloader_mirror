@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -289,9 +289,6 @@ public abstract class HighWayCore extends UseNet {
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
         if (!requiresAccount(link)) {
             return true;
-        } else if (account == null) {
-            /* without account its not possible to download the link. */
-            return false;
         }
         /* Make sure that we do not start more than the allowed number of max simultaneous downloads for the current host. */
         synchronized (getMapLock()) {
@@ -1039,13 +1036,5 @@ public abstract class HighWayCore extends UseNet {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

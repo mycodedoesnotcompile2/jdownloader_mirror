@@ -56,7 +56,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "dailyleech.com" }, urls = { "" })
 public class DailyleechCom extends PluginForHost {
     private static final String          PROTOCOL       = "https://";
     /* Connection limits */
@@ -103,17 +103,6 @@ public class DailyleechCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            /* without account its not possible to download the link */
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(final DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -125,7 +114,6 @@ public class DailyleechCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         final String directurlproperty = getCachedLinkPropertyKey(account);
         // if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
@@ -644,13 +632,5 @@ public class DailyleechCom extends PluginForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return ACCOUNT_MAXDLS;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

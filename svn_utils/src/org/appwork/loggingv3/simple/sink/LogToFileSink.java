@@ -63,7 +63,9 @@ import java.util.zip.ZipOutputStream;
 
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.simple.LogRecord2;
+import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.utils.CompareUtils;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.IO;
@@ -82,7 +84,7 @@ public class LogToFileSink extends AbstractSink {
      *
      */
     private static final Pattern REGEX_DATE_LOGS_FOLDERS = Pattern.compile("^logs_(.*)_[^_]+$");
-    private static final Pattern REGEX_DATE_LOGS_ZIPS    = Pattern.compile("^logs_(.*?)(-(.*))?_[^_]+\\.zip$");
+    private static final Pattern REGEX_DATE_LOGS_ZIPS    = Pattern.compile("^logs_(.*?)(?:-(.*))?_[^_]+\\.zip$");
     /**
      *
      */
@@ -160,6 +162,15 @@ public class LogToFileSink extends AbstractSink {
             path = f;
             this.from = from;
             this.to = to;
+            DebugMode.breakIf(to < 0);
+        }
+
+        /**
+         * @see java.lang.Object#toString()
+         */
+        @Override
+        public String toString() {
+            return path.getName() + " - " + DateMapper.formatJsonDefault(from) + " - " + DateMapper.formatJsonDefault(to);
         }
 
         /**

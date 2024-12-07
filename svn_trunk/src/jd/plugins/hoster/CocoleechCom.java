@@ -45,7 +45,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cocoleech.com" }, urls = { "" })
 public class CocoleechCom extends PluginForHost {
     /* 2024-06-14: Alternative domain: cocodebrid.com */
     private static final String          API_ENDPOINT       = "https://members.cocoleech.com/auth/api";
@@ -92,15 +92,6 @@ public class CocoleechCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException, IOException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -312,13 +303,5 @@ public class CocoleechCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

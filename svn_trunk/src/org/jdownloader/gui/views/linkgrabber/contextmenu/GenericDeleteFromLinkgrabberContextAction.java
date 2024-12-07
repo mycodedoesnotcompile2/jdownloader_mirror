@@ -6,6 +6,7 @@ import jd.controlling.linkcrawler.CrawledPackage;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.controlling.contextmenu.TableContext;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.bottombar.GenericDeleteFromLinkgrabberAction;
 import org.jdownloader.gui.views.linkgrabber.bottombar.IncludedSelectionSetup;
@@ -18,8 +19,18 @@ public class GenericDeleteFromLinkgrabberContextAction extends GenericDeleteFrom
         addContextSetup(0, tableContext = new TableContext(false, true));
     }
 
+    @Override
     protected void initIncludeSelectionSupport() {
         addContextSetup(1, includedSelection = new IncludedSelectionSetup(LinkGrabberTable.getInstance(), this, this) {
+            @Override
+            public SelectionType getSelectionType() {
+                final SelectionType ret = super.getSelectionType();
+                if (SelectionType.ALL.equals(ret) && !isIgnoreFiltered()) {
+                    return SelectionType.BACKEND;
+                }
+                return ret;
+            }
+
             @Override
             public void updateListeners() {
             }
@@ -27,13 +38,12 @@ public class GenericDeleteFromLinkgrabberContextAction extends GenericDeleteFrom
     }
 
     @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
+    protected void onUpdate(final SelectionType selectionType, final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
+        super.onUpdate(selectionType, selectionInfo);
         new EDTRunner() {
             @Override
             protected void runInEDT() {
-                SelectionInfo<CrawledPackage, CrawledLink> selection = GenericDeleteFromLinkgrabberContextAction.this.selection.get();
-                final boolean hasSelection = selection != null && !selection.isEmpty();
+                final boolean hasSelection = selectionInfo != null && !selectionInfo.isEmpty();
                 if (hasSelection) {
                     if (tableContext.isItemVisibleForSelections()) {
                         setVisible(true);

@@ -1,15 +1,6 @@
 package jd.plugins.components;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.utils.Time;
-
 import jd.config.Property;
-import jd.controlling.AccountController;
-import jd.controlling.AccountControllerEvent;
-import jd.controlling.AccountControllerListener;
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
@@ -17,6 +8,8 @@ import jd.plugins.LinkStatus;
 import jd.plugins.MultiHostHost;
 import jd.plugins.Plugin;
 import jd.plugins.PluginException;
+
+import org.appwork.exceptions.WTFException;
 
 /**
  * Instead of duplication we create a class
@@ -26,7 +19,7 @@ import jd.plugins.PluginException;
  * @author raztoki
  *
  */
-public class MultiHosterManagement implements AccountControllerListener {
+public class MultiHosterManagement {
     private final String host;
 
     public MultiHosterManagement(final String host) {
@@ -35,20 +28,6 @@ public class MultiHosterManagement implements AccountControllerListener {
 
     protected String getErrorProperty() {
         return getHost().replaceAll("https?://|\\.|\\-", "") + "_failedtimes_";
-    }
-
-    private final Map<String, Map<Object, Map<String, UnavailableHost>>> dataBase = new HashMap<String, Map<Object, Map<String, UnavailableHost>>>();
-
-    protected Map<Object, Map<String, UnavailableHost>> getDB() {
-        final String host = getHost();
-        synchronized (dataBase) {
-            Map<Object, Map<String, UnavailableHost>> ret = dataBase.get(host);
-            if (ret == null) {
-                ret = new HashMap<Object, Map<String, UnavailableHost>>();
-                dataBase.put(host, ret);
-            }
-            return ret;
-        }
     }
 
     private String getHost() {
@@ -62,87 +41,22 @@ public class MultiHosterManagement implements AccountControllerListener {
     }
 
     public void putError(final Object account, final DownloadLink downloadLink, final Long timeout, final String reason) throws PluginException {
-        if (account instanceof Account) {
-            AccountController.getInstance().getEventSender().addListener(this, true);
-        }
-        final Map<Object, Map<String, UnavailableHost>> db = getDB();
-        synchronized (db) {
-            // null(multihosterwide) && AccountType && Account
-            final UnavailableHost nue = new UnavailableHost(reason, Time.systemIndependentCurrentJVMTimeMillis() + timeout);
-            Map<String, UnavailableHost> unavailableMap = db.get(account);
-            if (unavailableMap == null) {
-                unavailableMap = new HashMap<String, UnavailableHost>();
-                db.put(account, unavailableMap);
+        setLimitOnAccount: if (account != null && account instanceof Account) {
+            /* Set limit on account so it is aware of current state of that host. */
+            final Account acc = (Account) account;
+            final AccountInfo ai = acc.getAccountInfo();
+            if (ai == null) {
+                break setLimitOnAccount;
             }
-            unavailableMap.put(downloadLink.getHost(), nue);
-            setLimitOnAccount: if (account != null && account instanceof Account) {
-                /* Set limit on account so it is aware of current state of that host. */
-                final Account acc = (Account) account;
-                final AccountInfo ai = acc.getAccountInfo();
-                if (ai == null) {
-                    break setLimitOnAccount;
-                }
-                final MultiHostHost mhost = ai.getMultihostSupportedHost(downloadLink.getHost());
-                if (mhost == null) {
-                    /* Host might have been removed from list of supported hosts in the meantime. */
-                    break setLimitOnAccount;
-                }
-                mhost.setErrorStatus(reason, timeout);
-                ai.updateMultihostSupportedHost(mhost);
+            final MultiHostHost mhost = ai.getMultihostSupportedHost(downloadLink.getHost());
+            if (mhost == null) {
+                /* Host might have been removed from list of supported hosts in the meantime. */
+                break setLimitOnAccount;
             }
+            mhost.setErrorStatus(reason, timeout);
+            ai.updateMultihostSupportedHost(mhost);
         }
         throw new PluginException(LinkStatus.ERROR_RETRY, reason);
-    }
-
-    /**
-     * Intended purpose is predownload. CanHandle can't deal with exceptions at this time. Later to be called within canHandle
-     *
-     * @param account
-     * @param downloadLink
-     * @throws PluginException
-     * @throws InterruptedException
-     */
-    public void runCheck(final Account account, final DownloadLink downloadLink) throws PluginException, InterruptedException {
-        final Map<Object, Map<String, UnavailableHost>> db = getDB();
-        synchronized (db) {
-            // check for null(multihosterwide) first, AccountTypes(specific to this account type) second, and Account (specific to this
-            // account) last!
-            MultiHostHost mhost = null;
-            final AccountInfo ai = account.getAccountInfo();
-            if (ai != null) {
-                mhost = ai.getMultihostSupportedHost(downloadLink.getHost());
-            }
-            final Object[] acc = new Object[] { null, account.getType(), account };
-            for (final Object ob : acc) {
-                final Map<String, UnavailableHost> unavailableMap = db.get(ob);
-                final UnavailableHost nue = unavailableMap != null ? (UnavailableHost) unavailableMap.get(downloadLink.getHost()) : null;
-                if (nue == null) {
-                    continue;
-                }
-                String errorReason = nue.getErrorReason();
-                Long lastUnavailable = nue.getErrorTimeout();
-                if (mhost != null) {
-                    if (mhost.getStatusText() != null) {
-                        errorReason = mhost.getStatusText();
-                    }
-                    if (mhost.getUnavailableUntilTimestamp() != -1) {
-                        lastUnavailable = mhost.getUnavailableUntilTimestamp();
-                    }
-                }
-                if (lastUnavailable == null) {
-                    // never can download from
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Not possible to download from " + downloadLink.getHost());
-                } else if (Time.systemIndependentCurrentJVMTimeMillis() < lastUnavailable) {
-                    final long wait = lastUnavailable - Time.systemIndependentCurrentJVMTimeMillis();
-                    throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Temporarily unavailable by this MultiHoster Provider: " + errorReason != null ? errorReason : "via " + getHost(), wait);
-                } else {
-                    unavailableMap.remove(downloadLink.getHost());
-                    if (unavailableMap.size() == 0) {
-                        db.remove(acc);
-                    }
-                }
-            }
-        }
     }
 
     /**
@@ -200,23 +114,4 @@ public class MultiHosterManagement implements AccountControllerListener {
         }
     }
 
-    @Override
-    public void onAccountControllerEvent(AccountControllerEvent event) {
-        switch (event.getType()) {
-        case ACCOUNT_CHECKED:
-        case ACCOUNT_PROPERTY_UPDATE:
-            if (event.getAccount().isValid()) {
-                final Map<Object, Map<String, UnavailableHost>> db = getDB();
-                synchronized (db) {
-                    final Account account = event.getAccount();
-                    db.remove(account);// remove account
-                    db.remove(null);// remove host wide block
-                    db.remove(account.getType()); // remove account type
-                }
-            }
-            break;
-        default:
-            break;
-        }
-    }
 }

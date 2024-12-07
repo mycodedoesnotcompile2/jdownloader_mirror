@@ -9,6 +9,9 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.SelectionInfo.PackageView;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 
 public class CollapseExpandAllAction extends SelectionBasedToolbarAction {
     public CollapseExpandAllAction() {
@@ -17,20 +20,29 @@ public class CollapseExpandAllAction extends SelectionBasedToolbarAction {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (getTable() != null) {
-            SelectionInfo<?, ?> selection = getTable().getSelectionInfo(false, true);
-            boolean allexpaned = true;
-            ArrayList<AbstractPackageNode> list = new ArrayList<AbstractPackageNode>();
-            for (PackageView<?, ?> p : selection.getPackageViews()) {
-                if (!p.isExpanded()) {
-                    allexpaned = false;
+        final PackageControllerTable table = getTable();
+        if (table != null) {
+            table.getSelectionInfo(new EDTSelectionInfoCallback() {
 
+                @Override
+                public boolean isCancelled() {
+                    return false;
                 }
-                list.add(p.getPackage());
 
-            }
-
-            getTable().getModel().setFilePackageExpand(!allexpaned, list.toArray(new AbstractPackageNode[] {}));
+                @Override
+                public void onSelectionInfo(SelectionInfo selectionInfo) {
+                    boolean allexpaned = true;
+                    final ArrayList<AbstractPackageNode> list = new ArrayList<AbstractPackageNode>();
+                    for (Object p : selectionInfo.getPackageViews()) {
+                        final PackageView pv = (PackageView) p;
+                        if (!pv.isExpanded()) {
+                            allexpaned = false;
+                        }
+                        list.add(pv.getPackage());
+                    }
+                    table.getModel().setFilePackageExpand(!allexpaned, list.toArray(new AbstractPackageNode[] {}));
+                }
+            }, SelectionType.ALL);
         }
     }
 
@@ -45,7 +57,6 @@ public class CollapseExpandAllAction extends SelectionBasedToolbarAction {
 
     @Override
     protected void onSelectionUpdate() {
-
         if (getTable() == null) {
             setEnabled(false);
             return;

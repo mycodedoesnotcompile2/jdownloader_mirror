@@ -23,6 +23,24 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.nutils.encoding.Encoding;
+import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountUnavailableException;
+import jd.plugins.DownloadLink;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
+import jd.plugins.MultiHostHost;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.components.MultiHosterManagement;
+
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
 import org.appwork.uio.ConfirmDialogInterface;
@@ -42,25 +60,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.plugins.Account;
-import jd.plugins.Account.AccountType;
-import jd.plugins.AccountInfo;
-import jd.plugins.AccountInvalidException;
-import jd.plugins.AccountUnavailableException;
-import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.MultiHostHost;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.PluginException;
-import jd.plugins.PluginForHost;
-import jd.plugins.components.MultiHosterManagement;
-
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50305 $", interfaceVersion = 4, names = { "debrid-link.com" }, urls = { "" })
 public class DebridLinkCom extends PluginForHost {
     private static MultiHosterManagement mhm                                                 = new MultiHosterManagement("debrid-link.com");
     private static final String          PROPERTY_DIRECTURL                                  = "directurl";
@@ -237,8 +237,8 @@ public class DebridLinkCom extends PluginForHost {
             ac.setStatus(ac.getStatus() + " | " + usedPercent + "% used");
         }
         /**
-         * 2021-02-23: This service doesn't allow users to use it whenever they use a VPN/Proxy. </br>
-         * Accounts can be checked but downloads will not work!
+         * 2021-02-23: This service doesn't allow users to use it whenever they use a VPN/Proxy. </br> Accounts can be checked but downloads
+         * will not work!
          */
         if (serverDetected != null && serverDetected instanceof Boolean && ((Boolean) serverDetected).booleanValue()) {
             throw new AccountUnavailableException("VPN/Proxy detected: Turn it off to be able to use this account", 5 * 60 * 1000l);
@@ -370,8 +370,7 @@ public class DebridLinkCom extends PluginForHost {
     }
 
     /**
-     * Sets token validity. </br>
-     * 2021-02-19: Token validity is set to 1 month via: https://debrid-link.com/webapp/account/apps
+     * Sets token validity. </br> 2021-02-19: Token validity is set to 1 month via: https://debrid-link.com/webapp/account/apps
      */
     private void accountSetTokenValidity(final Account account, final long expiresIn) {
         account.setProperty(PROPERTY_ACCOUNT_ACCESS_TOKEN_TIMESTAMP_VALID_UNTIL, System.currentTimeMillis() + expiresIn * 1000l);
@@ -442,7 +441,7 @@ public class DebridLinkCom extends PluginForHost {
         }
         final String errorkey = (String) entries.get("error");
         /* List of error key to message obtained from: https://debrid-link.com/api_doc/v2/errors */
-        final Map<String, String> errorKeyToMessageMap = new HashMap<>();
+        final Map<String, String> errorKeyToMessageMap = new HashMap<String, String>();
         errorKeyToMessageMap.put("access_denied", "The resource owner denied the request for authorization. (Invalid scope or something else)");
         errorKeyToMessageMap.put("accountLocked", "User account is currently locked");
         errorKeyToMessageMap.put("authorization_pending", "The end user hasn't yet completed the user-interaction steps");
@@ -563,15 +562,6 @@ public class DebridLinkCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
@@ -670,14 +660,6 @@ public class DebridLinkCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(DownloadLink link) throws Exception {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 
     @Override

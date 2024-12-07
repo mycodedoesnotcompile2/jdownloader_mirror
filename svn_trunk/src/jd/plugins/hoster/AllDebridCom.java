@@ -88,7 +88,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -135,7 +135,7 @@ public class AllDebridCom extends PluginForHost {
     }
 
     private boolean isSelfhosted(final DownloadLink link) {
-        if (link != null && this.canHandle(link.getPluginPatternMatcher())) {
+        if (link != null && canHandle(link.getPluginPatternMatcher())) {
             return true;
         } else {
             return false;
@@ -1184,15 +1184,6 @@ public class AllDebridCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public Class<? extends PluginConfigInterface> getConfigInterface() {
         return AlldebridComConfig.class;
     }
@@ -1308,13 +1299,5 @@ public class AllDebridCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         return "https://help." + getHost() + "/en/Third%20party%20tools/jdownloader";
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

@@ -28,11 +28,17 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.TransferHandler;
 
+import jd.controlling.TaskQueue;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.swing.exttable.DropHighlighter;
 import org.appwork.swing.exttable.ExtCheckBoxMenuItem;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.event.queue.QueueAction;
+import org.appwork.utils.event.queue.Queue;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
@@ -56,12 +62,6 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.DeleteFileOptions;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
-
-import jd.controlling.TaskQueue;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.miginfocom.swing.MigLayout;
 
 public class DownloadsTable extends PackageControllerTable<FilePackage, DownloadLink> {
     private static final long          serialVersionUID = 8843600834248098174L;
@@ -123,18 +123,23 @@ public class DownloadsTable extends PackageControllerTable<FilePackage, Download
 
     @Override
     protected boolean onShortcutDelete(final java.util.List<AbstractNode> selectedObjects, final KeyEvent evt, final boolean direct) {
-        getSelectionInfo(new SelectionInfoCallback<FilePackage, DownloadLink>() {
+        getSelectionInfo(new QueueSelectionInfoCallback<FilePackage, DownloadLink>() {
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
             @Override
             public void onSelectionInfo(final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
-                TaskQueue.getQueue().add(new QueueAction<Void, RuntimeException>() {
-                    @Override
-                    protected Void run() throws RuntimeException {
-                        DownloadTabActionUtils.deleteLinksRequest(selectionInfo, _GUI.T.RemoveSelectionAction_actionPerformed_(), DeleteFileOptions.REMOVE_LINKS_ONLY, evt.isControlDown());
-                        return null;
-                    }
-                });
+                DownloadTabActionUtils.deleteLinksRequest(selectionInfo, _GUI.T.RemoveSelectionAction_actionPerformed_(), DeleteFileOptions.REMOVE_LINKS_ONLY, evt.isControlDown());
             }
-        });
+
+            @Override
+            public Queue getQueue() {
+                return TaskQueue.getQueue();
+            }
+        }, SelectionType.SELECTED);
         return true;
     }
 

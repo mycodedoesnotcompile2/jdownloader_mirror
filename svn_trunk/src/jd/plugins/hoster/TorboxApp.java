@@ -53,7 +53,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -107,15 +107,6 @@ public class TorboxApp extends UseNet {
          * We'll be doing it this way right know, knowing that the user can easily try to exceed that limit with JDownloader.
          */
         return -16;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -560,13 +551,5 @@ public class TorboxApp extends UseNet {
         } else {
             return Integer.MAX_VALUE;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "filebit.pl" }, urls = { "" })
 public class FileBitPl extends PluginForHost {
     private static final String          APIKEY   = "YWI3Y2E2NWM3OWQxYmQzYWJmZWU3NTRiNzY0OTM1NGQ5ODI3ZjlhNmNkZWY3OGE1MjQ0ZjU4NmM5NTNiM2JjYw==";
     private static final String          API_BASE = "https://filebit.pl/api/index.php";
@@ -99,16 +99,6 @@ public class FileBitPl extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -131,7 +121,6 @@ public class FileBitPl extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         /*
          * 2019-08-17: It is especially important to try to re-use generated downloadurls in this case because they will charge the complete
          * traffic of a file once you add an URL to their download-queue.
@@ -678,13 +667,5 @@ public class FileBitPl extends PluginForHost {
             throw e;
         }
         return entries;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

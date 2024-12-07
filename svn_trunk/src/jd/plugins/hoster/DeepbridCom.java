@@ -58,7 +58,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "deepbrid.com" }, urls = { "https?://(?:www\\.)?deepbrid\\.com/dl\\?f=([a-f0-9]{32})" })
 public class DeepbridCom extends PluginForHost {
     private static final String          API_BASE                   = "https://www.deepbrid.com/backend-dl/index.php";
     private static MultiHosterManagement mhm                        = new MultiHosterManagement("deepbrid.com");
@@ -120,14 +120,10 @@ public class DeepbridCom extends PluginForHost {
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null && link.getPluginPatternMatcher() != null && new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).matches()) {
+        if (account == null && link.getPluginPatternMatcher() != null && canHandle(link.getPluginPatternMatcher())) {
             /* Without account itis only possible to download URLs for files which are on the server of this multihost! */
             return true;
-        } else if (account == null) {
-            /* Without account its not possible to download links from other filehosts */
-            return false;
         } else {
-            mhm.runCheck(account, link);
             return super.canHandle(link, account);
         }
     }
@@ -307,7 +303,6 @@ public class DeepbridCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         handleDL(account, link);
     }

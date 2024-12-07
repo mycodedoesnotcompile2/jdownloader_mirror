@@ -13,6 +13,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.Timer;
 
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.controlling.packagecontroller.AbstractPackageNode;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.interfaces.View;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -24,18 +31,12 @@ import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
 import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModel;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.Position;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.gui.LAFOptions;
-
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.controlling.packagecontroller.AbstractPackageNode;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.interfaces.View;
 
 public abstract class AbstractOverviewPanel<T, ParentType extends AbstractPackageNode<ChildrenType, ParentType>, ChildrenType extends AbstractPackageChildrenNode<ParentType>> extends MigPanel implements GUIListener, GenericConfigEventListener<Boolean>, HierarchyListener {
     private List<DataEntry<T>>                                            dataEntries;
@@ -263,20 +264,19 @@ public abstract class AbstractOverviewPanel<T, ParentType extends AbstractPackag
 
     @Override
     public void onConfigValueModified(KeyHandler<Boolean> keyHandler, Boolean newValue) {
-        tableModel.getTable().getSelectionInfo(new SelectionInfoCallback<ParentType, ChildrenType>() {
+        tableModel.getTable().getSelectionInfo(new EDTSelectionInfoCallback<ParentType, ChildrenType>() {
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
             @Override
             public void onSelectionInfo(final SelectionInfo<ParentType, ChildrenType> selectionInfo) {
-                new EDTHelper<Void>() {
-                    @Override
-                    public Void edtRun() {
-                        final boolean containsSelection = !selectionInfo.isEmpty();
-                        hasSelection.set(containsSelection);
-                        fastDelayer.run();
-                        return null;
-                    }
-                }.start(true);
+                final boolean containsSelection = !selectionInfo.isEmpty();
+                hasSelection.set(containsSelection);
+                fastDelayer.run();
             }
-        });
+        }, SelectionType.SELECTED);
     }
 
     @Override

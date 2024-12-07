@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "boxbit.app" }, urls = { "" })
 public class BoxbitApp extends PluginForHost {
     /**
      * New project of: geragera.com.br </br>
@@ -96,15 +96,6 @@ public class BoxbitApp extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -427,13 +418,5 @@ public class BoxbitApp extends PluginForHost {
             /* No error */
         }
         return entries;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(final DownloadLink link) {
     }
 }

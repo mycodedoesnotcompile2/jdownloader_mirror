@@ -51,7 +51,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "fakirdebrid.net" }, urls = { "" })
 public class FakirdebridNet extends PluginForHost {
     // private static final String WEBSITE_BASE = "https://fakirdebrid.net";
     private static final String          API_BASE           = "https://fakirdebrid.net/api";
@@ -101,18 +101,7 @@ public class FakirdebridNet extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         if (!attemptStoredDownloadurlDownload(link, this.getHost() + "directlink", link.getBooleanProperty(PROPERTY_RESUME, defaultResume), link.getIntegerProperty(PROPERTY_MAXCHUNKS, defaultMaxchunks))) {
             this.login(account, false);
             // br.setAllowedResponseCodes(new int[] { 503 });
@@ -457,13 +446,5 @@ public class FakirdebridNet extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

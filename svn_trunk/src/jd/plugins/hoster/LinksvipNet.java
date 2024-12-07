@@ -44,7 +44,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linksvip.net" }, urls = { "" })
 public class LinksvipNet extends PluginForHost {
     private static final String                            NICE_HOST                 = "linksvip.net";
     private static final String                            NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -94,16 +94,6 @@ public class LinksvipNet extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -123,7 +113,6 @@ public class LinksvipNet extends PluginForHost {
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
         prepBRWebsite(this.br);
         setConstants(account, link);
-        mhm.runCheck(currentAcc, currentLink);
         synchronized (hostUnavailableMap) {
             HashMap<String, Long> unavailableMap = hostUnavailableMap.get(account);
             if (unavailableMap != null) {
@@ -311,13 +300,5 @@ public class LinksvipNet extends PluginForHost {
             account.clearCookies("");
             throw e;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

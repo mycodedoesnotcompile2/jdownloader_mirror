@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50299 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "cooldebrid.com" }, urls = { "" })
 public class CooldebridCom extends PluginForHost {
     private static final String          WEBSITE_BASE = "https://cooldebrid.com";
     private static MultiHosterManagement mhm          = new MultiHosterManagement("cooldebrid.com");
@@ -75,15 +75,6 @@ public class CooldebridCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         return AvailableStatus.UNCHECKABLE;
-    }
-
-    @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            return super.canHandle(link, account);
-        }
     }
 
     @Override
@@ -359,13 +350,5 @@ public class CooldebridCom extends PluginForHost {
         } else {
             return false;
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

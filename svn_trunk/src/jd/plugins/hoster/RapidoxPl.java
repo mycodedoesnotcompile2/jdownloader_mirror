@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "rapidox.pl" }, urls = { "" })
 public class RapidoxPl extends PluginForHost {
     private final String                 NICE_HOST                 = "rapidox.pl";
     private final String                 NICE_HOSTproperty         = NICE_HOST.replaceAll("(\\.|\\-)", "");
@@ -86,16 +86,6 @@ public class RapidoxPl extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(DownloadLink downloadLink) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -113,7 +103,6 @@ public class RapidoxPl extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         login(account, false);
         String dllink = checkDirectLink(link, NICE_HOSTproperty + "directlink");
         if (dllink == null) {
@@ -409,13 +398,5 @@ public class RapidoxPl extends PluginForHost {
         } else {
             /* No error */
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

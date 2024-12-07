@@ -17,6 +17,7 @@ import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -185,13 +186,6 @@ public class GeT24Org extends PluginForHost {
 
     @Override
     public void handleFree(DownloadLink link) throws Exception {
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
+        throw new AccountRequiredException();
     }
 }

@@ -48,7 +48,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "debridplanet.com" }, urls = { "" })
 public class DebridplanetCom extends PluginForHost {
     private static final String          API_BASE               = "https://debridplanet.com/v1";
     private static MultiHosterManagement mhm                    = new MultiHosterManagement("debridplanet.com");
@@ -80,16 +80,6 @@ public class DebridplanetCom extends PluginForHost {
     }
 
     @Override
-    public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
-            return false;
-        } else {
-            mhm.runCheck(account, link);
-            return super.canHandle(link, account);
-        }
-    }
-
-    @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
     }
@@ -106,7 +96,6 @@ public class DebridplanetCom extends PluginForHost {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
-        mhm.runCheck(account, link);
         this.login(account, false);
         if (!attemptStoredDownloadurlDownload(link)) {
             final Map<String, Object> postdata = new HashMap<String, Object>();
@@ -301,13 +290,5 @@ public class DebridplanetCom extends PluginForHost {
                 throw new AccountUnavailableException("Unknown error happened: " + message, 5 * 60 * 1000l);
             }
         }
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }
