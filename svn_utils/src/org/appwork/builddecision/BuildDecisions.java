@@ -51,7 +51,6 @@ import org.appwork.loggingv3.LogV3;
 import org.appwork.utils.Application;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.IO;
 import org.appwork.utils.Joiner;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
@@ -128,10 +127,9 @@ public class BuildDecisions {
         if (!ENABLED) {
             return;
         }
-        for (final StackTraceElement stack : new Exception().getStackTrace()) {
-            if (stack.toString().contains("IDETestRunner")) {
-                return;
-            }
+        if (System.getProperty("AWTEST") != null) {
+            // skip this for test runs
+            return;
         }
         final ArrayList<Exception> exceptions = new ArrayList<Exception>();
         try {
@@ -146,8 +144,8 @@ public class BuildDecisions {
                 final String mainClass = command.split(" ")[0];
                 final File projectFolder = getProjectFolder(Class.forName(mainClass));
                 try {
-                    final File javaFile = new File(projectFolder, "src/" + mainClass.replace(".", "/") + ".java");
-                    final String java = IO.readFileToString(javaFile);
+                    // final File javaFile = new File(projectFolder, "src/" + mainClass.replace(".", "/") + ".java");
+                    // final String java = IO.readFileToString(javaFile);
                     // final File mainProject = new File(cp.split(File.pathSeparator)[0]).getParentFile();
                     new ClassPathScanner<Throwable>() {
                         @Override
@@ -175,9 +173,11 @@ public class BuildDecisions {
                                                 if (!Arrays.asList(d.loadedImports).contains(cls)) {
                                                     throw new Exception("The class-reference fails in BuildDecisions.add(...) " + mainClass + "!\r\nEnsure that  " + imp + " is added as parameter \r\nRequired by BuildTag " + usedTag + "\r\nIn " + s.getClass() + "");
                                                 }
-                                                if (!java.contains(imp)) {
-                                                    throw new Exception("Could not find any required import in " + mainClass + "!\r\nEnsure that  " + imp + " is imported!" + "\r\nRequired by BuildTag " + usedTag + "\r\nIn " + s.getClass() + "");
-                                                }
+                                                // if (!java.contains(imp)) {
+                                                // throw new Exception("Could not find any required import in " + mainClass + "!\r\nEnsure
+                                                // that " + imp + " is imported!" + "\r\nRequired by BuildTag " + usedTag + "\r\nIn " +
+                                                // s.getClass() + "");
+                                                // }
                                             }
                                             final String[] deps = o.getDependsOn();
                                             if (deps != null) {
@@ -213,7 +213,7 @@ public class BuildDecisions {
             exceptions.add(e);
         } finally {
             for (Exception e : exceptions) {
-                e.printStackTrace();
+                System.err.println(e.getMessage());
             }
             if (exceptions.size() > 0) {
                 DebugMode.debugger();
@@ -244,21 +244,43 @@ public class BuildDecisions {
      * @param defaultLogger
      */
     public static void status(LogInterface logger) {
-        for (Entry<String, BuildDecisionInfo> es : INSTANCE.entrySet()) {
-            String str = "Build Decision: " + es.getKey();
-            Class<?>[] imports = es.getValue().getLoadedImports();
-            if (imports == null || imports.length == 0) {
-                str += "\r\n-no-classes-";
-            } else {
-                // is this really 1.6? check!
-                for (Class<?> cls : imports) {
-                    final String version = cls.getPackage().getImplementationVersion();
-                    URL url = cls.getClassLoader().getResource(cls.getName().replace(".", "/") + ".class");
-                    // No Logger init here!
-                    str += ("\r\nLoaded library: " + cls.getPackage().getImplementationTitle() + "/" + cls.getPackage().getImplementationVendor() + "\r\nClass: " + cls + "\r\nVersion: " + version + "\r\nLoaded from: " + url);
+        try {
+            if (logger == null) {
+                return;
+            }
+            RuntimeMXBean bean = ManagementFactory.getRuntimeMXBean();
+            if (bean != null) {
+                String cp = bean.getClassPath();
+                if (cp != null) {
+                    for (String s : cp.split(File.pathSeparator)) {
+                        logger.info("ClathPath: " + s);
+                    }
                 }
             }
-            logger.info(str);
+            for (Entry<String, BuildDecisionInfo> es : INSTANCE.entrySet()) {
+                String str = "Build Decision: " + es.getKey();
+                Class<?>[] imports = es.getValue().getLoadedImports();
+                if (imports == null || imports.length == 0) {
+                    str += "\r\n-no-classes-";
+                } else {
+                    // is this really 1.6? check!
+                    for (Class<?> cls : imports) {
+                        final String version = cls.getPackage().getImplementationVersion();
+                        URL url = cls.getClassLoader().getResource(cls.getName().replace(".", "/") + ".class");
+                        // No Logger init here!
+                        str += ("\r\nLoaded library: " + cls.getPackage().getImplementationTitle() + "/" + cls.getPackage().getImplementationVendor() + "\r\nClass: " + cls + "\r\nVersion: " + version + "\r\nLoaded from: " + url);
+                    }
+                }
+                logger.info(str);
+            }
+        } catch (Throwable e) {
+            if (e instanceof InterruptedException) {
+                DebugMode.debugger();
+                Thread.currentThread().interrupt();
+            }
+            if (logger != null) {
+                logger.log(e);
+            }
         }
     }
 
@@ -267,5 +289,12 @@ public class BuildDecisions {
      */
     public static boolean isEnabled() {
         return ENABLED;
+    }
+
+    /**
+     * @return
+     */
+    public static boolean isEmpty() {
+        return INSTANCE.isEmpty();
     }
 }

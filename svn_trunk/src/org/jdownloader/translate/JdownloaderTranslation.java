@@ -1267,6 +1267,9 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Audio Codec" })
     String lit_audio_codec();
 
+    @Default(lngs = { "en" }, values = { "Audio Type" })
+    String lit_audio_type();
+
     @Default(lngs = { "en" }, values = { "Filetype" })
     String lit_file_container();
 

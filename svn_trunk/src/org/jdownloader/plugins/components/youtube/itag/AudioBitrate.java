@@ -22,6 +22,7 @@ public enum AudioBitrate implements IntegerInterface, LabelInterface {
     KBIT_32_ESTIMATED(31),
     KBIT_24(24),
     KBIT_12(12);
+
     private final int kbit;
 
     private AudioBitrate(int kbit) {

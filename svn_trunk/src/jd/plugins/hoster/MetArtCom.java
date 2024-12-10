@@ -36,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50205 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50313 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -149,15 +149,16 @@ public class MetArtCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         this.setBrowserExclusive();
         this.login(account, true);
+        final AccountInfo ai = new AccountInfo();
         if (br.getURL() == null || !br.getURL().contains("/api/user-data")) {
             br.getPage("https://www." + account.getHoster() + "/api/user-data");
             getSetAccountTypeSimple(account, ai);
         }
         findMoreInformation: if (account.getType() == AccountType.PREMIUM) {
             /* Try to find the expire-date the hard way... */
+            logger.info("Trying to find premium expire date the hard way...");
             final Cookies requiredCookies = account.loadCookies(COOKIES_METARTNETWORK);
             if (requiredCookies == null || requiredCookies.isEmpty()) {
                 /* E.g. if user used cookie login method we won't have these cookies! */
@@ -194,6 +195,10 @@ public class MetArtCom extends PluginForHost {
     }
 
     private void processSubscriptions(final Account account, final AccountInfo ai, final List<Map<String, Object>> subscriptions) {
+        if (subscriptions == null || subscriptions.isEmpty()) {
+            ai.setExpired(true);
+            return;
+        }
         long highestExpireDate = -1;
         int numberofLifetimeSubscriptions = 0;
         for (final Map<String, Object> subscription : subscriptions) {
@@ -209,20 +214,23 @@ public class MetArtCom extends PluginForHost {
         if (numberofLifetimeSubscriptions == subscriptions.size()) {
             logger.info("All subscriptions are lifetime subscriptions -> Account is a lifetime premium account");
             account.setType(AccountType.LIFETIME);
-        } else {
+        } else if (highestExpireDate > System.currentTimeMillis()) {
             ai.setValidUntil(highestExpireDate);
+        } else {
+            logger.info("Failed to determine reasonable expire-date for premium account");
         }
         ai.setStatus(account.getType().getLabel() + " | Paid Packages: " + subscriptions.size());
     }
 
-    private void getSetAccountTypeSimple(final Account account, final AccountInfo ai) {
+    private void getSetAccountTypeSimple(final Account account, final AccountInfo ai) throws AccountUnavailableException {
         Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        entries = (Map<String, Object>) entries.get("initialState");
-        entries = (Map<String, Object>) entries.get("auth");
-        entries = (Map<String, Object>) entries.get("user");
-        if (Boolean.TRUE.equals(entries.get("validSubscription"))) {
+        final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "initialState/auth/user");
+        if (Boolean.TRUE.equals(user.get("accountNeedsAgeVerification"))) {
+            throw new AccountUnavailableException("Age verification needed", 1 * 60 * 60 * 1000);
+        }
+        if (Boolean.TRUE.equals(user.get("hasAnyValidSubscription"))) {
             account.setType(AccountType.PREMIUM);
-            final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) entries.get("subscriptions");
+            final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) user.get("subscriptions");
             if (subscriptions != null && ai != null) {
                 processSubscriptions(account, ai, subscriptions);
             }
@@ -230,9 +238,14 @@ public class MetArtCom extends PluginForHost {
             account.setType(AccountType.FREE);
         }
         /* This plugin supports cookie login --> Make sure that usernames are unique! */
-        final String email = (String) entries.get("email");
+        final String email = (String) user.get("email");
         if (!StringUtils.isEmpty(email)) {
             account.setUser(email);
+        }
+        if (Boolean.TRUE.equals(user.get("isDownloadsBlocked"))) {
+            if (ai != null) {
+                ai.setStatus(ai.getStatus() + " | Downloads blocked!");
+            }
         }
     }
 
@@ -243,11 +256,9 @@ public class MetArtCom extends PluginForHost {
         if (cookies != null || userCookies != null) {
             if (userCookies != null) {
                 logger.info("Attempting user cookie login");
-                br.setCookies(getHost(), userCookies);
                 setCookies(br, userCookies);
             } else if (cookies != null) { // no need to check for this because it can never be null?!
                 logger.info("Attempting cookie login");
-                br.setCookies(getHost(), cookies);
                 setCookies(br, cookies);
             }
             if (!verifyCredentials) {
@@ -260,7 +271,7 @@ public class MetArtCom extends PluginForHost {
                 logger.info("Cookie login successful");
                 account.saveCookies(br.getCookies(br.getHost()), "");
                 return;
-            } catch (final Throwable e) {
+            } catch (final Exception e) {
                 /* Not logged in = Different json -> Exception */
                 logger.info("Cookie login failed");
                 if (userCookies != null) {
@@ -270,7 +281,6 @@ public class MetArtCom extends PluginForHost {
                         throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                     }
                 }
-                br.clearAll();
             }
         }
         logger.info("Performing full login");
@@ -299,7 +309,7 @@ public class MetArtCom extends PluginForHost {
             brc.setAllowedResponseCodes(401);
             brc.getHeaders().put("Content-Type", "application/json");
             brc.getPage("https://sso.metartnetwork.com/api/app-data");
-            Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
+            Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
             /* Handle login captcha */
             final String reCaptchaSiteKey = entries.get("googleReCaptchaKey").toString();
             final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaSiteKey) {
@@ -320,15 +330,14 @@ public class MetArtCom extends PluginForHost {
                 throw new AccountInvalidException();
             } else if (brc.getHttpConnection().getResponseCode() == 403) {
                 throw new AccountInvalidException("Account banned");
-            } else {
-                /* Login successful: Access special URL that will lead to multiple redirects and provide required cookies. */
-                entries = JavaScriptEngineFactory.jsonToJavaMap(brc.toString());
-                final String redirectURL = entries.get("redirectTo").toString();
-                br.getPage(redirectURL);
-                final Cookies freshCookies = brc.getCookies(brc.getHost());
-                this.setCookies(br, freshCookies);
-                account.saveCookies(freshCookies, COOKIES_METARTNETWORK);
             }
+            /* Login successful: Access special URL that will lead to multiple redirects and provide required cookies. */
+            entries = JavaScriptEngineFactory.jsonToJavaMap(brc.getRequest().getHtmlCode());
+            final String redirectURL = entries.get("redirectTo").toString();
+            br.getPage(redirectURL);
+            final Cookies freshCookies = brc.getCookies(brc.getHost());
+            this.setCookies(br, freshCookies);
+            account.saveCookies(freshCookies, COOKIES_METARTNETWORK);
         }
         account.saveCookies(br.getCookies(br.getHost()), "");
     }

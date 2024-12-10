@@ -5,8 +5,6 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
-import jd.plugins.DownloadLink;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -18,10 +16,13 @@ import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.generics.GenericAudioInfo;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
+
+import jd.plugins.DownloadLink;
 
 public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements AudioInterface {
     public AudioVariant(VariantBase base) {
@@ -86,7 +87,7 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
         id = id.replace("*CONTAINER*", getContainer().getLabel().toUpperCase(Locale.ENGLISH) + "");
         id = id.replace("*AUDIO_CODEC*", getAudioCodec().getLabel() + "");
         id = id.replace("*AUDIO_BITRATE*", getAudioBitrate().getKbit() + "");
-        id = id.replace("*LNG*", StringUtils.valueOrEmpty(getAudioIdForPattern()));
+        id = id.replace("*LNG*", StringUtils.valueOrEmpty(getAudioIdForPattern(this)));
         id = id.replace("*DEMUX*", (getBaseVariant().getiTagAudio() == null) ? "[DEMUX]" : "");
         switch (getiTagAudioOrVideoItagEquivalent().getAudioCodec()) {
         case AAC_SPATIAL:
@@ -123,10 +124,16 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
 
     private static final String TYPE_ID_PATTERN = PluginJsonConfig.get(YoutubeConfig.class).getVariantNamePatternAudio();
 
-    private String getAudioIdForPattern() {
-        final Locale locale = getAudioLocale();
+    public static String getAudioIdForPattern(AudioInterface variant) {
+        final Locale locale = variant.getAudioLocale();
         if (locale != null) {
-            return locale.getDisplayName();
+            final String displayName = locale.getDisplayName();
+            final AudioType audioType = variant.getAudioType();
+            if (audioType == null) {
+                return displayName;
+            } else {
+                return displayName + " (" + audioType.getLabel() + ")";
+            }
         } else {
             return null;
         }
@@ -165,5 +172,10 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
     @Override
     public Locale getAudioLocale() {
         return getGenericInfo()._getLocale();
+    }
+
+    @Override
+    public AudioType getAudioType() {
+        return AudioType.getAudioType(this);
     }
 }

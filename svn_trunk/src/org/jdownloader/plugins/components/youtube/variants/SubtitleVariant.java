@@ -5,8 +5,6 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
-import jd.plugins.DownloadLink;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.StringUtils;
@@ -16,6 +14,8 @@ import org.jdownloader.plugins.components.youtube.YoutubeClipData;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.config.PluginJsonConfig;
+
+import jd.plugins.DownloadLink;
 
 public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
     // public String getCustomName(Object caller) {
@@ -113,7 +113,7 @@ public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
     @Override
     public int compareTo(Object o) {
         if (!(o instanceof SubtitleVariant)) {
-            return super.compareTo(o);
+            return -1;
         } else {
             final AbstractVariant o1 = this;
             final AbstractVariant o2 = (AbstractVariant) o;

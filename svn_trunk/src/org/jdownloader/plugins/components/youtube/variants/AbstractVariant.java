@@ -6,11 +6,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
-import jd.config.Property;
-import jd.http.Request;
-import jd.plugins.DownloadLink;
-import jd.plugins.PluginForHost;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.SimpleMapper;
@@ -27,6 +22,11 @@ import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.components.youtube.itag.QualitySortIdentifier;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.generics.AbstractGenericVariantInfo;
+
+import jd.config.Property;
+import jd.http.Request;
+import jd.plugins.DownloadLink;
+import jd.plugins.PluginForHost;
 
 public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> implements LinkVariant, Comparable {
     private static ArrayList<AbstractVariant> VARIANTS_LIST;
@@ -272,25 +272,25 @@ public abstract class AbstractVariant<Data extends AbstractGenericVariantInfo> i
     }
 
     private static final SimpleMapper MAPPER = new SimpleMapper() {
-                                                 @Override
-                                                 protected JSonFactory newJsonFactory(String jsonString) {
-                                                     return new JSonFactory(jsonString) {
-                                                         @Override
-                                                         protected String dedupeString(String string) {
-                                                             return string;
-                                                         }
-                                                     };
-                                                 }
+        @Override
+        protected JSonFactory newJsonFactory(String jsonString) {
+            return new JSonFactory(jsonString) {
+                @Override
+                protected String dedupeString(String string) {
+                    return string;
+                }
+            };
+        }
 
-                                                 @Override
-                                                 protected void initMapper() {
-                                                 }
+        @Override
+        protected void initMapper() {
+        }
 
-                                                 @Override
-                                                 public boolean isPrettyPrintEnabled() {
-                                                     return false;
-                                                 }
-                                             };
+        @Override
+        public boolean isPrettyPrintEnabled() {
+            return false;
+        }
+    };
 
     public String getStorableString() {
         String ret = storableString;

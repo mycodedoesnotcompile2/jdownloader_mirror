@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -41,8 +41,9 @@ import org.appwork.utils.logging2.LogInterface;
  *
  */
 public interface LogV3Factory {
+    public void setPredecessor(LogV3Factory previousFactory);
 
-    public LogV3Factory setFactory(LogV3Factory previousFactory);
+    public void setSuccessor(LogV3Factory newFactory);
 
     /**
      * @param simpleName
@@ -51,4 +52,7 @@ public interface LogV3Factory {
     public LogInterface getLogger(Object context);
 
     public LogInterface getDefaultLogger();
+    /**
+     * @param simpleLoggerFactory
+     */
 }

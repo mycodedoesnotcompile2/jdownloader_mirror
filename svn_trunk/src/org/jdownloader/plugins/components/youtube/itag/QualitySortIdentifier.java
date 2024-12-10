@@ -38,6 +38,16 @@ public enum QualitySortIdentifier implements LabelInterface {
             return CompareUtils.compareInt(VideoFrameRate.getSortId(o1), VideoFrameRate.getSortId(o2));
         }
     },
+    AUDIO_TYPE {
+        @Override
+        public String getLabel() {
+            return _JDT.T.lit_audio_type();
+        }
+
+        public int compare(AbstractVariant o1, AbstractVariant o2) {
+            return CompareUtils.compareInt(AudioType.getSortId(o1), AudioType.getSortId(o2));
+        }
+    },
     AUDIO_BITRATE {
         @Override
         public String getLabel() {
@@ -92,5 +102,6 @@ public enum QualitySortIdentifier implements LabelInterface {
             return CompareUtils.compareBoolean(b2, b1);
         }
     };
+
     abstract public int compare(AbstractVariant o1, AbstractVariant o2);
 }

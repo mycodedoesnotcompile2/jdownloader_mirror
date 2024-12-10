@@ -72,6 +72,7 @@ public class CFG_YOUTUBE {
     public static final ObjectKeyHandler              BLACKLISTED_AUDIO_CODECS                                  = SH.getKeyHandler("BlacklistedAudioCodecs", ObjectKeyHandler.class);
     public static final StringKeyHandler              PACKAGE_PATTERN                                           = SH.getKeyHandler("PackagePattern", StringKeyHandler.class);
     public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_CODEC                 = SH.getKeyHandler("QualitySortIdentifierOrderAudioCodec", StringListHandler.class);
+    public static final StringListHandler             QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_TYPE                  = SH.getKeyHandler("QualitySortIdentifierOrderAudioType", StringListHandler.class);
     public static final ObjectKeyHandler              CHOOSE_VARIANT_DIALOG_BLACKLISTED_FILE_CONTAINERS         = SH.getKeyHandler("ChooseVariantDialogBlacklistedFileContainers", ObjectKeyHandler.class);
     public static final StringKeyHandler              SUBTITLE_FILENAME_PATTERN                                 = SH.getKeyHandler("SubtitleFilenamePattern", StringKeyHandler.class);
     public static final BooleanKeyHandler             CHOOSE_ALTERNATIVE_FOR_MASS_CHANGE_OR_ADD_DIALOG          = SH.getKeyHandler("ChooseAlternativeForMassChangeOrAddDialog", BooleanKeyHandler.class);

@@ -22,12 +22,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import net.sf.sevenzipjbinding.ArchiveFormat;
-
 import org.jdownloader.extensions.extraction.ArchiveFile.ArchiveID;
 import org.jdownloader.extensions.extraction.content.ContentView;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
+
+import net.sf.sevenzipjbinding.ArchiveFormat;
 
 /**
  * Contains information about the archivefile.
@@ -39,18 +39,20 @@ public class Archive {
     public static String getBestArchiveID(List<ArchiveFile> archiveFiles, final String suggestedArchiveID) {
         final HashMap<String, ArchiveID> scores = new HashMap<String, ArchiveID>();
         for (final ArchiveFile archiveFile : archiveFiles) {
-            if (archiveFile != null) {
-                final String archiveID = archiveFile.getArchiveID();
-                if (archiveID != null) {
-                    ArchiveID score = scores.get(archiveID);
-                    if (score == null) {
-                        score = new ArchiveID(archiveID);
-                        score.increaseScore();
-                        scores.put(archiveID, score);
-                    }
-                    score.increaseScore();
-                }
+            if (archiveFile == null) {
+                continue;
             }
+            final String archiveID = archiveFile.getArchiveID();
+            if (archiveID == null) {
+                continue;
+            }
+            ArchiveID score = scores.get(archiveID);
+            if (score == null) {
+                score = new ArchiveID(archiveID);
+                score.increaseScore();
+                scores.put(archiveID, score);
+            }
+            score.increaseScore();
         }
         if (suggestedArchiveID != null) {
             ArchiveID score = scores.get(suggestedArchiveID);
@@ -296,11 +298,12 @@ public class Archive {
     }
 
     public boolean contains(Object contains) {
-        if (contains != null) {
-            for (ArchiveFile file : getArchiveFiles()) {
-                if (file.contains(contains)) {
-                    return true;
-                }
+        if (contains == null) {
+            return false;
+        }
+        for (ArchiveFile file : getArchiveFiles()) {
+            if (file.contains(contains)) {
+                return true;
             }
         }
         return false;
@@ -331,11 +334,12 @@ public class Archive {
     }
 
     public ArchiveFile getArchiveFileByPath(String filename) {
-        if (filename != null) {
-            for (final ArchiveFile af : getArchiveFiles()) {
-                if (filename.equals(af.getFilePath())) {
-                    return af;
-                }
+        if (filename == null) {
+            return null;
+        }
+        for (final ArchiveFile af : getArchiveFiles()) {
+            if (filename.equals(af.getFilePath())) {
+                return af;
             }
         }
         return null;

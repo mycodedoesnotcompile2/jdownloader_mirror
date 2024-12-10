@@ -13,6 +13,7 @@ public enum VideoFrameRate implements IntegerInterface, LabelInterface {
     FPS_24(24),
     FPS_15(15),
     FPS_6(6);
+
     private final double fps;
 
     public final double getFps() {

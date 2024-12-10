@@ -228,7 +228,11 @@ public class FlexiVariablesTest extends AWTest {
         vars.put("a", "AAA");
         vars.put("i", 1);
         c.setVariables(vars);
-        c.setStr("Ist das ein A: ${variables.a} und eine Zahl: ${variables.i}");
+        // $${escaped} ---> ${escaped}
+        // ${$escaped} ---> ${escaped}
+        // ${$$escaped} ---> ${$escaped}
+        c.setStr("Ist $${dsad} ein A: ${variables[\"$}\"]} und eine Zahl: ${variables.i}  ${balbl$}aasd");
+        // Ist ${#escaped} ein A: ${variables.a} und eine Zahl: ${variables.i}
         c.setStr2("${variables.a}");
         c.setStr3("${variable.doesnotexistandisNotpartoftheaccesslist}");
         c.setStrSameAs2("${variables.a}");
@@ -255,7 +259,7 @@ public class FlexiVariablesTest extends AWTest {
             assertEquals(resultC.getInternArray()[1].arrayList.get(2), "b");
             // is actually the same instance!
             assertTrue(resultC.getInternArray()[1].arrayList.get(3) == resultC.getInternArray()[1].arrayList.get(4));
-            assertEquals(resultC.getStr(), "Ist das ein A: AAA und eine Zahl: " + resultC.getI());
+            assertEquals(resultC.getStr(), "Ist ${dsad} ein A: ${variables[\"$}\"]} und eine Zahl: " + resultC.getI() + "  ${balbl$}aasd");
             assertEquals(resultC.getStr2(), "AAA");
             assertEquals(resultC.getI(), 1);
             // actual same instance

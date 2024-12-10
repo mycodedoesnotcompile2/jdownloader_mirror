@@ -26,16 +26,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.regex.Pattern;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
-import jd.plugins.AddonPanel;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownRequest;
 import org.appwork.shutdown.ShutdownVetoException;
@@ -99,6 +89,16 @@ import org.jdownloader.images.NewTheme;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.settings.staticreferences.CFG_LINKGRABBER;
 import org.jdownloader.translate._JDT;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.packagecontroller.PackageControllerModifyVetoListener;
+import jd.plugins.AddonPanel;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
 
 public class ExtractionExtension extends AbstractExtension<ExtractionConfig, ExtractionTranslation> implements FileCreationListener, MenuExtenderHandler, PackageControllerModifyVetoListener<FilePackage, DownloadLink> {
     private ExtractionQueue       extractionQueue = new ExtractionQueue();
@@ -261,59 +261,59 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
      * @throws ArchiveException
      */
     public Archive buildArchive(final ArchiveFactory factory) throws ArchiveException {
-        if (!Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
-            final ExtractionController ec = getExtractionController(factory);
-            final Archive existing = ec != null ? ec.getArchive() : null;
-            if (existing == null) {
-                Throwable throwable = null;
-                final boolean deepInspection = !(factory instanceof CrawledLinkFactory);
-                for (IExtraction extractor : extractors) {
-                    try {
-                        if (!Boolean.FALSE.equals(extractor.isSupported(factory, deepInspection))) {
-                            final Archive archive = extractor.buildArchive(factory, deepInspection);
-                            if (archive != null) {
-                                for (final ArchiveFile archiveFile : archive.getArchiveFiles()) {
-                                    archiveFile.setArchive(archive);
-                                }
-                                return archive;
+        if (Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
+            return null;
+        }
+        final ExtractionController ec = getExtractionController(factory);
+        final Archive existing = ec != null ? ec.getArchive() : null;
+        if (existing == null) {
+            Throwable throwable = null;
+            final boolean deepInspection = !(factory instanceof CrawledLinkFactory);
+            for (IExtraction extractor : extractors) {
+                try {
+                    if (!Boolean.FALSE.equals(extractor.isSupported(factory, deepInspection))) {
+                        final Archive archive = extractor.buildArchive(factory, deepInspection);
+                        if (archive != null) {
+                            for (final ArchiveFile archiveFile : archive.getArchiveFiles()) {
+                                archiveFile.setArchive(archive);
                             }
+                            return archive;
                         }
-                    } catch (final Throwable e) {
-                        throwable = e;
-                        logger.log(e);
                     }
-                }
-                if (throwable == null) {
-                    factory.setPartOfAnArchive(false);
+                } catch (final Throwable e) {
+                    throwable = e;
+                    logger.log(e);
                 }
             }
-            return existing;
+            if (throwable == null) {
+                factory.setPartOfAnArchive(false);
+            }
         }
-        return null;
+        return existing;
     }
 
     public DummyArchive createDummyArchive(final Archive archive) throws CheckException {
         if (archive == null) {
             return null;
-        } else {
-            final ArchiveFactory factory = archive.getFactory();
-            if (!Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
-                final boolean deepInspection = !(factory instanceof CrawledLinkFactory);
-                for (IExtraction extractor : extractors) {
-                    try {
-                        if (!Boolean.FALSE.equals(extractor.isSupported(factory, deepInspection))) {
-                            final DummyArchive dummyArchive = extractor.checkComplete(archive);
-                            if (dummyArchive != null) {
-                                return dummyArchive;
-                            }
-                        }
-                    } catch (final Throwable e) {
-                        logger.log(e);
-                    }
-                }
-            }
+        }
+        final ArchiveFactory factory = archive.getFactory();
+        if (Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
             return null;
         }
+        final boolean deepInspection = !(factory instanceof CrawledLinkFactory);
+        for (IExtraction extractor : extractors) {
+            try {
+                if (!Boolean.FALSE.equals(extractor.isSupported(factory, deepInspection))) {
+                    final DummyArchive dummyArchive = extractor.checkComplete(archive);
+                    if (dummyArchive != null) {
+                        return dummyArchive;
+                    }
+                }
+            } catch (final Throwable e) {
+                logger.log(e);
+            }
+        }
+        return null;
     }
 
     public boolean isComplete(Archive archive) {
@@ -334,17 +334,18 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
      * @return
      */
     private IExtraction getExtractorInstanceByFactory(final ArchiveFactory factory) {
-        if (!Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
-            for (IExtraction extractor : extractors) {
-                try {
-                    if (Boolean.TRUE.equals(extractor.isSupported(factory, true))) {
-                        final IExtraction ret = extractor.getClass().getConstructor(new Class[] { this.getClass() }).newInstance(this);
-                        ret.setLogger(extractor.logger);
-                        return ret;
-                    }
-                } catch (Throwable e) {
-                    getLogger().log(e);
+        if (Boolean.FALSE.equals(factory.isPartOfAnArchive())) {
+            return null;
+        }
+        for (IExtraction extractor : extractors) {
+            try {
+                if (Boolean.TRUE.equals(extractor.isSupported(factory, true))) {
+                    final IExtraction ret = extractor.getClass().getConstructor(new Class[] { this.getClass() }).newInstance(this);
+                    ret.setLogger(extractor.logger);
+                    return ret;
                 }
+            } catch (Throwable e) {
+                getLogger().log(e);
             }
         }
         return null;
@@ -633,69 +634,70 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
     }
 
     public void onNewFile(final Object caller, final File[] fileList) {
-        if (fileList != null && fileList.length > 0) {
-            try {
-                if (caller instanceof SingleDownloadController) {
-                    final DownloadLink link = ((SingleDownloadController) caller).getDownloadLink();
-                    if (getExtractionController(link) == null) {
-                        final Archive archive = buildArchive(new DownloadLinkArchiveFactory(link));
-                        if (archive != null && isAutoExtractEnabled(archive)) {
-                            addToQueue(caller, archive, false);
-                        }
+        if (fileList == null || fileList.length == 0) {
+            return;
+        }
+        try {
+            if (caller instanceof SingleDownloadController) {
+                final DownloadLink link = ((SingleDownloadController) caller).getDownloadLink();
+                if (getExtractionController(link) == null) {
+                    final Archive archive = buildArchive(new DownloadLinkArchiveFactory(link));
+                    if (archive != null && isAutoExtractEnabled(archive)) {
+                        addToQueue(caller, archive, false);
                     }
-                } else if (caller instanceof ExtractionController) {
-                    if (getSettings().isDeepExtractionEnabled() && matchesDeepExtractionBlacklist(fileList) == false) {
-                        final List<File> files = new ArrayList<File>(fileList.length);
-                        for (File file : fileList) {
-                            if (getExtractionController(file) == null) {
-                                files.add(file);
-                            }
-                        }
-                        if (files.size() > 0) {
-                            final ExtractionController con = (ExtractionController) caller;
-                            final ArrayList<String> knownPasswords = new ArrayList<String>();
-                            final String usedPassword = con.getArchive().getFinalPassword();
-                            if (StringUtils.isNotEmpty(usedPassword)) {
-                                knownPasswords.add(usedPassword);
-                            }
-                            final List<String> archiveSettingsPasswords = con.getArchive().getSettings().getPasswords();
-                            if (archiveSettingsPasswords != null) {
-                                knownPasswords.addAll(archiveSettingsPasswords);
-                            }
-                            final List<ArchiveFactory> archiveFactories = new ArrayList<ArchiveFactory>(files.size());
-                            for (File archiveStartFile : files) {
-                                archiveFactories.add(new FileArchiveFactory(archiveStartFile, con.getArchive()));
-                            }
-                            final List<Archive> newArchives = ArchiveValidator.getArchivesFromPackageChildren(archiveFactories);
-                            for (Archive newArchive : newArchives) {
-                                if (newArchive != null && isAutoExtractEnabled(newArchive)) {
-                                    final ArchiveFile firstArchiveFile = newArchive.getArchiveFiles().get(0);
-                                    if (firstArchiveFile instanceof FileArchiveFile) {
-                                        newArchive.getSettings().setExtractPath(((FileArchiveFile) firstArchiveFile).getFile().getParent());
-                                    }
-                                    newArchive.getSettings().setPasswords(knownPasswords);
-                                    addToQueue(caller, newArchive, false);
-                                }
-                            }
-                        }
-                    }
-                } else {
+                }
+            } else if (caller instanceof ExtractionController) {
+                if (getSettings().isDeepExtractionEnabled() && matchesDeepExtractionBlacklist(fileList) == false) {
                     final List<File> files = new ArrayList<File>(fileList.length);
                     for (File file : fileList) {
                         if (getExtractionController(file) == null) {
                             files.add(file);
                         }
                     }
-                    final List<Archive> newArchives = ArchiveValidator.getArchivesFromPackageChildren(files);
-                    for (Archive newArchive : newArchives) {
-                        if (newArchive != null && isAutoExtractEnabled(newArchive)) {
-                            addToQueue(caller, newArchive, false);
+                    if (files.size() > 0) {
+                        final ExtractionController con = (ExtractionController) caller;
+                        final ArrayList<String> knownPasswords = new ArrayList<String>();
+                        final String usedPassword = con.getArchive().getFinalPassword();
+                        if (StringUtils.isNotEmpty(usedPassword)) {
+                            knownPasswords.add(usedPassword);
+                        }
+                        final List<String> archiveSettingsPasswords = con.getArchive().getSettings().getPasswords();
+                        if (archiveSettingsPasswords != null) {
+                            knownPasswords.addAll(archiveSettingsPasswords);
+                        }
+                        final List<ArchiveFactory> archiveFactories = new ArrayList<ArchiveFactory>(files.size());
+                        for (File archiveStartFile : files) {
+                            archiveFactories.add(new FileArchiveFactory(archiveStartFile, con.getArchive()));
+                        }
+                        final List<Archive> newArchives = ArchiveValidator.getArchivesFromPackageChildren(archiveFactories);
+                        for (Archive newArchive : newArchives) {
+                            if (newArchive != null && isAutoExtractEnabled(newArchive)) {
+                                final ArchiveFile firstArchiveFile = newArchive.getArchiveFiles().get(0);
+                                if (firstArchiveFile instanceof FileArchiveFile) {
+                                    newArchive.getSettings().setExtractPath(((FileArchiveFile) firstArchiveFile).getFile().getParent());
+                                }
+                                newArchive.getSettings().setPasswords(knownPasswords);
+                                addToQueue(caller, newArchive, false);
+                            }
                         }
                     }
                 }
-            } catch (Exception e) {
-                logger.log(e);
+            } else {
+                final List<File> files = new ArrayList<File>(fileList.length);
+                for (File file : fileList) {
+                    if (getExtractionController(file) == null) {
+                        files.add(file);
+                    }
+                }
+                final List<Archive> newArchives = ArchiveValidator.getArchivesFromPackageChildren(files);
+                for (Archive newArchive : newArchives) {
+                    if (newArchive != null && isAutoExtractEnabled(newArchive)) {
+                        addToQueue(caller, newArchive, false);
+                    }
+                }
             }
+        } catch (Exception e) {
+            logger.log(e);
         }
     }
 
@@ -828,26 +830,27 @@ public class ExtractionExtension extends AbstractExtension<ExtractionConfig, Ext
      * @return
      */
     protected File appendSubFolder(Archive archive, File ret) {
-        if (getSettings().isSubpathEnabled()) {
-            if (archive.getContentView().getFileCount() < getSettings().getSubPathMinFilesTreshhold()) {
-                logger.info("No Subfolder because Root contains only " + archive.getContentView().getFileCount() + " files");
-                return ret;
-            }
-            if (archive.getContentView().getDirectoryCount() < getSettings().getSubPathMinFoldersTreshhold()) {
-                logger.info("No Subfolder because Root contains only " + archive.getContentView().getDirectoryCount() + " folders");
-                return ret;
-            }
-            if (archive.getContentView().getDirectoryCount() + archive.getContentView().getFileCount() < getSettings().getSubPathMinFilesOrFoldersTreshhold()) {
-                logger.info("No Subfolder because Root contains only " + (archive.getContentView().getDirectoryCount() + archive.getContentView().getFileCount()) + " files and folders");
-                return ret;
-            }
-            String sub = getSettings().getSubPath();
+        if (!getSettings().isSubpathEnabled()) {
+            return ret;
+        }
+        if (archive.getContentView().getFileCount() < getSettings().getSubPathMinFilesTreshhold()) {
+            logger.info("No Subfolder because Root contains only " + archive.getContentView().getFileCount() + " files");
+            return ret;
+        }
+        if (archive.getContentView().getDirectoryCount() < getSettings().getSubPathMinFoldersTreshhold()) {
+            logger.info("No Subfolder because Root contains only " + archive.getContentView().getDirectoryCount() + " folders");
+            return ret;
+        }
+        if (archive.getContentView().getDirectoryCount() + archive.getContentView().getFileCount() < getSettings().getSubPathMinFilesOrFoldersTreshhold()) {
+            logger.info("No Subfolder because Root contains only " + (archive.getContentView().getDirectoryCount() + archive.getContentView().getFileCount()) + " files and folders");
+            return ret;
+        }
+        String sub = getSettings().getSubPath();
+        if (!StringUtils.isEmpty(sub)) {
+            sub = archive.getFactory().createExtractSubPath(sub, archive);
             if (!StringUtils.isEmpty(sub)) {
-                sub = archive.getFactory().createExtractSubPath(sub, archive);
-                if (!StringUtils.isEmpty(sub)) {
-                    sub = sub.trim();
-                    ret = new File(ret, sub);
-                }
+                sub = sub.trim();
+                ret = new File(ret, sub);
             }
         }
         return ret;

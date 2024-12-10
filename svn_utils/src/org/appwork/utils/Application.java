@@ -979,6 +979,12 @@ public class Application {
         }
     }
 
+    private static Class<?> MAINCLASS = null;
+
+    public static Class<?> getMainClass() {
+        return MAINCLASS;
+    }
+
     /**
      * sets current Application Folder and Jar ID. MUST BE SET at startup! Can only be set once!
      *
@@ -988,8 +994,27 @@ public class Application {
     public synchronized static void setApplication(final String newAppFolder) {
         Application.ROOT = null;
         Application.APP_FOLDER = newAppFolder;
-        Application.ensureFrameWorkInit();
+        if (MAINCLASS == null) {
+            Application.MAINCLASS = findMainClass();
+        }
         Application.ROOT = getRoot(Application.class);
+        Application.ensureFrameWorkInit();
+    }
+
+    private static Class<?> findMainClass() {
+        final StackTraceElement[] stackTrace = new Exception().getStackTrace();
+        if (stackTrace == null || stackTrace.length == 0) {
+            return null;
+        }
+        final StackTraceElement first = stackTrace[stackTrace.length - 1];
+        final String className = first.getClassName();
+        try {
+            final Class<?> clz = Class.forName(className);
+            clz.getMethod("main", String[].class);
+            return clz;
+        } catch (Exception ignore) {
+            return null;
+        }
     }
 
     /**
@@ -1048,7 +1073,7 @@ public class Application {
             BuildDecisions.status(LogV3.defaultLogger());
             // do not run in Tests
             if (BuildDecisions.isEnabled() && !isJared(null)) {
-                if (System.getProperty("BUILD_DECISIONS_DIRECT") != null) {
+                if (System.getProperty("BUILD_DECISIONS_DIRECT") != null || BuildDecisions.isEmpty()) {
                     BuildDecisions.validate();
                 } else {
                     new Thread("BuildDecisions Check") {

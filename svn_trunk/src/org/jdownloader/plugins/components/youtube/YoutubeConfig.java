@@ -26,6 +26,7 @@ import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.youtube.configpanel.YoutubeVariantCollection;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.itag.QualitySortIdentifier;
 import org.jdownloader.plugins.components.youtube.itag.VideoCodec;
 import org.jdownloader.plugins.components.youtube.itag.VideoFrameRate;
@@ -154,6 +155,12 @@ public interface YoutubeConfig extends PluginConfigInterface {
     public static class QualitySortIdentifierOrderAudioCodec extends AbstractEnumOrderFixList {
         public QualitySortIdentifierOrderAudioCodec() {
             super(AudioCodec.class);
+        }
+    }
+
+    public static class QualitySortIdentifierOrderAudioType extends AbstractEnumOrderFixList {
+        public QualitySortIdentifierOrderAudioType() {
+            super(AudioType.class);
         }
     }
 
@@ -432,6 +439,10 @@ public interface YoutubeConfig extends PluginConfigInterface {
     @CustomValueGetter(QualitySortIdentifierOrderAudioCodec.class)
     String[] getQualitySortIdentifierOrderAudioCodec();
 
+    @AboutConfig
+    @CustomValueGetter(QualitySortIdentifierOrderAudioType.class)
+    String[] getQualitySortIdentifierOrderAudioType();
+
     // @AboutConfig
     // ArrayList<YoutubeCustomVariantStorable> getCustomVariants();
     //
@@ -586,6 +597,8 @@ public interface YoutubeConfig extends PluginConfigInterface {
     void setQualitySortIdentifierOrderAudioBitrate(String[] s);
 
     void setQualitySortIdentifierOrderAudioCodec(String[] s);
+
+    void setQualitySortIdentifierOrderAudioType(String[] s);
 
     void setQualitySortIdentifierOrderFiletype(String[] s);
 

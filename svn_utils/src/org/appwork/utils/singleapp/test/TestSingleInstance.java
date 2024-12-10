@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -114,7 +114,8 @@ public class TestSingleInstance extends AWTest {
         try {
             LOCALHOST = HTTPConnectionUtils.getLoopback(IPVERSION.IPV4_IPV6)[0];
             // LOCALHOST = InetAddress.getAllByName("192.168.2.123")[0];
-            for (int i = 0; i < 1; i++) {
+            final int numOfTests = Application.getMainClass() == TestSingleInstance.class ? 10 : 1;
+            for (int i = 0; i < numOfTests; i++) {
                 System.out.println("Test:" + i);
                 testInvalidClientID();
                 testByeBye();
@@ -136,12 +137,14 @@ public class TestSingleInstance extends AWTest {
                                                                @Override
                                                                public void onIncommingMessage(ResponseSender callback, String[] message) {
                                                                    exception = new Exception("this should not happen");
+                                                                   LogV3.info(Application.getThreadDump());
                                                                }
                                                            };
     private ResponseListener         mayNotGetResponses    = new ResponseListener() {
                                                                @Override
                                                                public void onReceivedResponse(Response r) {
                                                                    exception = new Exception("Received Response - this should not happen");
+                                                                   LogV3.info(Application.getThreadDump());
                                                                }
 
                                                                @Override
@@ -216,6 +219,14 @@ public class TestSingleInstance extends AWTest {
             // TODO Auto-generated constructor stub
         }
 
+        /**
+         * @see org.appwork.utils.singleapp.SingleAppInstance#getDesiredServerPort(int)
+         */
+        @Override
+        protected int getDesiredServerPort(int desiredPort) {
+            return 0;
+        }
+
         /*
          * (non-Javadoc)
          *
@@ -243,6 +254,9 @@ public class TestSingleInstance extends AWTest {
          */
         @Override
         protected void onUncaughtExceptionDuringHandlingIncommingConnections(Throwable e) {
+            LogV3.info("Uncaught exception");
+            LogV3.info(Application.getThreadDump());
+            // DebugMode.debugger();
             exception = e;
         }
     }
@@ -309,6 +323,7 @@ public class TestSingleInstance extends AWTest {
                     throw new Exception(exception);
                 }
             } catch (Exception e) {
+                LogV3.info(Application.getThreadDump());
                 exception = e;
             }
             while (clientThreads.size() > 0) {
@@ -361,6 +376,7 @@ public class TestSingleInstance extends AWTest {
                         e.printStackTrace();
                     }
                 }
+                LogV3.info(Application.getThreadDump());
                 exception = new Exception("We should not reach this codepoint");
             }
         }) {
@@ -432,6 +448,7 @@ public class TestSingleInstance extends AWTest {
                     throw new Exception(exception);
                 }
             } catch (Exception e) {
+                LogV3.info(Application.getThreadDump());
                 exception = e;
             }
             if (exception != null) {
@@ -798,6 +815,7 @@ public class TestSingleInstance extends AWTest {
                         invalidResponseIDException = e2;
                     }
                     assertTrue(invalidResponseIDException != null);
+                } finally {
                 }
             }
             synchronized (LOCK) {

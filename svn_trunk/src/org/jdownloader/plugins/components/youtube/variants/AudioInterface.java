@@ -4,6 +4,7 @@ import java.util.Locale;
 
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 
 public interface AudioInterface {
@@ -16,4 +17,6 @@ public interface AudioInterface {
     Locale getAudioLocale();
 
     String getAudioId();
+
+    AudioType getAudioType();
 }

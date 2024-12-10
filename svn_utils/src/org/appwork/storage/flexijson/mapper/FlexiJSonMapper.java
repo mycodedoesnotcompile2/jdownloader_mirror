@@ -57,8 +57,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
@@ -1341,9 +1339,9 @@ public class FlexiJSonMapper {
         try {
             if (isReferencesEnabled()) {
                 if (setter != null && json instanceof FlexiJSonValue && ((FlexiJSonValue) json).getType() == ValueType.STRING) {
-                    List<FlexiVariableAccess> access;
+                    List<String> access;
                     try {
-                        access = ClassCache.getClassCache(setter.getMethod().getDeclaringClass()).getAnnotations(setter.getKey(), FlexiVariableAccess.class);
+                        access = getReferencesAccess(setter.getMethod().getDeclaringClass(), setter.key);
                         json = this.resolveValue(json, cType, access, null);
                     } catch (final NoSuchMethodException e) {
                         throw new FlexiMapperException(json, cType, null, e);
@@ -1484,6 +1482,17 @@ public class FlexiJSonMapper {
                 context.set(null);
             }
         }
+    }
+
+    protected List<String> getReferencesAccess(final Type cls, String key) throws NoSuchMethodException {
+        List<String> access = new ArrayList<String>();
+        List<FlexiVariableAccess> a = ClassCache.getClassCache(cls).getAnnotations(key, FlexiVariableAccess.class);
+        if (a != null) {
+            for (FlexiVariableAccess aa : a) {
+                access.add(aa.value());
+            }
+        }
+        return access;
     }
 
     /**
@@ -1777,7 +1786,7 @@ public class FlexiJSonMapper {
         }
     }
 
-    protected FlexiJSonNode resolveValue(FlexiJSonNode value, final CompiledType fieldType, final List<FlexiVariableAccess> access, LinkedHashSet<JSPath> loopCheck) throws FlexiMapperException, CannotResolvePathException {
+    protected FlexiJSonNode resolveValue(FlexiJSonNode value, final CompiledType fieldType, final List<String> access, LinkedHashSet<JSPath> loopCheck) throws FlexiMapperException, CannotResolvePathException, NoSuchMethodException {
         try {
             long a = Time.systemIndependentCurrentJVMTimeMillis();
             boolean isStepping = Time.systemIndependentCurrentJVMTimeMillis() - a > 10;
@@ -1803,166 +1812,241 @@ public class FlexiJSonMapper {
                     }.join(loopCheck) + "->" + valuePath.toPathString(false), null);
                 }
                 {
-                    final HashSet<String> refs = new HashSet<String>();
-                    String raw = ((FlexiJSonValue) value).getStringValue();
-                    final String orgRaw = raw;
-                    final Pattern pat = Pattern.compile("\\$\\{[\\w\\.\\d\\[\\]]+(#p\\d+)?}");
-                    final Matcher matcher = pat.matcher(raw);
-                    while (matcher.find()) {
-                        final String group = matcher.group(0);
-                        final String path = group.substring(2, group.length() - 1);
-                        refs.add(path);
-                    }
-                    if (refs.size() == 0) {
-                        return value;
-                    }
-                    final HashSet<String> replaced = new HashSet<String>();
-                    FlexiJSonNode root = null;
-                    NEXT_ANNOTATION: for (final FlexiVariableAccess anno : access) {
-                        NEXT_REF: for (final String path : refs) {
-                            if (path.matches(anno.value())) {
-                                FlexiJSonNode base = null;
-                                JSPath jsPath = JSPath.fromPathString(path);
-                                final Object last = jsPath.getLast();
-                                if (last instanceof MetaElement) {
-                                    jsPath = jsPath.getParent();
-                                    String meta = ((MetaElement) last).getString().substring(1);
-                                    base = value;
-                                    // supports #ppp or #p3
-                                    while (meta.startsWith("p")) {
-                                        base = base.getParent();
-                                        meta = meta.substring(1);
-                                    }
-                                    // this allows even a mixture like #pp2 ( -> #ppp)
-                                    String num = "";
-                                    while (meta.length() > 0 && Character.isDigit(meta.charAt(0))) {
-                                        num += meta.substring(0, 1);
-                                        meta = meta.substring(1);
-                                    }
-                                    for (int i = 1; i < Integer.parseInt(num); i++) {
-                                        base = base.getParent();
-                                    }
-                                    base = base.resolvePath(JSPath.fromPathString(meta));
-                                    if (base == null) {
-                                        throw new FlexiMapperException(value, fieldType, "Illegal #..base path definition");
-                                    }
-                                } else {
-                                    if (root == null) {
-                                        root = FlexiUtils.getRoot(value.getParent());
-                                    }
-                                    base = root;
-                                }
-                                JSPath backToWildcard = jsPath;
-                                int i = 0;
-                                int foundWildcardAt = -1;
-                                for (Object o : backToWildcard) {
-                                    if ("".equals(o)) {
-                                        foundWildcardAt = i;
-                                    }
-                                    i++;
-                                }
-                                JSPath me = valuePath;
-                                ArrayList<Object> add = new ArrayList<Object>();
-                                if (foundWildcardAt >= 0) {
-                                    for (i = backToWildcard.size() - 1; i > foundWildcardAt; i--) {
-                                        add.add(0, backToWildcard.getLast());
-                                        backToWildcard = backToWildcard.getParent();
-                                    }
-                                }
-                                if (add.size() > 0) {
-                                    JSPath basePath = FlexiUtils.fromFlexiNode(base);
-                                    if (basePath.size() + backToWildcard.size() > me.size()) {
-                                        throw new FlexiMapperException(value, fieldType, "Cannot Resolve");
-                                    }
-                                    JSPath mustMatchWildCards = me.subPath(basePath.size(), basePath.size() + backToWildcard.size());
-                                    boolean matches = true;
-                                    for (int ii = 0; ii < mustMatchWildCards.size(); ii++) {
-                                        if ("".equals(backToWildcard.get(ii))) {
-                                            continue;
-                                        } else if (CompareUtils.equals(mustMatchWildCards.get(ii), backToWildcard.get(ii))) {
-                                            continue;
-                                        } else {
-                                            matches = false;
-                                            break;
-                                        }
-                                    }
-                                    if (!matches) {
-                                        throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
-                                    }
-                                    base = base.resolvePath(mustMatchWildCards);
-                                    jsPath = JSPath.fromPathElements(add);
-                                }
-                                if (base == null) {
-                                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Base not found: " + path, null);
-                                }
-                                FlexiJSonNode newValue = base.resolvePath(jsPath);
-                                if (newValue == null) {
-                                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
-                                }
-                                JSPath pathFromRoot = FlexiUtils.fromFlexiNode(newValue);
-                                Object lastKey = pathFromRoot.getLast();
-                                JSPath parent = pathFromRoot.getParent();
-                                CompiledType linkedType = getContext().getRootType().resolve(parent);
-                                while (linkedType.isListContainer()) {
-                                    lastKey = parent.getLast();
-                                    parent = parent.getParent();
-                                    linkedType = getContext().getRootType().resolve(parent);
-                                }
-                                // ensure that the target is fully resolved
-                                List<FlexiVariableAccess> subaccess = linkedType.getClassCache().getAnnotations(StringUtils.valueOfOrNull(lastKey), FlexiVariableAccess.class);
-                                newValue = resolveValue(newValue, fieldType, subaccess, loopCheck);
-                                if (fieldType.isString()) {
-                                    if (newValue != null && newValue instanceof FlexiJSonValue) {
-                                        if (raw.equals("${" + path + "}")) {
-                                            if (((FlexiJSonValue) newValue).getType() == ValueType.STRING) {
-                                                value = newValue;
-                                                replaced.add(path);
-                                                break NEXT_ANNOTATION;
-                                            }
-                                        } else {
-                                            raw = raw.replaceAll(Pattern.quote("${" + path + "}"), String.valueOf(((FlexiJSonValue) newValue).getValue()));
-                                            replaced.add(path);
-                                            if (replaced.size() == refs.size()) {
-                                                // nothing more to replace
-                                                break NEXT_ANNOTATION;
-                                            } else {
-                                                continue NEXT_REF;
-                                            }
-                                        }
-                                    }
-                                } else if (raw.equals("${" + path + "}")) {
-                                    // ref only
-                                    if (newValue != null) {
-                                        replaced.add(path);
-                                        value = newValue;
-                                        // break - ref resolved
-                                        break NEXT_ANNOTATION;
-                                    }
-                                } else {
-                                    throw new FlexiMapperException(value, fieldType, "Illegal Link - no replace allowed at this point - only direct links", null);
-                                }
-                            } else {
-                                try {
-                                    LogV3.info("Forbidden Reference: " + path + " @ " + FlexiUtils.getPathString(value));
-                                } catch (final InvalidPathException e) {
-                                    LogV3.log(e);
-                                }
-                            }
-                        }
-                    }
-                    refs.removeAll(replaced);
-                    if (refs.size() > 0) {
-                        LogV3.info("Could not resolve :" + refs);
-                    }
-                    if (raw != orgRaw) {
-                        value = this.createFlexiJSonValue(raw);
-                    }
+                    return resolveWithoutLoopCheck(value, fieldType, access, loopCheck, valuePath);
                 }
             }
         } catch (final InvalidPathException e) {
             throw new FlexiMapperException(value, fieldType, "Illegal ${reference} path.", e);
         }
         return value;
+    }
+
+    protected FlexiJSonNode resolveWithoutLoopCheck(FlexiJSonNode value, final CompiledType fieldType, final List<String> access, LinkedHashSet<JSPath> loopCheck, JSPath valuePath) throws FlexiMapperException, InvalidPathException, NoSuchMethodException, CannotResolvePathException {
+        String raw = ((FlexiJSonValue) value).getStringValue();
+        final String orgRaw = raw;
+        final HashSet<String> refs = new HashSet<String>();
+        char[] chars = raw.toCharArray();
+        boolean inVariable = false;
+        List<int[]> toUnescape = new ArrayList<int[]>();
+        StringBuilder newText = null;
+        StringBuilder jsPathBuilder = new StringBuilder();
+        int validatedUnescapes = -1;
+        int escapes = 0;
+        NEXT_CHAR: for (int i = 0; i < chars.length; i++) {
+            char c = chars[i];
+            int remaining = chars.length - i - 1;
+            try {
+                if (inVariable) {
+                    if (c == '}') {
+                        if (escapes > 0) {
+                            // collect escape sequences to replace later reverse to avoid index issues
+                            toUnescape.add(0, new int[] { i - escapes, escapes });
+                            if (escapes % 2 == 1) {
+                                jsPathBuilder.append(c);
+                                continue NEXT_CHAR;
+                            }
+                        }
+                        String toResolve = jsPathBuilder.toString();
+                        // refs.add(jsPathBuilder.toString());
+                        FlexiJSonNode replacement = resolve(toResolve, value, fieldType, valuePath, loopCheck, access);
+                        if (fieldType.isString() || fieldType.isObject()) {
+                            if (replacement != null && replacement instanceof FlexiJSonValue) {
+                                if (i == chars.length - 1) {
+                                    if (((FlexiJSonValue) replacement).getType() == ValueType.STRING) {
+                                        return replacement;
+                                    }
+                                } else {
+                                    newText.append(String.valueOf(((FlexiJSonValue) replacement).getValue()));
+                                    jsPathBuilder.setLength(0);
+                                    inVariable = false;
+                                    continue NEXT_CHAR;
+                                }
+                            }
+                        } else if (i == chars.length - 1) {
+                            // ref only
+                            return replacement;
+                        } else {
+                            throw new FlexiMapperException(value, fieldType, "Illegal Link - no replace allowed at this point - only direct links", null);
+                        }
+                    }
+                    jsPathBuilder.append(c);
+                } else {
+                    if (newText != null) {
+                        newText.append(c);
+                    }
+                    if (c == '$') {
+                        if (remaining > 0 && chars[i + 1] == '{') {
+                            // start tag reached
+                            if (newText == null) {
+                                newText = new StringBuilder(raw.length());
+                                newText.append(raw, 0, i + 1);
+                            }
+                            i++;
+                            if (escapes > 0) {
+                                // collect escape sequences to replace later reverse to avoid index issues
+                                newText.setLength(newText.length() - (escapes + 1) / 2);
+                                if (escapes % 2 == 1) {
+                                    newText.append('{');
+                                    continue NEXT_CHAR;
+                                }
+                                DebugMode.breakIf(jsPathBuilder.length() > 0);
+                            } else {
+                                // remove $
+                                newText.setLength(newText.length() - 1);
+                            }
+                            inVariable = true;
+                        }
+                    }
+                }
+            } finally {
+                if (c == '$') {
+                    escapes++;
+                } else {
+                    escapes = 0;
+                }
+            }
+        }
+        if (inVariable) {
+            newText.append('$').append('{').append(jsPathBuilder);
+        }
+        if (newText != null) {
+            return createFlexiJSonValue(newText.toString());
+        }
+        // final Pattern pat = Pattern.compile("\\$\\{[\\w\\.\\d\\[\\]]+(#p\\d+)?}");
+        // final Matcher matcher = pat.matcher(raw);
+        // while (matcher.find()) {
+        // final String group = matcher.group(0);
+        // final String path = group.substring(2, group.length() - 1);
+        // refs.add(path);
+        // }
+        return value;
+    }
+
+    /**
+     * @param value
+     * @param fieldType
+     * @param valuePath
+     * @param loopCheck
+     * @param toResolve
+     * @param access
+     * @return
+     * @throws FlexiMapperException
+     * @throws InvalidPathException
+     * @throws NoSuchMethodException
+     * @throws CannotResolvePathException
+     */
+    private FlexiJSonNode resolve(String path, FlexiJSonNode value, CompiledType fieldType, JSPath valuePath, LinkedHashSet<JSPath> loopCheck, List<String> access) throws FlexiMapperException, InvalidPathException, NoSuchMethodException, CannotResolvePathException {
+        final HashSet<String> replaced = new HashSet<String>();
+        FlexiJSonNode root = null;
+        NEXT_ANNOTATION: for (final String regex : access) {
+            if (path.matches(regex)) {
+                FlexiJSonNode base = null;
+                JSPath jsPath = JSPath.fromPathString(path);
+                final Object last = jsPath.getLast();
+                if (last instanceof MetaElement) {
+                    jsPath = jsPath.getParent();
+                    String meta = ((MetaElement) last).getString().substring(1);
+                    base = value;
+                    // supports #ppp or #p3
+                    while (meta.startsWith("p")) {
+                        base = base.getParent();
+                        meta = meta.substring(1);
+                    }
+                    // this allows even a mixture like #pp2 ( -> #ppp)
+                    String num = "";
+                    while (meta.length() > 0 && Character.isDigit(meta.charAt(0))) {
+                        num += meta.substring(0, 1);
+                        meta = meta.substring(1);
+                    }
+                    for (int i = 1; i < Integer.parseInt(num); i++) {
+                        base = base.getParent();
+                    }
+                    base = base.resolvePath(JSPath.fromPathString(meta));
+                    if (base == null) {
+                        throw new FlexiMapperException(value, fieldType, "Illegal #..base path definition");
+                    }
+                } else {
+                    if (root == null) {
+                        root = FlexiUtils.getRoot(value.getParent());
+                    }
+                    base = root;
+                }
+                JSPath backToWildcard = jsPath;
+                int i = 0;
+                int foundWildcardAt = -1;
+                for (Object o : backToWildcard) {
+                    if ("".equals(o)) {
+                        foundWildcardAt = i;
+                    }
+                    i++;
+                }
+                JSPath me = valuePath;
+                ArrayList<Object> add = new ArrayList<Object>();
+                if (foundWildcardAt >= 0) {
+                    for (i = backToWildcard.size() - 1; i > foundWildcardAt; i--) {
+                        add.add(0, backToWildcard.getLast());
+                        backToWildcard = backToWildcard.getParent();
+                    }
+                }
+                if (add.size() > 0) {
+                    JSPath basePath = FlexiUtils.fromFlexiNode(base);
+                    if (basePath.size() + backToWildcard.size() > me.size()) {
+                        throw new FlexiMapperException(value, fieldType, "Cannot Resolve");
+                    }
+                    JSPath mustMatchWildCards = me.subPath(basePath.size(), basePath.size() + backToWildcard.size());
+                    boolean matches = true;
+                    for (int ii = 0; ii < mustMatchWildCards.size(); ii++) {
+                        if ("".equals(backToWildcard.get(ii))) {
+                            continue;
+                        } else if (CompareUtils.equals(mustMatchWildCards.get(ii), backToWildcard.get(ii))) {
+                            continue;
+                        } else {
+                            matches = false;
+                            break;
+                        }
+                    }
+                    if (!matches) {
+                        throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
+                    }
+                    base = base.resolvePath(mustMatchWildCards);
+                    jsPath = JSPath.fromPathElements(add);
+                }
+                if (base == null) {
+                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Base not found: " + path, null);
+                }
+                FlexiJSonNode newValue = base.resolvePath(jsPath);
+                if (newValue == null) {
+                    throw new FlexiMapperException(value, fieldType, "Cannot resolve reference: Path not found: " + path, null);
+                }
+                JSPath pathFromRoot = FlexiUtils.fromFlexiNode(newValue);
+                Object lastKey = pathFromRoot.getLast();
+                JSPath parent = pathFromRoot.getParent();
+                CompiledType linkedType = getContext().getRootType().resolve(parent);
+                while (linkedType.isListContainer()) {
+                    lastKey = parent.getLast();
+                    parent = parent.getParent();
+                    linkedType = getContext().getRootType().resolve(parent);
+                }
+                // ensure that the target is fully resolved
+                List<String> subaccess = getReferencesAccess(linkedType.type, StringUtils.valueOfOrNull(lastKey));
+                newValue = resolveValue(newValue, fieldType, subaccess, loopCheck);
+                return newValue;
+            } else {
+                try {
+                    LogV3.info("Forbidden Reference: " + path + " @ " + FlexiUtils.getPathString(value));
+                } catch (final InvalidPathException e) {
+                    LogV3.log(e);
+                }
+                return onUnresolvableReference(path);
+            }
+        }
+        return null;
+    }
+
+    protected FlexiJSonNode onUnresolvableReference(String path) {
+        // TODO: Handling of forbidden references
+        // DebugMode.debugger();
+        return createFlexiJSonValue("${" + path + "}");
     }
 
     private ThreadLocal<FlexiMapperContext> context = new ThreadLocal<FlexiMapperContext>();

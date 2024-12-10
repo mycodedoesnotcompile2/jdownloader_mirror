@@ -43,7 +43,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.LogV3Factory;
 import org.appwork.loggingv3.LoggerProvider;
-import org.appwork.loggingv3.PreInitLoggerFactory;
 import org.appwork.loggingv3.simple.sink.LogToFileSink;
 import org.appwork.loggingv3.simple.sink.LogToStdOutSink;
 import org.appwork.loggingv3.simple.sink.Sink;
@@ -197,14 +196,7 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     @Override
-    public SimpleLoggerFactory setFactory(final LogV3Factory previousFactory) {
-        if (previousFactory instanceof PreInitLoggerFactory) {
-            // forward cached entries
-            for (final LogRecord2 c : ((PreInitLoggerFactory) previousFactory).getCached()) {
-                this.publish(c);
-            }
-        }
-        return this;
+    public void setPredecessor(final LogV3Factory previousFactory) {
     }
 
     /**
@@ -234,5 +226,12 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
      */
     public void set() {
         LogV3.setFactory(this);
+    }
+
+    /**
+     * @see org.appwork.loggingv3.LogV3Factory#setSuccessor(org.appwork.loggingv3.LogV3Factory)
+     */
+    @Override
+    public void setSuccessor(LogV3Factory newFactory) {
     }
 }

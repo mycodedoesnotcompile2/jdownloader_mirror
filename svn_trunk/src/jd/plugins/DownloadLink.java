@@ -32,20 +32,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import jd.config.Property;
-import jd.controlling.downloadcontroller.DownloadLinkCandidate;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.HistoryEntry;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinknameCleaner;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.packagecontroller.AbstractNodeNotifier;
-import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
-import jd.plugins.DownloadLinkDatabindingInterface.Key;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.HashInfo;
-import jd.plugins.download.HashInfo.TYPE;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
@@ -73,6 +59,20 @@ import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.config.Property;
+import jd.controlling.downloadcontroller.DownloadLinkCandidate;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.HistoryEntry;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.packagecontroller.AbstractNodeNotifier;
+import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
+import jd.plugins.DownloadLinkDatabindingInterface.Key;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.HashInfo;
+import jd.plugins.download.HashInfo.TYPE;
 
 /**
  * Hier werden alle notwendigen Informationen zu einem einzelnen Download festgehalten. Die Informationen werden dann in einer Tabelle
@@ -1064,7 +1064,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     /*
      * Gibt zurueck ob Dieser Link schon auf verfuegbarkeit getestet wurde.+ Diese FUnktion fuehrt keinen!! Check durch. Sie prueft nur ob
      * schon geprueft worden ist. anschiessend kann mit isAvailable() die verfuegbarkeit ueberprueft werden
-     * 
+     *
      * @return Link wurde schon getestet (true) nicht getestet(false)
      */
     public boolean isAvailabilityStatusChecked() {
@@ -1724,8 +1724,9 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     /**
-     * Returns whether or not a download password is required to download this item. 7 </br> In most of all cases, this cannot be known
-     * until downloads are started but in some instances this can be set e.g. during folder crawling already.
+     * Returns whether or not a download password is required to download this item. 7 </br>
+     * In most of all cases, this cannot be known until downloads are started but in some instances this can be set e.g. during folder
+     * crawling already.
      */
     public boolean isPasswordProtected() {
         return this.getBooleanProperty(PROPERTY_PASSWORD_PROTECTED, false);
@@ -1786,9 +1787,13 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     /**
-     * Allows to set multiple HashInfo. </br> 2024-06-27: This is kind of just a mockup, add functionality. </br> Supported data types:
-     * </br> - String </br> - HashInfo </br> - List<HashInfo> and List<String> </br> Throws IllegalArgumentException if you provide
-     * something totally wrong. Wrong hash-strings are ignored (no Exception). <br>
+     * Allows to set multiple HashInfo. </br>
+     * 2024-06-27: This is kind of just a mockup, add functionality. </br>
+     * Supported data types: </br>
+     * - String </br>
+     * - HashInfo </br>
+     * - List<HashInfo> and List<String> </br>
+     * Throws IllegalArgumentException if you provide something totally wrong. Wrong hash-strings are ignored (no Exception). <br>
      * See ticket: https://svn.jdownloader.org/issues/90472
      */
     public void setHashInfos(final Object hashInfos) {
@@ -2025,16 +2030,17 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     /**
-     * This date will later be written in the file if wanted by the user. </br> Preferable not(!) set this because in most of all cases this
-     * information will be obtained via the "Last-Modified" header once a download is complete.
+     * This date will later be written in the file if wanted by the user. </br>
+     * Preferable not(!) set this because in most of all cases this information will be obtained via the "Last-Modified" header once a
+     * download is complete.
      */
     public void setLastModifiedTimestamp(final long timestamp) {
         this.setProperty(PROPERTY_LAST_MODIFIED, timestamp);
     }
 
     /**
-     * Returns timestamp when this file was last modified. </br> Typically only given [before download] if provided by an API and set on
-     * this DownloadLink.
+     * Returns timestamp when this file was last modified. </br>
+     * Typically only given [before download] if provided by an API and set on this DownloadLink.
      */
     public long getLastModifiedTimestamp() {
         return this.getLongProperty(PROPERTY_LAST_MODIFIED, -1);
@@ -2615,21 +2621,22 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     public void addHistoryEntry(HistoryEntry entry) {
-        if (entry != null) {
-            final int maxEntries = CFG_GENERAL.CFG.getMaxDownloadLinkHistoryEntries();
-            if (maxEntries > 0) {
-                synchronized (this) {
-                    if (history == null) {
-                        history = new ArrayList<HistoryEntry>();
-                    }
-                    while (history.size() > maxEntries) {
-                        history.remove(0);
-                    }
-                    history.add(entry);
+        if (entry == null) {
+            return;
+        }
+        final int maxEntries = CFG_GENERAL.CFG.getMaxDownloadLinkHistoryEntries();
+        if (maxEntries > 0) {
+            synchronized (this) {
+                if (history == null) {
+                    history = new ArrayList<HistoryEntry>();
                 }
-                if (hasNotificationListener()) {
-                    notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
+                while (history.size() > maxEntries) {
+                    history.remove(0);
                 }
+                history.add(entry);
+            }
+            if (hasNotificationListener()) {
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
             }
         }
     }

@@ -17,6 +17,7 @@ public enum VideoCodec implements LabelInterface, TooltipInterface {
     VP9_WORSE_PROFILE_1("Google VP9 Low Quality Profile", "VP9 LQ"),
     VP8("Google VP8", "VP8"),
     H263("AVC H.263", "H263");
+
     private String label;
     private String labelLong;
 

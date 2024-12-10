@@ -43,6 +43,7 @@ public enum AudioCodec implements LabelInterface, TooltipInterface {
             return _JDT.T.AudioCodec_vorbis_spatial();
         }
     };
+
     private String label;
     private String labelLong;
 
@@ -64,7 +65,7 @@ public enum AudioCodec implements LabelInterface, TooltipInterface {
         return getLabelLong();
     }
 
-    public static AudioCodec getByVariant(AbstractVariant o1) {
+    private static AudioCodec getByVariant(AbstractVariant o1) {
         if (o1 instanceof AudioInterface) {
             return ((AudioInterface) o1).getAudioCodec();
         } else {

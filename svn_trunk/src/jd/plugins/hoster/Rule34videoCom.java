@@ -29,7 +29,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50310 $", interfaceVersion = 3, names = {}, urls = {})
 public class Rule34videoCom extends KernelVideoSharingComV2 {
     public Rule34videoCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -92,6 +92,11 @@ public class Rule34videoCom extends KernelVideoSharingComV2 {
         } else {
             return super.isOfflineWebsite(br);
         }
+    }
+
+    @Override
+    protected boolean preferTitleHTML() {
+        return true;
     }
 
     @Override

@@ -2,6 +2,7 @@ package org.jdownloader.plugins.components.youtube.configpanel;
 
 import org.jdownloader.plugins.components.youtube.Projection;
 import org.jdownloader.plugins.components.youtube.VariantIDStorable;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.variants.AbstractVariant;
 import org.jdownloader.plugins.components.youtube.variants.AudioInterface;
 import org.jdownloader.plugins.components.youtube.variants.ImageVariant;
@@ -41,6 +42,13 @@ public class AbstractVariantWrapper {
     }
 
     final public AbstractVariant variant;
+
+    public AudioType getAudioType() {
+        if (variant instanceof AudioInterface) {
+            return ((AudioInterface) variant).getAudioType();
+        }
+        return null;
+    }
 
     public String getLanguageCode() {
         String lng = null;

@@ -11,12 +11,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.packagecontroller.AbstractNodeVisitor;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import jd.plugins.PluginForHost;
-
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.os.CrossSystem;
@@ -28,6 +22,12 @@ import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFactory;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.extensions.extraction.split.SplitType;
 import org.jdownloader.settings.GeneralSettings;
+
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.packagecontroller.AbstractNodeVisitor;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import jd.plugins.PluginForHost;
 
 public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implements ArchiveFactory {
     public static final String DOWNLOADLINK_KEY_EXTRACTEDPATH = "EXTRACTEDPATH";
@@ -108,22 +108,21 @@ public class DownloadLinkArchiveFactory extends DownloadLinkArchiveFile implemen
                 }
             }
         }
-        if (unsafeChars.size() > 0) {
-            final String filePathPattern = new Regex(pattern, "\\^\\\\Q(.*?)\\\\E").getMatch(0);
-            final File filePath = new File(filePathPattern);
-            final String fileNamePattern = filePath.getName();
-            String modifiedFilaNamePattern = fileNamePattern;
-            for (final Character unsafeChar : unsafeChars) {
-                modifiedFilaNamePattern = modifiedFilaNamePattern.replace(unsafeChar.toString(), "\\\\E.\\\\Q");
-            }
-            // we need to escape $ because it has special meaning in String.replaceFirst
-            modifiedFilaNamePattern = modifiedFilaNamePattern.replace("$", "\\$");
-            final String modifiedFilePathPattern = filePathPattern.replaceFirst(Pattern.quote(fileNamePattern) + "$", modifiedFilaNamePattern);
-            final String ret = pattern.replace("^\\Q" + filePathPattern + "\\E", "^\\Q" + modifiedFilePathPattern + "\\E");
-            return ret;
-        } else {
+        if (unsafeChars.isEmpty()) {
             return pattern;
         }
+        final String filePathPattern = new Regex(pattern, "\\^\\\\Q(.*?)\\\\E").getMatch(0);
+        final File filePath = new File(filePathPattern);
+        final String fileNamePattern = filePath.getName();
+        String modifiedFilaNamePattern = fileNamePattern;
+        for (final Character unsafeChar : unsafeChars) {
+            modifiedFilaNamePattern = modifiedFilaNamePattern.replace(unsafeChar.toString(), "\\\\E.\\\\Q");
+        }
+        // we need to escape $ because it has special meaning in String.replaceFirst
+        modifiedFilaNamePattern = modifiedFilaNamePattern.replace("$", "\\$");
+        final String modifiedFilePathPattern = filePathPattern.replaceFirst(Pattern.quote(fileNamePattern) + "$", modifiedFilaNamePattern);
+        final String ret = pattern.replace("^\\Q" + filePathPattern + "\\E", "^\\Q" + modifiedFilePathPattern + "\\E");
+        return ret;
     }
 
     /*

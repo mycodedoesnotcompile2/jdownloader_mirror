@@ -24,6 +24,7 @@ public enum FileContainer implements LabelInterface, TooltipInterface {
     JPG("jpg", "JPEG Image"),
     SRT("srt", "Subtitle"),
     TXT("txt", "Text");
+
     private final String extension;
     private final String longLabel;
 

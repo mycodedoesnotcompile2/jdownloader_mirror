@@ -37,22 +37,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -90,6 +74,8 @@ import org.jdownloader.plugins.components.google.GoogleHelper;
 import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.components.youtube.YoutubeReplacer.DataOrigin;
 import org.jdownloader.plugins.components.youtube.YoutubeReplacer.DataSource;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
+import org.jdownloader.plugins.components.youtube.itag.StreamContainer;
 import org.jdownloader.plugins.components.youtube.itag.VideoCodec;
 import org.jdownloader.plugins.components.youtube.itag.VideoResolution;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
@@ -117,6 +103,22 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
+
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     static {
@@ -171,18 +173,18 @@ public class YoutubeHelper {
     // }
     private static final Map<String, YoutubeReplacer> REPLACER_MAP = new HashMap<String, YoutubeReplacer>();
     public static final List<YoutubeReplacer>         REPLACER     = new ArrayList<YoutubeReplacer>() {
-        @Override
-        public boolean add(final YoutubeReplacer e) {
-            for (final String tag : e.getTags()) {
-                if (REPLACER_MAP.put(tag, e) != null) {
-                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                        throw new WTFException("Duplicate error:" + tag);
-                    }
-                }
-            }
-            return super.add(e);
-        };
-    };
+                                                                       @Override
+                                                                       public boolean add(final YoutubeReplacer e) {
+                                                                           for (final String tag : e.getTags()) {
+                                                                               if (REPLACER_MAP.put(tag, e) != null) {
+                                                                                   if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                                                                                       throw new WTFException("Duplicate error:" + tag);
+                                                                                   }
+                                                                               }
+                                                                           }
+                                                                           return super.add(e);
+                                                                       };
+                                                                   };
 
     public static String applyReplacer(String name, YoutubeHelper helper, DownloadLink link) {
         final Matcher tagMatcher = Pattern.compile("(?i)([A-Z0-9\\_]+)(\\[[^\\]]*\\])?").matcher("");
@@ -1183,13 +1185,21 @@ public class YoutubeHelper {
                         final AudioInterface audio = ((AudioInterface) variant);
                         final Locale locale = audio.getAudioLocale();
                         if (locale != null) {
-                            if ("code".equalsIgnoreCase(mod)) {
-                                return locale.getLanguage();
+                            final AudioType type = audio.getAudioType();
+                            final StringBuilder sb = new StringBuilder();
+                            if ("type".equalsIgnoreCase(mod)) {
+                                if (type == null) {
+                                    return "";
+                                }
+                                sb.append(" (").append(type.getLabel()).append(")");
+                            } else if ("code".equalsIgnoreCase(mod)) {
+                                sb.append(locale.getLanguage());
                             } else if ("display".equalsIgnoreCase(mod)) {
-                                return locale.getDisplayLanguage();
+                                sb.append(locale.getDisplayLanguage());
                             } else {
-                                return locale.getDisplayName();
+                                sb.append(locale.getDisplayName());
                             }
+                            return sb.toString();
                         }
                     }
                 }
@@ -1471,17 +1481,25 @@ public class YoutubeHelper {
                     final String html5PlayerSource = ensurePlayerSource();
                     // String[][] func = new Regex(html5PlayerSource,
                     // "(?x)(?:\\.get\\(\"n\"\\)\\)&&\\(b=|b=String\\.fromCharCode\\(110\\),c=a\\.get\\(b\\)\\)&&\\(c=)([a-zA-Z0-9$]+)(?:\\[(\\d+)\\])?\\([a-zA-Z0-9]\\)").getMatches();
-                    // since 2024-08-06
-                    function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                    // since 2024-12-09
+                    function = new Regex(html5PlayerSource, "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
+                    if (function != null) {
+                        final String varName = new Regex(html5PlayerSource, "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
+                        function = function.replaceAll("if\\s*\\(typeof\\s*\\w+\\s*===\\s*\\\"undefined\\\"\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
+                    }
                     if (function == null) {
-                        // since 2024-07-31
-                        function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                        // since 2024-08-06
+                        function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
                         if (function == null) {
-                            // since 2024-07
-                            function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                            // since 2024-07-31
+                            function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
                             if (function == null) {
-                                // before 2024-07
-                                function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                                // since 2024-07
+                                function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                                if (function == null) {
+                                    // before 2024-07
+                                    function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                                }
                             }
                         }
                     }
@@ -3113,9 +3131,39 @@ public class YoutubeHelper {
             final List<Map<String, Object>> adaptiveFormats = (List<Map<String, Object>>) streamingData.get("adaptiveFormats");
             if (adaptiveFormats != null && adaptiveFormats.size() > 0) {
                 final String dataSrc = "new_adaptive_fmts_map." + src;
+                final Map<YoutubeITAG, List<YoutubeStreamData>> dataMap = new LinkedHashMap<YoutubeITAG, List<YoutubeStreamData>>();
                 for (final Map<String, Object> format : adaptiveFormats) {
                     final YoutubeStreamData data = convert(format, dataSrc);
                     if (data != null) {
+                        List<YoutubeStreamData> list = dataMap.get(data.getItag());
+                        if (list == null) {
+                            list = new ArrayList<>();
+                            dataMap.put(data.getItag(), list);
+                        }
+                        list.add(data);
+                    }
+                }
+                for (Entry<YoutubeITAG, List<YoutubeStreamData>> dataMapEntry : dataMap.entrySet()) {
+                    if (dataMapEntry.getKey().getRawContainer() == StreamContainer.DASH_AUDIO) {
+                        boolean hasLngId = false;
+                        for (YoutubeStreamData data : dataMapEntry.getValue()) {
+                            if (data.getLngId() != null) {
+                                hasLngId = true;
+                                break;
+                            }
+                        }
+                        if (hasLngId) {
+                            // remove entries without audio lng information and keep those with audio lng information
+                            final Iterator<YoutubeStreamData> it = dataMapEntry.getValue().iterator();
+                            while (it.hasNext()) {
+                                final YoutubeStreamData next = it.next();
+                                if (next.getLngId() == null) {
+                                    it.remove();
+                                }
+                            }
+                        }
+                    }
+                    for (YoutubeStreamData data : dataMapEntry.getValue()) {
                         if (fmtMaps.add(new StreamMap(data, dataSrc))) {
                             ret++;
                         }

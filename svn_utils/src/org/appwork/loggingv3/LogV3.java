@@ -46,11 +46,6 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.NullOutputStream;
 
-/**
- * @author Thomas
- * @date 18.09.2018
- *
- */
 public class LogV3 {
     static {
         Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler() {
@@ -64,21 +59,28 @@ public class LogV3 {
 
     public static LogV3Factory I() {
         if (INSTANCE == null) {
-            // this can only happen, if there is a LogV3 call in the LoggerFactory init itself
+            DebugMode.debugger();
+            // this should not happen. We added a debugger call in setFactory to see if we set INSTANCE to null anywhere.
+            // we should be able to remove this soon.
             setFactory(new LogV3FactoryImpl());
         }
         return INSTANCE;
     }
 
-    private static LogV3Factory INSTANCE = createInstance();
+    private volatile static LogV3Factory INSTANCE = new PreInitLoggerFactory().initDefaults();
+    static {
+        setFactory(createInstance());
+    }
 
     /**
      * @return
      */
     private static LogV3Factory createInstance() {
-        String load = PreInitLoggerFactory.class.getName();
         try {
-            final String clazz = System.getProperty("org.appwork.LoggerFactory", load);
+            final String clazz = System.getProperty("org.appwork.LoggerFactory");
+            if (clazz == null) {
+                return INSTANCE;
+            }
             final LogV3Factory ret = (LogV3Factory) Class.forName(clazz).newInstance();
             try {
                 final Method initDefaults = ret.getClass().getMethod("initDefaults", new Class[] {});
@@ -162,10 +164,19 @@ public class LogV3 {
      * @param string
      */
     public static void setFactory(final LogV3Factory instance) {
+        if (instance == INSTANCE) {
+            return;
+        }
         if (instance == null) {
+            DebugMode.debugger();
             INSTANCE = null;
         } else {
-            INSTANCE = instance.setFactory(INSTANCE);
+            LogV3Factory prev = INSTANCE;
+            instance.setPredecessor(prev);
+            if (prev != null) {
+                prev.setSuccessor(instance);
+            }
+            INSTANCE = instance;
         }
     }
 

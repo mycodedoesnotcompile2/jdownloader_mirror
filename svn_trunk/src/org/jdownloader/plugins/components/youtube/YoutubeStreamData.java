@@ -92,6 +92,10 @@ public class YoutubeStreamData {
     }
 
     public void setLngId(String lngId) {
+        // TODO: verifiy
+        // .4 = original
+        // .10 = ai
+        // .3 = additional
         this.lngId = lngId;
     }
 

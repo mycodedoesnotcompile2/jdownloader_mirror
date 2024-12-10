@@ -24,6 +24,7 @@ import java.util.Map;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonMapperException;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -53,7 +54,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50310 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -320,7 +321,12 @@ public class TorboxApp extends UseNet {
             /* Obtain usenet login credentials if user owns a pro account */
             try {
                 final Request req_usenet = br.createGetRequest(API_BASE + "/usenet/provider/account");
-                final Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
+                Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    /* 2024-12-09: Test-workaround for server side API design flaw */
+                    final Request req_usenet_2 = br.createPostRequest(API_BASE + "/usenet/provider/account/resetpw", "");
+                    usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet_2, account, null);
+                }
                 final int maxConnections = ((Number) usenet_data.get("connections")).intValue();
                 account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenet_data.get("username"));
                 account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenet_data.get("password"));

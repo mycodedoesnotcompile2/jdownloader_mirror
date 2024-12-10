@@ -5,8 +5,6 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
-import jd.plugins.DownloadLink;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.DebugMode;
@@ -21,12 +19,15 @@ import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.itag.VideoCodec;
 import org.jdownloader.plugins.components.youtube.itag.VideoResolution;
 import org.jdownloader.plugins.components.youtube.itag.YoutubeITAG;
 import org.jdownloader.plugins.components.youtube.variants.generics.GenericVideoInfo;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.translate._JDT;
+
+import jd.plugins.DownloadLink;
 
 public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements VideoInterface, AudioInterface {
     public VideoVariant(VariantBase base) {
@@ -70,15 +71,6 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
     private static final Icon   VIDEO           = new AbstractIcon(IconKey.ICON_VIDEO, 16);
     private static final String TYPE_ID_PATTERN = PluginJsonConfig.get(YoutubeConfig.class).getVariantNamePatternVideo();
 
-    private String getAudioIdForPattern() {
-        final Locale locale = getAudioLocale();
-        if (locale != null) {
-            return locale.getDisplayName();
-        } else {
-            return null;
-        }
-    }
-
     @Override
     public String _getName(Object caller) {
         String id = TYPE_ID_PATTERN;
@@ -88,7 +80,7 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
         id = id.replace("*AUDIO_CODEC*", getAudioCodec().getLabel() + "");
         id = id.replace("*VIDEO_CODEC*", getVideoCodec() + "");
         id = id.replace("*AUDIO_BITRATE*", getAudioBitrate().getKbit() + "");
-        id = id.replace("*LNG*", StringUtils.valueOrEmpty(getAudioIdForPattern()));
+        id = id.replace("*LNG*", StringUtils.valueOrEmpty(AudioVariant.getAudioIdForPattern(this)));
         switch (getProjection()) {
         case SPHERICAL:
             id = id.replace("*360*", "[360°]");
@@ -320,6 +312,11 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
     @Override
     public String getAudioId() {
         return getGenericInfo().getaId();
+    }
+
+    @Override
+    public AudioType getAudioType() {
+        return AudioType.getAudioType(this);
     }
 
     @Override

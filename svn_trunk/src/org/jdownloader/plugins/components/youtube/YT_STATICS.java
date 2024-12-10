@@ -14,6 +14,7 @@ import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.txtresource.TranslationFactory;
 import org.jdownloader.plugins.components.youtube.itag.AudioBitrate;
 import org.jdownloader.plugins.components.youtube.itag.AudioCodec;
+import org.jdownloader.plugins.components.youtube.itag.AudioType;
 import org.jdownloader.plugins.components.youtube.itag.QualitySortIdentifier;
 import org.jdownloader.plugins.components.youtube.itag.VideoCodec;
 import org.jdownloader.plugins.components.youtube.itag.VideoFrameRate;
@@ -30,6 +31,7 @@ public class YT_STATICS {
     public static Map<AudioBitrate, Integer>    SORTIDS_AUDIO_BITRATE;
     public static List<QualitySortIdentifier>   SORTIDS;
     public static Map<AudioCodec, Integer>      SORTIDS_AUDIO_CODEC;
+    public static Map<AudioType, Integer>       SORTIDS_AUDIO_TYPE;
     public static Map<FileContainer, Integer>   SORTIDS_FILE_CONTAINER;
     public static HashMap<String, Integer>      SUBTITLE_PREFERRENCE_MAP;
     static {
@@ -47,6 +49,7 @@ public class YT_STATICS {
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER.getEventSender().addListener(listener);
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_BITRATE.getEventSender().addListener(listener);
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_CODEC.getEventSender().addListener(listener);
+        CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_AUDIO_TYPE.getEventSender().addListener(listener);
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_VIDEO_CODEC.getEventSender().addListener(listener);
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_VIDEO_FRAMERATE.getEventSender().addListener(listener);
         CFG_YOUTUBE.QUALITY_SORT_IDENTIFIER_ORDER_RESOLUTION.getEventSender().addListener(listener);
@@ -59,8 +62,9 @@ public class YT_STATICS {
         SORTIDS_VIDEO_FRAMERATE = update(VideoFrameRate.class, CFG.getQualitySortIdentifierOrderVideoFramerate());
         SORTIDS_AUDIO_BITRATE = update(AudioBitrate.class, CFG.getQualitySortIdentifierOrderAudioBitrate());
         SORTIDS_AUDIO_CODEC = update(AudioCodec.class, CFG.getQualitySortIdentifierOrderAudioCodec());
+        SORTIDS_AUDIO_TYPE = update(AudioType.class, CFG.getQualitySortIdentifierOrderAudioType());
         SORTIDS_FILE_CONTAINER = update(FileContainer.class, CFG.getQualitySortIdentifierOrderFiletype());
-        ArrayList<QualitySortIdentifier> sortIds = new ArrayList<QualitySortIdentifier>();
+        final ArrayList<QualitySortIdentifier> sortIds = new ArrayList<QualitySortIdentifier>();
         for (String s : CFG.getQualitySortIdentifierOrder()) {
             sortIds.add(QualitySortIdentifier.valueOf(s));
         }

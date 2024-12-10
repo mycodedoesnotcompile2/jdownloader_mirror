@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -568,6 +568,14 @@ public class SingleAppInstance {
         start(null, (String[]) null);
     }
 
+    protected int getDesiredServerPort(int desiredPort) {
+        if (desiredPort <= 0) {
+            return SingleAppInstance.DEFAULTPORT;
+        } else {
+            return desiredPort;
+        }
+    }
+
     public synchronized void start(final ResponseListener responseListener, final String... message) throws AnotherInstanceRunningException, UncheckableInstanceException, AnotherInstanceRunningButFailedToConnectException, ErrorReadingResponseException, InterruptedException, ExceptionInRunningInstance {
         if (this.fileLock != null) {
             return;
@@ -587,7 +595,7 @@ public class SingleAppInstance {
                 throw new AnotherInstanceRunningException(this.appID);
             } catch (IncompleteResponseException e) {
                 if (e.clientOKWasValid) {
-                    /// There is actually a running instance, but communication failed.no reason to start an own session
+                    // / There is actually a running instance, but communication failed.no reason to start an own session
                     throw e;
                 }
                 errorReadingException = e;
@@ -638,9 +646,7 @@ public class SingleAppInstance {
             this.serverSocket = new ServerSocket();
             SocketAddress socketAddress = null;
             try {
-                if (port <= 0) {
-                    port = SingleAppInstance.DEFAULTPORT;
-                }
+                port = getDesiredServerPort(port);
                 // try old port first
                 socketAddress = new InetSocketAddress(localHost, port);
                 this.serverSocket.bind(socketAddress);
@@ -996,7 +1002,7 @@ public class SingleAppInstance {
                     onIncommingTrailingMessage(line);
                 }
             } catch (IOException ignore) {
-                throw ignore;
+                // throw ignore;
             }
         } catch (IOException e) {
             synchronized (connections) {
@@ -1041,6 +1047,7 @@ public class SingleAppInstance {
             final Socket socket;
             final ClientConnection client;
             synchronized (connections) {
+                System.out.println("Connections on Exit: " + connections.size());
                 if (connections.size() == 0) {
                     break;
                 } else {
@@ -1057,12 +1064,14 @@ public class SingleAppInstance {
                     try {
                         closeSocket = closeConnection(client);
                     } catch (IOException ignore) {
+                        // ignore.printStackTrace();
                     }
                 }
                 if (closeSocket) {
                     try {
                         socket.close();
                     } catch (IOException ignore) {
+                        // ignore.printStackTrace();
                     }
                 }
             }

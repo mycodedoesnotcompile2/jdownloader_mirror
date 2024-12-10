@@ -116,42 +116,49 @@ public class Multi extends IExtraction {
     }
 
     public void setPermissions(ISimpleInArchiveItem item, File extractTo) {
+        if (item == null) {
+            return;
+        } else if (extractTo == null) {
+            return;
+        } else if (!extractTo.exists()) {
+            return;
+        } else if (!getConfig().isRestoreFilePermissions()) {
+            return;
+        }
         if ((CrossSystem.isUnix() || CrossSystem.isMac())) {
-            if (getConfig().isRestoreFilePermissions() && item != null && extractTo != null && extractTo.exists()) {
-                try {
-                    FilePermissionSet filePermissionSet = null;
-                    final Integer attributesInteger = item.getAttributes();
-                    final String hostOS = item.getHostOS();
-                    if (attributesInteger != null) {
-                        final int attributes = attributesInteger.intValue();
-                        if (StringUtils.equalsIgnoreCase("Unix", hostOS) && attributes != 0) {
-                            filePermissionSet = new FilePermissionSet();
-                            int attributeIndex = 16;
-                            filePermissionSet.setOtherExecute((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setOtherWrite((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setOtherRead((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setGroupExecute((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setGroupWrite((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setGroupRead((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setUserExecute((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setUserWrite((attributes & 1 << attributeIndex++) != 0);
-                            filePermissionSet.setUserRead((attributes & 1 << attributeIndex++) != 0);
-                        }
+            try {
+                FilePermissionSet filePermissionSet = null;
+                final Integer attributesInteger = item.getAttributes();
+                final String hostOS = item.getHostOS();
+                if (attributesInteger != null) {
+                    final int attributes = attributesInteger.intValue();
+                    if (StringUtils.equalsIgnoreCase("Unix", hostOS) && attributes != 0) {
+                        filePermissionSet = new FilePermissionSet();
+                        int attributeIndex = 16;
+                        filePermissionSet.setOtherExecute((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setOtherWrite((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setOtherRead((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setGroupExecute((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setGroupWrite((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setGroupRead((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setUserExecute((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setUserWrite((attributes & 1 << attributeIndex++) != 0);
+                        filePermissionSet.setUserRead((attributes & 1 << attributeIndex++) != 0);
                     }
-                    if (filePermissionSet != null) {
-                        if (Application.getJavaVersion() >= Application.JAVA17) {
-                            FilePermission17.setFilePermission(extractTo, filePermissionSet);
-                        } else {
-                            if (filePermissionSet.isUserExecute()) {
-                                if (!extractTo.setExecutable(true, filePermissionSet.isOtherExecute() == false && filePermissionSet.isOtherExecute() == false)) {
-                                    throw new IOException("Failed to set " + filePermissionSet + " to " + extractTo);
-                                }
+                }
+                if (filePermissionSet != null) {
+                    if (Application.getJavaVersion() >= Application.JAVA17) {
+                        FilePermission17.setFilePermission(extractTo, filePermissionSet);
+                    } else {
+                        if (filePermissionSet.isUserExecute()) {
+                            if (!extractTo.setExecutable(true, filePermissionSet.isOtherExecute() == false && filePermissionSet.isOtherExecute() == false)) {
+                                throw new IOException("Failed to set " + filePermissionSet + " to " + extractTo);
                             }
                         }
                     }
-                } catch (final Throwable e) {
-                    logger.log(e);
                 }
+            } catch (final Throwable e) {
+                logger.log(e);
             }
         }
     }
@@ -473,67 +480,71 @@ public class Multi extends IExtraction {
 
     @Override
     public DummyArchive checkComplete(Archive archive) throws CheckException {
-        if (archive.getArchiveType() != null) {
-            try {
-                final DummyArchive dummyArchive = new DummyArchive(archive, archive.getArchiveType());
-                for (final ArchiveFile archiveFile : archive.getArchiveFiles()) {
-                    dummyArchive.add(new DummyArchiveFile(archiveFile));
-                }
-                if (dummyArchive.isComplete()) {
-                    final ArchiveType archiveType = archive.getArchiveType();
-                    final String firstArchiveFile = archive.getArchiveFiles().get(0).getFilePath();
-                    final String partNumberOfFirstArchiveFile = archiveType.getPartNumberString(firstArchiveFile);
-                    if (archiveType.getFirstPartIndex() != archiveType.getPartNumber(partNumberOfFirstArchiveFile)) {
-                        throw new CheckException("Wrong firstArchiveFile(" + firstArchiveFile + ") for Archive(" + archive.getName() + ")");
-                    }
-                    final ArchiveFile lastArchiveFile = archive.getLastArchiveFile();
-                    if (lastArchiveFile != null) {
-                        final DownloadLinkArchiveFactory factory;
-                        if (archive.getFactory() instanceof DownloadLinkArchiveFactory) {
-                            factory = (DownloadLinkArchiveFactory) archive.getFactory();
-                        } else if (archive.getParentArchive() != null && archive.getParentArchive().getFactory() instanceof DownloadLinkArchiveFactory) {
-                            factory = (DownloadLinkArchiveFactory) archive.getParentArchive().getFactory();
-                        } else {
-                            factory = null;
-                        }
-                        if (factory != null) {
-                            final int nextIndex = archiveType.getPartNumber(archiveType.getPartNumberString(lastArchiveFile.getFilePath())) + 1;
-                            final List<ArchiveFile> maybeMissingArchiveFiles = ArchiveType.getMissingArchiveFiles(archive, archiveType, nextIndex);
-                            if (maybeMissingArchiveFiles.size() > 0) {
-                                final Set<String> archiveIDs = new HashSet<String>();
-                                factoryLoop: for (final DownloadLink downloadLink : factory.getDownloadLinks()) {
-                                    final FilePackage fp = downloadLink.getFilePackage();
-                                    final boolean readL = fp.getModifyLock().readLock();
-                                    try {
-                                        final List<Archive> searchArchives = extension.getArchivesFromPackageChildren(fp.getChildren(), archiveIDs, -1);
-                                        if (searchArchives != null) {
-                                            for (final Archive searchArchive : searchArchives) {
-                                                if (archiveIDs.add(searchArchive.getArchiveID())) {
-                                                    for (ArchiveFile maybeMissingArchiveFile : maybeMissingArchiveFiles) {
-                                                        if (StringUtils.equals(maybeMissingArchiveFile.getName(), searchArchive.getName())) {
-                                                            dummyArchive.add(new DummyArchiveFile(new MissingArchiveFile(searchArchive, maybeMissingArchiveFile.getFilePath())));
-                                                            break factoryLoop;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } finally {
-                                        fp.getModifyLock().readUnlock(readL);
+        if (archive.getArchiveType() == null) {
+            return null;
+        }
+        try {
+            final DummyArchive dummyArchive = new DummyArchive(archive, archive.getArchiveType());
+            for (final ArchiveFile archiveFile : archive.getArchiveFiles()) {
+                dummyArchive.add(new DummyArchiveFile(archiveFile));
+            }
+            if (!dummyArchive.isComplete()) {
+                return dummyArchive;
+            }
+            final ArchiveType archiveType = archive.getArchiveType();
+            final String firstArchiveFile = archive.getArchiveFiles().get(0).getFilePath();
+            final String partNumberOfFirstArchiveFile = archiveType.getPartNumberString(firstArchiveFile);
+            if (archiveType.getFirstPartIndex() != archiveType.getPartNumber(partNumberOfFirstArchiveFile)) {
+                throw new CheckException("Wrong firstArchiveFile(" + firstArchiveFile + ") for Archive(" + archive.getName() + ")");
+            }
+            final ArchiveFile lastArchiveFile = archive.getLastArchiveFile();
+            if (lastArchiveFile == null) {
+                return dummyArchive;
+            }
+            final DownloadLinkArchiveFactory factory;
+            if (archive.getFactory() instanceof DownloadLinkArchiveFactory) {
+                factory = (DownloadLinkArchiveFactory) archive.getFactory();
+            } else if (archive.getParentArchive() != null && archive.getParentArchive().getFactory() instanceof DownloadLinkArchiveFactory) {
+                factory = (DownloadLinkArchiveFactory) archive.getParentArchive().getFactory();
+            } else {
+                factory = null;
+            }
+            if (factory == null) {
+                return dummyArchive;
+            }
+            final int nextIndex = archiveType.getPartNumber(archiveType.getPartNumberString(lastArchiveFile.getFilePath())) + 1;
+            final List<ArchiveFile> maybeMissingArchiveFiles = ArchiveType.getMissingArchiveFiles(archive, archiveType, nextIndex);
+            if (maybeMissingArchiveFiles.isEmpty()) {
+                return dummyArchive;
+            }
+            final Set<String> archiveIDs = new HashSet<String>();
+            factoryLoop: for (final DownloadLink downloadLink : factory.getDownloadLinks()) {
+                final FilePackage fp = downloadLink.getFilePackage();
+                final boolean readL = fp.getModifyLock().readLock();
+                try {
+                    final List<Archive> searchArchives = extension.getArchivesFromPackageChildren(fp.getChildren(), archiveIDs, -1);
+                    if (searchArchives != null) {
+                        for (final Archive searchArchive : searchArchives) {
+                            if (archiveIDs.add(searchArchive.getArchiveID())) {
+                                for (ArchiveFile maybeMissingArchiveFile : maybeMissingArchiveFiles) {
+                                    if (StringUtils.equals(maybeMissingArchiveFile.getName(), searchArchive.getName())) {
+                                        dummyArchive.add(new DummyArchiveFile(new MissingArchiveFile(searchArchive, maybeMissingArchiveFile.getFilePath())));
+                                        break factoryLoop;
                                     }
                                 }
                             }
                         }
                     }
+                } finally {
+                    fp.getModifyLock().readUnlock(readL);
                 }
-                return dummyArchive;
-            } catch (CheckException e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new CheckException("Cannot check Archive(" + archive.getName() + ")", e);
             }
+            return dummyArchive;
+        } catch (CheckException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new CheckException("Cannot check Archive(" + archive.getName() + ")", e);
         }
-        return null;
     }
 
     @Override
@@ -1454,23 +1465,24 @@ public class Multi extends IExtraction {
 
     private void updateContentView(ISimpleInArchive simpleInterface) {
         final Archive archive = getExtractionController().getArchive();
+        if (archive == null) {
+            return;
+        }
         try {
-            if (archive != null) {
-                initFilters();
-                final ContentView newView = new ContentView();
-                for (ISimpleInArchiveItem item : simpleInterface.getArchiveItems()) {
-                    try {
-                        final String itemPath = item.getPath();
-                        if (StringUtils.isEmpty(itemPath) || isFiltered(itemPath) != null) {
-                            continue;
-                        }
-                        newView.add(new PackedFile(item.isFolder(), itemPath, item.getSize()));
-                    } catch (SevenZipException e) {
-                        getLogger().log(e);
+            initFilters();
+            final ContentView newView = new ContentView();
+            for (ISimpleInArchiveItem item : simpleInterface.getArchiveItems()) {
+                try {
+                    final String itemPath = item.getPath();
+                    if (StringUtils.isEmpty(itemPath) || isFiltered(itemPath) != null) {
+                        continue;
                     }
+                    newView.add(new PackedFile(item.isFolder(), itemPath, item.getSize()));
+                } catch (SevenZipException e) {
+                    getLogger().log(e);
                 }
-                archive.setContentView(newView);
             }
+            archive.setContentView(newView);
         } catch (SevenZipException e) {
             getLogger().log(e);
         }

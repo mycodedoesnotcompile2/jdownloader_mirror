@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 47996 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50311 $", interfaceVersion = 3, names = {}, urls = {})
 public class CutyIo extends PluginForDecrypt {
     public CutyIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class CutyIo extends PluginForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "cuty.io", "cutty.app" });
+        ret.add(new String[] { "cuty.io", "cutty.app", "cety.app" });
         return ret;
     }
 
@@ -93,7 +93,6 @@ public class CutyIo extends PluginForDecrypt {
         if (form3 == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        br.setFollowRedirects(false);
         final boolean skipWaitTime = false;
         final String waitSecondsStr = br.getRegex("class=\"timer\"[^>]*>(\\d+)</span>").getMatch(0);
         if (waitSecondsStr != null) {
@@ -106,6 +105,7 @@ public class CutyIo extends PluginForDecrypt {
         } else {
             logger.warning("Failed to find wait-time-value before final form");
         }
+        br.setFollowRedirects(false);
         br.submitForm(form3);
         final String finallink = br.getRedirectLocation();
         if (finallink == null) {
