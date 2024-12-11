@@ -44,7 +44,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47806 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50319 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
     /**
      * 2022-12-27: different site/api
@@ -123,23 +123,22 @@ public class RedGifsCom extends GfyCatCom {
                 token = (String) entries.get("token");
                 if (StringUtils.isEmpty(token)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                } else {
-                    tokenDetails[0] = token;
-                    tokenDetails[1] = now + TimeUnit.HOURS.toMillis(23);
-                    try {
-                        final String payload = new Regex(token, "^.*?\\.([^\\.]+)").getMatch(0);
-                        final String jsonString = new String(Base64.decodeFast(payload.replace("-", "+").replace("_", "/")), "UTF-8");
-                        final Map<String, Object> json = restoreFromString(jsonString, TypeRef.MAP);
-                        final Number iat = (Number) json.get("iat");
-                        final Number exp = (Number) json.get("exp");
-                        if (iat != null && exp != null) {
-                            // minimum 1 hour
-                            final long expireIn = Math.max(60 * 60, exp.longValue() - iat.longValue());
-                            tokenDetails[1] = now + expireIn * 1000l;
-                        }
-                    } catch (Exception e) {
-                        logger.log(e);
+                }
+                tokenDetails[0] = token;
+                tokenDetails[1] = now + TimeUnit.HOURS.toMillis(23);
+                try {
+                    final String payload = new Regex(token, "^.*?\\.([^\\.]+)").getMatch(0);
+                    final String jsonString = new String(Base64.decodeFast(payload.replace("-", "+").replace("_", "/")), "UTF-8");
+                    final Map<String, Object> json = restoreFromString(jsonString, TypeRef.MAP);
+                    final Number iat = (Number) json.get("iat");
+                    final Number exp = (Number) json.get("exp");
+                    if (iat != null && exp != null) {
+                        // minimum 1 hour
+                        final long expireIn = Math.max(60 * 60, exp.longValue() - iat.longValue());
+                        tokenDetails[1] = now + expireIn * 1000l;
                     }
+                } catch (Exception e) {
+                    logger.log(e);
                 }
             }
             return token;
@@ -163,7 +162,7 @@ public class RedGifsCom extends GfyCatCom {
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
-        this.br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
         br.setAllowedResponseCodes(new int[] { 410, 500 });
         final String firstToken = getTemporaryToken(br, null);
         Request view = getView(br, firstToken, fid);
@@ -222,10 +221,10 @@ public class RedGifsCom extends GfyCatCom {
         } else {
             link.setName(filename);
         }
-        if (link.getComment() == null) {
+        if (StringUtils.isEmpty(link.getComment())) {
             final List<String> tags = (List<String>) gif.get("tags");
             if (tags != null && tags.size() > 0) {
-                String description = StringUtils.join(tags.toArray(new Object[0]), " ");
+                String description = StringUtils.join(tags.toArray(new Object[0]), ", ");
                 if (!StringUtils.isEmpty(username)) {
                     description += " Porn GIF by " + username;
                 } else {

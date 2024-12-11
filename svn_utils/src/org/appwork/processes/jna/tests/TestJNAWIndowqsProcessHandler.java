@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.appwork.jna.tests.TestApp;
+import org.appwork.app.gui.BasicGui;
 import org.appwork.processes.ProcessHandler;
 import org.appwork.processes.ProcessInfo;
 import org.appwork.processes.jna.JNAWindowsProcessHandler;
@@ -70,6 +70,11 @@ public class TestJNAWIndowqsProcessHandler extends AWTest {
         if (!CrossSystem.isWindows()) {
             return;
         }
+        // required for post build tests to auto-include requirements
+        // this will throw a Class not found error, if BasicGui is not part of the build - and this will get ignored.
+        // without this import, we will get an undefined error in the extra process spawned later - which cannot be evaluated by the Post
+        // Script Runner correctly.
+        BasicGui.class.getName();
         String unique = "awtest" + UniqueAlltimeID.create();
         JNAWindowsProcessHandler handler = new JNAWindowsProcessHandler();
         testSendCloseToWindow(unique, handler);

@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50310 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50319 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -132,6 +133,10 @@ public class TorboxApp extends UseNet {
 
     @Override
     public void handleMultiHost(final DownloadLink link, final Account account) throws Exception {
+        if (isUsenetLink(link)) {
+            super.handleMultiHost(link, account);
+            return;
+        }
         this.login(account, false);
         final String directlinkproperty = this.getPropertyKey("directlink");
         String storedDirecturl = link.getStringProperty(directlinkproperty);
@@ -204,7 +209,9 @@ public class TorboxApp extends UseNet {
             dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
-                mhm.handleErrorGeneric(account, link, "Final downloadlink did not lead to file content", 50, 5 * 60 * 1000l);
+                checkErrors(br, account, link);
+                /* This code should never be reached */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "WTF");
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
@@ -321,19 +328,15 @@ public class TorboxApp extends UseNet {
             /* Obtain usenet login credentials if user owns a pro account */
             try {
                 final Request req_usenet = br.createGetRequest(API_BASE + "/usenet/provider/account");
-                Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
-                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                    /* 2024-12-09: Test-workaround for server side API design flaw */
-                    final Request req_usenet_2 = br.createPostRequest(API_BASE + "/usenet/provider/account/resetpw", "");
-                    usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet_2, account, null);
-                }
+                final Map<String, Object> usenet_data = (Map<String, Object>) this.callAPI(br, req_usenet, account, null);
                 final int maxConnections = ((Number) usenet_data.get("connections")).intValue();
                 account.setProperty(PROPERTY_ACCOUNT_USENET_USERNAME, usenet_data.get("username"));
                 account.setProperty(PROPERTY_ACCOUNT_USENET_PASSWORD, usenet_data.get("password"));
                 account.setProperty(PROPERTY_ACCOUNT_USENET_SERVER, usenet_data.get("host"));
-                account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, maxConnections); // 25
-                usenet.setStatusText(usenet_data.get("limitations").toString());
-                // usenet.setMaxChunks(maxConnections);
+                account.setProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, maxConnections); // default = 25
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                    usenet.setStatusText("Connections: " + maxConnections);
+                }
                 usenet.setMaxDownloads(maxConnections);
             } catch (final InterruptedException ie) {
                 throw ie;
@@ -451,7 +454,7 @@ public class TorboxApp extends UseNet {
     }
 
     private String getApikey(final Account account) {
-        return correctPassword(account.getPass());
+        return account.getPass();
     }
 
     private Object checkErrors(final Browser br, final Account account, final DownloadLink link) throws PluginException, InterruptedException {
@@ -484,12 +487,30 @@ public class TorboxApp extends UseNet {
             return;
         }
         // TODO: Add better errorhandling
+        // TODO: Add more error keys
         /*
          * List of possible error codes/strings: </br>
          * https://www.postman.com/wamy-dev/workspace/torbox/collection/29572726-4244cdaf-ece6-4b6d-a2ca-463a3af48f54
          */
-        // final Object error = entries.get("error");
+        final String errorcode = (String) entries.get("error");
         final String errormsg = entries.get("detail").toString();
+        final HashSet<String> accountErrorsPermanent = new HashSet<String>();
+        accountErrorsPermanent.add("BAD_TOKEN");
+        final HashSet<String> accountErrorsTemporary = new HashSet<String>();
+        accountErrorsTemporary.add("ACTIVE_LIMIT");
+        final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
+        downloadErrorsHostUnavailable.add("UNSUPPORTED_SITE");
+        final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
+        if (accountErrorsPermanent.contains(errorcode)) {
+            /* This is the only error which allows us to remove the apikey and re-login. */
+            throw new AccountInvalidException(errormsg);
+        } else if (accountErrorsTemporary.contains(errorcode)) {
+            throw new AccountUnavailableException(errormsg, 5 * 60 * 1000);
+        } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
+            mhm.putError(account, link, 5 * 60 * 1000l, errormsg);
+        } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg);
+        }
         if (link != null) {
             /* E.g. {"success":false,"detail":"Failed to request web download. Please try again later.","data":null} */
             mhm.handleErrorGeneric(account, link, errormsg, 50, 1 * 60 * 1000l);
@@ -498,12 +519,13 @@ public class TorboxApp extends UseNet {
         }
     }
 
-    private static String correctPassword(final String pw) {
-        if (pw != null) {
-            return pw.trim().replace("-", "");
-        } else {
+    @Override
+    public String updateAccountPassword(final Account account, final String password) {
+        if (password == null) {
             return null;
         }
+        final String ret = password.trim().replace("-", "");
+        return super.updateAccountPassword(account, ret);
     }
 
     @Override
@@ -515,7 +537,7 @@ public class TorboxApp extends UseNet {
     protected boolean looksLikeValidAPIKey(final String str) {
         if (str == null) {
             return false;
-        } else if (correctPassword(str).matches("[a-f0-9]{32}")) {
+        } else if (updateAccountPassword(null, str).matches("[a-f0-9]{32}")) {
             return true;
         } else {
             return false;
@@ -539,16 +561,9 @@ public class TorboxApp extends UseNet {
     @Override
     protected UsenetServer getUseNetServer(final Account account) throws Exception {
         final UsenetServer userv = new UsenetServer(account.getStringProperty(PROPERTY_ACCOUNT_USENET_SERVER), 563, true);
-        userv.setConnections(account.getIntegerProperty(PROPERTY_ACCOUNT_USENET_SERVER, 1));
+        userv.setConnections(account.getIntegerProperty(PROPERTY_ACCOUNT_MAX_DOWNLOADS_USENET, 1));
         return userv;
     }
-    // @Override
-    // public List<UsenetServer> getAvailableUsenetServer() {
-    // // TODO: Obtain this data from API
-    // final List<UsenetServer> ret = new ArrayList<UsenetServer>();
-    // ret.addAll(UsenetServer.createServerList("usenet.torbox.app", true, 563));
-    // return ret;
-    // }
 
     @Override
     protected int getMaxSimultanDownload(final DownloadLink link, final Account account) {

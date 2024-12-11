@@ -18,6 +18,7 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
@@ -36,7 +37,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.RedGifsCom;
 
-@DecrypterPlugin(revision = "$Revision: 47705 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50319 $", interfaceVersion = 3, names = {}, urls = {})
 public class RedgifsComProfile extends PluginForDecrypt {
     public RedgifsComProfile(PluginWrapper wrapper) {
         super(wrapper);
@@ -67,10 +68,12 @@ public class RedgifsComProfile extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
+    private static final Pattern PATTERN_USERS = Pattern.compile("/users/([\\w\\-]+)", Pattern.CASE_INSENSITIVE);
+
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/users/([\\w\\-]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_USERS.pattern());
         }
         return ret.toArray(new String[0]);
     }
@@ -78,7 +81,7 @@ public class RedgifsComProfile extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
-        final String username = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String username = new Regex(param.getCryptedUrl(), PATTERN_USERS).getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(username);
         final RedGifsCom plg = (RedGifsCom) this.getNewPluginForHostInstance(this.getHost());
