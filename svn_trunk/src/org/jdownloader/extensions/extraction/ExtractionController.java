@@ -26,6 +26,14 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.linkcollector.LinknameCleaner;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.raf.FileBytesCache;
+
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.ValidationException;
@@ -35,6 +43,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.os.CrossSystem;
 import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.controlling.FileCreationManager.DeleteOption;
 import org.jdownloader.controlling.UniqueAlltimeID;
@@ -44,13 +53,6 @@ import org.jdownloader.extensions.extraction.bindings.file.FileArchiveFile;
 import org.jdownloader.extensions.extraction.multi.ArchiveType;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.IfFileExistsAction;
-
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.raf.FileBytesCache;
 
 /**
  * Responsible for the correct procedure of the extraction process. Contains one IExtraction instance.
@@ -65,9 +67,10 @@ public class ExtractionController extends QueueAction<Void, RuntimeException> im
     private final IExtraction  extractor;
     private ScheduledFuture<?> timer;
     private Type               latestEvent;
-    private final AtomicLong   completeBytes  = new AtomicLong(0);
-    private final AtomicLong   processedBytes = new AtomicLong(0);
-    private volatile IO_MODE   crcHashing     = IO_MODE.NORMAL;
+    private final AtomicLong   completeBytes                                 = new AtomicLong(0);
+    private final AtomicLong   processedBytes                                = new AtomicLong(0);
+    private volatile IO_MODE   crcHashing                                    = IO_MODE.NORMAL;
+    private final boolean      applyFilenameRegexReplaceMapToExtractionPaths = CFG_EXTRACTION.CFG.isApplyFilenameRegexReplaceMapToExtractionPaths();
 
     public boolean isSameArchive(Archive archive) {
         if (archive == null) {
@@ -721,5 +724,30 @@ public class ExtractionController extends QueueAction<Void, RuntimeException> im
                 crcHashing = newMode;
             }
         }
+    }
+
+    /** Removes unwanted stuff from given extraction path and returns a cleaned path. */
+    public String getCleanedExtractionPath(final String inputPath) {
+        // always alleviate the path and filename
+        final String pathSegments[] = inputPath.split("(/|\\\\)");
+        final StringBuilder cleanpath = new StringBuilder();
+        boolean newSegmentAdded = false;
+        for (final String pathSegment : pathSegments) {
+            if (newSegmentAdded) {
+                cleanpath.append(File.separator);
+                newSegmentAdded = false;
+            }
+            final String cleanedSegment;
+            if (applyFilenameRegexReplaceMapToExtractionPaths) {
+                cleanedSegment = LinknameCleaner.cleanFilename(pathSegment);
+            } else {
+                cleanedSegment = CrossSystem.alleviatePathParts(pathSegment, true);
+            }
+            if (cleanedSegment.length() > 0) {
+                cleanpath.append(cleanedSegment);
+                newSegmentAdded = true;
+            }
+        }
+        return cleanpath.toString();
     }
 }

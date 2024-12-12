@@ -36,11 +36,10 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
-import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.OkRu;
 
-@DecrypterPlugin(revision = "$Revision: 50168 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
+@DecrypterPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
 public class OkRuDecrypter extends PluginForDecrypt {
     public OkRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,9 +51,9 @@ public class OkRuDecrypter extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
+        final OkRu plugin = (OkRu) this.getNewPluginForHostInstance(this.getHost());
         if (account != null) {
-            final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
-            ((jd.plugins.hoster.OkRu) plugin).login(account, false);
+            plugin.login(account, false);
         } else {
             OkRu.prepBR(this.br);
         }
@@ -205,10 +204,9 @@ public class OkRuDecrypter extends PluginForDecrypt {
             /* Crawl single video -> Check for embedded content on external websites */
             final String vid = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
             final String contenturl = "https://ok.ru/video/" + vid;
-            br.getPage(contenturl);
-            if (jd.plugins.hoster.OkRu.isOffline(br)) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
+            final DownloadLink main = createDownloadlink(contenturl);
+            plugin.requestFileInformation(main, account, false);
+            main.setAvailable(true);
             String externID = null;
             String provider = null;
             final Map<String, Object> entries = jd.plugins.hoster.OkRu.getFlashVars(br);
@@ -230,11 +228,6 @@ public class OkRuDecrypter extends PluginForDecrypt {
                 return ret;
             }
             /* No external hosting provider found --> Content should be hosted by ok.ru --> Pass over to hosterplugin. */
-            final DownloadLink main = createDownloadlink(contenturl);
-            main.setName(vid);
-            if (jd.plugins.hoster.OkRu.isOffline(this.br)) {
-                main.setAvailable(false);
-            }
             ret.add(main);
         }
         return ret;

@@ -85,61 +85,64 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.PornHubComVideoCrawler;
 
-@HostPlugin(revision = "$Revision: 50016 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50326 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornHubComVideoCrawler.class })
 public class PornHubCom extends PluginForHost {
     /* Connection stuff */
     // private static final boolean FREE_RESUME = true;
     // private static final int FREE_MAXCHUNKS = 0;
-    private static final int                      FREE_MAXDOWNLOADS                       = 5;
-    private static final boolean                  ACCOUNT_FREE_RESUME                     = true;
-    private static final int                      ACCOUNT_FREE_MAXCHUNKS                  = 0;
-    private static final int                      ACCOUNT_FREE_MAXDOWNLOADS               = 5;
-    public static final boolean                   use_download_workarounds                = true;
-    private static final String                   type_photo                              = "(?i).+/photo/\\d+";
-    private static final String                   type_gif_webm                           = "(?i).+/(embed)?gif/\\d+";
-    public static final String                    html_privatevideo                       = "id=\"iconLocked\"";
-    public static final String                    html_privateimage                       = "profile/private-lock\\.png";
-    public static final String                    html_purchase_only                      = "(?i)'Buy on video player'";
-    public static final String                    html_premium_only                       = "(?i)<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.</h2>";
-    private String                                dlUrl                                   = null;
+    private static final int                      FREE_MAXDOWNLOADS                         = 5;
+    private static final boolean                  ACCOUNT_FREE_RESUME                       = true;
+    private static final int                      ACCOUNT_FREE_MAXCHUNKS                    = 0;
+    private static final int                      ACCOUNT_FREE_MAXDOWNLOADS                 = 5;
+    public static final boolean                   use_download_workarounds                  = true;
+    private static final String                   type_photo                                = "(?i).+/photo/\\d+";
+    private static final String                   type_gif_webm                             = "(?i).+/(embed)?gif/\\d+";
+    public static final String                    html_privatevideo                         = "id=\"iconLocked\"";
+    public static final String                    html_privateimage                         = "profile/private-lock\\.png";
+    public static final String                    html_purchase_only                        = "(?i)'Buy on video player'";
+    public static final String                    html_premium_only                         = "(?i)<h2>\\s*Upgrade to Pornhub Premium to enjoy this video\\.</h2>";
+    private String                                dlUrl                                     = null;
     /** Dev: disable this if pornhub plugins shall skip all mp4 progressive streams and disable user setting for mp4 progressive streams. */
-    public static final boolean                   ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT = true;
+    public static final boolean                   ENABLE_INTERNAL_MP4_PROGRESSIVE_SUPPORT   = true;
     /* Note: Video bitrates and resolutions are not exact, they can vary. */
     /* Quality, { videoCodec, videoBitrate, videoResolution, audioCodec, audioBitrate } */
-    public static LinkedHashMap<String, String[]> formats                                 = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
-                                                                                              {
-                                                                                                  put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
-                                                                                                  put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
-                                                                                                  put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
-                                                                                                  put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
-                                                                                                  put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
-                                                                                                  put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
-                                                                                              }
-                                                                                          });
-    public static final String                    BEST_ONLY                               = "BEST_ONLY";
-    public static final String                    BEST_SELECTION_ONLY                     = "BEST_SELECTION_ONLY";
-    public static final String                    CRAWL_VIDEO_HLS                         = "CRAWL_VIDEO_HLS";
-    public static final String                    CRAWL_VIDEO_MP4                         = "CRAWL_VIDEO_MP4";
+    public static LinkedHashMap<String, String[]> formats                                   = new LinkedHashMap<String, String[]>(new LinkedHashMap<String, String[]>() {
+                                                                                                {
+                                                                                                    put("240", new String[] { "AVC", "400", "420x240", "AAC LC", "54" });
+                                                                                                    put("480", new String[] { "AVC", "600", "850x480", "AAC LC", "54" });
+                                                                                                    put("720", new String[] { "AVC", "1500", "1280x720", "AAC LC", "54" });
+                                                                                                    put("1080", new String[] { "AVC", "4000", "1920x1080", "AAC LC", "96" });
+                                                                                                    put("1440", new String[] { "AVC", "6000", " 2560x1440", "AAC LC", "96" });
+                                                                                                    put("2160", new String[] { "AVC", "8000", "3840x2160", "AAC LC", "128" });
+                                                                                                }
+                                                                                            });
+    public static final String                    BEST_ONLY                                 = "BEST_ONLY";
+    public static final String                    BEST_SELECTION_ONLY                       = "BEST_SELECTION_ONLY";
+    public static final String                    CRAWL_VIDEO_HLS                           = "CRAWL_VIDEO_HLS";
+    public static final String                    CRAWL_VIDEO_MP4                           = "CRAWL_VIDEO_MP4";
     // mp4
     // no
     // longer
     // available?
-    public static final String                    CRAWL_THUMBNAIL                         = "CRAWL_THUMBNAIL";
-    public static final String                    FAST_LINKCHECK                          = "FAST_LINKCHECK";
-    private static final String                   USE_ORIGINAL_SERVER_FILENAME            = "USE_ORIGINAL_SERVER_FILENAME";
-    public static final String                    GIFS_WEBM                               = "GIFS_WEBM";
-    private final String                          REMOVED_VIDEO                           = "(?i)>\\s*This video has been removed\\s*<";
-    public static final String                    PROPERTY_TITLE                          = "title";
-    public static final String                    PROPERTY_FORMAT                         = "format";
-    public static final String                    PROPERTY_QUALITY                        = "quality";
-    public static final String                    PROPERTY_DIRECTLINK                     = "directlink";
-    public static final String                    PROPERTY_DATE                           = "date";
-    public static final String                    PROPERTY_CATEGORIES_COMMA_SEPARATED     = "categories_comma_separated";
-    public static final String                    PROPERTY_TAGS_COMMA_SEPARATED           = "tags_comma_separated";
-    public static final String                    PROPERTY_ACTORS_COMMA_SEPARATED         = "actors_comma_separated";
-    public static final String                    PROPERTY_USERNAME                       = "username";
-    public static final String                    PROPERTY_VIEWKEY                        = "viewkey";
+    public static final String                    CRAWL_THUMBNAIL                           = "CRAWL_THUMBNAIL";
+    public static final String                    FAST_LINKCHECK                            = "FAST_LINKCHECK";
+    private static final String                   USE_ORIGINAL_SERVER_FILENAME              = "USE_ORIGINAL_SERVER_FILENAME";
+    public static final String                    GIFS_WEBM                                 = "GIFS_WEBM";
+    private final String                          REMOVED_VIDEO                             = "(?i)>\\s*This video has been removed\\s*<";
+    public static final String                    PROPERTY_TITLE                            = "title";
+    public static final String                    PROPERTY_FORMAT                           = "format";
+    public static final String                    PROPERTY_QUALITY                          = "quality";
+    public static final String                    PROPERTY_DIRECTLINK                       = "directlink";
+    public static final String                    PROPERTY_DATE                             = "date";
+    public static final String                    PROPERTY_CATEGORIES_COMMA_SEPARATED       = "categories_comma_separated";
+    public static final String                    PROPERTY_TAGS_COMMA_SEPARATED             = "tags_comma_separated";
+    public static final String                    PROPERTY_ACTORS_COMMA_SEPARATED           = "actors_comma_separated";
+    public static final String                    PROPERTY_VIDEO_PRODUCTION                 = "video_production";
+    public static final String                    PROPERTY_LANGUAGE_SPOKEN_IN_VIDEO         = "language_spoken_in_video";
+    public static final String                    PROPERTY_MODEL_ATTRIBUTES_COMMA_SEPARATES = "model_attributes_comma_separated";
+    public static final String                    PROPERTY_USERNAME                         = "username";
+    public static final String                    PROPERTY_VIEWKEY                          = "viewkey";
 
     public static List<String[]> getPluginDomains() {
         return PornHubComVideoCrawler.getPluginDomains();

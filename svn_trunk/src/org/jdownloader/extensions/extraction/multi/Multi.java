@@ -31,6 +31,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.sf.sevenzipjbinding.ArchiveFormat;
+import net.sf.sevenzipjbinding.ExtractOperationResult;
+import net.sf.sevenzipjbinding.IArchiveExtractCallback;
+import net.sf.sevenzipjbinding.IArchiveOpenCallback;
+import net.sf.sevenzipjbinding.IInStream;
+import net.sf.sevenzipjbinding.PropID;
+import net.sf.sevenzipjbinding.SevenZip;
+import net.sf.sevenzipjbinding.SevenZipException;
+import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
+import net.sf.sevenzipjbinding.simple.ISimpleInArchive;
+import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem;
+
 import org.appwork.utils.Application;
 import org.appwork.utils.BinaryLogic;
 import org.appwork.utils.DebugMode;
@@ -68,21 +83,6 @@ import org.jdownloader.extensions.extraction.content.PackedFile;
 import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExistsDialog;
 import org.jdownloader.settings.IfFileExistsAction;
 import org.jdownloader.updatev2.UpdateController;
-
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.sf.sevenzipjbinding.ArchiveFormat;
-import net.sf.sevenzipjbinding.ExtractOperationResult;
-import net.sf.sevenzipjbinding.IArchiveExtractCallback;
-import net.sf.sevenzipjbinding.IArchiveOpenCallback;
-import net.sf.sevenzipjbinding.IInStream;
-import net.sf.sevenzipjbinding.PropID;
-import net.sf.sevenzipjbinding.SevenZip;
-import net.sf.sevenzipjbinding.SevenZipException;
-import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream;
-import net.sf.sevenzipjbinding.simple.ISimpleInArchive;
-import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem;
 
 public class Multi extends IExtraction {
     private volatile int               crack = 0;
@@ -127,33 +127,35 @@ public class Multi extends IExtraction {
         }
         if ((CrossSystem.isUnix() || CrossSystem.isMac())) {
             try {
-                FilePermissionSet filePermissionSet = null;
                 final Integer attributesInteger = item.getAttributes();
-                final String hostOS = item.getHostOS();
-                if (attributesInteger != null) {
-                    final int attributes = attributesInteger.intValue();
-                    if (StringUtils.equalsIgnoreCase("Unix", hostOS) && attributes != 0) {
-                        filePermissionSet = new FilePermissionSet();
-                        int attributeIndex = 16;
-                        filePermissionSet.setOtherExecute((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setOtherWrite((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setOtherRead((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setGroupExecute((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setGroupWrite((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setGroupRead((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setUserExecute((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setUserWrite((attributes & 1 << attributeIndex++) != 0);
-                        filePermissionSet.setUserRead((attributes & 1 << attributeIndex++) != 0);
-                    }
+                if (attributesInteger == null) {
+                    return;
                 }
-                if (filePermissionSet != null) {
-                    if (Application.getJavaVersion() >= Application.JAVA17) {
-                        FilePermission17.setFilePermission(extractTo, filePermissionSet);
-                    } else {
-                        if (filePermissionSet.isUserExecute()) {
-                            if (!extractTo.setExecutable(true, filePermissionSet.isOtherExecute() == false && filePermissionSet.isOtherExecute() == false)) {
-                                throw new IOException("Failed to set " + filePermissionSet + " to " + extractTo);
-                            }
+                final int attributes = attributesInteger.intValue();
+                if (attributes == 0) {
+                    return;
+                }
+                final String hostOS = item.getHostOS();
+                if (!StringUtils.equalsIgnoreCase("Unix", hostOS)) {
+                    return;
+                }
+                final FilePermissionSet filePermissionSet = new FilePermissionSet();
+                int attributeIndex = 16;
+                filePermissionSet.setOtherExecute((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setOtherWrite((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setOtherRead((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setGroupExecute((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setGroupWrite((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setGroupRead((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setUserExecute((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setUserWrite((attributes & 1 << attributeIndex++) != 0);
+                filePermissionSet.setUserRead((attributes & 1 << attributeIndex++) != 0);
+                if (Application.getJavaVersion() >= Application.JAVA17) {
+                    FilePermission17.setFilePermission(extractTo, filePermissionSet);
+                } else {
+                    if (filePermissionSet.isUserExecute()) {
+                        if (!extractTo.setExecutable(true, filePermissionSet.isOtherExecute() == false && filePermissionSet.isOtherExecute() == false)) {
+                            throw new IOException("Failed to set " + filePermissionSet + " to " + extractTo);
                         }
                     }
                 }
@@ -177,12 +179,13 @@ public class Multi extends IExtraction {
             } else {
                 modified = System.currentTimeMillis();
             }
-            if (modified > 0) {
-                if (!extractTo.setLastModified(modified)) {
-                    logger.warning("Could not set last write/modified time(" + modified + "/" + new Date(modified) + ") for " + item.getPath());
-                } else {
-                    logger.warning("Set last write/modified time(" + modified + "/" + new Date(modified) + ")  for " + item.getPath());
-                }
+            if (modified == 0) {
+                return;
+            }
+            if (!extractTo.setLastModified(modified)) {
+                logger.warning("Could not set last write/modified time(" + modified + "/" + new Date(modified) + ") for " + item.getPath());
+            } else {
+                logger.warning("Set last write/modified time(" + modified + "/" + new Date(modified) + ")  for " + item.getPath());
             }
         } catch (final Throwable e) {
             logger.log(e);
@@ -289,163 +292,162 @@ public class Multi extends IExtraction {
                 return customLibID;
             }
             return null;
-        } else {
-            final ArrayList<String> libIDs = new ArrayList<String>();
-            final OperatingSystem os = CrossSystem.getOS();
-            final ARCHFamily arch = CrossSystem.getARCHFamily();
-            final boolean is64BitJvm = Application.is64BitJvm();
-            switch (os.getFamily()) {
-            case BSD:
-                switch (arch) {
-                case RISCV:
-                    switch (os) {
-                    case FREEBSD:
-                        if (is64BitJvm) {
-                            libIDs.add("FreeBSD-riscv64");
-                        } else {
-                            libIDs.add("FreeBSD-riscv32");
-                            libIDs.add("FreeBSD-riscv");
-                        }
-                        break;
-                    default:
-                        break;
-                    }
-                    break;
-                case X86:
-                    switch (os) {
-                    case DRAGONFLYBSD:
-                        if (is64BitJvm) {
-                            libIDs.add("DragonFlyBSD-amd64");
-                        } else {
-                        }
-                        break;
-                    case FREEBSD:
-                        if (is64BitJvm) {
-                            libIDs.add("FreeBSD-amd64");
-                        } else {
-                            libIDs.add("FreeBSD-i386");
-                        }
-                        break;
-                    case NETBSD:
-                        if (Application.is64BitJvm()) {
-                            libIDs.add("NetBSD-amd64");
-                        } else {
-                            libIDs.add("NetBSD-i386");
-                        }
-                        break;
-                    default:
-                        break;
+        }
+        final ArrayList<String> libIDs = new ArrayList<String>();
+        final OperatingSystem os = CrossSystem.getOS();
+        final ARCHFamily arch = CrossSystem.getARCHFamily();
+        final boolean is64BitJvm = Application.is64BitJvm();
+        switch (os.getFamily()) {
+        case BSD:
+            switch (arch) {
+            case RISCV:
+                switch (os) {
+                case FREEBSD:
+                    if (is64BitJvm) {
+                        libIDs.add("FreeBSD-riscv64");
+                    } else {
+                        libIDs.add("FreeBSD-riscv32");
+                        libIDs.add("FreeBSD-riscv");
                     }
                     break;
                 default:
                     break;
                 }
                 break;
-            case LINUX:
-                switch (arch) {
-                case RISCV:
+            case X86:
+                switch (os) {
+                case DRAGONFLYBSD:
                     if (is64BitJvm) {
-                        libIDs.add("Linux-riscv64");
+                        libIDs.add("DragonFlyBSD-amd64");
                     } else {
-                        libIDs.add("Linux-riscv32");
-                        libIDs.add("Linux-riscv");
                     }
                     break;
-                case ARM:
+                case FREEBSD:
                     if (is64BitJvm) {
-                        if (LibCDetector.isMuslSupported()) {
-                            libIDs.add("Linux-arm64-musl");
-                            libIDs.add("Linux-aarch64-musl");
-                        }
-                        // new scheme
-                        libIDs.add("Linux-arm64");
-                        // old scheme
-                        libIDs.add("Linux-aarch64");
+                        libIDs.add("FreeBSD-amd64");
                     } else {
-                        if (LibCDetector.isMuslSupported()) {
-                            libIDs.add("Linux-armhf-musl");
-                            libIDs.add("Linux-armv7-musl");
-                        }
-                        // new scheme
-                        libIDs.add("Linux-armv5");
-                        if (HardwareType.getHardware() != null && HardwareTypeInterface.ID.QNAP.equals(HardwareType.getHardware().getHardwareType())) {
-                            libIDs.add("Linux-armv5-qnap");// cross-compiled with cross-project-arm-20110901.tar.gz
-                        }
-                        libIDs.add("Linux-armv6");// should work fine on most devices
-                        libIDs.add("Linux-armv71");
-                        if (RaspberryPi.getRaspberryPiDetails() != null) {
-                            // old scheme
-                            libIDs.add("Linux-armpi");
-                            libIDs.add("Linux-armpi2");
-                        }
-                        // old scheme without good PI detection
-                        libIDs.add("Linux-arm2");
-                        libIDs.add("Linux-arm");
-                        libIDs.add("Linux-arm3");
+                        libIDs.add("FreeBSD-i386");
                     }
                     break;
-                case X86:
-                    if (is64BitJvm) {
-                        if (LibCDetector.isMuslSupported()) {
-                            // Testing on Ubuntu
-                            // apt-get install musl-dev
-                            // ln -s /usr/lib/x86_64-linux-musl/libc.so /lib/libc.musl-x86_64.so.1
-                            libIDs.add("Linux-amd64-musl");
-                        }
-                        libIDs.add("Linux-amd64");
+                case NETBSD:
+                    if (Application.is64BitJvm()) {
+                        libIDs.add("NetBSD-amd64");
                     } else {
-                        if (LibCDetector.isMuslSupported()) {
-                            libIDs.add("Linux-i386-musl");
-                        }
-                        libIDs.add("Linux-i386");
+                        libIDs.add("NetBSD-i386");
                     }
-                    break;
-                case PPC:
-                    libIDs.add("Linux-ppc");
                     break;
                 default:
                     break;
-                }
-                break;
-            case MAC:
-                if (is64BitJvm) {
-                    if (CrossSystem.ARCHFamily.ARM.equals(arch)) {
-                        // AppleSilicon, M1, arm64
-                        libIDs.add("Mac-arm64");
-                    } else {
-                        // Intel CPU
-                        libIDs.add("Mac-x86_64");
-                    }
-                } else {
-                    libIDs.add("Mac-i386");
-                }
-                break;
-            case WINDOWS:
-                if (is64BitJvm) {
-                    if (CrossSystem.ARCHFamily.ARM.equals(arch)) {
-                        // Windows 10 on ARM, eg Surface X Pro
-                        libIDs.add("Windows-arm64");
-                    } else {
-                        libIDs.add("Windows-amd64");
-                    }
-                } else {
-                    libIDs.add("Windows-x86");
                 }
                 break;
             default:
                 break;
             }
-            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-                final String lastWorkingLibID = extractionExtension.getSettings().getLastWorkingLibID();
-                if (StringUtils.isNotEmpty(lastWorkingLibID)) {
-                    libIDs.remove(lastWorkingLibID);
-                    libIDs.add(0, lastWorkingLibID);
-                    extractionExtension.getSettings().setLastWorkingLibID(null);
-                    extractionExtension.getSettings()._getStorageHandler().write();
+            break;
+        case LINUX:
+            switch (arch) {
+            case RISCV:
+                if (is64BitJvm) {
+                    libIDs.add("Linux-riscv64");
+                } else {
+                    libIDs.add("Linux-riscv32");
+                    libIDs.add("Linux-riscv");
                 }
+                break;
+            case ARM:
+                if (is64BitJvm) {
+                    if (LibCDetector.isMuslSupported()) {
+                        libIDs.add("Linux-arm64-musl");
+                        libIDs.add("Linux-aarch64-musl");
+                    }
+                    // new scheme
+                    libIDs.add("Linux-arm64");
+                    // old scheme
+                    libIDs.add("Linux-aarch64");
+                } else {
+                    if (LibCDetector.isMuslSupported()) {
+                        libIDs.add("Linux-armhf-musl");
+                        libIDs.add("Linux-armv7-musl");
+                    }
+                    // new scheme
+                    libIDs.add("Linux-armv5");
+                    if (HardwareType.getHardware() != null && HardwareTypeInterface.ID.QNAP.equals(HardwareType.getHardware().getHardwareType())) {
+                        libIDs.add("Linux-armv5-qnap");// cross-compiled with cross-project-arm-20110901.tar.gz
+                    }
+                    libIDs.add("Linux-armv6");// should work fine on most devices
+                    libIDs.add("Linux-armv71");
+                    if (RaspberryPi.getRaspberryPiDetails() != null) {
+                        // old scheme
+                        libIDs.add("Linux-armpi");
+                        libIDs.add("Linux-armpi2");
+                    }
+                    // old scheme without good PI detection
+                    libIDs.add("Linux-arm2");
+                    libIDs.add("Linux-arm");
+                    libIDs.add("Linux-arm3");
+                }
+                break;
+            case X86:
+                if (is64BitJvm) {
+                    if (LibCDetector.isMuslSupported()) {
+                        // Testing on Ubuntu
+                        // apt-get install musl-dev
+                        // ln -s /usr/lib/x86_64-linux-musl/libc.so /lib/libc.musl-x86_64.so.1
+                        libIDs.add("Linux-amd64-musl");
+                    }
+                    libIDs.add("Linux-amd64");
+                } else {
+                    if (LibCDetector.isMuslSupported()) {
+                        libIDs.add("Linux-i386-musl");
+                    }
+                    libIDs.add("Linux-i386");
+                }
+                break;
+            case PPC:
+                libIDs.add("Linux-ppc");
+                break;
+            default:
+                break;
             }
-            return checkLibraries(extractionExtension, filter(libIDs));
+            break;
+        case MAC:
+            if (is64BitJvm) {
+                if (CrossSystem.ARCHFamily.ARM.equals(arch)) {
+                    // AppleSilicon, M1, arm64
+                    libIDs.add("Mac-arm64");
+                } else {
+                    // Intel CPU
+                    libIDs.add("Mac-x86_64");
+                }
+            } else {
+                libIDs.add("Mac-i386");
+            }
+            break;
+        case WINDOWS:
+            if (is64BitJvm) {
+                if (CrossSystem.ARCHFamily.ARM.equals(arch)) {
+                    // Windows 10 on ARM, eg Surface X Pro
+                    libIDs.add("Windows-arm64");
+                } else {
+                    libIDs.add("Windows-amd64");
+                }
+            } else {
+                libIDs.add("Windows-x86");
+            }
+            break;
+        default:
+            break;
         }
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            final String lastWorkingLibID = extractionExtension.getSettings().getLastWorkingLibID();
+            if (StringUtils.isNotEmpty(lastWorkingLibID)) {
+                libIDs.remove(lastWorkingLibID);
+                libIDs.add(0, lastWorkingLibID);
+                extractionExtension.getSettings().setLastWorkingLibID(null);
+                extractionExtension.getSettings()._getStorageHandler().write();
+            }
+        }
+        return checkLibraries(extractionExtension, filter(libIDs));
     }
 
     public static final String getSevenZipJBindingVersion() {
@@ -744,23 +746,14 @@ public class Multi extends IExtraction {
                 itemPath = newItemPath;
             }
         }
-        Matcher filter = null;
-        if ((filter = isFiltered(itemPath)) != null) {
+        final Matcher filter = isFiltered(itemPath);
+        if (filter != null) {
             logger.info("Filtering item:" + itemPath + " from " + firstArchiveFile + "|pattern:" + filter.pattern());
             skipped.set(true);
             return null;
         }
+        itemPath = ctrl.getCleanedExtractionPath(itemPath);
         final Long size = item.getSize();
-        // always alleviate the path and filename
-        final String itemPathParts[] = itemPath.split("(/|\\\\)");
-        final StringBuilder sb = new StringBuilder();
-        for (final String pathPartItem : itemPathParts) {
-            if (sb.length() > 0) {
-                sb.append(File.separator);
-            }
-            sb.append(CrossSystem.alleviatePathParts(pathPartItem));
-        }
-        itemPath = sb.toString();
         final String extractToRoot = getExtractionController().getExtractToFolder().getAbsoluteFile() + File.separator;
         File extractToFile = new File(extractToRoot + itemPath);
         logger.info("Extract " + extractToFile);
@@ -1257,25 +1250,25 @@ public class Multi extends IExtraction {
                     if (signatureString.length() >= 24) {
                         /*
                          * 0x0001 Volume attribute (archive volume)
-                         *
+                         * 
                          * 0x0002 Archive comment present RAR 3.x uses the separate comment block and does not set this flag.
-                         *
+                         * 
                          * 0x0004 Archive lock attribute
-                         *
+                         * 
                          * 0x0008 Solid attribute (solid archive)
-                         *
+                         * 
                          * 0x0010 New volume naming scheme ('volname.partN.rar')
-                         *
+                         * 
                          * 0x0020 Authenticity information present RAR 3.x does not set this flag.
-                         *
+                         * 
                          * 0x0040 Recovery record present
-                         *
+                         * 
                          * 0x0080 Block headers are encrypted
                          */
                         final String headerBitFlags1 = "" + signatureString.charAt(20) + signatureString.charAt(21);
                         /*
                          * 0x0100 FIRST Volume
-                         *
+                         * 
                          * 0x0200 EncryptedVerion
                          */
                         // final String headerBitFlags2 = "" + signatureString.charAt(22) + signatureString.charAt(23);

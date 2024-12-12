@@ -1,5 +1,7 @@
 package org.jdownloader.extensions.extraction;
 
+import jd.plugins.ExtensionConfigInterface;
+
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
@@ -11,8 +13,6 @@ import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
 import org.appwork.storage.config.annotations.SpinnerValidator;
 import org.jdownloader.controlling.FileCreationManager;
 import org.jdownloader.settings.IfFileExistsAction;
-
-import jd.plugins.ExtensionConfigInterface;
 
 public interface ExtractionConfig extends ExtensionConfigInterface {
     @DefaultStringArrayValue(value = { "##Lines with XX are comments", "##Skip deep extraction of archives that contain binary files", ".*\\.exe", ".*\\.msi", ".*\\.bat", ".xbe", ".elf", ".sh" })
@@ -238,4 +238,11 @@ public interface ExtractionConfig extends ExtensionConfigInterface {
     public FLUSH_MODE getFlushMode();
 
     void setFlushMode(FLUSH_MODE mode);
+
+    @DefaultBooleanValue(false)
+    @AboutConfig
+    @DescriptionForConfigEntry("Enabled = Apply 'filenamereplacemap' on extract paths. Disabled = Do not apply 'filenamereplacemap' and only remove basic non-allowed characters and leading dots. As to why: Leading dots will make files and folders invisible under Unix-like systems. If you want leading dots to be removed AND want to apply the replace map, you need to put the removal of leading dots into the replace map.")
+    boolean isApplyFilenameRegexReplaceMapToExtractionPaths();
+
+    void setApplyFilenameRegexReplaceMapToExtractionPaths(boolean b);
 }

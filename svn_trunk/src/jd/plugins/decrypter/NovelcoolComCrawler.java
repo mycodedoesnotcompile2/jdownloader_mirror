@@ -33,7 +33,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.NovelcoolCom;
 
-@DecrypterPlugin(revision = "$Revision: 50164 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = {}, urls = {})
 public class NovelcoolComCrawler extends PluginForDecrypt {
     public NovelcoolComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         return buildAnnotationUrls(getPluginDomains());
     }
 
-    private static final String PATTERN_RELATIVE_CHAPTER = "(?i)/chapter/[A-Za-z0-9\\-]+/(\\d+)/?";
+    private static final String PATTERN_RELATIVE_CHAPTER = "(?i)/chapter/([A-Za-z0-9\\-]+)/(\\d+)/?";
     private static final String PATTERN_RELATIVE_NOVEL   = "(?i)/novel/([\\w\\-]+)\\.html";
 
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
@@ -83,8 +83,10 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String chapterIDFromURL = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER).getMatch(0);
-        if (chapterIDFromURL != null) {
+        final Regex regex_chapter = new Regex(param.getCryptedUrl(), PATTERN_RELATIVE_CHAPTER);
+        if (regex_chapter.patternFind()) {
+            final String chapterSlug = regex_chapter.getMatch(0);
+            final String chapterTitleFromSlug = chapterSlug.replace("-", " ").trim();
             /* Find all pictures of a chapter of a novel */
             final String chapterNumber = getChapterNumberFromURL(param.getCryptedUrl());
             final String bookID = br.getRegex("cur_book_id = \"(\\d+)").getMatch(0);
@@ -95,7 +97,7 @@ public class NovelcoolComCrawler extends PluginForDecrypt {
                 if (br.containsHTML("chapter-start-mark")) {
                     /* Download chapter as html page */
                     final DownloadLink chapterAsHTML = this.createDownloadlink(br.getURL() + ".jdeatme");
-                    chapterAsHTML.setFinalFileName(br._getURL().getPath() + ".html");
+                    chapterAsHTML.setFinalFileName(chapterTitleFromSlug + ".html");
                     chapterAsHTML.setDownloadSize(br.getRequest().getHtmlCode().getBytes("UTF-8").length);
                     chapterAsHTML.setAvailable(true);
                     ret.add(chapterAsHTML);

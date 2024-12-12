@@ -44,15 +44,19 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50319 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50321 $", interfaceVersion = 2, names = {}, urls = {})
 public class RedGifsCom extends GfyCatCom {
-    /**
-     * 2022-12-27: different site/api
-     *
-     * @param wrapper
-     */
     public RedGifsCom(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
+        br.setAllowedResponseCodes(new int[] { 410, 500 });
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -79,7 +83,7 @@ public class RedGifsCom extends GfyCatCom {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/(?:(?:watch|ifr)/)?([A-Za-z0-9]+)");
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/watch/([A-Za-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
@@ -104,7 +108,7 @@ public class RedGifsCom extends GfyCatCom {
                 TEMPORARYTOKENS.put(br.getProxy(), tokenDetails);
             }
             if (failSafeTemporaryTokenIssue.get()) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid");
             }
             String token = (String) tokenDetails[0];
             final long now = Time.systemIndependentCurrentJVMTimeMillis();
@@ -119,7 +123,7 @@ public class RedGifsCom extends GfyCatCom {
                 request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.redgifs.com");
                 request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.redgifs.com/");
                 brc.getPage(request);
-                final Map<String, Object> entries = restoreFromString(brc.toString(), TypeRef.MAP);
+                final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
                 token = (String) entries.get("token");
                 if (StringUtils.isEmpty(token)) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -145,13 +149,27 @@ public class RedGifsCom extends GfyCatCom {
         }
     }
 
-    private Request getView(final Browser br, final String token, String fid) throws Exception {
-        final GetRequest request = br.createGetRequest("https://api.redgifs.com/v2/gifs/" + fid + "?views=yes");
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.redgifs.com");
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.redgifs.com/");
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
-        br.getPage(request);
-        return request;
+    /** Access single gif or gif gallery API. */
+    public final Map<String, Object> getView(final Browser br, final String token, final String id) throws Exception {
+        final GetRequest req = br.createGetRequest("https://api.redgifs.com/v2/gifs/" + id + "?views=yes&users=yes&niches=yes");
+        return getPage(br, token, req);
+    }
+
+    public final Map<String, Object> getPage(final Browser br, final String token, final Request req) throws Exception {
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, "https://www.redgifs.com");
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_REFERER, "https://www.redgifs.com/");
+        req.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Bearer " + token);
+        br.getPage(req);
+        if (req.getHttpConnection().getResponseCode() == 401) {
+            failSafeTemporaryTokenIssue.set(true);
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Session token invalid");
+        } else if (req.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (req.getHttpConnection().getResponseCode() == 410) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "410 gone");
+        }
+        final Map<String, Object> response = restoreFromString(req.getHtmlCode(), TypeRef.MAP);
+        return response;
     }
 
     @Override
@@ -161,27 +179,8 @@ public class RedGifsCom extends GfyCatCom {
             link.setName(fid);
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
-        br.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, "JDownloader");
-        br.setAllowedResponseCodes(new int[] { 410, 500 });
-        final String firstToken = getTemporaryToken(br, null);
-        Request view = getView(br, firstToken, fid);
-        if (view.getHttpConnection().getResponseCode() == 401) {
-            /* Try again with fresh token. */
-            final String nextToken = getTemporaryToken(br, firstToken);
-            if (!StringUtils.equals(firstToken, nextToken)) {
-                view = getView(br, nextToken, fid);
-            }
-        }
-        if (view.getHttpConnection().getResponseCode() == 401) {
-            failSafeTemporaryTokenIssue.set(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (view.getHttpConnection().getResponseCode() == 404) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (view.getHttpConnection().getResponseCode() == 410) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> response = restoreFromString(view.getHtmlCode(), TypeRef.MAP);
+        final String token = getTemporaryToken(br, null);
+        final Map<String, Object> response = getView(br, token, fid);
         final Map<String, Object> gif = (Map<String, Object>) response.get("gif");
         parseFileInfo(link, gif);
         return AvailableStatus.TRUE;
@@ -243,6 +242,6 @@ public class RedGifsCom extends GfyCatCom {
 
     @Override
     public String getAGBLink() {
-        return "https://www.redgifs.com/terms";
+        return "https://www." + getHost() + "/terms";
     }
 }

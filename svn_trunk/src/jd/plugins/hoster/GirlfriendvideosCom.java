@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -29,9 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50169 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z]/([a-z0-9\\-_]+)/(\\d+)\\.php" })
+@HostPlugin(revision = "$Revision: 50324 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z0-9]/([a-z0-9\\-_]+)/(\\d+)\\.php" })
 public class GirlfriendvideosCom extends PluginForHost {
     public GirlfriendvideosCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -91,7 +91,7 @@ public class GirlfriendvideosCom extends PluginForHost {
         String filename = br.getRegex("\"name\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
         if (dllink == null) {
             if (br.containsHTML("file=[a-z]/[a-z0-9\\-_]+/\\d+\\.flv\"")) {
-                dllink = "http://" + this.getHost() + "/videos/" + new Regex(link.getDownloadURL(), "members/([a-z]/[a-z0-9\\-_]+/\\d+)").getMatch(0) + ".flv";
+                dllink = "http://" + this.getHost() + "/videos/" + new Regex(link.getDownloadURL(), "members/([a-z0-9]/[a-z0-9\\-_]+/\\d+)").getMatch(0) + ".flv";
             } else {
                 dllink = br.getRegex("\"(/videos/[a-z]/[a-z0-9\\-_]+/\\d+\\.mp4)").getMatch(0);
                 if (dllink != null) {

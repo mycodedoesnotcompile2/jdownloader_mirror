@@ -35,7 +35,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50319 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50326 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -111,6 +111,11 @@ public class MetArtCom extends PluginForHost {
         } else {
             return super.getLinkID(link);
         }
+    }
+
+    @Override
+    public String getMirrorID(final DownloadLink link) {
+        return this.getLinkID(link);
     }
 
     @Override
@@ -272,6 +277,7 @@ public class MetArtCom extends PluginForHost {
                     }
                 }
             }
+            br.clearCookies(null);
         }
         logger.info("Performing full login");
         /* Redirect to: https://sso.metartnetwork.com/login */
@@ -280,7 +286,7 @@ public class MetArtCom extends PluginForHost {
         final Browser brb = br.cloneBrowser();
         brb.getPage("/cm?");
         final String _csrfToken = brb.getCookie(brb.getHost(), "_csrfToken", Cookies.NOTDELETEDPATTERN);
-        if (_csrfToken == null) {
+        if (StringUtils.isEmpty(_csrfToken)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         final Browser brc = brb.cloneBrowser();

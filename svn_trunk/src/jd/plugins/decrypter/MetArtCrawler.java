@@ -5,9 +5,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GenericM3u8;
 import jd.plugins.hoster.MetArtCom;
 
-@DecrypterPlugin(revision = "$Revision: 50210 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50326 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { MetArtCom.class })
 public class MetArtCrawler extends PluginForDecrypt {
     public MetArtCrawler(PluginWrapper wrapper) {
@@ -71,8 +71,8 @@ public class MetArtCrawler extends PluginForDecrypt {
         return ret.toArray(new String[0]);
     }
 
-    private static final String TYPE_GALLERY = "(?i)https://[^/]+/model/([^/]+)/gallery/(\\d+)/([^/]+)";
-    private static final String TYPE_MOVIE   = "(?i)https://[^/]+/model/([^/]+)/movie/(\\d+)/([^/]+)";
+    private static final Pattern PATTERN_GALLERY = Pattern.compile("/model/([^/]+)/gallery/(\\d+)/([^/]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_MOVIE   = Pattern.compile("/model/([^/]+)/movie/(\\d+)/([^/]+)", Pattern.CASE_INSENSITIVE);
 
     @Override
     public int getMaxConcurrentProcessingInstances() {
@@ -84,7 +84,7 @@ public class MetArtCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, final ProgressController progress) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final MetartConfig cfg = PluginJsonConfig.get(getLazyC(), MetartConfig.class);
-        final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), TYPE_GALLERY);
+        final Regex urlinfo_gallery = new Regex(param.getCryptedUrl(), PATTERN_GALLERY);
         final Regex urlinfo_movie;
         final Set<PhotoQuality> qualitiesPhotosLoose = cfg.getMediaQualitiesPhotosLoose();
         final Set<PhotoQuality> qualitiesPhotosZip = cfg.getMediaQualitiesPhotosZip();
@@ -129,7 +129,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                 // for(final MediaQuality qual:qualitiesPhotosZip) {
                 // qual.getInternalValue();
                 // }
-                br.getPage("https://www." + this.getHost() + "/api/gallery?name=" + galleryname + "&date=" + date + "&mediaFirst=42&page=1");
+                br.getPage("https://www." + getHost() + "/api/gallery?name=" + galleryname + "&date=" + date + "&mediaFirst=42&page=1");
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
@@ -150,13 +150,13 @@ public class MetArtCrawler extends PluginForDecrypt {
                         continue;
                     }
                     String filename = (String) zipFile.get("fileName");
-                    if (!filename.toLowerCase(Locale.ENGLISH).endsWith(".zip")) {
-                        filename += ".zip";
-                    }
+                    filename = this.applyFilenameExtension(filename, ".zip");
                     final String filesizeStr = zipFile.get("size").toString();
-                    final DownloadLink dl = this.createDownloadlink("https://www.metart.com/api/download-media/" + uuid + "/photos/" + quality);
+                    final DownloadLink dl = this.createDownloadlink("https://www." + getHost() + "/api/download-media/" + uuid + "/photos/" + quality);
                     dl.setFinalFileName(filename);
-                    dl.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                    if (!StringUtils.isEmpty(filesizeStr)) {
+                        dl.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+                    }
                     dl.setAvailable(true);
                     dl._setFilePackage(fp);
                     dl.setProperty(MetArtCom.PROPERTY_UUID, uuid);
@@ -165,7 +165,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                 }
             }
             if (qualitiesPhotosLoose != null && qualitiesPhotosLoose.size() > 0) {
-                br.getPage("https://www." + this.getHost() + "/api/image?name=" + galleryname + "&date=" + date + "&order=5&mediaType=gallery");
+                br.getPage("https://www." + getHost() + "/api/image?name=" + galleryname + "&date=" + date + "&order=5&mediaType=gallery");
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
@@ -186,7 +186,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                             continue;
                         }
                         final String filenameURL = UrlQuery.parse(url).get("filename");
-                        final DownloadLink dl = new DownloadLink(plg, filenameURL, this.getHost(), url, true);
+                        final DownloadLink dl = new DownloadLink(plg, filenameURL, getHost(), url, true);
                         dl.setAvailable(true);
                         if (filenameURL != null) {
                             dl.setName(filenameURL);
@@ -198,7 +198,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                     }
                 }
             }
-        } else if ((urlinfo_movie = new Regex(param.getCryptedUrl(), TYPE_MOVIE)).patternFind()) {
+        } else if ((urlinfo_movie = new Regex(param.getCryptedUrl(), PATTERN_MOVIE)).patternFind()) {
             /* New 2020-12-08 */
             final String modelname = urlinfo_movie.getMatch(0);
             final String date = urlinfo_movie.getMatch(1);
@@ -245,7 +245,7 @@ public class MetArtCrawler extends PluginForDecrypt {
                     /* E.g. avi, wmv */
                     ext = qualityKey;
                 }
-                final String downloadurl = "https://www." + this.getHost() + "/api/download-media/" + uuid + "/film/" + qualityKey;
+                final String downloadurl = "https://www." + getHost() + "/api/download-media/" + uuid + "/film/" + qualityKey;
                 String filename = modelname + " - " + title;
                 /* Do not e.g. generate filenames like "title_avi.avi" */
                 if (!ext.equals(qualityKey)) {

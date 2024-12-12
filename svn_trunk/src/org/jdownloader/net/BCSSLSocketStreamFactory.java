@@ -47,10 +47,12 @@ import org.bouncycastle.tls.TlsAuthentication;
 import org.bouncycastle.tls.TlsClientProtocol;
 import org.bouncycastle.tls.TlsCredentials;
 import org.bouncycastle.tls.TlsExtensionsUtils;
+import org.bouncycastle.tls.TlsNoCloseNotifyException;
 import org.bouncycastle.tls.TlsServerCertificate;
 import org.bouncycastle.tls.TlsUtils;
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
 import org.bouncycastle.util.Strings;
+import org.jdownloader.logging.LogController;
 
 /**
  * @author daniel
@@ -357,6 +359,44 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
         final Integer selectedCipherSuite = client.getSelectedCipherSuite();
         final String selectedCipherSuiteName = getCipherSuiteName(selectedCipherSuite);
         return new BCSSLSocketStreamInterface() {
+            final InputStream is = new InputStream() {
+
+                final InputStream is = protocol.getInputStream();
+
+                @Override
+                public int read() throws IOException {
+                    final byte[] buf = new byte[1];
+                    final int ret = read(buf, 0, 1);
+                    return ret <= 0 ? -1 : buf[0] & 0xFF;
+                }
+
+                private boolean eof = false;
+
+                @Override
+                public int read(byte[] buf, int off, int len) throws IOException {
+                    if (eof) {
+                        return -1;
+                    }
+                    try {
+                        return is.read(buf, off, len);
+                    } catch (TlsNoCloseNotifyException ignore) {
+                        LogController.CL().log(ignore);
+                        eof = true;
+                        return -1;
+                    }
+                }
+
+                @Override
+                public int available() throws IOException {
+                    return is.available();
+                }
+
+                @Override
+                public void close() throws IOException {
+                    is.close();
+                }
+            };
+
             @Override
             public Socket getSocket() {
                 return getParentSocketStream().getSocket();
@@ -374,7 +414,7 @@ public class BCSSLSocketStreamFactory implements SSLSocketStreamFactory {
 
             @Override
             public InputStream getInputStream() throws IOException {
-                return protocol.getInputStream();
+                return is;
             }
 
             @Override

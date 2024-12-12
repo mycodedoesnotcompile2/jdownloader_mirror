@@ -27,6 +27,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.net.URLHelper;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.AccountController;
@@ -51,16 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.net.URLHelper;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@DecrypterPlugin(revision = "$Revision: 49275 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50326 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -468,8 +468,8 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         final String seeAllURL = br.getRegex("(" + Regex.escape(br._getURL().getPath()) + "/[^\"]+)\" class=\"seeAllButton greyButton float-right\">").getMatch(0);
         if (seeAllURL != null) {
             /**
-             * E.g. users/bla/videos --> /users/bla/videos/favorites </br> Without this we might only see some of all items and no
-             * pagination which is needed to be able to find all items.
+             * E.g. users/bla/videos --> /users/bla/videos/favorites </br>
+             * Without this we might only see some of all items and no pagination which is needed to be able to find all items.
              */
             logger.info("Found seeAllURL: " + seeAllURL);
             PornHubCom.getPage(br, seeAllURL);
@@ -891,59 +891,31 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             logger.info("Enable HLS because no MP4 found!");
             crawlHLS = true;
         }
-        String categoriesCommaSeparated = br.getRegex("'categories_in_video'\\s*:\\s*'([^<>\"']+)'").getMatch(0);
+        String categoriesCommaSeparated = null, tagsCommaSeparated = null, pornstarsCommaSeparated = null, video_production = null, language_spoken_in_video = null, modelAttributesCommaSeparated;
+        categoriesCommaSeparated = br.getRegex("'categories_in_video'\\s*:\\s*'([^<>\"']+)'").getMatch(0);
         if (StringUtils.isEmpty(categoriesCommaSeparated)) {
             /* Fallback */
             final String categoriesSrc = br.getRegex("<div class=\"categoriesWrapper\">(.*?)</div>\\s+</div>").getMatch(0);
-            final String[] categories = new Regex(categoriesSrc, ", 'Category'[^\"]+\">([^<>\"]+)</a>").getColumn(0);
-            if (categories != null && categories.length > 0) {
-                categoriesCommaSeparated = "";
-                for (int index = 0; index < categories.length; index++) {
-                    final String category = categories[index];
-                    if (StringUtils.isNotEmpty(category)) {
-                        if (categoriesCommaSeparated.length() > 0) {
-                            categoriesCommaSeparated += "," + category;
-                        } else {
-                            categoriesCommaSeparated += category;
-                        }
-                    }
-                }
+            if (categoriesSrc != null) {
+                final String[] categories = new Regex(categoriesSrc, ", 'Category'[^\"]+\">([^<>\"]+)</a>").getColumn(0);
+                categoriesCommaSeparated = getCommaSeparatedString(categories);
             }
         }
         final String[] tags = br.getRegex("(?i)data-label=\"Tag\"[^>]*>([^<]+)</a>").getColumn(0);
-        String tagsCommaSeparated = null;
-        if (tags != null && tags.length > 0) {
-            tagsCommaSeparated = "";
-            for (int index = 0; index < tags.length; index++) {
-                final String tag = tags[index];
-                if (StringUtils.isNotEmpty(tag)) {
-                    if (tagsCommaSeparated.length() > 0) {
-                        tagsCommaSeparated += "," + tag;
-                    } else {
-                        tagsCommaSeparated += tag;
-                    }
-                }
-            }
-        }
-        String pornstarsCommaSeparated = br.getRegex("'pornstars_in_video'\\s*:\\s*'([^<>\"']+)'").getMatch(0);
+        tagsCommaSeparated = getCommaSeparatedString(tags);
+        pornstarsCommaSeparated = br.getRegex("'pornstars_in_video'\\s*:\\s*'([^\"']+)'").getMatch(0);
         if (StringUtils.isEmpty(pornstarsCommaSeparated)) {
             /* Fallback */
             final String pornstarsSrc = br.getRegex("<div class=\"pornstarsWrapper js-pornstarsWrapper\">(.*?)<div class=\"tooltipTrig suggestBtn\"").getMatch(0);
-            final String[] pornstars = new Regex(pornstarsSrc, "data-mxptext=\"([^\"]+)").getColumn(0);
-            if (pornstars != null && pornstars.length > 0) {
-                pornstarsCommaSeparated = "";
-                for (int index = 0; index < pornstars.length; index++) {
-                    final String pornstar = pornstars[index];
-                    if (StringUtils.isNotEmpty(pornstar)) {
-                        if (pornstarsCommaSeparated.length() > 0) {
-                            pornstarsCommaSeparated += "," + pornstar;
-                        } else {
-                            pornstarsCommaSeparated += pornstar;
-                        }
-                    }
-                }
+            if (pornstarsSrc != null) {
+                final String[] pornstars = new Regex(pornstarsSrc, "data-mxptext=\"([^\"]+)").getColumn(0);
+                pornstarsCommaSeparated = getCommaSeparatedString(pornstars);
             }
         }
+        video_production = br.getRegex("'video_production'\\s*:\\s*'([^\"']+)'").getMatch(0);
+        language_spoken_in_video = br.getRegex("'language_spoken_in_video'\\s*:\\s*'([^\"']+)'").getMatch(0);
+        final String[] modelAttributesList = br.getRegex("data-label=\"model_attributes\"[^>]*>([^<]+)</a>").getColumn(0);
+        modelAttributesCommaSeparated = getCommaSeparatedString(modelAttributesList);
         String uploadDate = PluginJSonUtils.getJson(br, "uploadDate");
         /* Try to get date only, without time */
         final String better_date = new Regex(uploadDate, "(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
@@ -1064,7 +1036,7 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
                 /*
                  * 2023-02-17: The following line of code contains a typo. This typo now needs to be there forever otherwise it would break
                  * the ability to find duplicates for thumbnails added in order versions :D
-                 * 
+                 *
                  * 2023-03-17: Nope, you can just fix PluginForHost.getLinkID and add support for old/new one ;)
                  */
                 dl.setLinkID("pornhub://" + viewkey + "_thumnail");
@@ -1093,11 +1065,40 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
             if (!StringUtils.isEmpty(pornstarsCommaSeparated)) {
                 result.setProperty(PornHubCom.PROPERTY_ACTORS_COMMA_SEPARATED, pornstarsCommaSeparated);
             }
+            if (!StringUtils.isEmpty(video_production)) {
+                result.setProperty(PornHubCom.PROPERTY_VIDEO_PRODUCTION, video_production);
+            }
+            if (!StringUtils.isEmpty(language_spoken_in_video)) {
+                result.setProperty(PornHubCom.PROPERTY_LANGUAGE_SPOKEN_IN_VIDEO, language_spoken_in_video);
+            }
+            if (!StringUtils.isEmpty(modelAttributesCommaSeparated)) {
+                result.setProperty(PornHubCom.PROPERTY_MODEL_ATTRIBUTES_COMMA_SEPARATES, modelAttributesCommaSeparated);
+            }
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(siteTitle);
         fp.addLinks(ret);
         return ret;
+    }
+
+    private static String getCommaSeparatedString(final String[] strings) {
+        if (strings == null || strings.length == 0) {
+            return null;
+        }
+        String result = "";
+        for (int index = 0; index < strings.length; index++) {
+            String str = strings[index];
+            str = Encoding.htmlDecode(str).trim();
+            if (StringUtils.isEmpty(str)) {
+                continue;
+            }
+            if (result.length() > 0) {
+                result += "," + str;
+            } else {
+                result += str;
+            }
+        }
+        return result;
     }
 
     private void checkVideoErrors(final Browser br) throws PluginException, DecrypterRetryException {

@@ -10,6 +10,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 
+import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
+import net.lingala.zip4j.core.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.io.ZipInputStream;
+import net.lingala.zip4j.model.FileHeader;
+import net.sf.sevenzipjbinding.SevenZipException;
+
 import org.appwork.utils.Files;
 import org.appwork.utils.Regex;
 import org.appwork.utils.ReusableByteArrayOutputStream;
@@ -34,13 +41,6 @@ import org.jdownloader.extensions.extraction.content.ContentView;
 import org.jdownloader.extensions.extraction.content.PackedFile;
 import org.jdownloader.extensions.extraction.gui.iffileexistsdialog.IfFileExistsDialog;
 import org.jdownloader.settings.IfFileExistsAction;
-
-import jd.controlling.downloadcontroller.IfFileExistsDialogInterface;
-import net.lingala.zip4j.core.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.ZipInputStream;
-import net.lingala.zip4j.model.FileHeader;
-import net.sf.sevenzipjbinding.SevenZipException;
 
 public class Zip4J extends IExtraction {
     private volatile int               crack                   = 0;
@@ -158,17 +158,8 @@ public class Zip4J extends IExtraction {
             skipped.set(true);
             return null;
         }
+        itemPath = ctrl.getCleanedExtractionPath(itemPath);
         final Long size = item.getUncompressedSize();
-        // always alleviate the path and filename
-        final String itemPathParts[] = itemPath.split("(/|\\\\)");
-        final StringBuilder sb = new StringBuilder();
-        for (final String pathPartItem : itemPathParts) {
-            if (sb.length() > 0) {
-                sb.append(File.separator);
-            }
-            sb.append(CrossSystem.alleviatePathParts(pathPartItem));
-        }
-        itemPath = sb.toString();
         final String extractToRoot = getExtractionController().getExtractToFolder().getAbsoluteFile() + File.separator;
         File extractToFile = new File(extractToRoot + itemPath);
         logger.info("Extract " + extractToFile);

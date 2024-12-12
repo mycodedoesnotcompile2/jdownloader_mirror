@@ -99,4 +99,5 @@ public class CFG_EXTRACTION {
      **/
     public static final ObjectKeyHandler                 PASSWORD_LIST                                                    = SH.getKeyHandler("PasswordList", ObjectKeyHandler.class);
     public static final StringKeyHandler                 SUB_PATH                                                         = SH.getKeyHandler("SubPath", StringKeyHandler.class);
+    public static final BooleanKeyHandler                APPLY_FILENAME_REGEX_REPLACE_MAP_TO_EXTRACTION_PATHS             = SH.getKeyHandler("ApplyFilenameRegexReplaceMapToExtractionPaths", BooleanKeyHandler.class);
 }

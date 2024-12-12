@@ -79,6 +79,10 @@ public class CrawlerJobSandbox {
         return job.isDeepAnalyse();
     }
 
+    public boolean isOverwritesPackagizerRulesEnabled() {
+        return job.getPostPackagizerModifier().size() > 0;
+    }
+
     public void setDeepAnalysisEnabled(boolean enabled) {
         job.setDeepAnalyse(enabled);
     }

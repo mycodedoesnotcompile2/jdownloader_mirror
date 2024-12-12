@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50321 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -213,7 +213,6 @@ public abstract class HighWayCore extends UseNet {
                 link.setName(this.getFID(link) + ".mp4");
             }
             if (account == null) {
-                link.getLinkStatus().setStatusText("Only downloadable/checkable via account!");
                 return AvailableStatus.UNCHECKABLE;
             }
             this.login(account, false);
@@ -252,7 +251,6 @@ public abstract class HighWayCore extends UseNet {
             }
             if (account == null) {
                 /* Some items might be checkable without account but we require an account for all items just in case. */
-                link.getLinkStatus().setStatusText("Only downloadable & checkable via account!");
                 return AvailableStatus.UNCHECKABLE;
             }
             this.login(account, false);
@@ -386,93 +384,92 @@ public abstract class HighWayCore extends UseNet {
         if (isUsenetLink(link)) {
             super.handleMultiHost(link, account);
             return;
-        } else {
-            boolean resume = this.isResumeable(link, account);
-            final int maxChunks = this.getMaxChunks(link, account);
-            int statuscode;
-            if (!this.attemptStoredDownloadurlDownload(link, resume, maxChunks)) {
-                this.login(account, false);
-                /* Request creation of downloadlink */
-                Map<String, Object> entries = null;
-                String passCode = link.getDownloadPassword();
-                int counter = 0;
-                do {
-                    if (counter > 0) {
-                        passCode = getUserInput("Password?", link);
-                    }
-                    String getdata = "json&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
+        }
+        boolean resume = this.isResumeable(link, account);
+        final int maxChunks = this.getMaxChunks(link, account);
+        int statuscode;
+        if (!this.attemptStoredDownloadurlDownload(link, resume, maxChunks)) {
+            this.login(account, false);
+            /* Request creation of downloadlink */
+            Map<String, Object> entries = null;
+            String passCode = link.getDownloadPassword();
+            int counter = 0;
+            do {
+                if (counter > 0) {
+                    passCode = getUserInput("Password?", link);
+                }
+                String getdata = "json&link=" + Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this));
+                if (passCode != null) {
+                    getdata += "&pass=" + Encoding.urlEncode(passCode);
+                }
+                br.getPage(getWebsiteBase() + "load.php?" + getdata);
+                entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                statuscode = ((Number) entries.get("code")).intValue();
+                if (statuscode != STATUSCODE_PASSWORD_NEEDED_OR_WRONG) {
+                    break;
+                } else if (counter >= 2) {
+                    logger.info("Password loop exceeded max retries");
+                    break;
+                } else {
                     if (passCode != null) {
-                        getdata += "&pass=" + Encoding.urlEncode(passCode);
-                    }
-                    br.getPage(getWebsiteBase() + "load.php?" + getdata);
-                    entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                    statuscode = ((Number) entries.get("code")).intValue();
-                    if (statuscode != STATUSCODE_PASSWORD_NEEDED_OR_WRONG) {
-                        break;
-                    } else if (counter >= 2) {
-                        logger.info("Password loop exceeded max retries");
-                        break;
+                        logger.info("Wrong password: " + passCode);
                     } else {
-                        if (passCode != null) {
-                            logger.info("Wrong password: " + passCode);
-                        } else {
-                            logger.info("Password required");
-                        }
-                        link.setPasswordProtected(true);
-                        counter++;
+                        logger.info("Password required");
                     }
-                } while (true);
-                if (statuscode == STATUSCODE_PASSWORD_NEEDED_OR_WRONG) {
-                    link.setDownloadPassword(null);
-                    throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
-                } else if (passCode != null) {
-                    /* Password has been entered correctly or previously given password was correct --> Save it */
-                    link.setDownloadPassword(passCode);
+                    link.setPasswordProtected(true);
+                    counter++;
                 }
-                this.checkErrors(entries, link, account);
-                final Object infoMsgO = entries.get("info");
-                if (infoMsgO instanceof String) {
-                    /* Low traffic warning message: Usually something like "Less than 10% traffic remaining" */
-                    displayBubbleNotification((String) infoMsgO, (String) infoMsgO);
-                }
-                entries = this.cacheDLChecker(entries, this.br, link, account);
-                String dllink = (String) entries.get("download");
-                /* Validate URL */
-                dllink = new URL(dllink).toString();
-                String hash = (String) entries.get("hash");
-                if (hash != null && !StringUtils.equalsIgnoreCase("hash", "null")) {
-                    if (hash.matches("(?i)md5:[a-f0-9]{32}")) {
-                        hash = hash.substring(hash.lastIndexOf(":") + 1);
-                        logger.info("Set md5 hash given by multihost: " + hash);
-                        link.setMD5Hash(hash);
-                    } else if (hash.matches("(?i)sha1:[a-f0-9]{40}")) {
-                        hash = hash.substring(hash.lastIndexOf(":") + 1);
-                        logger.info("Set sha1 hash given by multihost: " + hash);
-                        link.setSha1Hash(hash);
-                    } else if (hash.matches("(?i)sha265:[a-f0-9]{40}")) {
-                        hash = hash.substring(hash.lastIndexOf(":") + 1);
-                        logger.info("Set sha265 hash given by multihost: " + hash);
-                        link.setSha256Hash(hash);
-                    } else {
-                        logger.info("Unsupported file-hash string: " + hash);
-                    }
-                }
-                link.setProperty(getDirectlinkProperty(), dllink);
-                br.setAllowedResponseCodes(new int[] { 503 });
-                dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
-                if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-                    br.followConnection(true);
-                    this.checkErrors(this.br, link, account);
-                    getMultiHosterManagement().handleErrorGeneric(account, null, "unknowndlerror", 1, 3 * 60 * 1000l);
+            } while (true);
+            if (statuscode == STATUSCODE_PASSWORD_NEEDED_OR_WRONG) {
+                link.setDownloadPassword(null);
+                throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+            } else if (passCode != null) {
+                /* Password has been entered correctly or previously given password was correct --> Save it */
+                link.setDownloadPassword(passCode);
+            }
+            this.checkErrors(entries, link, account);
+            final Object infoMsgO = entries.get("info");
+            if (infoMsgO instanceof String) {
+                /* Low traffic warning message: Usually something like "Less than 10% traffic remaining" */
+                displayBubbleNotification((String) infoMsgO, (String) infoMsgO);
+            }
+            entries = this.cacheDLChecker(entries, this.br, link, account);
+            String dllink = (String) entries.get("download");
+            /* Validate URL */
+            dllink = new URL(dllink).toExternalForm();
+            String hash = (String) entries.get("hash");
+            if (hash != null && !StringUtils.equalsIgnoreCase("hash", "null")) {
+                if (hash.matches("(?i)md5:[a-f0-9]{32}")) {
+                    hash = hash.substring(hash.lastIndexOf(":") + 1);
+                    logger.info("Set md5 hash given by multihost: " + hash);
+                    link.setMD5Hash(hash);
+                } else if (hash.matches("(?i)sha1:[a-f0-9]{40}")) {
+                    hash = hash.substring(hash.lastIndexOf(":") + 1);
+                    logger.info("Set sha1 hash given by multihost: " + hash);
+                    link.setSha1Hash(hash);
+                } else if (hash.matches("(?i)sha265:[a-f0-9]{40}")) {
+                    hash = hash.substring(hash.lastIndexOf(":") + 1);
+                    logger.info("Set sha265 hash given by multihost: " + hash);
+                    link.setSha256Hash(hash);
+                } else {
+                    logger.info("Unsupported file-hash string: " + hash);
                 }
             }
-            controlSlot(+1);
-            try {
-                dl.startDownload();
-            } finally {
-                // remove usedHost slot from hostMap
-                controlSlot(-1);
+            link.setProperty(getDirectlinkProperty(), dllink);
+            br.setAllowedResponseCodes(new int[] { 503 });
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resume, maxChunks);
+            if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+                br.followConnection(true);
+                this.checkErrors(this.br, link, account);
+                getMultiHosterManagement().handleErrorGeneric(account, null, "unknowndlerror", 1, 3 * 60 * 1000l);
             }
+        }
+        controlSlot(+1);
+        try {
+            dl.startDownload();
+        } finally {
+            // remove usedHost slot from hostMap
+            controlSlot(-1);
         }
     }
 
@@ -623,13 +620,13 @@ public abstract class HighWayCore extends UseNet {
             this.login(account, true);
             br.getPage(this.getAPIBase() + "?hoster&user");
             final AccountInfo ai = new AccountInfo();
-            ai.setTrafficRefill(false);
             final Map<String, Object> entries = this.checkErrors(this.br, null, account);
             final Map<String, Object> accountInfo = (Map<String, Object>) entries.get("user");
             final int accountResume = ((Number) accountInfo.get("resume")).intValue();
             final long premiumUntil = ((Number) accountInfo.get("premium_bis")).longValue();
             final long premiumTraffic = ((Number) accountInfo.get("premium_traffic")).longValue();
             final long trafficLeftToday = ((Number) accountInfo.get("traffic_remain_today")).longValue();
+            ai.setTrafficRefill(false);
             ai.setTrafficLeft(trafficLeftToday);
             /* Set account type and account information */
             if (Boolean.TRUE.equals(entries.get("premium"))) {
@@ -662,7 +659,6 @@ public abstract class HighWayCore extends UseNet {
                 account.setProperty(PROPERTY_ACCOUNT_RESUME, false);
             }
             final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-            final HashSet<String> supportedhosts_dupes_for_legacy_handling = new HashSet<String>();
             /* List of items which should not be displayed in JD GUI. */
             final HashSet<String> ignoreItems = new HashSet<String>();
             ignoreItems.add("beta");
@@ -769,7 +765,6 @@ public abstract class HighWayCore extends UseNet {
                 if (!this.looksLikeValidAPIKey(account.getPass())) {
                     throw new AccountInvalidException("Invalid API key format");
                 }
-                account.setPass(account.getPass());
             }
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, "Basic " + Encoding.Base64Encode(account.getUser() + ":" + account.getPass()));
             final Cookies cookies = account.loadCookies("");
@@ -895,10 +890,11 @@ public abstract class HighWayCore extends UseNet {
             return entries;
         } catch (final JSonMapperException jse) {
             final String errormsg = "Invalid API response";
+            final long waitMillis = 30 * 1000l;
             if (link != null) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, 30 * 1000l);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, errormsg, waitMillis);
             } else {
-                throw new AccountUnavailableException(errormsg, 30 * 1000l);
+                throw new AccountUnavailableException(errormsg, waitMillis);
             }
         }
     }
@@ -981,7 +977,7 @@ public abstract class HighWayCore extends UseNet {
                 if (link != null) {
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, msg, retrySeconds * 1000l);
                 } else {
-                    throw new AccountUnavailableException("Unexpected error: " + msg, retrySeconds * 1000l);
+                    throw new AccountUnavailableException(msg, retrySeconds * 1000l);
                 }
             }
         } else {

@@ -25,18 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -64,7 +52,19 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-@HostPlugin(revision = "$Revision: 50174 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@HostPlugin(revision = "$Revision: 50329 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
@@ -93,11 +93,9 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br>
-         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
-         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br>
-         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
+         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
@@ -174,6 +172,7 @@ public class XHamsterCom extends PluginForHost {
 
     /* Porn_plugin */
     private final String          SETTING_SELECTED_VIDEO_FORMAT          = "SELECTED_VIDEO_FORMAT";
+    private final String          SETTING_FILENAME_ID                    = "Filename_id";
     /* The list of qualities/formats displayed to the user */
     private static final String[] FORMATS                                = new String[] { "Best available", "240p", "360p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
     public static final String    domain_premium                         = "faphouse.com";
@@ -192,7 +191,7 @@ public class XHamsterCom extends PluginForHost {
 
     private void setConfigElements() {
         getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, FORMATS, "Preferred format").setDefaultValue(0));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), "Filename_id", "Only for videos: Change file name to 'filename_VideoID.ext' e.g. 'test_48604.mp4' ?").setDefaultValue(false));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_FILENAME_ID, "Only for videos: Change file name to 'filename_VideoID.ext' e.g. 'test_48604.mp4' ?").setDefaultValue(true));
     }
 
     @Override
@@ -212,9 +211,9 @@ public class XHamsterCom extends PluginForHost {
     public static String getCorrectedURL(String url) {
         /*
          * Remove language-subdomain to enforce original/English language else xhamster may auto-translate video-titles based on that
-         * subdomain.
+         * subdomain. ge(germany), fra(france)...
          */
-        url = url.replaceFirst("://(www\\.)?([a-z]{2}\\.)?", "://");
+        url = url.replaceFirst("://(www\\.)?([a-z]{2,3}\\.)?", "://");
         final String domainFromURL = Browser.getHost(url, true);
         String newDomain = domainFromURL;
         for (final String deadDomain : getDeadDomains()) {
@@ -435,7 +434,7 @@ public class XHamsterCom extends PluginForHost {
                 }
             }
             if (title != null) {
-                title = Encoding.htmlDecode(title).trim();
+                title = Encoding.htmlDecode(Encoding.unicodeDecode(title)).trim();
                 filename = title + extDefault;
                 link.setFinalFileName(filename);
             }
@@ -504,7 +503,8 @@ public class XHamsterCom extends PluginForHost {
                 ext = extDefault;
             }
             if (title != null) {
-                if (getPluginConfig().getBooleanProperty("Filename_id", true)) {
+                title = Encoding.htmlDecode(Encoding.unicodeDecode(title));
+                if (getPluginConfig().getBooleanProperty(SETTING_FILENAME_ID, true)) {
                     filename = title + "_" + fid;
                 } else {
                     filename = fid + "_" + title;
@@ -1431,10 +1431,9 @@ public class XHamsterCom extends PluginForHost {
             /* Check vja ajax request -> json */
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br>
-             * Redirects to mainpage if cookies are invalid. </br>
-             * Return json if cookies are valid. </br>
-             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
+             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
+             * user is non-premium.
              */
             final boolean looksLikeJsonResponse = br.getRequest().getHtmlCode().startsWith("{");
             if (br.getHttpConnection().getContentType().contains("json") && (looksLikeJsonResponse || br.toString().equals("null"))) {
