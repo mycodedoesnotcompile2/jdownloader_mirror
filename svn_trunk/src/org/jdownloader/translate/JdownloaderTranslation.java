@@ -466,10 +466,10 @@ public interface JdownloaderTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Invalid download directory: Permission issue: Can't write into folder %s" })
     String DownloadLink_setSkipped_statusmessage_invalid_path_permission_issue_failed_to_write_into_folder(final String str);
 
-    @Default(lngs = { "en" }, values = { "Invalid download directory: Filename too long" })
+    @Default(lngs = { "en" }, values = { "Filename too long" })
     String DownloadLink_setSkipped_statusmessage_invalid_path_too_long_filename();
 
-    @Default(lngs = { "en" }, values = { "Invalid download directory: Path too long" })
+    @Default(lngs = { "en" }, values = { "Download path too long" })
     String DownloadLink_setSkipped_statusmessage_invalid_path_too_long_path();
 
     @Default(lngs = { "en" }, values = { "Skipped - Account is missing" })

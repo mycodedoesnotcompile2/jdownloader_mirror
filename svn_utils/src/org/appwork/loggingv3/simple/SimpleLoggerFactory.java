@@ -222,10 +222,12 @@ public class SimpleLoggerFactory implements LogV3Factory, SinkProvider {
     }
 
     /**
+     * @return
      *
      */
-    public void set() {
+    public SimpleLoggerFactory set() {
         LogV3.setFactory(this);
+        return this;
     }
 
     /**

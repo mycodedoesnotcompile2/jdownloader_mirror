@@ -32,7 +32,7 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
 
     private List<CompiledDomainRule>              rules;
     final private DomainRuleControllerEventSender eventSender;
-    private int                                   maxSimultaneDownloads;
+    private int                                   maxSimultaneousDownloads;
 
     /**
      * Create a new instance of DomainRuleController. This is a singleton class. Access the only existing instance by using
@@ -77,7 +77,7 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
             }
         }
         this.rules = newList;
-        this.maxSimultaneDownloads = maxDownloads;
+        this.maxSimultaneousDownloads = maxDownloads;
         eventSender.fireEvent(new DomainRuleControllerEvent() {
             @Override
             public void sendTo(DomainRuleControllerListener listener) {
@@ -96,8 +96,8 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
     // return 0;
     // }
 
-    public int getMaxSimultanDownloads() {
-        return maxSimultaneDownloads;
+    public int getMaxSimultaneousDownloads() {
+        return maxSimultaneousDownloads;
     }
 
     public DomainRuleSet createRuleSet(final Account account, final String downloadDomain, final String pluginDomain, final String name) {

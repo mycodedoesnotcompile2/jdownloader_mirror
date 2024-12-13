@@ -18,6 +18,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.antiDDoSForDecrypt;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.nutils.encoding.Encoding;
@@ -29,9 +31,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.jdownloader.plugins.components.antiDDoSForDecrypt;
-
-@DecrypterPlugin(revision = "$Revision: 50162 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50336 $", interfaceVersion = 3, names = {}, urls = {})
 public class RmzCr extends antiDDoSForDecrypt {
     public RmzCr(PluginWrapper wrapper) {
         super(wrapper);
@@ -40,7 +40,7 @@ public class RmzCr extends antiDDoSForDecrypt {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rmz.watch", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online" });
+        ret.add(new String[] { "rapidmoviez.me", "rapidmoviez.com", "rapidmoviez.cr", "rmz.watch", "rmz.cr", "rapidmoviez.click", "rapidmoviez.website", "rapidmoviez.online", "rmz.lat" });
         return ret;
     }
 
@@ -67,13 +67,13 @@ public class RmzCr extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = param.getCryptedUrl();
         br.setFollowRedirects(true);
         getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         String fpName = br.getRegex("<div id=\"title_release_before_title\"></div>\\s*<h2>([^<>\"]+)<").getMatch(0);
         if (fpName == null) {
             fpName = br.getRegex("<title>RapidMoviez\\s+-\\s+([^<]+)</title>").getMatch(0);

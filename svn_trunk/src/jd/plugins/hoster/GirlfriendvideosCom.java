@@ -17,8 +17,6 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -31,7 +29,9 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50324 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z0-9]/([a-z0-9\\-_]+)/(\\d+)\\.php" })
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50337 $", interfaceVersion = 2, names = { "girlfriendvideos.com" }, urls = { "https?://(?:www\\.)?girlfriendvideos\\.com/members/[a-z0-9]/([a-z0-9\\-_]+)/(\\d+)\\.php" })
 public class GirlfriendvideosCom extends PluginForHost {
     public GirlfriendvideosCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -89,14 +89,12 @@ public class GirlfriendvideosCom extends PluginForHost {
         }
         // String filename = br.getRegex("<title>Girlfriend Videos \\- ([^<>\"]*?)</title>").getMatch(0); -> Free User-Submitted ...
         String filename = br.getRegex("\"name\"\\s*:\\s*\"([^\"]+)\"").getMatch(0);
-        if (dllink == null) {
-            if (br.containsHTML("file=[a-z]/[a-z0-9\\-_]+/\\d+\\.flv\"")) {
-                dllink = "http://" + this.getHost() + "/videos/" + new Regex(link.getDownloadURL(), "members/([a-z0-9]/[a-z0-9\\-_]+/\\d+)").getMatch(0) + ".flv";
-            } else {
-                dllink = br.getRegex("\"(/videos/[a-z]/[a-z0-9\\-_]+/\\d+\\.mp4)").getMatch(0);
-                if (dllink != null) {
-                    dllink = "http://" + this.getHost() + dllink;
-                }
+        if (br.containsHTML("file=[a-z]/[a-z0-9\\-_]+/\\d+\\.flv\"")) {
+            dllink = "http://" + this.getHost() + "/videos/" + new Regex(link.getDownloadURL(), "members/([a-z0-9]/[a-z0-9\\-_]+/\\d+)").getMatch(0) + ".flv";
+        } else {
+            dllink = br.getRegex("\"(/videos/[a-z0-9]/[a-z0-9\\-_]+/\\d+\\.mp4)").getMatch(0);
+            if (dllink != null) {
+                dllink = br.getURL(dllink).toExternalForm();
             }
         }
         if (filename != null) {
@@ -136,16 +134,11 @@ public class GirlfriendvideosCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (dl.getConnection().getResponseCode() == 403) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 403", 60 * 60 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 60 * 60 * 1000l);
-            }
+        if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
+        handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 

@@ -20,6 +20,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.appwork.storage.config.JsonConfig;
+import org.jdownloader.plugins.HashCheckPluginProgress;
+import org.jdownloader.settings.GeneralSettings;
+
 import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
 import jd.http.Browser;
 import jd.http.Request;
@@ -27,10 +31,6 @@ import jd.http.URLConnectionAdapter;
 import jd.plugins.PluginProgress;
 import jd.plugins.download.raf.FileBytesMap.FileBytesMapView;
 import jd.plugins.download.raf.HTTPDownloader;
-
-import org.appwork.storage.config.JsonConfig;
-import org.jdownloader.plugins.HashCheckPluginProgress;
-import org.jdownloader.settings.GeneralSettings;
 
 abstract public class DownloadInterface {
     @Deprecated
@@ -90,57 +90,61 @@ abstract public class DownloadInterface {
     protected static final int                      MAX_CONCURRENT_HASH_CHECKS = JsonConfig.create(GeneralSettings.class).getMaxConcurrentHashChecks();
 
     protected HashResult getHashResult(Downloadable downloadable, File file) throws InterruptedException {
-        if (downloadable.isHashCheckEnabled() && JsonConfig.create(GeneralSettings.class).isHashCheckEnabled()) {
-            final int maxConcurrent = MAX_CONCURRENT_HASH_CHECKS;
-            final int nextWaitIndex = maxConcurrent - 1;
-            AtomicBoolean waitLock = new AtomicBoolean(false);
-            synchronized (HASHCHECK_QEUEU) {
-                HASHCHECK_QEUEU.add(waitLock);
-                waitLock.set(HASHCHECK_QEUEU.indexOf(waitLock) > nextWaitIndex);
-            }
+        if (!downloadable.isHashCheckEnabled()) {
+            /* Has check disabled or not possible for this item. */
+            return null;
+        } else if (!JsonConfig.create(GeneralSettings.class).isHashCheckEnabled()) {
+            /* Hash check disabled in settings */
+            return null;
+        }
+        final int maxConcurrent = MAX_CONCURRENT_HASH_CHECKS;
+        final int nextWaitIndex = maxConcurrent - 1;
+        AtomicBoolean waitLock = new AtomicBoolean(false);
+        synchronized (HASHCHECK_QEUEU) {
+            HASHCHECK_QEUEU.add(waitLock);
+            waitLock.set(HASHCHECK_QEUEU.indexOf(waitLock) > nextWaitIndex);
+        }
+        try {
+            final PluginProgress hashWait = new HashCheckPluginProgress(null, Color.YELLOW.darker().darker(), null);
             try {
-                final PluginProgress hashWait = new HashCheckPluginProgress(null, Color.YELLOW.darker().darker(), null);
-                try {
-                    downloadable.addPluginProgress(hashWait);
-                    if (waitLock.get()) {
-                        synchronized (waitLock) {
-                            if (waitLock.get()) {
-                                waitLock.wait();
-                            }
-                        }
-                    }
-                    final HashInfo hashInfo = downloadable.getHashInfo();
-                    downloadable.removePluginProgress(hashWait);
-                    final HashResult hashResult = downloadable.getHashResult(hashInfo, file);
-                    if (hashResult != null) {
-                        downloadable.getLogger().info(hashResult.toString());
-                        if (hashResult.getFinalLinkState().isFinished()) {
-                            downloadable.setHashInfo(hashResult.getHashInfo());
-                        }
-                    }
-                    return hashResult;
-                } finally {
-                    downloadable.removePluginProgress(hashWait);
-                }
-            } finally {
-                synchronized (HASHCHECK_QEUEU) {
-                    final boolean callNext = HASHCHECK_QEUEU.indexOf(waitLock) <= nextWaitIndex;
-                    HASHCHECK_QEUEU.remove(waitLock);
-                    if (HASHCHECK_QEUEU.size() > nextWaitIndex && callNext) {
-                        waitLock = HASHCHECK_QEUEU.get(nextWaitIndex);
-                    } else {
-                        waitLock = null;
-                    }
-                }
-                if (waitLock != null) {
+                downloadable.addPluginProgress(hashWait);
+                if (waitLock.get()) {
                     synchronized (waitLock) {
-                        waitLock.set(false);
-                        waitLock.notifyAll();
+                        if (waitLock.get()) {
+                            waitLock.wait();
+                        }
                     }
+                }
+                final HashInfo hashInfo = downloadable.getHashInfo();
+                downloadable.removePluginProgress(hashWait);
+                final HashResult hashResult = downloadable.getHashResult(hashInfo, file);
+                if (hashResult != null) {
+                    downloadable.getLogger().info(hashResult.toString());
+                    if (hashResult.getFinalLinkState().isFinished()) {
+                        downloadable.setHashInfo(hashResult.getHashInfo());
+                    }
+                }
+                return hashResult;
+            } finally {
+                downloadable.removePluginProgress(hashWait);
+            }
+        } finally {
+            synchronized (HASHCHECK_QEUEU) {
+                final boolean callNext = HASHCHECK_QEUEU.indexOf(waitLock) <= nextWaitIndex;
+                HASHCHECK_QEUEU.remove(waitLock);
+                if (HASHCHECK_QEUEU.size() > nextWaitIndex && callNext) {
+                    waitLock = HASHCHECK_QEUEU.get(nextWaitIndex);
+                } else {
+                    waitLock = null;
+                }
+            }
+            if (waitLock != null) {
+                synchronized (waitLock) {
+                    waitLock.set(false);
+                    waitLock.notifyAll();
                 }
             }
         }
-        return null;
     }
 
     public abstract boolean startDownload() throws Exception;

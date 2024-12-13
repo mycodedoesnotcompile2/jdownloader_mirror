@@ -212,6 +212,9 @@ public class LinknameCleaner {
             throw new IllegalArgumentException();
         } else if (maxLength <= 0) {
             throw new IllegalArgumentException();
+        } else if (pfilename.isMultipartArchive()) {
+            /* Do not shorten names of multipart archive files. */
+            return null;
         }
         String filenameWithoutExtension = pfilename.getFilenameWithoutExtensionAdvanced();
         final String ext = pfilename.getExtensionAdvanced();
@@ -227,7 +230,6 @@ public class LinknameCleaner {
         } else {
             maxLengthForFilenameWithoutExt = maxLength;
         }
-        // TODO: Add detection of archives / multipart archives and do not offer auto rename for such items.
         filenameWithoutExtension = replaceCharactersByMap(filenameWithoutExtension, FILENAME_TOO_LONG_REPLACEMAP);
         /* Trim in case after cutting it, it randomly ends with a space. */
         filenameWithoutExtension = filenameWithoutExtension.trim();

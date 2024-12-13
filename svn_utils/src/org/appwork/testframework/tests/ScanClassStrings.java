@@ -41,10 +41,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.regex.Pattern;
 
+import org.appwork.builddecision.BuildDecisionRequired;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.AWTestValidateClassReference;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.StringUtils;
 
@@ -63,9 +65,41 @@ public class ScanClassStrings extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
+        if (isPostBuildTest()) {
+            return;
+        }
         new ClassPathScanner<Exception>() {
             @Override
             public void handle(Class<?> type) throws Exception {
+                BuildDecisionRequired buildDec = type.getAnnotation(BuildDecisionRequired.class);
+                if (buildDec != null) {
+                    for (String str : buildDec.imports()) {
+                        for (String s : str.split(";")) {
+                            if (StringUtils.isEmpty(s)) {
+                                continue;
+                            }
+                            try {
+                                Class.forName(s);
+                            } catch (Exception e) {
+                                LogV3.warning("Invalid Class Definition in  " + buildDec + " - " + type);
+                                LogV3.log(e);
+                                throw e;
+                            }
+                        }
+                    }
+                }
+                TestDependency testDep = type.getAnnotation(TestDependency.class);
+                if (testDep != null) {
+                    for (String str : testDep.value()) {
+                        try {
+                            Class.forName(str);
+                        } catch (Exception e) {
+                            LogV3.warning("Invalid Class Definition in  " + buildDec + " - " + type);
+                            LogV3.log(e);
+                            throw e;
+                        }
+                    }
+                }
                 for (Field f : type.getDeclaredFields()) {
                     if (Modifier.isFinal(f.getModifiers())) {
                         if (Modifier.isStatic(f.getModifiers())) {
@@ -86,7 +120,7 @@ public class ScanClassStrings extends AWTest {
                                         throw e;
                                     }
                                     if (!checkPackage(anno, str)) {
-                                        throw new WTFException("Something is wrong with the dependsOnPackages declarion: \r\n" + type.getName() + "." + f.getName());
+                                        throw new WTFException("Something is wrong with the dependsOnPackages declarion. Class is availaible, but non of its jar.: \r\n" + type.getName() + "." + f.getName() + "\r\n" + ManagementFactory.getRuntimeMXBean().getClassPath());
                                     }
                                 }
                             }
@@ -114,5 +148,12 @@ public class ScanClassStrings extends AWTest {
                 return false;
             }
         }.run();
+    }
+
+    /**
+     * @return
+     */
+    private boolean isPostBuildTest() {
+        return System.getProperty(org.appwork.testframework.PostBuildRunner.POSTBUILDTEST) != null;
     }
 }

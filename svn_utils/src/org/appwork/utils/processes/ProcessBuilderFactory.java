@@ -110,7 +110,6 @@ public class ProcessBuilderFactory {
             try {
                 sdtStream.close();
             } catch (Throwable ignore) {
-
             }
             try {
                 process.destroy();

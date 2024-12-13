@@ -288,6 +288,7 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
      *
      */
     public static void setAsDefault() {
+        System.setProperty("AWU_SERIALIZER_CLASS", FlexiSerializer.class.getName());
         Deser.set(new FlexiSerializer());
     }
 }

@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 50037 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
+@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = { "files.fm" }, urls = { "https?://(?:\\w+\\.)?files\\.fm/u/[a-z0-9]+" })
 public class FilesFmFolder extends PluginForDecrypt {
     public FilesFmFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,18 +82,17 @@ public class FilesFmFolder extends PluginForDecrypt {
             final String contentUrl = br.getURL("/u/" + folderIDTmp).toString();
             ret.add(createDownloadlink(contentUrl));
         }
-        String[] links = br.getRegex("id=\"report_[^\"]+\".*?class=\"OrderID\"").getColumn(-1);
-        if (links == null || links.length == 0) {
+        String[] htmls = br.getRegex("id=\"report_[^\"]+\".*?class=\"OrderID\"").getColumn(-1);
+        if (htmls == null || htmls.length == 0) {
             if (folders != null && folders.length > 0) {
+                /* Only subfolders and no single files */
                 return ret;
-            }
-        }
-        if (links == null || links.length == 0) {
-            if (hostplg.canHandle(br.getURL())) {
+            } else if (hostplg.canHandle(br.getURL())) {
                 /* Folder redirected to single file-link */
                 ret.add(this.createDownloadlink(br.getURL()));
                 return ret;
             } else {
+                /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
@@ -101,26 +100,26 @@ public class FilesFmFolder extends PluginForDecrypt {
         String title = br.getRegex("<title>([^<]+)</title>").getMatch(0);
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
-            title = title.replaceFirst(" \\| files\\.fm", "");
+            title = title.replaceFirst("(?i) \\| files\\.fm\\.?", "");
             fp.setName(title);
         } else {
             /* Fallback */
             fp.setName(br._getURL().getPath());
         }
-        for (final String singleLink : links) {
-            String filename = new Regex(singleLink, "class=\"full-file-name\">([^<>\"]+)<").getMatch(0);
-            final String ext = new Regex(singleLink, "class=\"filename-extension\"[^>]*>([^<>\"]+)<").getMatch(0);
-            final String filesize = new Regex(singleLink, "class=\"file_size\">([^<>}\"]*?)<").getMatch(0);
-            String fileid = new Regex(singleLink, "(?:\\?|&)i=([a-z0-9]+)").getMatch(0);
+        for (final String html : htmls) {
+            String filename = new Regex(html, "class=\"full-file-name\">([^<>\"]+)<").getMatch(0);
+            final String ext = new Regex(html, "class=\"filename-extension\"[^>]*>([^<>\"]+)<").getMatch(0);
+            final String filesize = new Regex(html, "class=\"file_size\">([^<>}\"]*?)<").getMatch(0);
+            String fileid = new Regex(html, "(?:\\?|&)i=([a-z0-9]+)").getMatch(0);
             if (fileid == null) {
                 /* 2021-01-25 */
-                fileid = new Regex(singleLink, "id=\"report_([a-z0-9]+)\"").getMatch(0);
+                fileid = new Regex(html, "id=\"report_([a-z0-9]+)\"").getMatch(0);
             }
             if (filename == null || filesize == null || fileid == null) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
-            filename = Encoding.htmlDecode(filename);
-            if (!filename.endsWith(ext)) {
+            filename = Encoding.htmlDecode(filename).trim();
+            if (ext != null && !filename.endsWith(ext)) {
                 filename += ext;
             }
             final String contentUrl = Request.getLocation("/down.php?i=" + fileid + "&n=" + filename, br.getRequest());

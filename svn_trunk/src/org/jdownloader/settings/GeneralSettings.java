@@ -291,7 +291,7 @@ public interface GeneralSettings extends ConfigInterface {
     int getMaxPluginRetries();
 
     @AboutConfig
-    @DescriptionForConfigEntry("How many downloads should Jdownloader download at once? Note that most hosters allow only one download at a time in freemode")
+    @DescriptionForConfigEntry("How many downloads should JDownloader attempt to download at once? Global max limit is 20.")
     @SpinnerValidator(min = 1, max = SOFT_MAX_DOWNLOADS)
     @DefaultIntValue(3)
     int getMaxSimultaneDownloads();

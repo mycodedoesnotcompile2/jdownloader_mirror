@@ -60,7 +60,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PornHubCom;
 
-@DecrypterPlugin(revision = "$Revision: 50326 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornHubComVideoCrawler extends PluginForDecrypt {
     @SuppressWarnings("deprecation")
     public PornHubComVideoCrawler(PluginWrapper wrapper) {
@@ -903,13 +903,20 @@ public class PornHubComVideoCrawler extends PluginForDecrypt {
         }
         final String[] tags = br.getRegex("(?i)data-label=\"Tag\"[^>]*>([^<]+)</a>").getColumn(0);
         tagsCommaSeparated = getCommaSeparatedString(tags);
-        pornstarsCommaSeparated = br.getRegex("'pornstars_in_video'\\s*:\\s*'([^\"']+)'").getMatch(0);
-        if (StringUtils.isEmpty(pornstarsCommaSeparated)) {
+        final String pornstarsSrc = br.getRegex("<div class=\"pornstarsWrapper[^\"]*\">(.*?)</div>\\s+</div>").getMatch(0);
+        if (pornstarsSrc != null) {
+            final String[] pornstars_list = new Regex(pornstarsSrc, "alt=\"avatar\">([^<]+)<span").getColumn(0);
+            if (pornstars_list != null && pornstars_list.length != 0) {
+                pornstarsCommaSeparated = getCommaSeparatedString(pornstars_list);
+            } else {
+                logger.warning("Failed to find pornstar information");
+            }
+        }
+        if (pornstarsCommaSeparated == null) {
             /* Fallback */
-            final String pornstarsSrc = br.getRegex("<div class=\"pornstarsWrapper js-pornstarsWrapper\">(.*?)<div class=\"tooltipTrig suggestBtn\"").getMatch(0);
-            if (pornstarsSrc != null) {
-                final String[] pornstars = new Regex(pornstarsSrc, "data-mxptext=\"([^\"]+)").getColumn(0);
-                pornstarsCommaSeparated = getCommaSeparatedString(pornstars);
+            final String pornstarsCommaSeparated_tmp = br.getRegex("'pornstars_in_video'\\s*:\\s*'([^\"']+)'").getMatch(0);
+            if (pornstarsCommaSeparated_tmp != null && !pornstarsCommaSeparated_tmp.equalsIgnoreCase("no")) {
+                pornstarsCommaSeparated = pornstarsCommaSeparated_tmp;
             }
         }
         video_production = br.getRegex("'video_production'\\s*:\\s*'([^\"']+)'").getMatch(0);

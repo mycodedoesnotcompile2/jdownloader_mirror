@@ -8,8 +8,10 @@ import org.appwork.storage.config.ConfigInterface;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.storage.simplejson.mapper.ClassCache.Rules;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.ClassPathScanner;
 
+@TestDependency({ "org.appwork.storage.StorableValidatorIgnoresMissingGetter" })
 public class ConfigInterfaceValidator extends StorableValidatorTest {
     public static void main(String[] args) {
         run();

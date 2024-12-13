@@ -11,6 +11,16 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
+import org.jdownloader.controlling.domainrules.CompiledDomainRule;
+import org.jdownloader.controlling.domainrules.DomainRuleSet;
+import org.jdownloader.logging.LogController;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
 import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
 import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.controlling.downloadcontroller.DownloadLinkCandidateResult.RESULT;
@@ -18,17 +28,6 @@ import jd.controlling.proxy.AbstractProxySelectorImpl;
 import jd.controlling.proxy.ProxyController;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.StringUtils;
-import org.jdownloader.controlling.domainrules.CompiledDomainRule;
-import org.jdownloader.controlling.domainrules.DomainRuleController;
-import org.jdownloader.controlling.domainrules.DomainRuleSet;
-import org.jdownloader.logging.LogController;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.settings.staticreferences.CFG_GENERAL;
 
 public class DownloadLinkCandidateSelector {
     private static class CandidateResultHolder {
@@ -73,38 +72,38 @@ public class DownloadLinkCandidateSelector {
     }
 
     private final Comparator<CandidateResultHolder>                                                        RESULT_SORTER = new Comparator<CandidateResultHolder>() {
-        private final DownloadLinkCandidateResult.RESULT[] FINAL_RESULT_SORT_ORDER = new RESULT[] { DownloadLinkCandidateResult.RESULT.SKIPPED, DownloadLinkCandidateResult.RESULT.ACCOUNT_REQUIRED, DownloadLinkCandidateResult.RESULT.PLUGIN_DEFECT, DownloadLinkCandidateResult.RESULT.FATAL_ERROR };
+                                                                                                                             private final DownloadLinkCandidateResult.RESULT[] FINAL_RESULT_SORT_ORDER = new RESULT[] { DownloadLinkCandidateResult.RESULT.SKIPPED, DownloadLinkCandidateResult.RESULT.ACCOUNT_REQUIRED, DownloadLinkCandidateResult.RESULT.PLUGIN_DEFECT, DownloadLinkCandidateResult.RESULT.FATAL_ERROR };
 
-        private int indexOf(RESULT o1) {
-            for (int index = 0; index < FINAL_RESULT_SORT_ORDER.length; index++) {
-                if (FINAL_RESULT_SORT_ORDER[index] == o1) {
-                    return index;
-                }
-            }
-            return -1;
-        }
+                                                                                                                             private int indexOf(RESULT o1) {
+                                                                                                                                 for (int index = 0; index < FINAL_RESULT_SORT_ORDER.length; index++) {
+                                                                                                                                     if (FINAL_RESULT_SORT_ORDER[index] == o1) {
+                                                                                                                                         return index;
+                                                                                                                                     }
+                                                                                                                                 }
+                                                                                                                                 return -1;
+                                                                                                                             }
 
-        private int compare(long x, long y) {
-            return (x < y) ? -1 : ((x == y) ? 0 : 1);
-        }
+                                                                                                                             private int compare(long x, long y) {
+                                                                                                                                 return (x < y) ? -1 : ((x == y) ? 0 : 1);
+                                                                                                                             }
 
-        @Override
-        public int compare(CandidateResultHolder o1, CandidateResultHolder o2) {
-            long i1 = indexOf(o1.getResult().getResult());
-            long i2 = indexOf(o2.getResult().getResult());
-            if (i1 >= 0 && i2 < 0) {
-                return -1;
-            } else if (i2 >= 0 && i1 < 0) {
-                return 1;
-            } else if (i1 >= 0 && i2 >= 0) {
-                return compare(i1, i2);
-            } else {
-                i1 = o1.getResult().getRemainingTime();
-                i2 = o2.getResult().getRemainingTime();
-                return -compare(i1, i2);
-            }
-        };
-    };
+                                                                                                                             @Override
+                                                                                                                             public int compare(CandidateResultHolder o1, CandidateResultHolder o2) {
+                                                                                                                                 long i1 = indexOf(o1.getResult().getResult());
+                                                                                                                                 long i2 = indexOf(o2.getResult().getResult());
+                                                                                                                                 if (i1 >= 0 && i2 < 0) {
+                                                                                                                                     return -1;
+                                                                                                                                 } else if (i2 >= 0 && i1 < 0) {
+                                                                                                                                     return 1;
+                                                                                                                                 } else if (i1 >= 0 && i2 >= 0) {
+                                                                                                                                     return compare(i1, i2);
+                                                                                                                                 } else {
+                                                                                                                                     i1 = o1.getResult().getRemainingTime();
+                                                                                                                                     i2 = o2.getResult().getRemainingTime();
+                                                                                                                                     return -compare(i1, i2);
+                                                                                                                                 }
+                                                                                                                             };
+                                                                                                                         };
     private final DownloadSession                                                                          session;
     private LinkedHashMap<DownloadLink, LinkedHashMap<DownloadLinkCandidate, DownloadLinkCandidateResult>> roundResults  = new LinkedHashMap<DownloadLink, LinkedHashMap<DownloadLinkCandidate, DownloadLinkCandidateResult>>();
     private final ProxyBalanceMode                                                                         freeProxyBalanceMode;
@@ -149,8 +148,8 @@ public class DownloadLinkCandidateSelector {
                     ret.setWaitTime(JsonConfig.create(GeneralSettings.class).getDownloadTempUnavailableRetryWaittime());
                     // must be part of history for the cleanup handling to work
                     history.attach(candidate);
-                            history.dettach(candidate, ret);
-                            return ret;
+                    history.dettach(candidate, ret);
+                    return ret;
                 }
             }
         }
@@ -159,8 +158,8 @@ public class DownloadLinkCandidateSelector {
             final DownloadLinkCandidateResult ret = new DownloadLinkCandidateResult(SkipReason.TOO_MANY_RETRIES, null, candidate.getCachedAccount().getHost(), false);
             // must be part of history for the cleanup handling to work
             history.attach(candidate);
-                    history.dettach(candidate, ret);
-                    return ret;
+            history.dettach(candidate, ret);
+            return ret;
         }
         return null;
     }
@@ -224,18 +223,10 @@ public class DownloadLinkCandidateSelector {
         return CachedAccountPermission.IMPOSSIBLE;
     }
 
-    protected final DomainRuleSet getDomainRuleSet(DownloadLinkCandidate candidate) {
-        final String downloadDomain = candidate.getLink().getDomainInfo().getTld();
-        final CachedAccount cachedAccount = candidate.getCachedAccount();
-        final String pluginDomain = cachedAccount.getHost();
-        final String fileName = candidate.getLink().getName();
-        return DomainRuleController.getInstance().createRuleSet(cachedAccount.getAccount(), downloadDomain, pluginDomain, fileName);
-    }
-
     public final DownloadLinkCandidatePermission getDownloadLinkCandidatePermission(final DownloadLinkCandidate candidate) {
         final int maxDownloads = Math.max(1, CFG_GENERAL.CFG.getMaxSimultaneDownloads());
         DomainRuleSet domainRuleSet = null;
-        if (!candidate.isForced() && session.getControllers().size() >= maxDownloads && (domainRuleSet = getDomainRuleSet(candidate)).size() == 0) {
+        if (!candidate.isForced() && session.getControllers().size() >= maxDownloads && (domainRuleSet = candidate.getDomainRuleSet()).size() == 0) {
             /**
              * not a forced candidate and no special rules and already reached max concurrent downloads
              */
@@ -323,9 +314,7 @@ public class DownloadLinkCandidateSelector {
             final String downloadDomain = downloadLink.getDomainInfo().getTld();
             final String pluginDomain = downloadCandidate.getCachedAccount().getHost();
             final String fileName = downloadLink.getName();
-            if (domainRuleSet == null) {
-                domainRuleSet = getDomainRuleSet(candidate);
-            }
+            domainRuleSet = candidate.getDomainRuleSet();
             for (final Entry<CompiledDomainRule, AtomicInteger> s : domainRuleSet.getMap().entrySet()) {
                 if (s.getKey().matches(downloadCandidate.getCachedAccount().getAccount(), downloadDomain, pluginDomain, fileName)) {
                     s.getValue().incrementAndGet();
@@ -342,9 +331,7 @@ public class DownloadLinkCandidateSelector {
             /**
              * max concurrent downloads or max concurrent downloads per host reached
              */
-            if (domainRuleSet == null) {
-                domainRuleSet = getDomainRuleSet(candidate);
-            }
+            domainRuleSet = candidate.getDomainRuleSet();
             for (final Entry<CompiledDomainRule, AtomicInteger> s : domainRuleSet.getMap().entrySet()) {
                 if (s.getKey().isAllowToExceedTheGlobalLimit()) {
                     if (s.getValue().get() < s.getKey().getMaxSimultanDownloads()) {
@@ -357,9 +344,7 @@ public class DownloadLinkCandidateSelector {
             }
             return DownloadLinkCandidatePermission.CONCURRENCY_LIMIT;
         }
-        if (domainRuleSet == null) {
-            domainRuleSet = getDomainRuleSet(candidate);
-        }
+        domainRuleSet = candidate.getDomainRuleSet();
         for (final Entry<CompiledDomainRule, AtomicInteger> s : domainRuleSet.getMap().entrySet()) {
             if (s.getValue().get() >= s.getKey().getMaxSimultanDownloads()) {
                 return DownloadLinkCandidatePermission.CONCURRENCY_LIMIT;

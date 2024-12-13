@@ -15,6 +15,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,6 +44,7 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
@@ -52,7 +54,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 49916 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -122,31 +124,12 @@ public class PornportalComCrawler extends PluginForDecrypt {
 
     private Account getUserLogin() throws Exception {
         final PluginForHost hostPlugin = getNewPluginForHostInstance(this.getHost());
-        Account aa = AccountController.getInstance().getValidAccount(this.getHost());
+        final Account aa = AccountController.getInstance().getValidAccount(this.getHost());
         if (aa == null) {
-            /*
-             * Try 'internal multihoster' handling e.g. user may have added account for erito.com which also grants premium access to other
-             * sites e.g. fakehub.com.
-             */
-            logger.info("Failed to find main account --> Looking for 'multihoster account'");
-            final ArrayList<String> allowedPornportalHosts = PornportalCom.getAllSupportedPluginDomainsFlat();
-            final List<Account> multihostAccounts = AccountController.getInstance().getMultiHostAccounts(this.getHost());
-            if (multihostAccounts != null) {
-                for (final Account multihostAcc : multihostAccounts) {
-                    final String multiHostHost = multihostAcc.getHoster();
-                    if (multihostAcc.isEnabled() && allowedPornportalHosts.contains(multiHostHost)) {
-                        logger.info("Found working multihost account: " + multihostAcc.getHoster());
-                        aa = multihostAcc;
-                        break;
-                    }
-                }
-            }
+            return null;
         }
-        if (aa != null) {
-            ((jd.plugins.hoster.PornportalCom) hostPlugin).login(this.br, aa, this.getHost(), false);
-            return aa;
-        }
-        return null;
+        ((jd.plugins.hoster.PornportalCom) hostPlugin).login(this.br, aa, this.getHost(), false);
+        return aa;
     }
 
     public ArrayList<DownloadLink> crawlContentAPI(final PluginForHost plg, final String contentID, final Account account, final PornportalComConfig cfg) throws Exception {
@@ -379,7 +362,8 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 }
             }
             if (!foundSelection.isEmpty()) {
-                return foundSelection;
+                ret.clear();
+                ret.addAll(foundSelection);
             } else {
                 /* Fallback: Add all qualities if none were found by selection */
                 logger.info("Failed to find any results by selection -> Returning all");
@@ -390,40 +374,109 @@ public class PornportalComCrawler extends PluginForDecrypt {
             }
             ret.addAll(videos);
         }
-        /* Crawl image gallery */
-        final String description = (String) result.get("description");
-        final FilePackage imagePackage = FilePackage.getInstance();
-        imagePackage.setName(result.get("title").toString());
-        if (description != null) {
-            imagePackage.setComment(description);
-        }
-        final ArrayList<DownloadLink> images = new ArrayList<DownloadLink>();
-        final List<Map<String, Object>> galleries = (List<Map<String, Object>>) result.get("galleries");
-        for (final Map<String, Object> gallery : galleries) {
-            final String format = gallery.get("format").toString();
-            if (!format.equalsIgnoreCase("pictures")) {
-                /* Skip e.g. thumbnails */
-                continue;
+        /* Crawl thumbnails */
+        crawlThumbnails: if (true) {
+            final boolean crawlThumbnails = true;
+            if (!crawlThumbnails) {
+                break crawlThumbnails;
             }
-            final int filesCount = ((Number) gallery.get("filesCount")).intValue();
-            final String filePattern = gallery.get("filePattern").toString();
-            final String urlformatter = gallery.get("url").toString();
-            for (int i = 1; i <= filesCount; i++) {
-                final String filename = String.format(filePattern, i);
-                final String directurl = urlformatter.replace(filePattern, filename);
-                final DownloadLink pic = new DownloadLink(plg, "pornportal", host, directurl, true);
-                pic.setName(filename);
-                pic.setProperty(PornportalCom.PROPERTY_directurl, directurl);
+            final Map<String, Object> images = (Map<String, Object>) result.get("images");
+            if (images == null) {
+                logger.info("Failed to find thumbnails #1");
+                break crawlThumbnails;
+            }
+            final Map<String, Object> poster = (Map<String, Object>) images.get("poster");
+            if (poster == null) {
+                logger.info("Failed to find thumbnails #2");
+                break crawlThumbnails;
+            }
+            final ArrayList<DownloadLink> thumbnails = new ArrayList<DownloadLink>();
+            final String description = (String) result.get("description");
+            final FilePackage thumbnailPackage = FilePackage.getInstance();
+            thumbnailPackage.setName(result.get("title").toString() + " - thumbnails");
+            if (description != null) {
+                thumbnailPackage.setComment(description);
+            }
+            /* Images are in maps named after numbers, stareting from "0". */
+            int index = 0;
+            while (true) {
+                final Map<String, Object> image = (Map<String, Object>) poster.get(Integer.toString(index));
+                if (image == null) {
+                    /* Reached end */
+                    break;
+                }
+                /* Find best image quality */
+                String url = null;
+                int highestHeight = -1;
+                for (final Object imageO : image.values()) {
+                    final Map<String, Object> imageQual = (Map<String, Object>) imageO;
+                    final int height = ((Number) imageQual.get("height")).intValue();
+                    if (url == null || height > highestHeight) {
+                        highestHeight = height;
+                        url = imageQual.get("url").toString();
+                    }
+                }
+                final String filenameFromURL = Plugin.getFileNameFromURL(new URL(url));
+                final DownloadLink pic = new DownloadLink(plg, "pornportal", host, url, true);
+                if (filenameFromURL != null) {
+                    /* Website sometimes has the same name for two different images -> Fix this by adding the index */
+                    pic.setFinalFileName((index + 1) + "_" + filenameFromURL);
+                }
+                pic.setProperty(PornportalCom.PROPERTY_directurl, url);
+                pic.setProperty(PornportalCom.PROPERTY_GALLERY_TYPE, PornportalCom.GALLERY_TYPE_THUMBNAIL_SLASH_POSTER);
                 pic.setProperty(PornportalCom.PROPERTY_GALLERY_ID, contentID);
-                pic.setProperty(PornportalCom.PROPERTY_GALLERY_POSITION, gallery.get("id"));
-                pic.setProperty(PornportalCom.PROPERTY_GALLERY_DIRECTORY, gallery.get("directory"));
-                pic.setProperty(PornportalCom.PROPERTY_GALLERY_SIZE, filesCount);
-                pic.setProperty(PornportalCom.PROPERTY_GALLERY_IMAGE_POSITION, i);
+                pic.setProperty(PornportalCom.PROPERTY_GALLERY_POSITION, index);
+                // pic.setProperty(PornportalCom.PROPERTY_GALLERY_DIRECTORY, "none/poster");
+                pic.setProperty(PornportalCom.PROPERTY_GALLERY_IMAGE_POSITION, index);
                 pic.setAvailable(true);
-                pic._setFilePackage(imagePackage);
-                images.add(pic);
+                pic._setFilePackage(thumbnailPackage);
+                thumbnails.add(pic);
+                index++;
             }
-            ret.addAll(images);
+            /* Only now do we know the gallery size -> Set it */
+            for (final DownloadLink pic : thumbnails) {
+                pic.setProperty(PornportalCom.PROPERTY_GALLERY_SIZE, index + 1);
+            }
+            ret.addAll(thumbnails);
+        }
+        /* Crawl image gallery */
+        final List<Map<String, Object>> galleries = (List<Map<String, Object>>) result.get("galleries");
+        if (galleries != null && galleries.size() > 0) {
+            final String description = (String) result.get("description");
+            final FilePackage imagePackage = FilePackage.getInstance();
+            imagePackage.setName(result.get("title").toString());
+            if (description != null) {
+                imagePackage.setComment(description);
+            }
+            final ArrayList<DownloadLink> images = new ArrayList<DownloadLink>();
+            for (final Map<String, Object> gallery : galleries) {
+                final String format = gallery.get("format").toString();
+                if (!format.equalsIgnoreCase("pictures")) {
+                    /* Skip e.g. thumbnails */
+                    /* 2024-12-12: TODO: Review this */
+                    continue;
+                }
+                final int filesCount = ((Number) gallery.get("filesCount")).intValue();
+                final String filePattern = gallery.get("filePattern").toString();
+                final String urlformatter = gallery.get("url").toString();
+                for (int i = 1; i <= filesCount; i++) {
+                    final String filename = String.format(filePattern, i);
+                    final String directurl = urlformatter.replace(filePattern, filename);
+                    final DownloadLink pic = new DownloadLink(plg, "pornportal", host, directurl, true);
+                    pic.setName(filename);
+                    pic.setProperty(PornportalCom.PROPERTY_directurl, directurl);
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_TYPE, PornportalCom.GALLERY_TYPE_GALLERY);
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_ID, contentID);
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_POSITION, gallery.get("id"));
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_DIRECTORY, gallery.get("directory"));
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_SIZE, filesCount);
+                    pic.setProperty(PornportalCom.PROPERTY_GALLERY_IMAGE_POSITION, i);
+                    pic.setAvailable(true);
+                    pic._setFilePackage(imagePackage);
+                    images.add(pic);
+                }
+                ret.addAll(images);
+            }
         }
         if (ret.isEmpty()) {
             /* We should always find at least one item! */

@@ -48,7 +48,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.PCloudComFolder;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 50284 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PCloudComFolder.class })
 public class PCloudCom extends PluginForHost {
     @SuppressWarnings("deprecation")
@@ -95,8 +95,11 @@ public class PCloudCom extends PluginForHost {
         } catch (final PluginException ignore) {
         }
         final String parentfolderid = link.getStringProperty("plain_parentfolderid");
+        final String sourceurl = link.getStringProperty("mainlink");
         if (folderid != null && parentfolderid != null) {
             return "https://u.pcloud.link/publink/show?code=" + folderid + "#folder=" + parentfolderid + "&tpl=publicfoldergrid";
+        } else if (sourceurl != null) {
+            return sourceurl;
         } else {
             return super.getPluginContentURL(link);
         }

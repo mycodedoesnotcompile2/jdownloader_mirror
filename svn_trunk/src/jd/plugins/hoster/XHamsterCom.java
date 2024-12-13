@@ -25,6 +25,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -52,25 +64,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.XHamsterGallery;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.hls.HlsContainer;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 50329 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50336 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { XHamsterGallery.class })
 public class XHamsterCom extends PluginForHost {
     public XHamsterCom(PluginWrapper wrapper) {
         super(wrapper);
         /* Actually only free accounts are supported */
-        this.enablePremium("https://faphouse.com/join");
+        this.enablePremium("https://" + domain_premium + "/join");
         setConfigElements();
     }
 
@@ -93,15 +93,17 @@ public class XHamsterCom extends PluginForHost {
             }
         }
         /**
-         * 2022-07-22: Workaround for possible serverside bug: </br> In some countries, xhamster seems to redirect users to xhamster2.com.
-         * </br> If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
-         * deu.xhamster3.com and deu.xhamster3.com. </br> See initial report: https://board.jdownloader.org/showthread.php?t=91170
+         * 2022-07-22: Workaround for possible serverside bug: </br>
+         * In some countries, xhamster seems to redirect users to xhamster2.com. </br>
+         * If those users send an Accept-Language header of "de,en-gb;q=0.7,en;q=0.3" they can get stuck in a redirect-loop between
+         * deu.xhamster3.com and deu.xhamster3.com. </br>
+         * See initial report: https://board.jdownloader.org/showthread.php?t=91170
          */
         final String acceptLanguage = "en-gb;q=0.7,en;q=0.3";
         br.setAcceptLanguage(acceptLanguage);
         br.getHeaders().put("Accept-Language", acceptLanguage);
         /* 2023-08-29: They've started to block older user agents. */
-        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36");
+        br.getHeaders().put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
         br.setAllowedResponseCodes(new int[] { 400, 410, 423, 452 });
         br.setFollowRedirects(true);
     }
@@ -172,7 +174,9 @@ public class XHamsterCom extends PluginForHost {
 
     /* Porn_plugin */
     private final String          SETTING_SELECTED_VIDEO_FORMAT          = "SELECTED_VIDEO_FORMAT";
+    private final int             default_SETTING_SELECTED_VIDEO_FORMAT  = 0;
     private final String          SETTING_FILENAME_ID                    = "Filename_id";
+    private final boolean         default_SETTING_FILENAME_ID            = true;
     /* The list of qualities/formats displayed to the user */
     private static final String[] FORMATS                                = new String[] { "Best available", "240p", "360p", "480p", "720p", "960p", "1080p", "1440p", "2160p" };
     public static final String    domain_premium                         = "faphouse.com";
@@ -190,8 +194,8 @@ public class XHamsterCom extends PluginForHost {
     private final String          PROPERTY_ACCOUNT_PREMIUM_LOGIN_URL     = "premium_login_url";
 
     private void setConfigElements() {
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, FORMATS, "Preferred format").setDefaultValue(0));
-        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_FILENAME_ID, "Only for videos: Change file name to 'filename_VideoID.ext' e.g. 'test_48604.mp4' ?").setDefaultValue(true));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_COMBOBOX_INDEX, getPluginConfig(), SETTING_SELECTED_VIDEO_FORMAT, FORMATS, "Preferred format").setDefaultValue(default_SETTING_SELECTED_VIDEO_FORMAT));
+        getConfig().addEntry(new ConfigEntry(ConfigContainer.TYPE_CHECKBOX, getPluginConfig(), SETTING_FILENAME_ID, "Only for videos: Change file name to 'filename_VideoID.ext' e.g. 'test_48604.mp4' ?").setDefaultValue(default_SETTING_FILENAME_ID));
     }
 
     @Override
@@ -504,7 +508,7 @@ public class XHamsterCom extends PluginForHost {
             }
             if (title != null) {
                 title = Encoding.htmlDecode(Encoding.unicodeDecode(title));
-                if (getPluginConfig().getBooleanProperty(SETTING_FILENAME_ID, true)) {
+                if (getPluginConfig().getBooleanProperty(SETTING_FILENAME_ID, default_SETTING_FILENAME_ID)) {
                     filename = title + "_" + fid;
                 } else {
                     filename = fid + "_" + title;
@@ -769,7 +773,7 @@ public class XHamsterCom extends PluginForHost {
     }
 
     private int getPreferredQualityHeight() {
-        final int selected_format = getPluginConfig().getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, 0);
+        final int selected_format = getPluginConfig().getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
         switch (selected_format) {
         default:
         case 8:
@@ -799,7 +803,7 @@ public class XHamsterCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     public String getDllink(final Browser br) throws IOException, PluginException {
         final SubConfiguration cfg = getPluginConfig();
-        final int selected_format = cfg.getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, 0);
+        final int selected_format = cfg.getIntegerProperty(SETTING_SELECTED_VIDEO_FORMAT, default_SETTING_SELECTED_VIDEO_FORMAT);
         final List<String> qualities = new ArrayList<String>();
         switch (selected_format) {
         /* Fallthrough to automatically choose the next best quality */
@@ -1431,9 +1435,10 @@ public class XHamsterCom extends PluginForHost {
             /* Check vja ajax request -> json */
             br.getPage(api_base_premium + "/subscription/get");
             /**
-             * Returns "null" if cookies are valid but this is not a premium account. </br> Redirects to mainpage if cookies are invalid.
-             * </br> Return json if cookies are valid. </br> Can also return json along with http responsecode 400 for valid cookies but
-             * user is non-premium.
+             * Returns "null" if cookies are valid but this is not a premium account. </br>
+             * Redirects to mainpage if cookies are invalid. </br>
+             * Return json if cookies are valid. </br>
+             * Can also return json along with http responsecode 400 for valid cookies but user is non-premium.
              */
             final boolean looksLikeJsonResponse = br.getRequest().getHtmlCode().startsWith("{");
             if (br.getHttpConnection().getContentType().contains("json") && (looksLikeJsonResponse || br.toString().equals("null"))) {

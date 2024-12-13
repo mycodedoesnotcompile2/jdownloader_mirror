@@ -31,6 +31,8 @@ import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DecrypterRetryException;
+import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
@@ -39,7 +41,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.OkRu;
 
-@DecrypterPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
+@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 3, names = { "ok.ru" }, urls = { "https?://(?:[A-Za-z0-9]+\\.)?(?:ok\\.ru|odnoklassniki\\.ru)/(?:video|videoembed|web-api/video/moviePlayer|live)/(\\d+(-\\d+)?)|https?://ok\\.ru/video/c(\\d+)|https://(?:www\\.)?ok\\.ru/profile/\\d+/video/c\\d+" })
 public class OkRuDecrypter extends PluginForDecrypt {
     public OkRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,6 +127,13 @@ public class OkRuDecrypter extends PluginForDecrypt {
                 }
                 logger.info("Found " + addedItems + " items on current page");
             } while (!this.isAbort());
+            if (ret.isEmpty()) {
+                if (br.containsHTML("class=\"stub-empty_t\"")) {
+                    throw new DecrypterRetryException(RetryReason.EMPTY_PROFILE);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+            }
         } else if (param.getCryptedUrl().matches(TYPE_PLAYLIST)) {
             br.getPage(param.getCryptedUrl());
             if (br.getHttpConnection().getResponseCode() == 404) {

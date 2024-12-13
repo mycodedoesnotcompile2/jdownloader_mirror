@@ -133,18 +133,17 @@ public class FilePathChecker {
                 if (CrossSystem.getOS().isMaximum(OperatingSystem.WINDOWS_NT) && file.getAbsolutePath().length() > 259) {
                     // old windows API does not allow longer paths
                     throw new BadFilePathException(file, BadFilePathException.PathFailureReason.PATH_TOO_LONG);
-                } else {
-                    folders = CrossSystem.getPathComponents(file);
-                    if (folders.length > 0) {
-                        String root = folders[0];
-                        if (root.matches("^[a-zA-Z]{1}:\\\\$") || root.matches("^[a-zA-Z]{1}://$")) {
-                            /* X:/ or X:\ */
-                            checking = new File(folders[0]);
-                        } else if (root.equals("\\\\")) {
-                            if (folders.length >= 3) {
-                                /* \\\\computer\\folder\\ in network */
-                                checking = new File(folders[0] + folders[1] + "\\" + folders[2]);
-                            }
+                }
+                folders = CrossSystem.getPathComponents(file);
+                if (folders.length > 0) {
+                    String root = folders[0];
+                    if (root.matches("^[a-zA-Z]{1}:\\\\$") || root.matches("^[a-zA-Z]{1}://$")) {
+                        /* X:/ or X:\ */
+                        checking = new File(folders[0]);
+                    } else if (root.equals("\\\\")) {
+                        if (folders.length >= 3) {
+                            /* \\\\computer\\folder\\ in network */
+                            checking = new File(folders[0] + folders[1] + "\\" + folders[2]);
                         }
                     }
                 }
@@ -160,7 +159,7 @@ public class FilePathChecker {
             }
         }
         if (!checkFolderCreate && !checkFileWrite) {
-            /* No errors until now and we're not allowed to write -> Call it success */
+            /* No errors until now and we're not allowed to write -> Validation successful -> Call it success */
             return;
         }
         /**
@@ -173,6 +172,7 @@ public class FilePathChecker {
         while (true) {
             pathlist.add(0, next);
             if (folderCreateStartSegmentIndex != -1 || (folderCreateStartSegmentIndex == -1 && !next.exists())) {
+                /* Find first non-existent part of path. */
                 folderCreateStartSegmentIndex = loop;
             }
             next = next.getParentFile();
@@ -232,12 +232,7 @@ public class FilePathChecker {
                 final File writeTest2 = new File(writeTest1.getParent(), "jd_accessCheck_" + new UniqueAlltimeID().getID());
                 if (writeTest2.exists()) {
                     /* This shall never happen */
-                    // throw e1;
-                    /*
-                     * Assume that we didn't write this file -> We don't know if the problem is that the filename is too long or if there is
-                     * a permission issue -> Assume permission issue.
-                     */
-                    throw new BadFilePathException(file, BadFilePathException.PathFailureReason.PERMISSION_PROBLEM, pathlist.size() - 1);
+                    throw e1;
                 }
                 try {
                     fileWriteCheck(writeTest2);
@@ -255,15 +250,6 @@ public class FilePathChecker {
 
     /** Writes file and deletes it again. */
     public static void fileWriteCheck(final File file) throws IOException {
-        // TODO: Maybe throw exception if file already exists
-        final boolean checkForExists = false;
-        if (checkForExists && file.isDirectory()) {
-            // return;
-            throw new BadFilePathException(file, BadFilePathException.PathFailureReason.FILE_ALREADY_EXISTS_AS_FOLDER);
-        } else if (checkForExists && file.exists()) {
-            // return;
-            throw new BadFilePathException(file, BadFilePathException.PathFailureReason.FILE_ALREADY_EXISTS);
-        }
         final RandomAccessFile raffile = IO.open(file, "rw");
         raffile.close();
         if (!file.delete()) {

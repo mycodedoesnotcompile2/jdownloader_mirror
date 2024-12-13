@@ -5,8 +5,9 @@
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
  *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,42 +32,23 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.processes.command;
+package org.appwork.testframework;
 
-import org.appwork.utils.logging2.LogInterface;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+@Retention(RUNTIME)
+@Target(TYPE)
 /**
- * @author Thomas
- * @date 18.10.2018
+ * define required classes to run a test. if one of these classes is not in cp,the test will get skipped
  *
+ * @author thomas
+ * @date Dec 11, 2024
+ * @TestDependency({JNAWindowsProcessHandler.class,BasicGui.class})
  */
-public class LogLineHandler extends AbstractLineHandler {
-    private LogInterface logger;
-    private String       linePrefix = null;
-
-    public LogLineHandler(String linePrefix, LogInterface logger) {
-        this.linePrefix = linePrefix;
-        this.logger = logger;
-    }
-
-    /**
-     * @param logger
-     */
-    public LogLineHandler(LogInterface logger) {
-        this.logger = logger;
-    }
-
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.processes.LineHandler#handleLine(java.lang.String, java.lang.Object)
-     */
-    @Override
-    public void handleLine(String line, Object caller) {
-        if (linePrefix != null) {
-            logger.info(linePrefix + line);
-        } else {
-            logger.info(line);
-        }
-    }
+public @interface TestDependency {
+    String[] value();
 }

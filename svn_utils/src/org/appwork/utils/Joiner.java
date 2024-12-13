@@ -59,6 +59,28 @@ public class Joiner {
         this.separator = separator;
     }
 
+    private boolean ignoreNull = false;
+
+    /**
+     * @return the ignoreNull
+     */
+    public boolean isIgnoreNull() {
+        return ignoreNull;
+    }
+
+    public Joiner ignoreNull(boolean ignoreNull) {
+        setIgnoreNull(ignoreNull);
+        return this;
+    }
+
+    /**
+     * @param ignoreNull
+     *            the ignoreNull to set
+     */
+    public void setIgnoreNull(boolean ignoreNull) {
+        this.ignoreNull = ignoreNull;
+    }
+
     /**
      * add the separator at the start - a leading separator
      */
@@ -163,6 +185,9 @@ public class Joiner {
      * @return
      */
     protected boolean skip(Object s) {
+        if (isIgnoreNull() && s == null) {
+            return true;
+        }
         return false;
     }
 

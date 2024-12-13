@@ -15,5 +15,11 @@ public enum IfFilenameTooLongAction implements LabelInterface {
         public String getLabel() {
             return _GUI.T.too_long_filename_use_shortened_filename();
         }
+    },
+    ASK_FOR_EACH_FILE() {
+        @Override
+        public String getLabel() {
+            return _GUI.T.ask();
+        }
     }
 }

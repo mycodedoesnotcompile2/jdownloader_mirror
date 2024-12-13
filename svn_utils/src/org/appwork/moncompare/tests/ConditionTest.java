@@ -75,6 +75,7 @@ import org.appwork.storage.flexijson.mapper.FlexiJSonMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.ConditionMapper;
 import org.appwork.storage.flexijson.mapper.typemapper.DateMapper;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.txtresource.LocaleMap;
 import org.appwork.utils.duration.TimeSpan;
 
@@ -83,6 +84,7 @@ import org.appwork.utils.duration.TimeSpan;
  * @date 06.05.2019
  *
  */
+@TestDependency({ "org.appwork.moncompare.Conditions" })
 public class ConditionTest extends AWTest {
     /**
      *

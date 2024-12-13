@@ -419,6 +419,9 @@ public class StorableValidatorTest extends AWTest {
             @Override
             public boolean isTypeWithlisted(Type gType, Method method) {
                 Class<?> raw = ReflectionUtils.getRaw(gType);
+                if (raw == null) {
+                    logInfoAnyway("NULL raw " + gType + " ." + gType.getTypeName());
+                }
                 try {
                     if (skipValidation(raw)) {
                         return true;

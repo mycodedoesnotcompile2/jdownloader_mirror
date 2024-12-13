@@ -131,4 +131,12 @@ public interface PornportalComConfig extends PluginConfigInterface {
     boolean isSelectQuality2160();
 
     void setSelectQuality2160(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(true)
+    @DescriptionForConfigEntry("Crawl thumbnails/posters?")
+    @Order(250)
+    boolean isCrawlThumbnails();
+
+    void setCrawlThumbnails(boolean b);
 }

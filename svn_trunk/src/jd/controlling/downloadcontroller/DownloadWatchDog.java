@@ -2310,7 +2310,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         final DownloadSession session = getSession();
         final DownloadLinkCandidateSelector selector = new DownloadLinkCandidateSelector(session);
         int maxConcurrentNormal = Math.max(1, config.getMaxSimultaneDownloads());
-        maxConcurrentNormal = Math.max(maxConcurrentNormal, DomainRuleController.getInstance().getMaxSimultanDownloads());
+        maxConcurrentNormal = Math.max(maxConcurrentNormal, DomainRuleController.getInstance().getMaxSimultaneousDownloads());
         int maxConcurrentForced = maxConcurrentNormal + Math.max(0, config.getMaxForcedDownloads());
         int loopCounter = 0;
         final boolean invalidate = session.setCandidatesRefreshRequired(false);
@@ -2343,7 +2343,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
             if (!session.isStopMarkReached()) {
                 selector.setForcedOnly(false);
                 /* then process normal activationRequests */
-                final boolean canExceed = DomainRuleController.getInstance().getMaxSimultanDownloads() > 0;
+                final boolean canExceed = DomainRuleController.getInstance().getMaxSimultaneousDownloads() > 0;
                 // heckForAdditionalDownloadSlots(session)
                 while (this.newDLStartAllowed(session)) {
                     if (!canExceed) {
@@ -4081,6 +4081,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                          */
                         filename = fileOutput.getName();
                     }
+                    /* Check if a mirror is currently being downloaded or if a file with the same name is currently being downloaded. */
                     for (final SingleDownloadController downloadController : session.getControllers()) {
                         if (downloadController == controller) {
                             continue;
@@ -4143,7 +4144,7 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             if (e.getReason() != PathFailureReason.PATH_SEGMENT_TOO_LONG) {
                                 throw e;
                             } else if ((pfname = new jd.plugins.ParsedFilename(filename)).isMultipartArchive()) {
-                                /* Do not offer auto filename shortening for multipart archive files. */
+                                /* Do not offer auto filename shortening for multipart archive files. User needs to do this manually. */
                                 throw e;
                             } else if (maxFilenameLength <= 0) {
                                 /*
@@ -4160,19 +4161,23 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                                 /* Shortening this filename was not possible -> Throw exception */
                                 throw e;
                             }
-                            final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, shortenedFilename).show();
-                            IfFilenameTooLongAction doAction;
-                            if (io.getCloseReason() == CloseReason.OK) {
-                                doAction = io.getAction();
-                            } else {
-                                /* Timeout or dialog closed/ignored -> Do not auto rename */
-                                doAction = IfFilenameTooLongAction.SKIP_FILE;
+                            final DownloadSession currentSession = getSession();
+                            IfFilenameTooLongAction action = currentSession.getOnFilenameTooLongAction(downloadLink.getFilePackage());
+                            if (action == null || action == IfFilenameTooLongAction.ASK_FOR_EACH_FILE) {
+                                final IfFilenameTooLongDialogInterface io = new IfFilenameTooLongDialog(downloadLink, shortenedFilename).show();
+                                if (io.getCloseReason() == CloseReason.OK) {
+                                    action = io.getAction();
+                                } else {
+                                    /* Timeout or dialog closed/ignored -> Do not auto rename */
+                                    action = IfFilenameTooLongAction.SKIP_FILE;
+                                }
+                                if (io.isDontShowAgainSelected()) {
+                                    currentSession.setOnFileFilenameTooLongAction(downloadLink.getFilePackage(), action);
+                                } else {
+                                    currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
+                                }
                             }
-                            if (doAction == null) {
-                                /* Fallback */
-                                doAction = IfFilenameTooLongAction.SKIP_FILE;
-                            }
-                            if (doAction != IfFilenameTooLongAction.RENAME_FILE) {
+                            if (IfFilenameTooLongAction.RENAME_FILE != action) {
                                 logger.info("Skipping filename auto short");
                                 throw e;
                             }
@@ -4183,158 +4188,156 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
                             final File writeTest2 = new File(writeTest1.getParent(), shortenedFilename);
                             if (writeTest2.exists()) {
                                 logger.info("File with shortened filename already exists!");
-                                // TODO
-                                // fileOutput = writeTest2;
-                                fileExists = true;
-                                /* Let rename handling down below take care about it (Exception or auto rename). */
-                                break deepCheckDownloadPathHandling;
+                                throw new SkipReasonException(SkipReason.FILE_EXISTS);
                             }
                         }
                     }
                 }
-                fileExistsOrInProgressHandling: if (fileExists || fileInProgress != null) {
-                    IfFileExistsAction doAction = config.getIfFileExistsAction();
-                    if (doAction == null || IfFileExistsAction.ASK_FOR_EACH_FILE == doAction) {
-                        final DownloadSession currentSession = getSession();
-                        doAction = currentSession.getOnFileExistsAction(downloadLink.getFilePackage());
-                        if (doAction == null || doAction == IfFileExistsAction.ASK_FOR_EACH_FILE) {
-                            final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress).show();
-                            if (io.getCloseReason() == CloseReason.TIMEOUT) {
-                                /* User did not react -> All we can do is display an error. */
-                                throw new SkipReasonException(SkipReason.FILE_EXISTS);
-                            }
-                            if (io.getCloseReason() == CloseReason.INTERRUPT) {
-                                throw new InterruptedException("IFFileExistsDialog Interrupted");
-                            }
-                            if (io.getCloseReason() != CloseReason.OK) {
-                                doAction = IfFileExistsAction.SKIP_FILE;
-                            } else {
-                                doAction = io.getAction();
-                            }
-                            if (doAction == null) {
-                                doAction = IfFileExistsAction.SKIP_FILE;
-                            }
-                            if (io.isDontShowAgainSelected() && io.getCloseReason() == CloseReason.OK) {
-                                currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), doAction);
-                            } else {
-                                currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
-                            }
+                if (!fileExists && fileInProgress == null) {
+                    /* Success -> Early return */
+                    return;
+                }
+                /* File already exists or file is currently being downloaded. */
+                IfFileExistsAction doAction = config.getIfFileExistsAction();
+                if (doAction == null || IfFileExistsAction.ASK_FOR_EACH_FILE == doAction) {
+                    final DownloadSession currentSession = getSession();
+                    doAction = currentSession.getOnFileExistsAction(downloadLink.getFilePackage());
+                    if (doAction == null || doAction == IfFileExistsAction.ASK_FOR_EACH_FILE) {
+                        final IfFileExistsDialogInterface io = new IfFileExistsDialog(downloadLink, fileInProgress).show();
+                        if (io.getCloseReason() == CloseReason.TIMEOUT) {
+                            /* User did not react -> All we can do is display an error. */
+                            throw new SkipReasonException(SkipReason.FILE_EXISTS);
+                        } else if (io.getCloseReason() == CloseReason.INTERRUPT) {
+                            throw new InterruptedException("IFFileExistsDialog Interrupted");
+                        }
+                        if (io.getCloseReason() == CloseReason.OK) {
+                            doAction = io.getAction();
+                        } else {
+                            doAction = IfFileExistsAction.SKIP_FILE;
+                        }
+                        if (doAction == null) {
+                            /* Fallback */
+                            doAction = IfFileExistsAction.SKIP_FILE;
+                        }
+                        if (io.isDontShowAgainSelected() && io.getCloseReason() == CloseReason.OK) {
+                            currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), doAction);
+                        } else {
+                            currentSession.setOnFileExistsAction(downloadLink.getFilePackage(), null);
                         }
                     }
-                    switch (doAction) {
-                    case SKIP_FILE:
-                        switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
-                        case SET_FILE_TO_SUCCESSFUL_MIRROR:
-                            if (fileInProgress != null) {
-                                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                            }
-                            throw new DeferredRunnableException(new ExceptionRunnable() {
-                                @Override
-                                public void run() throws Exception {
-                                    final PluginForHost plugin = controller.getProcessingPlugin();
-                                    if (plugin != null) {
-                                        final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
-                                        if (downloadable != null) {
-                                            switch (mirrorDetectionDecision) {
-                                            case AUTO:
-                                                final HashInfo hashInfo = downloadable.getHashInfo();
-                                                if (hashInfo != null) {
-                                                    final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
-                                                    if (hashResult != null && hashResult.match()) {
-                                                        downloadable.setHashResult(hashResult);
-                                                        downloadLink.setDownloadCurrent(fileOutput.length());
-                                                        throw new PluginException(LinkStatus.FINISHED);
-                                                    }
-                                                }
-                                            case FILENAME_FILESIZE:
-                                                final long fileSize = downloadable.getVerifiedFileSize();
-                                                if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                }
+                switch (doAction) {
+                case SKIP_FILE:
+                    switch (CFG_GENERAL.CFG.getOnSkipDueToAlreadyExistsAction()) {
+                    case SET_FILE_TO_SUCCESSFUL_MIRROR:
+                        if (fileInProgress != null) {
+                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                        }
+                        throw new DeferredRunnableException(new ExceptionRunnable() {
+                            @Override
+                            public void run() throws Exception {
+                                final PluginForHost plugin = controller.getProcessingPlugin();
+                                if (plugin != null) {
+                                    final Downloadable downloadable = plugin.newDownloadable(downloadLink, null);
+                                    if (downloadable != null) {
+                                        switch (mirrorDetectionDecision) {
+                                        case AUTO:
+                                            final HashInfo hashInfo = downloadable.getHashInfo();
+                                            if (hashInfo != null) {
+                                                final HashResult hashResult = downloadable.getHashResult(hashInfo, fileOutput);
+                                                if (hashResult != null && hashResult.match()) {
+                                                    downloadable.setHashResult(hashResult);
                                                     downloadLink.setDownloadCurrent(fileOutput.length());
                                                     throw new PluginException(LinkStatus.FINISHED);
                                                 }
-                                                break;
-                                            case FILENAME:
-                                            case DISABLED:
-                                            default:
-                                                // nothing
                                             }
-                                        }
-                                    }
-                                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                                }
-                            });
-                        case SET_FILE_TO_SUCCESSFUL:
-                            throw new PluginException(LinkStatus.FINISHED);
-                        default:
-                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                        }
-                    case OVERWRITE_FILE:
-                        if (fileInProgress != null) {
-                            /* We cannot overwrite a file that is currently in progress */
-                            controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Blocked by:" + fileInProgress);
-                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                        } else if (!fileOutput.delete()) {
-                            controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Can't delete initial file");
-                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                        } else {
-                            break;
-                        }
-                    case AUTO_RENAME:
-                        final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
-                        final String downloadPath = fileOutput.getParent();
-                        String extension = splitName[1];
-                        if (extension == null) {
-                            extension = "";
-                        } else {
-                            extension = "." + extension;
-                        }
-                        String name = splitName[0];
-                        int duplicateFilenameCounter = 2;
-                        final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
-                        if (alreadyDuplicated != null) {
-                            /* it seems the file already got auto renamed! */
-                            duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
-                            name = new Regex(name, "(.*)_\\d+$").getMatch(0);
-                        }
-                        try {
-                            File check = null;
-                            String newName = null;
-                            while (true) {
-                                newName = name + "_" + (duplicateFilenameCounter++) + extension;
-                                check = new File(downloadPath, newName);
-                                if (check.exists()) {
-                                    check = null;
-                                } else {
-                                    for (SingleDownloadController downloadController : session.getControllers()) {
-                                        if (downloadController == controller) {
-                                            continue;
-                                        }
-                                        if (session.getFileAccessManager().isLockedBy(check, downloadController)) {
-                                            check = null;
+                                        case FILENAME_FILESIZE:
+                                            final long fileSize = downloadable.getVerifiedFileSize();
+                                            if (fileSize >= 0 && fileSize == fileOutput.length()) {
+                                                downloadLink.setDownloadCurrent(fileOutput.length());
+                                                throw new PluginException(LinkStatus.FINISHED);
+                                            }
                                             break;
+                                        case FILENAME:
+                                        case DISABLED:
+                                        default:
+                                            // nothing
                                         }
                                     }
                                 }
-                                if (check != null) {
-                                    break;
-                                }
+                                throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                             }
-                            // we can do this, because the localFilecheck always runs BEFORE the download
-                            // except for org.jdownloader.controlling.linkcrawler.GenericVariants.DEMUX_GENERIC_AUDIO
-                            controller.setSessionDownloadFilename(newName);
-                            downloadLink.setForcedFileName(newName);
-                            downloadLink.setChunksProgress(null);
-                        } catch (Throwable e) {
-                            LogSource.exception(controller.getLogger(), e);
-                            downloadLink.setForcedFileName(null);
-                            throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
-                        }
-                        break;
+                        });
+                    case SET_FILE_TO_SUCCESSFUL:
+                        throw new PluginException(LinkStatus.FINISHED);
                     default:
                         throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                     }
+                case OVERWRITE_FILE:
+                    if (fileInProgress != null) {
+                        /* We cannot overwrite a file that is currently in progress */
+                        controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Blocked by:" + fileInProgress);
+                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                    } else if (!fileOutput.delete()) {
+                        controller.getLogger().severe("Cannot overwrite file:" + fileOutput + " | Can't delete initial file");
+                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                    } else {
+                        break;
+                    }
+                case AUTO_RENAME:
+                    final String splitName[] = CrossSystem.splitFileName(fileOutput.getName());
+                    final String downloadPath = fileOutput.getParent();
+                    String extension = splitName[1];
+                    if (extension == null) {
+                        extension = "";
+                    } else {
+                        extension = "." + extension;
+                    }
+                    String name = splitName[0];
+                    int duplicateFilenameCounter = 2;
+                    final String alreadyDuplicated = new Regex(name, ".*_(\\d{1,5})$").getMatch(0);
+                    if (alreadyDuplicated != null) {
+                        /* it seems the file already got auto renamed! */
+                        duplicateFilenameCounter = Integer.parseInt(alreadyDuplicated) + 1;
+                        name = new Regex(name, "(.*)_\\d+$").getMatch(0);
+                    }
+                    try {
+                        File check = null;
+                        String newName = null;
+                        while (true) {
+                            newName = name + "_" + (duplicateFilenameCounter++) + extension;
+                            check = new File(downloadPath, newName);
+                            if (check.exists()) {
+                                check = null;
+                            } else {
+                                for (SingleDownloadController downloadController : session.getControllers()) {
+                                    if (downloadController == controller) {
+                                        continue;
+                                    }
+                                    if (session.getFileAccessManager().isLockedBy(check, downloadController)) {
+                                        check = null;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (check != null) {
+                                break;
+                            }
+                        }
+                        // we can do this, because the localFilecheck always runs BEFORE the download
+                        // except for org.jdownloader.controlling.linkcrawler.GenericVariants.DEMUX_GENERIC_AUDIO
+                        controller.setSessionDownloadFilename(newName);
+                        downloadLink.setForcedFileName(newName);
+                        downloadLink.setChunksProgress(null);
+                    } catch (Throwable e) {
+                        LogSource.exception(controller.getLogger(), e);
+                        downloadLink.setForcedFileName(null);
+                        throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
+                    }
+                    break;
+                default:
+                    throw new PluginException(LinkStatus.ERROR_ALREADYEXISTS);
                 }
-                return;
             }
 
             @Override

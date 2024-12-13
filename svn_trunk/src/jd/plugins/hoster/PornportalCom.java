@@ -64,7 +64,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 50120 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -170,13 +170,14 @@ public class PornportalCom extends PluginForHost {
         final String videoid = link.getStringProperty(PROPERTY_VIDEO_ID);
         final String videoquality = link.getStringProperty(PROPERTY_VIDEO_QUALITY);
         final String videoStreamType = link.getStringProperty(PROPERTY_VIDEO_STREAM_TYPE);
+        final String gallery_type = this.getGalleryType(link);
         final String galleryid = link.getStringProperty(PROPERTY_GALLERY_ID);
         final int galleryImagePosition = link.getIntegerProperty(PROPERTY_GALLERY_IMAGE_POSITION, -1);
         final int galleryPosition = link.getIntegerProperty(PROPERTY_GALLERY_POSITION, -1);
         if (videoid != null && videoquality != null) {
             return this.getHost() + "://video" + videoid + "/" + videoquality + "/" + videoStreamType;
         } else if (galleryid != null && galleryPosition != -1 && galleryImagePosition != -1) {
-            return this.getHost() + "://photo" + galleryid + "/" + galleryPosition + "/" + galleryImagePosition;
+            return this.getHost() + "://photo" + gallery_type + galleryid + "/" + galleryPosition + "/" + galleryImagePosition;
         } else {
             return super.getLinkID(link);
         }
@@ -277,38 +278,40 @@ public class PornportalCom extends PluginForHost {
         return 0;
     }
 
-    public static final String PROPERTY_directurl              = "directurl";
-    public static final String PROPERTY_VIDEO_ID               = "videoid";
-    public static final String PROPERTY_VIDEO_QUALITY          = "quality";
-    public static final String PROPERTY_VIDEO_STREAM_TYPE      = "stream_type";
-    public static final String PROPERTY_GALLERY_ID             = "galleryid";
-    public static final String PROPERTY_GALLERY_POSITION       = "gallery_position";
-    public static final String PROPERTY_GALLERY_IMAGE_POSITION = "gallery_image_position";
-    public static final String PROPERTY_GALLERY_DIRECTORY      = "gallery_directory";
-    public static final String PROPERTY_GALLERY_SIZE           = "gallery_size";
-    public static Object       KEYLOCK                         = new Object();
+    public static final String PROPERTY_directurl                  = "directurl";
+    public static final String PROPERTY_VIDEO_ID                   = "videoid";
+    public static final String PROPERTY_VIDEO_QUALITY              = "quality";
+    public static final String PROPERTY_VIDEO_STREAM_TYPE          = "stream_type";
+    public static final String PROPERTY_GALLERY_TYPE               = "gallerytype";
+    public static final String PROPERTY_GALLERY_ID                 = "galleryid";
+    public static final String PROPERTY_GALLERY_POSITION           = "gallery_position";
+    public static final String PROPERTY_GALLERY_IMAGE_POSITION     = "gallery_image_position";
+    public static final String PROPERTY_GALLERY_DIRECTORY          = "gallery_directory";
+    public static final String PROPERTY_GALLERY_SIZE               = "gallery_size";
+    public static Object       KEYLOCK                             = new Object();
+    public static final String GALLERY_TYPE_GALLERY                = "gallery";
+    public static final String GALLERY_TYPE_THUMBNAIL_SLASH_POSTER = "thumbnail_slash_poster";
 
     public static Request getPage(final Browser br, final Request request) throws Exception {
         br.getPage(request);
         String RNKEY = evalKEY(br);
-        if (RNKEY != null) {
-            int maxLoops = 8;// up to 3 loops in tests
-            synchronized (KEYLOCK) {
-                while (true) {
-                    if (RNKEY == null) {
-                        return br.getRequest();
-                    } else if (--maxLoops > 0) {
-                        br.setCookie(br.getHost(), "KEY", RNKEY);
-                        Thread.sleep(1000 + ((8 - maxLoops) * 500));
-                        br.getPage(request.cloneRequest());
-                        RNKEY = evalKEY(br);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
+        if (RNKEY == null) {
+            return br.getRequest();
+        }
+        int maxLoops = 8;// up to 3 loops in tests
+        synchronized (KEYLOCK) {
+            while (true) {
+                if (RNKEY == null) {
+                    return br.getRequest();
+                } else if (--maxLoops > 0) {
+                    br.setCookie(br.getHost(), "KEY", RNKEY);
+                    Thread.sleep(1000 + ((8 - maxLoops) * 500));
+                    br.getPage(request.cloneRequest());
+                    RNKEY = evalKEY(br);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-        } else {
-            return br.getRequest();
         }
     }
 
@@ -337,6 +340,19 @@ public class PornportalCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
         return requestFileInformation(link, null, false);
+    }
+
+    private String getGalleryType(final DownloadLink link) {
+        final String galleryID = link.getStringProperty(PROPERTY_GALLERY_ID);
+        if (galleryID == null) {
+            /* Item is not part of an image gallery */
+            return null;
+        }
+        /*
+         * Use GALLERY_TYPE_GALLERY as fallback since in older plugin versions we only had one type: Image gallery. Thumbnails/Posters were
+         * added later.
+         */
+        return link.getStringProperty(PROPERTY_GALLERY_TYPE, GALLERY_TYPE_GALLERY);
     }
 
     private String getContentID(final DownloadLink link) {

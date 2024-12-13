@@ -33,16 +33,21 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.processes.command;
 
-
 /**
  * @author daniel
  * @date Jul 26, 2019
  *
  */
 public class ProcessInputStream extends ProcessStream {
-
     public ProcessInputStream(Process process) {
         super(process, process.getInputStream());
     }
 
+    /**
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "std";
+    }
 }

@@ -92,6 +92,7 @@ import org.appwork.storage.validator.classvalidator.StorableClassValidator2;
 import org.appwork.storage.validator.classvalidator.StorableClassValidator3;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
@@ -104,6 +105,7 @@ import org.appwork.utils.reflection.CompiledType;
  * @date 23.02.2022
  *
  */
+@TestDependency({ "org.appwork.storage.StorableValidatorIgnoresMissingGetter" })
 public class FlexiStorageInterfaceValidatorTest extends AWTest {
     public static interface CanStoreRules {
         /**

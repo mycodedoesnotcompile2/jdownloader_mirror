@@ -33,16 +33,21 @@
  * ==================================================================================================================================================== */
 package org.appwork.utils.processes.command;
 
-
 /**
  * @author daniel
  * @date Jul 26, 2019
  *
  */
 public class ProcessErrorStream extends ProcessStream {
-
     public ProcessErrorStream(Process process) {
         super(process, process.getErrorStream());
     }
 
+    /**
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "err";
+    }
 }

@@ -24,12 +24,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -48,7 +42,13 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FreeDiscPl;
 
-@DecrypterPlugin(revision = "$Revision: 48624 $", interfaceVersion = 3, names = { "freedisc.pl" }, urls = { "https?://(?:(?:www|m)\\.)?freedisc\\.pl/([A-Za-z0-9_\\-]+),d-(\\d+)(,([\\w\\-]+))?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.plugins.components.config.FreeDiscPlConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50337 $", interfaceVersion = 3, names = { "freedisc.pl" }, urls = { "https?://(?:(?:www|m)\\.)?freedisc\\.pl/([A-Za-z0-9_\\-]+),d-(\\d+)(,([\\w\\-]+))?" })
 public class FreeDiscPlFolder extends PluginForDecrypt {
     public FreeDiscPlFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -121,15 +121,18 @@ public class FreeDiscPlFolder extends PluginForDecrypt {
         final boolean crawlSubfolders = PluginJsonConfig.get(FreeDiscPlConfig.class).isCrawlSubfolders();
         final Map<String, Object> responseFolder = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> filesMap = (Map<String, Object>) JavaScriptEngineFactory.walkJson(responseFolder, "response/data/data"); // Contains
-                                                                                                                                           // all
-                                                                                                                                           // file
-                                                                                                                                           // items
+        // all
+        // file
+        // items
         int numberofSubfolders = 0;
         int numberofFiles = 0;
         final List<Map<String, Object>> filesAndSubfolders = new ArrayList<Map<String, Object>>();
         filesAndSubfolders.add(subfolderMap);
         filesAndSubfolders.add(filesMap);
         for (final Map<String, Object> map : filesAndSubfolders) {
+            if (map == null) {
+                continue;
+            }
             for (final Object resourceO : map.values()) {
                 final Map<String, Object> resource = (Map<String, Object>) resourceO;
                 final String type = resource.get("type").toString();

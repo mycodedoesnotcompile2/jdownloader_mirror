@@ -2,6 +2,9 @@ package jd.controlling.downloadcontroller;
 
 import java.lang.ref.WeakReference;
 
+import org.jdownloader.controlling.domainrules.DomainRuleController;
+import org.jdownloader.controlling.domainrules.DomainRuleSet;
+
 import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.controlling.proxy.AbstractProxySelectorImpl;
 import jd.plugins.DownloadLink;
@@ -12,6 +15,7 @@ public class DownloadLinkCandidate {
     private final CachedAccount               cachedAccount;
     private final AbstractProxySelectorImpl   proxySelector;
     private final boolean                     customizedAccount;
+    private DomainRuleSet                     domainRuleSet = null;
 
     public AbstractProxySelectorImpl getProxySelector() {
         return proxySelector;
@@ -31,7 +35,7 @@ public class DownloadLinkCandidate {
 
     @Override
     public String toString() {
-        DownloadLink link = getLink();
+        final DownloadLink link = getLink();
         return "DownloadCandidate:" + link + "|Host " + (link == null ? null : link.getHost()) + "|Account:" + cachedAccount + "|Proxy:" + proxySelector;
     }
 
@@ -57,5 +61,18 @@ public class DownloadLinkCandidate {
 
     public boolean isCustomizedAccount() {
         return customizedAccount;
+    }
+
+    public DomainRuleSet getDomainRuleSet() {
+        if (domainRuleSet != null) {
+            return domainRuleSet;
+        }
+        final DownloadLink link = getLink();
+        final String downloadDomain = link.getDomainInfo().getTld();
+        final CachedAccount cachedAccount = getCachedAccount();
+        final String pluginDomain = cachedAccount.getHost();
+        final String fileName = link.getName();
+        domainRuleSet = DomainRuleController.getInstance().createRuleSet(cachedAccount.getAccount(), downloadDomain, pluginDomain, fileName);
+        return domainRuleSet;
     }
 }

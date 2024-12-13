@@ -49,6 +49,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
+import org.appwork.builddecision.BuildDecisions;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
 import org.appwork.loggingv3.simple.LogRecord2;
@@ -78,6 +79,10 @@ import org.appwork.utils.processes.ProcessOutput;
  *
  */
 public class PostBuildRunner {
+    /**
+     *
+     */
+    public static final String            POSTBUILDTEST                              = "POSTBUILDTEST";
     /**
      *
      */
@@ -119,6 +124,7 @@ public class PostBuildRunner {
     private static ArrayList<String> TESTS_OK;
 
     public static void main(final String[] args) throws Exception {
+        BuildDecisions.setEnabled(false);
         Application.setApplication(".appwork-tests");
         AWTest.initLogger(new SimpleFormatter() {
             @Override
@@ -238,8 +244,31 @@ public class PostBuildRunner {
     }
 
     protected static void runSingleTest(final String[] args) {
+        String testClass = args[1];
+        logInfoAnyway("Test " + testClass);
         try {
-            String testClass = args[1];
+            TestDependency dependencies = Class.forName(testClass, false, PostBuildRunner.class.getClassLoader()).getAnnotation(TestDependency.class);
+            if (dependencies != null) {
+                for (String str : dependencies.value()) {
+                    logInfoAnyway("Test Dependency: " + str);
+                    Class.forName(str, false, PostBuildRunner.class.getClassLoader());
+                }
+            }
+        } catch (Throwable e) {
+            if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null || Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
+                AWTest.setLoggerSilent(false, false);
+                LogV3.info(header("ERROR") + "Class file(s) not in JAR: " + e.getMessage());
+                LogV3.disableSysout();
+                // LogV3.log(e);
+                System.exit(2);
+            }
+            // Force to cached error log.
+            AWTest.setLoggerSilent(false, true);
+            LogV3.log(e);
+            LogV3.disableSysout();
+            System.exit(1);
+        }
+        try {
             Class.forName(testClass);
             // test if the class is a valid path and can get loaded.
             String folderWithTestWorkspace = args[2];
@@ -258,18 +287,19 @@ public class PostBuildRunner {
             LogV3.info(header("SUCCESS") + "Test Finished Successfuly");
             LogV3.disableSysout();
             System.exit(0);
-        } catch (java.lang.InstantiationException e) {
+            // } catch (java.lang.InstantiationException e) {
         } catch (Throwable e) {
-            if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null || Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
-                AWTest.setLoggerSilent(false, false);
-                LogV3.info(header("ERROR") + "Class file(s) not in JAR: " + e.getMessage());
-                LogV3.disableSysout();
-                // LogV3.log(e);
-                System.exit(2);
-            }
             // Force to cached error log.
             AWTest.setLoggerSilent(false, true);
             LogV3.log(e);
+            if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null) {
+                logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
+                System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
+            }
+            if (Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
+                logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
+                System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
+            }
             LogV3.disableSysout();
             System.exit(1);
         }
@@ -286,6 +316,7 @@ public class PostBuildRunner {
      * @throws Exception
      */
     private static void runTest(String clz, String base, String[] args) throws Exception {
+        System.setProperty(POSTBUILDTEST, clz);
         PostBuildTestInterface instance;
         instance = (PostBuildTestInterface) Class.forName(clz).getConstructor(new Class[] {}).newInstance(new Object[] {});
         String[] paras = new String[args.length - 2];

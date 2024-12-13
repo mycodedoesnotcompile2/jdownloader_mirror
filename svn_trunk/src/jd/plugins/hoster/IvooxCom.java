@@ -15,6 +15,8 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.hoster;
 
+import java.util.regex.Pattern;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
@@ -29,7 +31,7 @@ import jd.plugins.PluginForHost;
 
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "ivoox.com" }, urls = { "https?://(?:[a-z]+\\.)?ivoox\\.com/(?:[a-z]{2}/)?[a-z0-9\\-]+audios\\-mp3_rf_(\\d+)_\\d+\\.html" })
+@HostPlugin(revision = "$Revision: 50337 $", interfaceVersion = 3, names = { "ivoox.com" }, urls = { "https?://(?:[a-z]+\\.)?ivoox\\.com/(?:[a-z]{2}/)?[a-z0-9\\-]+audios\\-mp3_rf_(\\d+)_\\d+\\.html" })
 public class IvooxCom extends PluginForHost {
     public IvooxCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -103,8 +105,11 @@ public class IvooxCom extends PluginForHost {
             br.getPage(official_download);
             dllink = br.getRegex("downloadFollow\\(event,\\'(https[^<>\"]+)\\'\\)").getMatch(0);
         } else {
-            /* 2019-02-05: Old way! */
-            dllink = "http://files.ivoox.com/listen/" + fid;
+            dllink = br.getRegex("(listen[^\"']*" + Pattern.quote(fid) + "[^\"']*\\.mp3)").getMatch(0);
+            if (dllink == null) {
+                /* 2019-02-05: Old way! */
+                dllink = "http://files.ivoox.com/listen/" + fid;
+            }
         }
         if (title != null) {
             title = Encoding.htmlDecode(title);

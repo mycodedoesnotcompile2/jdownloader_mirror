@@ -44,6 +44,7 @@ public interface RemoteAPIConfig extends ConfigInterface {
     void setDeprecatedApiLocalhostOnly(boolean b);
 
     @AboutConfig
+    @RequiresRestart("A JDownloader Restart is Required")
     @DefaultBooleanValue(false)
     boolean isDeprecatedApiEnabled();
 
@@ -55,6 +56,7 @@ public interface RemoteAPIConfig extends ConfigInterface {
     public boolean isHeadlessMyJDownloaderMandatory();
 
     @AboutConfig
+    @RequiresRestart("A JDownloader Restart is Required")
     @DefaultIntValue(3128)
     int getDeprecatedApiPort();
 

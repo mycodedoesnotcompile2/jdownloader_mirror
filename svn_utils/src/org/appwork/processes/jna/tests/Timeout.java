@@ -4,9 +4,10 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
+ *         e-mail@appwork.org
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -31,42 +32,38 @@
  *     If the AGPL does not fit your needs, please contact us. We'll find a solution.
  * ====================================================================================================================================================
  * ==================================================================================================================================================== */
-package org.appwork.utils.processes.command;
+package org.appwork.processes.jna.tests;
 
-import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.Time;
 
 /**
- * @author Thomas
- * @date 18.10.2018
+ * @author thomas
+ * @date 20.11.2024
  *
  */
-public class LogLineHandler extends AbstractLineHandler {
-    private LogInterface logger;
-    private String       linePrefix = null;
+public class Timeout {
+    private int  ms;
+    private long started;
 
-    public LogLineHandler(String linePrefix, LogInterface logger) {
-        this.linePrefix = linePrefix;
-        this.logger = logger;
+    /**
+     * @param i
+     */
+    public Timeout(int ms) {
+        this.ms = ms;
+        reset();
     }
 
     /**
-     * @param logger
+     *
      */
-    public LogLineHandler(LogInterface logger) {
-        this.logger = logger;
+    private void reset() {
+        started = Time.systemIndependentCurrentJVMTimeMillis();
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * @see org.appwork.utils.processes.LineHandler#handleLine(java.lang.String, java.lang.Object)
+    /**
+     * @return
      */
-    @Override
-    public void handleLine(String line, Object caller) {
-        if (linePrefix != null) {
-            logger.info(linePrefix + line);
-        } else {
-            logger.info(line);
-        }
+    public boolean isAlive() {
+        return Time.systemIndependentCurrentJVMTimeMillis() - started < ms;
     }
 }
