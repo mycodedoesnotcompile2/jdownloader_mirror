@@ -3,8 +3,6 @@ package org.jdownloader.controlling.domainrules;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.plugins.Account;
-
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -17,6 +15,8 @@ import org.jdownloader.controlling.domainrules.event.DomainRuleControllerEventSe
 import org.jdownloader.controlling.domainrules.event.DomainRuleControllerListener;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.plugins.Account;
 
 public class DomainRuleController implements GenericConfigEventListener<Object> {
     private static final DomainRuleController INSTANCE = new DomainRuleController();
@@ -63,16 +63,18 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
         int maxDownloads = 0;
         if (rules != null) {
             for (final DomainRule dr : rules) {
-                if (dr != null && dr.isEnabled()) {
-                    try {
-                        newList.add(new CompiledDomainRule(dr));
-                        if (dr.isAllowToExceedTheGlobalLimit()) {
-                            maxDownloads = Math.max(maxDownloads, dr.getMaxSimultanDownloads());
-                        }
-                    } catch (Throwable e) {
-                        UIOManager.I().show(ExceptionDialogInterface.class, new ExceptionDialog(UIOManager.BUTTONS_HIDE_CANCEL, _GUI.T.lit_error_occured(), e.getMessage() + "\r\n" + JSonStorage.toString(dr), e, _GUI.T.lit_close(), null));
+                if (dr == null) {
+                    continue;
+                } else if (!dr.isEnabled()) {
+                    continue;
+                }
+                try {
+                    newList.add(new CompiledDomainRule(dr));
+                    if (dr.isAllowToExceedTheGlobalLimit()) {
+                        maxDownloads = Math.max(maxDownloads, dr.getMaxSimultanDownloads());
                     }
-
+                } catch (Throwable e) {
+                    UIOManager.I().show(ExceptionDialogInterface.class, new ExceptionDialog(UIOManager.BUTTONS_HIDE_CANCEL, _GUI.T.lit_error_occured(), e.getMessage() + "\r\n" + JSonStorage.toString(dr), e, _GUI.T.lit_close(), null));
                 }
             }
         }
@@ -84,9 +86,7 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
                 listener.onDomainRulesUpdated();
             }
         });
-
     }
-
     // public int getMaxSimulanDownloadsbyDomain(String candidateLinkHost) {
     // int max = 0;
     //

@@ -53,7 +53,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50275 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50346 $", interfaceVersion = 3, names = {}, urls = {})
 public class UpstoRe extends antiDDoSForHost {
     public UpstoRe(PluginWrapper wrapper) {
         super(wrapper);
@@ -170,9 +170,10 @@ public class UpstoRe extends antiDDoSForHost {
                 link.setName(fid);
             }
         }
-        if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid fileID");
-        }
+        // Links with all lowercase and numbers are valid, this check is bogus
+        //if (fid.toLowerCase(Locale.ENGLISH).equals(fid)) {
+        //    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid fileID");
+        //}
         this.setBrowserExclusive();
         getPage(contenturl);
         if (isOffline1()) {

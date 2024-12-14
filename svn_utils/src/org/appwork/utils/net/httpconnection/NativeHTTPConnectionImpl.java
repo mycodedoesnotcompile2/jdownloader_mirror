@@ -589,7 +589,7 @@ public class NativeHTTPConnectionImpl implements HTTPConnection {
         if (code == 407) {
             /* auth invalid/missing */
             throw new ProxyAuthException(this.proxy);
-        } else if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401) {
+        } else if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401 || code == 410) {
             if (this.convertedInputStream == null) {
                 final InputStream rawInputStream = getRawInputStream();
                 if (this.contentDecoded && !RequestMethod.HEAD.equals(this.getRequestMethod())) {

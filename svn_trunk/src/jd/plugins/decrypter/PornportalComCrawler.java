@@ -54,7 +54,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50344 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -155,9 +155,10 @@ public class PornportalComCrawler extends PluginForDecrypt {
             videoObjects.addAll(children);
         }
         final String host = this.getHost();
+        FilePackage videoPackage = null;
         final HashMap<String, List<DownloadLink>> resultsTrailers = new HashMap<String, List<DownloadLink>>();
         final HashMap<String, List<DownloadLink>> resultsFullVideos = new HashMap<String, List<DownloadLink>>();
-        for (final Map<String, Object> clipinfo : videoObjects) {
+        videoObjects: for (final Map<String, Object> clipinfo : videoObjects) {
             final String type = (String) clipinfo.get("type");
             // final String type = (String) entries.get("type");
             final String itemID = Long.toString(JavaScriptEngineFactory.toLong(clipinfo.get("id"), 0));
@@ -177,10 +178,10 @@ public class PornportalComCrawler extends PluginForDecrypt {
                 title = contentID + "_trailer";
             }
             final boolean isTrailer = type.equals("trailer");
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(title);
+            videoPackage = FilePackage.getInstance();
+            videoPackage.setName(title);
             if (!StringUtils.isEmpty(description)) {
-                fp.setComment(description);
+                videoPackage.setComment(description);
             }
             final List<Map<String, Object>> allFullVideos = new ArrayList<Map<String, Object>>();
             final List<Map<String, Object>> allTrailers = new ArrayList<Map<String, Object>>();
@@ -221,7 +222,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
             } catch (final Exception ignore) {
                 /* Skip non-video objects */
                 logger.log(ignore);
-                logger.info("Skipped video item: " + itemID);
+                logger.info("Skipped non-video item: " + itemID);
                 continue;
             }
             /* Now walk through all qualities in all types */
@@ -271,7 +272,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
                     patternMatcher = contentURL;
                     dl = new DownloadLink(plg, "pornportal", host, patternMatcher, true);
                 } else {
-                    /* Without account users can only download trailers and their directurls never expire. */
+                    /* Without account users can only download trailers and their direct urls never expire. */
                     patternMatcher = downloadurl;
                     contentURL = downloadurl;
                     dl = new DownloadLink(JDUtilities.getPluginForHost("DirectHTTP"), "pornportal", host, patternMatcher, true);
@@ -293,7 +294,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
                     dl.setDownloadSize(filesize);
                 }
                 dl.setAvailable(true);
-                dl._setFilePackage(fp);
+                dl._setFilePackage(videoPackage);
                 final HashMap<String, List<DownloadLink>> targetQualityMap;
                 if (isTrailer) {
                     targetQualityMap = resultsTrailers;
@@ -311,11 +312,11 @@ public class PornportalComCrawler extends PluginForDecrypt {
                  * As long as at least one non-trailer item was processed we can jump out of this loop because we will not add trailers when
                  * full video is available.
                  */
-                break;
+                break videoObjects;
             } else {
                 /* This should never happen! */
                 plg.getLogger().warning("Failed to find any downloadable content for videoID: " + itemID);
-                break;
+                break videoObjects;
             }
         }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
@@ -392,8 +393,13 @@ public class PornportalComCrawler extends PluginForDecrypt {
             }
             final ArrayList<DownloadLink> thumbnails = new ArrayList<DownloadLink>();
             final String description = (String) result.get("description");
-            final FilePackage thumbnailPackage = FilePackage.getInstance();
-            thumbnailPackage.setName(result.get("title").toString() + " - thumbnails");
+            final FilePackage thumbnailPackage;
+            if (videoPackage != null) {
+                thumbnailPackage = videoPackage;
+            } else {
+                thumbnailPackage = FilePackage.getInstance();
+                thumbnailPackage.setName(result.get("title").toString() + " - thumbnails");
+            }
             if (description != null) {
                 thumbnailPackage.setComment(description);
             }

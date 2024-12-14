@@ -1,12 +1,9 @@
 package org.jdownloader.controlling.contextmenu;
 
-import java.awt.event.ActionEvent;
-
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 
 import org.jdownloader.gui.views.SelectionInfo;
-import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 
 public abstract class CustomizableTableContextAppAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableSelectionAppAction<PackageType, ChildrenType> {
@@ -32,37 +29,9 @@ public abstract class CustomizableTableContextAppAction<PackageType extends Abst
     }
 
     @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
-        requestTableContextUpdate();
-    }
-
-    @Override
-    public void actionPerformed(final ActionEvent e) {
-        final SelectionType selectionType = getSelectionType();
-        getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {
-
-            @Override
-            public void onSelectionInfo(final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
-                onActionPerformed(e, selectionType, selectionInfo);
-            }
-
-            @Override
-            public boolean isCancelled() {
-                return false;
-            }
-        }, selectionType);
-    }
-
-    protected SelectionType getSelectionType() {
-        return SelectionType.SELECTED;
-    }
-
-    protected void onActionPerformed(final ActionEvent e, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
-    }
-
-    protected void requestTableContextUpdate() {
-        boolean has = !isEmptyContext();
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+        super.onRequestUpdateSelection(requestor, selectionType, selectionInfo);
+        final boolean has = !hasSelection(selectionInfo);
         if (tableContext != null) {
             if (has) {
                 if (tableContext.isItemVisibleForSelections()) {
@@ -86,10 +55,6 @@ public abstract class CustomizableTableContextAppAction<PackageType extends Abst
         } else if (has) {
             setVisible(true);
         }
-    }
-
-    protected boolean isEmptyContext() {
-        return !hasSelection(getSelection());
     }
 
     public TableContext getTableContext() {

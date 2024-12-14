@@ -1,5 +1,7 @@
 package org.jdownloader.controlling.contextmenu;
 
+import java.awt.event.ActionEvent;
+
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
@@ -10,6 +12,7 @@ import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
 
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.downloads.DownloadsView;
@@ -72,9 +75,53 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
     }
 
     @Override
+    public void actionPerformed(final ActionEvent e) {
+        final SelectionType selectionType = getSelectionType();
+        getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {
+
+            @Override
+            public void onSelectionInfo(final SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+                onActionPerformed(e, selectionType, selectionInfo);
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+        }, selectionType);
+    }
+
+    protected SelectionType getSelectionType() {
+        return SelectionType.SELECTED;
+    }
+
+    protected void onActionPerformed(final ActionEvent e, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+    }
+
+    @Override
     public void requestUpdate(Object requestor) {
         super.requestUpdate(requestor);
-        setEnabled(hasSelection());
+        requestUpdateSelection(requestor);
+    }
+
+    protected void requestUpdateSelection(final Object requestor) {
+        setEnabled(false);
+        final SelectionType selectionType = getSelectionType();
+        getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            public void onSelectionInfo(org.jdownloader.gui.views.SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+                onRequestUpdateSelection(requestor, selectionType, selectionInfo);
+
+            };
+        }, selectionType);
+    }
+
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+        setEnabled(hasSelection(selectionInfo));
     }
 
     protected boolean hasSelection() {

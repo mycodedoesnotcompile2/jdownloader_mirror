@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 import jd.plugins.Account;
 
 public class CompiledDomainRule {
-
     private final DomainRule rule;
     private final Pattern    domainPattern;
     private final Pattern    accountPattern;
@@ -44,6 +43,14 @@ public class CompiledDomainRule {
         return true;
     }
 
+    public DomainRule getDomainRule() {
+        return rule;
+    }
+
+    public Integer getMaxChunks() {
+        return rule.getMaxChunks();
+    }
+
     public int getMaxSimultanDownloads() {
         return rule.getMaxSimultanDownloads();
     }
@@ -51,5 +58,4 @@ public class CompiledDomainRule {
     public boolean isAllowToExceedTheGlobalLimit() {
         return rule.isAllowToExceedTheGlobalLimit();
     }
-
 }

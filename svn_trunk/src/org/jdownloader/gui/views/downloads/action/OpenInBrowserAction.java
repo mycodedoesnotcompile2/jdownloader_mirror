@@ -19,6 +19,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.images.NewTheme;
 
 public class OpenInBrowserAction extends CustomizableTableContextAppAction<FilePackage, DownloadLink> implements ActionContext {
@@ -60,21 +61,19 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
     }
 
     @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
         final int threshold = getMaxOpenThreshold();
         if (!CrossSystem.isOpenBrowserSupported() || threshold == 0) {
             setEnabled(false);
             return;
         }
-        final SelectionInfo<FilePackage, DownloadLink> selection = getSelection();
-        if (hasSelection(selection)) {
+        if (hasSelection(selectionInfo)) {
             if (threshold < 0) {
                 setEnabled(true);
                 return;
             } else {
-                final List<DownloadLink> links = selection.getChildren();
-                if (links.size() < threshold) {
+                final List<DownloadLink> links = selectionInfo.getChildren();
+                if (links.size() <= threshold) {
                     for (final DownloadLink link : links) {
                         if (link.getView().getDisplayUrl() != null) {
                             setEnabled(true);
@@ -87,16 +86,20 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
         setEnabled(false);
     }
 
+    @Override
     public void actionPerformed(ActionEvent e) {
-        if (!isEnabled()) {
-            return;
+        if (isEnabled()) {
+            super.actionPerformed(e);
         }
-        final SelectionInfo<FilePackage, DownloadLink> selection = getSelection();
-        if (hasSelection(selection)) {
+    }
+
+    @Override
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
+        if (hasSelection(selectionInfo) && isEnabled()) {
             new Thread("OpenInBrowserAction") {
                 public void run() {
                     final int delay = getOpenDelay();
-                    final Set<String> urls = LinkTreeUtils.getURLs(selection, true);
+                    final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
                     if (urls.size() < 5 && delay < 1000) {
                         for (String url : urls) {
                             try {
@@ -151,4 +154,5 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
             }.start();
         }
     }
+
 }

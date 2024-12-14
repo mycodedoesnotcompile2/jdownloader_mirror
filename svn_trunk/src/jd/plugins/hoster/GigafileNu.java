@@ -36,11 +36,20 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50344 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
     }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
+    }
+
+    public static final String PROPERTY_FILE_ID = "file_id";
 
     @Override
     public String getAGBLink() {
@@ -102,7 +111,6 @@ public class GigafileNu extends PluginForHost {
             link.setName(this.getFID(link));
         }
         this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -116,11 +124,6 @@ public class GigafileNu extends PluginForHost {
             filename = br.getRegex("onclick=\"download\\([^\\)]+\\);\">([^<>\"]+)</p>").getMatch(0);
         }
         String filesizeStr = br.getRegex("<span style=\"font-size: 12px;\">（(.*?)）</span>").getMatch(0);
-        if (filesizeStr == null) {
-            /* 2022-02-15 */
-            filesizeStr = br.getRegex("class=\"dl_size\"[^>]*>([^<>\"]+)<").getMatch(0);
-        }
-        final String filesizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
         if (nonZipFiles != null && nonZipFiles.length == 1) {
             /* We only got one file -> Do not attempt .zip download and set name of that file right away. */
             filename = nonZipFiles[0];
@@ -129,10 +132,7 @@ public class GigafileNu extends PluginForHost {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
         }
-        if (filesizeBytesStr != null) {
-            /* Prefer precise filesize. */
-            link.setDownloadSize(Long.parseLong(filesizeBytesStr));
-        } else if (filesizeStr != null) {
+        if (filesizeStr != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
         }
         return AvailableStatus.TRUE;
@@ -140,31 +140,37 @@ public class GigafileNu extends PluginForHost {
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link, "free_directlink");
+        handleDownload(link);
     }
 
-    private void handleDownload(final DownloadLink link, final String directlinkproperty) throws Exception, PluginException {
+    private void handleDownload(final DownloadLink link) throws Exception, PluginException {
+        final String directlinkproperty = "free_directlink";
         if (!attemptStoredDownloadurlDownload(link, directlinkproperty, this.isResumeable(link, null), this.getMaxChunks(link, null))) {
             requestFileInformation(link);
             final String mainFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
-            final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
-            String fileIDForDownload = null;
-            if (filesJson != null) {
-                final List<Object> ressourcelist = restoreFromString(filesJson, TypeRef.LIST);
-                if (ressourcelist.size() == 1) {
-                    /* Single file -> Download that, else .zip of all files. */
-                    final Map<String, Object> filemap = (Map<String, Object>) ressourcelist.get(0);
-                    fileIDForDownload = filemap.get("file").toString();
-                    logger.info("Downloading single file: " + fileIDForDownload);
-                } else {
-                    logger.info("This is a folder containing " + ressourcelist.size() + " files --> Download .zip file containing all files");
+            String fileIDForDownload = link.getStringProperty(PROPERTY_FILE_ID);
+            if (fileIDForDownload == null) {
+                final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
+                if (filesJson != null) {
+                    final List<Object> ressourcelist = restoreFromString(filesJson, TypeRef.LIST);
+                    if (ressourcelist.size() == 1) {
+                        /* Single file -> Download that, else .zip of all files. */
+                        final Map<String, Object> filemap = (Map<String, Object>) ressourcelist.get(0);
+                        fileIDForDownload = filemap.get("file").toString();
+                        logger.info("Downloading single file: " + fileIDForDownload);
+                    } else {
+                        logger.info("This is a folder containing " + ressourcelist.size() + " files --> Download .zip file containing all files");
+                    }
+                }
+                if (fileIDForDownload == null && mainFileID == null) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            if (fileIDForDownload == null && mainFileID == null) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
             final String dllink;
-            if (fileIDForDownload == null) {
+            if (fileIDForDownload != null) {
+                /* Single file download */
+                dllink = "/download.php?file=" + fileIDForDownload;
+            } else {
                 /* .zip download */
                 /* 2023-09-19: Now both ways are the same??! */
                 // dllink = "/dl_zip.php?file=" + mainFileID;
@@ -173,9 +179,6 @@ public class GigafileNu extends PluginForHost {
                 } else {
                     dllink = "/download.php?file=" + mainFileID;
                 }
-            } else {
-                /* Single file download */
-                dllink = "/download.php?file=" + fileIDForDownload;
             }
             // final String fileiidFromURL = new Regex(br.getURL(), "https?://[^/]+/(.+)").getMatch(0);
             // final String dllink = "/dl_zip.php?file=" + fileiidFromURL;
@@ -192,7 +195,10 @@ public class GigafileNu extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
+            if (fileIDForDownload != null && !link.hasProperty(PROPERTY_FILE_ID)) {
+                link.setProperty(PROPERTY_FILE_ID, fileIDForDownload);
+            }
         }
         dl.startDownload();
     }

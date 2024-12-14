@@ -143,11 +143,6 @@ public class ConfirmSelectionBarAction extends ConfirmLinksContextAction impleme
     }
 
     @Override
-    protected void requestTableContextUpdate() {
-
-    }
-
-    @Override
     public void initContextDefaults() {
         setCtrlToggle(false);
     }

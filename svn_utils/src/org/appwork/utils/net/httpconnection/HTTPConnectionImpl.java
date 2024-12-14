@@ -1463,7 +1463,7 @@ public class HTTPConnectionImpl implements HTTPConnection {
         this.connect();
         this.connectInputStream();
         final int code = this.getResponseCode();
-        if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401) {
+        if (this.isOK() || code == 404 || code == 403 || code == 416 || code == 401 || code == 410) {
             if (this.convertedInputStream == null) {
                 InputStream rawInputStream = getRawInputStream();
                 if (this.contentDecoded && !RequestMethod.HEAD.equals(this.getRequestMethod())) {

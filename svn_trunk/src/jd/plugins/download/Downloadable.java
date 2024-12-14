@@ -6,7 +6,9 @@ import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
 import jd.controlling.downloadcontroller.FileIsLockedException;
 import jd.controlling.downloadcontroller.ManagedThrottledConnectionHandler;
+import jd.controlling.downloadcontroller.SingleDownloadController;
 import jd.http.Browser;
+import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.DownloadLinkDatabindingInterface;
 import jd.plugins.PluginProgress;
@@ -38,6 +40,10 @@ public interface Downloadable {
     long getVerifiedFileSize();
 
     boolean isServerComaptibleForByteRangeRequest();
+
+    public DownloadLink getDownloadLink();
+
+    public SingleDownloadController getDownloadLinkController();
 
     /**
      * Return the pluginhost. this can be the requested domain, but it may be a different domain as well

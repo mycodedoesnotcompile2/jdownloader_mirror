@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -46,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50144 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50344 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,20 +95,20 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:(beta|www|chan)\\.)?" + buildHostsPatternPart(domains) + "/(";
-            regex += "[a-z]{2}/books/\\d+";
+            regex += "([a-z]{2,3}/)?books/[A-Za-z0-9]+";
             regex += "|[a-z]{2}\\?tags=pool:\\d+";
-            regex += "|[a-z0-9]{2}/books\\?tags=.+";
-            regex += "|[a-z0-9]{2}(?:/posts)?\\?tags=.+";
+            regex += "|[a-z0-9]{2,3}/books\\?tags=.+";
+            regex += "|[a-z0-9]{2,3}(?:/posts)?\\?tags=.+";
             regex += ")";
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
     }
 
-    private final String       TYPE_BOOK       = "(?i)https?://[^/]+/([a-z]{2})/books/(\\d+)";
+    private final Pattern      TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
     private final String       TYPE_TAGS_BOOK  = "(?i)https?://[^/]+/([a-z]{2})\\?tags=pool:(\\d+)";
-    private final String       TYPE_TAGS_BOOKS = "(?i)https?://[^/]+/([a-z0-9]{2})/books\\?tags=(.+)";
-    private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/(([a-z]{2})/)?.*tags=([^&]+)";
+    private final String       TYPE_TAGS_BOOKS = "(?i)https?://[^/]+/([a-z0-9]{2,3})/books\\?tags=(.+)";
+    private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/(([a-z]{2,3})/)?.*tags=([^&]+)";
     public static final String API_BASE        = "https://capi-v2.sankakucomplex.com";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
@@ -118,7 +119,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         if (param.getCryptedUrl().matches(TYPE_TAGS_BOOKS)) {
             return crawlTagsBooksAPI(param);
-        } else if (param.getCryptedUrl().matches(TYPE_BOOK)) {
+        } else if (new Regex(param.getCryptedUrl(), TYPE_BOOK).patternFind()) {
             return crawlBook(param);
         } else {
             return crawlTagsPosts(param, account);
@@ -400,14 +401,18 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     /** Crawls all pages of a book. */
     private ArrayList<DownloadLink> crawlBook(final CryptedLink param) throws Exception {
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_BOOK);
-        final String languageFromURL = urlinfo.getMatch(0);
-        final String bookID = urlinfo.getMatch(1);
-        if (languageFromURL == null || bookID == null) {
+        String language = urlinfo.getMatch(1);
+        final String bookID = urlinfo.getMatch(2);
+        if (bookID == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        if (language == null) {
+            /* Fallback */
+            language = "en";
+        }
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        br.getPage(API_BASE + "/pools/" + bookID + "?lang=" + languageFromURL + "&includes[]=series&exceptStatuses[]=deleted");
+        br.getPage(API_BASE + "/pools/" + bookID + "?lang=" + language + "&includes[]=series&exceptStatuses[]=deleted");
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -420,7 +425,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final List<Map<String, Object>> posts = (List<Map<String, Object>>) entries.get("posts");
         int page = 0;
         for (final Map<String, Object> post : posts) {
-            final DownloadLink link = this.createDownloadlink("https://beta.sankakucomplex.com/" + languageFromURL + "/post/show/" + post.get("id") + "?tags=pool%3A" + bookID + "&page=" + page);
+            final DownloadLink link = this.createDownloadlink("https://beta.sankakucomplex.com/" + language + "/post/show/" + post.get("id") + "?tags=pool%3A" + bookID + "&page=" + page);
             link.setProperty(SankakucomplexCom.PROPERTY_BOOK_TITLE, bookTitle);
             link.setProperty(SankakucomplexCom.PROPERTY_PAGE_NUMBER, page);
             link.setProperty(SankakucomplexCom.PROPERTY_PAGE_NUMBER_MAX, posts.size() - 1);

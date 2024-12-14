@@ -29,11 +29,11 @@ import jd.plugins.download.raf.OldRAFDownload;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.DebugMode;
-import org.appwork.utils.net.HTTPHeader;
+import org.jdownloader.controlling.domainrules.CompiledDomainRule;
+import org.jdownloader.controlling.domainrules.DomainRuleSet;
 import org.jdownloader.settings.GeneralSettings;
 
 public class BrowserAdapter {
-
     @Deprecated
     public static final int      ERROR_REDIRECTED = -1;
     private static final boolean NEW_CORE         = DebugMode.TRUE_IN_IDE_ELSE_FALSE;
@@ -43,16 +43,48 @@ public class BrowserAdapter {
         if (NEW_CORE) {
             dl = new HTTPDownloader(downloadable, request);
         } else {
-            if (false) {
-                // was fine all the years, so better optimize handling in download system to better support edge cases with downloading
-                // content-encoding connections
-                request.getHeaders().put(new HTTPHeader(HTTPConstants.HEADER_REQUEST_ACCEPT_ENCODING, "identity", false));
-            }
             dl = new jd.plugins.download.raf.OldRAFDownload(downloadable, request);
         }
+        findDomainRuleChunks: if (pluginConnections <= 0) {
+            final DomainRuleSet domainRuleSet = downloadable.getDownloadLinkController().getDownloadLinkCandidate().getDomainRuleSet();
+            Integer domainRuleChunksInteger = null;
+            for (CompiledDomainRule domainRule : domainRuleSet) {
+                domainRuleChunksInteger = domainRule.getMaxChunks();
+                if (domainRuleChunksInteger != null) {
+                    break;
+                }
+            }
+            if (domainRuleChunksInteger == null) {
+                break findDomainRuleChunks;
+            }
+            final int domainRuleConnections = domainRuleChunksInteger.intValue();
+            if (pluginConnections == 0) {
+                /* No limits -> Apply domainRule limit */
+                pluginConnections = domainRuleConnections;
+            } else if (domainRuleConnections > 0) {
+                // domainRuleConnections has fixed value and pluginConnections has limits
+                pluginConnections = Math.min(domainRuleConnections, Math.abs(pluginConnections));
+            } else if (domainRuleConnections < 0) {
+                // domainRuleConnections has limits and pluginConnections has limits
+                pluginConnections = -Math.min(Math.abs(domainRuleConnections), Math.abs(pluginConnections));
+            }
+        }
+        final int globalMax = JsonConfig.create(GeneralSettings.class).getMaxChunksPerFile();
         final int customizedConnections = downloadable.getChunks();
         final int setConnections;
-        if (pluginConnections > 0) {
+        if (pluginConnections == 0) {
+            // pluginConnection has no limits
+            if (customizedConnections == 0) {
+                // no limits for pluginConnections, use max
+                setConnections = globalMax;
+            } else if (customizedConnections > 0) {
+                // prefer customizedConnections over max
+                setConnections = customizedConnections;
+            } else {
+                // use smaller of customizedConnections and max
+                setConnections = Math.min(globalMax, Math.abs(customizedConnections));
+            }
+        } else if (pluginConnections > 0) {
             // pluginConnection has fixed value
             if (customizedConnections == 0) {
                 // no customized, use pluginConnections
@@ -61,25 +93,11 @@ public class BrowserAdapter {
                 // use smaller of pluginConnections and customizedConnections
                 setConnections = Math.min(pluginConnections, Math.abs(customizedConnections));
             }
-        } else if (pluginConnections == 0) {
-            // pluginConnection has no limits
-            final int max = JsonConfig.create(GeneralSettings.class).getMaxChunksPerFile();
-            if (customizedConnections == 0) {
-                // no limits for pluginConnections, use max
-                setConnections = max;
-            } else if (customizedConnections > 0) {
-                // prefer customizedConnections over max
-                setConnections = customizedConnections;
-            } else {
-                // use smaller of customizedConnections and max
-                setConnections = Math.min(max, Math.abs(customizedConnections));
-            }
         } else {
             // pluginConnections has limits
-            final int max = JsonConfig.create(GeneralSettings.class).getMaxChunksPerFile();
             if (customizedConnections == 0) {
                 // use smaller of pluginsConnections and max
-                setConnections = Math.min(max, Math.abs(pluginConnections));
+                setConnections = Math.min(globalMax, Math.abs(pluginConnections));
             } else {
                 // use smaller of pluginsConnections and customizedConnections
                 setConnections = Math.min(customizedConnections, Math.abs(pluginConnections));
@@ -98,13 +116,8 @@ public class BrowserAdapter {
 
     public static Downloadable getDownloadable(DownloadLink downloadLink, Browser br) {
         final SingleDownloadController controller = downloadLink.getDownloadLinkController();
-        if (controller != null) {
-            final PluginForHost plugin = controller.getProcessingPlugin();
-            if (plugin != null) {
-                return plugin.newDownloadable(downloadLink, br);
-            }
-        }
-        return null;
+        final PluginForHost plugin = controller.getProcessingPlugin();
+        return plugin.newDownloadable(downloadLink, br);
     }
 
     @Deprecated
@@ -222,5 +235,4 @@ public class BrowserAdapter {
     public static DownloadInterface openDownload(Browser br, DownloadLink downloadLink, Form form, boolean resume, int chunks) throws Exception {
         return openDownload(br, downloadLink, br.createRequest(form), resume, chunks);
     }
-
 }

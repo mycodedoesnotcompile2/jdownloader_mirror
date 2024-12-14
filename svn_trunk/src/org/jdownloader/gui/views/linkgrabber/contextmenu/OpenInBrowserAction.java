@@ -19,6 +19,7 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
 import org.jdownloader.gui.views.components.packagetable.LinkTreeUtils;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.images.NewTheme;
 
 public class OpenInBrowserAction extends CustomizableTableContextAppAction<CrawledPackage, CrawledLink> implements ActionContext {
@@ -62,6 +63,11 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<Crawl
     @Override
     public void requestUpdate(Object requestor) {
         super.requestUpdate(requestor);
+
+    }
+
+    @Override
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
         final int threshold = getMaxOpenThreshold();
         if (!CrossSystem.isOpenBrowserSupported() || threshold == 0) {
             setEnabled(false);
@@ -74,7 +80,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<Crawl
                 return;
             } else {
                 final List<CrawledLink> links = selection.getChildren();
-                if (links.size() < threshold) {
+                if (links.size() <= threshold) {
                     for (final CrawledLink cl : links) {
                         if (cl.getDownloadLink().getView().getDisplayUrl() != null) {
                             setEnabled(true);
@@ -87,69 +93,73 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<Crawl
         setEnabled(false);
     }
 
+    @Override
     public void actionPerformed(ActionEvent e) {
-        if (!isEnabled()) {
-            return;
+        if (isEnabled()) {
+            super.actionPerformed(e);
         }
-        final SelectionInfo<CrawledPackage, CrawledLink> lselection = getSelection();
-        if (lselection == null || lselection.isEmpty()) {
-            return;
-        }
-        new Thread("OpenInBrowserAction") {
-            public void run() {
-                final int delay = getOpenDelay();
-                final Set<String> urls = LinkTreeUtils.getURLs(lselection, true);
-                if (urls.size() < 5 && delay < 1000) {
-                    for (String url : urls) {
-                        try {
-                            Thread.sleep(delay);
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                        CrossSystem.openURL(url);
-                    }
-                    return;
-                }
-                final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
-                    private int total = -1;
-                    private int current;
-
-                    @Override
-                    public void run() throws Exception {
-                        total = urls.size();
-                        current = 0;
-                        for (String url : urls) {
-                            CrossSystem.openURL(url);
-                            current++;
-                            Thread.sleep(delay);
-                        }
-                    }
-
-                    @Override
-                    public String getString() {
-                        return current + "/" + total;
-                    }
-
-                    @Override
-                    public int getProgress() {
-                        if (total == 0) {
-                            return -1;
-                        }
-                        final int ret = (current * 100) / total;
-                        return ret;
-                    }
-
-                    @Override
-                    public String getLabelString() {
-                        return null;
-                    }
-                }, 0, _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi(), _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi_msg(urls.size()), NewTheme.I().getIcon(IconKey.ICON_BROWSE, 32), null, null);
-                try {
-                    Dialog.getInstance().showDialog(pg);
-                } catch (DialogNoAnswerException e) {
-                    e.printStackTrace();
-                }
-            }
-        }.start();
     }
+
+    @Override
+    protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
+        if (hasSelection(selectionInfo) && isEnabled()) {
+            new Thread("OpenInBrowserAction") {
+                public void run() {
+                    final int delay = getOpenDelay();
+                    final Set<String> urls = LinkTreeUtils.getURLs(selectionInfo, true);
+                    if (urls.size() < 5 && delay < 1000) {
+                        for (String url : urls) {
+                            try {
+                                Thread.sleep(delay);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            CrossSystem.openURL(url);
+                        }
+                        return;
+                    }
+                    final ProgressDialog pg = new ProgressDialog(new ProgressGetter() {
+                        private int total = -1;
+                        private int current;
+
+                        @Override
+                        public void run() throws Exception {
+                            total = urls.size();
+                            current = 0;
+                            for (String url : urls) {
+                                CrossSystem.openURL(url);
+                                current++;
+                                Thread.sleep(delay);
+                            }
+                        }
+
+                        @Override
+                        public String getString() {
+                            return current + "/" + total;
+                        }
+
+                        @Override
+                        public int getProgress() {
+                            if (total == 0) {
+                                return -1;
+                            }
+                            final int ret = (current * 100) / total;
+                            return ret;
+                        }
+
+                        @Override
+                        public String getLabelString() {
+                            return null;
+                        }
+                    }, 0, _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi(), _GUI.T.OpenInBrowserAction_actionPerformed_open_in_browser__multi_msg(urls.size()), NewTheme.I().getIcon(IconKey.ICON_BROWSE, 32), null, null);
+                    try {
+                        Dialog.getInstance().showDialog(pg);
+                    } catch (DialogNoAnswerException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+        }
+    }
+
 }
