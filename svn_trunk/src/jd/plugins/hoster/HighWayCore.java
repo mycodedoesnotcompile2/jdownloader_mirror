@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50321 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50347 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -216,25 +216,20 @@ public abstract class HighWayCore extends UseNet {
                 return AvailableStatus.UNCHECKABLE;
             }
             this.login(account, false);
-            final boolean check_via_json = true;
-            if (check_via_json) {
-                final String json_url = link.getPluginPatternMatcher().replaceAll("(?i)stream=(?:0|1)", "") + "&json=1";
-                br.getPage(json_url);
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-                final Number code = (Number) entries.get("code");
-                if (code != null && code.intValue() != 0) {
-                    /* E.g. {"code":"8","error":"ID nicht bekannt"} */
-                    final String errormessage = (String) entries.get("error");
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormessage);
-                }
-                this.checkErrors(br, link, account);
-                link.setFinalFileName(entries.get("name").toString());
-                final String filesizeBytesStr = entries.get("size").toString();
-                if (filesizeBytesStr != null && filesizeBytesStr.matches("\\d+")) {
-                    link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-                }
-            } else {
-                checkDirecturl(link);
+            final String json_url = link.getPluginPatternMatcher().replaceAll("(?i)stream=(?:0|1)", "") + "&json=1";
+            br.getPage(json_url);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Number code = (Number) entries.get("code");
+            if (code != null && code.intValue() != 0) {
+                /* E.g. {"code":"8","error":"ID nicht bekannt"} */
+                final String errormessage = (String) entries.get("error");
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, errormessage);
+            }
+            this.checkErrors(br, link, account);
+            link.setFinalFileName(entries.get("name").toString());
+            final String filesizeBytesStr = entries.get("size").toString();
+            if (filesizeBytesStr != null && filesizeBytesStr.matches("\\d+")) {
+                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
             }
         } else {
             /* Direct-URL download. */

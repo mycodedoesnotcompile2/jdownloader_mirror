@@ -16,6 +16,7 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -33,8 +34,9 @@ import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
+import jd.plugins.hoster.GigafileNu;
 
-@DecrypterPlugin(revision = "$Revision: 50344 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -70,20 +72,23 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/UNFINISHED_PLUGIN(\\d+-[a-z0-9]+)");
+            ret.add("https?://\\d+\\." + buildHostsPatternPart(domains) + "/(\\d+-[a-z0-9]+)");
         }
         return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        br.getPage(param.getCryptedUrl());
+        final String contenturl = param.getCryptedUrl();
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String contentID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
+        final String contentID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
         String fileIDForDownload = null;
+        final GigafileNu hosterplugin = (GigafileNu) this.getNewPluginForHostInstance(this.getHost());
+        final HashSet<String> fileIDs = new HashSet<String>();
         if (filesJson != null) {
             final String[] filenames = br.getRegex("alt=\"スキャン中\" style=\"height: 18px;\">\\s*</span>\\s*<span class=\"\">([^<]+)</span>").getColumn(0);
             final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) restoreFromString(filesJson, TypeRef.OBJECT);
@@ -96,13 +101,24 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             }
             for (int i = 0; i < ressourcelist.size(); i++) {
                 final Map<String, Object> file = ressourcelist.get(i);
-                final DownloadLink link = this.createDownloadlink("TODO");
+                final String fileID = file.get("file").toString();
+                if (!fileIDs.add(fileID)) {
+                    /* Skip duplicates */
+                    continue;
+                }
+                final DownloadLink link = this.createDownloadlink(contenturl);
+                link.setDefaultPlugin(hosterplugin);
+                link.setHost(this.getHost());
+                /* There is no specific single file URL -> set "folder" URL as contenturl. */
+                link.setContentUrl(contenturl);
                 if (foundFilenames) {
                     String filename = filenames[i];
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setName(filename);
+                    link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
                 }
                 link.setDownloadSize(((Number) file.get("size")).longValue());
+                link.setProperty(GigafileNu.PROPERTY_FILE_ID, fileID);
                 link.setAvailable(true);
                 ret.add(link);
             }
@@ -114,8 +130,29 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
             } else {
                 logger.info("This is a folder containing " + ressourcelist.size() + " files --> Download .zip file containing all files");
             }
-        } else {
-            logger.warning("Failed to find json for individual files");
+        }
+        final String singleFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
+        if (singleFileID != null && fileIDs.add(singleFileID)) {
+            final String fileSizeBytesStr = br.getRegex("var size = (\\d+);").getMatch(0);
+            final DownloadLink link = this.createDownloadlink(contenturl);
+            link.setDefaultPlugin(hosterplugin);
+            link.setHost(this.getHost());
+            /* There is no specific single file URL -> set "folder" URL as contenturl. */
+            link.setContentUrl(contenturl);
+            String filename = br.getRegex("onclick=\"download\\([^\\)]+\\);\">([^<>\"]+)</p>").getMatch(0);
+            if (filename != null) {
+                filename = Encoding.htmlDecode(filename).trim();
+                link.setName(filename);
+                link.setProperty(GigafileNu.PROPERTY_FILE_NAME_FROM_CRAWLER, filename);
+            }
+            if (fileSizeBytesStr != null) {
+                link.setDownloadSize(Long.parseLong(fileSizeBytesStr));
+            } else {
+                logger.warning("Failed to find size of single file");
+            }
+            link.setProperty(GigafileNu.PROPERTY_FILE_ID, singleFileID);
+            link.setAvailable(true);
+            ret.add(link);
         }
         if (ret.isEmpty()) {
             if (!br.containsHTML("download\\('" + contentID) && !br.containsHTML("var file = \"" + contentID)) {
@@ -126,6 +163,7 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
         }
         // String fpName = br.getRegex("").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
+        fp.setPackageKey(this.getHost() + "/folder/" + contentID);
         fp.addLinks(ret);
         return ret;
     }

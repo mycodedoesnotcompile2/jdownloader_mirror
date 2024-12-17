@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50342 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -400,6 +400,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
                         dl.setRelativeDownloadFolderPath(realpath);
                         final FilePackage fp = FilePackage.getInstance();
                         fp.setName(realpath);
+                        dl._setFilePackage(fp);
+                    } else {
+                        /* No path or folder title known but we still know that all files should go into one package. */
+                        final FilePackage fp = FilePackage.getInstance();
+                        // fp.setPackageKey(this.getHost() + "://folder/" + surl);
+                        fp.setName(surl);
                         dl._setFilePackage(fp);
                     }
                     if (targetFileID == null) {

@@ -60,7 +60,7 @@ import jd.plugins.hoster.ZdfDeMediathek;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface;
 import jd.plugins.hoster.ZdfDeMediathek.ZdfmediathekConfigInterface.SubtitleType;
 
-@DecrypterPlugin(revision = "$Revision: 50293 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
+@DecrypterPlugin(revision = "$Revision: 50347 $", interfaceVersion = 3, names = { "zdf.de", "3sat.de", "phoenix.de" }, urls = { "https?://(?:www\\.)?zdf\\.de/(?:.+/)?[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?zdf\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?3sat\\.de/.+/[A-Za-z0-9_\\-]+\\.html|https?://(?:www\\.)?3sat\\.de/uri/(?:syncvideoimport_beitrag_\\d+|transfer_SCMS_[a-f0-9\\-]+|[a-z0-9\\-]+)", "https?://(?:www\\.)?phoenix\\.de/(?:.*?-\\d+\\.html.*|podcast/[A-Za-z0-9]+/video/rss\\.xml)" })
 public class ZDFMediathekDecrypter extends PluginForDecrypt {
     private boolean                          fastlinkcheck             = false;
     private final String                     TYPE_ZDF                  = "(?i)https?://(?:www\\.)?(?:zdf\\.de|3sat\\.de)/.+";
@@ -245,47 +245,6 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
         }
     }
 
-    /** Returns API parameters from html. */
-    private String[] getApiParams(final Browser br, final String url) throws IOException, PluginException {
-        br.getPage(url);
-        if (br.containsHTML(">\\s*Video leider nicht mehr verfügbar")) {
-            /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        String apitoken = br.getRegex("\"apiToken\"\\s*:\\s*\"([^\"\\']+)").getMatch(0);
-        if (apitoken == null) {
-            apitoken = br.getRegex("apiToken\\s*:\\s*'([^\"\\']+)").getMatch(0);
-        }
-        String api_base = br.getRegex("apiService\\s*:\\s*'(https?://[^<>\"\\']+)").getMatch(0);
-        String embed_content = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
-        if (embed_content == null) {
-            embed_content = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
-        }
-        String config = br.getRegex("\"config\"\\s*:\\s*\"(https?://.*?)\"").getMatch(0);
-        if (config == null) {
-            config = br.getRegex("player\\s*:\\s*\\{[^\\}]*js\\s*:\\s*'(https?://[^\"\\']+)").getMatch(0);
-        }
-        String profile = br.getRegex("\\.json\\?profile=([^\"]+)\"").getMatch(0);
-        if (config != null) {
-            br.getPage(config);
-            String tmp = br.getRegex("\"apiProfile\"\\s*:\\s*\"(.*?)\"").getMatch(0);
-            if (tmp == null) {
-                tmp = br.getRegex("apiProfile\\s*:\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-            }
-            if (tmp == null) {
-                tmp = br.getRegex("DEFAULT_API_PROFILE\\s*=\\s*(?:\"|')([^\"\\']+)").getMatch(0);
-            }
-            if (tmp != null) {
-                profile = tmp;
-            }
-        }
-        if (apitoken == null || api_base == null || profile == null) {
-            return null;
-        } else {
-            return new String[] { apitoken, api_base, profile, embed_content };
-        }
-    }
-
     private ArrayList<DownloadLink> crawlPhoenixRSS(final CryptedLink param) throws IOException, PluginException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.getPage(param.getCryptedUrl());
@@ -390,25 +349,88 @@ public class ZDFMediathekDecrypter extends PluginForDecrypt {
             /* Probably no video content - most likely, used added an invalid TYPER_ZDF_REDIRECT url. */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String apiParams[] = getApiParams(br, param.getCryptedUrl());
-        if (apiParams == null) {
+        // sophoraID = "tafeln-reduzierung-lebensmittel-ausgabe-video-100";
+        br.getPage(param.getCryptedUrl());
+        if (br.containsHTML(">\\s*Video leider nicht mehr verfügbar")) {
+            /* E.g. https://www.zdf.de/3sat/politik-und-gesellschaft/die-schweizer-alpen-3-100.html */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        final String[] embeddedVideos = br.getRegex("/embed/\\?mediaID=(/[^<>\"']+)").getColumn(0);
+        if (embeddedVideos != null && embeddedVideos.length > 0) {
+            /*
+             * Check for embedded video items e.g.:
+             * https://www.zdf.de/nachrichten/heute-sendungen/tafeln-reduzierung-lebensmittel-ausgabe-video-100.html
+             */
+            final HashSet<String> sophoraIDs = new HashSet<String>();
+            for (final String url : embeddedVideos) {
+                final String[] urlparts = url.split("/");
+                final String lastPart = urlparts[urlparts.length - 1];
+                if (lastPart.matches("[a-z0-9\\-_]+")) {
+                    sophoraIDs.add(lastPart);
+                    sophoraID = lastPart;
+                }
+            }
+            if (sophoraIDs.size() > 1) {
+                logger.warning("Website contains multiple video embedIDs -> Crawling only last video: " + sophoraID);
+            }
+        }
+        String apitoken = br.getRegex("\"apiToken\"\\s*:\\s*\"([^\"\\']+)").getMatch(0);
+        if (apitoken == null) {
+            apitoken = br.getRegex("apiToken\\s*:\\s*'([^\"\\']+)").getMatch(0);
+        }
+        if (apitoken == null) {
+            /* 2024-12-16 */
+            apitoken = "20c238b5345eb428d01ae5c748c5076f033dfcc7";
+        }
+        String api_base = br.getRegex("apiService\\s*:\\s*'(https?://[^<>\"\\']+)").getMatch(0);
+        if (api_base == null) {
+            /* 2024-12-16 */
+            api_base = "https://api.zdf.de";
+        }
+        String embed_content = br.getRegex("\"embed_content\"\\s*:\\s*\"(/.*?)\"").getMatch(0);
+        if (embed_content == null) {
+            embed_content = br.getRegex("embed_content\\s*:\\s*'([^\"\\']+)").getMatch(0);
+        }
+        if (embed_content != null) {
+            sophoraID = embed_content;
+        }
+        String config = br.getRegex("\"config\"\\s*:\\s*\"(https?://.*?)\"").getMatch(0);
+        if (config == null) {
+            config = br.getRegex("player\\s*:\\s*\\{[^\\}]*js\\s*:\\s*'(https?://[^\"\\']+)").getMatch(0);
+        }
+        if (config == null) {
+            config = "https://ngp.zdf.de/configs/zdf/zdf2016/configuration.json";
+            // config = "https://ngp.zdf.de/miniplayer/embed/configuration.json";
+        }
+        String profile = br.getRegex("\\.json\\?profile=([^\"]+)\"").getMatch(0);
+        if (config != null) {
+            final Browser brc = br.cloneBrowser();
+            brc.getPage(config);
+            String profileTmp = brc.getRegex("\"apiProfile\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+            if (profileTmp == null) {
+                profileTmp = brc.getRegex("apiProfile\\s*:\\s*(?:\"|')([^\"\\']+)").getMatch(0);
+            }
+            if (profileTmp == null) {
+                profileTmp = brc.getRegex("DEFAULT_API_PROFILE\\s*=\\s*(?:\"|')([^\"\\']+)").getMatch(0);
+            }
+            if (profileTmp != null) {
+                profile = profileTmp;
+            }
+        }
+        if (profile == null) {
             /*
              * Probably not a video URL e.g.
              * https://www.zdf.de/nachrichten/panorama/kriminalitaet/nacktbilder-erpressung-soziale-medien-100.html
              */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        /* 2016-12-21: By hardcoding the apitoken we can save one http request thus have a faster crawl process :) */
-        if (apiParams[3] != null) {
-            sophoraID = apiParams[3];
-        }
-        final GetRequest request = br.createGetRequest(apiParams[1] + "/content/documents/" + sophoraID + ".json?profile=" + apiParams[2]);
-        request.getHeaders().put("Api-Auth", "Bearer " + apiParams[0]);
+        final GetRequest request = br.createGetRequest(api_base + "/content/documents/" + sophoraID + ".json?profile=" + profile);
+        request.getHeaders().put("Api-Auth", "Bearer " + apitoken);
         br.getPage(request);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        return handleZdfJson(param, br, apiParams[0]);
+        return handleZdfJson(param, br, apitoken);
     }
 
     /** Handles ZDF json present in given browser after API request has been made before. */

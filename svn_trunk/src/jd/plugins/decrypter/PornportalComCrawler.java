@@ -54,7 +54,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50344 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -103,7 +103,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
             logger.info("No account given --> Trailer download");
             if (!PornportalCom.prepareBrAPI(this, br, null)) {
                 logger.info("Getting fresh API data");
-                br.getPage("https://site-ma." + Browser.getHost(param.getCryptedUrl(), false) + "/login");
+                PornportalCom.getPage(br, "https://site-ma." + Browser.getHost(param.getCryptedUrl(), false) + "/login");
                 if (!PornportalCom.prepareBrAPI(this, br, null)) {
                     logger.warning("Failed to set required API headers");
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -114,7 +114,7 @@ public class PornportalComCrawler extends PluginForDecrypt {
         if (contentID == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        final PluginForHost hostPlugin = getNewPluginForHostInstance(this.getHost());
+        final PornportalCom hostPlugin = (PornportalCom) getNewPluginForHostInstance(this.getHost());
         return crawlContentAPI(hostPlugin, contentID, acc, PluginJsonConfig.get(PornportalComConfig.class));
     }
 

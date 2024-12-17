@@ -17,15 +17,24 @@ package jd.plugins.hoster;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo;
 import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
+import org.jdownloader.plugins.components.config.XFSConfigVideo.PreferredDownloadQuality;
 import org.jdownloader.plugins.components.config.XFSConfigVideoVoeSx;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -36,6 +45,7 @@ import jd.parser.Regex;
 import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -45,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.VoeSxCrawler;
 
-@HostPlugin(revision = "$Revision: 50271 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50349 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { VoeSxCrawler.class })
 public class VoeSx extends XFileSharingProBasic {
     public VoeSx(final PluginWrapper wrapper) {
@@ -306,9 +316,12 @@ public class VoeSx extends XFileSharingProBasic {
         }
         final String streamDownloadlink = getDllinkVideohost(link, account, br, br.getRequest().getHtmlCode());
         final DownloadMode mode = this.getPreferredDownloadModeFromConfig();
-        if (streamDownloadlink != null && (mode == DownloadMode.STREAM || mode == DownloadMode.AUTO) && Boolean.TRUE.equals(requiresCaptchaForOfficialVideoDownload())) {
+        if (streamDownloadlink != null && mode == DownloadMode.STREAM) {
+            return null;
+        } else if (streamDownloadlink != null && mode == DownloadMode.AUTO && Boolean.TRUE.equals(requiresCaptchaForOfficialVideoDownload()) && (account == null || !AccountType.PREMIUM.equals(account.getType()))) {
             /*
-             * User wants to download stream. Obtaining an official downloadlink would require the user to enter a captcha -> Skip that.
+             * User wants to download stream in free- or free account mode. Obtaining an official downloadlink would require the user to
+             * enter a captcha -> Skip that.
              */
             return null;
         }
@@ -327,34 +340,58 @@ public class VoeSx extends XFileSharingProBasic {
             }
             this.submitForm(br, dlform);
         }
+        final String[] directurls = br.getRegex("\"(https?://[^/]+/engine/download/[^\"]+)\"").getColumn(0);
+        if (directurls == null || directurls.length == 0) {
+            logger.warning("Failed to find dllink via official video download");
+            return null;
+        }
         String dllink = this.getDllink(link, account, br, br.getRequest().getHtmlCode());
-        if (StringUtils.isEmpty(dllink)) {
-            /*
-             * 2019-05-30: Test - worked for: xvideosharing.com - not exactly required as getDllink will usually already return a result.
-             */
-            dllink = br.getRegex("(?i)>\\s*Download Link\\s*</td>\\s*<td><a href=\"(https?://[^\"]+)\"").getMatch(0);
-            if (dllink == null) {
-                /* 2023-10-07 */
-                dllink = br.getRegex("<a href=\"(http[^\"]+)\"[^>]*class=\"btn btn-primary\" target=\"_blank\"").getMatch(0);
-                if (dllink == null) {
-                    /* 2023-11-21 */
-                    dllink = br.getRegex("\"(https?://[^/]+/engine/download/[^\"]+)\"").getMatch(0);
+        final String userSelectedQualityValue = getPreferredDownloadQualityStr();
+        if (userSelectedQualityValue != null) {
+            /* Try to find user preferred quality */
+            for (final String directurl : directurls) {
+                if (StringUtils.containsIgnoreCase(directurl, "_" + userSelectedQualityValue + ".mp4")) {
+                    dllink = directurl;
+                    break;
                 }
             }
-            if (dllink != null) {
-                dllink = Encoding.htmlOnlyDecode(dllink);
+            if (dllink == null) {
+                logger.info("Failed to find user preferred quality: " + userSelectedQualityValue);
+            } else {
+                logger.info("Found user preferred quality: " + userSelectedQualityValue);
             }
         }
-        if (StringUtils.isEmpty(dllink)) {
-            logger.warning("Failed to find dllink via official video download");
-        } else {
-            logger.info("Successfully found dllink via official video download");
-            final String filesizeBytesStr = br.getRegex("File Size \\(bytes\\)</td>\\s*<td>\\s*(\\d+)\\s*<").getMatch(0);
-            if (filesizeBytesStr != null) {
-                link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
-            }
+        if (dllink == null) {
+            /* Fallback/best */
+            dllink = directurls[directurls.length - 1];
+        }
+        logger.info("Successfully found dllink via official video download");
+        dllink = Encoding.htmlOnlyDecode(dllink);
+        final String filesizeBytesStr = br.getRegex("File Size \\(bytes\\)</td>\\s*<td>\\s*(\\d+)\\s*<").getMatch(0);
+        if (filesizeBytesStr != null) {
+            link.setVerifiedFileSize(Long.parseLong(filesizeBytesStr));
         }
         return dllink;
+    }
+
+    protected String getPreferredDownloadQualityHeightStr() {
+        final Class<? extends XFSConfigVideo> cfgO = getVideoConfigInterface();
+        if (cfgO == null) {
+            return null;
+        }
+        final XFSConfigVideo cfg = PluginJsonConfig.get(cfgO);
+        final PreferredDownloadQuality quality = cfg.getPreferredDownloadQuality();
+        switch (quality) {
+        case HIGH:
+            return "1080p";
+        case NORMAL:
+            return "720p";
+        case LOW:
+            return "480p";
+        case BEST:
+        default:
+            return null;
+        }
     }
 
     @Override
@@ -423,6 +460,279 @@ public class VoeSx extends XFileSharingProBasic {
     }
 
     @Override
+    protected Long findExpireTimestamp(final Account account, final Browser br, AtomicBoolean isPreciseTimestampFlag) throws Exception {
+        final String[] expiredates = br.getRegex("(\\d{1,2}/\\d{1,2}/\\d{4} \\d{2}:\\d{2})").getColumn(0);
+        if (expiredates == null || expiredates.length == 0) {
+            /* Fallback */
+            return super.findExpireTimestamp(account, br, isPreciseTimestampFlag);
+        }
+        /* User can own multiple premium packages at the same time -> Return highest expire date value */
+        long highestExpireTimestamp = -1;
+        for (final String expiredate : expiredates) {
+            final long timestamp = TimeFormatter.getMilliSeconds(expiredate, "dd/MM/yyyy HH:mm", Locale.ENGLISH);
+            if (timestamp > highestExpireTimestamp) {
+                highestExpireTimestamp = timestamp;
+            }
+        }
+        isPreciseTimestampFlag.set(true);
+        return highestExpireTimestamp;
+    }
+
+    @Override
+    protected AccountInfo fetchAccountInfoAPI(final Browser br, final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        final Map<String, Object> entries = loginAPI(br, account);
+        /** 2019-07-31: Better compare expire-date against their serverside time if possible! */
+        final String server_timeStr = (String) entries.get("server_time");
+        final Map<String, Object> result = (Map<String, Object>) entries.get("result");
+        long expire_milliseconds_precise_to_the_second = 0;
+        final long currentTime;
+        if (server_timeStr != null && server_timeStr.matches("\\d{4}\\-\\d{2}\\-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
+            currentTime = TimeFormatter.getMilliSeconds(server_timeStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+        } else {
+            /* Fallback */
+            currentTime = br.getCurrentServerTime(System.currentTimeMillis());
+        }
+        String expireStr = (String) result.get("premium_expire");
+        if (StringUtils.isEmpty(expireStr)) {
+            /* 2024-12-16: voe.sx custom field. */
+            expireStr = (String) result.get("premium_until");
+        }
+        if (expireStr != null && expireStr.matches("\\d{4}\\-\\d{2}\\-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
+            expire_milliseconds_precise_to_the_second = TimeFormatter.getMilliSeconds(expireStr, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+        }
+        ai.setUnlimitedTraffic();
+        final long premiumDurationMilliseconds = expire_milliseconds_precise_to_the_second - currentTime;
+        if (premiumDurationMilliseconds <= 0) {
+            /* Expired premium or no expire date given --> Free Account */
+            setAccountLimitsByType(account, AccountType.FREE);
+        } else {
+            /* Expire date is in the future --> Premium account */
+            ai.setValidUntil(System.currentTimeMillis() + premiumDurationMilliseconds);
+            setAccountLimitsByType(account, AccountType.PREMIUM);
+        }
+        final String premium_bandwidthBytesStr = (String) result.get("premium_bandwidth"); // Double as string
+        final String traffic_leftBytesStr = (String) result.get("traffic_left");
+        if (premium_bandwidthBytesStr != null) {
+            ai.setTrafficLeft(SizeFormatter.getSize(premium_bandwidthBytesStr));
+        } else if (traffic_leftBytesStr != null) {
+            ai.setTrafficLeft(SizeFormatter.getSize(traffic_leftBytesStr));
+        }
+        {
+            /* Now set less relevant account information */
+            final Object balanceO = result.get("balance"); // Double returned as string
+            if (balanceO != null) {
+                ai.setAccountBalance(SizeFormatter.getSize(balanceO.toString()));
+            }
+            /* 2019-07-26: values can also be "inf" for "Unlimited": "storage_left":"inf" */
+            // final long storage_left = JavaScriptEngineFactory.toLong(entries.get("storage_left"), 0);
+            final Object storage_usedO = result.get("storage_used");
+            if (storage_usedO != null) {
+                ai.setUsedSpace(SizeFormatter.getSize(storage_usedO.toString()));
+            }
+        }
+        // final Object isPremium = result.get("premium"); e.g. highstream.tv
+        final Object files_totalO = result.get("files_total");
+        if (files_totalO instanceof Number) {
+            ai.setFilesNum(((Number) files_totalO).intValue());
+        }
+        final String email = (String) result.get("email");
+        if (this.enableAccountApiOnlyMode() && !StringUtils.isEmpty(email)) {
+            /*
+             * Each account is unique. Do not care what the user entered - trust what API returns! <br> This is not really important - more
+             * visually so that something that makes sense is displayed to the user in his account managers' "Username" column!
+             */
+            account.setUser(email);
+        }
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            /* Devs only */
+            String accStatus;
+            if (ai.getStatus() != null && !ai.getStatus().startsWith("[API] ")) {
+                accStatus = ai.getStatus();
+            } else {
+                accStatus = account.getType().toString();
+            }
+            ai.setStatus("[API] | DLs: " + account.hasProperty(PROPERTY_ACCOUNT_ALLOW_API_DOWNLOAD_ATTEMPT_IN_WEBSITE_MODE) + " | " + accStatus);
+        }
+        return ai;
+    }
+
+    @Override
+    public boolean massLinkcheckerAPI(final DownloadLink[] urls, final String apikey) {
+        if (urls == null || urls.length == 0 || !this.looksLikeValidAPIKey(apikey)) {
+            return false;
+        }
+        boolean linkcheckerHasFailed = false;
+        final String preferredQualityHeightStr = getPreferredDownloadQualityHeightStr();
+        try {
+            final Browser br = new Browser();
+            this.prepBrowser(br, getMainPage());
+            br.setCookiesExclusive(true);
+            final StringBuilder sb = new StringBuilder();
+            final ArrayList<DownloadLink> links = new ArrayList<DownloadLink>();
+            int index = 0;
+            while (true) {
+                links.clear();
+                while (true) {
+                    /*
+                     * We test max 50 links at once. 2020-05-29: XFS default API linkcheck limit is exactly 50 items. If you check more than
+                     * 50 items, it will only return results for the first 50 items.
+                     */
+                    if (index == urls.length || links.size() == 50) {
+                        break;
+                    } else {
+                        links.add(urls[index]);
+                        index++;
+                    }
+                }
+                final ArrayList<DownloadLink> apiLinkcheckLinks = new ArrayList<DownloadLink>();
+                sb.delete(0, sb.capacity());
+                for (final DownloadLink link : links) {
+                    try {
+                        resolveShortURL(br.cloneBrowser(), link, null);
+                    } catch (final PluginException e) {
+                        logger.log(e);
+                        if (e.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
+                            link.setAvailableStatus(AvailableStatus.FALSE);
+                        } else if (e.getLinkStatus() == LinkStatus.ERROR_IP_BLOCKED) {
+                            link.setAvailableStatus(AvailableStatus.TRUE);
+                        } else {
+                            link.setAvailableStatus(AvailableStatus.UNCHECKABLE);
+                        }
+                        if (!link.isNameSet()) {
+                            setWeakFilename(link, null);
+                        }
+                        /*
+                         * We cannot check shortLinks via API so if we're unable to convert them to TYPE_NORMAL we basically already checked
+                         * them here. Also we have to avoid sending wrong fileIDs to the API otherwise linkcheck WILL fail!
+                         */
+                        continue;
+                    }
+                    sb.append(this.getFUIDFromURL(link));
+                    sb.append("%2C");
+                    apiLinkcheckLinks.add(link);
+                }
+                getPage(br, getAPIBase() + "/file/info?key=" + apikey + "&file_code=" + sb.toString());
+                Map<String, Object> entries = null;
+                try {
+                    entries = this.checkErrorsAPI(br, links.get(0), null);
+                } catch (final Throwable e) {
+                    logger.log(e);
+                    /* E.g. invalid apikey, broken serverside API, developer mistake (e.g. sent fileIDs in invalid format) */
+                    logger.info("Fatal failure");
+                    return false;
+                }
+                final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("result");
+                for (final DownloadLink link : apiLinkcheckLinks) {
+                    Map<String, Object> fileInfo = null;
+                    final String thisFUID = this.getFUIDFromURL(link);
+                    for (final Map<String, Object> fileInfoTmp : ressourcelist) {
+                        String fuid_temp = (String) fileInfoTmp.get("filecode");
+                        if (StringUtils.isEmpty(fuid_temp)) {
+                            /* 2022-08-09 */
+                            fuid_temp = (String) fileInfoTmp.get("file_code");
+                            if (StringUtils.isEmpty(fuid_temp)) {
+                                /* 2024-12-16: Special voe.sx */
+                                fuid_temp = (String) fileInfoTmp.get("fileCode");
+                            }
+                        }
+                        if (StringUtils.equals(fuid_temp, thisFUID)) {
+                            fileInfo = fileInfoTmp;
+                            break;
+                        }
+                    }
+                    if (fileInfo == null) {
+                        /**
+                         * This should never happen. Possible reasons: <br>
+                         * - Wrong APIKey <br>
+                         * - We tried to check too many items at once <br>
+                         * - API only allows users to check self-uploaded content --> Disable API linkchecking in plugin! <br>
+                         * - API does not not allow linkchecking at all --> Disable API linkchecking in plugin! <br>
+                         */
+                        logger.warning("WTF failed to find information for fuid: " + this.getFUIDFromURL(link));
+                        linkcheckerHasFailed = true;
+                        continue;
+                    }
+                    /* E.g. check for "result":[{"status":404,"filecode":"xxxxxxyyyyyy"}] */
+                    final int status = ((Number) fileInfo.get("status")).intValue();
+                    if (!link.isNameSet()) {
+                        setWeakFilename(link, null);
+                    }
+                    String filename = null;
+                    boolean isVideohost = false;
+                    if (status != 200) {
+                        link.setAvailable(false);
+                    } else {
+                        link.setAvailable(true);
+                        filename = (String) fileInfo.get("name");
+                        if (StringUtils.isEmpty(filename)) {
+                            filename = (String) fileInfo.get("file_title");
+                        }
+                        Number filesize = null;
+                        if (preferredQualityHeightStr != null) {
+                            filesize = (Number) fileInfo.get("size_" + preferredQualityHeightStr);
+                        }
+                        if (filesize == null) {
+                            /* Fallback/default */
+                            /* Look for 1080p first since they put the middle quality size (720p) in the field "file_size". */
+                            filesize = (Number) fileInfo.get("size_1080p");
+                            if (filesize == null) {
+                                filesize = (Number) fileInfo.get("file_size");
+                            }
+                        }
+                        final Object canplay = fileInfo.get("canplay");
+                        final Object views_started = fileInfo.get("views_started");
+                        final Object views = fileInfo.get("views");
+                        final Object length = fileInfo.get("length");
+                        isVideohost = canplay != null || views_started != null || views != null || length != null;
+                        /* Filesize is not always given especially not for videohosts. */
+                        if (filesize != null) {
+                            link.setDownloadSize(filesize.longValue());
+                        }
+                    }
+                    if (!isVideohost) {
+                        isVideohost = this.internal_isVideohoster_enforce_video_filename(link, null);
+                    }
+                    if (!StringUtils.isEmpty(filename)) {
+                        /*
+                         * At least for videohosts, filenames from json would often not contain a file extension!
+                         */
+                        if (Encoding.isHtmlEntityCoded(filename)) {
+                            filename = Encoding.htmlDecode(filename).trim();
+                        }
+                        if (isVideohost) {
+                            filename = this.applyFilenameExtension(filename, ".mp4");
+                        }
+                        /* Trust API filenames -> Set as final filename. */
+                        link.setFinalFileName(filename);
+                    } else {
+                        /* Use cached name */
+                        final String name = link.getName();
+                        if (name != null && isVideohost) {
+                            link.setName(this.applyFilenameExtension(filename, ".mp4"));
+                        }
+                    }
+                }
+                if (index == urls.length) {
+                    break;
+                }
+            }
+        } catch (final Exception e) {
+            logger.log(e);
+            return false;
+        } finally {
+            if (linkcheckerHasFailed) {
+                logger.info("Seems like massLinkcheckerAPI availablecheck is not supported by this host or currently broken");
+            }
+        }
+        if (linkcheckerHasFailed) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Override
     public Class<? extends XFSConfigVideoVoeSx> getConfigInterface() {
         return XFSConfigVideoVoeSx.class;
     }
@@ -443,5 +753,21 @@ public class VoeSx extends XFileSharingProBasic {
     protected boolean supports_availablecheck_alt() {
         // 2024-07-04
         return false;
+    }
+
+    @Override
+    protected String getRelativeAccountInfoURL() {
+        return "/settings";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("^[A-Za-z0-9]{64}$")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }

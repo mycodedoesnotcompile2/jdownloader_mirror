@@ -27,16 +27,16 @@ import org.appwork.utils.formatter.SizeFormatter;
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50344 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50347 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNu extends PluginForHost {
     public GigafileNu(PluginWrapper wrapper) {
         super(wrapper);
@@ -49,7 +49,8 @@ public class GigafileNu extends PluginForHost {
         return br;
     }
 
-    public static final String PROPERTY_FILE_ID = "file_id";
+    public static final String PROPERTY_FILE_ID                = "file_id";
+    public static final String PROPERTY_FILE_NAME_FROM_CRAWLER = "filename_from_crawler";
 
     @Override
     public String getAGBLink() {
@@ -75,7 +76,8 @@ public class GigafileNu extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://\\d+\\." + buildHostsPatternPart(domains) + "/(\\d+-[a-z0-9]+)");
+            /* Liks are added via crawler plugin */
+            ret.add("");
         }
         return ret.toArray(new String[0]);
     }
@@ -100,7 +102,7 @@ public class GigafileNu extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return link.getStringProperty(PROPERTY_FILE_ID);
     }
 
     @Override
@@ -108,32 +110,43 @@ public class GigafileNu extends PluginForHost {
         final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
         this.setBrowserExclusive();
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.containsHTML("download\\('" + fid) && !br.containsHTML("var file = \"" + fid)) {
+        }
+        final PluginForDecrypt crawlerplugin = this.getNewPluginForDecryptInstance(this.getHost());
+        if (!crawlerplugin.canHandle(br.getURL())) {
+            /* E.g. redirect to main page */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String[] nonZipFiles = br.getRegex("alt=\"スキャン中\" style=\"height: 18px;\">\\s*</span>\\s*<span class=\"\">([^<]+)</span>").getColumn(0);
-        String filename = br.getRegex("<span>([^<>\"]+\\.zip)</span>").getMatch(0);
-        if (filename == null) {
-            /* 2022-02-15 */
-            filename = br.getRegex("onclick=\"download\\([^\\)]+\\);\">([^<>\"]+)</p>").getMatch(0);
+        final String filenameFromCrawler = link.getStringProperty(PROPERTY_FILE_NAME_FROM_CRAWLER);
+        if (filenameFromCrawler != null) {
+            link.setName(filenameFromCrawler);
+        } else {
+            final String[] nonZipFiles = br.getRegex("alt=\"スキャン中\" style=\"height: 18px;\">\\s*</span>\\s*<span class=\"\">([^<]+)</span>").getColumn(0);
+            String filename = br.getRegex("<span>([^<>\"]+\\.zip)</span>").getMatch(0);
+            if (filename == null) {
+                /* 2022-02-15 */
+                filename = br.getRegex("onclick=\"download\\([^\\)]+\\);\">([^<>\"]+)</p>").getMatch(0);
+            }
+            if (nonZipFiles != null && nonZipFiles.length == 1) {
+                /* We only got one file -> Do not attempt .zip download and set name of that file right away. */
+                filename = nonZipFiles[0];
+            }
+            if (filename != null) {
+                filename = Encoding.htmlDecode(filename).trim();
+                link.setName(filename);
+            }
         }
-        String filesizeStr = br.getRegex("<span style=\"font-size: 12px;\">（(.*?)）</span>").getMatch(0);
-        if (nonZipFiles != null && nonZipFiles.length == 1) {
-            /* We only got one file -> Do not attempt .zip download and set name of that file right away. */
-            filename = nonZipFiles[0];
-        }
-        if (filename != null) {
-            filename = Encoding.htmlDecode(filename).trim();
-            link.setName(filename);
-        }
-        if (filesizeStr != null) {
-            link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
+        if (!link.hasProperty(PROPERTY_FILE_ID)) {
+            /* Legacy handling for items that haven't been added via crawler. */
+            String firstFilesizeStr = br.getRegex("<span style=\"font-size: 12px;\">（(.*?)）</span>").getMatch(0);
+            if (firstFilesizeStr != null) {
+                link.setDownloadSize(SizeFormatter.getSize(firstFilesizeStr));
+            }
         }
         return AvailableStatus.TRUE;
     }
@@ -150,6 +163,7 @@ public class GigafileNu extends PluginForHost {
             final String mainFileID = br.getRegex("var file = \"([^\"]+)").getMatch(0);
             String fileIDForDownload = link.getStringProperty(PROPERTY_FILE_ID);
             if (fileIDForDownload == null) {
+                /* Legacy handling */
                 final String filesJson = br.getRegex("var files = (\\[.*?\\]);").getMatch(0);
                 if (filesJson != null) {
                     final List<Object> ressourcelist = restoreFromString(filesJson, TypeRef.LIST);
@@ -196,8 +210,10 @@ public class GigafileNu extends PluginForHost {
                 }
             }
             link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
-            if (fileIDForDownload != null && !link.hasProperty(PROPERTY_FILE_ID)) {
-                link.setProperty(PROPERTY_FILE_ID, fileIDForDownload);
+            if (!link.hasProperty(PROPERTY_FILE_ID)) {
+                if (fileIDForDownload != null) {
+                    link.setProperty(PROPERTY_FILE_ID, fileIDForDownload);
+                }
             }
         }
         dl.startDownload();
