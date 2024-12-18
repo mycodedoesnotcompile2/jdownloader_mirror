@@ -640,7 +640,7 @@ public class Browser {
     private String                              acceptLanguage        = "de, en-gb;q=0.9, en;q=0.8";
     /*
      * -1 means use default Timeouts
-     *
+     * 
      * 0 means infinite (DO NOT USE if not needed)
      */
     private int                                 connectTimeout        = -1;
@@ -964,7 +964,7 @@ public class Browser {
     /**
      * Creates a new postrequest based an an requestVariable ArrayList
      *
-     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
+     * @deprecated use {@link #createPostRequest(String, UrlQuery, String)
      *
      *
      */
@@ -2609,7 +2609,7 @@ public class Browser {
         } else {
             // final boolean isCloudflareHeaderCfRayExistent = req.getResponseHeader("cf-ray") != null;
             final boolean isCloudflareServer = StringUtils.containsIgnoreCase(request.getResponseHeader(HTTPConstants.HEADER_RESPONSE_SERVER), "cloudflare");
-            final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522;
+            final boolean isTypicalCloudflareResponseCode = con.getResponseCode() == 403 || con.getResponseCode() == 502 || con.getResponseCode() == 503 || con.getResponseCode() == 429 || con.getResponseCode() == 522 || con.getResponseCode() == 523;
             // TODO: Add better Cloudflare detection (more/better html snippets)
             // TODO: Add separate BlockedType for Cloudflare-Captcha, see: https://svn.jdownloader.org/issues/90281
             /**
@@ -2635,7 +2635,7 @@ public class Browser {
                         }
                     }
                     /* 2023-06-06: This is only a text output. Do not use the errormessage/text for anything else at this moment!! */
-                    final String errorText = request.getRegex("<h1>([^<]+)</h1>").getMatch(0);
+                    final String errorText = request.getRegex("<h1[^>]*>\\s*(.*?)\\s*</h1>").getMatch(0);
                     browser.getLogger().info("Cloudflare parsed errormessage: " + errorText);
                     if (errorCode != null) {
                         if (errorCode.matches("5\\d{2}")) {
@@ -3138,8 +3138,8 @@ public class Browser {
                     return null;
                 }
                 if (true) { /*
-                 * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
-                 */
+                             * TODO: Add header based detection too -> At least check "server" header so we do not only rely on html code.
+                             */
                     /* See new ESET NOD32 html code 2023: https://board.jdownloader.org/showthread.php?t=91433 */
                     return null;
                 } else if (request.containsHTML("<div class\\s*=\\s*\"prodhead\">\\s*<div class\\s*=\\s*\"logoimg\">\\s*<span class\\s*=\\s*\"logotxt\">\\s*ESET NOD32 Antivirus\\s*</span>\\s*</div>\\s*</div>") && request.containsHTML("- ESET NOD32 Antivirus\\s*</title>")) {

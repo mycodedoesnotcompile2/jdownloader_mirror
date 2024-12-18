@@ -651,6 +651,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Status" })
     String StatusColumn_StatusColumn2();
 
+    @Default(lngs = { "en" }, values = { "Index" })
+    String IndexColumn_IndexColumn();
+
     @Default(lngs = { "en" }, values = { "Enabled / Disabled" })
     String EnabledDisabledColumn_EnabledDisabledColumn();
 

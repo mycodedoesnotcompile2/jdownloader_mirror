@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50319 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50353 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -145,7 +145,6 @@ public class TorboxApp extends UseNet {
             logger.info("Trying to re-use stored directurl: " + storedDirecturl);
             dllink = storedDirecturl;
         } else {
-            logger.info("Creating or finding internal file_id");
             final UrlQuery query = new UrlQuery();
             query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
             if (!StringUtils.isEmpty(link.getDownloadPassword())) {
@@ -500,6 +499,12 @@ public class TorboxApp extends UseNet {
         accountErrorsTemporary.add("ACTIVE_LIMIT");
         final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
         downloadErrorsHostUnavailable.add("UNSUPPORTED_SITE");
+        /*
+         * E.g. {"success":false,"error":"DOWNLOAD_LIMIT_REACHED",
+         * "detail":"You have reached the 10 downloads limit for ddownload.com, ddl.to. Please try again in 24 hours when the limit resets."
+         * ,"data":null}
+         */
+        downloadErrorsHostUnavailable.add("DOWNLOAD_LIMIT_REACHED");
         final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
         if (accountErrorsPermanent.contains(errorcode)) {
             /* This is the only error which allows us to remove the apikey and re-login. */

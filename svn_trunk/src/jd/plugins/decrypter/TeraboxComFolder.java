@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50353 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -228,6 +228,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 surl = newSurlValue;
             }
         }
+        String share_username = null;
         int page = 1;
         final int maxItemsPerPage = 20;
         final UrlQuery queryFolder = new UrlQuery();
@@ -273,7 +274,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 boolean captchaRequired = false;
                 int count = 0;
                 final int maxTries = 10;
-                do {
+                passwordloop: do {
                     count += 1;
                     logger.info("Captcha/password attempt " + count + " / " + maxTries);
                     /*
@@ -304,15 +305,15 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     errno = ((Number) entries.get("errno")).intValue();
                     passwordCookie = (String) entries.get("randsk");
                     if (!StringUtils.isEmpty(passwordCookie)) {
-                        break;
+                        /* User has entered correct password */
+                        logger.info("Password loop: Success");
+                        break passwordloop;
+                    } else if (count >= maxTries) {
+                        logger.info("Password loop: Giving up");
+                        break passwordloop;
                     } else {
-                        if (count >= maxTries) {
-                            logger.info("Giving up");
-                            break;
-                        } else {
-                            logger.info("Wrong password or captcha");
-                            continue;
-                        }
+                        logger.info("Password loop: Wrong password or captcha");
+                        continue passwordloop;
                     }
                 } while (!this.isAbort());
                 if (passwordCookie == null) {
@@ -343,6 +344,32 @@ public class TeraboxComFolder extends PluginForDecrypt {
             if (ressourcelist.isEmpty()) {
                 logger.info("Stopping because: Current page doesn't contain any items");
                 break;
+            }
+            if (preGivenPath == null && share_username == null) {
+                /* This request is solely to find the "share_username". */
+                final UrlQuery query_shorturlinfo = new UrlQuery();
+                query_shorturlinfo.add("app_id", getAppID());
+                query_shorturlinfo.add("web", "1");
+                query_shorturlinfo.add("channel", getChannel());
+                query_shorturlinfo.add("clienttype", getClientType());
+                /* 2023-06-21: jstoken is mandatory when account is given. */
+                query_shorturlinfo.add("jsToken", jstoken != null ? jstoken : "");
+                query_shorturlinfo.add("dp-logid", "");
+                query_shorturlinfo.add("shorturl", "1" + surl);
+                if (!StringUtils.isEmpty(preGivenPath)) {
+                    query_shorturlinfo.add("dir", preGivenPath);
+                } else {
+                    query_shorturlinfo.add("root", "1");
+                }
+                query_shorturlinfo.add("scene", "");
+                br.getPage(protocolAndSubdomain + "/api/shorturlinfo?" + query_shorturlinfo.toString());
+                final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final int fcount = ((Number) entries2.get("fcount")).intValue();
+                if (fcount == 0) {
+                    /* Empty folder */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                share_username = entries2.get("share_username").toString();
             }
             for (final Map<String, Object> ressource : ressourcelist) {
                 final String path = (String) ressource.get("path");
@@ -396,7 +423,7 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     dl.setProperty(TeraboxCom.PROPERTY_ACCOUNT_JS_TOKEN, jstoken);
                     /* This can be useful to refresh directurls a lot quicker. */
                     dl.setProperty(TeraboxCom.PROPERTY_PAGINATION_PAGE, page);
-                    if (realpath.length() > 1) {
+                    if (realpath.length() > 0) {
                         dl.setRelativeDownloadFolderPath(realpath);
                         final FilePackage fp = FilePackage.getInstance();
                         fp.setName(realpath);
@@ -405,7 +432,12 @@ public class TeraboxComFolder extends PluginForDecrypt {
                         /* No path or folder title known but we still know that all files should go into one package. */
                         final FilePackage fp = FilePackage.getInstance();
                         // fp.setPackageKey(this.getHost() + "://folder/" + surl);
-                        fp.setName(surl);
+                        if (share_username != null) {
+                            /* Mimic title from browser */
+                            fp.setName("Sharing from " + share_username);
+                        } else {
+                            fp.setName(surl);
+                        }
                         dl._setFilePackage(fp);
                     }
                     if (targetFileID == null) {

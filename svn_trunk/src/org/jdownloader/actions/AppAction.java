@@ -31,6 +31,8 @@ public abstract class AppAction extends BasicAction {
 
     private boolean              visible = true;
 
+    public static final String   VISIBLE = "Visible";
+
     public AppAction() {
         super();
 
@@ -103,18 +105,16 @@ public abstract class AppAction extends BasicAction {
         return visible;
     }
 
-    public void setVisible(boolean newValue) {
+    public void setVisible(final boolean newValue) {
         if (visible == newValue) {
             return;
         }
         boolean oldValue = visible;
         this.visible = newValue;
-
-        firePropertyChange("visible", Boolean.valueOf(oldValue), Boolean.valueOf(newValue));
+        firePropertyChange(VISIBLE, Boolean.valueOf(oldValue), Boolean.valueOf(newValue));
     }
 
     public Icon getIcon(int size) {
-
         Icon actionIcon = null;
         String iconKey = getIconKey();
         if (NewTheme.I().hasIcon(iconKey)) {
@@ -123,7 +123,6 @@ public abstract class AppAction extends BasicAction {
             Icon icon = (Icon) getValue(Action.LARGE_ICON_KEY);
             if (icon == null) {
                 icon = getSmallIcon();
-
                 if (icon != null) {
                     actionIcon = (IconIO.getScaledInstance(icon, size, size));
                 }

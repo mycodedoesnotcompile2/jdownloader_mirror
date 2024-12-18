@@ -47,11 +47,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49072 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50350 $", interfaceVersion = 3, names = {}, urls = {})
 public class UfileIo extends antiDDoSForHost {
     public UfileIo(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://uploadfiles.io/#packages");
+        this.enablePremium("https://" + getHost() + "/pricing");
     }
 
     @Override
@@ -61,7 +61,7 @@ public class UfileIo extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://uploadfiles.io/terms";
+        return "https://" + getHost() + "/terms";
     }
 
     @Override
@@ -226,7 +226,11 @@ public class UfileIo extends antiDDoSForHost {
         String dllink = checkDirectLink(link, directlinkproperty);
         if (dllink == null) {
             if (br.containsHTML("(?i)>\\s*Premium Access Only")) {
-                throw new AccountRequiredException();
+                if (br.containsHTML("The hosting period for this file has now expired,\\s*only paid users can download it")) {
+                    throw new AccountRequiredException("The hosting period for this file has now expired. Only paid users can download it.");
+                } else {
+                    throw new AccountRequiredException();
+                }
             }
             final String fileID = this.getFID(link);
             String csrftest = br.getRegex("name=\"csrf_test_name\" value=\"([a-f0-9]+)\"").getMatch(0);
@@ -261,7 +265,7 @@ public class UfileIo extends antiDDoSForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+        link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         dl.startDownload();
     }
 
@@ -375,7 +379,6 @@ public class UfileIo extends antiDDoSForHost {
             /* free accounts can still have captcha */
             account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(false);
-            ai.setStatus("Registered (free) user");
         } else {
             /* 2019-01-29: TODO */
             // final String expire = br.getRegex("").getMatch(0);
@@ -395,7 +398,6 @@ public class UfileIo extends antiDDoSForHost {
             account.setType(AccountType.PREMIUM);
             account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
-            ai.setStatus("Premium account");
             this.getPage("/dashboard/settings/billing");
             final Regex expireinfo = br.getRegex("Your next billing date is (\\d+)[a-z]* ([A-Za-z]+ \\d{4})<");
             final String expireDay = expireinfo.getMatch(0);
@@ -425,8 +427,7 @@ public class UfileIo extends antiDDoSForHost {
         if (acc == null) {
             /* no account, yes we can expect captcha */
             return true;
-        }
-        if (acc.getType() == AccountType.FREE) {
+        } else if (acc.getType() == AccountType.FREE) {
             /* Free accounts can have captchas */
             return true;
         }
@@ -437,13 +438,5 @@ public class UfileIo extends antiDDoSForHost {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
     }
 }

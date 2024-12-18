@@ -668,6 +668,14 @@ public class SelectionInfo<PackageType extends AbstractPackageNode<ChildrenType,
         return false;
     }
 
+    public static boolean isEmpty(SelectionInfo<?, ?> selectionInfo) {
+        return selectionInfo == null || selectionInfo.isEmpty();
+    }
+
+    public static boolean isNotEmpty(SelectionInfo<?, ?> selectionInfo) {
+        return selectionInfo != null && !selectionInfo.isEmpty();
+    }
+
     /**
      * false if there are selected links
      *

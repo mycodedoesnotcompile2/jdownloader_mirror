@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -1478,27 +1479,26 @@ public class YoutubeHelper {
             synchronized (jsCache) {
                 function = jsCache.get(functionCacheKey);
                 if (function == null) {
-                    final String html5PlayerSource = ensurePlayerSource();
                     // String[][] func = new Regex(html5PlayerSource,
                     // "(?x)(?:\\.get\\(\"n\"\\)\\)&&\\(b=|b=String\\.fromCharCode\\(110\\),c=a\\.get\\(b\\)\\)&&\\(c=)([a-zA-Z0-9$]+)(?:\\[(\\d+)\\])?\\([a-zA-Z0-9]\\)").getMatches();
                     // since 2024-12-09
-                    function = new Regex(html5PlayerSource, "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
+                    function = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(0);
                     if (function != null) {
-                        final String varName = new Regex(html5PlayerSource, "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
+                        final String varName = new Regex(ensurePlayerSource(), "(=function\\((\\w+)\\)\\{var \\w+\\s*=\\s*\\2\\.split\\(\\2\\.slice\\(0,0\\)\\),\\w+\\s*=\\s*\\[.*?\\};)\n").getMatch(1);
                         function = function.replaceAll("if\\s*\\(typeof\\s*\\w+\\s*===\\s*\\\"undefined\\\"\\)\\s*return\\s*" + Pattern.quote(varName) + "\\s*;", "");
                     }
                     if (function == null) {
                         // since 2024-08-06
-                        function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                        function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(a\\.slice\\(0,0\\)\\),c=\\[.*?\\};)\n").getMatch(0);
                         if (function == null) {
                             // since 2024-07-31
-                            function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
+                            function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\\(\"\"\\,\"\"\\)\\),c=\\[.*?\\};)\n").getMatch(0);
                             if (function == null) {
                                 // since 2024-07
-                                function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                                function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=String\\.prototype\\.split\\.call\\(a,\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
                                 if (function == null) {
                                     // before 2024-07
-                                    function = new Regex(html5PlayerSource, "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
+                                    function = new Regex(ensurePlayerSource(), "(=function\\(a\\)\\{var b=a\\.split\\(\"\"\\),c=\\[.*?\\};)\n").getMatch(0);
                                 }
                             }
                         }
@@ -1530,7 +1530,9 @@ public class YoutubeHelper {
                 final String result = StringUtils.valueOfOrNull(engine.get("result"));
                 if (result != null) {
                     output = result;
-                    if (result.startsWith("enhanced_except")) {
+                    if (result.startsWith("org.mozilla.javascript")) {
+                        throw new ScriptException(result);
+                    } else if (result.startsWith("enhanced_except")) {
                         throw new Exception("Invalid result:" + result);
                     } else {
                         synchronized (jsCache) {
@@ -1573,13 +1575,12 @@ public class YoutubeHelper {
             descrambler = jsCache.get(resultCacheKey + "descrambler");
             des = jsCache.get(resultCacheKey + "des");
             if (descrambler == null) {
-                final String html5PlayerSource = ensurePlayerSource();
                 if (descrambler == null) {
-                    descrambler = new Regex(html5PlayerSource, "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
+                    descrambler = new Regex(ensurePlayerSource(), "\"signature\"\\s*,\\s*([\\$\\w]+)\\([\\$\\w\\.]+\\s*\\)\\s*\\)(\\s*\\)\\s*){0,};").getMatch(0);
                     if (descrambler == null) {
-                        descrambler = new Regex(html5PlayerSource, "(?:^|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                        descrambler = new Regex(ensurePlayerSource(), "(?:^|[^a-zA-Z0-9_$])([a-zA-Z0-9_$]{2})\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
                         if (descrambler == null) {
-                            descrambler = new Regex(html5PlayerSource, "([a-zA-Z0-9$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
+                            descrambler = new Regex(ensurePlayerSource(), "([a-zA-Z0-9_$]+)\\s*=\\s*function\\((\\w+)\\)\\{\\s*\\2=\\s*\\2\\.split\\(\"\"\\)").getMatch(0);
                             if (descrambler == null) {
                                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                             }
@@ -1588,15 +1589,15 @@ public class YoutubeHelper {
                 }
                 logger.info("FunctionName:" + descrambler);
                 final String func = "(?<!\\.)" + Pattern.quote(descrambler) + "\\s*=\\s*function\\(([^)]+)\\)\\{(.+?return.*?)\\};";
-                des = new Regex(html5PlayerSource, Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
-                all = new Regex(html5PlayerSource, Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
+                des = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(1);
+                all = new Regex(ensurePlayerSource(), Pattern.compile(func, Pattern.DOTALL)).getMatch(-1);
                 logger.info("Function:" + all);
                 if (all == null) {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
                 final String requiredObjectName = new Regex(des, "([\\w\\d\\$]+)\\.([\\w\\d]{2})\\(").getMatch(0);
                 if (requiredObjectName != null) {
-                    final String requiredObject = new Regex(html5PlayerSource, Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
+                    final String requiredObject = new Regex(ensurePlayerSource(), Pattern.compile("var " + Pattern.quote(requiredObjectName) + "=\\{.*?\\}\\};", Pattern.DOTALL)).getMatch(-1);
                     if (requiredObject == null) {
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Missing object:" + requiredObject);
                     }
@@ -1610,12 +1611,25 @@ public class YoutubeHelper {
             }
         }
         while (true) {
+            final JSShutterDelegate jsShutter = new JSShutterDelegate() {
+                @Override
+                public boolean isClassVisibleToScript(boolean trusted, String className) {
+                    if ("org.mozilla.javascript.JavaScriptException".equals(className)) {
+                        return true;
+                    }
+                    return trusted;
+                }
+            };
             try {
+                JSRhinoPermissionRestricter.THREAD_JSSHUTTER.put(Thread.currentThread(), jsShutter);
                 final ScriptEngineManager manager = org.jdownloader.scripting.JavaScriptEngineFactory.getScriptEngineManager(this);
                 final ScriptEngine engine = manager.getEngineByName("javascript");
                 final String debugJS = all + " " + descrambler + "(\"" + sig + "\")";
                 final String result = StringUtils.valueOfOrNull(engine.eval(debugJS));
                 if (result != null) {
+                    if (result.startsWith("org.mozilla.javascript")) {
+                        throw new ScriptException(result);
+                    }
                     logger.info("sig1(" + vid.videoID + "," + playerID + "):" + sig + "->" + result);
                     return result;
                 }
@@ -1640,6 +1654,8 @@ public class YoutubeHelper {
                     }
                 }
                 logger.log(e);
+            } finally {
+                JSRhinoPermissionRestricter.THREAD_JSSHUTTER.remove(Thread.currentThread());
             }
             break;
         }

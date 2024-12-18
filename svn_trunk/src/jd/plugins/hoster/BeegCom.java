@@ -42,7 +42,7 @@ import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 50231 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.)?beeg\\.com/-?\\d+(?:\\?t=\\d+-\\d+)?|https?://beta\\.beeg\\.com/-\\d+(?:\\?t=\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 50352 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/-\\d+(?:\\?t=\\d+-\\d+)?" })
 public class BeegCom extends PluginForHost {
     private String dllink[] = null;
 
@@ -66,7 +66,7 @@ public class BeegCom extends PluginForHost {
     }
 
     private static final String TYPE_BETA        = "https?://beta\\.beeg\\.com/-(\\d+)(?:\\?t=(\\d+-\\d+))?";
-    private static final String TYPE_NORMAL      = "https?://beeg\\.com/-?(\\d+)(?:\\?t=(\\d+-\\d+))?";
+    private static final String TYPE_NORMAL      = "https?://beeg\\.com/-(\\d+)(?:\\?t=(\\d+-\\d+))?";
     private boolean             server_issue     = false;
     private static final String PROPERTY_IS_HLS  = "is_hls";
     private static final String PROPERTY_QUALITY = "what_quality";

@@ -18,7 +18,9 @@ package jd.plugins.decrypter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -43,17 +45,19 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.BbcCom;
 
-@DecrypterPlugin(revision = "$Revision: 48660 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
+@DecrypterPlugin(revision = "$Revision: 50353 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "https?://(?:www\\.)?(?:bbc\\.com|bbc\\.co\\.uk)/.+" })
 public class BbcComDecrypter extends PluginForDecrypt {
     public BbcComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
 
-    private final String        TYPE_EMBED      = "(?i)https?://[^/]+/[^/]+/av-embeds/.+";
-    private static final String TYPE_PROGRAMMES = "(?i)https?://[^/]+/programmes/([^/]+)$";
+    private final String          TYPE_EMBED      = "(?i)https?://[^/]+/[^/]+/av-embeds/.+";
+    private static final String   TYPE_PROGRAMMES = "(?i)https?://[^/]+/programmes/([^/]+)$";
+    private final HashSet<String> globaldupes     = new HashSet<String>();
 
     @SuppressWarnings("unchecked")
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        globaldupes.clear();
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         br.setFollowRedirects(true);
         br.getPage(param.getCryptedUrl());
@@ -375,14 +379,16 @@ public class BbcComDecrypter extends PluginForDecrypt {
             }
         }
         /* 2024-02-12: works for e.g. https://www.bbc.co.uk/archive/the-great-egg-race--eggmobiles/zbrvmfr */
-        final String[] jsons20240212 = br.getRegex("Morph\\.setPayload\\('([^']+)', \\(\\{\"\\);").getColumn(0);
-        if (jsons20240212 != null && jsons20240212.length > 0) {
-            for (final String json : jsons20240212) {
-                final Map<String, Object> map20240212 = restoreFromString(json, TypeRef.MAP);
-                findVideoMapsDownloadLinkList20240212(ret, map20240212);
-            }
+        final HashSet<String> jsons_all = new HashSet<String>();
+        final String[] jsons2024_02_12 = br.getRegex("Morph\\.setPayload\\('([^']+)', \\(\\{\"\\);").getColumn(0);
+        jsons_all.addAll(Arrays.asList(jsons2024_02_12));
+        final String[] jsons_2024_12_17 = br.getRegex("type=\"application/json\">(.*?)</script>").getColumn(0);
+        jsons_all.addAll(Arrays.asList(jsons_2024_12_17));
+        for (final String json : jsons_all) {
+            final Object object = restoreFromString(json, TypeRef.OBJECT);
+            findVideoMapsDownloadLinkList20240212(ret, object);
         }
-        if (this.br.getURL().matches(TYPE_PROGRAMMES)) {
+        if (br.getURL().matches(TYPE_PROGRAMMES)) {
             if (ret.isEmpty()) {
                 ret.addAll(crawlProgrammes(br.getURL()));
             }
@@ -500,13 +506,20 @@ public class BbcComDecrypter extends PluginForDecrypt {
         }
     }
 
-    private void findVideoMapsDownloadLinkList20240212(final ArrayList<DownloadLink> results, final Object o) {
+    private void findVideoMapsDownloadLinkList20240212(final List<DownloadLink> results, final Object o) {
         if (o instanceof Map) {
             final Map<String, Object> entrymap = (Map<String, Object>) o;
-            final Object duration = entrymap.get("duration");
+            // final Object versions = entrymap.get("versions");
+            Object duration = entrymap.get("duration");
+            if (duration == null) {
+                duration = JavaScriptEngineFactory.walkJson(entrymap, "versions/{0}/duration");
+            }
             final String title = (String) entrymap.get("title");
-            final String vpid = entrymap.get("vpid").toString();
-            if (duration != null && title != null && vpid != null) {
+            String vpid = (String) entrymap.get("vpid");
+            if (vpid == null) {
+                vpid = (String) JavaScriptEngineFactory.walkJson(entrymap, "versions/{0}/versionId");
+            }
+            if (duration != null && title != null && vpid != null && globaldupes.add(vpid)) {
                 /* Hit :) */
                 final DownloadLink dl = this.generateDownloadlink(vpid);
                 dl.setContentUrl(br.getURL());

@@ -70,8 +70,7 @@ public class StringUtils {
     }
 
     /**
-     * Returns formatted number as String according to given padLength. </br>
-     * E.g. number 1 with padLength 3 will return "001".
+     * Returns formatted number as String according to given padLength. </br> E.g. number 1 with padLength 3 will return "001".
      */
     public static String formatByPadLength(final int padLength, final int num) {
         return String.format(Locale.US, "%0" + padLength + "d", num);
@@ -122,62 +121,62 @@ public class StringUtils {
     final private static String whitespace_chars = "[" /*
                                                         * dummy empty string for homogeneity
                                                         */
-            + "\\u0009" // CHARACTER
-            // TABULATION
-            + "\\u000A" // LINE
-            // FEED
-            // (LF)
-            + "\\u000B" // LINE
-            // TABULATION
-            + "\\u000C" // FORM
-            // FEED
-            // (FF)
-            + "\\u000D" // CARRIAGE
-            // RETURN
-            // (CR)
-            + "\\u0020" // SPACE
-            + "\\u0085" // NEXT
-            // LINE
-            // (NEL)
-            + "\\u00A0" // NO-BREAK
-            // SPACE
-            + "\\u1680" // OGHAM
-            // SPACE
-            // MARK
-            + "\\u180E" // MONGOLIAN
-            // VOWEL
-            // SEPARATOR
-            + "\\u2000" // EN QUAD
-            + "\\u2001" // EM QUAD
-            + "\\u2002" // EN SPACE
-            + "\\u2003" // EM SPACE
-            + "\\u2004" // THREE-PER-EM
-            // SPACE
-            + "\\u2005" // FOUR-PER-EM
-            // SPACE
-            + "\\u2006" // SIX-PER-EM
-            // SPACE
-            + "\\u2007" // FIGURE
-            // SPACE
-            + "\\u2008" // PUNCTUATION
-            // SPACE
-            + "\\u2009" // THIN
-            // SPACE
-            + "\\u200A" // HAIR
-            // SPACE
-            + "\\u2028" // LINE
-            // SEPARATOR
-            + "\\u2029" // PARAGRAPH
-            // SEPARATOR
-            + "\\u202F" // NARROW
-            // NO-BREAK
-            // SPACE
-            + "\\u205F" // MEDIUM
-            // MATHEMATICAL
-            // SPACE
-            + "\\u3000" // IDEOGRAPHIC
-            // SPACE
-            + "]";
+                                                         + "\\u0009" // CHARACTER
+                                                         // TABULATION
+                                                         + "\\u000A" // LINE
+                                                         // FEED
+                                                         // (LF)
+                                                         + "\\u000B" // LINE
+                                                         // TABULATION
+                                                         + "\\u000C" // FORM
+                                                         // FEED
+                                                         // (FF)
+                                                         + "\\u000D" // CARRIAGE
+                                                         // RETURN
+                                                         // (CR)
+                                                         + "\\u0020" // SPACE
+                                                         + "\\u0085" // NEXT
+                                                         // LINE
+                                                         // (NEL)
+                                                         + "\\u00A0" // NO-BREAK
+                                                         // SPACE
+                                                         + "\\u1680" // OGHAM
+                                                         // SPACE
+                                                         // MARK
+                                                         + "\\u180E" // MONGOLIAN
+                                                         // VOWEL
+                                                         // SEPARATOR
+                                                         + "\\u2000" // EN QUAD
+                                                         + "\\u2001" // EM QUAD
+                                                         + "\\u2002" // EN SPACE
+                                                         + "\\u2003" // EM SPACE
+                                                         + "\\u2004" // THREE-PER-EM
+                                                         // SPACE
+                                                         + "\\u2005" // FOUR-PER-EM
+                                                         // SPACE
+                                                         + "\\u2006" // SIX-PER-EM
+                                                         // SPACE
+                                                         + "\\u2007" // FIGURE
+                                                         // SPACE
+                                                         + "\\u2008" // PUNCTUATION
+                                                         // SPACE
+                                                         + "\\u2009" // THIN
+                                                         // SPACE
+                                                         + "\\u200A" // HAIR
+                                                         // SPACE
+                                                         + "\\u2028" // LINE
+                                                         // SEPARATOR
+                                                         + "\\u2029" // PARAGRAPH
+                                                         // SEPARATOR
+                                                         + "\\u202F" // NARROW
+                                                         // NO-BREAK
+                                                         // SPACE
+                                                         + "\\u205F" // MEDIUM
+                                                         // MATHEMATICAL
+                                                         // SPACE
+                                                         + "\\u3000" // IDEOGRAPHIC
+                                                         // SPACE
+                                                         + "]";
 
     public static String trim(String input) {
         if (input != null) {
@@ -679,9 +678,48 @@ public class StringUtils {
         return null;
     }
 
+    /**
+     * https://stackoverflow.com/questions/1306727/way-to-get-number-of-digits-in-an-int
+     *
+     * https://stackoverflow.com/a/1308407
+     */
+    protected static int getPadLengthFast(final int n) {
+        if (n < 100000) { // 1 to 5
+            if (n < 100) { // 1 or 2
+                if (n < 10) {
+                    return 1;
+                }
+                return 2;
+            } else { // 3, 4 or 5
+                if (n < 1000) {
+                    return 3;
+                }
+                if (n < 10000) {
+                    return 4;
+                }
+                return 5;
+            }
+        } else { // 6 to 7
+            if (n < 10000000) { // 6 or 7
+                if (n < 1000000) {
+                    return 6;
+                }
+                return 7;
+            } else { // 8, 9 or 10
+                if (n < 100000000) {
+                    return 8;
+                }
+                if (n < 1000000000) {
+                    return 9;
+                }
+                return 10;
+            }
+        }
+    }
+
     public static int getPadLength(final int num) {
         if (num >= 0) {
-            return String.valueOf(num).length();
+            return getPadLengthFast(num);
         } else {
             throw new IllegalArgumentException("num must be >=0!:" + num);
         }

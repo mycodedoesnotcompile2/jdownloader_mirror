@@ -227,6 +227,7 @@ public class JNAWindowsProcessHandler implements ProcessHandler {
         String timestamp = (String) p.get("CreationDate");
         pi.setId(((Number) p.get("ProcessId")).intValue() + "-" + timestamp + (String) p.get("CommandLine"));
         pi.setExecutablePath((String) p.get("ExecutablePath"));
+        pi.setExecutableName((String) p.get("Name"));
         if (StringUtils.isNotEmpty(timestamp)) {
             pi.setCreationTime(parseCreationTime(timestamp));
         }

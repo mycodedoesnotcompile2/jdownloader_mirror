@@ -26,6 +26,7 @@ import org.jdownloader.gui.views.downloads.columns.FileCountColumn;
 import org.jdownloader.gui.views.downloads.columns.FileSizeColumn;
 import org.jdownloader.gui.views.downloads.columns.FinishedDateColumn;
 import org.jdownloader.gui.views.downloads.columns.HosterColumn;
+import org.jdownloader.gui.views.downloads.columns.IndexColumn;
 import org.jdownloader.gui.views.downloads.columns.LoadedColumn;
 import org.jdownloader.gui.views.downloads.columns.ModifiedDateColumn;
 import org.jdownloader.gui.views.downloads.columns.PriorityColumn;
@@ -92,6 +93,7 @@ public class DownloadsTableModel extends PackageControllerTableModel<FilePackage
         this.addColumn(new FileSizeColumn());
         this.addColumn(new FileCountColumn());
         this.addColumn(stopSignColumn = new StopSignColumn());
+        this.addColumn(new IndexColumn(DownloadController.getInstance()));
         // reset sort
     }
 

@@ -131,6 +131,7 @@ public class TestJNAWindowsProcessHandler extends AWTest {
 
     protected void testKill(String unique, ProcessHandler handler) throws IOException, Exception {
         Timeout timeout = new Timeout(5000);
+        logInfoAnyway(java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath());
         final Command command = new Command(CrossSystem.getJavaBinary(), "-cp", java.lang.management.ManagementFactory.getRuntimeMXBean().getClassPath(), TestApp.class.getName(), "-" + unique);
         command.setOutputHandler(new AbstractLineHandler() {
             @Override

@@ -27,6 +27,7 @@ import org.jdownloader.gui.views.downloads.columns.FileColumn;
 import org.jdownloader.gui.views.downloads.columns.FileCountColumn;
 import org.jdownloader.gui.views.downloads.columns.FileSizeColumn;
 import org.jdownloader.gui.views.downloads.columns.HosterColumn;
+import org.jdownloader.gui.views.downloads.columns.IndexColumn;
 import org.jdownloader.gui.views.downloads.columns.ModifiedDateColumn;
 import org.jdownloader.gui.views.downloads.columns.PriorityColumn;
 import org.jdownloader.gui.views.downloads.columns.SizeColumn;
@@ -125,6 +126,7 @@ public class LinkGrabberTableModel extends PackageControllerTableModel<CrawledPa
         this.addColumn(new HasCaptchaColumn());
         this.addColumn(new FileSizeColumn());
         this.addColumn(new FileCountColumn());
+        this.addColumn(new IndexColumn(LinkCollector.getInstance()));
     }
 
     protected void setVariantsSupport(final boolean vs) {

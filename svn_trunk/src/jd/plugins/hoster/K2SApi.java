@@ -14,6 +14,22 @@ import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.RFC2047;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
+import org.jdownloader.captcha.blacklist.CaptchaBlackList;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.config.Keep2shareConfig;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
+import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.captcha.SkipRequest;
@@ -43,22 +59,6 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.decrypter.Keep2ShareCcDecrypter;
 import jd.plugins.download.DownloadInterface;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.RFC2047;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
-import org.jdownloader.captcha.blacklist.CaptchaBlackList;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.config.Keep2shareConfig;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.CaptchaTimeoutBehavior;
-import org.jdownloader.plugins.components.config.Keep2shareConfig.LinkcheckMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 /**
  * Abstract class supporting keep2share/fileboom/publish2<br/>
  * <a href="https://github.com/keep2share/api/">Github documentation</a>
@@ -66,17 +66,19 @@ import org.jdownloader.plugins.config.PluginJsonConfig;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50234 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50350 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
-    private final String        lng                        = getLanguage();
-    private final String        PROPERTY_ACCOUNT_AUTHTOKEN = "auth_token";
+    private final String        lng                                                    = getLanguage();
+    private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
+    private final String        PROPERTY_ACCOUNT_DOWNLOADLIMIT_REACHED_UNTIL_TIMESTAMP = "downloadlimit_reached_until_timestamp";
     /* Reconnect workaround settings */
-    private static final String PROPERTY_FILE_ID           = "fileID";
-    private final String        PROPERTY_LASTDOWNLOAD      = "_lastdownload_timestamp";
-    public static final String  PROPERTY_ACCESS            = "access";
+    private static final String PROPERTY_FILE_ID                                       = "fileID";
+    private final String        PROPERTY_LASTDOWNLOAD                                  = "_lastdownload_timestamp";
+    public static final String  PROPERTY_ACCESS                                        = "access";
+    private static final String TEXT_DOWNLOADLIMIT_REACHED                             = "Downloadlimit reached";
     // public static final String PROPERTY_isAvailableForFree = "isAvailableForFree";
     /* Hardcoded time to wait between downloads once limit is reached. */
-    private final long          FREE_RECONNECTWAIT_MILLIS  = 1 * 60 * 60 * 1000L;
+    private final long          FREE_RECONNECTWAIT_MILLIS                              = 1 * 60 * 60 * 1000L;
 
     public K2SApi(PluginWrapper wrapper) {
         super(wrapper);
@@ -231,7 +233,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50234 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 50350 $"));
     }
 
     /**
@@ -301,8 +303,8 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * There are special long fileIDs most likely used for tracking. </br> There can be multiple of those IDs available for the same file so
-     * those special IDs can't be reliably used for duplicate-checking.
+     * There are special long fileIDs most likely used for tracking. </br>
+     * There can be multiple of those IDs available for the same file so those special IDs can't be reliably used for duplicate-checking.
      */
     public static boolean isSpecialFileID(final String fuid) {
         if (fuid != null && (fuid.contains("-") || fuid.contains("_"))) {
@@ -376,8 +378,8 @@ public abstract class K2SApi extends PluginForHost {
     public boolean internal_supportsMassLinkcheck() {
         /**
          * The need to have a setting for the mass-linkcheck behavior is mainly due to a serverside API bug in mass-linkcheck which leads to
-         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br> More detailed description:
-         * https://board.jdownloader.org/showthread.php?t=95537
+         * files being displayed as online while they actually don't exist anymore (abused/deleted). </br>
+         * More detailed description: https://board.jdownloader.org/showthread.php?t=95537
          */
         final Keep2shareConfig cfg = PluginJsonConfig.get(this.getConfigInterface());
         final LinkcheckMode mode = cfg.getFileLinkcheckMode();
@@ -459,8 +461,8 @@ public abstract class K2SApi extends PluginForHost {
                                 final Boolean isFolder = (Boolean) fileInfo.get("is_folder");
                                 if (Boolean.TRUE.equals(isFolder)) {
                                     /**
-                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br> This should never
-                                     * happen.
+                                     * Check if somehow a fileID has managed to go into the hoster plugin handling. </br>
+                                     * This should never happen.
                                      */
                                     link.setAvailable(false);
                                     if (link.getComment() == null) {
@@ -475,8 +477,8 @@ public abstract class K2SApi extends PluginForHost {
                             if (StringUtils.equals((String) root.get("message"), "Invalid request params")) {
                                 /**
                                  * 2022-02-25: Workaround for when checking only one <b>invalid</b> fileID e.g.
-                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br> This may also happen when there are multiple
-                                 * fileIDs to check and all of them are invalid.
+                                 * "2ahUKEwiUlaOqlZv2AhWLyIUKHXOjAmgQuZ0HegQIARBG". </br>
+                                 * This may also happen when there are multiple fileIDs to check and all of them are invalid.
                                  */
                                 for (final DownloadLink dl : links) {
                                     dl.setAvailable(false);
@@ -610,6 +612,7 @@ public abstract class K2SApi extends PluginForHost {
             /* Request has already been done before. */
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         }
+        final String remaining_time_next_reset_quota = (String) entries.get("remaining_time_next_reset_quota");
         final Number available_traffic = (Number) entries.get("available_traffic");
         /*
          * 2019-11-26: Expired premium accounts will have their old expire-date given thus we'll have to check for that before setting
@@ -654,6 +657,13 @@ public abstract class K2SApi extends PluginForHost {
         }
         fetchAdditionalAccountInfo(account, ai, br, auth_token);
         setAccountLimits(account);
+        if (!StringUtils.isEmpty(remaining_time_next_reset_quota)) {
+            /* E.g. "remaining_time_next_reset_quota":"Remaining time next reset quota: 11 hours and 33 minutes" */
+            ai.setStatus(ai.getStatus() + " | " + remaining_time_next_reset_quota);
+        }
+        if (PluginJsonConfig.get(this.getConfigInterface()).isEnableReconnectWorkaround()) {
+            this.checkForFreeAccountLimits(account);
+        }
         return ai;
     }
 
@@ -707,10 +717,10 @@ public abstract class K2SApi extends PluginForHost {
         } else {
             logger.info("Generating new directurl");
             final boolean isFree = !this.isPremium(account);
-            if ("premium".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS)) && isFree) {
+            if (isFree && "premium".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS))) {
                 // download not possible
                 premiumDownloadRestriction(getErrorMessageForUser(3));
-            } else if ("private".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS)) && isFree) {
+            } else if (isFree && "private".equalsIgnoreCase(link.getStringProperty(PROPERTY_ACCESS))) {
                 privateDownloadRestriction(getErrorMessageForUser(8));
             }
             String currentIP = null;
@@ -718,17 +728,12 @@ public abstract class K2SApi extends PluginForHost {
                 /**
                  * Experimental reconnect handling to prevent having to enter a captcha just to see that a limit has been reached!
                  */
-                currentIP = new BalancedWebIPCheck(null).getExternalIP().getIP();
-                final String downloadlimitText = "Downloadlimit reached";
-                logger.info("New free/free-account Download: currentIP = " + currentIP);
                 if (account != null) {
-                    final long lastdownloadFreeAccountTimestampMillis = account.getLongProperty(PROPERTY_LASTDOWNLOAD, 0);
-                    final long passedTimeMillisSinceLastFreeAccountDownload = System.currentTimeMillis() - lastdownloadFreeAccountTimestampMillis;
-                    if (passedTimeMillisSinceLastFreeAccountDownload < FREE_RECONNECTWAIT_MILLIS) {
-                        logger.info("Experimental handling active --> There still seems to be a waittime on the current account --> ERROR_IP_BLOCKED to prevent unnecessary captcha");
-                        throw new AccountUnavailableException(downloadlimitText, FREE_RECONNECTWAIT_MILLIS - passedTimeMillisSinceLastFreeAccountDownload);
-                    }
+                    /* Check for limits sitting on account */
+                    checkForFreeAccountLimits(account);
                 }
+                currentIP = new BalancedWebIPCheck(null).getExternalIP().getIP();
+                logger.info("New free/free-account Download: currentIP = " + currentIP);
                 final Map<String, Long> blockedIPsMap = this.getBlockedIPsMap();
                 synchronized (blockedIPsMap) {
                     /* Load list of saved IPs + timestamp of last download and add it to our main map */
@@ -748,9 +753,9 @@ public abstract class K2SApi extends PluginForHost {
                 final long lastdownload = getPluginSavedLastDownloadTimestamp(currentIP);
                 final long passedTimeSinceLastDl = System.currentTimeMillis() - lastdownload;
                 if (passedTimeSinceLastDl < FREE_RECONNECTWAIT_MILLIS) {
-                    logger.info("Experimental handling active --> There still seems to be a waittime on the current IP --> ERROR_IP_BLOCKED to prevent unnecessary captcha");
+                    logger.info("There still seems to be a waittime on the current IP --> ERROR_IP_BLOCKED to prevent unnecessary captcha");
                     final long thisWaitMillis = FREE_RECONNECTWAIT_MILLIS - passedTimeSinceLastDl;
-                    ipBlockedOrAccountLimit(link, account, downloadlimitText, thisWaitMillis);
+                    ipBlockedOrAccountLimit(link, account, TEXT_DOWNLOADLIMIT_REACHED, thisWaitMillis);
                     /* This code should never be reached (exception should happen before). */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
@@ -787,7 +792,8 @@ public abstract class K2SApi extends PluginForHost {
             final String free_download_key = (String) geturlResponse.get("free_download_key");
             if (!StringUtils.isEmpty(free_download_key)) {
                 /**
-                 * Free and free-account download </br> In some rare cases, the API wants us to wait again even though we've already waited.
+                 * Free and free-account download </br>
+                 * In some rare cases, the API wants us to wait again even though we've already waited.
                  */
                 /*
                  * {"status":"success","code":200,"message":"Captcha accepted, please wait","free_download_key":"homeHash","time_wait":30}
@@ -808,14 +814,12 @@ public abstract class K2SApi extends PluginForHost {
                         stopNow = true;
                     }
                     final int waitseconds = waitsecondsO.intValue();
-                    final long waitMillis = waitseconds * 1001l;
+                    final long waitMillis = waitseconds * 1000l;
                     if (waitseconds > 180 || stopNow) {
-                        if (waitMillis <= FREE_RECONNECTWAIT_MILLIS) {
-                            final long waittimeStartedBeforeMillis = FREE_RECONNECTWAIT_MILLIS - waitMillis;
-                            final long timestampWaittimeStarted = System.currentTimeMillis() - waittimeStartedBeforeMillis;
-                            this.saveFreeLimit(account, currentIP, timestampWaittimeStarted);
-                        }
                         ipBlockedOrAccountLimit(link, account, "Downloadlimit reached", waitMillis);
+                        if (account != null) {
+                            account.setProperty(PROPERTY_ACCOUNT_DOWNLOADLIMIT_REACHED_UNTIL_TIMESTAMP, System.currentTimeMillis() + waitMillis);
+                        }
                         /* This code should never be reached (exception should happen before). */
                         throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                     }
@@ -844,6 +848,10 @@ public abstract class K2SApi extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             logger.info("dllink = " + dllink);
+            /*
+             * We are going to start the download exactly now so let's save the time when it was started in order to try to avoid
+             * unnecessary captchas later.
+             */
             this.saveFreeLimit(account, currentIP, System.currentTimeMillis());
         }
         /*
@@ -880,6 +888,30 @@ public abstract class K2SApi extends PluginForHost {
         }
     }
 
+    /** Checks for cached free account limits. */
+    private void checkForFreeAccountLimits(final Account account) throws PluginException {
+        if (this.isPremium(account)) {
+            return;
+        }
+        /* Check for limit sitting on account */
+        /* Check for exactly known limit time to be over */
+        final long timeUntilLimitTimestampPasses = account.getLongProperty(PROPERTY_ACCOUNT_DOWNLOADLIMIT_REACHED_UNTIL_TIMESTAMP, 0) - System.currentTimeMillis();
+        if (timeUntilLimitTimestampPasses > 0) {
+            ipBlockedOrAccountLimit(null, account, TEXT_DOWNLOADLIMIT_REACHED, timeUntilLimitTimestampPasses);
+            /* This code should never be reached (exception should happen before). */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        /* Check for default limit time to have passed. */
+        final long lastdownloadFreeAccountTimestampMillis = account.getLongProperty(PROPERTY_LASTDOWNLOAD, 0);
+        final long passedTimeMillisSinceLastFreeAccountDownload = System.currentTimeMillis() - lastdownloadFreeAccountTimestampMillis;
+        if (passedTimeMillisSinceLastFreeAccountDownload < FREE_RECONNECTWAIT_MILLIS) {
+            logger.info("There still seems to be a waittime on the current account");
+            ipBlockedOrAccountLimit(null, account, TEXT_DOWNLOADLIMIT_REACHED, FREE_RECONNECTWAIT_MILLIS - passedTimeMillisSinceLastFreeAccountDownload);
+            /* This code should never be reached (exception should happen before). */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+    }
+
     protected void ipBlockedOrAccountLimit(final DownloadLink link, final Account account, final String errorMsg, final long waitMillis) throws PluginException {
         if (account != null) {
             throw new AccountUnavailableException(errorMsg, waitMillis);
@@ -895,9 +927,10 @@ public abstract class K2SApi extends PluginForHost {
         if (StringUtils.startsWithCaseInsensitive(captchaAddress, "http://")) {
             /**
              * 2020-02-03: Possible workaround for this issues reported here: board.jdownloader.org/showthread.php?t=82989 and 2020-04-23:
-             * board.jdownloader.org/showthread.php?t=83927 </br> and board.jdownloader.org/showthread.php?t=83781 </br> Explanation: This
-             * filehost will block the users' IP if too many un-answered captcha requests are taking place. </br> This method is here to try
-             * to avoid this.
+             * board.jdownloader.org/showthread.php?t=83927 </br>
+             * and board.jdownloader.org/showthread.php?t=83781 </br>
+             * Explanation: This filehost will block the users' IP if too many un-answered captcha requests are taking place. </br>
+             * This method is here to try to avoid this.
              */
             logger.info("login-captcha_url is not https --> Changing it to https");
             captchaAddress = captchaAddress.replaceFirst("(?i)http://", "https://");
@@ -1271,7 +1304,7 @@ public abstract class K2SApi extends PluginForHost {
                     // IP temp. blocked on login
                     // DOWNLOAD_TRAFFIC_EXCEEDED = 2; "Traffic limit exceed"
                     // assume all types
-                    ipBlockedOrAccountLimit(link, account, msgForUser, 15 * 60 * 1000l);
+                    ipBlockedOrAccountLimit(link, account, msgForUser, FREE_RECONNECTWAIT_MILLIS);
                     /* This code should never be reached (exception should happen before). */
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 case 3:
@@ -1301,7 +1334,9 @@ public abstract class K2SApi extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 case 6:
                     // DOWNLOAD_FREE_THREAD_COUNT_TO_MANY = 6; "Free account does not allow to download more than one file at the same time"
-                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, msgForUser);
+                    ipBlockedOrAccountLimit(link, account, msgForUser, 15 * 60 * 1000l);
+                    /* This code should never be reached (exception should happen before). */
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 case 9:
                     /*
                      * {"status":"error","code":406,"message":"Download is not available","errorCode":21,"errors":[{"code":9,
@@ -1777,9 +1812,9 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     /**
-     * Check single file via single linkcheck using another API call. </br> Can be used as a workaround for this problem:
-     * https://board.jdownloader.org/showthread.php?t=95537 </br> API call used here:
-     * https://keep2share.github.io/api/#resources:/getFileStatus:post
+     * Check single file via single linkcheck using another API call. </br>
+     * Can be used as a workaround for this problem: https://board.jdownloader.org/showthread.php?t=95537 </br>
+     * API call used here: https://keep2share.github.io/api/#resources:/getFileStatus:post
      */
     private AvailableStatus requestFileInformationViaSingleLinkcheck_GetfilestatusAPICall(final DownloadLink link) throws Exception {
         final HashMap<String, Object> postdataGetfilestatus = new HashMap<String, Object>();
@@ -2105,7 +2140,6 @@ public abstract class K2SApi extends PluginForHost {
             return true;
         }
     }
-
     // @Override
     // public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
     // final boolean isAvailableForFree = link.getBooleanProperty(PROPERTY_isAvailableForFree, true);
