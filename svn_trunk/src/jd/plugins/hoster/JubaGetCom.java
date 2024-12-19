@@ -49,7 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50355 $", interfaceVersion = 3, names = { "juba-get.com" }, urls = { "" })
 public class JubaGetCom extends PluginForHost {
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
@@ -172,8 +172,8 @@ public class JubaGetCom extends PluginForHost {
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
-        final AccountInfo ai = new AccountInfo();
         login(account, true, "https://" + this.getHost() + "/generator");
+        final AccountInfo ai = new AccountInfo();
         final String trafficUsedToday = br.getRegex("<b>\\s*Total today:([^<]+)</b><br>").getMatch(0);
         final String trafficUsedEver = br.getRegex("<b>\\s*Total generated:([^<]+)<").getMatch(0);
         final String expireDate = br.getRegex("Expires in\\s*:\\s*([^<>\n\r\t]+)").getMatch(0);
@@ -191,7 +191,16 @@ public class JubaGetCom extends PluginForHost {
             ai.setStatus(account.getType().getLabel() + " | Used today: " + trafficUsedToday.trim() + " | Total: " + trafficUsedEver.trim());
         }
         /* They do not have an API so we need to extract the host limit information from HTML. */
-        final String[] htmls = br.getRequest().getHtmlCode().split("<img");
+        /*
+         * The website can contain the same information multiple times (same host as working and not working) so we try to narrow it down by
+         * pre-filtering the html source.
+         */
+        String htmlsource = br.getRegex("div class=\"card-body\">(\\s*<img.*?)</div>\\s*</div>").getMatch(0);
+        if (htmlsource == null) {
+            /* Fallback */
+            htmlsource = br.getRequest().getHtmlCode();
+        }
+        final String[] htmls = htmlsource.split("<img");
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         for (final String html : htmls) {
             String hostWithoutTLD = new Regex(html, "data-original-title=\"([^\" \\(]+)\"").getMatch(0);
@@ -210,7 +219,7 @@ public class JubaGetCom extends PluginForHost {
                 continue;
             }
             final MultiHostHost mhost;
-            /* Some small corrections */
+            /* Some small corrections needed, because their website is horrible. */
             if (hostWithoutTLD.equalsIgnoreCase("DropDownload")) {
                 mhost = new MultiHostHost("drop.download");
             } else if (hostWithoutTLD.equalsIgnoreCase("FreeDLink")) {
@@ -236,6 +245,7 @@ public class JubaGetCom extends PluginForHost {
                 mhost.setTrafficMax(trafficMax);
                 mhost.setTrafficLeft(trafficMax - trafficUsed);
             } else {
+                /* This is okay. Not all hosts got individual limits. */
                 logger.info("Failed to find detailed limits for host: " + hostWithoutTLD);
             }
             supportedhosts.add(mhost);

@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -264,51 +263,54 @@ public class HosterRuleController implements AccountControllerListener {
     }
 
     public AccountCache getAccountCache(final String host, final DownloadSession session) {
-        if (StringUtils.isEmpty(host)) {
-            return null;
-        }
-        final String finalHost = host.toLowerCase(Locale.ENGLISH);
         return queue.addWait(new QueueAction<AccountCache, RuntimeException>() {
             @Override
             protected AccountCache run() throws RuntimeException {
-                for (AccountUsageRule hr : loadedRules) {
-                    if (hr.isEnabled() && finalHost.equalsIgnoreCase(hr.getHoster())) {
-                        final List<CachedAccountGroup> ret = new ArrayList<CachedAccountGroup>();
-                        for (AccountGroup ag : hr.getAccounts()) {
-                            final CachedAccountGroup group = new CachedAccountGroup(ag.getRule());
-                            for (AccountReference acr : ag.getChildren()) {
-                                if (acr.isAvailable()) {
-                                    if (acr.isEnabled()) {
-                                        final CachedAccount cachedAccount;
-                                        if (FreeAccountReference.isFreeAccount(acr)) {
-                                            cachedAccount = new CachedAccount(finalHost, null, session.getPlugin(finalHost));
-                                        } else {
-                                            final Account acc = acr.getAccount();
-                                            if (acc != null) {
-                                                cachedAccount = new CachedAccount(finalHost, acc, session.getPlugin(acc.getHoster()));
-                                            } else {
-                                                cachedAccount = null;
-                                            }
-                                        }
-                                        if (cachedAccount != null) {
-                                            group.add(cachedAccount);
-                                        }
-                                    } else if (FreeAccountReference.isFreeAccount(acr)) {
-                                        logger.info("Free Download disabled by Account Rule: " + host);
-                                    }
+                for (final AccountUsageRule hr : loadedRules) {
+                    if (!hr.isEnabled()) {
+                        /* Rule is disabled */
+                        continue;
+                    } else if (!host.equalsIgnoreCase(hr.getHoster())) {
+                        /* Rule is not for given host. */
+                        continue;
+                    }
+                    final List<CachedAccountGroup> ret = new ArrayList<CachedAccountGroup>();
+                    for (final AccountGroup ag : hr.getAccounts()) {
+                        final CachedAccountGroup group = new CachedAccountGroup(ag.getRule());
+                        for (final AccountReference acr : ag.getChildren()) {
+                            if (!acr.isAvailable()) {
+                                continue;
+                            } else if (!acr.isEnabled()) {
+                                if (FreeAccountReference.isFreeAccount(acr)) {
+                                    logger.info("Free Download disabled by Account Rule: " + host);
+                                }
+                                continue;
+                            }
+                            final CachedAccount cachedAccount;
+                            if (FreeAccountReference.isFreeAccount(acr)) {
+                                cachedAccount = new CachedAccount(host, null, session.getPlugin(host));
+                            } else {
+                                final Account acc = acr.getAccount();
+                                if (acc != null) {
+                                    cachedAccount = new CachedAccount(host, acc, session.getPlugin(acc.getHoster()));
+                                } else {
+                                    cachedAccount = null;
                                 }
                             }
-                            if (group.size() > 0) {
-                                ret.add(group);
+                            if (cachedAccount != null) {
+                                group.add(cachedAccount);
                             }
                         }
-                        return new AccountCache(ret) {
-                            @Override
-                            public boolean isCustomizedCache() {
-                                return true;
-                            }
-                        };
+                        if (group.size() > 0) {
+                            ret.add(group);
+                        }
                     }
+                    return new AccountCache(ret) {
+                        @Override
+                        public boolean isCustomizedCache() {
+                            return true;
+                        }
+                    };
                 }
                 return null;
             }
@@ -406,7 +408,6 @@ public class HosterRuleController implements AccountControllerListener {
             hr.getAccounts().add(defaultNoAccountGroup);
         }
         if (Boolean.FALSE.equals(isHosterpluginAllowsUsageRuleCreation)) {
-            // TODO: Maybe auto-delete such invalid rules
             logger.info("Disable and removed rule for host " + host + " because: plugin does not allow usage rule creation");
             hr.setEnabled(false);
             this.remove(hr);

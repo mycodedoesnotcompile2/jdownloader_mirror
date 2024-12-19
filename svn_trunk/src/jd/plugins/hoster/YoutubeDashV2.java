@@ -154,7 +154,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 50217 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 50360 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -2862,8 +2862,8 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
     }
 
     @Override
-    public void extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
-        new YoutubeLinkGrabberExtender(this, parent, pv, allPvs).run();
+    public List<JComponent> extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
+        return new YoutubeLinkGrabberExtender(this, parent, pv, allPvs).run();
     }
 
     @Override

@@ -21,12 +21,13 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50359 $", interfaceVersion = 3, names = {}, urls = {})
 public class BigwarpIo extends XFileSharingProBasic {
     public BigwarpIo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -108,5 +109,14 @@ public class BigwarpIo extends XFileSharingProBasic {
     @Override
     protected boolean isVideohoster_enforce_video_filename() {
         return true;
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (br.containsHTML(">\\s*File is no longer available")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
+        }
     }
 }

@@ -1,12 +1,11 @@
 package org.jdownloader.gui.views.linkgrabber.contextmenu;
 
-import java.awt.Component;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import javax.swing.JComponent;
-import javax.swing.JPopupMenu;
 
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
@@ -54,13 +53,16 @@ public class LinkgrabberPluginLink extends MenuItemData implements MenuLink {
             @Override
             public void onSelectionInfo(SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
                 final Collection<PluginView<CrawledLink>> views = selectionInfo.getPluginViews();
-                final JPopupMenu container = new JPopupMenu();
+                final List<JComponent> menuEntries = new ArrayList<JComponent>();
                 for (PluginView<CrawledLink> pv : views) {
-                    pv.getPlugin().extendLinkgrabberContextMenu(container, pv, views);
+                    final List<JComponent> pluginMenuEntries = pv.getPlugin().extendLinkgrabberContextMenu(root, pv, views);
+                    if (pluginMenuEntries != null) {
+                        menuEntries.addAll(pluginMenuEntries);
+                    }
                 }
-                if (container.getComponentCount() > 0) {
+                if (menuEntries.size() > 0) {
                     int index = rootIndex;
-                    for (final Component comp : container.getComponents()) {
+                    for (final JComponent comp : menuEntries) {
                         root.add(comp, index++);
                     }
                     root.revalidate();

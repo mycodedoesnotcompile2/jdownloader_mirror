@@ -414,19 +414,20 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
      * @return
      */
     public boolean hasDownloadLinkwithURL(final String url) {
-        if (url != null) {
-            final String correctUrl = url.trim();
-            for (final FilePackage fp : getPackagesCopy()) {
-                boolean readL2 = fp.getModifyLock().readLock();
-                try {
-                    for (DownloadLink dl : fp.getChildren()) {
-                        if (correctUrl.equalsIgnoreCase(dl.getPluginPatternMatcher())) {
-                            return true;
-                        }
+        if (url == null) {
+            return false;
+        }
+        final String correctUrl = url.trim();
+        for (final FilePackage fp : getPackagesCopy()) {
+            boolean readL2 = fp.getModifyLock().readLock();
+            try {
+                for (DownloadLink dl : fp.getChildren()) {
+                    if (correctUrl.equalsIgnoreCase(dl.getPluginPatternMatcher())) {
+                        return true;
                     }
-                } finally {
-                    fp.getModifyLock().readUnlock(readL2);
                 }
+            } finally {
+                fp.getModifyLock().readUnlock(readL2);
             }
         }
         return false;

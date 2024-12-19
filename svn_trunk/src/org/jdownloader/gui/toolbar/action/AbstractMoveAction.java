@@ -2,16 +2,16 @@ package org.jdownloader.gui.toolbar.action;
 
 import java.awt.event.ActionEvent;
 import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 
 import jd.gui.swing.jdgui.MainTabbedPane;
 
 import org.jdownloader.actions.AppAction;
-import org.jdownloader.actions.event.AppActionListener;
 import org.jdownloader.controlling.contextmenu.CustomizableAppAction;
 import org.jdownloader.gui.event.GUIEventSender;
 import org.jdownloader.gui.event.GUIListener;
 
-public abstract class AbstractMoveAction extends CustomizableAppAction implements AppActionListener, GUIListener {
+public abstract class AbstractMoveAction extends CustomizableAppAction implements GUIListener, PropertyChangeListener {
 
     protected AppAction delegate;
 
@@ -31,12 +31,12 @@ public abstract class AbstractMoveAction extends CustomizableAppAction implement
 
     protected void setDelegateAction(AppAction moveTopAction) {
         if (delegate != null) {
-            delegate.getEventSender().removeListener(this);
+            delegate.removePropertyChangeListener(this);
         }
         this.delegate = moveTopAction;
         if (delegate != null) {
             setTooltipText(delegate.getTooltipText());
-            delegate.getEventSender().addListener(this, true);
+            delegate.addPropertyChangeListener(this);
             setEnabled(delegate.isEnabled());
         } else {
             setEnabled(false);
@@ -44,9 +44,9 @@ public abstract class AbstractMoveAction extends CustomizableAppAction implement
     }
 
     @Override
-    public void onActionPropertyChanged(PropertyChangeEvent parameter) {
-        if ("enabled".equals(parameter.getPropertyName())) {
-            setEnabled((Boolean) parameter.getNewValue());
+    public void propertyChange(PropertyChangeEvent evt) {
+        if (evt.getPropertyName() == "enabled") {
+            setEnabled((Boolean) evt.getNewValue());
         }
     }
 

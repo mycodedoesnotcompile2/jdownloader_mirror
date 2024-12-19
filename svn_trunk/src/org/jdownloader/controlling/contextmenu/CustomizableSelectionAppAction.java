@@ -35,8 +35,9 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
         }
     }
 
+    @Deprecated
     protected boolean hasSelection(SelectionInfo<?, ?> selection) {
-        return selection != null && !selection.isEmpty();
+        return SelectionInfo.isNotEmpty(selection);
     }
 
     protected void getSelection(final SelectionInfoCallback<PackageType, ChildrenType> callback, final SelectionType selectionType) {
@@ -121,9 +122,10 @@ public abstract class CustomizableSelectionAppAction<PackageType extends Abstrac
     }
 
     protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
-        setEnabled(hasSelection(selectionInfo));
+        setEnabled(SelectionInfo.isNotEmpty(selectionInfo));
     }
 
+    @Deprecated
     protected boolean hasSelection() {
         final SelectionInfo<?, ?> selectionInfo = getSelection();
         return hasSelection(selectionInfo);

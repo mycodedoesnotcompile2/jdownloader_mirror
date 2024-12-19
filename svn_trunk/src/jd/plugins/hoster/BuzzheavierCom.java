@@ -33,8 +33,9 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.BuzzheavierComFolder;
 
-@HostPlugin(revision = "$Revision: 50306 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50354 $", interfaceVersion = 3, names = {}, urls = {})
 public class BuzzheavierCom extends PluginForHost {
     public BuzzheavierCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +72,8 @@ public class BuzzheavierCom extends PluginForHost {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/([a-z0-9]{12})");
+            /* Links are added via crawler plugin -> No pattern */
+            ret.add("");
         }
         return ret.toArray(new String[0]);
     }
@@ -87,7 +89,7 @@ public class BuzzheavierCom extends PluginForHost {
     }
 
     private String getFID(final DownloadLink link) {
-        return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+        return new Regex(link.getPluginPatternMatcher(), BuzzheavierComFolder.PATTERN_FILE_FOLDER).getMatch(0);
     }
 
     @Override

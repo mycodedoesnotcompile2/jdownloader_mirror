@@ -8,15 +8,6 @@ import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 
-import org.appwork.swing.action.BasicAction;
-import org.appwork.utils.event.queue.QueueAction;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.gui.views.SelectionInfo.PluginView;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.plugins.controller.host.PluginFinder;
-
 import jd.PluginWrapper;
 import jd.controlling.downloadcontroller.DownloadController;
 import jd.controlling.linkcollector.LinkCollectingJob;
@@ -34,7 +25,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50087 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+import org.appwork.swing.action.BasicAction;
+import org.appwork.utils.event.queue.QueueAction;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.translate._GUI;
+import org.jdownloader.gui.views.SelectionInfo.PluginView;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.host.PluginFinder;
+
+@HostPlugin(revision = "$Revision: 50360 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     public LinkCrawlerRetry(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,11 +96,12 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     @Override
-    public void extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, final Collection<PluginView<CrawledLink>> allPvs) {
+    public List<JComponent> extendLinkgrabberContextMenu(JComponent parent, final PluginView<CrawledLink> pv, final Collection<PluginView<CrawledLink>> allPvs) {
         if (pv.size() == 0) {
-            return;
+            return null;
         }
-        parent.add(new JMenuItem(new BasicAction() {
+        List<JComponent> ret = new ArrayList<JComponent>();
+        ret.add(new JMenuItem(new BasicAction() {
             {
                 setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
                 setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
@@ -123,6 +124,7 @@ public class LinkCrawlerRetry extends PluginForHost {
                 });
             }
         }));
+        return ret;
     }
 
     private void retry(List<CrawledLink> links) {
@@ -141,11 +143,12 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     @Override
-    public void extendDownloadsTableContextMenu(final JComponent parent, final PluginView<DownloadLink> pv, final Collection<PluginView<DownloadLink>> views) {
+    public List<JComponent> extendDownloadsTableContextMenu(final JComponent parent, final PluginView<DownloadLink> pv, final Collection<PluginView<DownloadLink>> views) {
         if (pv.size() == 0) {
-            return;
+            return null;
         }
-        parent.add(new JMenuItem(new BasicAction() {
+        final List<JComponent> ret = new ArrayList<JComponent>();
+        ret.add(new JMenuItem(new BasicAction() {
             {
                 setName(_GUI.T.AddLinksDialog_AddLinksDialog_());
                 setSmallIcon(new AbstractIcon(IconKey.ICON_LINKGRABBER, 16));
@@ -169,6 +172,7 @@ public class LinkCrawlerRetry extends PluginForHost {
                 });
             }
         }));
+        return ret;
     }
 
     @Override

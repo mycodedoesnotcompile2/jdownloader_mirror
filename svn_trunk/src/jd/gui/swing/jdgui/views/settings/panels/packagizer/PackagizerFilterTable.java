@@ -26,6 +26,7 @@ public class PackagizerFilterTable extends BasicJDTable<PackagizerRule> {
         this.setSearchEnabled(true);
         getTableHeader().setReorderingAllowed(false);
         this.setDragEnabled(true);
+        // TODO: drag drop of packagizer rule
         setTransferHandler(new ExtTransferHandler<PackagizerRule>());
         if (Application.getJavaVersion() >= Application.JAVA16) {
             setDropMode(DropMode.INSERT_ROWS);
@@ -36,7 +37,7 @@ public class PackagizerFilterTable extends BasicJDTable<PackagizerRule> {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.exttable.ExtTable#onContextMenu(javax.swing.JPopupMenu , java.lang.Object, java.util.ArrayList,
      * org.appwork.swing.exttable.ExtColumn)
      */
@@ -69,7 +70,7 @@ public class PackagizerFilterTable extends BasicJDTable<PackagizerRule> {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see org.appwork.swing.exttable.ExtTable#onShortcutDelete(java.util.ArrayList , java.awt.event.KeyEvent, boolean)
      */
     @Override

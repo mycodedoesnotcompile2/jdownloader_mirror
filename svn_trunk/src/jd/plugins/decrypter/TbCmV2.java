@@ -102,7 +102,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@DecrypterPlugin(revision = "$Revision: 50272 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50354 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -207,7 +207,7 @@ public class TbCmV2 extends PluginForDecrypt {
     }
 
     private String getChannelIDFromUrl(final String url) {
-        return new Regex(url, "/channel/([^/\\?]+)").getMatch(0);
+        return new Regex(url, "(?i)/channel/([^/\\?]+)").getMatch(0);
     }
 
     private String getUsernameFromUrl(final String url) {
@@ -390,7 +390,6 @@ public class TbCmV2 extends PluginForDecrypt {
         };
         if (StringUtils.isEmpty(playlistID) && StringUtils.isEmpty(userName) && !StringUtils.isEmpty(videoID)) {
             /* Single video */
-            final YoutubeClipData singleVid = new org.jdownloader.plugins.components.youtube.YoutubeClipData(videoID);
             final String indexFromAddedURLStr = new Regex(cleanedurl, "(?i)index=(\\d+)").getMatch(0);
             if (indexFromAddedURLStr != null) {
                 putGlobalProperty(videoID, YoutubeHelper.YT_PLAYLIST_POSITION, Integer.parseInt(indexFromAddedURLStr));

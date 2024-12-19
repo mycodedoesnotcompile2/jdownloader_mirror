@@ -1,12 +1,11 @@
 package org.jdownloader.gui.views.downloads.contextmenumanager;
 
-import java.awt.Component;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
 import javax.swing.JComponent;
-import javax.swing.JPopupMenu;
 
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
@@ -54,13 +53,16 @@ public class DownloadsTablePluginLink extends MenuItemData implements MenuLink {
             @Override
             public void onSelectionInfo(SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
                 final Collection<PluginView<DownloadLink>> views = selectionInfo.getPluginViews();
-                final JPopupMenu container = new JPopupMenu();
+                final List<JComponent> menuEntries = new ArrayList<JComponent>();
                 for (PluginView<DownloadLink> pv : views) {
-                    pv.getPlugin().extendDownloadsTableContextMenu(container, pv, views);
+                    final List<JComponent> pluginMenuEntries = pv.getPlugin().extendDownloadsTableContextMenu(root, pv, views);
+                    if (pluginMenuEntries != null) {
+                        menuEntries.addAll(pluginMenuEntries);
+                    }
                 }
-                if (container.getComponentCount() > 0) {
+                if (menuEntries.size() > 0) {
                     int index = rootIndex;
-                    for (final Component comp : container.getComponents()) {
+                    for (final JComponent comp : menuEntries) {
                         root.add(comp, index++);
                     }
                     root.revalidate();

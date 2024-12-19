@@ -67,7 +67,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
             setEnabled(false);
             return;
         }
-        if (hasSelection(selectionInfo)) {
+        if (SelectionInfo.isNotEmpty(selectionInfo)) {
             if (threshold < 0) {
                 setEnabled(true);
                 return;
@@ -95,7 +95,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<FileP
 
     @Override
     protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<FilePackage, DownloadLink> selectionInfo) {
-        if (hasSelection(selectionInfo) && isEnabled()) {
+        if (SelectionInfo.isNotEmpty(selectionInfo) && isEnabled()) {
             new Thread("OpenInBrowserAction") {
                 public void run() {
                     final int delay = getOpenDelay();

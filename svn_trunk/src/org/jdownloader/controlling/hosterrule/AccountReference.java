@@ -2,12 +2,12 @@ package org.jdownloader.controlling.hosterrule;
 
 import java.util.Date;
 
+import org.appwork.utils.Hash;
+import org.jdownloader.DomainInfo;
+
 import jd.plugins.Account;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountTrafficView;
-
-import org.appwork.utils.Hash;
-import org.jdownloader.DomainInfo;
 
 public class AccountReference {
     public AccountReference() {
@@ -67,12 +67,11 @@ public class AccountReference {
         final AccountInfo ai = getAccount().getAccountInfo();
         if (ai == null) {
             return null;
+        }
+        if (ai.getValidUntil() <= 0) {
+            return null;
         } else {
-            if (ai.getValidUntil() <= 0) {
-                return null;
-            } else {
-                return new Date(ai.getValidUntil());
-            }
+            return new Date(ai.getValidUntil());
         }
     }
 

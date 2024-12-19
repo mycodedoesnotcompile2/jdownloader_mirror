@@ -38,7 +38,7 @@ public class MenuContainer extends MenuItemData {
 
     @Override
     public JMenu createItem(MenuBuilder menuBuilder) {
-        JMenu subMenu = new ExtMenuImpl(getName());
+        final JMenu subMenu = new ExtMenuImpl(getName());
         if (StringUtils.isNotEmpty(_getDescription())) {
             subMenu.getAccessibleContext().setAccessibleDescription(_getDescription());
         }

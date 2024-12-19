@@ -3,15 +3,15 @@ package org.jdownloader.actions;
 import java.awt.Toolkit;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.lang.ref.WeakReference;
 
 import javax.swing.Action;
 import javax.swing.Icon;
+import javax.swing.JComponent;
 import javax.swing.KeyStroke;
 
 import org.appwork.swing.action.BasicAction;
 import org.appwork.utils.images.IconIO;
-import org.jdownloader.actions.event.AppActionEvent;
-import org.jdownloader.actions.event.AppActionEventSender;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.images.NewTheme;
 
@@ -23,15 +23,13 @@ import org.jdownloader.images.NewTheme;
  */
 public abstract class AppAction extends BasicAction {
 
-    protected String             iconKey;
+    protected String           iconKey;
 
-    protected int                size;
+    protected int              size;
 
-    private AppActionEventSender eventSender;
+    private boolean            visible = true;
 
-    private boolean              visible = true;
-
-    public static final String   VISIBLE = "Visible";
+    public static final String VISIBLE = "visible";
 
     public AppAction() {
         super();
@@ -55,20 +53,6 @@ public abstract class AppAction extends BasicAction {
      */
     public void setAccelerator(int vkQ) {
         setAccelerator(vkQ, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-    }
-
-    public synchronized AppActionEventSender getEventSender() {
-        if (eventSender == null) {
-            eventSender = new AppActionEventSender();
-            addPropertyChangeListener(new PropertyChangeListener() {
-
-                @Override
-                public void propertyChange(PropertyChangeEvent evt) {
-                    eventSender.fireEvent(new AppActionEvent(AppAction.this, AppActionEvent.Type.PROPERTY_CHANGE, evt));
-                }
-            });
-        }
-        return eventSender;
     }
 
     public void setIconKey(String iconKey) {
@@ -105,11 +89,33 @@ public abstract class AppAction extends BasicAction {
         return visible;
     }
 
+    public void addVisibilityPropertyChangeListener(final JComponent component) {
+        final WeakReference<JComponent> weakComponent = new WeakReference<JComponent>(component);
+        addPropertyChangeListener(new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                final JComponent component = weakComponent.get();
+                if (component == null) {
+                    removePropertyChangeListener(this);
+                    return;
+                }
+                if (evt.getPropertyName() == AppAction.VISIBLE) {
+                    final boolean newVisible = Boolean.TRUE.equals(evt.getNewValue());
+                    if (newVisible != component.isVisible()) {
+                        component.setVisible(newVisible);
+                        component.firePropertyChange(AppAction.VISIBLE, !newVisible, newVisible);
+                    }
+                }
+            }
+        });
+    }
+
     public void setVisible(final boolean newValue) {
         if (visible == newValue) {
             return;
         }
-        boolean oldValue = visible;
+        final boolean oldValue = visible;
         this.visible = newValue;
         firePropertyChange(VISIBLE, Boolean.valueOf(oldValue), Boolean.valueOf(newValue));
     }

@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.Queue.QueuePriority;
@@ -332,41 +333,42 @@ public class DownloadSession extends Property {
     }
 
     public synchronized PluginForHost getPlugin(String host) {
-        if (!StringUtils.isEmpty(host)) {
-            final Iterator<Entry<PluginForHost, PluginClassLoaderChild>> it = getActivationPluginCache().entrySet().iterator();
-            while (it.hasNext()) {
-                final Entry<PluginForHost, PluginClassLoaderChild> next = it.next();
-                final PluginForHost plugin = next.getKey();
-                if (plugin != null && StringUtils.equalsIgnoreCase(host, plugin.getHost())) {
-                    return plugin;
-                }
-            }
-            PluginForHost plugin = JDUtilities.getPluginForHost(host);
-            if (plugin == null) {
-                final LazyHostPlugin fallBackPlugin = HostPluginController.getInstance().getFallBackPlugin();
-                if (fallBackPlugin != null) {
-                    try {
-                        plugin = fallBackPlugin.getPrototype(PluginClassLoader.getThreadPluginClassLoaderChild());
-                    } catch (Throwable e) {
-                        LogController.CL().log(e);
-                    }
-                }
-            }
-            getActivationPluginCache().put(plugin, PluginClassLoader.getSharedChild(plugin));
-            return plugin;
+        if (StringUtils.isEmpty(host)) {
+            return null;
         }
-        return null;
+        final Iterator<Entry<PluginForHost, PluginClassLoaderChild>> it = getActivationPluginCache().entrySet().iterator();
+        while (it.hasNext()) {
+            final Entry<PluginForHost, PluginClassLoaderChild> next = it.next();
+            final PluginForHost plugin = next.getKey();
+            if (plugin != null && StringUtils.equalsIgnoreCase(host, plugin.getHost())) {
+                return plugin;
+            }
+        }
+        PluginForHost plugin = JDUtilities.getPluginForHost(host);
+        if (plugin == null) {
+            final LazyHostPlugin fallBackPlugin = HostPluginController.getInstance().getFallBackPlugin();
+            if (fallBackPlugin != null) {
+                try {
+                    plugin = fallBackPlugin.getPrototype(PluginClassLoader.getThreadPluginClassLoaderChild());
+                } catch (Throwable e) {
+                    LogController.CL().log(e);
+                }
+            }
+        }
+        getActivationPluginCache().put(plugin, PluginClassLoader.getSharedChild(plugin));
+        return plugin;
     }
 
     public synchronized PluginClassLoaderChild getPluginClassLoaderChild(final PluginForHost plugin) {
-        if (plugin != null) {
-            final Iterator<Entry<PluginForHost, PluginClassLoaderChild>> it = getActivationPluginCache().entrySet().iterator();
-            while (it.hasNext()) {
-                final Entry<PluginForHost, PluginClassLoaderChild> next = it.next();
-                final PluginForHost entry = next.getKey();
-                if (entry == plugin) {
-                    return next.getValue();
-                }
+        if (plugin == null) {
+            return null;
+        }
+        final Iterator<Entry<PluginForHost, PluginClassLoaderChild>> it = getActivationPluginCache().entrySet().iterator();
+        while (it.hasNext()) {
+            final Entry<PluginForHost, PluginClassLoaderChild> next = it.next();
+            final PluginForHost entry = next.getKey();
+            if (entry == plugin) {
+                return next.getValue();
             }
         }
         return null;
@@ -469,11 +471,10 @@ public class DownloadSession extends Property {
     }
 
     public AccountCache getAccountCache(final DownloadLink link) {
-        String host = link.getHost();
+        final String host = link.getHost();
         if (StringUtils.isEmpty(host)) {
             return AccountCache.NA;
         }
-        host = host.toLowerCase(Locale.ENGLISH);
         AccountCache ret = null;
         synchronized (accountCache) {
             if (accountCache.containsKey(host)) {
@@ -486,9 +487,9 @@ public class DownloadSession extends Property {
             }
         }
         final PluginForHost defaulPlugin = getPlugin(host);
+        final List<CachedAccountGroup> cachedGroups = new ArrayList<CachedAccountGroup>();
         if (isUseAccountsEnabled() == false) {
-            /* accounts disabled -> free only */
-            final List<CachedAccountGroup> cachedGroups = new ArrayList<CachedAccountGroup>();
+            /* Accounts disabled -> free only */
             final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);
             freeGroup.add(new CachedAccount(host, null, defaulPlugin));
             cachedGroups.add(freeGroup);
@@ -496,26 +497,31 @@ public class DownloadSession extends Property {
         } else {
             ret = HosterRuleController.getInstance().getAccountCache(host, this);
             if (ret == null) {
-                final List<CachedAccountGroup> cachedGroups = new ArrayList<CachedAccountGroup>();
+                /* No usage rules available: Use premium account -> Free Account -> Non account */
                 boolean removeNoAccountWithCaptcha = false;
                 final CachedAccountGroup hosterPremiumGroup = new CachedAccountGroup(Rules.ORDER);
                 final CachedAccountGroup hosterFreeGroup = new CachedAccountGroup(Rules.RANDOM);
                 for (final Account acc : AccountController.getInstance().list(host)) {
-                    if (acc.isEnabled() && acc.isValid()) {
-                        final AccountInfo ai = acc.getAccountInfo();
-                        if (ai == null || ai.isSpecialTraffic() || ai.isUnlimitedTraffic() || ai.isTrafficRefill()) {
-                            removeNoAccountWithCaptcha = true;
-                        }
-                        final CachedAccount cachedAccount = new CachedAccount(host, acc, defaulPlugin);
-                        switch (acc.getType()) {
-                        case LIFETIME:
-                        case PREMIUM:
-                            hosterPremiumGroup.add(cachedAccount);
-                            break;
-                        default:
-                            hosterFreeGroup.add(cachedAccount);
-                            break;
-                        }
+                    if (!acc.isEnabled()) {
+                        /* Ignore disabled accounts */
+                        continue;
+                    } else if (!acc.isValid()) {
+                        /* Ignore invalid/expired accounts */
+                        continue;
+                    }
+                    final AccountInfo ai = acc.getAccountInfo();
+                    if (ai == null || ai.isSpecialTraffic() || ai.isUnlimitedTraffic() || ai.isTrafficRefill()) {
+                        removeNoAccountWithCaptcha = true;
+                    }
+                    final CachedAccount cachedAccount = new CachedAccount(host, acc, defaulPlugin);
+                    switch (acc.getType()) {
+                    case LIFETIME:
+                    case PREMIUM:
+                        hosterPremiumGroup.add(cachedAccount);
+                        break;
+                    default:
+                        hosterFreeGroup.add(cachedAccount);
+                        break;
                     }
                 }
                 if (hosterPremiumGroup.size() > 0) {
@@ -530,37 +536,52 @@ public class DownloadSession extends Property {
                 }
                 {
                     // multihoster
-                    final CachedAccountGroup multiHosterGroup = new CachedAccountGroup(Rules.ORDER);
                     final List<Account> multiHosts = AccountController.getInstance().getMultiHostAccounts(host);
                     if (multiHosts != null) {
+                        final CachedAccountGroup multiHosterGroup = new CachedAccountGroup(Rules.ORDER);
                         for (final Account acc : multiHosts) {
-                            if (acc.isEnabled() && acc.isValid()) {
-                                multiHosterGroup.add(new CachedAccount(host, acc, getPlugin(acc.getHoster())));
+                            if (!acc.isEnabled()) {
+                                /* Ignore disabled accounts */
+                                continue;
+                            } else if (!acc.isValid()) {
+                                /* Ignore invalid/expired accounts */
+                                continue;
                             }
+                            multiHosterGroup.add(new CachedAccount(host, acc, getPlugin(acc.getHoster())));
                         }
-                    }
-                    if (multiHosterGroup.size() > 0) {
-                        if (multiHosterGroup.size() > 1) {
-                            try {
-                                Collections.sort(multiHosterGroup, ACCOUNT_SORTER);
-                            } catch (final Throwable e) {
-                                LogController.CL().log(e);
+                        if (multiHosterGroup.size() > 0) {
+                            if (multiHosterGroup.size() > 1) {
+                                try {
+                                    Collections.sort(multiHosterGroup, ACCOUNT_SORTER);
+                                } catch (final Throwable e) {
+                                    LogController.CL().log(e);
+                                }
                             }
+                            cachedGroups.add(multiHosterGroup);
                         }
-                        cachedGroups.add(multiHosterGroup);
                     }
                 }
                 if (hosterFreeGroup.size() > 0) {
                     cachedGroups.add(hosterFreeGroup);
                 }
-                {
-                    // free(no account)
-                    final CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
-                    if (cachedGroups.size() == 0 || !removeNoAccountWithCaptcha || !noAccount.hasCaptcha(link)) {
-                        final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);
-                        freeGroup.add(noAccount);
-                        cachedGroups.add(freeGroup);
-                    }
+                // free(no account)
+                final CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
+                final boolean allowNonAccountDownloadsWhenAccountIsAvailable = DebugMode.TRUE_IN_IDE_ELSE_FALSE == true ? false : true;
+                final boolean addNoAccountGroup;
+                if (cachedGroups.size() > 0 && !allowNonAccountDownloadsWhenAccountIsAvailable) {
+                    /* At least one account is available -> Do not allow non-account download. */
+                    addNoAccountGroup = false;
+                } else if (cachedGroups.size() == 0) {
+                    addNoAccountGroup = true;
+                } else if (!removeNoAccountWithCaptcha || !noAccount.hasCaptcha(link)) {
+                    addNoAccountGroup = true;
+                } else {
+                    addNoAccountGroup = false;
+                }
+                if (addNoAccountGroup) {
+                    final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);
+                    freeGroup.add(noAccount);
+                    cachedGroups.add(freeGroup);
                 }
                 ret = new AccountCache(cachedGroups);
             }

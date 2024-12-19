@@ -20,6 +20,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.BeegComConfig;
+import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -33,16 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.BeegComConfig;
-import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
-@HostPlugin(revision = "$Revision: 50352 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/-\\d+(?:\\?t=\\d+-\\d+)?" })
+@HostPlugin(revision = "$Revision: 50354 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/-?([0-9]{5,})(?:\\?t=\\d+-\\d+)?" })
 public class BeegCom extends PluginForHost {
     private String dllink[] = null;
 
@@ -57,17 +58,14 @@ public class BeegCom extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://beeg.com/contacts/";
+        return "https://" + getHost() + "/contacts/";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
-    private static final String TYPE_BETA        = "https?://beta\\.beeg\\.com/-(\\d+)(?:\\?t=(\\d+-\\d+))?";
-    private static final String TYPE_NORMAL      = "https?://beeg\\.com/-(\\d+)(?:\\?t=(\\d+-\\d+))?";
-    private boolean             server_issue     = false;
     private static final String PROPERTY_IS_HLS  = "is_hls";
     private static final String PROPERTY_QUALITY = "what_quality";
 
@@ -84,10 +82,8 @@ public class BeegCom extends PluginForHost {
     private String getFID(final DownloadLink link) {
         if (link.getPluginPatternMatcher() == null) {
             return null;
-        } else if (link.getPluginPatternMatcher().matches(TYPE_BETA)) {
-            return new Regex(link.getPluginPatternMatcher(), TYPE_BETA).getMatch(0);
         } else {
-            return new Regex(link.getPluginPatternMatcher(), TYPE_NORMAL).getMatch(0);
+            return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
         }
     }
 
@@ -112,13 +108,20 @@ public class BeegCom extends PluginForHost {
         dllink = null;
     }
 
+    private String getContentURL(final DownloadLink link) {
+        String url = link.getPluginPatternMatcher();
+        final String domainFromURL = Browser.getHost(url, true);
+        /* Remove subdomains such as "www." or "beta.".s */
+        url = url.replaceFirst(Pattern.quote(domainFromURL), this.getHost());
+        return url;
+    }
+
     public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         dllink = null;
         final String extDefault = ".mp4";
         if (!link.isNameSet()) {
             link.setName(this.getFID(link) + extDefault);
         }
-        server_issue = false;
         final String videoidOriginal = getFID(link);
         if (videoidOriginal == null) {
             /* This should never happen */
@@ -127,7 +130,6 @@ public class BeegCom extends PluginForHost {
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         String title = null;
-
         String extraParams = "";
         final String timeParams = UrlQuery.parse(link.getPluginPatternMatcher()).get("t");
         final Regex timeParamsRegex = new Regex(timeParams, "(\\d+)-(\\d+)");
@@ -202,12 +204,7 @@ public class BeegCom extends PluginForHost {
                 link.removeProperty(PROPERTY_IS_HLS);
             }
             if (!isDownload && !isHLS) {
-                try {
-                    basicLinkCheck(br.cloneBrowser(), br.createGetRequest(dllink[1]), link, link.getFinalFileName(), extDefault);
-                } catch (Exception e) {
-                    logger.log(e);
-                    server_issue = true;
-                }
+                basicLinkCheck(br.cloneBrowser(), br.createGetRequest(dllink[1]), link, link.getFinalFileName(), extDefault);
             }
         }
         return AvailableStatus.TRUE;
@@ -216,9 +213,7 @@ public class BeegCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception {
         requestFileInformation(link, true);
-        if (server_issue) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server issue", 30 * 60 * 1000l);
-        } else if (dllink == null) {
+        if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (isHLS(link)) {

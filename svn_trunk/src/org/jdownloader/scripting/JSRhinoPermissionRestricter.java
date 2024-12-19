@@ -184,6 +184,10 @@ public class JSRhinoPermissionRestricter {
                         return true;
                     } else if (className.startsWith("org.mozilla.javascript.ConsString")) {
                         return true;
+                    } else if (className.startsWith("org.mozilla.javascript.JavaScriptException")) {
+                        return true;
+                    } else if (className.startsWith("org.mozilla.javascript.EvaluatorException")) {
+                        return true;
                     } else if (className.equals("org.mozilla.javascript.EcmaError")) {
                         LogController.CL().severe("Javascript error occured");
                         return true;

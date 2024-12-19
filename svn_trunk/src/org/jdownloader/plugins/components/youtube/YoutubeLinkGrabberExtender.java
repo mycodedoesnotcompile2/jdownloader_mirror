@@ -32,7 +32,6 @@ import org.appwork.swing.action.BasicAction;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.CounterMap;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.logging2.extmanager.LoggerFactory;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.dialog.DialogCanceledException;
@@ -55,28 +54,24 @@ import org.jdownloader.plugins.components.youtube.variants.VariantInfo;
 import org.jdownloader.plugins.components.youtube.variants.VideoVariant;
 
 public class YoutubeLinkGrabberExtender {
-    private JComponent                          parent;
-    private PluginView<CrawledLink>             pv;
-    private Collection<PluginView<CrawledLink>> allPvs;
-    private PluginForHost                       plg;
-    private JMenuItem                           addVariants;
+
+    private PluginView<CrawledLink>          pv;
+    private final PluginForHost              plg;
+    private JMenuItem                        addVariants;
     // protected HashMap<String, AbstractVariant> map;
-    private JMenu                               youtubeMenu;
-    private HashMap<VariantGroup, JMenuItem>    groupMenuItems;
-    private LogInterface                        logger;
+    private JMenu                            youtubeMenu;
+    private HashMap<VariantGroup, JMenuItem> groupMenuItems;
 
     public YoutubeLinkGrabberExtender(PluginForHost plg, JComponent parent, PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
         this.plg = plg;
-        this.parent = parent;
         this.pv = pv;
-        this.allPvs = allPvs;
-        logger = plg.getLogger();
     }
 
     private CounterMap<VariantGroup> groupCount;
     private JMenu                    setVariantMenu;
 
-    public void run() {
+    public List<JComponent> run() {
+        final List<JComponent> ret = new ArrayList<JComponent>();
         addVariants = new JMenuItem(new BasicAction() {
             {
                 setSmallIcon(new AbstractIcon(IconKey.ICON_ADD, 18));
@@ -89,7 +84,7 @@ public class YoutubeLinkGrabberExtender {
             }
         });
         // addVariants.setIcon(new BadgeIcon(DomainInfo.getInstance(getHost()).getFavIcon(), new AbstractIcon(IconKey.ICON_ADD, 16), 4, 4));
-        parent.add(youtubeMenu = new JMenu("youtube.com"));
+        ret.add(youtubeMenu = new JMenu("youtube.com"));
         Icon icon = DomainInfo.getInstance("youtube.com").getFavIcon();
         youtubeMenu.setIcon(icon);
         youtubeMenu.add(setVariantMenu = new JMenu(_GUI.T.youtube_choose_variant()));
@@ -115,6 +110,10 @@ public class YoutubeLinkGrabberExtender {
         }
         youtubeMenu.add(addVariants);
         new Thread("Collect Variants") {
+            {
+                setDaemon(true);
+            }
+
             public void run() {
                 groupCount = new CounterMap<VariantGroup>();
                 for (CrawledLink cl : pv.getChildren()) {
@@ -152,6 +151,7 @@ public class YoutubeLinkGrabberExtender {
                 };
             };
         }.start();
+        return ret;
     }
 
     protected void addVariants() {

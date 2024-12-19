@@ -4,6 +4,7 @@ import jd.controlling.packagecontroller.AbstractPackageChildrenNode;
 import jd.controlling.packagecontroller.AbstractPackageNode;
 
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.EDTSelectionInfoCallback;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 
 public abstract class CustomizableTableContextAppAction<PackageType extends AbstractPackageNode<ChildrenType, PackageType>, ChildrenType extends AbstractPackageChildrenNode<PackageType>> extends CustomizableSelectionAppAction<PackageType, ChildrenType> {
@@ -29,13 +30,28 @@ public abstract class CustomizableTableContextAppAction<PackageType extends Abst
     }
 
     @Override
+    protected void requestUpdateSelection(final Object requestor) {
+        final SelectionType selectionType = getSelectionType();
+        getSelection(new EDTSelectionInfoCallback<PackageType, ChildrenType>() {
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            public void onSelectionInfo(org.jdownloader.gui.views.SelectionInfo<PackageType, ChildrenType> selectionInfo) {
+                onRequestUpdateSelection(requestor, selectionType, selectionInfo);
+            };
+        }, selectionType);
+    }
+
+    @Override
     protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<PackageType, ChildrenType> selectionInfo) {
-        super.onRequestUpdateSelection(requestor, selectionType, selectionInfo);
-        final boolean has = !hasSelection(selectionInfo);
+        final boolean hasSelectoin = SelectionInfo.isNotEmpty(selectionInfo);
         if (tableContext != null) {
-            if (has) {
+            if (hasSelectoin) {
                 if (tableContext.isItemVisibleForSelections()) {
                     setVisible(true);
+                    setEnabled(true);
                 } else {
                     setVisible(false);
                     setEnabled(false);
@@ -49,11 +65,12 @@ public abstract class CustomizableTableContextAppAction<PackageType extends Abst
                     setEnabled(false);
                 }
             }
-        } else if (!has) {
+        } else if (!hasSelectoin) {
             setVisible(false);
             setEnabled(false);
-        } else if (has) {
+        } else if (hasSelectoin) {
             setVisible(true);
+            setEnabled(true);
         }
     }
 

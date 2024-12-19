@@ -74,7 +74,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<Crawl
             return;
         }
         final SelectionInfo<CrawledPackage, CrawledLink> selection = getSelection();
-        if (hasSelection(selection)) {
+        if (SelectionInfo.isNotEmpty(selection)) {
             if (threshold < 0) {
                 setEnabled(true);
                 return;
@@ -102,7 +102,7 @@ public class OpenInBrowserAction extends CustomizableTableContextAppAction<Crawl
 
     @Override
     protected void onActionPerformed(ActionEvent e, SelectionType selectionType, final SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
-        if (hasSelection(selectionInfo) && isEnabled()) {
+        if (SelectionInfo.isNotEmpty(selectionInfo) && isEnabled()) {
             new Thread("OpenInBrowserAction") {
                 public void run() {
                     final int delay = getOpenDelay();

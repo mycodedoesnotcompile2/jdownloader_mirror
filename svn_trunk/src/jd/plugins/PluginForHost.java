@@ -59,6 +59,53 @@ import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.table.JTableHeader;
 
+import jd.PluginWrapper;
+import jd.captcha.JACMethod;
+import jd.config.SubConfiguration;
+import jd.controlling.AccountController;
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
+import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
+import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
+import jd.controlling.downloadcontroller.DiskSpaceReservation;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ExceptionRunnable;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
+import jd.controlling.linkchecker.LinkChecker;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CheckableLink;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.LinkCrawler;
+import jd.controlling.linkcrawler.LinkCrawlerThread;
+import jd.controlling.packagecontroller.AbstractNode;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
+import jd.controlling.reconnect.ipcheck.IPCheckException;
+import jd.controlling.reconnect.ipcheck.OfflineException;
+import jd.gui.swing.jdgui.BasicJDTable;
+import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.NoGateWayException;
+import jd.http.ProxySelectorInterface;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.nutils.Formatter;
+import jd.nutils.JDHash;
+import jd.plugins.Account.AccountError;
+import jd.plugins.DownloadLink.AvailableStatus;
+import jd.plugins.MultiHostHost.MultihosterHostStatus;
+import jd.plugins.download.DownloadInterface;
+import jd.plugins.download.DownloadInterfaceFactory;
+import jd.plugins.download.DownloadLinkDownloadable;
+import jd.plugins.download.Downloadable;
+import net.miginfocom.swing.MigLayout;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -99,6 +146,7 @@ import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.net.httpconnection.HTTPConnection.RequestMethod;
 import org.appwork.utils.net.httpconnection.HTTPProxy;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.appwork.utils.swing.SwingUtils;
 import org.appwork.utils.swing.dialog.AbstractDialog;
@@ -176,53 +224,6 @@ import org.jdownloader.translate._JDT;
 import org.jdownloader.updatev2.UpdateController;
 import org.jdownloader.updatev2.UpdateHandler;
 
-import jd.PluginWrapper;
-import jd.captcha.JACMethod;
-import jd.config.SubConfiguration;
-import jd.controlling.AccountController;
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-import jd.controlling.downloadcontroller.AccountCache.ACCOUNTTYPE;
-import jd.controlling.downloadcontroller.DiskSpaceManager.DISKSPACERESERVATIONRESULT;
-import jd.controlling.downloadcontroller.DiskSpaceReservation;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ExceptionRunnable;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.SingleDownloadController.WaitingQueueItem;
-import jd.controlling.linkchecker.LinkChecker;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CheckableLink;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.LinkCrawler;
-import jd.controlling.linkcrawler.LinkCrawlerThread;
-import jd.controlling.packagecontroller.AbstractNode;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.ipcheck.BalancedWebIPCheck;
-import jd.controlling.reconnect.ipcheck.IPCheckException;
-import jd.controlling.reconnect.ipcheck.OfflineException;
-import jd.gui.swing.jdgui.BasicJDTable;
-import jd.gui.swing.jdgui.views.settings.panels.pluginsettings.PluginConfigPanel;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.NoGateWayException;
-import jd.http.ProxySelectorInterface;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.nutils.Formatter;
-import jd.nutils.JDHash;
-import jd.plugins.Account.AccountError;
-import jd.plugins.DownloadLink.AvailableStatus;
-import jd.plugins.MultiHostHost.MultihosterHostStatus;
-import jd.plugins.download.DownloadInterface;
-import jd.plugins.download.DownloadInterfaceFactory;
-import jd.plugins.download.DownloadLinkDownloadable;
-import jd.plugins.download.Downloadable;
-import net.miginfocom.swing.MigLayout;
-
 /**
  * Dies ist die Oberklasse fuer alle Plugins, die von einem Anbieter Dateien herunterladen koennen
  *
@@ -231,10 +232,11 @@ import net.miginfocom.swing.MigLayout;
 public abstract class PluginForHost extends Plugin {
     private static final String    COPY_MOVE_FILE = "CopyMoveFile";
     private static final Pattern[] PATTERNS       = new Pattern[] {
-            /**
-             * these patterns should split filename and fileextension (extension must include the point)
-             */
-            // multipart rar archives
+                                                  /**
+                                                   * these patterns should split filename and fileextension (extension must include the
+                                                   * point)
+                                                   */
+                                                  // multipart rar archives
             Pattern.compile("(.*)(\\.pa?r?t?\\.?[0-9]+.*?\\.rar$)", Pattern.CASE_INSENSITIVE),
             // normal files with extension
             Pattern.compile("(.*)(\\..*?$)", Pattern.CASE_INSENSITIVE) };
@@ -1250,8 +1252,8 @@ public abstract class PluginForHost extends Plugin {
             }
             /**
              * In some cases, individual hosts can have different traffic calculation values than 100%. <br>
-             * This calculation applies for the global account-traffic and not for the individual host. </br>
-             * Example: File size is 1GB, individual host traffic calculation factor is 400% <br>
+             * This calculation applies for the global account-traffic and not for the individual host. </br> Example: File size is 1GB,
+             * individual host traffic calculation factor is 400% <br>
              * Account traffic needed: 4GB <br>
              * Individual host traffic needed: 1GB
              */
@@ -1478,16 +1480,16 @@ public abstract class PluginForHost extends Plugin {
     public void handleMultiHost(DownloadLink downloadLink, Account account) throws Exception {
         /*
          * fetchAccountInfo must fill ai.setMultiHostSupport to signal all supported multiHosts
-         *
+         * 
          * please synchronized on accountinfo and the ArrayList<String> when you change something in the handleMultiHost function
-         *
+         * 
          * in fetchAccountInfo we don't have to synchronize because we create a new instance of AccountInfo and fill it
-         *
+         * 
          * if you need customizable maxDownloads, please use getMaxSimultanDownload to handle this you are in multihost when account host
          * does not equal link host!
-         *
-         *
-         *
+         * 
+         * 
+         * 
          * will update this doc about error handling
          */
         logger.severe("invalid call to handleMultiHost: " + downloadLink.getName() + ":" + downloadLink.getHost() + " to " + getHost() + ":" + this.getVersion() + " with " + account);
@@ -2525,25 +2527,40 @@ public abstract class PluginForHost extends Plugin {
         });
     }
 
-    public void extendLinkgrabberContextMenu(JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
+    public List<JComponent> extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
+        final List<JComponent> ret = new ArrayList<JComponent>();
         if (pv.size() == 1 && supportsUpdateDownloadLink(pv.get(0))) {
             final JMenuItem changeURLMenuItem = createChangeURLMenuItem(pv.get(0));
             if (changeURLMenuItem != null) {
-                parent.add(changeURLMenuItem);
+                ret.add(changeURLMenuItem);
             }
         }
         if (allPvs.size() != 1) {
-            return;
+            return ret;
         }
         final JMenu setVariants = new JMenu(_GUI.T.PluginForHost_extendLinkgrabberContextMenu_generic_convert());
-        setVariants.setIcon(DomainInfo.getInstance(getHost()).getFavIcon());
+        final DomainInfo domainInfo = DomainInfo.getInstance(getHost());
+        setVariants.setIcon(domainInfo.getFavIcon());
         setVariants.setEnabled(false);
         final JMenu addVariants = new JMenu("Add converted variant...");
-        addVariants.setIcon(new BadgeIcon(DomainInfo.getInstance(getHost()), new AbstractIcon(IconKey.ICON_ADD, 16), 4, 4));
+        addVariants.setIcon(new BadgeIcon(domainInfo, new AbstractIcon(IconKey.ICON_ADD, 16), 4, 4));
         addVariants.setEnabled(false);
-        // setVariants.setVisible(false);
-        // addVariants.setVisible(false);
         new Thread("Collect Variants") {
+
+            {
+                setDaemon(true);
+            }
+
+            protected boolean isVisible() {
+                return new EDTHelper<Boolean>() {
+
+                    @Override
+                    public Boolean edtRun() {
+                        return parent.isVisible();
+                    }
+                }.getReturnValue();
+            }
+
             public void run() {
                 try {
                     Thread.sleep(2000);
@@ -2553,6 +2570,9 @@ public abstract class PluginForHost extends Plugin {
                 HashSet<GenericVariants> map = new HashSet<GenericVariants>();
                 final ArrayList<GenericVariants> list = new ArrayList<GenericVariants>();
                 for (CrawledLink cl : pv.getChildren()) {
+                    if (!isVisible()) {
+                        break;
+                    }
                     if (cl.getDownloadLink() == null || !cl.getDownloadLink().getBooleanProperty("GENERIC_VARIANTS", false) || !cl.getDownloadLink().hasVariantSupport()) {
                         continue;
                     }
@@ -2576,6 +2596,9 @@ public abstract class PluginForHost extends Plugin {
                         return o1.name().compareTo(o2.name());
                     }
                 });
+                if (!isVisible()) {
+                    return;
+                }
                 new EDTRunner() {
                     @Override
                     protected void runInEDT() {
@@ -2637,17 +2660,21 @@ public abstract class PluginForHost extends Plugin {
                 };
             };
         }.start();
-        parent.add(setVariants);
-        parent.add(addVariants);
+        ret.add(setVariants);
+        ret.add(addVariants);
+        return ret;
     }
 
-    public void extendDownloadsTableContextMenu(JComponent parent, PluginView<DownloadLink> pv, Collection<PluginView<DownloadLink>> views) {
+    public List<JComponent> extendDownloadsTableContextMenu(JComponent parent, PluginView<DownloadLink> pv, Collection<PluginView<DownloadLink>> views) {
         if (pv.size() == 1 && supportsUpdateDownloadLink(pv.get(0))) {
             final JMenuItem changeURLMenuItem = createChangeURLMenuItem(pv.get(0));
             if (changeURLMenuItem != null) {
-                parent.add(changeURLMenuItem);
+                final List<JComponent> ret = new ArrayList<JComponent>();
+                ret.add(changeURLMenuItem);
+                return ret;
             }
         }
+        return null;
     }
 
     public Downloadable newDownloadable(DownloadLink downloadLink, final Browser br) {
