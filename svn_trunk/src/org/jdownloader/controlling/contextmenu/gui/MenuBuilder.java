@@ -83,50 +83,45 @@ public class MenuBuilder {
         if (root == null) {
             return;
         }
-        long t = System.currentTimeMillis();
-        try {
-            int counter = 0;
-            for (MenuItemData i : md.getItems()) {
-                try {
-                    final MenuItemData inst = i;
-                    if (inst._getValidateException() != null) {
-                        continue;
-                    }
-                    //
-                    int count = root.getComponentCount();
-                    if (root instanceof JMenu) {
-                        count = ((JMenu) root).getMenuComponentCount() + root.getComponentCount();
-                    }
-                    if (count == 0 && inst instanceof SeparatorData) {
-                        continue;
-                    }
-                    switch (inst.getType()) {
-                    case ACTION:
-                        addAction(root, inst, counter, md.getItems().size());
-                        break;
-                    case CONTAINER:
-                        addContainer(root, inst, counter, md.getItems().size());
-                        break;
-                    default:
-                        throw new Exception("Unsupported Type:" + inst.getType());
-                    }
-                } catch (Throwable e) {
-                    logger.warning("Could Not Build MenuItem: " + i);
-                    logger.log(e);
-                } finally {
-                    counter++;
+        int counter = 0;
+        for (MenuItemData i : md.getItems()) {
+            try {
+                final MenuItemData inst = i;
+                if (inst._getValidateException() != null) {
+                    continue;
                 }
-            }
-            if (root instanceof ExtMenuInterface) {
-                ((ExtMenuInterface) root).cleanup();
-            }
-            for (Component c : root.getComponents()) {
-                if (c instanceof AfterLayerUpdateInterface) {
-                    ((AfterLayerUpdateInterface) c).onAfterLayerDone(root, md);
+                //
+                int count = root.getComponentCount();
+                if (root instanceof JMenu) {
+                    count = ((JMenu) root).getMenuComponentCount() + root.getComponentCount();
                 }
+                if (count == 0 && inst instanceof SeparatorData) {
+                    continue;
+                }
+                switch (inst.getType()) {
+                case ACTION:
+                    addAction(root, inst, counter, md.getItems().size());
+                    break;
+                case CONTAINER:
+                    addContainer(root, inst, counter, md.getItems().size());
+                    break;
+                default:
+                    throw new Exception("Unsupported Type:" + inst.getType());
+                }
+            } catch (Throwable e) {
+                logger.warning("Could Not Build MenuItem: " + i);
+                logger.log(e);
+            } finally {
+                counter++;
             }
-        } finally {
-            // System.out.println("Menu Creation Layer: " + md + " took " + (System.currentTimeMillis() - t));
+        }
+        if (root instanceof ExtMenuInterface) {
+            ((ExtMenuInterface) root).cleanup();
+        }
+        for (Component c : root.getComponents()) {
+            if (c instanceof AfterLayerUpdateInterface) {
+                ((AfterLayerUpdateInterface) c).onAfterLayerDone(root, md);
+            }
         }
     }
 

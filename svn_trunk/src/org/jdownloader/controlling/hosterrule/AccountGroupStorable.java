@@ -3,11 +3,11 @@ package org.jdownloader.controlling.hosterrule;
 import java.util.ArrayList;
 import java.util.List;
 
-import jd.plugins.Account;
-
 import org.appwork.storage.Storable;
 import org.appwork.storage.StorableAllowPrivateAccessModifier;
 import org.jdownloader.controlling.hosterrule.AccountGroup.Rules;
+
+import jd.plugins.Account;
 
 public class AccountGroupStorable implements Storable {
     private ArrayList<AccountReferenceStorable> children;
@@ -56,21 +56,28 @@ public class AccountGroupStorable implements Storable {
     }
 
     public AccountGroup restore(String hoster, List<Account> availableAccounts) {
-        if (availableAccounts != null) {
-            ArrayList<AccountReference> childsP = new ArrayList<AccountReference>(children.size());
-            for (AccountReferenceStorable ars : children) {
-                AccountReference child = ars.restore(hoster, availableAccounts);
-                if (child != null) {
-                    childsP.add(child);
+        if (availableAccounts == null) {
+            return null;
+        }
+        final ArrayList<AccountReference> childsP = new ArrayList<AccountReference>(children.size());
+        nextChild: for (AccountReferenceStorable ars : children) {
+            final AccountReference restored = ars.restore(hoster, availableAccounts);
+            if (restored == null) {
+                continue;
+            }
+            for (AccountReference child : childsP) {
+                if (child.getID() == restored.getID()) {
+                    continue nextChild;
                 }
             }
-            if (childsP.size() > 0) {
-                AccountGroup ret = new AccountGroup(childsP);
-                ret.setRule(rule);
-                ret.setName(getName());
-                return ret;
-            }
+            childsP.add(restored);
         }
-        return null;
+        if (childsP.size() == 0) {
+            return null;
+        }
+        AccountGroup ret = new AccountGroup(childsP);
+        ret.setRule(rule);
+        ret.setName(getName());
+        return ret;
     }
 }

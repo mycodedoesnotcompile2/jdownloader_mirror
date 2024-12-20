@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50353 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -306,19 +306,45 @@ public class TorboxApp extends UseNet {
         ai.setStatus(statusText);
         /* Obtain list of supported hosts */
         final Request req_hosters = br.createGetRequest(API_BASE + "/webdl/hosters");
-        final List<Map<String, Object>> hosterlist = (List<Map<String, Object>>) this.callAPI(br, req_hosters, account, null);
+        final List<Map<String, Object>> hosts = (List<Map<String, Object>>) this.callAPI(br, req_hosters, account, null);
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
-        for (final Map<String, Object> hosterlistitem : hosterlist) {
-            final String domain = hosterlistitem.get("domain").toString();
-            final String name = hosterlistitem.get("name").toString();
-            if (domain.equalsIgnoreCase("usenet") || name.equalsIgnoreCase("usenet")) {
-                /* Usenet is added/handled down below */
-                continue;
+        hosterloop: for (final Map<String, Object> host : hosts) {
+            List<String> domains = (List<String>) host.get("domains");
+            // final String domain = hosterlistitem.get("domain").toString();
+            final String name = host.get("name").toString();
+            final String note = (String) host.get("note");
+            final long daily_link_limit = ((Number) host.get("daily_link_limit")).longValue();
+            final long daily_link_used = ((Number) host.get("daily_link_used")).longValue();
+            final long daily_bandwidth_limit = ((Number) host.get("daily_bandwidth_limit")).longValue();
+            final long daily_bandwidth_used = ((Number) host.get("daily_bandwidth_used")).longValue();
+            final MultiHostHost mhost = new MultiHostHost();
+            if (domains == null) {
+                /* Fallback */
+                logger.warning("WTF bad json response for item: " + name);
+                domains = new ArrayList<String>();
+                domains.add(name);
             }
-            final MultiHostHost mhost = new MultiHostHost(domain);
+            for (final String domain : domains) {
+                if (domain.equalsIgnoreCase("usenet") || name.equalsIgnoreCase("usenet")) {
+                    /* Usenet is added/handled down below */
+                    continue hosterloop;
+                }
+                mhost.addDomain(domain);
+            }
             mhost.setName(name);
-            if (Boolean.FALSE.equals(hosterlistitem.get("status"))) {
+            if (Boolean.FALSE.equals(host.get("status"))) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
+            }
+            if (!StringUtils.isEmpty(note)) {
+                mhost.setStatusText(note);
+            }
+            if (daily_link_limit != 0) {
+                mhost.setLinksMax(daily_link_limit);
+                mhost.setLinksLeft(daily_link_limit - daily_link_used);
+            }
+            if (daily_bandwidth_limit != 0) {
+                mhost.setTrafficLeft(daily_bandwidth_limit);
+                mhost.setTrafficLeft(daily_bandwidth_limit - daily_bandwidth_used);
             }
             supportedhosts.add(mhost);
         }

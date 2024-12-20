@@ -24,11 +24,12 @@ import org.appwork.utils.StringUtils;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49519 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50364 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,6 +67,10 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
         if (embed != null && !StringUtils.equals(br._getURL().getPath(), new URL(embed).getPath())) {
             br.setFollowRedirects(true);
             br.getPage(embed);
+            final String msg = this.getPrivateVideoWebsiteMessage(br);
+            if (msg != null) {
+                throw new AccountRequiredException(msg);
+            }
             return super.getDllink(link, br);
         } else {
             return super.getDllink(link, br);
@@ -84,6 +89,16 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
             return true;
         } else {
             return super.isOfflineWebsite(br);
+        }
+    }
+
+    @Override
+    protected String getPrivateVideoWebsiteMessage(final Browser br) {
+        final String errormsg = br.getRegex(">\\s*(This video is a private video .*?Only active members can watch private videos\\.?)<").getMatch(0);
+        if (errormsg != null) {
+            return errormsg;
+        } else {
+            return super.getPrivateVideoWebsiteMessage(br);
         }
     }
 }

@@ -499,6 +499,7 @@ public class DownloadSession extends Property {
             if (ret == null) {
                 /* No usage rules available: Use premium account -> Free Account -> Non account */
                 boolean removeNoAccountWithCaptcha = false;
+                int numberofPremiumAccounts = 0;
                 final CachedAccountGroup hosterPremiumGroup = new CachedAccountGroup(Rules.ORDER);
                 final CachedAccountGroup hosterFreeGroup = new CachedAccountGroup(Rules.RANDOM);
                 for (final Account acc : AccountController.getInstance().list(host)) {
@@ -525,6 +526,7 @@ public class DownloadSession extends Property {
                     }
                 }
                 if (hosterPremiumGroup.size() > 0) {
+                    numberofPremiumAccounts += hosterPremiumGroup.size();
                     if (hosterPremiumGroup.size() > 1) {
                         try {
                             Collections.sort(hosterPremiumGroup, ACCOUNT_SORTER);
@@ -550,6 +552,7 @@ public class DownloadSession extends Property {
                             multiHosterGroup.add(new CachedAccount(host, acc, getPlugin(acc.getHoster())));
                         }
                         if (multiHosterGroup.size() > 0) {
+                            numberofPremiumAccounts += multiHosterGroup.size();
                             if (multiHosterGroup.size() > 1) {
                                 try {
                                     Collections.sort(multiHosterGroup, ACCOUNT_SORTER);
@@ -566,17 +569,16 @@ public class DownloadSession extends Property {
                 }
                 // free(no account)
                 final CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
-                final boolean allowNonAccountDownloadsWhenAccountIsAvailable = DebugMode.TRUE_IN_IDE_ELSE_FALSE == true ? false : true;
+                final boolean allowNonAccountDownloadsWhenAnyPremiumAccountIsAvailable = DebugMode.TRUE_IN_IDE_ELSE_FALSE == true ? false : true;
                 final boolean addNoAccountGroup;
-                if (cachedGroups.size() > 0 && !allowNonAccountDownloadsWhenAccountIsAvailable) {
+                if (numberofPremiumAccounts > 0 && !allowNonAccountDownloadsWhenAnyPremiumAccountIsAvailable) {
                     /* At least one account is available -> Do not allow non-account download. */
                     addNoAccountGroup = false;
-                } else if (cachedGroups.size() == 0) {
-                    addNoAccountGroup = true;
-                } else if (!removeNoAccountWithCaptcha || !noAccount.hasCaptcha(link)) {
-                    addNoAccountGroup = true;
-                } else {
+                } else if (removeNoAccountWithCaptcha && noAccount.hasCaptcha(link)) {
+                    /* Do not allow non-account download with captcha */
                     addNoAccountGroup = false;
+                } else {
+                    addNoAccountGroup = true;
                 }
                 if (addNoAccountGroup) {
                     final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);

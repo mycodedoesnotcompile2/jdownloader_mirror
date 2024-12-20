@@ -138,11 +138,6 @@ public class ConfirmSelectionBarAction extends ConfirmLinksContextAction impleme
     }
 
     @Override
-    public void setVisible(boolean newValue) {
-        super.setVisible(newValue);
-    }
-
-    @Override
     public void initContextDefaults() {
         setCtrlToggle(false);
     }

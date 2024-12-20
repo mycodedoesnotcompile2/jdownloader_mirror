@@ -83,7 +83,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50079 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -190,7 +190,7 @@ public class GoogleDrive extends PluginForHost {
      * Contains the quality modifier of the last chosen quality. This property gets reset on reset DownloadLink to ensure that a user cannot
      * change the quality and then resume the started download with another URL.
      */
-    private final String          PROPERTY_USED_QUALITY                          = "USED_QUALITY";
+    private final static String   PROPERTY_USED_QUALITY                          = "USED_QUALITY";
     private static final String   PROPERTY_GOOGLE_DOCUMENT                       = "IS_GOOGLE_DOCUMENT";
     private static final String   PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION        = "GOOGLE_DOCUMENT_FILE_EXTENSION";
     private static final String   PROPERTY_FORCED_FINAL_DOWNLOADURL              = "FORCED_FINAL_DOWNLOADURL";
@@ -423,7 +423,7 @@ public class GoogleDrive extends PluginForHost {
                 continue;
             }
         } while (retries <= 1);
-        parseFileInfoAPIAndWebsiteWebAPI(this, JsonSchemeType.API, link, true, true, entries);
+        parseFileInfoAPIAndWebsiteWebAPI(this, JsonSchemeType.API, link, entries);
         /* Store "real" fileID if item was a shortcut to another ID. */
         if (!StringUtils.equals(fileID, fileID_so_far)) {
             link.setProperty(PROPERTY_REAL_FILE_ID, fileID);
@@ -475,7 +475,7 @@ public class GoogleDrive extends PluginForHost {
         }
     }
 
-    public static void parseFileInfoAPIAndWebsiteWebAPI(final Plugin plugin, final JsonSchemeType schemetype, final DownloadLink link, final boolean setFinalFilename, final boolean setVerifiedFilesize, final Map<String, Object> entries) {
+    public static void parseFileInfoAPIAndWebsiteWebAPI(final Plugin plugin, final JsonSchemeType schemetype, final DownloadLink link, final Map<String, Object> entries) {
         /* Some field names are different in API and WebAPI. */
         /* Filesize is returned as String so we need to parse it to long. */
         final String filename;
@@ -510,16 +510,12 @@ public class GoogleDrive extends PluginForHost {
             final Map<String, Object> exportLinks = (Map<String, Object>) entries.get("exportLinks");
             parseGoogleDocumentPropertiesAPIAndSetFilename(plugin, link, filename, googleDriveDocumentType, exportLinks);
         } else {
-            setFilename(plugin, link, Boolean.FALSE, filename, setFinalFilename);
+            setFilename(plugin, link, Boolean.FALSE, filename, true);
             /* Remove this flag just in case this item has been wrongly tagged as a Google Document before. */
             link.removeProperty(PROPERTY_GOOGLE_DOCUMENT);
         }
         if (filesize > -1) {
-            if (setVerifiedFilesize) {
-                link.setVerifiedFileSize(filesize);
-            } else {
-                link.setDownloadSize(filesize);
-            }
+            link.setVerifiedFileSize(filesize);
         }
         /* Set hash for CRC check */
         if (!StringUtils.isEmpty(checksumSha256)) {
@@ -685,7 +681,7 @@ public class GoogleDrive extends PluginForHost {
                 /* Important: Without this, some google documents will not be downloadable! */
                 logger.info("Handling extra linkcheck as preparation for google document download");
                 try {
-                    crawlAdditionalFileInformationFromWebsite(br, link, account, false, true);
+                    crawlAdditionalFileInformationFromWebsite(br, link, account, false);
                 } catch (final PluginException docCheckFailure) {
                     if (isDownload || docCheckFailure.getLinkStatus() == LinkStatus.ERROR_FILE_NOT_FOUND) {
                         throw docCheckFailure;
@@ -907,7 +903,7 @@ public class GoogleDrive extends PluginForHost {
      *
      * @throws InterruptedException
      */
-    private void crawlAdditionalFileInformationFromWebsite(final Browser br, final DownloadLink link, final Account account, final boolean accessFileViewPageIfNotAlreadyDone, final boolean trustAndSetFileInfo) throws PluginException, IOException, InterruptedException {
+    private void crawlAdditionalFileInformationFromWebsite(final Browser br, final DownloadLink link, final Account account, final boolean accessFileViewPageIfNotAlreadyDone) throws PluginException, IOException, InterruptedException {
         if (accessFileViewPageIfNotAlreadyDone && !br.getURL().matches(PATTERN_FILE) && this.websiteWebapiKey == null) {
             this.handleLinkcheckFileOverview(br, link, account, false, false);
         }
@@ -930,7 +926,7 @@ public class GoogleDrive extends PluginForHost {
         /* Use same errorhandling than used for official API usage. */
         this.handleErrorsAPI(br, link, account);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        parseFileInfoAPIAndWebsiteWebAPI(this, JsonSchemeType.WEBSITE, link, trustAndSetFileInfo, trustAndSetFileInfo, entries);
+        parseFileInfoAPIAndWebsiteWebAPI(this, JsonSchemeType.WEBSITE, link, entries);
     }
 
     private static void setFilename(final Plugin plg, final DownloadLink link, final Boolean looksLikeGoogleDocument, String filename, final boolean setFinalFilename) {
@@ -1266,26 +1262,9 @@ public class GoogleDrive extends PluginForHost {
             }
             /* Save the quality we've decided to download in case user stops- and resumes download later. */
             link.setProperty(PROPERTY_USED_QUALITY, chosenQuality);
-            String filenameOld = link.getName();
-            if (StringUtils.isEmpty(filenameOld)) {
-                /* This fallback should never be needed! */
-                filenameOld = "video";
-            }
-            /* Update file-extension in filename to .mp4 and add quality identifier to filename if chosen by user. */
-            final String videoExt = ".mp4";
-            String filenameNew = applyFilenameExtension(filenameOld, videoExt);
-            if (PluginJsonConfig.get(GoogleConfig.class).isAddStreamQualityIdentifierToFilename()) {
-                final String newFilenameEnding = "_" + chosenQuality + "p" + videoExt;
-                if (!filenameNew.toLowerCase(Locale.ENGLISH).endsWith(newFilenameEnding)) {
-                    filenameNew = filenameNew.replaceFirst("(?i)\\.mp4$", newFilenameEnding);
-                }
-            }
-            if (!filenameNew.equals(filenameOld)) {
-                logger.info("Setting new filename for stream download | Old: " + filenameOld + " | New: " + filenameNew);
-                setFilename(this, link, Boolean.FALSE, filenameNew, true);
-            }
             /* Stream handling was successful so we can delete the 'failed timestamp'. */
             link.removeProperty(PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED);
+            updateDownloadLinkForVideoStreamDownloads(link);
             return chosenQualityDownloadlink;
         } catch (final PluginException pe) {
             if (isFallback) {
@@ -1298,6 +1277,31 @@ public class GoogleDrive extends PluginForHost {
             }
             throw pe;
         }
+    }
+
+    private void updateDownloadLinkForVideoStreamDownloads(final DownloadLink link) {
+        final String filenameOld = link.getName();
+        final int chosenQuality = link.getIntegerProperty(PROPERTY_USED_QUALITY, -1);
+        if (filenameOld == null) {
+            return;
+        } else if (chosenQuality == -1) {
+            return;
+        }
+        /* Now we can be sure that this is a stream download. */
+        /* Update file-extension in filename to .mp4 and add quality identifier to filename if chosen by user. */
+        final String videoExt = ".mp4";
+        String filenameNew = applyFilenameExtension(filenameOld, videoExt);
+        if (PluginJsonConfig.get(GoogleConfig.class).isAddStreamQualityIdentifierToFilename()) {
+            final String newFilenameEnding = "_" + chosenQuality + "p" + videoExt;
+            if (!filenameNew.toLowerCase(Locale.ENGLISH).endsWith(newFilenameEnding)) {
+                filenameNew = filenameNew.replaceFirst("(?i)" + Pattern.quote(videoExt) + "$", newFilenameEnding);
+            }
+        }
+        if (!filenameNew.equals(filenameOld)) {
+            logger.info("Setting new filename for stream download | Old: " + filenameOld + " | New: " + filenameNew);
+            setFilename(this, link, Boolean.FALSE, filenameNew, true);
+        }
+        this.prepareNonOriginalFileDownload(link);
     }
 
     /**
@@ -1405,9 +1409,6 @@ public class GoogleDrive extends PluginForHost {
                 directurl = GoogleDrive.API_BASE + "/files/" + this.getFID(link) + "?" + queryFile.toString();
                 logger.info("Downloading original file");
             }
-            if (isNonOriginalFileDownload) {
-                this.prepareNonOriginalFileDownload(link);
-            }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, resume, maxchunks);
         } else {
             /* Website download */
@@ -1457,9 +1458,6 @@ public class GoogleDrive extends PluginForHost {
             } else {
                 logger.info("Downloading file");
             }
-            if (isNonOriginalFileDownload) {
-                this.prepareNonOriginalFileDownload(link);
-            }
             dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, resume, maxchunks);
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 logger.info("Download attempt failed -> Direct download not possible -> One step more might be required or special handling for stream download or google document download");
@@ -1495,7 +1493,7 @@ public class GoogleDrive extends PluginForHost {
                  * Do not set final filename/setVerifiedFileSize here as we could be downloading the video stream which has a different
                  * filesize/file-hash.
                  */
-                crawlAdditionalFileInformationFromWebsite(br.cloneBrowser(), link, account, true, false);
+                crawlAdditionalFileInformationFromWebsite(br.cloneBrowser(), link, account, true);
             } catch (final Exception ignore) {
                 logger.log(ignore);
                 logger.info("Failed to crawl additional file information for correct \"Last Modified\" date due to Exception");
@@ -1512,6 +1510,10 @@ public class GoogleDrive extends PluginForHost {
         if (link.getFinalFileName() == null && !StringUtils.isEmpty(connectionFilename)) {
             link.setFinalFileName(connectionFilename);
             link.setProperty(PROPERTY_CACHED_FILENAME, connectionFilename);
+        }
+        updateDownloadLinkForVideoStreamDownloads(link);
+        if (isNonOriginalFileDownload) {
+            this.prepareNonOriginalFileDownload(link);
         }
         dl.startDownload();
     }
@@ -2177,7 +2179,6 @@ public class GoogleDrive extends PluginForHost {
             return;
         }
         link.removeProperty(PROPERTY_DIRECTURL);
-        link.setProperty(DirectHTTP.PROPERTY_ServerComaptibleForByteRangeRequest, true);
         link.removeProperty(PROPERTY_USED_QUALITY);
         link.removeProperty(PROPERTY_CAN_DOWNLOAD);
         link.removeProperty(PROPERTY_TIMESTAMP_QUOTA_REACHED_ACCOUNT);

@@ -38,9 +38,7 @@ public class ToggleAppAction extends CustomizableAppAction implements ComponentP
     }
 
     public ToggleAppAction(BooleanKeyHandler handler, String name, String tt) {
-
         this.handler = handler;
-
         setName(name);
         setTooltipText(tt);
         setSelected(handler.isEnabled());
@@ -49,7 +47,7 @@ public class ToggleAppAction extends CustomizableAppAction implements ComponentP
 
     @Override
     public JComponent createComponent(MenuItemData menuItemData) {
-        ExtCheckBoxMenuItem ret = new ExtCheckBoxMenuItem(this);
+        final ExtCheckBoxMenuItem ret = new ExtCheckBoxMenuItem(this);
         ret.setHideOnClick(isHidePopupOnClick());
         ret.getAccessibleContext().setAccessibleName(getName());
         ret.getAccessibleContext().setAccessibleDescription(getTooltipText());

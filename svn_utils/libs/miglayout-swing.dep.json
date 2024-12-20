@@ -1,7 +1,7 @@
 {
   "artefact":"com.miglayout/miglayout-swing",
   "dependencies":null,
-  "filter":null,
+ "filter":["^(?!.*-test\\.jar$).+(-sources)?\\.jar$"],
   "history":[],
   "installed":{
     "changes":null,

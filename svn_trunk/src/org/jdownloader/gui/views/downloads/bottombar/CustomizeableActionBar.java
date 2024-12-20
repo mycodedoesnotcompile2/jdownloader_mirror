@@ -12,8 +12,6 @@ import java.awt.Rectangle;
 import java.awt.Transparency;
 import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.lang.reflect.InvocationTargetException;
 
 import javax.swing.AbstractButton;
@@ -49,15 +47,8 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.images.NewTheme;
 import org.jdownloader.updatev2.gui.LAFOptions;
 
-public class CustomizeableActionBar extends MigPanel implements PropertyChangeListener {
+public class CustomizeableActionBar extends MigPanel {
     private final AbstractBottomBarMenuManager manager;
-
-    @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        if ("visible".equals(evt.getPropertyName())) {
-            manager.refresh();
-        }
-    }
 
     public CustomizeableActionBar(AbstractBottomBarMenuManager bottomBarMenuManager) {
         super("ins 0 0 0 0,gap " + LAFOptions.getInstance().getExtension().customizeLayoutGetDefaultGap(), "[]", "[]");
@@ -151,8 +142,6 @@ public class CustomizeableActionBar extends MigPanel implements PropertyChangeLi
     private void addAction(MenuItemData menudata) throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ExtensionNotLoadedException {
         CustomizableAppAction action = menudata.createAction();
         // action.setEnabled(true);
-        action.removePropertyChangeListener(this);
-        action.addPropertyChangeListener(this);
         if (!action.isVisible()) {
             return;
         }
@@ -161,7 +150,7 @@ public class CustomizeableActionBar extends MigPanel implements PropertyChangeLi
         } else if (MenuItemData.isEmptyValue(menudata.getShortcut())) {
             action.setAccelerator(null);
         }
-        JComponent bt = null;
+        final JComponent bt;
         if (action instanceof SelfComponentFactoryInterface) {
             action.requestUpdate(this);
             bt = ((SelfComponentFactoryInterface) action).createComponent();
@@ -172,6 +161,7 @@ public class CustomizeableActionBar extends MigPanel implements PropertyChangeLi
             action.requestUpdate(this);
             bt = new ExtButton(action);
         }
+        action.addVisibilityPropertyChangeListener(bt);
         bt.setEnabled(action.isEnabled());
         if (action instanceof SelfLayoutInterface) {
             add(bt, ((SelfLayoutInterface) action).createConstraints());

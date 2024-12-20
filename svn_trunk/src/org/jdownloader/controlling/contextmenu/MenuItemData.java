@@ -6,6 +6,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -24,9 +25,6 @@ import jd.controlling.TaskQueue;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.Storable;
-import org.appwork.storage.config.MinTimeWeakReference;
-import org.appwork.storage.config.MinTimeWeakReferenceCleanup;
-import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.QueueAction;
 import org.jdownloader.actions.AppAction;
@@ -37,7 +35,7 @@ import org.jdownloader.extensions.ExtensionController;
 import org.jdownloader.extensions.ExtensionNotLoadedException;
 import org.jdownloader.images.NewTheme;
 
-public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
+public class MenuItemData implements Storable {
     public static final String      EMPTY      = "<EMPTY>";
     /* needed for old values */
     private static final String     EMPTY_NAME = "<NO NAME>";
@@ -108,18 +106,16 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
         CONTAINER;
     }
 
-    private Type                                                                 type    = Type.ACTION;
-    private boolean                                                              validated;
-    private Exception                                                            validateException;
-    private MenuContainerRoot                                                    root;
-    private String                                                               mnemonic;
-    private String                                                               shortcut;
-    private NullsafeAtomicReference<MinTimeWeakReference<CustomizableAppAction>> action  = new NullsafeAtomicReference<MinTimeWeakReference<CustomizableAppAction>>();
-    private boolean                                                              visible = true;
+    private Type              type    = Type.ACTION;
+    private boolean           validated;
+    private Exception         validateException;
+    private MenuContainerRoot root;
+    private String            mnemonic;
+    private String            shortcut;
+    private boolean           visible = true;
 
     public void setMnemonic(String mnemonic) {
         this.mnemonic = mnemonic;
-        clearCachedAction();
     }
 
     public Type getType() {
@@ -148,7 +144,6 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
 
     public void setName(String name) {
         this.name = name;
-        clearCachedAction();
     }
 
     public String getIconKey() {
@@ -157,7 +152,6 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
 
     public void setIconKey(String iconKey) {
         this.iconKey = iconKey;
-        clearCachedAction();
     }
 
     public void add(MenuItemData child) {
@@ -226,9 +220,14 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
         } else if (!action.isVisible()) {
             return null;
         } else if (action instanceof ComponentProviderInterface) {
-            return ((ComponentProviderInterface) action).createComponent(this);
+            final JComponent ret = ((ComponentProviderInterface) action).createComponent(this);
+            if (ret != null) {
+                action.addVisibilityPropertyChangeListener(ret);
+            }
+            return ret;
         }
         final JMenuItem ret = createMenuItem(action, menuBuilder);
+        action.addVisibilityPropertyChangeListener(ret);
         if (StringUtils.isNotEmpty(name)) {
             ret.setText(name);
         }
@@ -279,6 +278,7 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
         final JMenuItem ret;
         if (action.isToggle()) {
             ret = new JCheckBoxMenuItem(action) {
+
                 @Override
                 protected void processMouseEvent(final MouseEvent e) {
                     if (!MenuItemData.this.processHideOnClickMouseEvent(this, menuBuilder == null || menuBuilder.isHideOnClick(), e)) {
@@ -288,12 +288,14 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
             };
         } else {
             ret = new JMenuItem(action) {
+
                 @Override
                 protected void processMouseEvent(final MouseEvent e) {
                     if (!MenuItemData.this.processHideOnClickMouseEvent(this, menuBuilder == null || menuBuilder.isHideOnClick(), e)) {
                         super.processMouseEvent(e);
                     }
                 }
+
             };
         }
         ret.getAccessibleContext().setAccessibleName(action.getName());
@@ -301,7 +303,8 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
         return ret;
     }
 
-    @SuppressWarnings("unchecked")
+    protected WeakReference<Constructor<?>> weakConstructor = new WeakReference<Constructor<?>>(null);
+
     public CustomizableAppAction createAction() throws ClassNotFoundException, NoSuchMethodException, SecurityException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ExtensionNotLoadedException {
         if (!validated) {
             //
@@ -311,40 +314,17 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
             //
             throw new WTFException("No ACTION");
         }
-        CustomizableAppAction ret = null;
-        MinTimeWeakReference<CustomizableAppAction> minWeakAction = this.action.get();
-        if (minWeakAction != null && (ret = minWeakAction.get()) != null) {
-            return ret;
+        Constructor<?> c = weakConstructor.get();
+        if (c == null) {
+            final Class<?> clazz = actionData._getClazz();
+            c = clazz.getConstructor();
+            weakConstructor = new WeakReference<Constructor<?>>(c);
         }
-        // if (action != null && action instanceof AbstractSelectionContextAction) {
-        // ((AbstractSelectionContextAction) action).setSelection(selection);
-        // if (action instanceof CachableInterface) {
-        // if (StringUtils.isNotEmpty(actionData.getData())) {
-        // ((CachableInterface) action).setData(actionData.getData());
-        // }
-        // }
-        // fill(action.getClass(), action);
-        // return customize(action);
-        // } else if (action != null && action instanceof CachableInterface) {
-        // // no need to set selection. action does not need any selection
-        //
-        // if (StringUtils.isNotEmpty(actionData.getData())) {
-        // ((CachableInterface) action).setData(actionData.getData());
-        // }
-        // fill(action.getClass(), action);
-        // return customize(action);
-        // } else if (action != null) {
-        // System.out.println("Please Update Action " + action.getClass().getName());
-        // }
-        Class<?> clazz = actionData._getClazz();
-        Constructor<?> c = clazz.getConstructor(new Class[] {});
-        ret = (CustomizableAppAction) c.newInstance(new Object[] {});
+        final CustomizableAppAction ret = (CustomizableAppAction) c.newInstance();
         ret.setMenuItemData(this);
         ret.applyMenuItemData();
         ret.initContextDefaults();
         ret.loadContextSetups();
-        minWeakAction = new MinTimeWeakReference<CustomizableAppAction>(ret, 30 * 1000l, "MenuItemAction", this);
-        action.set(minWeakAction);
         return (ret);
     }
 
@@ -443,7 +423,6 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
 
     public void setShortcut(String shortcut) {
         this.shortcut = shortcut;
-        clearCachedAction();
     }
 
     // public String _getShortcut() {
@@ -463,19 +442,6 @@ public class MenuItemData implements MinTimeWeakReferenceCleanup, Storable {
 
     public void setVisible(boolean b) {
         visible = b;
-        clearCachedAction();
-    }
-
-    public void clearCachedAction() {
-        final MinTimeWeakReference<CustomizableAppAction> old = action.getAndSet(null);
-        if (old != null) {
-            old.clear();
-        }
-    }
-
-    @Override
-    public void onMinTimeWeakReferenceCleanup(MinTimeWeakReference<?> minTimeWeakReference) {
-        action.compareAndSet((MinTimeWeakReference<CustomizableAppAction>) minTimeWeakReference, null);
     }
 
     public static Icon getIcon(String key, int size) {

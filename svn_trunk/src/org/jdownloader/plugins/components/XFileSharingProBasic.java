@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50349 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4180,13 +4180,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         }
     }
 
-    /** If thus returns true, API account information can be trusted in website mode. */
-    protected boolean trustAccountInfoAPI(final Browser br, Account account, AccountInfo ai) throws Exception {
-        return true;
-    }
-
     protected AccountInfo fetchAccountInfoWebsite(final Account account) throws Exception {
-        AccountInfo ai = null;
+        AccountInfo ai = new AccountInfo();
         loginWebsite(null, account, true);
         /*
          * Only access URL if we haven't accessed it before already. Some sites will redirect to their Account-Info page right after
@@ -4195,28 +4190,24 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (br.getURL() == null || !br.getURL().contains(getRelativeAccountInfoURL())) {
             getPage(this.getMainPage() + getRelativeAccountInfoURL());
         }
-        /*
-         * 2019-07-11: apikey handling - prefer account info via API instead of website if allowed.
-         */
-        try {
+        boolean apiSuccess = false;
+        obtainAccountInfoFromAPI: try {
             final String apikey = this.findAPIKey(this.br.cloneBrowser());
-            if (apikey != null) {
-                /*
-                 * 2019-07-11: Use API even if 'supports_api()' is disabled because if it works it is a much quicker and more reliable way
-                 * to get account information.
-                 */
-                logger.info("Found apikey --> Trying to get AccountInfo via API: " + apikey);
-                /* Save apikey for later usage */
-                synchronized (account) {
-                    account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
-                    try {
-                        ai = this.fetchAccountInfoAPI(this.br.cloneBrowser(), account);
-                    } catch (final Throwable e) {
-                        e.printStackTrace();
-                        logger.warning("Failed to find accountinfo via API even though apikey is given; probably serverside API failure --> Fallback to website handling");
-                        /* Do not store invalid API key */
-                        account.removeProperty(PROPERTY_ACCOUNT_apikey);
-                    }
+            if (apikey == null) {
+                break obtainAccountInfoFromAPI;
+            }
+            logger.info("Found apikey --> Trying to get AccountInfo via API: " + apikey);
+            /* Save apikey for later usage */
+            synchronized (account) {
+                account.setProperty(PROPERTY_ACCOUNT_apikey, apikey);
+                try {
+                    ai = this.fetchAccountInfoAPI(this.br.cloneBrowser(), account);
+                    apiSuccess = true;
+                } catch (final Throwable e) {
+                    e.printStackTrace();
+                    logger.warning("Failed to find accountinfo via API even though apikey is given; probably serverside API failure --> Fallback to website handling");
+                    /* Do not store invalid API key */
+                    account.removeProperty(PROPERTY_ACCOUNT_apikey);
                 }
             }
         } catch (final Throwable e) {
@@ -4227,7 +4218,6 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             logger.info("Failed to find apikey (with Exception) --> Continuing via website");
             logger.log(e);
         }
-        final boolean apiSuccess = ai != null && trustAccountInfoAPI(br, account, ai);
         final boolean devDebugTrustAPIInfo = false;
         if (apiSuccess && devDebugTrustAPIInfo && DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
             /* Trust API info */
@@ -4245,10 +4235,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             }
             return ai;
         }
-        if (ai == null) {
+        if (apiSuccess) {
             /* No info from API available */
-            ai = new AccountInfo();
-        } else {
             logger.info("Found AccountInfo via API but trying to obtain trafficleft value from website as it is usually not given via API");
         }
         fetchAccountInfoWebsiteTraffic(br, account, ai);

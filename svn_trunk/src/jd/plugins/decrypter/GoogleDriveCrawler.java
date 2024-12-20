@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GoogleDrive;
 
-@DecrypterPlugin(revision = "$Revision: 49173 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -580,7 +580,7 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
             if (kind.equals("drive#file") && !isShortcutFolder) {
                 /* Single file */
                 dl = createDownloadlink(generateFileURL(id, resourceKey));
-                GoogleDrive.parseFileInfoAPIAndWebsiteWebAPI(this, type, dl, true, true, resource);
+                GoogleDrive.parseFileInfoAPIAndWebsiteWebAPI(this, type, dl, resource);
                 if (subfolder != null) {
                     /*
                      * Packagizer property so user can e.g. merge all files of a folder and subfolders in a package named after the name of

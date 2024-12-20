@@ -36,12 +36,6 @@ public class AddFilteredStuffAction extends CustomizableAppAction implements Act
 
     }
 
-    @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
-
-    }
-
     public static String getTranslationForOnlyVisibleIfThereIsFilteredStuff() {
         return _JDT.T.AddFilteredStuffAction_getTranslationForOnlyVisibleIfThereIsFilteredStuff();
     }

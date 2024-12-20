@@ -157,6 +157,7 @@ public interface GraphicalUserInterfaceSettings extends ConfigInterface {
 
     @AboutConfig
     @DefaultEnumValue("ON_STARTUP")
+    @DescriptionForConfigEntry("ON_STARTUP: Skip the first clipboard content on startup. ON_ENABLE: Skip the first clipboard content when enabling clipboard observation. NEVER: Always process clipboard content immediately, both on startup and when clipboard observation is enabled.")
     CLIPBOARD_SKIP_MODE getClipboardSkipMode();
 
     void setClipboardSkipMode(CLIPBOARD_SKIP_MODE mode);

@@ -225,7 +225,6 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         // }
                         name.setText(resetName);
                         item.setName(resetName);
-                        item.clearCachedAction();
                         updateInfo(item);
                         managerFrame.fireUpdate();
                     }
@@ -255,7 +254,6 @@ public class InfoPanel extends MigPanel implements ActionListener, Scrollable {
                         // newIconKey = MenuItemData.EMPTY;
                         // }
                         item.setIconKey(resetIconKey);
-                        item.clearCachedAction();
                         updateInfo(item);
                         managerFrame.fireUpdate();
                     }

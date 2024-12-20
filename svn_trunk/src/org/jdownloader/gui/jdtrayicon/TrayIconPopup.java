@@ -356,6 +356,7 @@ public final class TrayIconPopup extends ExtJFrame implements MouseListener {
                 }
             });
         }
+        action.addVisibilityPropertyChangeListener(b);
         // resizecomps.add(b);
         return b;
     }

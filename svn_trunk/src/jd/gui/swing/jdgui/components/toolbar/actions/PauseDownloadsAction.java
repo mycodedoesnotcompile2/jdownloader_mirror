@@ -2,6 +2,13 @@ package jd.gui.swing.jdgui.components.toolbar.actions;
 
 import java.awt.event.ActionEvent;
 
+import jd.controlling.downloadcontroller.DownloadLinkCandidate;
+import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
+
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -12,13 +19,6 @@ import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.toolbar.action.AbstractToolBarAction;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.translate._JDT;
-
-import jd.controlling.downloadcontroller.DownloadLinkCandidate;
-import jd.controlling.downloadcontroller.DownloadLinkCandidateResult;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogProperty;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.downloadcontroller.event.DownloadWatchdogListener;
 
 public class PauseDownloadsAction extends AbstractToolBarAction implements DownloadWatchdogListener, GenericConfigEventListener<Integer>, ActionContext {
 
@@ -40,16 +40,6 @@ public class PauseDownloadsAction extends AbstractToolBarAction implements Downl
             setHideIfDownloadsAreStopped(false);
         }
 
-    }
-
-    @Override
-    public void requestUpdate(Object requestor) {
-        super.requestUpdate(requestor);
-    }
-
-    @Override
-    public Object getValue(String key) {
-        return super.getValue(key);
     }
 
     public void actionPerformed(ActionEvent e) {

@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49038 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = {}, urls = {})
 public class DarkiboxCom extends XFileSharingProBasic {
     public DarkiboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -173,12 +173,6 @@ public class DarkiboxCom extends XFileSharingProBasic {
     }
 
     @Override
-    protected boolean trustAccountInfoAPI(Browser br, Account account, AccountInfo ai) throws Exception {
-        // api and website does not return available traffic
-        return ai != null;
-    }
-
-    @Override
     protected boolean isVideohoster_enforce_video_filename() {
         return true;
     }
@@ -190,11 +184,24 @@ public class DarkiboxCom extends XFileSharingProBasic {
 
     @Override
     protected String regexWaittime(final String html) {
-        final String waitSeconds = new Regex(html, ">(\\d+)</span>\\s*seconds\\s*</span>").getMatch(0);
+        final String waitSeconds = new Regex(html, ">\\s*(\\d+)\\s*</span>\\s*seconds\\s*</span>").getMatch(0);
         if (waitSeconds != null) {
             return waitSeconds;
         } else {
             return super.regexWaittime(html);
+        }
+    }
+
+    @Override
+    protected String regExTrafficLeft(final Browser br) {
+        String trafficleftStr = br.getRegex("Bandwidth limit</div>\\s*<h6>\\s*(\\d+[^<]+)/\\s*\\d+ Days\\s*<").getMatch(0);
+        if (trafficleftStr != null) {
+            /* Convert French -> English */
+            trafficleftStr = trafficleftStr.replace("Go", "Gb");
+            trafficleftStr = trafficleftStr.replace("Mo", "Mb");
+            return trafficleftStr;
+        } else {
+            return super.regExTrafficLeft(br);
         }
     }
 }

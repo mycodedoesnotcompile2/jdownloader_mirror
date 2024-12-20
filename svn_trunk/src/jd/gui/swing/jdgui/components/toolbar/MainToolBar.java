@@ -24,8 +24,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.List;
@@ -601,16 +599,7 @@ public class MainToolBar extends JToolBar implements MouseListener, DownloadWatc
                             bt.setHideActionText(true);
                         }
                     }
-                    final AbstractButton finalBt = bt;
-                    action.addPropertyChangeListener(new PropertyChangeListener() {
-                        @Override
-                        public void propertyChange(PropertyChangeEvent evt) {
-                            if ("visible".equals(evt.getPropertyName())) {
-                                Boolean value = (Boolean) evt.getNewValue();
-                                finalBt.setVisible(value);
-                            }
-                        }
-                    });
+                    action.addVisibilityPropertyChangeListener(bt);
                     bt.setVisible(action.isVisible());
                     last = menudata;
                     final Object value = action.getValue(Action.ACCELERATOR_KEY);

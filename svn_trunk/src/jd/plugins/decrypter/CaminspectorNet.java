@@ -15,15 +15,19 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package jd.plugins.decrypter;
 
+import java.util.ArrayList;
+
 import org.appwork.utils.Regex;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
+import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
+import jd.plugins.DownloadLink;
 
-@DecrypterPlugin(revision = "$Revision: 45843 $", interfaceVersion = 3, names = { "caminspector.net" }, urls = { "https?://(?:www\\.)?caminspector\\.net/videos/\\d+/([a-z0-9\\-]+)/" })
+@DecrypterPlugin(revision = "$Revision: 50364 $", interfaceVersion = 3, names = { "caminspector.net" }, urls = { "https?://(?:www\\.)?caminspector\\.net/videos/\\d+/([a-z0-9\\-]+)/" })
 public class CaminspectorNet extends PornEmbedParser {
     public CaminspectorNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -45,5 +49,15 @@ public class CaminspectorNet extends PornEmbedParser {
         } else {
             return false;
         }
+    }
+
+    @Override
+    public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
+        final ArrayList<DownloadLink> ret = super.decryptIt(param, progress);
+        for (final DownloadLink result : ret) {
+            /* Important for cwtvembeds.com items. */
+            result.setReferrerUrl(param.getCryptedUrl());
+        }
+        return ret;
     }
 }
