@@ -1,7 +1,7 @@
 name: Daily update of this mirror
-on:
-  schedule:
-    - cron:  '10 05 * * *'
+on: workflow_dispatch
+  #schedule:
+  #  - cron:  '10 05 * * *'
 
 permissions:
   contents: write
@@ -17,6 +17,7 @@ jobs:
       run: |
         cd "$GITHUB_WORKSPACE"
 
+        sudo apt update && sudo apt install subversion
         mkdir -p ./svn_browser
         mkdir -p ./svn_trunk
         mkdir -p ./svn_MyJDownloaderClient
