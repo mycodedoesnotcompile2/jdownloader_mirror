@@ -830,8 +830,8 @@ abstract public class ZeveraCore extends UseNet {
     }
 
     /**
-     * @return true: Account has 'access_token' property. </br>
-     *         false: Account does not have 'access_token' property.
+     * @return true: Account has 'access_token' property so pairing login was used. </br>
+     *         false: Account does not have 'access_token' property so API Key login was used.
      */
     public static boolean setAuthHeader(final Browser br, final Account account) {
         final String access_token = account.getStringProperty("access_token");

@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49202 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50398 $", interfaceVersion = 3, names = {}, urls = {})
 public class WorldBytezCom extends XFileSharingProBasic {
     public WorldBytezCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -82,7 +82,7 @@ public class WorldBytezCom extends XFileSharingProBasic {
     public void correctDownloadLink(final DownloadLink link) {
         final Regex special = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL);
         if (special.patternFind()) {
-            link.setPluginPatternMatcher("https://" + this.getHost() + super.buildNormalURLPath(link, special.getMatch(0)));
+            link.setPluginPatternMatcher("https://" + this.getHost() + super.buildURLPath(link, special.getMatch(0), URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD));
         }
     }
 

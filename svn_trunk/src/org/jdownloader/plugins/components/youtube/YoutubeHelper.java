@@ -2712,6 +2712,60 @@ public class YoutubeHelper {
         return request;
     }
 
+    private static boolean API_MWEB_ENABLED = true;
+
+    /**
+     * does also return ultralow formats
+     * 
+     * @param br
+     * @return
+     * @throws Exception
+     */
+    protected Request buildAPI_MWEB_Request(final Browser br) throws Exception {
+        if (!API_MWEB_ENABLED) {
+            logger.info("buildAPI_MWEB_Request:disabled");
+            return null;
+        }
+        final Map<String, Object> post = new LinkedHashMap<String, Object>();
+        final Map<String, Object> client = new LinkedHashMap<String, Object>();
+        client.put("clientName", "MWEB");
+        client.put("clientVersion", "2.20241202.07.00");
+        client.put("userAgent", "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)");
+        client.put("hl", "en");
+        client.put("timeZone", "UTC");
+        client.put("utcOffsetMinutes", 0);
+        final Map<String, Object> context = new LinkedHashMap<String, Object>();
+        context.put("client", client);
+        post.put("context", context);
+        post.put("videoId", vid.videoID);
+        final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
+        contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
+        final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
+        playbackContext.put("contentPlaybackContext", contentPlaybackContext);
+        post.put("playbackContext", playbackContext);
+        post.put("contentCheckOk", true);
+        post.put("racyCheckOk", true);
+        final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
+        request.getHeaders().put("X-Youtube-Client-Name", "2");
+        request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
+        final String domain = "https://www.youtube.com";
+        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
+        final Account account = getAccountLoggedIn();
+        if (account != null) {
+            /* For logged in users: */
+            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
+            if (sapisidhash != null) {
+                request.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
+            }
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        } else {
+            request.getHeaders().remove("Authorization");
+            request.getHeaders().put("X-Goog-Authuser", "0");
+        }
+        return request;
+    }
+
     private static boolean API_TV_ENABLED = true;
 
     /**

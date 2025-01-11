@@ -18,6 +18,9 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.parser.html.Form;
@@ -26,10 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50369 $", interfaceVersion = 3, names = {}, urls = {})
 public class ClicknuploadOrg extends XFileSharingProBasic {
     public ClicknuploadOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -46,7 +46,7 @@ public class ClicknuploadOrg extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clickndownload.org", "clickndownload.space", "clicknupload.space", "clickndownload.click", "clickndownload.link", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name" });
+        ret.add(new String[] { "clicknupload.click", "clicknupload.link", "clicknupload.red", "clicknupload.to", "clicknupload.cc", "clicknupload.co", "clicknupload.org", "clicknupload.com", "clicknupload.me", "clicknupload.club", "clicknupload.online", "clicknupload.download", "clicknupload.vip", "clickndownload.org", "clickndownload.space", "clicknupload.space", "clickndownload.click", "clickndownload.link", "clicknupload.site", "clicknupload.xyz", "clicknupload.one", "clicknupload.name", "clickndownload.site" });
         return ret;
     }
 

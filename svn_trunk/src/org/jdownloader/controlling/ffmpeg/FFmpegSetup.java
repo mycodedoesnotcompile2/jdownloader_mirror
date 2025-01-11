@@ -170,4 +170,10 @@ public interface FFmpegSetup extends ConfigInterface {
     String[] getDash2OggAudioCommand();
 
     void setDash2OggAudioCommand(String[] command);
+
+    @AboutConfig
+    @DefaultStringArrayValue({ "-i", "%audio", "-f", "matroska", "-c:a", "copy", "%out", "-y" })
+    String[] getDash2MkvAudioCommand();
+
+    void setDash2MkvAudioCommand(String[] command);
 }

@@ -23,6 +23,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import org.appwork.utils.DebugMode;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigSendCm;
+import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -39,17 +49,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-import org.appwork.utils.DebugMode;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm;
-import org.jdownloader.plugins.components.config.XFSConfigSendCm.LoginMode;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50409 $", interfaceVersion = 3, names = {}, urls = {})
 public class SendCm extends XFileSharingProBasic {
     public SendCm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,7 +66,7 @@ public class SendCm extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "send.cm", "sendit.cloud", "usersfiles.com", "tusfiles.com", "tusfiles.net" });
+        ret.add(new String[] { "send.cm", "sendit.cloud", "send.now", "usersfiles.com", "tusfiles.com", "tusfiles.net" });
         return ret;
     }
 
@@ -189,8 +189,8 @@ public class SendCm extends XFileSharingProBasic {
     public void doFree(final DownloadLink link, final Account account) throws Exception, PluginException {
         if (allowAPIDownloadIfApikeyIsAvailable(link, account)) {
             /**
-             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br> Looks like this is supposed to help with
-             * Cloudflare problems.
+             * 2023-10-16: Special: For "Free accounts" with paid "Premium bandwidth". </br>
+             * Looks like this is supposed to help with Cloudflare problems.
              */
             final String directurl = this.getDllinkAPI(link, account);
             handleDownload(link, account, null, directurl);

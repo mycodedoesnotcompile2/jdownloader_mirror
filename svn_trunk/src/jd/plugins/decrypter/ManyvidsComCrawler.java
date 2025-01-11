@@ -45,7 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.ManyvidsCom;
 
-@DecrypterPlugin(revision = "$Revision: 49074 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50390 $", interfaceVersion = 3, names = {}, urls = {})
 public class ManyvidsComCrawler extends PluginForDecrypt {
     public ManyvidsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -266,10 +266,7 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
             }
             if (crawlVideoStreams) {
                 logger.info("Crawling stream downloadurls");
-                final Map<String, Object> teasermap = (Map<String, Object>) data2.get("teaser");
                 final String videourl1 = (String) data2.get("filepath");
-                final String videourl2 = (String) data2.get("transcodedFilepath");
-                final String videourlTeaser = teasermap.get("filepath").toString();
                 if (!StringUtils.isEmpty(videourl1)) {
                     /* Original video -> We may know the filesize of this item. */
                     final DownloadLink video1 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl1));
@@ -278,12 +275,19 @@ public class ManyvidsComCrawler extends PluginForDecrypt {
                     }
                     ret.add(video1);
                 }
+                final String videourl2 = (String) data2.get("transcodedFilepath");
                 if (!StringUtils.isEmpty(videourl2)) {
                     /* Transcoded video -> We do not know the filesize of this item. */
                     final DownloadLink video2 = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourl2));
                     ret.add(video2);
                 }
-                ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourlTeaser)));
+                final Map<String, Object> teasermap = (Map<String, Object>) data2.get("teaser");
+                if (teasermap != null) {
+                    final String videourlTeaser = (String) teasermap.get("filepath");
+                    if (!StringUtils.isEmpty(videourlTeaser)) {
+                        ret.add(this.createDownloadlink(DirectHTTP.createURLForThisPlugin(videourlTeaser)));
+                    }
+                }
             }
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(title);

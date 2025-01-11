@@ -19,13 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jdownloader.plugins.components.config.EvilangelCoreConfig;
-import org.jdownloader.plugins.components.config.EvilangelCoreConfigAdulttime;
+import org.jdownloader.plugins.components.config.EvilangelCoreConfigTouchmywife;
 
 import jd.PluginWrapper;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49578 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50370 $", interfaceVersion = 3, names = {}, urls = {})
 public class EvilangelTouchmywifeCom extends EvilangelCore {
     public EvilangelTouchmywifeCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -62,7 +62,7 @@ public class EvilangelTouchmywifeCom extends EvilangelCore {
 
     @Override
     public Class<? extends EvilangelCoreConfig> getConfigInterface() {
-        return EvilangelCoreConfigAdulttime.class;
+        return EvilangelCoreConfigTouchmywife.class;
     }
 
     @Override

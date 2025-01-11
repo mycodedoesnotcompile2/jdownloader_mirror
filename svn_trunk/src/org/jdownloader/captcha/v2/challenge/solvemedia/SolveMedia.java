@@ -15,6 +15,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.UserAgents;
 
+@Deprecated
 public class SolveMedia {
     private final Browser      br;
     private String             challenge;
@@ -55,8 +56,12 @@ public class SolveMedia {
         }
     }
 
-    public SolveMedia(final Browser br) {
+    public SolveMedia(final Browser br) throws PluginException {
         this.br = br;
+        if (true) {
+            /* Solvemedia service went down some time in 2024 */
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Solvemedia.com captcha does not exist anymore");
+        }
     }
 
     public File downloadCaptcha(final File captchaFile) throws Exception {

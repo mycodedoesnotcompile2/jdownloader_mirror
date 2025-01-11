@@ -24,6 +24,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.CaptchaHelperHostPluginHCaptcha;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
@@ -39,7 +40,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50410 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwiftuploadsCom extends PluginForHost {
     public SwiftuploadsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,6 +66,7 @@ public class SwiftuploadsCom extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "swiftuploads.com" });
         ret.add(new String[] { "uptoearn.xyz" });
+        ret.add(new String[] { "uploadzap.com" });
         return ret;
     }
 
@@ -175,8 +177,15 @@ public class SwiftuploadsCom extends PluginForHost {
             final Number dlconfig_captcha = (Number) dlconfig.get("captcha");
             if (dlconfig_captcha != null && dlconfig_captcha.intValue() == 1) {
                 // e.g. uptoearn.xyz
-                final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
-                dlform2.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                if (br.containsHTML("class=\"h-captcha\"")) {
+                    /* 2025-01-07: uploadzap.com */
+                    final String hcaptchaResponse = new CaptchaHelperHostPluginHCaptcha(this, br).getToken();
+                    dlform2.put("g-recaptcha-response", Encoding.urlEncode(hcaptchaResponse));
+                    dlform2.put("h-captcha-response", Encoding.urlEncode(hcaptchaResponse));
+                } else {
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                    dlform2.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+                }
             }
             br.submitForm(dlform2);
             final String csrftoken = br.getRegex("name=\"csrf-token\" content=\"([^\"]+)\"").getMatch(0);

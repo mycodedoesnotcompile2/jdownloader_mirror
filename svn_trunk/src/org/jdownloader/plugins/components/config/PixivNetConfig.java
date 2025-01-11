@@ -25,4 +25,12 @@ public interface PixivNetConfig extends PluginConfigInterface {
     boolean isCrawlUserWorksIndividually();
 
     void setCrawlUserWorksIndividually(boolean b);
+
+    @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Crawled images will start at index 1 instead of 0 (default)?")
+    @Order(40)
+    boolean isCrawlImageIndexStartAtOne();
+
+    void setCrawlImageIndexStartAtOne(boolean b);
 }

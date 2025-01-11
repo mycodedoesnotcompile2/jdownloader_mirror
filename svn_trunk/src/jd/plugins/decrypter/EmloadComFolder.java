@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.EmloadCom;
 
-@DecrypterPlugin(revision = "$Revision: 49924 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50398 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { EmloadCom.class })
 public class EmloadComFolder extends antiDDoSForDecrypt {
     public EmloadComFolder(PluginWrapper wrapper) {
@@ -86,19 +86,25 @@ public class EmloadComFolder extends antiDDoSForDecrypt {
         } else if (br.containsHTML(">\\s*This could be due to the following reasons")) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fpName = br.getRegex("<h2>Folder :([^<>\"]+): \\d+ Files </h2>").getMatch(0);
-        final String[] links = br.getRegex("(https?://(?:www\\.)?wdupload\\.com/(?:v2/)?file/[^<>\"]+)\"").getColumn(0);
+        String title = br.getRegex("<h2>Folder :([^<>\"]+): \\d+ Files </h2>").getMatch(0);
+        if (title == null) {
+            title = br.getRegex("<h2 class=\"name wordwrap s18 b font\"[^>]*>([^<]+)</h2>").getMatch(0);
+        }
+        final String[] links = br.getRegex("(https?://(?:www\\.)?[^/]+/(?:v2/)?file/[^\"]+)\"").getColumn(0);
         if (links == null || links.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final String singleLink : links) {
             ret.add(createDownloadlink(singleLink));
         }
-        if (fpName != null) {
-            final FilePackage fp = FilePackage.getInstance();
-            fp.setName(Encoding.htmlDecode(fpName).trim());
-            fp.addLinks(ret);
+        final FilePackage fp = FilePackage.getInstance();
+        if (title != null) {
+            fp.setName(Encoding.htmlDecode(title).trim());
+        } else {
+            /* Fallback */
+            fp.setName(br._getURL().getPath());
         }
+        fp.addLinks(ret);
         return ret;
     }
 }

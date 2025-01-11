@@ -21,12 +21,15 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
+import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50396 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreedlInk extends XFileSharingProBasic {
     public FreedlInk(final PluginWrapper wrapper) {
         super(wrapper);
@@ -65,14 +68,34 @@ public class FreedlInk extends XFileSharingProBasic {
         final AccountType type = account != null ? account.getType() : null;
         if (AccountType.FREE.equals(type)) {
             /* Free Account */
-            return false;
+            return true;
         } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
-            return false;
+            return true;
         }
+    }
+
+    @Override
+    public Form findFormDownload1Free(Browser br) throws Exception {
+        final Form ret = super.findFormDownload1Free(br);
+        if (ret == null) {
+            return null;
+        }
+        ret.put("download_free", "1");
+        return ret;
+    }
+
+    @Override
+    protected Form findFormDownload2Free(Browser br) {
+        final Form ret = super.findFormDownload2Free(br);
+        if (ret == null) {
+            return null;
+        }
+        ret.put("download_free", "1");
+        return ret;
     }
 
     @Override
@@ -89,20 +112,17 @@ public class FreedlInk extends XFileSharingProBasic {
             return 1;
         }
     }
-    // @Override
-    // protected String regexWaittime(final Browser br) {
-    // String waitSecondsStr = super.regexWaittime(br);
-    // if (waitSecondsStr == null && this.isLoggedin(br)) {
-    // /**
-    // * 2024-07-15: Workaround for broken website when user is logged in: Website owner forgot to add wait time in html while it is
-    // * required. </br>
-    // * Reference: https://board.jdownloader.org/showthread.php?t=95609
-    // */
-    // logger.info("Pre download wait workaround active");
-    // waitSecondsStr = "60";
-    // }
-    // return waitSecondsStr;
-    // }
+
+    @Override
+    protected String regexWaittime(final String html) {
+        // 2024-12-31
+        final String waitSecondsStr = new Regex(html, "seconds\\.html\\(\\s*(\\d+)\\s*\\)").getMatch(0);
+        if (waitSecondsStr != null) {
+            return waitSecondsStr;
+        } else {
+            return super.regexWaittime(br);
+        }
+    }
 
     @Override
     public int getMaxSimultaneousFreeAnonymousDownloads() {

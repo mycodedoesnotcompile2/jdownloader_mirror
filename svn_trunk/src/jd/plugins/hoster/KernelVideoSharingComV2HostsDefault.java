@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -35,7 +35,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "pornwhite.com" });
         ret.add(new String[] { "voyeurhit.com" });
         ret.add(new String[] { "hotmovs.com", "hotmovs.tube" });
-        ret.add(new String[] { "theclassicporn.com" });
         ret.add(new String[] { "porndr.com" });
         ret.add(new String[] { "momvids.com", "motherporno.com" });
         ret.add(new String[] { "wankoz.com" });
@@ -50,16 +49,12 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "tryboobs.com" });
         ret.add(new String[] { "vikiporn.com" });
         ret.add(new String[] { "katestube.com" });
-        ret.add(new String[] { "babestube.com", "foxytube.com" });
-        ret.add(new String[] { "freehardcore.com" });
         ret.add(new String[] { "bravoteens.com" });
         ret.add(new String[] { "onlygayvideo.com" });
         ret.add(new String[] { "mylust.com" });
         ret.add(new String[] { "yourporngod.com" });
         ret.add(new String[] { "everydayporn.co" });
-        ret.add(new String[] { "camhub.cc", "camhub.world", "zzpornozz.xyz" });
         ret.add(new String[] { "upornia.com" });
-        ret.add(new String[] { "finevids.xxx" });
         ret.add(new String[] { "vr.pornhat.com" });
         ret.add(new String[] { "xxxymovies.com" });
         ret.add(new String[] { "needgayporn.com" });
@@ -75,8 +70,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "camhoes.tv" });
         /* 2021-01-18 */
         ret.add(new String[] { "gaysearch.com" });
-        /* 2021-01-19 */
-        ret.add(new String[] { "porntn.com" });
         /* 2021-04-06 */
         ret.add(new String[] { "punishbang.com" });
         /* 2021-08-04 */
@@ -92,8 +85,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         /* 2022-03-24 */
         ret.add(new String[] { "wild-pornstars.com" });
         /* 2022-03-28 */
-        ret.add(new String[] { "fapnow.xxx" });
-        /* 2022-03-28 */
         ret.add(new String[] { "4kporn.xxx" });
         /* 2022-03-28 */
         ret.add(new String[] { "bigwank.com" });
@@ -101,8 +92,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "xxxshake.com" });
         /* 2022-03-28 */
         ret.add(new String[] { "xgroovy.com" });
-        /* 2022-04-08 */
-        ret.add(new String[] { "moviesand.com" });
         /* 2022-05-02 */
         ret.add(new String[] { "heavyfetish.com" });
         /* 2022-06-05 */
@@ -150,6 +139,13 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         /* 2024-10-21 */
         ret.add(new String[] { "severeporn.com" });
         return ret;
+    }
+
+    @Override
+    protected ArrayList<String> getDeadDomains() {
+        final ArrayList<String> domains = new ArrayList<String>();
+        domains.add("motherporno.com"); // 2025-01-07
+        return domains;
     }
 
     @Override

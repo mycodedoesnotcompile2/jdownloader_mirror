@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.sound.sampled.AudioFormat;
@@ -39,28 +40,6 @@ import javax.swing.JTextPane;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.text.JTextComponent;
-
-import jd.controlling.AccountController;
-import jd.controlling.TaskQueue;
-import jd.controlling.accountchecker.AccountChecker;
-import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.downloadcontroller.DownloadSession;
-import jd.controlling.downloadcontroller.DownloadWatchDog;
-import jd.controlling.downloadcontroller.DownloadWatchDogJob;
-import jd.controlling.downloadcontroller.ProxyInfoHistory;
-import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
-import jd.controlling.downloadcontroller.SingleDownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.controlling.linkcrawler.CrawledPackage;
-import jd.controlling.proxy.AbstractProxySelectorImpl;
-import jd.controlling.reconnect.Reconnecter;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.FilePackage;
-import net.sourceforge.htmlunit.corejs.javascript.Function;
-import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.JsonConfig;
@@ -88,6 +67,7 @@ import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.speedmeter.SpeedMeterInterface.Resolution;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.appwork.utils.swing.dialog.Dialog;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.api.RemoteAPIController;
 import org.jdownloader.extensions.eventscripter.EnvironmentException;
 import org.jdownloader.extensions.eventscripter.ScriptAPI;
@@ -103,6 +83,28 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.WaitingSkipReason;
 import org.jdownloader.settings.SoundSettings;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
+
+import jd.controlling.AccountController;
+import jd.controlling.TaskQueue;
+import jd.controlling.accountchecker.AccountChecker;
+import jd.controlling.accountchecker.AccountChecker.AccountCheckJob;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.downloadcontroller.DownloadSession;
+import jd.controlling.downloadcontroller.DownloadWatchDog;
+import jd.controlling.downloadcontroller.DownloadWatchDogJob;
+import jd.controlling.downloadcontroller.ProxyInfoHistory;
+import jd.controlling.downloadcontroller.ProxyInfoHistory.WaitingSkipReasonContainer;
+import jd.controlling.downloadcontroller.SingleDownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.controlling.linkcrawler.CrawledPackage;
+import jd.controlling.proxy.AbstractProxySelectorImpl;
+import jd.controlling.reconnect.Reconnecter;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.FilePackage;
+import net.sourceforge.htmlunit.corejs.javascript.Function;
+import net.sourceforge.htmlunit.corejs.javascript.ScriptableObject;
 
 public class ScriptEnvironment {
     private static HashMap<String, Object>                       GLOBAL_PROPERTIES = new HashMap<String, Object>();
@@ -1148,6 +1150,119 @@ public class ScriptEnvironment {
         } catch (Throwable e) {
             throw new EnvironmentException(e);
         }
+    }
+
+    @ScriptAPI(description = "Show a Confirm Dialog", parameters = { "message", "okOption", "cancelOption" }, example = "showConfirmDialog(\"Do you like this method?\",\"yes\",\"no\"")
+    public static int showConfirmDialog(final String message, final String okOption, final String cancelOption) {
+        final ScriptThread env = getScriptThread();
+        final String id = T.T.showConfirmDialog_title(env.getScript().getName(), env.getScript().getEventTrigger().getLabel());
+        final AtomicReference<Object> dialogReference = new AtomicReference<Object>();
+        new Thread(id) {
+            {
+                setDaemon(true);
+            }
+
+            public void run() {
+                try {
+                    final ConfirmDialog confirmDialog = new ConfirmDialog(Dialog.STYLE_LARGE, id, message, new AbstractIcon(IconKey.ICON_QUESTION, 32), okOption, cancelOption) {
+                        @Override
+                        protected int getPreferredWidth() {
+                            return 600;
+                        }
+
+                        @Override
+                        public String getDontShowAgainKey() {
+                            return null;
+                        };
+
+                        @Override
+                        public boolean isRemoteAPIEnabled() {
+                            return true;
+                        }
+
+                        @Override
+                        protected void modifyTextPane(JTextPane textField) {
+                        }
+
+                        @Override
+                        public ModalityType getModalityType() {
+                            return ModalityType.MODELESS;
+                        }
+
+                        @Override
+                        protected JTextComponent addMessageComponent(final MigPanel p) {
+                            JTextPane textField = new JTextPane();
+                            modifyTextPane(textField);
+                            final Font font = textField.getFont();
+                            if (BinaryLogic.containsAll(flagMask, Dialog.STYLE_HTML)) {
+                                textField.setContentType("text/html");
+                                textField.addHyperlinkListener(new HyperlinkListener() {
+                                    public void hyperlinkUpdate(final HyperlinkEvent e) {
+                                        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                                            CrossSystem.openURL(e.getURL());
+                                        }
+                                    }
+                                });
+                            } else {
+                                textField.setContentType("text/plain");
+                            }
+                            textField.setFont(font);
+                            textField.setText(getMessage());
+                            if (env.isAdvancedAlert()) {
+                                textField.setEditable(true);
+                            } else {
+                                textField.setEditable(false);
+                            }
+                            textField.setBackground(null);
+                            textField.setOpaque(false);
+                            if (env.isAdvancedAlert()) {
+                                textField.setFocusable(true);
+                            } else {
+                                textField.setFocusable(false);
+                            }
+                            textField.setForeground(new JLabel().getForeground());
+                            textField.putClientProperty("Synthetica.opaque", Boolean.FALSE);
+                            textField.setCaretPosition(0);
+                            if (BinaryLogic.containsAll(flagMask, Dialog.STYLE_LARGE)) {
+                                p.add(new JScrollPane(textField), "pushx,growx");
+                            } else {
+                                p.add(textField);
+                            }
+                            return textField;
+                        }
+
+                        @Override
+                        public void pack() {
+                            getDialog().pack();
+                        }
+                    };
+                    final ConfirmDialogInterface dialog = UIOManager.I().show(ConfirmDialogInterface.class, confirmDialog);
+                    dialogReference.set(dialog);
+                } finally {
+                    synchronized (dialogReference) {
+                        dialogReference.compareAndSet(null, Boolean.FALSE);
+                        dialogReference.notifyAll();
+                    }
+                }
+            };
+        }.start();
+        synchronized (dialogReference) {
+            while (dialogReference.get() == null) {
+                try {
+                    dialogReference.wait();
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }
+        if (dialogReference.get() instanceof ConfirmDialogInterface) {
+            try {
+                ((ConfirmDialogInterface) dialogReference.get()).throwCloseExceptions();
+                return 1;
+            } catch (DialogNoAnswerException e) {
+            }
+        }
+        return 0;
     }
 
     private static void showMessageDialog(final String string) {

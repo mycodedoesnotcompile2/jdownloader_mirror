@@ -289,7 +289,7 @@ public interface YoutubeConfig extends PluginConfigInterface {
     //
     // void setBestGroupVariantEnabled(boolean b);
     @AboutConfig
-    @DescriptionForConfigEntry("Use this if you want to get more than 1 subtitle per video e.g. [\"de\", \"en\", \"ar\", \"zh-HK\", \"ru\", \"tr\"]")
+    @DescriptionForConfigEntry("Use this if you want to get more than 1 subtitle per video. [\"de\", \"ar\", \"zh-HK\"] or [\"*\"] for all")
     List<String> getExtraSubtitles();
 
     @AboutConfig

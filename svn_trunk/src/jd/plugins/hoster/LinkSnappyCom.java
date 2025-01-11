@@ -23,26 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.appwork.storage.JSonMapperException;
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.storage.config.annotations.AboutConfig;
-import org.appwork.storage.config.annotations.DefaultBooleanValue;
-import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.encoding.URLEncode;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.gui.IconKey;
-import org.jdownloader.gui.views.downloads.columns.ETAColumn;
-import org.jdownloader.images.AbstractIcon;
-import org.jdownloader.plugins.PluginTaskID;
-import org.jdownloader.plugins.config.PluginConfigInterface;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
-import org.jdownloader.settings.staticreferences.CFG_GUI;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.http.Browser;
@@ -67,13 +47,33 @@ import jd.plugins.PluginForHost;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
+import org.appwork.storage.JSonMapperException;
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
+import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.gui.IconKey;
+import org.jdownloader.gui.views.downloads.columns.ETAColumn;
+import org.jdownloader.images.AbstractIcon;
+import org.jdownloader.plugins.PluginTaskID;
+import org.jdownloader.plugins.config.PluginConfigInterface;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
+import org.jdownloader.settings.staticreferences.CFG_GUI;
+
 /**
  *
  * @author raztoki
  * @author psp
  * @author bilalghouri
  */
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
+@HostPlugin(revision = "$Revision: 50371 $", interfaceVersion = 3, names = { "linksnappy.com" }, urls = { "https?://(?:www\\.)?linksnappy\\.com/torrents/(\\d+)/download" })
 public class LinkSnappyCom extends PluginForHost {
     private static MultiHosterManagement mhm = new MultiHosterManagement("linksnappy.com");
 
@@ -137,8 +137,8 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     /**
-     * Defines max. wait time for cached downloads after last serverside progress change. </br>
-     * Longer time than this and progress of serverside download did not change --> Abort
+     * Defines max. wait time for cached downloads after last serverside progress change. </br> Longer time than this and progress of
+     * serverside download did not change --> Abort
      */
     private final int    CACHE_WAIT_THRESHOLD     = 10 * 60000;
     private final String PROPERTY_DIRECTURL       = "linksnappycomdirectlink";
@@ -170,7 +170,7 @@ public class LinkSnappyCom extends PluginForHost {
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
         this.loginAPI(account, false);
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, link.getPluginPatternMatcher(), true, 0);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, modifySSL(link.getPluginPatternMatcher()), true, 0);
         handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
@@ -491,7 +491,7 @@ public class LinkSnappyCom extends PluginForHost {
             /* Check for other errors */
             handleErrors(link, account, entries);
             /* 2021-02-18: Downloadurl will always be returned even if file hasn't been downloaded successfully serverside yet! */
-            dllink = (String) entries.get("generated");
+            dllink = modifySSL((String) entries.get("generated"));
             if (StringUtils.isEmpty(dllink)) {
                 /* This should never happen */
                 throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Failed to find final downloadurl");
@@ -522,10 +522,9 @@ public class LinkSnappyCom extends PluginForHost {
         }
         if (dl.startDownload() && PluginJsonConfig.get(LinkSnappyComConfig.class).isClearDownloadHistoryEnabled()) {
             /**
-             * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br>
-             * Also make sure we get no exception as our download was successful. </br>
-             * NOTE: Even failed downloads will appear in the download history - but they will also be cleared once there is one successful
-             * download.
+             * Check if user wants JD to clear serverside download history in linksnappy account after each successful download. </br> Also
+             * make sure we get no exception as our download was successful. </br> NOTE: Even failed downloads will appear in the download
+             * history - but they will also be cleared once there is one successful download.
              */
             logger.info("Clearing download history");
             try {
@@ -537,6 +536,17 @@ public class LinkSnappyCom extends PluginForHost {
                 logger.log(ignore);
                 logger.warning("Delete download history failed");
             }
+        }
+    }
+
+    private String modifySSL(final String url) {
+        if (url == null) {
+            return null;
+        }
+        if (PluginJsonConfig.get(LinkSnappyComConfig.class).isSSLDownloadsEnabled()) {
+            return url.replaceFirst("(?i)^http://", "https://");
+        } else {
+            return url.replaceFirst("(?i)^https://", "http://");
         }
     }
 
@@ -578,7 +588,7 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final Account account) throws Exception {
-        final String url = link.getStringProperty(PROPERTY_DIRECTURL);
+        final String url = modifySSL(link.getStringProperty(PROPERTY_DIRECTURL));
         if (StringUtils.isEmpty(url)) {
             return false;
         }
@@ -609,8 +619,7 @@ public class LinkSnappyCom extends PluginForHost {
     }
 
     /**
-     * Parses API json (without error handling for API answer). </br>
-     * Takes care about invalid API responses (non-json responses).
+     * Parses API json (without error handling for API answer). </br> Takes care about invalid API responses (non-json responses).
      */
     private Map<String, Object> parseJson(final Browser br, final DownloadLink link, final Account account) throws PluginException, InterruptedException {
         Map<String, Object> entries = null;
@@ -800,11 +809,16 @@ public class LinkSnappyCom extends PluginForHost {
 
     public static interface LinkSnappyComConfig extends PluginConfigInterface {
         final String                    text_ClearDownloadHistoryEnabled = "Clear download history after each successful download?";
+        final String                    text_SSLDownloadsEnabledEnabled  = "Enable SSL Downloads?";
         public static final TRANSLATION TRANSLATION                      = new TRANSLATION();
 
         public static class TRANSLATION {
             public String getClearDownloadHistoryEnabled_label() {
                 return text_ClearDownloadHistoryEnabled;
+            }
+
+            public String getSSLDownloadsEnabled_label() {
+                return text_SSLDownloadsEnabledEnabled;
             }
         }
 
@@ -814,5 +828,12 @@ public class LinkSnappyCom extends PluginForHost {
         boolean isClearDownloadHistoryEnabled();
 
         void setClearDownloadHistoryEnabled(boolean b);
+
+        @AboutConfig
+        @DefaultBooleanValue(false)
+        @DescriptionForConfigEntry(text_SSLDownloadsEnabledEnabled)
+        boolean isSSLDownloadsEnabled();
+
+        void setSSLDownloadsEnabled(boolean b);
     }
 }

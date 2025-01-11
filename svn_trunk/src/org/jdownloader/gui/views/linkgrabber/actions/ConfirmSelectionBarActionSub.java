@@ -16,6 +16,7 @@ import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.controlling.contextmenu.ActionContext;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.gui.views.SelectionInfo;
+import org.jdownloader.gui.views.components.packagetable.PackageControllerTable.SelectionType;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTable;
 import org.jdownloader.gui.views.linkgrabber.LinkGrabberTableModel;
 import org.jdownloader.gui.views.linkgrabber.contextmenu.ConfirmLinksContextAction;
@@ -122,6 +123,10 @@ public class ConfirmSelectionBarActionSub extends ConfirmLinksContextAction impl
         ConfirmLinksContextAction ret = super.setAutoStart(autoStart);
         updateListeners();
         return ret;
+    }
+
+    @Override
+    protected void onRequestUpdateSelection(Object requestor, SelectionType selectionType, SelectionInfo<CrawledPackage, CrawledLink> selectionInfo) {
     }
 
     @Override

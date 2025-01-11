@@ -25,6 +25,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.ConfigContainer;
 import jd.config.ConfigEntry;
@@ -42,14 +49,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BandCampComDecrypter;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@HostPlugin(revision = "$Revision: 49768 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50407 $", interfaceVersion = 2, names = {}, urls = {})
 public class BandCampCom extends PluginForHost {
     public BandCampCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -128,7 +128,7 @@ public class BandCampCom extends PluginForHost {
     public static final String  PROPERTY_VIDEO_HEIGHT               = "video_height";
     public static final String  PROPERTY_FILE_TYPE                  = "type";
     public static final String  PROPERTY_TRACK_DATE_TIMESTAMP       = "datetimestamp";
-    public static final String  PROPERTY_DIRECTURL             = "directurl";
+    public static final String  PROPERTY_DIRECTURL                  = "directurl";
     private String              dllink                              = null;
 
     @Override
@@ -203,6 +203,7 @@ public class BandCampCom extends PluginForHost {
             /* Unknown track-number/index */
             trackIndex = -1;
         }
+        parseAndSetAlbumInfo(link, br);
         parseAndSetSingleTrackInfo(link, br, trackIndex);
         dllink = link.getStringProperty(PROPERTY_DIRECTURL);
         final String filename = getFormattedFilename(link);
@@ -213,15 +214,18 @@ public class BandCampCom extends PluginForHost {
         return AvailableStatus.TRUE;
     }
 
-    public static void parseAndSetSingleTrackInfo(final DownloadLink link, final Browser br, final int trackIndex) {
-        /** Parse possibly missing metadata here. Do not overwrite existing properties with wrong- or null values!! */
-        // final String albumOrTrackTitle = new Regex(htmlEntityDecoded, "\"title\"\\s*:\\s*\"([^<>\"]*?)\"").getMatch(0);
+    public static void parseAndSetAlbumInfo(final DownloadLink link, final Browser br) {
+        final String username = BandCampComDecrypter.regexUsernameFromURL(br.getURL());
+        if (username != null) {
+            link.setProperty(PROPERTY_USERNAME, username);
+        }
         final String json_album = br.getRegex("<script type=\"application/(?:json\\+ld|ld\\+json)\">\\s*(.*?)\\s*</script>").getMatch(0);
         final Map<String, Object> albumInfo = JSonStorage.restoreFromString(json_album, TypeRef.MAP);
-        String artist = null;
-        final String albumArtist = br.getRegex(">\\s*by\\s*<span>\\s*<[^>]*>([^<]+)</a>").getMatch(0);
+        String albumArtist = br.getRegex(">\\s*by\\s*<span>\\s*<[^>]*>([^<]+)</a>").getMatch(0);
         if (albumArtist != null) {
-            link.setProperty(PROPERTY_ARTIST_ALBUM, Encoding.htmlDecode(albumArtist).trim());
+            albumArtist = Encoding.htmlDecode(albumArtist).trim();
+            link.setProperty(PROPERTY_ARTIST_ALBUM, albumArtist);
+            link.setProperty(PROPERTY_ARTIST, albumArtist);// may be overridden in parseAndSetSingleTrackInfo
         }
         String albumTitle = (String) JavaScriptEngineFactory.walkJson(albumInfo, "inAlbum/name");
         if (albumTitle == null) {
@@ -233,24 +237,25 @@ public class BandCampCom extends PluginForHost {
         if (albumTitle != null) {
             link.setProperty(PROPERTY_ALBUM_TITLE, Encoding.htmlOnlyDecode(albumTitle).trim());
         }
-        link.setProperty(PROPERTY_FILE_TYPE, "mp3");
-        final boolean isHtmlContextOfSingleTrack;
-        final String trackIDFromHTML = br.getRegex("<\\!-- track id (\\d+) -->").getMatch(0);
-        if (trackIDFromHTML != null || new Regex(br.getURL(), PATTERN_SINGLE_TRACK).patternFind()) {
-            isHtmlContextOfSingleTrack = true;
-        } else {
-            isHtmlContextOfSingleTrack = false;
-        }
-        if (trackIDFromHTML != null && !link.hasProperty(PROPERTY_CONTENT_ID)) {
-            link.setProperty(PROPERTY_CONTENT_ID, trackIDFromHTML);
-        }
         final String albumDatePublishedStr = (String) JavaScriptEngineFactory.walkJson(albumInfo, "datePublished");
         if (albumDatePublishedStr != null) {
-            if (isHtmlContextOfSingleTrack) {
+            final boolean isHtmlContextOfSingleTrack;
+            final String trackIDFromHTML = br.getRegex("<\\!-- track id (\\d+) -->").getMatch(0);
+            if (trackIDFromHTML != null || new Regex(br.getURL(), PATTERN_SINGLE_TRACK).patternFind()) {
                 link.setProperty(PROPERTY_TRACK_DATE_TIMESTAMP, BandCampComDecrypter.dateToTimestamp(albumDatePublishedStr));
             } else {
                 link.setProperty(PROPERTY_ALBUM_DATE_TIMESTAMP, BandCampComDecrypter.dateToTimestamp(albumDatePublishedStr));
             }
+        }
+    }
+
+    public static void parseAndSetSingleTrackInfo(final DownloadLink link, final Browser br, final int trackIndex) {
+        /** Parse possibly missing metadata here. Do not overwrite existing properties with wrong- or null values!! */
+        // final String albumOrTrackTitle = new Regex(htmlEntityDecoded, "\"title\"\\s*:\\s*\"([^<>\"]*?)\"").getMatch(0);
+        link.setProperty(PROPERTY_FILE_TYPE, "mp3");
+        final String trackIDFromHTML = br.getRegex("<\\!-- track id (\\d+) -->").getMatch(0);
+        if (trackIDFromHTML != null && !link.hasProperty(PROPERTY_CONTENT_ID)) {
+            link.setProperty(PROPERTY_CONTENT_ID, trackIDFromHTML);
         }
         String trackJson = br.getRegex("data-tralbum=\"([^\"]+)").getMatch(0);
         if (trackJson != null) {
@@ -262,7 +267,7 @@ public class BandCampCom extends PluginForHost {
             }
             trackJson = Encoding.htmlOnlyDecode(trackJson);
             final Map<String, Object> trackInfo0 = JSonStorage.restoreFromString(trackJson, TypeRef.MAP);
-            artist = trackInfo0.get("artist").toString();
+            String artist = trackInfo0.get("artist").toString();
             final List<Map<String, Object>> tracklist = (List<Map<String, Object>>) trackInfo0.get("trackinfo");
             Map<String, Object> trackinfo1 = null;
             if (targetTrackID != null) {
@@ -282,7 +287,11 @@ public class BandCampCom extends PluginForHost {
             if (trackinfo1 != null) {
                 artist = (String) trackinfo1.get("artist");
                 artistAndTrackTitle = (String) trackinfo1.get("title");
-                link.setProperty(PROPERTY_CONTENT_ID, trackinfo1.get("id").toString());
+                Object track_id = trackinfo1.get("id");
+                if (track_id == null) {
+                    track_id = trackinfo1.get("track_id");
+                }
+                link.setProperty(PROPERTY_CONTENT_ID, track_id.toString());
                 link.setProperty(PROPERTY_ALBUM_TRACK_POSITION, trackinfo1.get("track_num"));
                 final String directurl = (String) JavaScriptEngineFactory.walkJson(trackinfo1, "file/mp3-128");
                 if (directurl != null && directurl.startsWith("http")) {

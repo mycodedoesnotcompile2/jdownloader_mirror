@@ -668,7 +668,7 @@ public interface GeneralSettings extends ConfigInterface {
     @AboutConfig
     @RequiresRestart("A JDownloader Restart is Required")
     @DefaultIntValue(25)
-    @DescriptionForConfigEntry("How many entries will be in the download Destination quick selection")
+    @DescriptionForConfigEntry("How many entries are allowed to be in the download destination quick selection. Set this to 0 to disable download destination history.")
     int getDownloadDestinationHistoryLength();
 
     void setDownloadDestinationHistoryLength(int i);

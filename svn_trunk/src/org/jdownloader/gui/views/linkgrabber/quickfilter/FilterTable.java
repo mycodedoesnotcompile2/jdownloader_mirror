@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.JPopupMenu;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 
 import jd.SecondLevelLaunch;
 import jd.controlling.linkcrawler.CrawledLink;
@@ -33,7 +34,6 @@ import org.appwork.storage.config.handler.BooleanKeyHandler;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.swing.exttable.ExtColumn;
 import org.appwork.swing.exttable.columns.ExtCheckColumn;
-import org.appwork.utils.swing.EDTHelper;
 import org.appwork.utils.swing.EDTRunner;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelCustomizer;
 import org.jdownloader.gui.views.components.packagetable.PackageControllerTableModelData;
@@ -378,14 +378,14 @@ public abstract class FilterTable extends BasicJDTable<Filter> implements Packag
             LinkGrabberTableModel.getInstance().addTableModifier(getTableDataModification(new Runnable() {
                 @Override
                 public void run() {
-                    new EDTHelper<Void>() {
+                    SwingUtilities.invokeLater(new Runnable() {
+
                         @Override
-                        public Void edtRun() {
+                        public void run() {
                             final JPopupMenu ret = MenuManagerLinkgrabberTableContext.getInstance().build(mouseEvent);
-                            ret.show(FilterTable.this, mouseEvent.getPoint().x, mouseEvent.getPoint().y);
-                            return null;
+                            showPopup(ret, mouseEvent.getPoint());
                         }
-                    }.start(true);
+                    });
                 }
             }), false);
             return popup;

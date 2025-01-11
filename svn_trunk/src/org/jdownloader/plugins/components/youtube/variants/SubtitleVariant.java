@@ -5,17 +5,15 @@ import java.util.Locale;
 
 import javax.swing.Icon;
 
+import jd.plugins.DownloadLink;
+
 import org.appwork.storage.JSonStorage;
-import org.appwork.utils.CompareUtils;
 import org.appwork.utils.StringUtils;
 import org.jdownloader.gui.translate._GUI;
-import org.jdownloader.plugins.components.youtube.YT_STATICS;
 import org.jdownloader.plugins.components.youtube.YoutubeClipData;
 import org.jdownloader.plugins.components.youtube.YoutubeConfig;
 import org.jdownloader.plugins.components.youtube.YoutubeStreamData;
 import org.jdownloader.plugins.config.PluginJsonConfig;
-
-import jd.plugins.DownloadLink;
 
 public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
     // public String getCustomName(Object caller) {
@@ -96,46 +94,6 @@ public class SubtitleVariant extends AbstractVariant<YoutubeSubtitleStorable> {
             return _GUI.T.YoutubeDash_getName_subtitles_(locale == null ? getGenericInfo().getLanguage() : locale.getDisplayName());
         } else {
             return _GUI.T.YoutubeDash_getName_subtitles_annotated(locale == null ? getGenericInfo().getLanguage() : locale.getDisplayName(), sb.toString());
-        }
-    }
-
-    // @Override
-    // public double getQualityRating() {
-    // double ret = super.getQualityRating();
-    // if (getGenericInfo()._isTranslated()) {
-    // ret /= 2;
-    // }
-    // if (getGenericInfo()._isSpeechToText()) {
-    // ret /= 3;
-    // }
-    // return ret;
-    // }
-    @Override
-    public int compareTo(Object o) {
-        if (!(o instanceof SubtitleVariant)) {
-            return -1;
-        } else {
-            final AbstractVariant o1 = this;
-            final AbstractVariant o2 = (AbstractVariant) o;
-            Integer pref1 = YT_STATICS.SUBTITLE_PREFERRENCE_MAP.get(((SubtitleVariant) o1).getLanguageCode());
-            Integer pref2 = YT_STATICS.SUBTITLE_PREFERRENCE_MAP.get(((SubtitleVariant) o2).getLanguageCode());
-            if (pref1 == null) {
-                pref1 = Integer.MIN_VALUE;
-            }
-            if (pref2 == null) {
-                pref2 = Integer.MIN_VALUE;
-            }
-            int ret = CompareUtils.compareComparable(pref1, pref2);
-            if (ret == 0) {
-                ret = CompareUtils.compareBoolean(((SubtitleVariant) o1).getGenericInfo()._isSpeechToText(), ((SubtitleVariant) o2).getGenericInfo()._isSpeechToText());
-                if (ret == 0) {
-                    ret = CompareUtils.compareBoolean(((SubtitleVariant) o1).getGenericInfo()._isTranslated(), ((SubtitleVariant) o2).getGenericInfo()._isTranslated());
-                    if (ret == 0) {
-                        ret = CompareUtils.compareComparable(((SubtitleVariant) o1).getDisplayLanguage(), ((SubtitleVariant) o2).getDisplayLanguage());
-                    }
-                }
-            }
-            return ret;
         }
     }
 

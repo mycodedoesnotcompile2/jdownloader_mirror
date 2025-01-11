@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.ComboBoxModel;
 import javax.swing.JComponent;
@@ -154,7 +155,7 @@ import org.jdownloader.plugins.controller.host.PluginFinder;
 import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.settings.staticreferences.CFG_YOUTUBE;
 
-@HostPlugin(revision = "$Revision: 50360 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
+@HostPlugin(revision = "$Revision: 50428 $", interfaceVersion = 3, names = { "youtube.com" }, urls = { "youtubev2://.+" })
 public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInterface {
     private static final String    YT_ALTERNATE_VARIANT = "YT_ALTERNATE_VARIANT";
     private static final String    DASH_AUDIO_FINISHED  = "DASH_AUDIO_FINISHED";
@@ -381,7 +382,6 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                 }
             }
         }
-
         boolean verifiedSize = true;
         long totalSize = -1;
         // youtube uses redirects - maybe for load balancing
@@ -1668,9 +1668,11 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
             final FFmpegMetaData ffMpegMetaData = new FFmpegMetaData();
             ffMpegMetaData.setTitle(downloadLink.getStringProperty(YoutubeHelper.YT_TITLE, null));
             ffMpegMetaData.setArtist(downloadLink.getStringProperty(YoutubeHelper.YT_CHANNEL_TITLE, null));
-            final String contentURL = downloadLink.getContentUrl();
+            String contentURL = downloadLink.getContentUrl();
             if (contentURL != null) {
-                ffMpegMetaData.setComment(contentURL.replaceFirst("(#variant=.+)", ""));
+                // TODO: maybe add settings for this
+                contentURL = YoutubeHelper.generateContentURL(downloadLink.getStringProperty(YoutubeHelper.YT_ID, null));
+                ffMpegMetaData.setComment(contentURL);
             }
             final long timestamp = downloadLink.getLongProperty(YoutubeHelper.YT_DATE, -1);
             if (timestamp > 0) {
@@ -2161,7 +2163,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                         downloadLink.getLinkStatus().setStatus(LinkStatus.FINISHED);
                                         deleteFlag = true;
                                     } else {
-                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_());
+                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
                                     }
                                     break;
                                 case M4A:
@@ -2169,7 +2171,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                         downloadLink.getLinkStatus().setStatus(LinkStatus.FINISHED);
                                         deleteFlag = true;
                                     } else {
-                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_());
+                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
                                     }
                                     break;
                                 case OGG:
@@ -2177,15 +2179,27 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
                                         downloadLink.getLinkStatus().setStatus(LinkStatus.FINISHED);
                                         deleteFlag = true;
                                     } else {
-                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_());
+                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
                                     }
+                                    break;
                                 case OPUS:
                                     if (ffmpeg.generateOpusAudio(progress, downloadLink.getFileOutput(), audioStreamPath)) {
                                         downloadLink.getLinkStatus().setStatus(LinkStatus.FINISHED);
                                         deleteFlag = true;
                                     } else {
-                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_());
+                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
                                     }
+                                    break;
+                                case MKV:
+                                    if (ffmpeg.generateMkvAudio(progress, downloadLink.getFileOutput(), audioStreamPath)) {
+                                        downloadLink.getLinkStatus().setStatus(LinkStatus.FINISHED);
+                                        deleteFlag = true;
+                                    } else {
+                                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
+                                    }
+                                    break;
+                                default:
+                                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, _GUI.T.YoutubeDash_handleFree_error_() + ":" + variant.getContainer());
                                 }
                             } catch (FFMpegException e) {
                                 if (FFMpegException.ERROR.DISK_FULL.equals(e.getError())) {
@@ -2862,7 +2876,7 @@ public class YoutubeDashV2 extends PluginForHost implements YoutubeHostPluginInt
     }
 
     @Override
-    public List<JComponent> extendLinkgrabberContextMenu(final JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
+    public List<JComponent> extendLinkgrabberContextMenu(final AtomicBoolean isCancelled, final JComponent parent, final PluginView<CrawledLink> pv, Collection<PluginView<CrawledLink>> allPvs) {
         return new YoutubeLinkGrabberExtender(this, parent, pv, allPvs).run();
     }
 

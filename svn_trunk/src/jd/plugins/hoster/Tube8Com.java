@@ -28,11 +28,11 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
-import jd.http.URLConnectionAdapter;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Base64;
 import jd.nutils.encoding.Encoding;
@@ -47,12 +47,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50416 $", interfaceVersion = 3, names = {}, urls = {})
 public class Tube8Com extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
-    private String              dllink = null;
-    private static final String mobile = "mobile";
+    private String dllink = null;
 
     public Tube8Com(PluginWrapper wrapper) {
         super(wrapper);
@@ -147,11 +146,7 @@ public class Tube8Com extends PluginForHost {
         } else if (this.br.getHttpConnection().getResponseCode() == 500) {
             return AvailableStatus.UNCHECKABLE;
         } else if (br.containsHTML("class=\"geo-blocked-container\"")) {
-            if (isDownload) {
-                throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
-            } else {
-                return AvailableStatus.TRUE;
-            }
+            throw new PluginException(LinkStatus.ERROR_FATAL, "GEO-blocked");
         }
         String title = br.getRegex("\"video_title\":\"([^\"]+)").getMatch(0);
         if (title == null) {
@@ -160,115 +155,30 @@ public class Tube8Com extends PluginForHost {
                 title = br.getRegex("<title>([^<]+)<").getMatch(0);
             }
         }
-        boolean failed = true;
-        boolean preferMobile = getPluginConfig().getBooleanProperty(mobile, false);
-        String videoDownloadUrls = "";
-        /* streaming link */
-        findStreamingLink();
-        if (dllink != null && requestVideo(link)) {
-            failed = false;
-        }
-        /* decrease HTTP requests */
-        if (failed || preferMobile) {
-            videoDownloadUrls = findDownloadurlStandardAndMobile(link);
-        }
-        /* normal link */
-        if (failed) {
-            findNormalLink(this.br.toString());
-        }
-        if (failed && dllink != null && requestVideo(link)) {
-            failed = false;
-        }
-        /* 3gp link */
-        if (failed || preferMobile) {
-            findMobileLink(videoDownloadUrls);
-        }
-        if ((failed || preferMobile) && dllink != null && requestVideo(link)) {
-            failed = false;
-        }
-        if (dllink == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         if (title != null) {
             title = Encoding.htmlDecode(title).trim();
-            /* Remove irrelevant parts */
-            title = title.replaceFirst(" Porn Videos - Tube8", "");
-            if (dllink.contains(".3gp")) {
-                link.setFinalFileName((title + ".3gp"));
-            } else if (dllink.contains(".mp4")) {
-                link.setFinalFileName((title + ".mp4"));
-            } else {
-                link.setFinalFileName(title + ".flv");
-            }
+            link.setFinalFileName((title + ".mp4"));
         }
-        if (failed) {
-            return AvailableStatus.UNCHECKABLE;
+        final boolean useNewHandling = false;
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && useNewHandling) {
+            // TODO: Fix this unfinished code
+            final Browser brc = br.cloneBrowser();
+            final String videoID = br.getRegex("page_params\\.videoId = (\\d+)").getMatch(0);
+            final String json = "{\"vkey\":" + videoID + ",\"s\":\"\",\"gt\":" + System.currentTimeMillis() + ",\"e\":false}";
+            final String jsonbase64 = Encoding.Base64Encode(json);
+            brc.getPage("https://www.tube8.com/media/hls/?s=" + jsonbase64);
+            final List<Map<String, Object>> qualities = (List<Map<String, Object>>) restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            /* Find best quality */
+            int heightMax = 0;
+            for (final Map<String, Object> quality : qualities) {
+                final int height = Integer.parseInt(quality.get("quality").toString());
+                if (dllink == null || height > heightMax) {
+                    heightMax = height;
+                    dllink = quality.get("videoUrl").toString();
+                }
+            }
         }
         return AvailableStatus.TRUE;
-    }
-
-    private boolean requestVideo(final DownloadLink link) throws Exception {
-        URLConnectionAdapter con = null;
-        final Browser br2 = br.cloneBrowser();
-        br2.setFollowRedirects(true);
-        try {
-            con = br2.openGetConnection(dllink);
-            if (looksLikeDownloadableContent(con)) {
-                if (con.getCompleteContentLength() > 0) {
-                    link.setDownloadSize(con.getCompleteContentLength());
-                }
-                return true;
-            } else {
-                try {
-                    br2.followConnection(true);
-                } catch (IOException e) {
-                    logger.log(e);
-                }
-                if (con.getResponseCode() == 401) {
-                    link.setProperty("401", 401);
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        } finally {
-            try {
-                if (con != null) {
-                    con.disconnect();
-                }
-            } catch (final Throwable e) {
-            }
-        }
-    }
-
-    @SuppressWarnings("deprecation")
-    private String findDownloadurlStandardAndMobile(final DownloadLink link) throws Exception {
-        final String hash = br.getRegex("videoHash\\s*=\\s*\"([a-z0-9]+)\"").getMatch(0);
-        if (hash == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        final Browser br2 = br.cloneBrowser();
-        br2.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        br2.getPage("https://www." + this.getHost() + "/ajax/getVideoDownloadURL.php?hash=" + hash + "&video=" + new Regex(link.getDownloadURL(), ".*?(\\d+)$").getMatch(0) + "&download_cdn=true&_=" + System.currentTimeMillis());
-        String ret = br2.getRegex("^(.*?)$").getMatch(0);
-        return ret != null ? ret.replace("\\", "") : "";
-    }
-
-    private void findMobileLink(final String correctedBR) throws Exception {
-        dllink = new Regex(correctedBR, "\"mobile_url\":\"(https?:.*?)\"").getMatch(0);
-        if (dllink == null) {
-            dllink = new Regex(correctedBR, "\"(https?://cdn\\d+\\.mobile\\.tube8\\.com/.*?)\"").getMatch(0);
-        }
-    }
-
-    private void findNormalLink(final String correctedBR) throws Exception {
-        dllink = new Regex(correctedBR, "\"standard_url\":\"(http.*?)\"").getMatch(0);
-        if (dllink == null) {
-            dllink = new Regex(correctedBR, "\"(https?://cdn\\d+\\.public\\.tube8\\.com/.*?)\"").getMatch(0);
-        }
-        if (dllink == null) {
-            dllink = new Regex(correctedBR, "page_params\\.videoUrlJS = \"(http[^<>\"]*?)\";").getMatch(0);
-        }
     }
 
     private void findStreamingLink() throws Exception {
@@ -306,12 +216,12 @@ public class Tube8Com extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.tube8.com/info.html#terms";
+        return "https://www." + getHost() + "/info.html#terms";
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return -1;
+        return Integer.MAX_VALUE;
     }
 
     @Override

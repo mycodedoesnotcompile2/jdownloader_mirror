@@ -39,7 +39,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.BbcComDecrypter;
 import jd.plugins.decrypter.BbcComiPlayerCrawler;
 
-@HostPlugin(revision = "$Revision: 49985 $", interfaceVersion = 3, names = { "bbc.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
 public class BbcCom extends PluginForHost {
     public BbcCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -51,6 +51,31 @@ public class BbcCom extends PluginForHost {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "bbc.com", "bbc.co.uk" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            /* No regex since links are added via crawler. */
+            ret.add("");
+        }
+        return ret.toArray(new String[0]);
     }
 
     @Override

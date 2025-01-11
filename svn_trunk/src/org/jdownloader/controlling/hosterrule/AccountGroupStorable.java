@@ -67,6 +67,7 @@ public class AccountGroupStorable implements Storable {
             }
             for (AccountReference child : childsP) {
                 if (child.getID() == restored.getID()) {
+                    /* Avoid duplicates. */
                     continue nextChild;
                 }
             }

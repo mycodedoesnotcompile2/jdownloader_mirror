@@ -43,7 +43,6 @@ import org.appwork.utils.net.PublicSuffixList;
  *
  */
 public class PublicSuffixListTest extends AWTest {
-
     public static void main(String[] args) {
         run();
     }
@@ -62,7 +61,13 @@ public class PublicSuffixListTest extends AWTest {
         assertEquals("xn--85x722f.com.cn", suffixList.getDomain("xn--85x722f.com.cn"));
         assertEquals("my", suffixList.getSubDomain("my.jdownloader.org"));
         assertEquals(null, suffixList.getSubDomain("jdownloader.org"));
-        assertEquals("127-0-0-1.mydns", suffixList.getSubDomain("127-0-0-1.mydns.jdownloader.org"));
+        final String mydns = "127-0-0-1.mydns.jdownloader.org";
+        assertEquals("jdownloader.org", suffixList.getDomain(mydns));
+        assertEquals("127-0-0-1.mydns", suffixList.getSubDomain(mydns));
+        assertEquals("org", suffixList.getTopLevelDomain(mydns));
+        final String dyn = "ip-127-0-0-1.dyn.luxdsl.pt.lu";
+        assertEquals("pt.lu", suffixList.getDomain(dyn));
+        assertEquals("ip-127-0-0-1.dyn.luxdsl", suffixList.getSubDomain(dyn));
+        assertEquals("lu", suffixList.getTopLevelDomain(dyn));
     }
-
 }

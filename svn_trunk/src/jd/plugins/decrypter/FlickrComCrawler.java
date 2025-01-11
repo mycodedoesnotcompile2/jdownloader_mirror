@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
@@ -57,7 +58,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.UserAgents;
 import jd.plugins.hoster.FlickrCom;
 
-@DecrypterPlugin(revision = "$Revision: 49122 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
+@DecrypterPlugin(revision = "$Revision: 50396 $", interfaceVersion = 3, names = { "flickr.com" }, urls = { "https?://(?:secure\\.|www\\.)?flickr\\.com/(?:photos|groups)/.+" })
 public class FlickrComCrawler extends PluginForDecrypt {
     public FlickrComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -664,14 +665,15 @@ public class FlickrComCrawler extends PluginForDecrypt {
                 }
                 final Browser brc = br.cloneBrowser();
                 brc.setFollowRedirects(true);
-                brc.getPage("https://www.flickr.com");
-                String apikey = brc.getRegex("root\\.YUI_config\\.flickr\\.api\\.site_key\\s*?=\\s*?\"(.*?)\"").getMatch(0);
+                /* 2025-01-02: apikey is now not available anymore in html of main page. */
+                brc.getPage("https://www.flickr.com/photos/" + new Random().nextInt(10000) + "/");
+                String apikey = brc.getRegex("root\\.YUI_config\\.flickr\\.api\\.site_key\\s*=\\s*\"([^\"]+)\"").getMatch(0);
                 if (apikey == null) {
                     apikey = PluginJSonUtils.getJsonValue(brc, "api_key");
                 }
                 if (StringUtils.isEmpty(apikey)) {
-                    /* 2021-09-22: Use static attempt as final fallback */
-                    apikey = "9d5522296a7b6e5af504263952122e1c";
+                    /* Try static attempt as final fallback. Do not store this one in api map! */
+                    return "4aa9959d5fec09919259ee714411d714";
                 }
                 api.put("apikey", apikey);
                 api.put("timestamp", System.currentTimeMillis());

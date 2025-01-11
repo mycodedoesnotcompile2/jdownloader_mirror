@@ -49,7 +49,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
+@HostPlugin(revision = "$Revision: 50404 $", interfaceVersion = 3, names = { "esoubory.cz" }, urls = { "https?://(?:www\\.)?esoubory\\.cz/(?:[a-z]{2}/)?(?:file|soubor|redir)/[a-f0-9]{8}/[a-z0-9\\-]+(?:/?|\\.html)" })
 public class EsouboryCz extends PluginForHost {
     public EsouboryCz(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,10 +76,10 @@ public class EsouboryCz extends PluginForHost {
         return "https://www." + getHost();
     }
 
-    private static final String          API_BASE                       = "https://www.esoubory.cz/api";
-    /* 2018-12-27: API for selfhosted content is broken */
-    private static final boolean         USE_API_FOR_SELFHOSTED_CONTENT = true;
-    private static MultiHosterManagement mhm                            = new MultiHosterManagement("esoubory.cz");
+    private static final String          API_BASE                                       = "https://www.esoubory.cz/api";
+    /* 2025-01-03: API for selfhosted content is broken */
+    private static final boolean         USE_API_IN_ACCOUNT_MODE_FOR_SELFHOSTED_CONTENT = false;
+    private static MultiHosterManagement mhm                                            = new MultiHosterManagement("esoubory.cz");
 
     private String getLinkpart(final DownloadLink link) {
         return new Regex(link.getPluginPatternMatcher(), "/([a-f0-9]{8}/[a-z0-9\\-]+)(?:/?|\\.html)").getMatch(0);
@@ -123,12 +123,13 @@ public class EsouboryCz extends PluginForHost {
     public AvailableStatus requestFileInformation(final DownloadLink link, final Account account) throws IOException, Exception {
         String name_url = new Regex(link.getPluginPatternMatcher(), "(?i)(?:file|soubor|redir)/[a-f0-9]{8}/([a-z0-9\\-]+)").getMatch(0);
         if (name_url != null && !link.isNameSet()) {
+            /* Fix file extension e.g. "-rar" -> ".rar". */
             name_url = name_url.replaceFirst("-([a-z0-9]{2,5})$", ".$1");
             link.setName(name_url);
         }
         String filename;
         String filesize;
-        if (account != null && USE_API_FOR_SELFHOSTED_CONTENT) {
+        if (account != null && USE_API_IN_ACCOUNT_MODE_FOR_SELFHOSTED_CONTENT) {
             /* API */
             br.getPage(API_BASE + "/exists?token=" + loginAPI(account, false) + "&url=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
             final Map<String, Object> data = this.checkErrorsAPI(br, link, account);
@@ -163,12 +164,15 @@ public class EsouboryCz extends PluginForHost {
             if (filesize == null) {
                 filesize = br.getRegex("<span class=\"fa fa-hdd-o\"></span>([^<]+)</span>").getMatch(0);
             }
-            String fileextension = br.getRegex("<span class=\"fa fa\\-file\"></span>([^<>\"]+)</span>").getMatch(0);
+            String fileextensionWithDot = br.getRegex("<span class=\"fa fa\\-file\"></span>([^<]+)</span>").getMatch(0);
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
-                if (fileextension != null) {
-                    fileextension = fileextension.trim();
-                    filename = this.applyFilenameExtension(filename, fileextension);
+                if (fileextensionWithDot != null) {
+                    fileextensionWithDot = fileextensionWithDot.trim();
+                    final String fileextensionWithoutDotButSpace = fileextensionWithDot.replace(".", " ");
+                    /* Remove file title ending with space + file-extension " mkv" */
+                    filename = filename.replaceFirst("(?i)" + fileextensionWithoutDotButSpace + "$", "");
+                    filename = this.applyFilenameExtension(filename, fileextensionWithDot);
                 }
                 /* Do not set the final filename here as we'll have the API when downloading via account anyways! */
                 link.setName(filename);
@@ -179,8 +183,15 @@ public class EsouboryCz extends PluginForHost {
             }
             /* Check for other offline traits after collecting file information. */
             /* 2023-06-26: Some files have their file-information (filesize/filename) given but are offline. */
-            if (br.containsHTML(">\\s*File is not available anymore")) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            /* 2025-01-03: This text is always in their html code even for files that are available so I've removed this check for now. */
+            // if (br.containsHTML(">\\s*File is not available anymore")) {
+            // throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            // }
+            if (filename == null) {
+                logger.warning("Failed to find filename");
+            }
+            if (filesize == null) {
+                logger.warning("Failed to find filesize");
             }
         }
         return AvailableStatus.TRUE;
@@ -206,7 +217,7 @@ public class EsouboryCz extends PluginForHost {
         final String contentURL = getContentURL(link);
         final boolean isSelfhostedContent = new Regex(contentURL, this.getSupportedLinks()).patternFind();
         if (finallink == null) {
-            if (isSelfhostedContent && !USE_API_FOR_SELFHOSTED_CONTENT) {
+            if (isSelfhostedContent && !USE_API_IN_ACCOUNT_MODE_FOR_SELFHOSTED_CONTENT) {
                 /* 2018-12-27: API Support broken for selfhosted content! */
                 /* 2020-05-12: API is working fine again for selfhosted content */
                 loginWebsite(account, false);

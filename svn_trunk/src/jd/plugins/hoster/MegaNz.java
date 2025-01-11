@@ -107,7 +107,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 49774 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50418 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -1571,7 +1571,11 @@ public class MegaNz extends PluginForHost {
                                 fos.close();
                             }
                         } finally {
-                            fis.close();
+                            try {
+                                fis.close();
+                            } catch (final IOException ignore) {
+                                logger.log(ignore);
+                            }
                         }
                         if (tmp == null) {
                             src.delete();

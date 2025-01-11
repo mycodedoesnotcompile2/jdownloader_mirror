@@ -42,7 +42,6 @@ import jd.controlling.AccountControllerListener;
 import jd.controlling.downloadcontroller.AccountCache;
 import jd.controlling.downloadcontroller.AccountCache.CachedAccount;
 import jd.controlling.downloadcontroller.DownloadSession;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.NewRuleAction;
 import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.dialog.EditHosterRuleDialog;
 import jd.plugins.Account;
 import jd.plugins.DownloadLink;
@@ -170,42 +169,44 @@ public class HosterRuleController implements AccountControllerListener {
 
     protected List<AccountUsageRule> fromStorable(List<AccountRuleStorable> list) {
         final List<AccountUsageRule> rules = new ArrayList<AccountUsageRule>();
-        if (list != null && list.size() > 0) {
-            final ArrayList<Account> availableAccounts = AccountController.getInstance().list(null);
-            final PluginFinder pluginFinder = new PluginFinder(logger);
-            for (final AccountRuleStorable ars : list) {
-                try {
-                    final AccountUsageRule rule = ars.restore(availableAccounts);
-                    rule.setOwner(this);
-                    final DownloadLink link = new DownloadLink(null, "", rule.getHoster(), "", false);
-                    final PluginForHost plugin = pluginFinder.assignPlugin(link, false);
-                    assignPlugin(rule, plugin);
-                    rules.add(rule);
-                } catch (Throwable e) {
-                    logger.log(e);
-                }
-            }
+        if (list == null || list.size() == 0) {
+            return rules;
+        }
+        final ArrayList<Account> availableAccounts = AccountController.getInstance().list(null);
+        final PluginFinder pluginFinder = new PluginFinder(logger);
+        for (final AccountRuleStorable ars : list) {
             try {
-                validateRules(rules);
+                final AccountUsageRule rule = ars.restore(availableAccounts);
+                rule.setOwner(this);
+                final DownloadLink link = new DownloadLink(null, "", rule.getHoster(), "", false);
+                final PluginForHost plugin = pluginFinder.assignPlugin(link, false);
+                assignPlugin(rule, plugin);
+                rules.add(rule);
             } catch (Throwable e) {
                 logger.log(e);
             }
+        }
+        try {
+            validateRules(rules);
+        } catch (Throwable e) {
+            logger.log(e);
         }
         return rules;
     }
 
     private void load() {
-        if (configFile.exists()) {
-            try {
-                final ArrayList<AccountRuleStorable> loaded = JSonStorage.restoreFromString(IO.readFileToString(configFile), new TypeRef<ArrayList<AccountRuleStorable>>() {
-                }, null);
-                if (loaded != null && loaded.size() > 0) {
-                    final List<AccountUsageRule> rules = fromStorable(loaded);
-                    this.loadedRules.addAll(rules);
-                }
-            } catch (Throwable e) {
-                logger.log(e);
+        if (!configFile.exists()) {
+            return;
+        }
+        try {
+            final ArrayList<AccountRuleStorable> loaded = JSonStorage.restoreFromString(IO.readFileToString(configFile), new TypeRef<ArrayList<AccountRuleStorable>>() {
+            }, null);
+            if (loaded != null && loaded.size() > 0) {
+                final List<AccountUsageRule> rules = fromStorable(loaded);
+                this.loadedRules.addAll(rules);
             }
+        } catch (Throwable e) {
+            logger.log(e);
         }
     }
 
@@ -244,22 +245,24 @@ public class HosterRuleController implements AccountControllerListener {
     }
 
     public void checkPluginUpdates() {
-        if (isInitialized()) {
-            queue.add(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected Void run() throws RuntimeException {
-                    final PluginFinder pluginFinder = new PluginFinder(logger);
-                    for (final AccountUsageRule rule : loadedRules) {
-                        final DownloadLink link = new DownloadLink(null, "", rule.getHoster(), "", false);
-                        final PluginForHost plugin = pluginFinder.assignPlugin(link, false);
-                        if (assignPlugin(rule, plugin)) {
-                            fireUpdate(rule);
-                        }
-                    }
-                    return null;
-                }
-            });
+        if (!isInitialized()) {
+            /* We can't check */
+            return;
         }
+        queue.add(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected Void run() throws RuntimeException {
+                final PluginFinder pluginFinder = new PluginFinder(logger);
+                for (final AccountUsageRule rule : loadedRules) {
+                    final DownloadLink link = new DownloadLink(null, "", rule.getHoster(), "", false);
+                    final PluginForHost plugin = pluginFinder.assignPlugin(link, false);
+                    if (assignPlugin(rule, plugin)) {
+                        fireUpdate(rule);
+                    }
+                }
+                return null;
+            }
+        });
     }
 
     public AccountCache getAccountCache(final String host, final DownloadSession session) {
@@ -376,35 +379,44 @@ public class HosterRuleController implements AccountControllerListener {
                     defaultAccountGroup.getChildren().add(ar);
                 }
                 if (isHosterpluginAllowsUsageRuleCreation == null) {
-                    isHosterpluginAllowsUsageRuleCreation = NewRuleAction.allowAccountUsageRuleCreation(acc.getPlugin().getLazyP());
+                    isHosterpluginAllowsUsageRuleCreation = allowUsageRule(acc.getPlugin().getLazyP());
                 }
             }
         } else {
             final PluginFinder pluginFinder = new PluginFinder(logger);
             final DownloadLink dummy = new DownloadLink(null, "", hr.getHoster(), "", false);
             final PluginForHost plugin = pluginFinder.assignPlugin(dummy, false);
-            isHosterpluginAllowsUsageRuleCreation = NewRuleAction.allowAccountUsageRuleCreation(plugin.getLazyP());
+            isHosterpluginAllowsUsageRuleCreation = allowUsageRule(plugin.getLazyP());
         }
         final List<Account> multiAccs = AccountController.getInstance().getMultiHostAccounts(host);
         if (multiAccs != null) {
             for (final Account acc : multiAccs) {
-                if (accounts.add(acc)) {
-                    final AccountReference ar = new AccountReference(acc);
-                    if (defaultMultiHosterAccountGroup == null) {
-                        int index = defaultNoAccountGroup == null ? hr.getAccounts().size() : hr.getAccounts().indexOf(defaultNoAccountGroup);
-                        if (index < 0) {
-                            index = hr.getAccounts().size();
-                        }
-                        defaultMultiHosterAccountGroup = new AccountGroup(_GUI.T.HosterRuleController_validateRule_multi_hoster_account());
-                        hr.getAccounts().add(index, defaultMultiHosterAccountGroup);
-                    }
-                    defaultMultiHosterAccountGroup.getChildren().add(ar);
+                if (!accounts.add(acc)) {
+                    continue;
                 }
+                final AccountReference ar = new AccountReference(acc);
+                if (defaultMultiHosterAccountGroup == null) {
+                    int index = defaultNoAccountGroup == null ? hr.getAccounts().size() : hr.getAccounts().indexOf(defaultNoAccountGroup);
+                    if (index < 0) {
+                        index = hr.getAccounts().size();
+                    }
+                    defaultMultiHosterAccountGroup = new AccountGroup(_GUI.T.HosterRuleController_validateRule_multi_hoster_account());
+                    hr.getAccounts().add(index, defaultMultiHosterAccountGroup);
+                }
+                defaultMultiHosterAccountGroup.getChildren().add(ar);
             }
         }
         if (defaultNoAccountGroup == null) {
             defaultNoAccountGroup = new AccountGroup(_GUI.T.HosterRuleController_validateRule_free());
-            defaultNoAccountGroup.getChildren().add(new FreeAccountReference(host));
+            final FreeAccountReference far = new FreeAccountReference(host);
+            if (accounts.size() > 0) {
+                /*
+                 * User has at least one account for this host -> Disable non account group so if user just creates- and confirms this rule,
+                 * non account download will be prohibited by default.
+                 */
+                far.setEnabled(false);
+            }
+            defaultNoAccountGroup.getChildren().add(far);
             hr.getAccounts().add(defaultNoAccountGroup);
         }
         if (Boolean.FALSE.equals(isHosterpluginAllowsUsageRuleCreation)) {
@@ -415,28 +427,39 @@ public class HosterRuleController implements AccountControllerListener {
         }
     }
 
+    /** Returns true if new rule creation is allowed according to some factors given inside given LazyHostPlugin instance. */
+    public boolean allowUsageRule(final LazyHostPlugin plg) {
+        if (plg.isOfflinePlugin()) {
+            /* Do not allow users to keep rules for domains we know to be permanently offline. */
+            return false;
+        }
+        return true;
+    }
+
     protected List<AccountRuleStorable> toStorable() {
-        if (isInitialized()) {
-            final ArrayList<AccountRuleStorable> saveList = new ArrayList<AccountRuleStorable>();
-            for (AccountUsageRule hr : loadedRules) {
-                saveList.add(new AccountRuleStorable(hr));
-            }
-            return saveList;
-        } else {
+        if (!isInitialized()) {
+            /* We can't do anything */
             return null;
         }
+        final ArrayList<AccountRuleStorable> saveList = new ArrayList<AccountRuleStorable>();
+        for (AccountUsageRule hr : loadedRules) {
+            saveList.add(new AccountRuleStorable(hr));
+        }
+        return saveList;
     }
 
     protected void save() {
-        if (isInitialized()) {
-            try {
-                final List<AccountRuleStorable> saveList = toStorable();
-                final SimpleMapper mapper = new SimpleMapper();
-                mapper.setPrettyPrintEnabled(false);
-                IO.secureWrite(configFile, mapper.objectToByteArray((saveList)));
-            } catch (Exception e) {
-                logger.log(e);
-            }
+        if (!isInitialized()) {
+            /* We can't do anything */
+            return;
+        }
+        try {
+            final List<AccountRuleStorable> saveList = toStorable();
+            final SimpleMapper mapper = new SimpleMapper();
+            mapper.setPrettyPrintEnabled(false);
+            IO.secureWrite(configFile, mapper.objectToByteArray((saveList)));
+        } catch (Exception e) {
+            logger.log(e);
         }
     }
 
@@ -471,30 +494,35 @@ public class HosterRuleController implements AccountControllerListener {
     }
 
     public void fireUpdate(final AccountUsageRule rule) {
-        if (rule != null) {
-            queue.addAsynch(new QueueAction<Void, RuntimeException>() {
-                @Override
-                protected boolean allowAsync() {
-                    return true;
-                }
-
-                @Override
-                protected Void run() throws RuntimeException {
-                    delayedSaver.delayedrun();
-                    try {
-                        validateRule(rule);
-                    } finally {
-                        eventSender.fireEvent(new HosterRuleControllerEvent(this, HosterRuleControllerEvent.Type.DATA_UPDATE, rule));
-                    }
-                    return null;
-                }
-            });
+        if (rule == null) {
+            return;
         }
+        queue.addAsynch(new QueueAction<Void, RuntimeException>() {
+            @Override
+            protected boolean allowAsync() {
+                return true;
+            }
+
+            @Override
+            protected Void run() throws RuntimeException {
+                delayedSaver.delayedrun();
+                try {
+                    validateRule(rule);
+                } finally {
+                    eventSender.fireEvent(new HosterRuleControllerEvent(this, HosterRuleControllerEvent.Type.DATA_UPDATE, rule));
+                }
+                return null;
+            }
+        });
     }
 
-    public void showEditPanel(final AccountUsageRule editing) {
+    /**
+     * Returns true if user confirmed edited rule. </br>
+     * Returns false if used closed or cancelled dialog.
+     */
+    public boolean showEditPanel(final AccountUsageRule editing) {
         if (editing == null) {
-            return;
+            return false;
         }
         EditHosterRuleDialog d = new EditHosterRuleDialog(editing);
         try {
@@ -508,10 +536,13 @@ public class HosterRuleController implements AccountControllerListener {
                     return null;
                 }
             });
+            return true;
         } catch (DialogClosedException e) {
             e.printStackTrace();
+            return false;
         } catch (DialogCanceledException e) {
             e.printStackTrace();
+            return false;
         }
     }
 

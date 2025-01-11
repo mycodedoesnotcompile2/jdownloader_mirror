@@ -21,14 +21,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.CivitaiComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
+import jd.http.URLConnectionAdapter;
 import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.CryptedLink;
@@ -43,7 +39,13 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 49960 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
+@DecrypterPlugin(revision = "$Revision: 50389 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -54,6 +56,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
     public Browser createNewBrowserInstance() {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
+        br.setLoadLimit(20 * 1024 * 1024);
         return br;
     }
 
@@ -97,6 +100,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
          */
         final String apiBase = "https://civitai.com/api/v1";
         final List<Map<String, Object>> modelVersions = new ArrayList<Map<String, Object>>();
+        String modelName = null;
         if (modelVersionId != null) {
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1models-versionsmodelversionid */
             br.getPage(apiBase + "/model-versions/" + modelVersionId);
@@ -113,6 +117,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            modelName = entries.get("name").toString();
             final List<Map<String, Object>> _modelVersions_ = (List<Map<String, Object>>) entries.get("modelVersions");
             modelVersions.addAll(_modelVersions_);
         } else if (itemType.equals("posts")) {
@@ -151,8 +156,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             /* 2024-07-17: use small limit/pagination size to avoid timeout issues */
             /**
              * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be rerturned but that
-             * is wrong --> Wrong API docs or bug in API. </br>
-             * Only with the nsfw parameter set to "X", all items will be returned.
+             * is wrong --> Wrong API docs or bug in API. </br> Only with the nsfw parameter set to "X", all items will be returned.
              */
             final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
             final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
@@ -160,11 +164,17 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             int page = 1;
             final HashSet<String> dupes = new HashSet<String>();
             pagination: while (nextpage != null && !isAbort()) {
-                br.getPage(nextpage);
-                if (br.getHttpConnection().getResponseCode() == 404) {
-                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                URLConnectionAdapter con = br.openGetConnection(nextpage);
+                final Map<String, Object> entries;
+                try {
+                    if (con.getResponseCode() == 404) {
+                        br.followConnection();
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    }
+                    entries = JSonStorage.restoreFromInputStream(con.getInputStream(), TypeRef.MAP);
+                } finally {
+                    con.disconnect();
                 }
-                final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final List<Map<String, Object>> images = (List<Map<String, Object>>) entries.get("items");
                 if (images == null || images.isEmpty()) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
@@ -216,9 +226,13 @@ public class CivitaiComCrawler extends PluginForDecrypt {
         /* Process collected ModelVersions */
         for (final Map<String, Object> entries : modelVersions) {
             final ArrayList<DownloadLink> thisRet = new ArrayList<DownloadLink>();
-            final String modelName = entries.get("name").toString();
+            final String modelVersionName = entries.get("name").toString();
             final FilePackage fp = FilePackage.getInstance();
-            fp.setName(modelName);
+            if (modelName != null) {
+                fp.setName(modelName + " - " + modelVersionName);
+            } else {
+                fp.setName(modelVersionName);
+            }
             fp.setPackageKey("civitai://model/modelVersion/" + modelVersionId);
             final List<Map<String, Object>> files = (List<Map<String, Object>>) entries.get("files");
             for (final Map<String, Object> file : files) {
@@ -230,7 +244,16 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 } else {
                     link = this.createDownloadlink(DirectHTTP.createURLForThisPlugin(downloadurl));
                 }
-                link.setFinalFileName(file.get("name").toString());
+                String filename = file.get("name").toString();
+                // images/videos may include ?token=YZX in name
+                filename = filename.replaceFirst("\\?token=.+", "");
+                final String mimeType = (String) file.get("mimeType");
+                final String ext = getExtensionFromMimeType(mimeType);
+                if (ext != null) {
+                    link.setFinalFileName(this.applyFilenameExtension(filename, "." + ext));
+                } else {
+                    link.setName(filename);
+                }
                 link.setDownloadSize(((Number) file.get("sizeKB")).longValue() * 1024);
                 link.setAvailable(true);
                 final String sha256 = (String) hashes.get("SHA256");

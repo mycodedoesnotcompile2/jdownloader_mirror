@@ -10,12 +10,6 @@ import javax.swing.JComponent;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
-import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
-
 import org.appwork.swing.MigPanel;
 import org.appwork.swing.components.ExtButton;
 import org.appwork.swing.exttable.tree.TreeNodeInterface;
@@ -31,8 +25,13 @@ import org.jdownloader.controlling.hosterrule.FreeAccountReference;
 import org.jdownloader.controlling.hosterrule.HosterRuleController;
 import org.jdownloader.gui.translate._GUI;
 
-public class EditHosterRuleDialog extends AbstractDialog<Integer> {
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.RefreshAction;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountInterface;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.AccountWrapper;
+import jd.gui.swing.jdgui.views.settings.panels.accountmanager.orderpanel.GroupWrapper;
 
+public class EditHosterRuleDialog extends AbstractDialog<Integer> {
     private AccountUsageRule         rule;
     private HosterPriorityTableModel model;
     private HosterPriorityTable      table;
@@ -86,7 +85,6 @@ public class EditHosterRuleDialog extends AbstractDialog<Integer> {
         tb.add(refreshButton = new ExtButton(new RefreshAction()), "sg 2,height 26!");
         tb.add(new ExtButton(new AddGroupAction(model)), "sg 2,height 26!");
         refreshButton.addFocusListener(new FocusListener() {
-
             @Override
             public void focusLost(FocusEvent e) {
             }
@@ -106,7 +104,7 @@ public class EditHosterRuleDialog extends AbstractDialog<Integer> {
         for (AccountInterface ai : model.getTree()) {
             if (ai instanceof GroupWrapper) {
                 List<AccountReference> childs = new ArrayList<AccountReference>();
-                for (TreeNodeInterface child : ((GroupWrapper) ai).getChildren()) {
+                for (final TreeNodeInterface child : ((GroupWrapper) ai).getChildren()) {
                     if (FreeAccountReference.isFreeAccount(((AccountWrapper) child).getAccount())) {
                         AccountReference ar = new FreeAccountReference(rule.getHoster());
                         ar.setEnabled(((AccountWrapper) child).isEnabled());
@@ -116,9 +114,7 @@ public class EditHosterRuleDialog extends AbstractDialog<Integer> {
                         ar.setEnabled(((AccountWrapper) child).isEnabled());
                         childs.add(ar);
                     }
-
                 }
-
                 AccountGroup group = new AccountGroup(childs);
                 group.setName(((GroupWrapper) ai).getName());
                 group.setRule(((GroupWrapper) ai).getRule());

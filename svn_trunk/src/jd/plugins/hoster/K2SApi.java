@@ -3,6 +3,8 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -10,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TimeZone;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,6 +22,7 @@ import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.RFC2047;
+import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.blacklist.BlockDownloadCaptchasByHost;
@@ -66,7 +70,7 @@ import jd.plugins.download.DownloadInterface;
  * @author raztoki
  *
  */
-@HostPlugin(revision = "$Revision: 50350 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50397 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class K2SApi extends PluginForHost {
     private final String        lng                                                    = getLanguage();
     private final String        PROPERTY_ACCOUNT_AUTHTOKEN                             = "auth_token";
@@ -138,9 +142,31 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     @Override
+    public long getTrafficRequired(final DownloadLink downloadLink, final Account account, long bytes) {
+        // traffic is credited in full on download url generation, see setStoredDirecturl method
+        return 0;
+    }
+
+    protected boolean isTrafficCredited(final DownloadLink link, final Account account) {
+        if (account != null) {
+            final long link_quota_reset_at_ts = link.getLongProperty(getDirectLinkProperty(account) + "_" + QUOTA_RESET_AT_TIMESTAMP, -1l);
+            if (link_quota_reset_at_ts != -1) {
+                final long account_quota_reset_at_ts = account.getLongProperty(QUOTA_RESET_AT_TIMESTAMP, -1);
+                if (link_quota_reset_at_ts == account_quota_reset_at_ts && System.currentTimeMillis() < account_quota_reset_at_ts) {
+                    /* download url generation is credited only once per day/account */
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public boolean enoughTrafficFor(final DownloadLink link, Account account) throws Exception {
-        final String directlinkproperty = getDirectLinkProperty(account);
-        final String dllink = link.getStringProperty(directlinkproperty);
+        if (isTrafficCredited(link, account)) {
+            return true;
+        }
+        final String dllink = getStoredDirecturl(link, account);
         if (StringUtils.isNotEmpty(dllink)) {
             /* Previously generated direct-URL is available -> Even if the account is out f traffic, that link should be downloadable. */
             return true;
@@ -224,7 +250,30 @@ public abstract class K2SApi extends PluginForHost {
     }
 
     protected final String getStoredDirecturl(final DownloadLink link, final Account account) {
-        return link.getStringProperty(this.getDirectLinkProperty(account));
+        final String directLinkProperty = this.getDirectLinkProperty(account);
+        return link.getStringProperty(directLinkProperty, null);
+    }
+
+    protected final void setStoredDirecturl(final DownloadLink link, final Account account, final String url) {
+        final String directLinkProperty = this.getDirectLinkProperty(account);
+        link.setProperty(directLinkProperty, url);
+        if (account != null && url != null) {
+            switch (account.getType()) {
+            case PREMIUM:
+            case LIFETIME:
+                if (!isTrafficCredited(link, account)) {
+                    final AccountInfo ai = account.getAccountInfo();
+                    if (ai != null) {
+                        final long trafficLeft = Math.max(0, ai.getTrafficLeft() - link.getVerifiedFileSize());
+                        ai.setTrafficLeft(trafficLeft);
+                    }
+                    link.setProperty(directLinkProperty + "_" + QUOTA_RESET_AT_TIMESTAMP, account.getProperty(QUOTA_RESET_AT_TIMESTAMP, null));
+                }
+                break;
+            default:
+                break;
+            }
+        }
     }
 
     /**
@@ -233,7 +282,7 @@ public abstract class K2SApi extends PluginForHost {
      * @author Jiaz
      */
     protected long getAPIRevision() {
-        return Math.max(0, Formatter.getRevision("$Revision: 50350 $"));
+        return Math.max(0, Formatter.getRevision("$Revision: 50397 $"));
     }
 
     /**
@@ -612,7 +661,6 @@ public abstract class K2SApi extends PluginForHost {
             /* Request has already been done before. */
             entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         }
-        final String remaining_time_next_reset_quota = (String) entries.get("remaining_time_next_reset_quota");
         final Number available_traffic = (Number) entries.get("available_traffic");
         /*
          * 2019-11-26: Expired premium accounts will have their old expire-date given thus we'll have to check for that before setting
@@ -657,15 +705,26 @@ public abstract class K2SApi extends PluginForHost {
         }
         fetchAdditionalAccountInfo(account, ai, br, auth_token);
         setAccountLimits(account);
-        if (!StringUtils.isEmpty(remaining_time_next_reset_quota)) {
-            /* E.g. "remaining_time_next_reset_quota":"Remaining time next reset quota: 11 hours and 33 minutes" */
-            ai.setStatus(ai.getStatus() + " | " + remaining_time_next_reset_quota);
+        final String quota_reset_at = (String) entries.get("quota_reset_at");
+        if (!StringUtils.isEmpty(quota_reset_at)) {
+            try {
+                final SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+                df.setTimeZone(TimeZone.getTimeZone("UTC"));
+                final long quota_reset_at_ts = df.parse(quota_reset_at).getTime();
+                account.setProperty(QUOTA_RESET_AT_TIMESTAMP, quota_reset_at_ts);
+                final long quota_reset_in = quota_reset_at_ts - System.currentTimeMillis();
+                ai.setStatus(ai.getStatus() + " | Quota reset in: " + TimeFormatter.formatMilliSeconds(quota_reset_in, TimeFormatter.HIDE_SECONDS));
+            } catch (final ParseException e) {
+                logger.log(e);
+            }
         }
         if (PluginJsonConfig.get(this.getConfigInterface()).isEnableReconnectWorkaround()) {
             this.checkForFreeAccountLimits(account);
         }
         return ai;
     }
+
+    private final String QUOTA_RESET_AT_TIMESTAMP = "quota_reset_at_ts";
 
     /** See https://keep2share.github.io/api/#resources:/accountInfo:post */
     private Map<String, Object> getAccountInfoViaAPI(final Account account, final Browser br, final String auth_token) throws Exception {
@@ -871,7 +930,7 @@ public abstract class K2SApi extends PluginForHost {
             }
         } catch (final Exception e) {
             if (storedDirecturl != null) {
-                link.removeProperty(this.getDirectLinkProperty(account));
+                setStoredDirecturl(link, account, null);
                 throw new PluginException(LinkStatus.ERROR_RETRY, "Stored directurl expired", e);
             } else {
                 throw e;
@@ -880,7 +939,7 @@ public abstract class K2SApi extends PluginForHost {
         // add download slot
         controlSlot(+1, account);
         try {
-            link.setProperty(this.getDirectLinkProperty(account), dllink);
+            setStoredDirecturl(link, account, dllink);
             dl.startDownload();
         } finally {
             // remove download slot
@@ -1777,7 +1836,7 @@ public abstract class K2SApi extends PluginForHost {
             // Content-Length: 35
             // Connection: close
             // Www-Authenticate: Swift realm="AUTH_system"
-            link.removeProperty(this.getDirectLinkProperty(account));
+            setStoredDirecturl(link, account, null);
             throw new PluginException(LinkStatus.ERROR_RETRY);
         } else if (dl.getConnection().getResponseCode() == 404 || br.containsHTML("(?i)>\\s*Not Found<")) {
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 404", 30 * 60 * 1000l);

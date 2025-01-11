@@ -38,7 +38,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "youjizz.com" }, urls = { "https?://(?:www\\.)?youjizz\\.com/videos/(embed/\\d+|.*?\\-\\d+\\.html)" })
+@HostPlugin(revision = "$Revision: 50396 $", interfaceVersion = 2, names = { "youjizz.com" }, urls = { "https?://(?:www\\.)?youjizz\\.com/videos/(embed/\\d+|.*?\\-\\d+\\.html)" })
 public class YouJizzCom extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -252,5 +252,11 @@ public class YouJizzCom extends PluginForHost {
 
     @Override
     public void resetPluginGlobals() {
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 }

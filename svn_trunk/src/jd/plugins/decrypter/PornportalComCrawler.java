@@ -54,7 +54,7 @@ import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.hoster.PornportalCom;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50400 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { PornportalCom.class })
 public class PornportalComCrawler extends PluginForDecrypt {
     public PornportalComCrawler(PluginWrapper wrapper) {
@@ -377,8 +377,8 @@ public class PornportalComCrawler extends PluginForDecrypt {
         }
         /* Crawl thumbnails */
         crawlThumbnails: if (true) {
-            final boolean crawlThumbnails = true;
-            if (!crawlThumbnails) {
+            if (cfg != null && !cfg.isCrawlThumbnails()) {
+                /* Thumbnails are disabled by user */
                 break crawlThumbnails;
             }
             final Map<String, Object> images = (Map<String, Object>) result.get("images");

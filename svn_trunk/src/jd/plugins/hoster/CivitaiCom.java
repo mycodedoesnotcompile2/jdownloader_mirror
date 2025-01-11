@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49684 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50389 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -182,6 +182,8 @@ public class CivitaiCom extends PluginForHost {
                 String filename = (String) imagemap.get("name");
                 final Number filesize = (Number) metadata.get("size");
                 if (!StringUtils.isEmpty(filename)) {
+                    // images/videos may include ?token=YZX in name
+                    filename = filename.replaceFirst("\\?token=.+", "");
                     filename = Encoding.htmlDecode(filename).trim();
                     link.setName(filename);
                 } else {

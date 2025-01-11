@@ -27,9 +27,10 @@ import jd.http.Browser;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
+import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50364 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50388 $", interfaceVersion = 3, names = {}, urls = {})
 public class CamwhoreshdCom extends KernelVideoSharingComV2 {
     public CamwhoreshdCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -70,8 +71,16 @@ public class CamwhoreshdCom extends KernelVideoSharingComV2 {
             final String msg = this.getPrivateVideoWebsiteMessage(br);
             if (msg != null) {
                 throw new AccountRequiredException(msg);
+            } else if (isOfflineWebsite(br)) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             return super.getDllink(link, br);
+        } else if (br.containsHTML("<iframe[^<]*src=")) {
+            /*
+             * Old links which embed other/offline content e.g.:
+             * https://www.camwhoreshd.com/videos/129496/kissofacobra-free-cam-recording-2017-04-01-021606-e7643fa5de28089b/
+             */
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else {
             return super.getDllink(link, br);
         }

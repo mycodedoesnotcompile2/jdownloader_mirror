@@ -15,68 +15,105 @@ import javax.swing.JSeparator;
 import org.jdownloader.actions.AppAction;
 
 public class ExtPopupMenu extends JPopupMenu implements ExtMenuInterface {
-
     protected final PropertyChangeListener propertyChangeListener = new PropertyChangeListener() {
-
-                                                                      @Override
-                                                                      public void propertyChange(PropertyChangeEvent evt) {
-                                                                          if (evt.getPropertyName() == "enabled") {
-                                                                              if (Boolean.TRUE.equals(evt.getNewValue())) {
-                                                                                  setEnabled(true);
-                                                                              } else if (Boolean.FALSE.equals(evt.getNewValue())) {
-                                                                                  boolean isEnabled = false;
-                                                                                  for (final Component elem : getComponents()) {
-                                                                                      if (elem.isEnabled()) {
-                                                                                          isEnabled = true;
-                                                                                          break;
-                                                                                      }
-                                                                                  }
-                                                                                  setEnabled(isEnabled);
-                                                                              }
-                                                                          }
-                                                                          if (AppAction.VISIBLE == evt.getPropertyName()) {
-                                                                              boolean lastVisible = false;
-                                                                              for (final Component elem : getComponents()) {
-                                                                                  if (elem instanceof JSeparator) {
-                                                                                      elem.setVisible(lastVisible);
-                                                                                  } else {
-                                                                                      lastVisible = elem.isVisible();
-                                                                                  }
-                                                                              }
-                                                                              revalidate();
-                                                                          }
-                                                                      }
-                                                                  };
-
+        @Override
+        public void propertyChange(PropertyChangeEvent evt) {
+            if (evt.getPropertyName() == "enabled") {
+                refreshEnabledState(Boolean.TRUE.equals(evt.getNewValue()));
+            }
+            if (AppAction.VISIBLE == evt.getPropertyName()) {
+                refreshJSeparatorVisibility();
+            }
+        }
+    };
     protected final ContainerListener      containerListener      = new ContainerListener() {
+        @Override
+        public void componentRemoved(ContainerEvent e) {
+            final Component child = e.getChild();
+            child.removePropertyChangeListener(propertyChangeListener);
+            if (isEnabled()) {
+                refreshEnabledState(false);
+            }
+            refreshJSeparatorVisibility();
+        }
 
-                                                                      @Override
-                                                                      public void componentRemoved(ContainerEvent e) {
-                                                                          final Component child = e.getChild();
-                                                                          child.removePropertyChangeListener(propertyChangeListener);
-                                                                          propertyChangeListener.propertyChange(new PropertyChangeEvent(child, "enabled", true, false));
-                                                                      }
+        @Override
+        public void componentAdded(ContainerEvent e) {
+            final Component child = e.getChild();
+            child.addPropertyChangeListener(propertyChangeListener);
+            if (!isEnabled() && child.isEnabled()) {
+                refreshEnabledState(true);
+            }
+            if (touchesJSeparator(child)) {
+                refreshJSeparatorVisibility();
+            }
+        }
+    };
 
-                                                                      @Override
-                                                                      public void componentAdded(ContainerEvent e) {
-                                                                          final Component child = e.getChild();
-                                                                          child.addPropertyChangeListener(propertyChangeListener);
-                                                                          final boolean enabled = child.isEnabled();
-                                                                          propertyChangeListener.propertyChange(new PropertyChangeEvent(child, "enabled", !enabled, enabled));
-                                                                          if (child instanceof JSeparator) {
-                                                                              final int componentCount = getComponentCount();
-                                                                              if (componentCount == 1) {
-                                                                                  remove(child);
-                                                                              } else if (componentCount > 1 && getComponent(componentCount - 2) instanceof JSeparator) {
-                                                                                  remove(child);
-                                                                              }
-                                                                          }
-                                                                      }
-                                                                  };
+    protected boolean touchesJSeparator(Component com) {
+        if (com instanceof JSeparator) {
+            return true;
+        }
+        final int index = getComponentIndex(com);
+        if (index == -1) {
+            return false;
+        }
+        final Component before = getComponent(Math.max(0, index - 1));
+        if (before instanceof JSeparator) {
+            return true;
+        }
+        final Component after = getComponent(Math.min(getComponentCount() - 1, index + 1));
+        if (after instanceof JSeparator) {
+            return true;
+        }
+        return false;
+    }
 
     public ExtPopupMenu() {
         addContainerListener(containerListener);
         setEnabled(false);
+    }
+
+    protected void refreshEnabledState(boolean enabled) {
+        if (enabled) {
+            setEnabled(true);
+        } else {
+            boolean isEnabled = false;
+            for (final Component elem : getComponents()) {
+                if (elem.isEnabled()) {
+                    isEnabled = true;
+                    break;
+                }
+            }
+            setEnabled(isEnabled);
+        }
+    }
+
+    protected void refreshJSeparatorVisibility() {
+        Component lastVisibleElem = null;
+        boolean lastVisible = false;
+        boolean revalidate = false;
+        for (final Component elem : getComponents()) {
+            final boolean isElemVisible = elem.isVisible();
+            if (elem instanceof JSeparator) {
+                if (lastVisibleElem instanceof JSeparator) {
+                    elem.setVisible(false);
+                    revalidate |= isElemVisible != false;
+                    lastVisible = false;
+                } else {
+                    elem.setVisible(lastVisible);
+                    revalidate |= isElemVisible != lastVisible;
+                }
+            } else {
+                lastVisible = isElemVisible;
+            }
+            if (lastVisible) {
+                lastVisibleElem = elem;
+            }
+        }
+        if (revalidate) {
+            revalidate();
+        }
     }
 
     protected JMenuItem createActionComponent(final Action a) {

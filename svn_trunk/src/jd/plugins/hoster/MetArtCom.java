@@ -1,5 +1,6 @@
 package jd.plugins.hoster;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.net.URLHelper;
@@ -35,11 +37,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50326 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50416 $", interfaceVersion = 2, names = {}, urls = {})
 public class MetArtCom extends PluginForHost {
     public MetArtCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://signup.met-art.com/model.htm?from=homepage");
+        this.enablePremium("https://join." + getHost() + "/?campaign=header-bar");
     }
 
     @Override
@@ -147,13 +149,13 @@ public class MetArtCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         this.setBrowserExclusive();
-        AccountInfo ai = this.login(account, true);
-        if (ai == null) {
-            br.getPage("https://www." + account.getHoster() + "/api/user-data");
-            ai = getSetAccountTypeSimple(account);
-        }
+        final AccountInfo ai = this.login(account, true);
         findMoreInformation: if (account.getType() == AccountType.PREMIUM && ai.getValidUntil() == -1) {
             /* Try to find the expire-date the hard way... */
+            if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                /* 2025-01-09: This is debug mode only code! */
+                break findMoreInformation;
+            }
             logger.info("Trying to find premium expire date the hard way...");
             final Cookies requiredCookies = account.loadCookies(COOKIES_METARTNETWORK);
             if (requiredCookies == null || requiredCookies.isEmpty()) {
@@ -190,59 +192,6 @@ public class MetArtCom extends PluginForHost {
         return ai;
     }
 
-    private void processSubscriptions(final Account account, final AccountInfo ai, final List<Map<String, Object>> subscriptions) {
-        if (subscriptions == null || subscriptions.isEmpty()) {
-            ai.setExpired(true);
-            return;
-        }
-        long highestExpireDate = -1;
-        int numberofLifetimeSubscriptions = 0;
-        for (final Map<String, Object> subscription : subscriptions) {
-            final String expireDateStr = subscription.get("expireDate").toString();
-            final long expireDateTimestamp = TimeFormatter.getMilliSeconds(expireDateStr, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
-            if (expireDateTimestamp > highestExpireDate) {
-                highestExpireDate = expireDateTimestamp;
-            }
-            if (Boolean.TRUE.equals(subscription.get("isLifetime"))) {
-                numberofLifetimeSubscriptions += 1;
-            }
-        }
-        if (numberofLifetimeSubscriptions == subscriptions.size()) {
-            logger.info("All subscriptions are lifetime subscriptions -> Account is a lifetime premium account");
-            account.setType(AccountType.LIFETIME);
-        } else if (highestExpireDate > System.currentTimeMillis()) {
-            ai.setValidUntil(highestExpireDate);
-        } else {
-            logger.info("Failed to determine reasonable expire-date for premium account");
-        }
-        ai.setStatus(account.getType().getLabel() + " | Paid Packages: " + subscriptions.size());
-    }
-
-    private AccountInfo getSetAccountTypeSimple(final Account account) throws AccountUnavailableException {
-        final AccountInfo ai = new AccountInfo();
-        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "initialState/auth/user");
-        if (Boolean.TRUE.equals(user.get("accountNeedsAgeVerification"))) {
-            throw new AccountUnavailableException("Age verification needed", 1 * 60 * 60 * 1000);
-        }
-        if (Boolean.TRUE.equals(user.get("hasAnyValidSubscription"))) {
-            account.setType(AccountType.PREMIUM);
-            final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) user.get("subscriptions");
-            processSubscriptions(account, ai, subscriptions);
-        } else {
-            account.setType(AccountType.FREE);
-        }
-        /* This plugin supports cookie login --> Make sure that usernames are unique! */
-        final String email = (String) user.get("email");
-        if (!StringUtils.isEmpty(email)) {
-            account.setUser(email);
-        }
-        if (Boolean.TRUE.equals(user.get("isDownloadsBlocked"))) {
-            ai.setStatus(ai.getStatus() + " | Downloads blocked!");
-        }
-        return ai;
-    }
-
     public AccountInfo login(final Account account, final boolean verifyCredentials) throws Exception {
         final Cookies cookies = account.loadCookies("");
         /* User cookie login is possible as an alternative way to login */
@@ -259,9 +208,8 @@ public class MetArtCom extends PluginForHost {
                 /* Do not verify credentials. */
                 return null;
             }
-            br.getPage("https://www." + this.getHost() + "/api/user-data");
             try {
-                final AccountInfo ai = getSetAccountTypeSimple(account);
+                final AccountInfo ai = fetchAndSetUserData(account);
                 account.setAccountInfo(ai);
                 logger.info("Cookie login successful");
                 account.saveCookies(br.getCookies(br.getHost()), "");
@@ -323,7 +271,65 @@ public class MetArtCom extends PluginForHost {
         this.setCookies(br, freshCookies);
         account.saveCookies(freshCookies, COOKIES_METARTNETWORK);
         account.saveCookies(br.getCookies(br.getHost()), "");
-        return null;
+        if (verifyCredentials) {
+            return fetchAndSetUserData(account);
+        } else {
+            return null;
+        }
+    }
+
+    private AccountInfo fetchAndSetUserData(final Account account) throws AccountUnavailableException, IOException {
+        br.getPage("https://www." + this.getHost() + "/api/user-data");
+        final AccountInfo ai = new AccountInfo();
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        final Map<String, Object> user = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "initialState/auth/user");
+        if (Boolean.TRUE.equals(user.get("accountNeedsAgeVerification"))) {
+            throw new AccountUnavailableException("Age verification needed", 1 * 60 * 60 * 1000);
+        }
+        if (Boolean.TRUE.equals(user.get("hasAnyValidSubscription"))) {
+            account.setType(AccountType.PREMIUM);
+            final List<Map<String, Object>> subscriptions = (List<Map<String, Object>>) user.get("subscriptions");
+            processSubscriptions(account, ai, subscriptions);
+        } else {
+            account.setType(AccountType.FREE);
+        }
+        /* This plugin supports cookie login --> Make sure that usernames are unique! */
+        final String email = (String) user.get("email");
+        if (!StringUtils.isEmpty(email)) {
+            account.setUser(email);
+        }
+        if (Boolean.TRUE.equals(user.get("isDownloadsBlocked"))) {
+            ai.setStatus(ai.getStatus() + " | Downloads blocked!");
+        }
+        return ai;
+    }
+
+    private void processSubscriptions(final Account account, final AccountInfo ai, final List<Map<String, Object>> subscriptions) {
+        if (subscriptions == null || subscriptions.isEmpty()) {
+            ai.setExpired(true);
+            return;
+        }
+        long highestExpireDate = -1;
+        int numberofLifetimeSubscriptions = 0;
+        for (final Map<String, Object> subscription : subscriptions) {
+            final String expireDateStr = subscription.get("expireDate").toString();
+            final long expireDateTimestamp = TimeFormatter.getMilliSeconds(expireDateStr, "yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.ENGLISH);
+            if (expireDateTimestamp > highestExpireDate) {
+                highestExpireDate = expireDateTimestamp;
+            }
+            if (Boolean.TRUE.equals(subscription.get("isLifetime"))) {
+                numberofLifetimeSubscriptions += 1;
+            }
+        }
+        if (numberofLifetimeSubscriptions == subscriptions.size()) {
+            logger.info("All subscriptions are lifetime subscriptions -> Account is a lifetime premium account");
+            account.setType(AccountType.LIFETIME);
+        } else if (highestExpireDate > System.currentTimeMillis()) {
+            ai.setValidUntil(highestExpireDate);
+        } else {
+            logger.info("Failed to determine reasonable expire-date for premium account");
+        }
+        ai.setStatus(account.getType().getLabel() + " | Paid Packages: " + subscriptions.size());
     }
 
     private void setCookies(final Browser br, final Cookies cookies) {

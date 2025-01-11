@@ -43,7 +43,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50050 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50409 $", interfaceVersion = 2, names = {}, urls = {})
 public class FeimaoyunCom extends PluginForHost {
     public FeimaoyunCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -259,48 +259,42 @@ public class FeimaoyunCom extends PluginForHost {
     @SuppressWarnings("deprecation")
     private boolean login(final Account account, final boolean validateCookies) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                boolean validatedCookies = false;
-                if (cookies != null) {
-                    this.br.setCookies(this.getHost(), cookies);
-                    if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 300000l && !validateCookies) {
-                        /* We trust these cookies as they're not that old --> Do not check them */
-                        logger.info("Trust cookies without checking as they're still fresh");
-                        return false;
-                    }
-                    br.getPage("https://www." + account.getHoster() + "/home.php");
-                    if (isLoggedIn()) {
-                        validatedCookies = true;
-                    } else {
-                        this.br = new Browser();
-                    }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            boolean validatedCookies = false;
+            if (cookies != null) {
+                this.br.setCookies(this.getHost(), cookies);
+                if (System.currentTimeMillis() - account.getCookiesTimeStamp("") <= 300000l && !validateCookies) {
+                    /* We trust these cookies as they're not that old --> Do not check them */
+                    logger.info("Trust cookies without checking as they're still fresh");
+                    return false;
                 }
-                if (!validatedCookies) {
-                    br.getPage("https://www." + account.getHoster() + "/home.php");
-                    br.postPage("/home.php", "action=login&task=login&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&remember=1");
-                    // if (this.br.containsHTML("yzm\\.php")) {
-                    // final DownloadLink dummyLink = new DownloadLink(this, "Account", account.getHoster(), "http://" +
-                    // account.getHoster(),
-                    // true);
-                    // final String code = getCaptchaCode("/yzm.php", dummyLink);
-                    // postData += "&yzm=" + Encoding.urlEncode(code);
-                    // }
-                    final String status = PluginJSonUtils.getJson(br, "status");
-                    if (!"true".equalsIgnoreCase(status) && !"1".equalsIgnoreCase(status)) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
+                br.getPage("https://www." + account.getHoster() + "/home.php");
+                if (isLoggedIn()) {
                     validatedCookies = true;
-                }
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-                return validatedCookies;
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
+                } else {
+                    br.clearCookies(null);
                     account.clearCookies("");
                 }
-                throw e;
             }
+            if (!validatedCookies) {
+                br.getPage("https://www." + account.getHoster() + "/home.php");
+                br.postPage("/home.php", "action=login&task=login&username=" + Encoding.urlEncode(account.getUser()) + "&password=" + Encoding.urlEncode(account.getPass()) + "&remember=1");
+                // if (this.br.containsHTML("yzm\\.php")) {
+                // final DownloadLink dummyLink = new DownloadLink(this, "Account", account.getHoster(), "http://" +
+                // account.getHoster(),
+                // true);
+                // final String code = getCaptchaCode("/yzm.php", dummyLink);
+                // postData += "&yzm=" + Encoding.urlEncode(code);
+                // }
+                final String status = PluginJSonUtils.getJson(br, "status");
+                if (!"true".equalsIgnoreCase(status) && !"1".equalsIgnoreCase(status)) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                }
+                validatedCookies = true;
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return validatedCookies;
         }
     }
 
@@ -311,11 +305,7 @@ public class FeimaoyunCom extends PluginForHost {
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        try {
-            login(account, true);
-        } catch (PluginException e) {
-            throw e;
-        }
+        login(account, true);
         br.getPage("/home.php?action=up_svip&m=");
         /* 2019-06-27: TODO: Check/fix this */
         long expire = 0;

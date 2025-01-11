@@ -8,9 +8,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import jd.controlling.captcha.SkipException;
-import jd.controlling.captcha.SkipRequest;
-
 import org.appwork.timetracker.TimeTracker;
 import org.appwork.timetracker.TimeTrackerController;
 import org.appwork.timetracker.TrackerRule;
@@ -51,6 +48,9 @@ import org.jdownloader.captcha.v2.solverjob.SolverJob;
 import org.jdownloader.controlling.UniqueAlltimeID;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_CAPTCHA;
+
+import jd.controlling.captcha.SkipException;
+import jd.controlling.captcha.SkipRequest;
 
 public class ChallengeResponseController {
     private static final ChallengeResponseController INSTANCE = new ChallengeResponseController();
@@ -182,10 +182,8 @@ public class ChallengeResponseController {
     }
 
     public void fireAfterSolveEvent(SolverJob<?> job, ChallengeSolver<?> solver) {
-        synchronized (job) {
-            job.getLogger().info("Solver " + solver + " finished job " + job);
-            job.notifyAll();
-        }
+        job.getLogger().info("Solver " + solver + " finished job " + job);
+        job._notifyAll();
         eventSender.fireEvent(new ChallengeResponseEvent(this, ChallengeResponseEvent.Type.SOLVER_END, solver, job));
     }
 
@@ -275,22 +273,20 @@ public class ChallengeResponseController {
             boolean timeout = false;
             while (!job.isSolved() && !job.isDone()) {
                 final BlacklistEntry<?> blackListEntry = CaptchaBlackList.getInstance().matches(c);
-                synchronized (job) {
-                    final Challenge<T> challenge = job.getChallenge();
-                    challenge.poll(job);
-                    if (!job.isSolved() && !job.isDone()) {
-                        final long validUntil = challenge.getValidUntil();
-                        if (validUntil != -1 && System.currentTimeMillis() > validUntil) {
-                            timeout = true;
-                            break;
-                        }
-                        job.wait(1000);
-                    } else {
+                final Challenge<T> challenge = job.getChallenge();
+                challenge.poll(job);
+                if (!job.isSolved() && !job.isDone()) {
+                    final long validUntil = challenge.getValidUntil();
+                    if (validUntil != -1 && System.currentTimeMillis() > validUntil) {
+                        timeout = true;
                         break;
                     }
-                    if (blackListEntry != null && job.setSkipRequest(SkipRequest.SINGLE)) {
-                        break;
-                    }
+                    job._wait(1000);
+                } else {
+                    break;
+                }
+                if (blackListEntry != null && job.setSkipRequest(SkipRequest.SINGLE)) {
+                    break;
                 }
             }
             if (timeout && job.setSkipRequest(SkipRequest.TIMEOUT)) {

@@ -6,6 +6,7 @@ import java.awt.Composite;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -16,6 +17,7 @@ import javax.swing.JComponent;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.plaf.TableUI;
 import javax.swing.plaf.synth.SynthContext;
 import javax.swing.plaf.synth.SynthGraphicsUtils;
@@ -72,6 +74,17 @@ public class BasicJDTable<T> extends ExtTable<T> implements GenericConfigEventLi
         if (col != null) {
             setGridColor(col);
         }
+    }
+
+    @Override
+    protected void showPopup(final JPopupMenu popup, final Point p) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                popup.show(BasicJDTable.this, p.x, p.y);
+            }
+        });
+        return;
     }
 
     protected void addSelectionHighlighter() {

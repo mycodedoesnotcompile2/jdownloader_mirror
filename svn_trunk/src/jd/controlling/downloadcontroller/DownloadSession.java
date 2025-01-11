@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.NullsafeAtomicReference;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.event.queue.Queue.QueuePriority;
@@ -527,17 +526,15 @@ public class DownloadSession extends Property {
                 }
                 if (hosterPremiumGroup.size() > 0) {
                     numberofPremiumAccounts += hosterPremiumGroup.size();
-                    if (hosterPremiumGroup.size() > 1) {
-                        try {
-                            Collections.sort(hosterPremiumGroup, ACCOUNT_SORTER);
-                        } catch (final Throwable e) {
-                            LogController.CL().log(e);
-                        }
+                    try {
+                        Collections.sort(hosterPremiumGroup, ACCOUNT_SORTER);
+                    } catch (final Throwable e) {
+                        LogController.CL().log(e);
                     }
                     cachedGroups.add(hosterPremiumGroup);
                 }
                 {
-                    // multihoster
+                    /* multihoster */
                     final List<Account> multiHosts = AccountController.getInstance().getMultiHostAccounts(host);
                     if (multiHosts != null) {
                         final CachedAccountGroup multiHosterGroup = new CachedAccountGroup(Rules.ORDER);
@@ -553,12 +550,10 @@ public class DownloadSession extends Property {
                         }
                         if (multiHosterGroup.size() > 0) {
                             numberofPremiumAccounts += multiHosterGroup.size();
-                            if (multiHosterGroup.size() > 1) {
-                                try {
-                                    Collections.sort(multiHosterGroup, ACCOUNT_SORTER);
-                                } catch (final Throwable e) {
-                                    LogController.CL().log(e);
-                                }
+                            try {
+                                Collections.sort(multiHosterGroup, ACCOUNT_SORTER);
+                            } catch (final Throwable e) {
+                                LogController.CL().log(e);
                             }
                             cachedGroups.add(multiHosterGroup);
                         }
@@ -567,17 +562,17 @@ public class DownloadSession extends Property {
                 if (hosterFreeGroup.size() > 0) {
                     cachedGroups.add(hosterFreeGroup);
                 }
-                // free(no account)
+                /* free(no account) */
                 final CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
-                final boolean allowNonAccountDownloadsWhenAnyPremiumAccountIsAvailable = DebugMode.TRUE_IN_IDE_ELSE_FALSE == true ? false : true;
                 final boolean addNoAccountGroup;
-                if (numberofPremiumAccounts > 0 && !allowNonAccountDownloadsWhenAnyPremiumAccountIsAvailable) {
-                    /* At least one account is available -> Do not allow non-account download. */
+                if (numberofPremiumAccounts > 0) {
+                    /* At least one premium account is available -> Do not allow non-account download. */
                     addNoAccountGroup = false;
                 } else if (removeNoAccountWithCaptcha && noAccount.hasCaptcha(link)) {
                     /* Do not allow non-account download with captcha */
                     addNoAccountGroup = false;
                 } else {
+                    /* Allow download without account */
                     addNoAccountGroup = true;
                 }
                 if (addNoAccountGroup) {

@@ -88,7 +88,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50404 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -892,7 +892,7 @@ public class AllDebridCom extends PluginForHost {
         logger.info("Generating fresh directurl");
         this.login(account, new AccountInfo(), false);
         String downloadPassword = link.getDownloadPassword();
-        Form dlform = new Form();
+        final Form dlform = new Form();
         dlform.setMethod(MethodType.GET);
         dlform.setAction(api_base + "/link/unlock");
         final String url;
@@ -932,14 +932,10 @@ public class AllDebridCom extends PluginForHost {
             logger.info("Breaking loop because: User entered correct password or none was needed");
             break;
         } while (counter <= 3);
-        final Map<String, Object> data = handleErrors(account, link);
+        Map<String, Object> data = handleErrors(account, link);
         if (!StringUtils.isEmpty(downloadPassword)) {
             /* Entered password looks to be correct -> Store password */
             link.setDownloadPassword(downloadPassword);
-        }
-        if (isSelfhosted) {
-            link.setFinalFileName(data.get("filename").toString());
-            link.setVerifiedFileSize(((Number) data.get("filesize")).longValue());
         }
         final Object delayID = data.get("delayed");
         if (delayID != null) {
@@ -953,9 +949,40 @@ public class AllDebridCom extends PluginForHost {
                 logger.info("Delayed handling success");
             }
         }
+        String dllink = (String) data.get("link");
+        if (StringUtils.isEmpty(dllink)) {
+            /**
+             * Assume that this is a stream download e.g. for eporner.com </br>
+             * https://docs.alldebrid.com/#streaming-links
+             */
+            final String linkID = data.get("id").toString();
+            Map<String, Object> best = null;
+            int bestQualityRank = 0;
+            final List<Map<String, Object>> streams = (List<Map<String, Object>>) data.get("streams");
+            for (final Map<String, Object> stream : streams) {
+                final int qualityRank = ((Number) stream.get("qualityRank")).intValue();
+                if (best == null || qualityRank > bestQualityRank) {
+                    best = stream;
+                    bestQualityRank = qualityRank;
+                }
+            }
+            final String streamID = best.get("id").toString();
+            final Form streamform = new Form();
+            streamform.setMethod(MethodType.GET);
+            streamform.setAction(api_base + "/link/streaming");
+            dlform.put("agent", agent_raw);
+            streamform.put("id", linkID);
+            streamform.put("stream", streamID);
+            br.submitForm(streamform);
+            data = handleErrors(account, link);
+            dllink = (String) data.get("link");
+        }
+        if (isSelfhosted) {
+            link.setFinalFileName(data.get("filename").toString());
+            link.setVerifiedFileSize(((Number) data.get("filesize")).longValue());
+        }
         link.setProperty(PROPERTY_maxchunks, data.get("max_chunks"));
         link.setProperty(getDirectLinkProperty(link, account) + "_paws", data.get("paws"));
-        final String dllink = data.get("link").toString();
         link.setProperty(getDirectLinkProperty(link, account), dllink);
         return dllink;
     }

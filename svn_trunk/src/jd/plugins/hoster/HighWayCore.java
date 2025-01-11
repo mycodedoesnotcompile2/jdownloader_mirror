@@ -66,7 +66,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginProgress;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50347 $", interfaceVersion = 1, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50394 $", interfaceVersion = 1, names = {}, urls = {})
 public abstract class HighWayCore extends UseNet {
     private static final String                            PATTERN_TV                             = "(?i)https?://[^/]+/onlinetv\\.php\\?id=.+";
     private static final int                               STATUSCODE_PASSWORD_NEEDED_OR_WRONG    = 13;
@@ -575,15 +575,16 @@ public abstract class HighWayCore extends UseNet {
                 if (cacheStatusO != null && cacheStatusO.toString().matches("(?i)i|s")) {
                     logger.info("Stepping out of cache handling because: Detected valid cacheStatus");
                     return entries;
-                } else if (!blockDownloadSlotsForCloudDownloads(account)) {
+                }
+                retryInSecondsThisRound = ((Number) entries.get("retry_in_seconds")).intValue();
+                textForJD = (String) entries.get("for_jd");
+                if (!blockDownloadSlotsForCloudDownloads(account)) {
                     /**
                      * Throw exception right away so other download candidates will be tried. </br>
                      * This may speed up downloads significantly for some users.
                      */
                     throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, textForJD, retryInSecondsThisRound * 1000l);
                 }
-                retryInSecondsThisRound = ((Number) entries.get("retry_in_seconds")).intValue();
-                textForJD = (String) entries.get("for_jd");
                 /* Wait and re-check */
                 final int retryInSeconds = Math.min(retryInSecondsThisRound, maxWaitSeconds - secondsWaited);
                 this.sleep(retryInSeconds * 1000l, link, textForJD);
@@ -807,11 +808,11 @@ public abstract class HighWayCore extends UseNet {
     public boolean isResumeable(final DownloadLink link, final Account account) {
         synchronized (getMapLock()) {
             final String downloadLinkHost = link.getHost();
-            final String hostFromLink = Browser.getHost(link.getPluginPatternMatcher(), true);
+            final String hostFromLink;
             final Map<String, Boolean> hostResumeMap = getMap(HighWayCore.hostResumeMap);
             if (hostResumeMap.containsKey(downloadLinkHost)) {
                 return hostResumeMap.get(downloadLinkHost);
-            } else if (hostResumeMap.containsKey(hostFromLink)) {
+            } else if (hostResumeMap.containsKey(hostFromLink = Browser.getHost(link.getPluginPatternMatcher(), true))) {
                 /* E.g. selfhosted items download */
                 return hostResumeMap.get(hostFromLink);
             }

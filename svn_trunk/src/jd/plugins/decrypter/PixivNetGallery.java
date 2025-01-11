@@ -22,14 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.PixivNetConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
@@ -52,7 +44,15 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.PixivNet;
 
-@DecrypterPlugin(revision = "$Revision: 48932 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.PixivNetConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50427 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { PixivNet.class })
 public class PixivNetGallery extends PluginForDecrypt {
     public PixivNetGallery(PluginWrapper wrapper) {
@@ -414,8 +414,11 @@ public class PixivNetGallery extends PluginForDecrypt {
         }
         final String filename_url = directurl != null ? new Regex(directurl, "/([^/]+\\.[a-z]+)$").getMatch(0) : null;
         String filename;
-        final String picNumberStr = new Regex(directurl, "/[^/]+_p(\\d+)[^/]*\\.[a-z]+$").getMatch(0);
+        String picNumberStr = new Regex(directurl, "/[^/]+_p(\\d+)[^/]*\\.[a-z]+$").getMatch(0);
         if (picNumberStr != null) {
+            if (PluginJsonConfig.get(this.getConfigInterface()).isCrawlImageIndexStartAtOne()) {
+                picNumberStr = Integer.toString(Integer.parseInt(picNumberStr) + 1);
+            }
             filename = this.generateFilename(contentID, title, titleAlt, username, tagsCommaSeparated, picNumberStr, null);
         } else if (filename_url != null) {
             /* Fallback - just use the given filename (minus extension)! */

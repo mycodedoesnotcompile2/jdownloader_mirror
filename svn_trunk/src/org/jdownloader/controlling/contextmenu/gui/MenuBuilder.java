@@ -4,10 +4,14 @@ import java.awt.Component;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.AbstractButton;
 import javax.swing.JComponent;
 import javax.swing.JMenu;
+import javax.swing.JPopupMenu;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.swing.EDTRunner;
@@ -23,9 +27,14 @@ public class MenuBuilder {
     protected final LogSource                             logger;
     protected final HashMap<JComponent, HashSet<Integer>> mnemonics;
     protected boolean                                     hideOnClick = true;
+    protected final AtomicBoolean                         isCanceled  = new AtomicBoolean(false);
 
     public boolean isHideOnClick() {
         return hideOnClick;
+    }
+
+    public AtomicBoolean getCancelled() {
+        return isCanceled;
     }
 
     public MenuBuilder setHideOnClick(boolean hideOnClick) {
@@ -35,6 +44,24 @@ public class MenuBuilder {
 
     public MenuBuilder(ContextMenuManager<?, ?> menuManager, JComponent root, MenuContainer md) {
         this.root = root;
+        if (root instanceof JPopupMenu) {
+            ((JPopupMenu) root).addPopupMenuListener(new PopupMenuListener() {
+
+                @Override
+                public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                }
+
+                @Override
+                public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
+                    isCanceled.set(true);
+                }
+
+                @Override
+                public void popupMenuCanceled(PopupMenuEvent e) {
+                    isCanceled.set(true);
+                }
+            });
+        }
         menuData = md;
         logger = menuManager.getLogger();
         mnemonics = new HashMap<JComponent, HashSet<Integer>>();

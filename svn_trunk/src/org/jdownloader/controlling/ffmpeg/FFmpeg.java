@@ -306,4 +306,8 @@ public abstract class FFmpeg extends AbstractFFmpegBinary {
     public boolean generateOggAudio(FFMpegProgress progress, String out, String audioIn) throws IOException, InterruptedException, FFMpegException {
         return demux(progress, out, audioIn, config.getDash2OggAudioCommand());
     }
+
+    public boolean generateMkvAudio(FFMpegProgress progress, String out, String audioIn) throws IOException, InterruptedException, FFMpegException {
+        return demux(progress, out, audioIn, config.getDash2MkvAudioCommand());
+    }
 }

@@ -969,6 +969,7 @@ public class SingleAppInstance {
                                                     throw new InvalidParameterException(CLIENT_ID_OK + " is reserved for internal usage");
                                                 } else {
                                                     try {
+                                                        LogV3.info("Send Response: " + response.getType() + ":" + response.getMessage());
                                                         client.sendResponse(response);
                                                     } catch (IOException e) {
                                                         throw new FailedToSendResponseException(response, e);

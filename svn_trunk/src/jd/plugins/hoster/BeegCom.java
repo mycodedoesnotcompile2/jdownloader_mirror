@@ -22,15 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.downloader.hls.HLSDownloader;
-import org.jdownloader.plugins.components.config.BeegComConfig;
-import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.plugins.controller.LazyPlugin;
-
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -43,7 +34,16 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50354 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/-?([0-9]{5,})(?:\\?t=\\d+-\\d+)?" })
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.config.BeegComConfig;
+import org.jdownloader.plugins.components.config.BeegComConfig.MODE;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+import org.jdownloader.plugins.controller.LazyPlugin;
+
+@HostPlugin(revision = "$Revision: 50427 $", interfaceVersion = 2, names = { "beeg.com" }, urls = { "https?://(?:www\\.|beta\\.)?beeg\\.com/(-\\d+$|-?\\d+\\?t=\\d+-\\d+|-?\\d{8,}$)" })
 public class BeegCom extends PluginForHost {
     private String dllink[] = null;
 
@@ -83,7 +83,7 @@ public class BeegCom extends PluginForHost {
         if (link.getPluginPatternMatcher() == null) {
             return null;
         } else {
-            return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
+            return new Regex(link.getPluginPatternMatcher(), "/-?(\\d+)").getMatch(0);
         }
     }
 

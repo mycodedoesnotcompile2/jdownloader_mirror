@@ -37,7 +37,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.SwiftuploadsCom;
 
-@DecrypterPlugin(revision = "$Revision: 49417 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50409 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { SwiftuploadsCom.class })
 public class SwiftuploadsComFolder extends PluginForDecrypt {
     public SwiftuploadsComFolder(PluginWrapper wrapper) {
@@ -83,7 +83,7 @@ public class SwiftuploadsComFolder extends PluginForDecrypt {
         }
         final String folderID = new Regex(param.getCryptedUrl(), this.getSupportedLinks()).getMatch(0);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final String folderTitle = br.getRegex(folderID + "/folder\">([^<]+)</a>").getMatch(0);
+        final String folderTitle = br.getRegex(folderID + "/folder\"[^>]*>([^<]+)</a>").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
         if (folderTitle != null) {
             fp.setName(Encoding.htmlDecode(folderTitle).trim());

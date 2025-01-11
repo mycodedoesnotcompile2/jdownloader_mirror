@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50394 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -391,7 +391,7 @@ public class TorboxApp extends UseNet {
                 logger.info("User has disabled notifications in web interface of " + getHost());
                 break notificationHandling;
             } else if (BubbleNotifyEnabledState.NEVER.equals(CFG_BUBBLE.CFG.getBubbleNotifyEnabledState())) {
-                logger.info("User has disabled BubbleNotifications globally in JDownloader settings");
+                /* User has disabled BubbleNotifications globally in JDownloader settings */
                 break notificationHandling;
             }
             long highestNotificationTimestamp = 0;

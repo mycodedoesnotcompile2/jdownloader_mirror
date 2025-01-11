@@ -46,7 +46,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.GoogleDrive;
 
-@DecrypterPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50412 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { GoogleDrive.class })
 public class GoogleDriveCrawler extends PluginForDecrypt {
     /**
@@ -643,6 +643,10 @@ public class GoogleDriveCrawler extends PluginForDecrypt {
         public String getOfflineTitle() {
             return this.offlineTitle;
         }
+    }
+
+    public static String generateFileURL(final String fileID) {
+        return generateFileURL(fileID, null);
     }
 
     public static String generateFileURL(final String fileID, final String resourceKey) {

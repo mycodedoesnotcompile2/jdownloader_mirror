@@ -25,6 +25,14 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
@@ -44,15 +52,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.BandCampCom;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.controller.LazyPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
-@DecrypterPlugin(revision = "$Revision: 49958 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50407 $", interfaceVersion = 2, names = {}, urls = {})
 @PluginDependencies(dependencies = { BandCampCom.class })
 public class BandCampComDecrypter extends PluginForDecrypt {
     public BandCampComDecrypter(PluginWrapper wrapper) {
@@ -95,7 +95,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         for (final String[] domains : pluginDomains) {
             final String domainspart = buildHostsPatternPart(domains);
             String regex = "https?://(([a-z0-9\\-]+\\.)?" + domainspart + "/(?:(?:album|track)/[a-z0-9\\-_]+|\\?show=\\d+)|(?!www\\.)?[a-z0-9\\-]+\\." + domainspart + "/?$)";
-            regex += "|https?://(?:www\\.)?" + domainspart + "/EmbeddedPlayer(?:\\.html)?[^\\?#]*/(?:album|track)=\\d+";
+            regex += "|https?://(?:www\\.)?" + domainspart + TYPE_EMBED.pattern();
             regex += "|https?://[\\w\\-]+\\." + domainspart + "(/music)?$";
             ret.add(regex);
         }
@@ -114,7 +114,7 @@ public class BandCampComDecrypter extends PluginForDecrypt {
     }
 
     private final Pattern                  TYPE_PROFILE       = Pattern.compile("(?i)https?://([\\w\\-]+)\\.[^/]+(/|/music)?$");
-    private final Pattern                  TYPE_EMBED         = Pattern.compile("(?i)https?://[^/]+/EmbeddedPlayer(?:\\.html)?.*?/(?:album|track)=\\d+.*");
+    public static final Pattern            TYPE_EMBED         = Pattern.compile("/EmbeddedPlayer(?:\\.html)?[^\\?#]*/(?:album|track)=\\d+.*", Pattern.CASE_INSENSITIVE);
     private final Pattern                  TYPE_SHOW          = Pattern.compile("(?i)https?://[^/]+/\\?show=(\\d+)");
     private static AtomicReference<String> videoSupportBroken = new AtomicReference<String>();
 
@@ -142,43 +142,39 @@ public class BandCampComDecrypter extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final HashSet<String> dupes = new HashSet<String>();
         if (json != null) {
-            // not every artist has data-client-items
+            // not every artist has data-client-items, does not contain all entries from /music!
             json = Encoding.htmlOnlyDecode(json);
             final Object jsonObject = restoreFromString(json, TypeRef.OBJECT);
             final List<Map<String, Object>> clientitems = (List<Map<String, Object>>) jsonObject;
             for (final Map<String, Object> clientitem : clientitems) {
                 final String type = clientitem.get("type").toString();
-                if (!type.equals("album")) {
+                if (!type.equals("album") && !type.equals("track")) {
                     logger.info("Skipping non-album item: " + JSonStorage.serializeToJson(clientitem));
                     continue;
                 }
                 String page_url = clientitem.get("page_url").toString();
-                page_url = Encoding.htmlOnlyDecode(page_url);
-                page_url = br.getURL(page_url).toExternalForm();
                 if (!dupes.add(page_url)) {
                     /* Skip duplicates */
                     continue;
                 }
+                page_url = Encoding.htmlOnlyDecode(page_url);
+                page_url = br.getURL(page_url).toExternalForm();
                 ret.add(this.createDownloadlink(page_url));
             }
         }
-        if (ret.isEmpty()) {
-            /* This shouldn't be needed! */
-            logger.warning("Performing last chance fallback");
-            final String[] albums = br.getRegex("(/album/[\\w\\-]+)").getColumn(0);
-            if (albums == null || albums.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            for (final String albumurlRelative : albums) {
-                if (!dupes.add(albumurlRelative)) {
-                    /* Skip duplicates */
-                    continue;
-                }
-                final String albumurl = br.getURL(albumurlRelative).toExternalForm();
-                ret.add(this.createDownloadlink(albumurl));
-            }
+        final String[] items = br.getRegex("(/(?:album|track)/[\\w\\-]+)").getColumn(0);
+        if (items == null || items.length == 0) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        logger.info("Found albums: " + ret.size());
+        for (final String item : items) {
+            if (!dupes.add(item)) {
+                /* Skip duplicates */
+                continue;
+            }
+            final String albumurl = br.getURL(item).toExternalForm();
+            ret.add(this.createDownloadlink(albumurl));
+        }
+        logger.info("Found albums/tracks: " + ret.size());
         return ret;
     }
 
@@ -354,12 +350,12 @@ public class BandCampComDecrypter extends PluginForDecrypt {
             dateTimestamp = dateToTimestamp(dateStr);
         }
         /**
-         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br> Example-album without any
-         * streamable tracks: https://midsummerex.bandcamp.com/album/intl
+         * Not all albums have playable audio tracks so for some, all we can crawl is the album cover art. </br>
+         * Example-album without any streamable tracks: https://midsummerex.bandcamp.com/album/intl
          */
         boolean isSingleTrack = new Regex(br.getURL(), BandCampCom.PATTERN_SINGLE_TRACK).patternFind();
         final List<Map<String, Object>> albumtracks = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(json);
-        if (albumtracks != null && albumtracks.size() > 0) {
+        if (albumtracks != null) {
             final String type = albuminfo.get("@type").toString();
             if (type.equalsIgnoreCase("MusicRecording") && albumtracks.size() == 1) {
                 isSingleTrack = true;
@@ -383,15 +379,18 @@ public class BandCampComDecrypter extends PluginForDecrypt {
             int index = 0;
             int numberOfUnPlayableTracks = 0;
             for (final Map<String, Object> audio : albumtracks) {
-                String contentUrl = audio.get("title_link").toString();
+                String contentUrl = (String) audio.get("title_link");
                 if (StringUtils.isEmpty(contentUrl)) {
-                    /* Skip invalid objects */
+                    /* Skip invalid objects / unplayable tracks e.g.: */
+                    numberOfUnPlayableTracks++;
+                    index++;
                     continue;
                 }
                 if (contentUrl.startsWith("/")) {
                     contentUrl = br.getURL(contentUrl).toExternalForm();
                 }
                 final DownloadLink audiotrack = createDownloadlink(contentUrl);
+                BandCampCom.parseAndSetAlbumInfo(audiotrack, br);
                 BandCampCom.parseAndSetSingleTrackInfo(audiotrack, br, index);
                 if (!audiotrack.hasProperty(BandCampCom.PROPERTY_DIRECTURL)) {
                     numberOfUnPlayableTracks++;
@@ -467,6 +466,10 @@ public class BandCampComDecrypter extends PluginForDecrypt {
                 if (ret.size() > 0) {
                     /* Inherit properties from first crawler audio track. */
                     thumb.setProperties(ret.get(0).getProperties());
+                } else {
+                    BandCampCom.parseAndSetAlbumInfo(thumb, br);
+                    // album with no tracks, use album title as title to have *nicer* thumbnail filename
+                    thumb.setProperty(BandCampCom.PROPERTY_TITLE, thumb.getStringProperty(BandCampCom.PROPERTY_ALBUM_TITLE, albumTitle));
                 }
                 // thumb.setProperty(BandCampCom.PROPERTY_TITLE, "coverart");
                 thumb.setProperty(BandCampCom.PROPERTY_FILE_TYPE, "jpg");
@@ -532,7 +535,11 @@ public class BandCampComDecrypter extends PluginForDecrypt {
     }
 
     public static final String regexUsernameFromURL(final String url) {
-        return new Regex(url, "(?i)https?://([^/]*?)\\.[^/]+/").getMatch(0);
+        final String ret = new Regex(url, "(?i)https?://([^/]*?)\\.[^/]+/").getMatch(0);
+        if (ret != null && ret.matches("(?i)www")) {
+            return null;
+        }
+        return ret;
     }
 
     public static final long dateToTimestamp(final String dateStr) {

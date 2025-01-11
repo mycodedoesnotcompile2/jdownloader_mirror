@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -246,10 +246,15 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                         if (ccm == null) {
                             return;
                         }
-                        ccm.show(ExtTable.this.getTableHeader(), e.getX(), e.getY());
-                        if (ccm.getComponentCount() == 0) {
-                            Toolkit.getDefaultToolkit().beep();
-                        }
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                showPopup(ccm, e.getPoint());
+                                if (ccm.getComponentCount() == 0) {
+                                    Toolkit.getDefaultToolkit().beep();
+                                }
+                            }
+                        });
                     }
                 }
             }
@@ -524,10 +529,15 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
                     Toolkit.getDefaultToolkit().beep();
                     return;
                 }
-                ccm.show(source, x, y);
-                if (ccm.getComponentCount() == 0) {
-                    Toolkit.getDefaultToolkit().beep();
-                }
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        showPopup(ccm, new Point(x, y));
+                        if (ccm.getComponentCount() == 0) {
+                            Toolkit.getDefaultToolkit().beep();
+                        }
+                    }
+                });
             }
         });
         p.add(button, "width 12!,height 12!");
@@ -1444,7 +1454,13 @@ public class ExtTable<E> extends JTable implements ToolTipHandler, PropertyChang
     //
     // }
     protected void showPopup(final JPopupMenu popup, final Point p) {
-        popup.show(ExtTable.this, p.x, p.y);
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                popup.show(ExtTable.this, p.x, p.y);
+            }
+        });
+        return;
     }
 
     @SuppressWarnings("unchecked")

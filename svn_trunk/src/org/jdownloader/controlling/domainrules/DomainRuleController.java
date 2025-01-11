@@ -3,6 +3,8 @@ package org.jdownloader.controlling.domainrules;
 import java.util.ArrayList;
 import java.util.List;
 
+import jd.plugins.Account;
+
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
@@ -15,8 +17,6 @@ import org.jdownloader.controlling.domainrules.event.DomainRuleControllerEventSe
 import org.jdownloader.controlling.domainrules.event.DomainRuleControllerListener;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.settings.staticreferences.CFG_GENERAL;
-
-import jd.plugins.Account;
 
 public class DomainRuleController implements GenericConfigEventListener<Object> {
     private static final DomainRuleController INSTANCE = new DomainRuleController();
@@ -87,6 +87,7 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
             }
         });
     }
+
     // public int getMaxSimulanDownloadsbyDomain(String candidateLinkHost) {
     // int max = 0;
     //
@@ -95,6 +96,10 @@ public class DomainRuleController implements GenericConfigEventListener<Object> 
     // }
     // return 0;
     // }
+    @Deprecated
+    public int getMaxSimultanDownloads() {
+        return getMaxSimultaneousDownloads();
+    }
 
     public int getMaxSimultaneousDownloads() {
         return maxSimultaneousDownloads;

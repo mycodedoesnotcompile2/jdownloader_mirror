@@ -24,17 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.appwork.utils.net.URLHelper;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
-import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
-import org.jdownloader.plugins.controller.host.HostPluginController;
-import org.jdownloader.plugins.controller.host.LazyHostPlugin;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -53,7 +42,18 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.Bunkr;
 
-@DecrypterPlugin(revision = "$Revision: 50328 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.net.URLHelper;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter;
+import org.jdownloader.controlling.filter.CompiledFiletypeFilter.CompiledFiletypeExtension;
+import org.jdownloader.plugins.controller.host.HostPluginController;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50427 $", interfaceVersion = 3, names = {}, urls = {})
 public class BunkrAlbum extends PluginForDecrypt {
     public BunkrAlbum(PluginWrapper wrapper) {
         super(wrapper);
@@ -71,8 +71,7 @@ public class BunkrAlbum extends PluginForDecrypt {
 
     /**
      * These domains are dead and can't be used for main URLs/albums BUT some of them can still be used for downloading inside directurls.
-     * </br>
-     * 2023-08-08: Example still working as CDN domain: bunkr.ru, bunkr.is
+     * </br> 2023-08-08: Example still working as CDN domain: bunkr.ru, bunkr.is
      */
     public static List<String> getDeadDomains() {
         return Arrays.asList(new String[] { "bunkr.su", "bunkr.ru", "bunkr.is", "bunkr.la" });
@@ -97,8 +96,8 @@ public class BunkrAlbum extends PluginForDecrypt {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/a/[A-Za-z0-9]+";
-            regex += "|https?://(\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:d|i|v)/[^/#\\?\"\\']+\\." + EXTENSIONS;
-            regex += "|https?://(\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:d|i|v)/[^/#\\?\"\\']+"; // Same but wider
+            regex += "|https?://(\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:d|i|v|f)/[^/#\\?\"\\']+\\." + EXTENSIONS;
+            regex += "|https?://(\\w+\\.)?" + buildHostsPatternPart(domains) + "/(?:d|i|v|f)/[^/#\\?\"\\']+"; // Same but wider
             regex += "|https?://c(?:dn)?(\\d+)?\\." + buildHostsPatternPart(domains) + "/[^/#\\?\"\\']+";// TYPE_CDN
             regex += "|https?://media-files\\d*\\." + buildHostsPatternPart(domains) + "/[^/#\\?\"\\']+";// TYPE_MEDIA_FILES
             ret.add(regex);
@@ -108,7 +107,7 @@ public class BunkrAlbum extends PluginForDecrypt {
 
     public static final String  TYPE_ALBUM                   = "(?i)https?://[^/]+/a/([A-Za-z0-9]+)";
     /* 2023-03-24: bunkr, files subdomain seems outdated? */
-    public static final Pattern PATTERN_SINGLE_FILE          = Pattern.compile("(?i)https?://([^/]+)/(d|i|v)/([^/#\\?\"\\']+).*");
+    public static final Pattern PATTERN_SINGLE_FILE          = Pattern.compile("(?i)https?://([^/]+)/(d|i|v|f)/([^/#\\?\"\\']+).*");
     public static final Pattern PATTERN_CDN_WITHOUT_EXT      = Pattern.compile("(?i)https?://c(?:dn)?(\\d+)?\\.[^/]+/[^/#\\?\"\\']+");
     public static final String  TYPE_CDN_WITH_EXT            = PATTERN_CDN_WITHOUT_EXT + "(\\." + EXTENSIONS + ")";
     public static final String  TYPE_MEDIA_FILES_WITHOUT_EXT = "(?i)https?://media-files(\\d*)\\.[^/]+/[^/#\\?\"\\']+";
@@ -310,8 +309,8 @@ public class BunkrAlbum extends PluginForDecrypt {
     }
 
     /**
-     * Returns URL if given URL looks like it is pointing to a single file. </br>
-     * Returns null if given URL-structure is unknown or does not seem to point to a single file.
+     * Returns URL if given URL looks like it is pointing to a single file. </br> Returns null if given URL-structure is unknown or does not
+     * seem to point to a single file.
      */
     private String isSingleMediaURL(final String url) {
         if (url == null) {

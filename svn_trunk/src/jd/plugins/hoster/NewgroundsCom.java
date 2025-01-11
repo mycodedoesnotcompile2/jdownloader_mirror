@@ -48,7 +48,7 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.plugins.controller.LazyPlugin;
 
-@HostPlugin(revision = "$Revision: 49243 $", interfaceVersion = 3, names = { "newgrounds.com" }, urls = { "https?://(?:www\\.)?newgrounds\\.com/(?:portal/view/|audio/listen/)(\\d+)" })
+@HostPlugin(revision = "$Revision: 50418 $", interfaceVersion = 3, names = { "newgrounds.com" }, urls = { "https?://(?:www\\.)?newgrounds\\.com/(?:portal/view/|audio/listen/)(\\d+)" })
 public class NewgroundsCom extends antiDDoSForHost {
     public NewgroundsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -196,13 +196,25 @@ public class NewgroundsCom extends antiDDoSForHost {
                 int qualityMax = 0;
                 while (iterator.hasNext()) {
                     final Entry<String, Object> entry = iterator.next();
-                    final String qualityStr = entry.getKey();
+                    String qualityStr = entry.getKey();
                     final List<Object> qualityInfoArray = (List<Object>) entry.getValue();
                     final Map<String, Object> qualityInfo = (Map<String, Object>) qualityInfoArray.get(0);
                     final String url = (String) qualityInfo.get("src");
-                    if (!qualityStr.matches("\\d+p") || StringUtils.isEmpty(url)) {
+                    if (StringUtils.isEmpty(url)) {
                         /* Skip invalid items */
                         continue;
+                    }
+                    if (!qualityStr.matches("\\d+p")) {
+                        final String p = new Regex(url, "(\\d{3,4})p\\.mp4").getMatch(0);
+                        if (p != null) {
+                            qualityStr = p;
+                        } else if ("4k".equals(qualityStr)) {
+                            qualityStr = "2160p";
+                        } else if ("2k".equals(qualityStr)) {
+                            qualityStr = "1440p";
+                        } else {
+                            continue;
+                        }
                     }
                     final int quality = Integer.parseInt(qualityStr.replace("p", ""));
                     if (quality > qualityMax) {

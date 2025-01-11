@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TeraboxCom;
 
-@DecrypterPlugin(revision = "$Revision: 50353 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50387 $", interfaceVersion = 3, names = {}, urls = {})
 public class TeraboxComFolder extends PluginForDecrypt {
     public TeraboxComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -336,32 +336,33 @@ public class TeraboxComFolder extends PluginForDecrypt {
                 entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             }
             errno = ((Number) entries.get("errno")).intValue();
-            if (errno != 0 || !entries.containsKey("list")) {
+            final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("list");
+            if (errno != 0 || ressourcelist == null) {
                 logger.info("Assume that this folder is offline");
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) entries.get("list");
             if (ressourcelist.isEmpty()) {
                 logger.info("Stopping because: Current page doesn't contain any items");
                 break;
             }
+            Boolean isRoot = null;
             if (preGivenPath == null && share_username == null) {
                 /* This request is solely to find the "share_username". */
                 final UrlQuery query_shorturlinfo = new UrlQuery();
-                query_shorturlinfo.add("app_id", getAppID());
-                query_shorturlinfo.add("web", "1");
-                query_shorturlinfo.add("channel", getChannel());
-                query_shorturlinfo.add("clienttype", getClientType());
+                query_shorturlinfo.appendEncoded("app_id", getAppID());
+                query_shorturlinfo.appendEncoded("web", "1");
+                query_shorturlinfo.appendEncoded("channel", getChannel());
+                query_shorturlinfo.appendEncoded("clienttype", getClientType());
                 /* 2023-06-21: jstoken is mandatory when account is given. */
-                query_shorturlinfo.add("jsToken", jstoken != null ? jstoken : "");
-                query_shorturlinfo.add("dp-logid", "");
-                query_shorturlinfo.add("shorturl", "1" + surl);
+                query_shorturlinfo.appendEncoded("jsToken", jstoken != null ? jstoken : "");
+                query_shorturlinfo.appendEncoded("dp-logid", "");
+                query_shorturlinfo.appendEncoded("shorturl", "1" + surl);
                 if (!StringUtils.isEmpty(preGivenPath)) {
-                    query_shorturlinfo.add("dir", preGivenPath);
+                    query_shorturlinfo.appendEncoded("dir", preGivenPath);
                 } else {
-                    query_shorturlinfo.add("root", "1");
+                    query_shorturlinfo.appendEncoded("root", "1");
                 }
-                query_shorturlinfo.add("scene", "");
+                query_shorturlinfo.appendEncoded("scene", "");
                 br.getPage(protocolAndSubdomain + "/api/shorturlinfo?" + query_shorturlinfo.toString());
                 final Map<String, Object> entries2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
                 final int fcount = ((Number) entries2.get("fcount")).intValue();
@@ -370,6 +371,11 @@ public class TeraboxComFolder extends PluginForDecrypt {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
                 share_username = entries2.get("share_username").toString();
+                if (((Number) entries2.get("root")).intValue() == 1) {
+                    isRoot = Boolean.TRUE;
+                } else {
+                    isRoot = Boolean.FALSE;
+                }
             }
             for (final Map<String, Object> ressource : ressourcelist) {
                 final String path = (String) ressource.get("path");
@@ -399,14 +405,20 @@ public class TeraboxComFolder extends PluginForDecrypt {
                         realpath = path;
                     }
                     final UrlQuery thisparams = new UrlQuery();
-                    thisparams.add("surl", surl);
-                    thisparams.appendEncoded("dir", realpath);// only the path!
-                    thisparams.add("fsid", fsidStr);
+                    thisparams.appendEncoded("surl", surl);
+                    if (isRoot != Boolean.TRUE) {
+                        /*
+                         * A path value can exist even for items in root but the internal "dir" and "path" values are two different things!
+                         * Do not append a dir value for items that are in the root folder!
+                         */
+                        thisparams.appendEncoded("dir", realpath);// only the path!
+                    }
+                    thisparams.appendEncoded("fsid", fsidStr);
                     thisparams.appendEncoded("fileName", serverfilename);
                     final String url = protocolAndSubdomain + "/sharing/link?" + thisparams.toString();
                     final String contentURL;
                     if (category == 1) {
-                        thisparams.add("page", Integer.toString(page));
+                        thisparams.appendEncoded("page", Integer.toString(page));
                         contentURL = protocolAndSubdomain + "/sharing/videoPlay?" + thisparams.toString();
                     } else {
                         /* No URL available that points directly to that file! */

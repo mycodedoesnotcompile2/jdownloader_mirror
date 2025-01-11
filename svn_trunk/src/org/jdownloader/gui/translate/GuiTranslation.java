@@ -2922,13 +2922,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Close this notification" })
     String Notify_createHeader_close_tt();
 
-    @Default(lngs = { "en" }, values = { "Bubble Notify" })
+    @Default(lngs = { "en" }, values = { "Notifications" })
     String NotifierConfigPanel_getTitle();
 
     @Default(lngs = { "en" }, values = { "New Links added" })
     String balloon_new_links();
 
-    @Default(lngs = { "en" }, values = { "Bubble Notifications are tiny messages that notify you when special events occur. " })
+    @Default(lngs = { "en" }, values = { "Notifications are tiny messages that notify you when special events occur." })
     String plugins_optional_JDLightTray_ballon_desc();
 
     @Default(lngs = { "en" }, values = { "during Linkcrawling and Onlinecheck" })
@@ -2952,10 +2952,10 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "JDownloader Reconnect" })
     String balloon_reconnect();
 
-    @Default(lngs = { "en" }, values = { "Bubble Settings" })
+    @Default(lngs = { "en" }, values = { "Notification settings" })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_settings_();
 
-    @Default(lngs = { "en" }, values = { "Show Bubbles while Silent Mode is active" })
+    @Default(lngs = { "en" }, values = { "Show notifications while Silent Mode is active" })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_silent_();
 
     @Default(lngs = { "en" }, values = { "Captcha Input required: %s1" })
@@ -3880,7 +3880,7 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Never" })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_never();
 
-    @Default(lngs = { "en" }, values = { "Show Bubbles if..." })
+    @Default(lngs = { "en" }, values = { "Show notifications if..." })
     String BubbleNotifyConfigPanel_BubbleNotifyConfigPanel_enabledstate();
 
     @Default(lngs = { "en" }, values = { "or" })
@@ -4087,13 +4087,13 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Successful" })
     String lit_successfull();
 
-    @Default(lngs = { "en" }, values = { "Open general Bubble Settings" })
+    @Default(lngs = { "en" }, values = { "Open general notification settings" })
     String bubblepopup_open_settings();
 
-    @Default(lngs = { "en" }, values = { "Hide this Bubble Type permanently" })
+    @Default(lngs = { "en" }, values = { "Hide this notification Type permanently" })
     String bubble_hide_permanent();
 
-    @Default(lngs = { "en" }, values = { "Are you sure that you do not want bubbles any more when %s1?\r\nYou can enable or disable bubbles at any time in the settings panel." })
+    @Default(lngs = { "en" }, values = { "Are you sure that you do not want notifications any more when %s1?\r\nYou can enable or disable notifications at any time in the settings panel." })
     String bubble_disable_rly_msg(String label);
 
     @Default(lngs = { "en" }, values = { "Progress" })

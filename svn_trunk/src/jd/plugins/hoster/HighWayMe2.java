@@ -42,7 +42,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 49704 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
+@HostPlugin(revision = "$Revision: 50385 $", interfaceVersion = 4, names = { "high-way.me" }, urls = { "https?://high-way\\.me/onlinetv\\.php\\?id=\\d+[^/]+" })
 public class HighWayMe2 extends HighWayCore {
     protected static MultiHosterManagement mhm                      = new MultiHosterManagement("high-way.me");
     private static final String            urlWebsiteAPICredentials = "high-way.me/pages/cred/";
@@ -129,7 +129,7 @@ public class HighWayMe2 extends HighWayCore {
     public static interface HighWayMeConfigInterface extends UsenetAccountConfigInterface {
         public class Translation {
             public String getUseDownloadslotBlockingCloudDownloadMode_label() {
-                return "Block download slots for files which have to be downloaded to the multihoster first? If you disable this, you will need to add account usage rules to be able to smoothly use this feature!";
+                return "Block download slots for files which have to be downloaded into the multihosters' cache? Recommended if you own multiple multihoster accounts.";
             }
         }
 

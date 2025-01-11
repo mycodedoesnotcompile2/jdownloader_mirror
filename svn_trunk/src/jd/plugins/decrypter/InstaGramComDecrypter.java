@@ -77,7 +77,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 49982 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50396 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1679,7 +1679,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> results = new ArrayList<DownloadLink>();
         final Map<String, Object> user = (Map<String, Object>) item.get("user");
         final String username = user.get("username").toString();
         final Object reel_typeO = item.get("reel_type");
@@ -1702,6 +1702,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 } else {
                     packagenameScheme = customPackagenameScheme;
                 }
+                /* No title available -> Use "story" as fallback */
+                metadata.setStoryTitle("story");
             } else if (reel_type.equals("highlight_reel")) {
                 /* Story highlight */
                 created_at = ((Number) item.get("created_at")).longValue();
@@ -1713,6 +1715,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 } else {
                     packagenameScheme = customPackagenameScheme;
                 }
+                metadata.setStoryTitle(title);
             } else {
                 /* Unknown/Unsupported reel_type */
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -1761,6 +1764,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 dl.setProperty(InstaGramCom.PROPERTY_internal_media_id, internalMediaID);
                 dl.setProperty(InstaGramCom.PROPERTY_uploader, username);
                 dl.setProperty(InstaGramCom.PROPERTY_is_part_of_story, true);
+                dl.setProperty(InstaGramCom.PROPERTY_story_title, metadata.getStoryTitle());
                 if (thisMediaType.intValue() == 2) {
                     dl.setProperty(InstaGramCom.PROPERTY_type, "video");
                 } else {
@@ -1768,7 +1772,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
                 dl.setFinalFileName(getFilename(this, dl));
                 dl._setFilePackage(fp);
-                decryptedLinks.add(dl);
+                results.add(dl);
                 distribute(dl);
                 orderID++;
             }
@@ -1822,16 +1826,16 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 if (fp != null) {
                     dl._setFilePackage(fp);
                 }
-                decryptedLinks.add(dl);
+                results.add(dl);
                 distribute(dl);
                 orderID++;
             }
             if (cfg.isPostCrawlerAddPostDescriptionAsTextfile() && !StringUtils.isEmpty(description)) {
                 /* Download picture-description as .txt file */
-                decryptedLinks.add(getTextDownloadlink(decryptedLinks.get(0)));
+                results.add(getTextDownloadlink(results.get(0)));
             }
         }
-        return decryptedLinks;
+        return results;
     }
 
     /**
@@ -1876,6 +1880,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         if (link.hasProperty(InstaGramCom.PROPERTY_filename_from_crawler)) {
             return link.getStringProperty(InstaGramCom.PROPERTY_filename_from_crawler);
         }
+        final String storyHighlightTitle = link.getStringProperty(InstaGramCom.PROPERTY_story_title);
         final String dateFormatted = link.getStringProperty(InstaGramCom.PROPERTY_date);
         final String username = link.getStringProperty(InstaGramCom.PROPERTY_uploader);
         final int orderid = link.getIntegerProperty(InstaGramCom.PROPERTY_orderid_raw);
@@ -1910,6 +1915,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             // *date*_*uploader* - *main_content_id* *orderid*_of_*orderid_max* - *shortcode*.*ext*
             String filename = filenameScheme.replace("*date*", dateFormatted);
             filename = filename.replace("*uploader*", username != null ? username : "-");
+            filename = filename.replace("*title*", storyHighlightTitle != null ? storyHighlightTitle : "-");
             filename = filename.replace("*orderid*", orderidFormatted != null ? orderidFormatted : "-");
             filename = filename.replace("*main_content_id*", mainContentID);
             filename = filename.replace("*orderid_max*", Integer.toString(orderid_max));
@@ -2300,9 +2306,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 }
             }
             return ret;
-        } else {
-            return this.crawlPostAltAPI(param, metadata, reel_media);
         }
+        return this.crawlPostAltAPI(param, metadata, reel_media);
     }
 
     /**
@@ -2418,11 +2423,12 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
     }
 
     protected class InstagramMetadata {
-        private String username      = null;
-        private String mainContentID = null;
-        private String hashtag       = null;
         private String description   = null;
+        private String hashtag       = null;
+        private String mainContentID = null;
         private String packageName   = null;
+        private String storyTitle    = null;
+        private String username      = null;
         private Date   date          = null;
 
         public InstagramMetadata() {
@@ -2432,20 +2438,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             this.username = username;
         }
 
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        public String getHashtag() {
-            return hashtag;
-        }
-
-        public void setHashtag(String hashtag) {
-            this.hashtag = hashtag;
+        public Object clone() throws CloneNotSupportedException {
+            return super.clone();
         }
 
         public String getDescription() {
@@ -2456,12 +2450,59 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             this.description = description;
         }
 
+        public Date getDate() {
+            return date;
+        }
+
+        public void setDate(Date date) {
+            this.date = date;
+        }
+
+        public String getDateFormatted() {
+            if (this.date == null) {
+                return null;
+            }
+            return new SimpleDateFormat("yyyy-MM-dd").format(this.date);
+        }
+
+        public String getHashtag() {
+            return hashtag;
+        }
+
+        public void setHashtag(String hashtag) {
+            this.hashtag = hashtag;
+        }
+
+        public String getMainContentID() {
+            return mainContentID;
+        }
+
+        public void setMainContentID(String mainContentID) {
+            this.mainContentID = mainContentID;
+        }
+
         public String getPackageName() {
             return packageName;
         }
 
         public void setPackageName(String packageName) {
             this.packageName = packageName;
+        }
+
+        public String getStoryTitle() {
+            return storyTitle;
+        }
+
+        public void setStoryTitle(String title) {
+            this.storyTitle = title;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
         }
 
         public FilePackage getFilePackage() {
@@ -2478,33 +2519,6 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 fp.setPackageKey(this.getPackageName());
             }
             return fp;
-        }
-
-        public Object clone() throws CloneNotSupportedException {
-            return super.clone();
-        }
-
-        public Date getDate() {
-            return date;
-        }
-
-        public String getDateFormatted() {
-            if (this.date == null) {
-                return null;
-            }
-            return new SimpleDateFormat("yyyy-MM-dd").format(this.date);
-        }
-
-        public void setDate(Date date) {
-            this.date = date;
-        }
-
-        public String getMainContentID() {
-            return mainContentID;
-        }
-
-        public void setMainContentID(String mainContentID) {
-            this.mainContentID = mainContentID;
         }
     }
 

@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48711 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50407 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -92,19 +92,21 @@ public class HdencodeOrg extends PluginForDecrypt {
         for (final String[] keyValuePair : specialFormKeyValuePairs) {
             captchaform.put(Encoding.urlEncode(keyValuePair[0]), Encoding.urlEncode(keyValuePair[1]));
         }
-        final String recaptchaV2Response;
+        final CaptchaHelperCrawlerPluginRecaptchaV2 helper;
         if (br.containsHTML("\"version\"\\s*:\\s*\"(invisible|v3)")) {
             /* Invisible reCaptchaV2 */
-            recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
+            helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
                 public TYPE getType() {
                     return TYPE.INVISIBLE;
                 }
-            }.getToken();
+            };
         } else {
             /* reCaptchaV2 auto handling */
-            recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br).getToken();
+            helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br);
         }
-        captchaform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaV2Response));
+        if (helper.getSiteKey() != null) {
+            captchaform.put("g-recaptcha-response", helper.getToken());
+        }
         br.submitForm(captchaform);
         final String[] htmls = br.getRegex("<blockquote>(.*?)</blockquote>").getColumn(0);
         if (htmls == null || htmls.length == 0) {

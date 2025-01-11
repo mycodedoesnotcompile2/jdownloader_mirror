@@ -56,7 +56,6 @@ import org.appwork.swing.synthetica.SyntheticaHelper;
  * @author thomas
  *
  */
-
 public class JScrollMenu extends JMenu {
     // Covers the one in the JMenu because the method that creates it in JMenu is private
     /** The popup menu portion of the menu. */
@@ -92,10 +91,9 @@ public class JScrollMenu extends JMenu {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see javax.swing.JComponent#getPreferredSize()
      */
-
     @Override
     public Dimension getPreferredSize() {
         Dimension ret = super.getPreferredSize();
@@ -121,7 +119,7 @@ public class JScrollMenu extends JMenu {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see javax.swing.AbstractButton#getText()
      */
     @Override
@@ -131,7 +129,7 @@ public class JScrollMenu extends JMenu {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see javax.swing.JComponent#paintComponent(java.awt.Graphics)
      */
     @Override
@@ -139,14 +137,13 @@ public class JScrollMenu extends JMenu {
         super.paintComponent(g);
     }
 
-    //////////////////////////////
-    //// All of these methods are necessary because ensurePopupMenuCreated() is private in JMenu
-    //////////////////////////////
+    // ////////////////////////////
+    // // All of these methods are necessary because ensurePopupMenuCreated() is private in JMenu
+    // ////////////////////////////
     @Override
     public void updateUI() {
         MenuItemUI u = (MenuItemUI) UIManager.getUI(this);
         setUI(u);
-
         if (popupMenu != null) {
             popupMenu.setUI((PopupMenuUI) UIManager.getUI(popupMenu));
         }
@@ -197,7 +194,6 @@ public class JScrollMenu extends JMenu {
         if (pos < 0) {
             throw new IllegalArgumentException("index less than zero.");
         }
-
         ensurePopupMenuCreated();
         popupMenu.insert(new JMenuItem(s), pos);
     }
@@ -217,7 +213,6 @@ public class JScrollMenu extends JMenu {
         if (pos < 0) {
             throw new IllegalArgumentException("index less than zero.");
         }
-
         ensurePopupMenuCreated();
         JMenuItem mi = new JMenuItem(a);
         mi.setHorizontalTextPosition(JButton.TRAILING);
@@ -231,7 +226,6 @@ public class JScrollMenu extends JMenu {
         if (index < 0) {
             throw new IllegalArgumentException("index less than zero.");
         }
-
         ensurePopupMenuCreated();
         popupMenu.insert(new JPopupMenu.Separator(), index);
     }
@@ -299,7 +293,6 @@ public class JScrollMenu extends JMenu {
     @Override
     public void applyComponentOrientation(ComponentOrientation o) {
         super.applyComponentOrientation(o);
-
         if (popupMenu != null) {
             int ncomponents = getMenuComponentCount();
             for (int i = 0; i < ncomponents; ++i) {

@@ -10,7 +10,6 @@ import javax.swing.JComponent;
 import jd.controlling.linkcrawler.CrawledLink;
 import jd.controlling.linkcrawler.CrawledPackage;
 
-import org.appwork.utils.swing.EDTHelper;
 import org.jdownloader.actions.AppAction;
 import org.jdownloader.controlling.contextmenu.MenuItemData;
 import org.jdownloader.controlling.contextmenu.MenuLink;
@@ -46,7 +45,7 @@ public class LinkgrabberPluginLink extends MenuItemData implements MenuLink {
     }
 
     @Override
-    public JComponent addTo(final JComponent root, MenuBuilder menuBuilder) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchMethodException, SecurityException, ExtensionNotLoadedException {
+    public JComponent addTo(final JComponent root, final MenuBuilder menuBuilder) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException, NoSuchMethodException, SecurityException, ExtensionNotLoadedException {
         final int rootIndex = root.getComponentCount();
         LinkGrabberTable.getInstance().getSelectionInfo(new EDTSelectionInfoCallback<CrawledPackage, CrawledLink>() {
 
@@ -55,7 +54,7 @@ public class LinkgrabberPluginLink extends MenuItemData implements MenuLink {
                 final Collection<PluginView<CrawledLink>> views = selectionInfo.getPluginViews();
                 final List<JComponent> menuEntries = new ArrayList<JComponent>();
                 for (PluginView<CrawledLink> pv : views) {
-                    final List<JComponent> pluginMenuEntries = pv.getPlugin().extendLinkgrabberContextMenu(root, pv, views);
+                    final List<JComponent> pluginMenuEntries = pv.getPlugin().extendLinkgrabberContextMenu(menuBuilder.getCancelled(), root, pv, views);
                     if (pluginMenuEntries != null) {
                         menuEntries.addAll(pluginMenuEntries);
                     }
@@ -71,13 +70,7 @@ public class LinkgrabberPluginLink extends MenuItemData implements MenuLink {
 
             @Override
             public boolean isCancelled() {
-                return Boolean.FALSE.equals(new EDTHelper<Boolean>() {
-
-                    @Override
-                    public Boolean edtRun() {
-                        return root.isVisible();
-                    }
-                }.getReturnValue());
+                return menuBuilder.getCancelled().get();
             }
         }, SelectionType.SELECTED);
         return null;

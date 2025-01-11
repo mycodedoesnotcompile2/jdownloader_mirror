@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 49602 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50415 $", interfaceVersion = 3, names = {}, urls = {})
 public class AdultdbIo extends PluginForDecrypt {
     public AdultdbIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -104,6 +104,26 @@ public class AdultdbIo extends PluginForDecrypt {
         if (keyValuePairs == null || keyValuePairs.length == 0) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
+        /* Find reCaptchaKey */
+        String rcKey = null;
+        final String[] jsurls = br.getRegex("(/wp-content/litespeed/js/[^\"]+)\"").getColumn(0);
+        if (jsurls != null && jsurls.length > 0) {
+            final Browser brx = br.cloneBrowser();
+            for (final String jsurl : jsurls) {
+                brx.getPage(jsurl);
+                rcKey = brx.getRegex("\"recaptcha_key\":\\s*\"([^\"]+)\"").getMatch(0);
+                if (rcKey != null) {
+                    break;
+                }
+                if (this.isAbort()) {
+                    throw new InterruptedException();
+                }
+            }
+        }
+        if (rcKey == null) {
+            logger.warning("Failed to find reCaptchaKey -> Using static fallback");
+            rcKey = "6Lc12LYZAAAAAHrmiB-FozY-KoqQYLFxEj6xoiAm";
+        }
         /* Fill form */
         final Map<String, String> mappings = new HashMap<String, String>();
         mappings.put("ptid", "captcha_id");
@@ -123,8 +143,6 @@ public class AdultdbIo extends PluginForDecrypt {
         brc.getHeaders().put("Accept", "application/json, text/javascript, */*; q=0.01");
         brc.getHeaders().put("Origin", "https://www." + getHost());
         brc.getHeaders().put("x-requested-with", "XMLHttpRequest");
-        /* 2024-08-19: source: https://www.adultdb.io/wp-content/litespeed/js/23c627e725593d7fb4a2788f56a64c8e.js?ver=e8c05 */
-        final String rcKey = "6LfND-MoAAAAAD_iyDmNoCo3sYBpDrzWrQ5smXxK";
         final String recaptchaV2Response = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br, rcKey).getToken();
         captchaform.put("token", Encoding.urlEncode(recaptchaV2Response));
         captchaform.setAction("/wp-admin/admin-ajax.php");

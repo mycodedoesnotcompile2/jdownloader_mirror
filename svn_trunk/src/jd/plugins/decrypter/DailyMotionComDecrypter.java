@@ -58,7 +58,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.DailyMotionCom;
 
 //Decrypts embedded videos from dailymotion
-@DecrypterPlugin(revision = "$Revision: 49500 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
+@DecrypterPlugin(revision = "$Revision: 50376 $", interfaceVersion = 2, names = { "dailymotion.com" }, urls = { "https?://(?:www\\.)?(dailymotion\\.com|dai\\.ly)/.+" })
 public class DailyMotionComDecrypter extends PluginForDecrypt {
     public DailyMotionComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -169,15 +169,20 @@ public class DailyMotionComDecrypter extends PluginForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         do {
             page++;
-            final String json = this.br.cloneBrowser().getPage("https://api.dailymotion.com/user/" + username + "/videos?limit=" + api_limit_items + "&page=" + page);
-            final Map<String, Object> entries = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(json);
+            final Browser brc = this.br.cloneBrowser();
+            brc.setAllowedResponseCodes(400);
+            brc.getPage("https://api.dailymotion.com/user/" + username + "/videos?limit=" + api_limit_items + "&page=" + page);
+            if (brc.getHttpConnection().getResponseCode() == 400) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else if (brc.getHttpConnection().getResponseCode() == 404) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
+            final String json = brc.getRequest().getHtmlCode();
+            final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             has_more = ((Boolean) entries.get("has_more")).booleanValue();
             final List<Map<String, Object>> list = (List<Map<String, Object>>) entries.get("list");
             for (final Map<String, Object> videomap : list) {
-                final String videoid = (String) videomap.get("id");
-                if (StringUtils.isEmpty(videoid)) {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
+                final String videoid = videomap.get("id").toString();
                 final DownloadLink dl = this.createDownloadlink(createVideolink(videoid));
                 dl._setFilePackage(fp);
                 ret.add(dl);

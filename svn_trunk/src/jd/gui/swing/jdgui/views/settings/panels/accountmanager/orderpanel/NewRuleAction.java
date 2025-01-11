@@ -62,43 +62,49 @@ public class NewRuleAction extends AbstractAddAction {
     /** Returns list of possible domains which an AccountUsageRule can be added for. */
     protected ArrayList<DomainInfo> getAvailableDomainInfoList() {
         final HashSet<DomainInfo> domains = new HashSet<DomainInfo>();
-        final HashSet<String> multihosterDomains = new HashSet<String>();
+        /* List of all hosts supported by all multi hoster accounts the user owns */
+        final List<MultiHostHost> all_mhosts = new ArrayList<MultiHostHost>();
         /* Collect domains of all multihoster accounts which the user currently has. */
         for (final Account acc : AccountController.getInstance().list()) {
             if (!acc.getPlugin().hasFeature(FEATURE.MULTIHOST)) {
                 continue;
             }
-            final String thisMultihosterDomain = acc.getHoster();
-            multihosterDomains.add(thisMultihosterDomain);
             final AccountInfo ai = acc.getAccountInfo();
             if (ai == null) {
+                /* Multihost without any AccountInfo -> Shouldn't happen. */
                 continue;
             }
-            final List<MultiHostHost> supportedhosts = ai.getMultiHostSupportV2();
-            if (supportedhosts == null) {
+            final List<MultiHostHost> this_mhosts = ai.getMultiHostSupportV2();
+            if (this_mhosts == null || this_mhosts.isEmpty()) {
+                /* Multihost without any supported hosts -> Shouldn't happen. */
                 continue;
             }
-            for (final MultiHostHost mhost : supportedhosts) {
-                for (final String domain : mhost.getDomains()) {
-                    if (multihosterDomains.contains(domain)) {
-                        /*
-                         * Multihoster supports its own domain or domains of other multihosters -> Exclude those domains from usage rule
-                         * selection
-                         */
-                        continue;
-                    }
-                    domains.add(mhost.getDomainInfo());
-                    /* Continue with next MultiHostHost entry */
-                    break;
-                }
-            }
+            all_mhosts.addAll(this_mhosts);
+        }
+        final HashSet<String> multihosterSupportedDomains = new HashSet<String>();
+        for (final MultiHostHost mhost : all_mhosts) {
+            multihosterSupportedDomains.addAll(mhost.getDomains());
         }
         final Collection<LazyHostPlugin> plugins = HostPluginController.getInstance().list();
         /* Collect all domains which the user is allowed to create usage rules for. */
-        for (final LazyHostPlugin plugin : plugins) {
-            if (allowAccountUsageRuleCreation(plugin)) {
-                domains.add(plugin.getDomainInfo());
+        for (final LazyHostPlugin plg : plugins) {
+            if (plg.hasFeature(FEATURE.MULTIHOST)) {
+                /* Do not allow user to add rules for multihoster domains. */
+                continue;
+            } else if (plg.isOfflinePlugin()) {
+                /* Do not allow users to create account usage rules for domains known to be permanently offline. */
+                continue;
+            } else if (plg.hasFeature(FEATURE.USENET) && !plg.getHost().equals("usenet")) {
+                /* Do not allow usage rule creation for pure usenet plugins. */
+                continue;
+            } else if (plg.hasFeature(FEATURE.INTERNAL)) {
+                /* Do not allow users to create account usage rules for internal plugins. */
+                continue;
+            } else if (!plg.isPremium() && !multihosterSupportedDomains.contains(plg.getHost())) {
+                /* Plugin has no account support and no multihost has support for it -> Do not allow the user to create a rule for it. */
+                continue;
             }
+            domains.add(plg.getDomainInfo());
         }
         /* Sort results. */
         final ArrayList<DomainInfo> lst = new ArrayList<DomainInfo>(domains);
@@ -114,29 +120,5 @@ public class NewRuleAction extends AbstractAddAction {
     @Override
     public String getTooltipText() {
         return _GUI.T.NewRuleAction_getTooltipText_tt_();
-    }
-
-    /** Returns true if new rule creation is allowed according to some factors given inside given LazyHostPlugin instance. */
-    public static boolean allowAccountUsageRuleCreation(final LazyHostPlugin plg) {
-        if (plg.hasFeature(FEATURE.USENET) && !plg.hasFeature(FEATURE.MULTIHOST)) {
-            /* Special case: usenet plugin */
-            return true;
-        } else if (!plg.isPremium()) {
-            return false;
-        } else if (plg.hasFeature(FEATURE.MULTIHOST)) {
-            /*
-             * Do not allow users to create account usage rules for multihosts as those usually don't host any files thus creating a rule
-             * doesn't make any sense.
-             */
-            return false;
-        } else if (plg.hasFeature(FEATURE.INTERNAL)) {
-            /* Do not allow users to create account usage rules for internal plugins. */
-            return false;
-        } else if (plg.isOfflinePlugin()) {
-            /* Do not allow users to create account usage rules for domains known to be permanently offline. */
-            return false;
-        } else {
-            return true;
-        }
     }
 }

@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.cloudflareturnstile.AbstractCloudflareTurnstileCaptcha;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -38,7 +39,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49420 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50408 $", interfaceVersion = 3, names = {}, urls = {})
 public class VeevTo extends XFileSharingProBasic {
     public VeevTo(final PluginWrapper wrapper) {
         super(wrapper);
@@ -138,6 +139,8 @@ public class VeevTo extends XFileSharingProBasic {
             // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             /* 2024-07-08 */
             throw new PluginException(LinkStatus.ERROR_FATAL, "Uploader has disabled downloads for this file");
+        } else if (AbstractCloudflareTurnstileCaptcha.containsCloudflareTurnstileClass(br)) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Unsupported captcha type 'Cloudflare Turnstile'");
         }
         final Form preForm = new Form();
         preForm.setMethod(MethodType.POST);

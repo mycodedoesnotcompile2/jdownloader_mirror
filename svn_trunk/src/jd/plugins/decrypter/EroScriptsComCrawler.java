@@ -27,10 +27,12 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 
-@DecrypterPlugin(revision = "$Revision: 49631 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
+@DecrypterPlugin(revision = "$Revision: 50399 $", interfaceVersion = 3, names = { "discuss.eroscripts.com" }, urls = { "https?://discuss\\.eroscripts\\.com/t/([\\w\\-/]+)" })
 public class EroScriptsComCrawler extends antiDDoSForDecrypt {
     @Override
     public Browser createNewBrowserInstance() {
@@ -374,6 +376,9 @@ public class EroScriptsComCrawler extends antiDDoSForDecrypt {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String contenturl = parameter.getCryptedUrl().replaceFirst("(?i)http://", "https://");
         br.getPage(contenturl);
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         // final Storage CFG = JSonStorage.getPlainStorage("quickfilters");
         String[][] linkMatches = br.getRegex("<a[^<>]*\\shref\\s*=\\s*(?:\"|')([^#][^\\s]+)(?:\"|')([^<>]+title\\s*=\\s*(?:\\\"|')([^\\'\\\"]*)(?:\\\"|'))?").getMatches();
         handleMatches(linkMatches, ret);

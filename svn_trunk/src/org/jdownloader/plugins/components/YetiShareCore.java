@@ -83,7 +83,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.components.UserAgents;
 
-@HostPlugin(revision = "$Revision: 50074 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50421 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class YetiShareCore extends antiDDoSForHost {
     public YetiShareCore(PluginWrapper wrapper) {
         super(wrapper);
@@ -434,7 +434,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
                  * This can only happen on special file information page! </br>
                  * Some websites enforce a specific language so there is no other way but to add traits for multiple languages.
                  */
-                if (br.containsHTML("(?i)>\\s*Status\\s*:\\s*</span>\\s*<span>\\s*(Deleted|Usunięto|Silindi|Çöp)\\s*</span>")) {
+                if (br.containsHTML(">\\s*Status\\s*:?\\s*</[^>]*>\\s*<[^>]*>\\s*(Deleted|Usunięto|Silindi|Çöp)\\s*</")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } else {
@@ -968,7 +968,7 @@ public abstract class YetiShareCore extends antiDDoSForHost {
     protected void hookBeforeCaptchaFormSubmit(final Browser br, final Form captchaForm) {
     }
 
-    private String regexInternalFileID(final Browser br) {
+    protected String regexInternalFileID(final Browser br) {
         return br.getRegex("showFileInformation\\((\\d+)").getMatch(0);
     }
 

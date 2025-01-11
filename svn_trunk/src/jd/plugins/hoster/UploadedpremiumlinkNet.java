@@ -34,7 +34,6 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -51,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50409 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -107,13 +106,32 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             passCode = getUserInput("Password?", link);
         }
         final UrlQuery query = new UrlQuery();
-        query.add("link", Encoding.urlEncode(link.getDefaultPlugin().buildExternalDownloadURL(link, this)));
+        query.appendEncoded("link", link.getDefaultPlugin().buildExternalDownloadURL(link, this));
         if (link.getDownloadPassword() != null) {
-            query.add("password", Encoding.urlEncode(link.getDownloadPassword()));
+            query.appendEncoded("password", link.getDownloadPassword());
         }
         final Map<String, Object> dlresponse = (Map<String, Object>) this.accessAPI(account, link, "/generate_link_by_api", query);
-        final String dllink = (String) dlresponse.get("link");
         int chunks = ((Number) dlresponse.get("maxchunks")).intValue();
+        final Object delayedID = dlresponse.get("delayed");
+        String dllink = null;
+        if (delayedID != null) {
+            /* Link needs to be downloaded to the multihost server first before we can download it. */
+            final UrlQuery query2 = new UrlQuery();
+            query2.appendEncoded("id", delayedID.toString());
+            final Map<String, Object> delayedstatus = (Map<String, Object>) this.accessAPI(account, link, "/check_delayed_link", query2);
+            final int status = ((Number) delayedstatus.get("status")).intValue();
+            if (status == 1) {
+                final int timeLeftSeconds = ((Number) delayedstatus.get("time_left")).intValue();
+                final int waitSeconds = Math.min(5 * 60, timeLeftSeconds);
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Delayed item processing | ETA: " + delayedstatus.get("time_left_str"), waitSeconds * 1000l);
+            } else if (status == 3) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Delayed item failed", 10 * 60 * 1000l);
+            }
+            /* status == 2 -> Success -> Download ready */
+            dllink = delayedstatus.get("link").toString();
+        } else {
+            dllink = dlresponse.get("link").toString();
+        }
         if (chunks > 1) {
             /* That means "up to X chunks" */
             chunks = -chunks;
@@ -131,7 +149,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             br.followConnection(true);
             mhm.handleErrorGeneric(account, link, "Unknown download error", 10, 5 * 60 * 1000l);
         }
-        this.dl.startDownload();
+        dl.startDownload();
     }
 
     @Override
@@ -229,7 +247,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
     }
 
     private Object accessAPI(final Account account, final DownloadLink link, final String path, final UrlQuery postdata) throws IOException, PluginException, InterruptedException {
-        postdata.add("api_key", Encoding.urlEncode(account.getPass()));
+        postdata.appendEncoded("api_key", account.getPass());
         final PostRequest req = br.createPostRequest(this.API_BASE + path, postdata);
         return accessAPI(account, link, req);
     }
@@ -293,6 +311,7 @@ public class UploadedpremiumlinkNet extends PluginForHost {
         downloadErrorsFileUnavailable.add("FILESIZE_LIMIT");
         downloadErrorsFileUnavailable.add("FILESIZE_LIMIT_FREE");
         downloadErrorsFileUnavailable.add("FILESIZE_LIMIT_GUEST");
+        downloadErrorsFileUnavailable.add("LINK_ALREADY_GENERATED");
         downloadErrorsFileUnavailable.add("LINK_ERROR");
         downloadErrorsFileUnavailable.add("LINK_GENERATION_FAILED");
         downloadErrorsFileUnavailable.add("LINK_TEMPORARILY_UNAVAILABLE");

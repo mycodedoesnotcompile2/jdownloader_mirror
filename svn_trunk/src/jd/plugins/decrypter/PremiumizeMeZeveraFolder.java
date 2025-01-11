@@ -30,7 +30,7 @@ import jd.plugins.hoster.PremiumizeMe;
 import jd.plugins.hoster.ZeveraCom;
 import jd.plugins.hoster.ZeveraCore;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50406 $", interfaceVersion = 2, names = {}, urls = {})
 public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
     public PremiumizeMeZeveraFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -60,7 +60,7 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://(?:[a-z0-9\\.\\-]+)?" + buildHostsPatternPart(domains) + "/files\\?folder_id=([a-zA-Z0-9\\-_]+)");
+            ret.add("https?://(?:[a-z0-9\\.\\-]+)?" + buildHostsPatternPart(domains) + "/files(\\?folder_id=[a-zA-Z0-9\\-_]+)?");
         }
         return ret.toArray(new String[0]);
     }
@@ -143,6 +143,7 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
             folderPathForFiles = folderPath;
         }
         final FilePackage fp = FilePackage.getInstance();
+        fp.setCleanupPackageName(false);
         fp.setName(folderPathForFiles);
         for (final PremiumizeBrowseNode node : premiumizeNodes) {
             final String itemName = node.getName();
@@ -215,23 +216,36 @@ public class PremiumizeMeZeveraFolder extends PluginForDecrypt {
         return null;
     }
 
-    protected static String accessCloudItem(final Browser br, final Account account, final String url_source) throws IOException, AccountInvalidException {
+    protected static String accessCloudItem(final Browser br, final Account account, final String url) throws IOException, AccountInvalidException {
         final boolean pairingLogin = ZeveraCore.setAuthHeader(br, account);
-        final String itemID = PremiumizeMe.getCloudID(url_source);
+        final String itemID = PremiumizeMe.getCloudID(url);
         final String client_id;
         if (account.getHoster().equals("premiumize.me")) {
             client_id = PremiumizeMe.getClientIDExt();
         } else {
             client_id = ZeveraCom.getClientIDExt();
         }
+        final boolean isFolder;
+        if (StringUtils.containsIgnoreCase(url, "folder_id")) {
+            /* Crawl specific folder_id. */
+            isFolder = true;
+        } else if (StringUtils.endsWithCaseInsensitive(url, "/files")) {
+            /* Root folder = Grab everything from users' cloud. */
+            isFolder = true;
+        } else {
+            isFolder = false;
+        }
         final UrlQuery query = new UrlQuery();
-        query.add("id", Encoding.urlEncode(itemID));
+        if (itemID != null) {
+            query.add("id", Encoding.urlEncode(itemID));
+        }
         query.add("client_id", Encoding.urlEncode(client_id));
         if (!pairingLogin) {
             query.add("apikey", Encoding.urlEncode(ZeveraCore.getAPIKey(account)));
         }
-        if (StringUtils.containsIgnoreCase(url_source, "folder_id")) {
+        if (isFolder) {
             /* Folder */
+            /* Request without "id" parameter = API returns root cloud-folder items. */
             br.getPage("https://www." + account.getHoster() + "/api/folder/list?" + query.toString());
         } else {
             /* Single file */

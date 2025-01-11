@@ -64,7 +64,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.PornportalComCrawler;
 
-@HostPlugin(revision = "$Revision: 50330 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50413 $", interfaceVersion = 2, names = {}, urls = {})
 public class PornportalCom extends PluginForHost {
     public PornportalCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -95,7 +95,6 @@ public class PornportalCom extends PluginForHost {
         ret.add(new String[] { "pornportal.com" });
         /* 2024-06-26: babes.com is now spicevids.com */
         ret.add(new String[] { "spicevids.com", "babes.com", "blackisbetter.com" });
-        ret.add(new String[] { "bellesafilms.com" });
         ret.add(new String[] { "biempire.com" });
         ret.add(new String[] { "brazzers.com", "brazzer.com" });
         ret.add(new String[] { "digitalplayground.com" });

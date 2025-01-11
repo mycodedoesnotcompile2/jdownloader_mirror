@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.appwork.loggingv3.LogV3;
 import org.appwork.serializer.Deser;
 import org.appwork.serializer.SC;
 import org.appwork.storage.TypeRef;
@@ -56,6 +57,7 @@ import org.appwork.utils.AutoCloseInputStream;
 import org.appwork.utils.CompareUtils;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.ReflectionUtils;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.reflection.Clazz;
 
 /**
@@ -186,6 +188,7 @@ public class FlexiSerializer extends AbstractSerializer implements SerializerInt
             final FlexiJSonNode node = createParser(json, context).parse();
             return getMapper(context).jsonToObject(node, type);
         } catch (Exception e) {
+            LogV3.info("Error Parsing Json from String: " + StringUtils.abr(json, 300, "[" + (json.length() - 300) + "]"));
             throw SerializerException.wrap(e);
         }
     }

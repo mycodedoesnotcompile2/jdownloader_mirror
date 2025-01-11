@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.JComponent;
 import javax.swing.JMenuItem;
@@ -34,7 +35,7 @@ import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.host.PluginFinder;
 
-@HostPlugin(revision = "$Revision: 50360 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50375 $", interfaceVersion = 3, names = { "LinkCrawlerRetry" }, urls = { "" })
 public class LinkCrawlerRetry extends PluginForHost {
     public LinkCrawlerRetry(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +97,7 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     @Override
-    public List<JComponent> extendLinkgrabberContextMenu(JComponent parent, final PluginView<CrawledLink> pv, final Collection<PluginView<CrawledLink>> allPvs) {
+    public List<JComponent> extendLinkgrabberContextMenu(final AtomicBoolean isCancelled, JComponent parent, final PluginView<CrawledLink> pv, final Collection<PluginView<CrawledLink>> allPvs) {
         if (pv.size() == 0) {
             return null;
         }
@@ -143,7 +144,7 @@ public class LinkCrawlerRetry extends PluginForHost {
     }
 
     @Override
-    public List<JComponent> extendDownloadsTableContextMenu(final JComponent parent, final PluginView<DownloadLink> pv, final Collection<PluginView<DownloadLink>> views) {
+    public List<JComponent> extendDownloadsTableContextMenu(final AtomicBoolean isCancelled, final JComponent parent, final PluginView<DownloadLink> pv, final Collection<PluginView<DownloadLink>> views) {
         if (pv.size() == 0) {
             return null;
         }

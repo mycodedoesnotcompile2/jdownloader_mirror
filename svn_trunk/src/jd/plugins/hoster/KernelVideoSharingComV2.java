@@ -38,6 +38,7 @@ import org.appwork.utils.DebugMode;
 import org.appwork.utils.IO;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils.DispositionHeader;
 import org.jdownloader.downloader.hls.HLSDownloader;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.plugins.components.antiDDoSForHost;
@@ -76,7 +77,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50364 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,6 +143,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     protected static final String PROPERTY_DIRECTURL        = "directurl";
     private static final String   extDefault                = ".mp4";
     private String                dllink                    = null;
+    public static final String    FIXNAME                   = "fixName";
 
     /**
      * Use this e.g. for: </br>
@@ -669,7 +671,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         }
         final String title = getFileTitle(link);
         if (!StringUtils.isEmpty(title)) {
-            link.setFinalFileName(title + extDefault);
+            final String finalName = title + extDefault;
+            link.setFinalFileName(finalName);
+            link.setProperty(FIXNAME, finalName);
         }
         if (this.isPrivateVideoWebsite(this.br)) {
             link.setProperty(PROPERTY_IS_PRIVATE_VIDEO, true);
@@ -722,7 +726,8 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 link.setProperty(PROPERTY_DIRECTURL, this.dllink);
                 if (StringUtils.isEmpty(title)) {
                     /* Fallback - attempt to find final filename */
-                    final String contentDispositionFilename = Plugin.getFileNameFromDispositionHeader(con);
+                    final DispositionHeader dispositionHeader = parseDispositionHeader(con);
+                    final String contentDispositionFilename = dispositionHeader != null ? dispositionHeader.getFilename() : null;
                     final String filenameFromFinalDownloadurl;
                     if (!StringUtils.isEmpty(contentDispositionFilename)) {
                         logger.info("Using final filename from content-disposition header: " + contentDispositionFilename);
@@ -827,7 +832,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         final String title = (String) video.get("title");
         final String description = (String) video.get("description");
         if (!StringUtils.isEmpty(title)) {
-            link.setFinalFileName(title + extDefault);
+            final String finalName = title + extDefault;
+            link.setFinalFileName(finalName);
+            link.setProperty(FIXNAME, finalName);
         }
         if (StringUtils.isEmpty(link.getComment()) && !StringUtils.isEmpty(description)) {
             link.setComment(description);
@@ -895,11 +902,16 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
 
     protected boolean isOfflineWebsite(final Browser br) {
         final int responsecode = br.getHttpConnection().getResponseCode();
-        if (responsecode == 404 || responsecode == 410) {
+        if (responsecode == 403) {
+            /* E.g. porndr.com, camhub.cc */
+            return true;
+        } else if (responsecode == 404) {
+            return true;
+        } else if (responsecode == 410) {
             return true;
         } else if (br._getURL().getPath().matches("(?i)/4(04|10)\\.php.*")) {
             return true;
-        } else if (br.containsHTML("(?i)>\\s*(Sorry, this video was deleted per copyright owner request|Video has been removed due to a violation of the Terms and Conditions|Deleted by the owner request|This video has been removed|Video removed due to DMCA)")) {
+        } else if (br.containsHTML(">\\s*(Sorry, this video was deleted per copyright owner request|Video has been removed due to a violation of the Terms and Conditions|Deleted by the owner request|This video has been removed|Video removed due to DMCA|Video is not found)")) {
             return true;
         } else {
             return false;
@@ -1160,7 +1172,12 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             logger.log(e);
             return false;
         } finally {
-            if (!valid) {
+            if (valid) {
+                final String cachedFilename = link.getStringProperty(FIXNAME);
+                if (cachedFilename != null) {
+                    link.setFinalFileName(cachedFilename);
+                }
+            } else {
                 try {
                     dl.getConnection().disconnect();
                 } catch (Throwable ignore) {
@@ -1339,7 +1356,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
             logger.info("Crawling qualities 1");
             int foundQualities = 0;
             /* Try to find the highest quality possible --> Example website that has multiple qualities available: camwhoresbay.com */
-            final String[][] videoInfos = br.getRegex("(?i)([a-z0-9_]+_text)\\s*:\\s*'(\\d+p(?:\\s*(?:HD|HQ|2K|4K))?|(?:HD|HQ|2K|4K))'").getMatches();
+            final String[][] videoInfos = br.getRegex("([a-z0-9_]+_text)\\s*:\\s*'(\\d+p(?:\\s*(?:HD|FHD|HQ|2K|4K))?|(?:HD|FHD|HQ|2K|4K))'").getMatches();
             for (final String[] vidInfo : videoInfos) {
                 final String varNameText = vidInfo[0];
                 final String videoQualityStr = vidInfo[1];
@@ -1349,6 +1366,8 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
                 } else if (videoQualityStr.equalsIgnoreCase("HQ")) {
                     /* 2020-12-14: Rare case e.g. thisvid.com */
                     videoQuality = 720;
+                } else if (videoQualityStr.equalsIgnoreCase("FHD")) {
+                    videoQuality = 1080;
                 } else if (videoQualityStr.equalsIgnoreCase("2K")) {
                     videoQuality = 1440;
                 } else if (videoQualityStr.equalsIgnoreCase("4K")) {
@@ -1726,7 +1745,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
-    protected final String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
+    protected String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
         if (qualityMap.isEmpty()) {
             logger.info("Cannot perform quality selection: qualityMap is empty");
             return null;

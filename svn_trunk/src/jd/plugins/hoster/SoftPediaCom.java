@@ -33,17 +33,16 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49209 $", interfaceVersion = 2, names = { "softpedia.com" }, urls = { "https?://(?:www\\.|drivers\\.)?softpedia\\.com/(get/.+/.*?\\.shtml|progDownload/.*?\\-download\\-\\d+\\.(s)?html)" })
+@HostPlugin(revision = "$Revision: 50406 $", interfaceVersion = 2, names = { "softpedia.com" }, urls = { "https?://(?:www\\.|drivers\\.)?softpedia\\.com/(get/.+/.*?\\.shtml|progDownload/.*?\\-download\\-\\d+\\.(s)?html)" })
 public class SoftPediaCom extends PluginForHost {
-    private static final String SOFTPEDIASERVERS  = "allservers";
-    private static final String SERVER0           = "SP Mirror (US)";
-    private static final String SERVER1           = "SP Mirror (RO)";
-    private static final String SERVER2           = "Softpedia Mirror (US)";
-    private static final String SERVER3           = "Softpedia Mirror (RO)";
+    private static final String SOFTPEDIASERVERS = "allservers";
+    private static final String SERVER0          = "SP Mirror (US)";
+    private static final String SERVER1          = "SP Mirror (RO)";
+    private static final String SERVER2          = "Softpedia Mirror (US)";
+    private static final String SERVER3          = "Softpedia Mirror (RO)";
     /** The list of server values displayed to the user */
-    private final String[]      servers           = new String[] { SERVER0, SERVER1, SERVER2, SERVER3 };
-    private static final int    FREE_MAXCHUNKS    = 1;
-    private static final int    FREE_MAXDOWNLOADS = -1;
+    private final String[]      servers          = new String[] { SERVER0, SERVER1, SERVER2, SERVER3 };
+    private static final int    FREE_MAXCHUNKS   = 1;
 
     public SoftPediaCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -84,7 +83,7 @@ public class SoftPediaCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override

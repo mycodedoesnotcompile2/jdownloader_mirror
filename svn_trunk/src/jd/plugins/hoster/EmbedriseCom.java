@@ -21,12 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
+import jd.nutils.encoding.Encoding;
+import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49412 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50398 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmbedriseCom extends XFileSharingProBasic {
     public EmbedriseCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -37,7 +39,7 @@ public class EmbedriseCom extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignum reCaptchaV2, hcaptcha<br />
+     * captchatype-info: 2025-01-02: special <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
@@ -57,7 +59,27 @@ public class EmbedriseCom extends XFileSharingProBasic {
     }
 
     public static String[] getAnnotationUrls() {
-        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
+        return buildAnnotationUrlsEmbedrise(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrlsEmbedrise(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            String regex = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + XFileSharingProBasic.getDefaultAnnotationPatternPart();
+            regex += "|https?://(?:www\\.)?" + buildHostsPatternPart(domains) + TYPE_SPECIAL;
+            ret.add(regex);
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private static final String TYPE_SPECIAL = "/v/([a-z0-9]{12})";
+
+    @Override
+    public void correctDownloadLink(final DownloadLink link) {
+        final Regex special = new Regex(link.getPluginPatternMatcher(), TYPE_SPECIAL);
+        if (special.patternFind()) {
+            link.setPluginPatternMatcher("https://" + this.getHost() + super.buildNormalURLPath(link, special.getMatch(0)));
+        }
     }
 
     @Override
@@ -108,5 +130,15 @@ public class EmbedriseCom extends XFileSharingProBasic {
     @Override
     protected boolean supportsShortURLs() {
         return false;
+    }
+
+    @Override
+    public String[] scanInfo(final String html, final String[] fileInfo) {
+        super.scanInfo(html, fileInfo);
+        final String betterFilename = new Regex(html, "<title>([^<]+) - Embedrise</title>").getMatch(0);
+        if (betterFilename != null) {
+            fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
+        }
+        return fileInfo;
     }
 }

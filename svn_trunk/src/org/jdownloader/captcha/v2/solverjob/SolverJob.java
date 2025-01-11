@@ -9,12 +9,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import jd.controlling.captcha.CaptchaSettings;
-import jd.controlling.captcha.SkipRequest;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.utils.Exceptions;
+import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogSource;
 import org.jdownloader.captcha.v2.AbstractResponse;
 import org.jdownloader.captcha.v2.Challenge;
@@ -22,20 +22,23 @@ import org.jdownloader.captcha.v2.ChallengeResponseController;
 import org.jdownloader.captcha.v2.ChallengeSolver;
 import org.jdownloader.captcha.v2.ValidationResult;
 
+import jd.controlling.captcha.CaptchaSettings;
+import jd.controlling.captcha.SkipRequest;
+
 public class SolverJob<T> {
-    private final Challenge<T>                            challenge;
-    private final CaptchaSettings                         config;
-    private final ChallengeResponseController             controller;
-    private volatile ArrayList<ResponseList<T>>           cumulatedList;
-    private final HashSet<ChallengeSolver<T>>             doneList  = new HashSet<ChallengeSolver<T>>();
-    private volatile ChallengeSolverJobEventSender        eventSender;
-    private final List<AbstractResponse<T>>               responses = new ArrayList<AbstractResponse<T>>();
-    private final CopyOnWriteArraySet<ChallengeSolver<T>> solverList;
-    private LogSource                                     logger;
-    private volatile SkipRequest                          skipRequest;
-    private final Object                                  LOCK      = new Object();
-    private final AtomicBoolean                           alive     = new AtomicBoolean(true);
-    private long                                          created;
+    private final Challenge<T>                                   challenge;
+    private final CaptchaSettings                                config;
+    private final ChallengeResponseController                    controller;
+    private volatile ArrayList<ResponseList<T>>                  cumulatedList;
+    private final HashSet<ChallengeSolver<T>>                    doneList    = new HashSet<ChallengeSolver<T>>();
+    private final AtomicReference<ChallengeSolverJobEventSender> eventSender = new AtomicReference<ChallengeSolverJobEventSender>();
+    private final List<AbstractResponse<T>>                      responses   = new ArrayList<AbstractResponse<T>>();
+    private final CopyOnWriteArraySet<ChallengeSolver<T>>        solverList;
+    private LogSource                                            logger;
+    private volatile SkipRequest                                 skipRequest;
+    private final AtomicInteger                                  LOCK        = new AtomicInteger();
+    private final AtomicBoolean                                  alive       = new AtomicBoolean(true);
+    private long                                                 created;
 
     public String toString() {
         return "CaptchaJob: " + new Date(created) + " " + challenge + " Solver: " + solverList;
@@ -157,13 +160,30 @@ public class SolverJob<T> {
                     return;
                 }
             }
+            final ChallengeSolverJobEventSender eventSender = getEventSender(false);
             if (eventSender != null) {
                 eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_DONE, solver));
             }
         } finally {
-            synchronized (this) {
-                this.notifyAll();
+            _notifyAll();
+        }
+    }
+
+    public boolean _wait(final int timeout) throws InterruptedException {
+        final int notifyCnt = LOCK.get();
+        synchronized (LOCK) {
+            if (notifyCnt != LOCK.get()) {
+                return false;
             }
+            LOCK.wait(timeout);
+            return true;
+        }
+    }
+
+    public void _notifyAll() {
+        synchronized (LOCK) {
+            LOCK.incrementAndGet();
+            LOCK.notifyAll();
         }
     }
 
@@ -173,6 +193,7 @@ public class SolverJob<T> {
                 throw new IllegalStateException("This Job does not contain this solver");
             }
         }
+        final ChallengeSolverJobEventSender eventSender = getEventSender(false);
         if (eventSender != null) {
             eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_START, solver));
         }
@@ -181,6 +202,7 @@ public class SolverJob<T> {
 
     private void fireNewAnswerEvent(AbstractResponse<T> abstractResponse) {
         controller.fireNewAnswerEvent(this, abstractResponse);
+        final ChallengeSolverJobEventSender eventSender = getEventSender(false);
         if (eventSender != null) {
             eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.NEW_ANSWER, abstractResponse));
         }
@@ -192,6 +214,7 @@ public class SolverJob<T> {
                 throw new IllegalStateException("This Job does not contain this solver");
             }
         }
+        final ChallengeSolverJobEventSender eventSender = getEventSender(false);
         if (eventSender != null) {
             eventSender.fireEvent(new ChallengeSolverJobEvent(this, ChallengeSolverJobEvent.Type.SOLVER_TIMEOUT, solver));
         }
@@ -201,11 +224,18 @@ public class SolverJob<T> {
         return challenge;
     }
 
-    public synchronized ChallengeSolverJobEventSender getEventSender() {
-        if (eventSender == null) {
-            eventSender = new ChallengeSolverJobEventSender();
+    public ChallengeSolverJobEventSender getEventSender() {
+        return getEventSender(true);
+    }
+
+    protected ChallengeSolverJobEventSender getEventSender(final boolean mustInit) {
+        while (true) {
+            final ChallengeSolverJobEventSender eventSender = this.eventSender.get();
+            if (eventSender != null || !mustInit) {
+                return eventSender;
+            }
+            this.eventSender.compareAndSet(null, new ChallengeSolverJobEventSender());
         }
-        return eventSender;
     }
 
     public boolean isDone() {
@@ -259,7 +289,7 @@ public class SolverJob<T> {
     public void waitFor(int timeout, ChallengeSolver<?>... instances) throws InterruptedException {
         long endTime = -1;
         if (timeout > 0) {
-            endTime = System.currentTimeMillis() + timeout;
+            endTime = Time.systemIndependentCurrentJVMTimeMillis() + timeout;
             log(this + " Wait max" + timeout + " ms for " + instances);
         } else {
             log(this + " Wait infinite for " + instances);
@@ -271,23 +301,21 @@ public class SolverJob<T> {
                 } else if (Thread.interrupted()) {
                     throw new InterruptedException(this + " got interrupted");
                 }
-                synchronized (this) {
-                    if (!areDone(instances)) {
-                        if (endTime > 0) {
-                            long timeToWait = endTime - System.currentTimeMillis();
-                            if (timeToWait > 0) {
-                                log(this + " Wait " + timeToWait);
-                                this.wait(timeToWait);
-                            } else {
-                                log(this + " Timed Out! ");
-                                return;
-                            }
+                if (!areDone(instances)) {
+                    if (endTime > 0) {
+                        long timeToWait = endTime - Time.systemIndependentCurrentJVMTimeMillis();
+                        if (timeToWait > 0) {
+                            log(this + " Wait " + timeToWait);
+                            _wait(timeout);
                         } else {
-                            log(this + " Wait infinite");
-                            this.wait();
+                            log(this + " Timed Out! ");
+                            return;
                         }
-                        log(this + " Wokeup");
+                    } else {
+                        log(this + " Wait infinite");
+                        _wait(0);
                     }
+                    log(this + " Wokeup");
                 }
             }
             if (isSolved()) {

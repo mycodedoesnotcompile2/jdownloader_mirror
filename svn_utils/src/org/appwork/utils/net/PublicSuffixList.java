@@ -100,7 +100,7 @@ public class PublicSuffixList {
     public String getDomain(String fullDomain) {
         final String topLeveLDomain = this.getTopLevelDomain(fullDomain);
         if (topLeveLDomain != null) {
-            final String pattern = "([^\\.]+\\." + Pattern.quote(topLeveLDomain) + ")";
+            final String pattern = "([^\\.]+\\." + Pattern.quote(topLeveLDomain) + ")$";
             final String domain = new Regex(fullDomain, pattern).getMatch(0);
             return domain;
         }

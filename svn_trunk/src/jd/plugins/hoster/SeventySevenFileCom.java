@@ -45,16 +45,16 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48628 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50390 $", interfaceVersion = 2, names = {}, urls = {})
 public class SeventySevenFileCom extends PluginForHost {
     public SeventySevenFileCom(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://77file.com/vip.php");
+        this.enablePremium("https://" + getHost() + "/vip.php");
     }
 
     @Override
     public String getAGBLink() {
-        return "https://www.77file.com/terms.php";
+        return "https://www." + getHost() + "/terms.php";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -82,16 +82,13 @@ public class SeventySevenFileCom extends PluginForHost {
     }
 
     /* Connection stuff */
-    private final boolean        FREE_RESUME                  = true;
-    private final int            FREE_MAXCHUNKS               = 1;
-    private final int            FREE_MAXDOWNLOADS            = 1;
-    private static final boolean ACCOUNT_FREE_RESUME          = true;
-    private static final int     ACCOUNT_FREE_MAXCHUNKS       = 1;
-    private static final int     ACCOUNT_FREE_MAXDOWNLOADS    = 1;
+    private final boolean        FREE_RESUME               = true;
+    private final int            FREE_MAXCHUNKS            = 1;
+    private static final boolean ACCOUNT_FREE_RESUME       = true;
+    private static final int     ACCOUNT_FREE_MAXCHUNKS    = 1;
     /* 2022-05-20: Premium limits untested */
-    private static final boolean ACCOUNT_PREMIUM_RESUME       = true;
-    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS    = 0;
-    private static final int     ACCOUNT_PREMIUM_MAXDOWNLOADS = -1;
+    private static final boolean ACCOUNT_PREMIUM_RESUME    = true;
+    private static final int     ACCOUNT_PREMIUM_MAXCHUNKS = 0;
 
     public void correctDownloadLink(final DownloadLink link) {
         link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("/down/", "/s/"));
@@ -140,12 +137,12 @@ public class SeventySevenFileCom extends PluginForHost {
             /* 2021-12-07 */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String extFileID = new Regex(br.getURL(), "/s/(.+)").getMatch(0);
+        final String extFileID = new Regex(br.getURL(), "(?i)/s/(.+)").getMatch(0);
         if (extFileID != null) {
             link.setLinkID(this.getHost() + "://" + extFileID);
         }
         String filename = br.getRegex("align=.absbottom. border=.0.[^>]*/>([^<>\"]+)<").getMatch(0);
-        String filesize = br.getRegex("<span id=\"file_size\">([^<>\"]+)</span>").getMatch(0);
+        String filesize = br.getRegex("<span id=\"file_size\">([^<]+)</span>").getMatch(0);
         if (filename != null) {
             link.setName(Encoding.htmlDecode(filename).trim());
         } else {
@@ -181,7 +178,10 @@ public class SeventySevenFileCom extends PluginForHost {
                 this.login(account, false);
             }
             requestFileInformation(link);
-            final String fileID2 = this.br.getRegex("file_id=(\\d+)").getMatch(0);
+            String fileID2 = this.br.getRegex("file_id=(\\d+)").getMatch(0);
+            if (fileID2 == null) {
+                fileID2 = this.br.getRegex("load_down_addr1\\('(\\d+)'\\)").getMatch(0);
+            }
             if (fileID2 == null) {
                 logger.warning("Failed to find fileID2");
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -189,32 +189,35 @@ public class SeventySevenFileCom extends PluginForHost {
             final Browser brAjax = this.br.cloneBrowser();
             brAjax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             brAjax.getPage("/ajax_new.php??a=1&ctime=" + System.currentTimeMillis());
-            /* 2020-04-09: Waittime is skippable */
-            final String longWaittimeStr = PluginJSonUtils.getJson(brAjax, "wtime");
-            if (longWaittimeStr != null && longWaittimeStr.matches("\\d+")) {
-                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(longWaittimeStr) * 1001l);
+            if (false) {
+                /* 2020-04-09: Waittime is skippable */
+                final String longWaittimeStr = PluginJSonUtils.getJson(brAjax, "wtime");
+                if (longWaittimeStr != null && longWaittimeStr.matches("\\d+")) {
+                    // TODO: what is difference between waittime and wtime ?
+                    throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, Integer.parseInt(longWaittimeStr) * 1001l);
+                }
             }
-            /* 2020-04-09: Waittime is skippable */
-            // final String waittimeStr = PluginJSonUtils.getJson(brAjax, "waittime");
-            // if (waittimeStr == null) {
-            // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            // }
-            // final int wait = Integer.parseInt(waittimeStr);
-            // /* Too high waittime --> Reconnect required */
-            // if (wait > 75) {
-            // throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait * 1001l);
-            // }
-            // this.sleep(wait * 1001l, link);
+            /* 2024-12-30: Waittime is NOT skippable */
+            final String waittimeStr = PluginJSonUtils.getJson(brAjax, "waittime");
+            if (waittimeStr == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final int wait = Integer.parseInt(waittimeStr);
+            /* Too high waittime --> Reconnect required */
+            if (wait > 75) {
+                throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, wait * 1001l);
+            }
+            this.sleep(wait * 1001l, link);
             /* 2020-04-09: '/down' page is skippable */
             // br.getPage(br.getURL().replace("/file/", "/down/"));
-            /* 2020-04-09: Captcha is skippable */
-            // final String code = getCaptchaCode("/imagecode.php", link);
-            // br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-            // br.postPage("/ajax.php", "action=check_code&code=" + Encoding.urlEncode(code));
-            // if (br.toString().equals("false")) {
-            // throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-            // }
-            br.postPage("/ajax.php", "action=load_down_addr1&file_id=" + fileID2);
+            /* 2024-12-30: Captcha is NOT skippable */
+            final String code = getCaptchaCode("/imagecode.php", link);
+            br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+            br.postPage("/ajax.php", "action=check_code&code=" + Encoding.urlEncode(code));
+            if (br.toString().equals("false")) {
+                throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+            }
+            br.postPage("/ajax.php", "action=load_down_addr1&file_id=" + fileID2 + "&code=" + Encoding.urlEncode(code));
             String dllink = br.getRegex("true\\|<a href=\"([^<>\"]+)").getMatch(0);
             if (dllink == null) {
                 dllink = br.getRegex("\"(https?://down\\.[^<>\"]+)\"").getMatch(0);
@@ -328,11 +331,11 @@ public class SeventySevenFileCom extends PluginForHost {
         final String premiumExpire = br.getRegex("(?i)VIP结束时间\\s*：</td>\\s*<td>\\s*(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         if (premiumExpire == null) {
             account.setType(AccountType.FREE);
-            account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
         } else {
             account.setType(AccountType.PREMIUM);
             ai.setValidUntil(TimeFormatter.getMilliSeconds(premiumExpire, "yyyy-MM-dd", Locale.ENGLISH), br);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
             account.setConcurrentUsePossible(true);
         }
         return ai;
@@ -396,12 +399,12 @@ public class SeventySevenFileCom extends PluginForHost {
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return 1;
     }
 
     @Override

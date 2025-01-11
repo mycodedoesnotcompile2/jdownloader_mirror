@@ -34,7 +34,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49941 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50390 $", interfaceVersion = 3, names = { "usenext.com" }, urls = { "" })
 public class UsenextCom extends UseNet {
     public UsenextCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,7 +52,7 @@ public class UsenextCom extends UseNet {
     };
 
     @Override
-    public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) throws PluginException {
+    public void update(final DownloadLink downloadLink, final Account account, long bytesTransfered) {
         final UsenetServer server = getLastUsedUsenetServer();
         /**
          * If the "flatrate domain" is in use, do not substract traffic from users' account. </br>

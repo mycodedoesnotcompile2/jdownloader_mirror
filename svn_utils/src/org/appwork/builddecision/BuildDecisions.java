@@ -48,10 +48,12 @@ import java.util.Map.Entry;
 import org.appwork.builddecision.BuildDecisionData.Option;
 import org.appwork.exceptions.WTFException;
 import org.appwork.loggingv3.LogV3;
+import org.appwork.testframework.AWTestValidateClassReference;
 import org.appwork.utils.Application;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.DebugMode;
 import org.appwork.utils.Joiner;
+import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.Time;
 import org.appwork.utils.logging2.LogInterface;
@@ -120,6 +122,9 @@ public class BuildDecisions {
         }
     }
 
+    @AWTestValidateClassReference
+    public static final String IDETestRunnerClass = "org.appwork.testframework.IDETestRunner";
+
     /**
      *
      */
@@ -128,6 +133,11 @@ public class BuildDecisions {
             return;
         }
         if (System.getProperty("AWTEST") != null) {
+            // skip this for test runs
+            return;
+        }
+        final Class<?> mainClass = Application.getMainClass();
+        if (mainClass != null && ReflectionUtils.isInstanceOf(IDETestRunnerClass, mainClass)) {
             // skip this for test runs
             return;
         }
@@ -141,8 +151,7 @@ public class BuildDecisions {
             LogV3.info("Command: " + command);
             if (command != null && !command.isEmpty()) {
                 long started = Time.systemIndependentCurrentJVMTimeMillis();
-                final String mainClass = command.split(" ")[0];
-                final File projectFolder = getProjectFolder(Class.forName(mainClass));
+                final File projectFolder = getProjectFolder(mainClass);
                 try {
                     // final File javaFile = new File(projectFolder, "src/" + mainClass.replace(".", "/") + ".java");
                     // final String java = IO.readFileToString(javaFile);
@@ -186,14 +195,14 @@ public class BuildDecisions {
                                                         continue;
                                                     }
                                                     if (!contains(dep)) {
-                                                        throw new Exception("The  BuildDecision Tag requires a dependency: Launcher:" + mainClass + " (" + Class.forName(mainClass).getSimpleName() + ".java:1)" + ":\r\nMissing Tag: " + dep);
+                                                        throw new Exception("The  BuildDecision Tag requires a dependency: Launcher:" + mainClass + " (" + mainClass.getSimpleName() + ".java:1)" + ":\r\nMissing Tag: " + dep);
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                     if (usedTag == null) {
-                                        throw new Exception("Could not find any BuildDecision Tag in " + mainClass + " (" + Class.forName(mainClass).getSimpleName() + ".java:1)" + ":\r\nChoose one:" + new Joiner("\r\n").prefix(true).join(options));
+                                        throw new Exception("Could not find any BuildDecision Tag in " + mainClass + " (" + mainClass.getSimpleName() + ".java:1)" + ":\r\nChoose one:" + new Joiner("\r\n").prefix(true).join(options));
                                     }
                                 }
                             } catch (Exception e) {
@@ -253,7 +262,7 @@ public class BuildDecisions {
                 String cp = bean.getClassPath();
                 if (cp != null) {
                     for (String s : cp.split(File.pathSeparator)) {
-                        logger.info("ClathPath: " + s);
+                        logger.info("ClassPath: " + s);
                     }
                 }
             }

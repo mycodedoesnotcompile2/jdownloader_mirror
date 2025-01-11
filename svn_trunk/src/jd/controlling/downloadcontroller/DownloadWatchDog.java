@@ -2752,23 +2752,10 @@ public class DownloadWatchDog implements DownloadControllerListener, StateMachin
         final Throwable throwable = result.getCaughtThrowable();
         final DownloadLinkCandidate candidate = singleDownloadController.getDownloadLinkCandidate();
         final DownloadLink link = candidate.getLink();
-        long sizeChange = Math.max(0, link.getView().getBytesLoaded() - singleDownloadController.getSizeBefore());
+        final long sizeChange = Math.max(0, link.getView().getBytesLoaded() - singleDownloadController.getSizeBefore());
         final Account account = singleDownloadController.getAccount();
         if (account != null && sizeChange > 0) {
-            /* updates traffic available for used account */
-            final AccountInfo ai = account.getAccountInfo();
-            if (ai != null && !ai.isUnlimitedTraffic()) {
-                long left = Math.max(0, ai.getTrafficLeft() - sizeChange);
-                ai.setTrafficLeft(left);
-                if (left == 0) {
-                    if (ai.isSpecialTraffic()) {
-                        logger.severe("Account: " + account.getUser() + ": Traffic Limit could be reached, but SpecialTraffic is available!");
-                    } else {
-                        logger.severe("Account: " + account.getUser() + ": Traffic Limit reached");
-                        account.setTempDisabled(true);
-                    }
-                }
-            }
+            candidate.getCachedAccount().getPlugin().update(link, account, sizeChange);
         }
         SkipReason skipReason = null;
         PluginException pluginException = null;

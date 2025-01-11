@@ -46,6 +46,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.WeakHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
@@ -311,37 +312,47 @@ public class TranslationFactory {
         return true;
     }
 
+    private static WeakHashMap<Locale, String> LOCALE_CACHE = new WeakHashMap<Locale, String>();
+
     public static Locale stringToLocale(final String lng) {
-        final String[] split = lng.split("[\\-\\_]");
-        final Locale def = Locale.getDefault();
-        final Locale ret;
-        switch (split.length) {
-        case 1:
-            if (split[0].equals(def.getLanguage())) {
-                // HostLocaleProviderAdapterImpl only supports matching OS Locale
-                ret = def;
-            } else {
-                ret = new Locale(split[0]);
+        synchronized (LOCALE_CACHE) {
+            for (final Entry<Locale, String> entry : LOCALE_CACHE.entrySet()) {
+                if (entry.getValue().equals(lng)) {
+                    return entry.getKey();
+                }
             }
-            break;
-        case 2:
-            if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry())) {
-                // avoid new Locale instance
-                ret = def;
-            } else {
-                ret = new Locale(split[0], split[1]);
+            final String[] split = lng.split("[\\-\\_]");
+            final Locale def = Locale.getDefault();
+            final Locale ret;
+            switch (split.length) {
+            case 1:
+                if (split[0].equals(def.getLanguage())) {
+                    // HostLocaleProviderAdapterImpl only supports matching OS Locale
+                    ret = def;
+                } else {
+                    ret = new Locale(split[0]);
+                }
+                break;
+            case 2:
+                if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry())) {
+                    // avoid new Locale instance
+                    ret = def;
+                } else {
+                    ret = new Locale(split[0], split[1]);
+                }
+                break;
+            default:
+                if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry()) && split[2].equals(def.getVariant())) {
+                    // avoid new Locale instance
+                    ret = def;
+                } else {
+                    ret = new Locale(split[0], split[1], split[2]);
+                }
+                break;
             }
-            break;
-        default:
-            if (split[0].equals(def.getLanguage()) && split[1].equals(def.getCountry()) && split[2].equals(def.getVariant())) {
-                // avoid new Locale instance
-                ret = def;
-            } else {
-                ret = new Locale(split[0], split[1], split[2]);
-            }
-            break;
+            LOCALE_CACHE.put(ret, lng);
+            return ret;
         }
-        return ret;
     }
 
     public static List<String> getVariantsOf(String lng) {

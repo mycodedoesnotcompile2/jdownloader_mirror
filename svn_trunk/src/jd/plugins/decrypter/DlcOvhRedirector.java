@@ -27,7 +27,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48799 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50390 $", interfaceVersion = 3, names = {}, urls = {})
 public class DlcOvhRedirector extends PluginForDecrypt {
     public DlcOvhRedirector(PluginWrapper wrapper) {
         super(wrapper);
@@ -56,7 +56,7 @@ public class DlcOvhRedirector extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            ret.add("https?://\\w+\\." + buildHostsPatternPart(domains) + "/enlace/redireccion/[^/]+");
+            ret.add("https?://\\w+\\." + buildHostsPatternPart(domains) + "/(enlace/redireccion|online/mostrar)/[^/]+");
         }
         return ret.toArray(new String[0]);
     }
