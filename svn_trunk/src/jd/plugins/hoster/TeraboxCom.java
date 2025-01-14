@@ -54,7 +54,7 @@ import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 import jd.plugins.download.HashResult;
 
-@HostPlugin(revision = "$Revision: 50173 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50429 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TeraboxComFolder.class })
 public class TeraboxCom extends PluginForHost {
     public TeraboxCom(PluginWrapper wrapper) {
@@ -216,7 +216,7 @@ public class TeraboxCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link, null);
-        throw new AccountRequiredException();
+        throw new AccountRequiredException("[Free] account required to download files from this host");
     }
 
     private String checkDirectLink(final DownloadLink link, final String property) {

@@ -77,7 +77,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = {}, urls = {})
 public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     public KernelVideoSharingComV2(PluginWrapper wrapper) {
         super(wrapper);
@@ -908,6 +908,9 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
         } else if (responsecode == 404) {
             return true;
         } else if (responsecode == 410) {
+            return true;
+        } else if (br._getURL().getPath() == null || "/".equals(br._getURL().getPath())) {
+            // redirect to main website
             return true;
         } else if (br._getURL().getPath().matches("(?i)/4(04|10)\\.php.*")) {
             return true;
@@ -1745,7 +1748,7 @@ public abstract class KernelVideoSharingComV2 extends antiDDoSForHost {
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
-    protected String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
+    protected String handleQualitySelection(final Browser br, final DownloadLink link, final Map<Integer, String> qualityMap) {
         if (qualityMap.isEmpty()) {
             logger.info("Cannot perform quality selection: qualityMap is empty");
             return null;

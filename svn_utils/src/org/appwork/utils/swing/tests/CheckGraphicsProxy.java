@@ -37,6 +37,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.JVMVersion;
 import org.appwork.utils.swing.Graphics2DProxy;
 
@@ -45,6 +46,7 @@ import org.appwork.utils.swing.Graphics2DProxy;
  * @date 29.01.2024
  *
  */
+@TestDependency({ "org.appwork.utils.swing.Graphics2DProxy" })
 public class CheckGraphicsProxy extends AWTest {
     /**
      * @see org.appwork.testframework.TestInterface#runTest()

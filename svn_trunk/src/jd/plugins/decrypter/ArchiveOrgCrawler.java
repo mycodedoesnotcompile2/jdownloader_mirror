@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50222 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 50435 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -874,7 +874,8 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
         final boolean crawlMetadataFiles = cfg.isFileCrawlerCrawlMetadataFiles();
         final boolean crawlThumbnails = cfg.isFileCrawlerCrawlThumbnails();
         final List<String> skippedItemsFilepaths = new ArrayList<String>();
-        String totalLengthSecondsStr = null;
+        String totalLengthSecondsOriginalStr = null;
+        String totalLengthSecondsDerivativeStr = null;
         Object desiredFileArchiveFileCount = null;
         final HashSet<String> originalFilenamesDupeCollection = new HashSet<String>();
         /** Restricted access usually means that original files are not downloadable or only DRM protected / encrypted items exist. */
@@ -947,8 +948,14 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             itemMapping.put(name, file);
             if (isOriginal) {
                 originalMapping.put(name, null);
+                if (totalLengthSecondsOriginalStr == null) {
+                    totalLengthSecondsOriginalStr = (String) filemap.get("length");
+                }
             } else if ("derivative".equals(source) && originalO instanceof String) {
                 originalMapping.put(name, originalO.toString());
+                if (totalLengthSecondsDerivativeStr == null && StringUtils.endsWithCaseInsensitive(name, ".mp4")) {
+                    totalLengthSecondsDerivativeStr = (String) filemap.get("length");
+                }
             }
             file.setProperty(ArchiveOrg.PROPERTY_FILENAME, filename);
             file.setProperty(ArchiveOrg.PROPERTY_ARTIST, filemap.get("artist")); // Optional field
@@ -1008,9 +1015,6 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             if (desiredSubpathDecoded2 != null && fullPath.endsWith(desiredSubpathDecoded2)) {
                 desiredFileArchiveFileCount = filemap.get("filecount");
                 singleDesiredFile2 = file;
-            }
-            if (isOriginal && totalLengthSecondsStr == null) {
-                totalLengthSecondsStr = (String) filemap.get("length");
             }
             /* Add items to list of all results. */
             /* Check some skip conditions */
@@ -1158,14 +1162,22 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             }
         } else if (StringUtils.equalsIgnoreCase(mediatype, "movies") && identifierDotMp4Exists) {
             /* Video "playlist" handling */
-            if (totalLengthSecondsStr == null || !totalLengthSecondsStr.matches("\\d+(\\.\\d+)?")) {
+            if (totalLengthSecondsOriginalStr == null || !totalLengthSecondsOriginalStr.matches("\\d+(\\.\\d+)?")) {
                 /* This should never happen */
                 logger.warning("Detected mediatype 'movies' item but failed to determine video playtime");
                 /* Return original files */
                 return selectedItems;
             }
             final int secondsPerSegment = 60;
-            final double totalLengthSeconds = Double.parseDouble(totalLengthSecondsStr);
+            double totalLengthSeconds = Double.parseDouble(totalLengthSecondsOriginalStr);
+            if (totalLengthSeconds == 0 && (totalLengthSecondsDerivativeStr != null && totalLengthSecondsDerivativeStr.matches("\\d+(\\.\\d+)?"))) {
+                /**
+                 * Edge case: Looks like archive.org original data may be corrupt sometimes, prividing "0.00" as length value. </br>
+                 * Example: https://archive.org/details/KNTV_20200205_073400_The_Tonight_Show_Starring_Jimmy_Fallon
+                 */
+                logger.info("Failed to find video length via info from original item -> Fallback to length from derivative -> " + totalLengthSecondsDerivativeStr);
+                totalLengthSeconds = Double.parseDouble(totalLengthSecondsDerivativeStr);
+            }
             final int numberofVideoSegments;
             final double remainingSeconds = totalLengthSeconds % secondsPerSegment;
             if (remainingSeconds == 0) {
@@ -1173,6 +1185,12 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             } else {
                 /* Uneven total runtime -> Last segment will be shorter than the others. */
                 numberofVideoSegments = (int) ((totalLengthSeconds / secondsPerSegment) + 1);
+            }
+            if (totalLengthSeconds == 0) {
+                /* This should never happen */
+                logger.warning("Detected mediatype 'movies' item but determined playtime of 0 seconds is unplausible");
+                /* Return original files */
+                return selectedItems;
             }
             int offsetSeconds = 0;
             /*

@@ -40,6 +40,7 @@ import java.util.Map;
 
 import org.appwork.jna.windows.wmi.JNAWMIUtils;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.os.CrossSystem;
 
 /**
@@ -47,6 +48,7 @@ import org.appwork.utils.os.CrossSystem;
  * @date 20.11.2024
  *
  */
+@TestDependency({ "org.appwork.jna.windows.wmi.JNAWMIUtils" })
 public class WMITests extends AWTest {
     /**
      * @param args

@@ -44,11 +44,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50224 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
+@HostPlugin(revision = "$Revision: 50432 $", interfaceVersion = 3, names = { "seedr.cc" }, urls = { "https://(?:www\\.)?seedr\\.cc/download/(file/\\d+|archive/[a-fA-F0-9]+\\?token=[a-fA-F0-9]+&exp=\\d+)" })
 public class SeedrCc extends PluginForHost {
     public SeedrCc(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("https://www.seedr.cc/premium");
+        this.enablePremium("https://www." + getHost() + "/premium");
     }
 
     @Override
@@ -62,7 +62,7 @@ public class SeedrCc extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://www.seedr.cc/dynamic/terms";
+        return "https://www." + getHost() + "/dynamic/terms";
     }
 
     /* Connection stuff */

@@ -14,15 +14,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import jd.SecondLevelLaunch;
-import jd.controlling.AccountController;
-import jd.controlling.TaskQueue;
-import jd.controlling.downloadcontroller.DownloadController;
-import jd.controlling.linkcollector.LinkCollector;
-import jd.nutils.Formatter;
-import jd.plugins.HostPlugin;
-import jd.plugins.PluginForHost;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.shutdown.ShutdownController;
 import org.appwork.shutdown.ShutdownEvent;
@@ -40,6 +31,15 @@ import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChi
 import org.jdownloader.plugins.controller.PluginController;
 import org.jdownloader.plugins.controller.PluginInfo;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
+
+import jd.SecondLevelLaunch;
+import jd.controlling.AccountController;
+import jd.controlling.TaskQueue;
+import jd.controlling.downloadcontroller.DownloadController;
+import jd.controlling.linkcollector.LinkCollector;
+import jd.nutils.Formatter;
+import jd.plugins.HostPlugin;
+import jd.plugins.PluginForHost;
 
 public class HostPluginController extends PluginController<PluginForHost> {
     private static final HostPluginController INSTANCE = new HostPluginController();
@@ -345,8 +345,10 @@ public class HostPluginController extends PluginController<PluginForHost> {
                                         if (purl != null) {
                                             lazyHostPlugin.setPremiumUrl(new String(purl));
                                         }
+                                        lazyHostPlugin.setHasPremiumConfig(plg.getAccountConfigInterface(null) != null);
                                     } else {
                                         lazyHostPlugin.setPremium(false);
+                                        lazyHostPlugin.setHasPremiumConfig(false);
                                     }
                                     /* set hasConfig */
                                     lazyHostPlugin.setHasConfig(plg.hasConfig());

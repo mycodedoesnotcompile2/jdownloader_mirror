@@ -3,6 +3,8 @@ package jd.plugins.decrypter;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import org.appwork.utils.Regex;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -15,9 +17,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.utils.Regex;
-
-@DecrypterPlugin(revision = "$Revision: 50427 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/threads/(\\d+)([a-z0-9\\-]+).*" })
+@DecrypterPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/threads/(\\d+)([a-z0-9\\-]+).*" })
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -57,14 +57,16 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                 if (title == null) {
                     title = new Regex(post, "<b>\\s*<div style\\s*=\\s*\"text-align: center;\">\\s*<font[^>]*>\\s*(.*?)\\s*</font>\\s*</div>\\s*</b>").getMatch(0);
                     if (title == null) {
-                        // The title is in the H2 tag spanning 3 lines
-                        title = new Regex(post, "<h2[^>]*>[\\r\\n\\s]*(.*?)[\\r\\n\\s]*</h2>").getMatch(0);
+                        title = new Regex(post, "<blockquote[^>]*>\\s*<b>\\s*(.*?)\\s*</b>\\s*<br").getMatch(0);
                         if (title == null) {
-                            title = threadID + "_" + postID;
+                            // The title is in the H2 tag spanning 3 lines
+                            title = new Regex(post, "<h2[^>]*>[\\r\\n\\s]*(.*?)[\\r\\n\\s]*</h2>").getMatch(0);
+                            if (title == null) {
+                                title = threadID + "_" + postID;
+                            }
                         }
                     }
                 }
-
                 FilePackage fp = null;
                 if (title != null) {
                     title = title.replaceAll("(<img.*>)", "");

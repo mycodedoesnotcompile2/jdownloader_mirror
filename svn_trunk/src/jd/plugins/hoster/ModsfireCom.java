@@ -18,16 +18,26 @@ package jd.plugins.hoster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
+import jd.http.Cookies;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
+import jd.parser.html.Form;
 import jd.plugins.Account;
+import jd.plugins.Account.AccountType;
+import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
@@ -35,15 +45,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48387 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50432 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsfireCom extends PluginForHost {
     public ModsfireCom(PluginWrapper wrapper) {
         super(wrapper);
+        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            this.enablePremium("https://" + getHost() + "/register");
+        }
     }
 
     @Override
     public String getAGBLink() {
-        return "https://modsfire.com/";
+        return "https://" + getHost() + "/tos";
     }
 
     private static List<String[]> getPluginDomains() {
@@ -70,12 +83,8 @@ public class ModsfireCom extends PluginForHost {
         return ret.toArray(new String[0]);
     }
 
-    /* Connection stuff */
-    private static final boolean       FREE_RESUME       = true;
-    private static final int           FREE_MAXCHUNKS    = 1;
-    private static final int           FREE_MAXDOWNLOADS = 20;
     /* Don't touch the following! */
-    private static final AtomicInteger freeRunning       = new AtomicInteger(0);
+    private static final AtomicInteger freeRunning = new AtomicInteger(0);
 
     @Override
     public String getLinkID(final DownloadLink link) {
@@ -92,6 +101,15 @@ public class ModsfireCom extends PluginForHost {
     }
 
     @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return true;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
+
+    @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         if (!link.isNameSet()) {
             /* Fallback */
@@ -103,7 +121,7 @@ public class ModsfireCom extends PluginForHost {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         } else if (!br.containsHTML("/download/" + this.getFID(link))) {
-            /* Not a downloadurl e.g. "https://modsfire.com/register" */
+            /* Not a download url e.g. "https://modsfire.com/register" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final Regex fileNameSize = br.getRegex("class=\"name-file\">([^<>\"]+) - (\\d+(?:\\.\\d{1,2})? [A-Za-z]+)</div>");
@@ -115,27 +133,31 @@ public class ModsfireCom extends PluginForHost {
         if (filename != null) {
             filename = Encoding.htmlDecode(filename).trim();
             link.setName(filename);
+        } else {
+            logger.warning("Failed to find filename");
         }
         if (filesize != null) {
             link.setDownloadSize(SizeFormatter.getSize(filesize));
+        } else {
+            logger.warning("Failed to find filename");
         }
         return AvailableStatus.TRUE;
     }
 
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
-        handleDownload(link, FREE_RESUME, FREE_MAXCHUNKS, "free_directlink");
+        handleDownload(link, null);
     }
 
-    private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
-        if (!attemptStoredDownloadurlDownload(link, directlinkproperty)) {
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        final String directlinkproperty = this.getDirecturlProperty(account);
+        if (!attemptStoredDownloadurlDownload(link, account)) {
             requestFileInformation(link);
-            final String dllink = "/d/" + this.getFID(link);
-            if (StringUtils.isEmpty(dllink)) {
-                logger.warning("Failed to find final downloadurl");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            if (account != null) {
+                this.login(account, false);
             }
-            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+            final String dllink = "/d/" + this.getFID(link);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 br.followConnection(true);
                 if (dl.getConnection().getResponseCode() == 403) {
@@ -148,7 +170,7 @@ public class ModsfireCom extends PluginForHost {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
             }
-            link.setProperty(directlinkproperty, dl.getConnection().getURL().toString());
+            link.setProperty(directlinkproperty, dl.getConnection().getURL().toExternalForm());
         }
         /* Add a download slot */
         controlMaxFreeDownloads(null, link, +1);
@@ -162,29 +184,40 @@ public class ModsfireCom extends PluginForHost {
     }
 
     protected void controlMaxFreeDownloads(final Account account, final DownloadLink link, final int num) {
-        if (account == null) {
-            synchronized (freeRunning) {
-                final int before = freeRunning.get();
-                final int after = before + num;
-                freeRunning.set(after);
-                logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
-            }
+        if (account != null) {
+            /* Do nothing */
+            return;
+        }
+        synchronized (freeRunning) {
+            final int before = freeRunning.get();
+            final int after = before + num;
+            freeRunning.set(after);
+            logger.info("freeRunning(" + link.getName() + ")|max:" + getMaxSimultanFreeDownloadNum() + "|before:" + before + "|after:" + after + "|num:" + num);
         }
     }
 
     @Override
     public boolean hasCaptcha(DownloadLink link, jd.plugins.Account acc) {
+        /* 2025-01-13: They use Cloudflare Turnstile captcha for free download but atm it is skippable. */
         return false;
     }
 
-    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final String directlinkproperty) throws Exception {
-        final String url = link.getStringProperty(directlinkproperty);
+    private String getDirecturlProperty(final Account account) {
+        if (account == null) {
+            return "directlink";
+        } else {
+            return "directlink_account_ " + account.getType().getLabel();
+        }
+    }
+
+    private boolean attemptStoredDownloadurlDownload(final DownloadLink link, final Account account) throws Exception {
+        final String url = link.getStringProperty(getDirecturlProperty(account));
         if (StringUtils.isEmpty(url)) {
             return false;
         }
         try {
             final Browser brc = br.cloneBrowser();
-            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, FREE_RESUME, FREE_MAXCHUNKS);
+            dl = new jd.plugins.BrowserAdapter().openDownload(brc, link, url, this.isResumeable(link, account), this.getMaxChunks(link, account));
             if (this.looksLikeDownloadableContent(dl.getConnection())) {
                 return true;
             } else {
@@ -199,6 +232,83 @@ public class ModsfireCom extends PluginForHost {
             }
             return false;
         }
+    }
+
+    private boolean login(final Account account, final boolean force) throws Exception {
+        synchronized (account) {
+            br.setFollowRedirects(true);
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            final String url_relative_premium = "/premium";
+            if (cookies != null) {
+                logger.info("Attempting cookie login");
+                this.br.setCookies(this.getHost(), cookies);
+                if (!force) {
+                    /* Don't validate cookies */
+                    return false;
+                }
+                br.getPage("https://" + this.getHost() + url_relative_premium);
+                if (this.isLoggedin(br)) {
+                    logger.info("Cookie login successful");
+                    /* Refresh cookie timestamp */
+                    account.saveCookies(br.getCookies(br.getHost()), "");
+                    return true;
+                } else {
+                    logger.info("Cookie login failed");
+                    br.clearCookies(null);
+                }
+            }
+            logger.info("Performing full login");
+            br.getPage("https://" + this.getHost() + "/login");
+            final Form loginform = br.getFormbyActionRegex(".*login");
+            if (loginform == null) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
+            }
+            if (AbstractRecaptchaV2.containsRecaptchaV2Class(br)) {
+                final String recaptchaResponse = new CaptchaHelperHostPluginRecaptchaV2(this, br).getToken();
+                loginform.put("g-recaptcha-response", Encoding.urlEncode(recaptchaResponse));
+            }
+            /* Can be username or email(!) */
+            loginform.put("email", Encoding.urlEncode(account.getUser()));
+            loginform.put("password", Encoding.urlEncode(account.getPass()));
+            loginform.put("remember", "on");
+            br.submitForm(loginform);
+            if (!isLoggedin(br)) {
+                throw new AccountInvalidException();
+            }
+            br.getPage(url_relative_premium);
+            account.saveCookies(br.getCookies(br.getHost()), "");
+            return true;
+        }
+    }
+
+    private boolean isLoggedin(final Browser br) {
+        return br.containsHTML("/logout\"");
+    }
+
+    @Override
+    public AccountInfo fetchAccountInfo(final Account account) throws Exception {
+        final AccountInfo ai = new AccountInfo();
+        login(account, true);
+        ai.setUnlimitedTraffic();
+        final String expire = br.getRegex("(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        if (expire == null) {
+            throw new AccountInvalidException("Free accounts are not supported");
+        }
+        ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "dd MMMM yyyy", Locale.ENGLISH));
+        account.setType(AccountType.PREMIUM);
+        account.setConcurrentUsePossible(true);
+        return ai;
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        // this.handleDownload(link, account);
+    }
+
+    @Override
+    public int getMaxSimultanPremiumDownloadNum() {
+        return Integer.MAX_VALUE;
     }
 
     @Override

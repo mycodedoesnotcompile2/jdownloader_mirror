@@ -19,16 +19,6 @@ import javax.swing.JScrollPane;
 import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
 
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.interfaces.SwitchPanel;
-import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
-import jd.gui.swing.jdgui.views.settings.components.StateUpdateListener;
-import jd.gui.swing.jdgui.views.settings.sidebar.AddonConfig;
-import jd.plugins.Account;
-import jd.plugins.Plugin;
-import jd.plugins.PluginConfigPanelNG;
-import net.miginfocom.swing.MigLayout;
-
 import org.appwork.exceptions.WTFException;
 import org.appwork.storage.config.JsonConfig;
 import org.appwork.swing.MigPanel;
@@ -51,12 +41,23 @@ import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.images.AbstractIcon;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 import org.jdownloader.plugins.controller.crawler.CrawlerPluginController;
 import org.jdownloader.plugins.controller.crawler.LazyCrawlerPlugin;
 import org.jdownloader.plugins.controller.host.HostPluginController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings;
+
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.interfaces.SwitchPanel;
+import jd.gui.swing.jdgui.views.settings.components.SettingsComponent;
+import jd.gui.swing.jdgui.views.settings.components.StateUpdateListener;
+import jd.gui.swing.jdgui.views.settings.sidebar.AddonConfig;
+import jd.plugins.Account;
+import jd.plugins.Plugin;
+import jd.plugins.PluginConfigPanelNG;
+import net.miginfocom.swing.MigLayout;
 
 public class PluginSettingsPanel extends JPanel implements SettingsComponent, ActionListener {
     /**
@@ -276,7 +277,7 @@ public class PluginSettingsPanel extends JPanel implements SettingsComponent, Ac
     public List<LazyPlugin<?>> fillModel() {
         final List<LazyPlugin<?>> lst = new ArrayList<LazyPlugin<?>>();
         for (final LazyHostPlugin plg : HostPluginController.getInstance().list()) {
-            if (plg.isHasConfig() || plg.isPremium()) {
+            if (plg.isHasConfig() || (plg.isPremium() && (plg.isHasPremiumConfig() || plg.hasFeature(FEATURE.MULTIHOST)))) {
                 lst.add(plg);
             }
         }

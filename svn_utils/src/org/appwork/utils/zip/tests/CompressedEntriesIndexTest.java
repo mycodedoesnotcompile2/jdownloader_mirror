@@ -48,6 +48,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.zip.CompressedEntriesIndex;
 
@@ -56,6 +57,7 @@ import org.appwork.utils.zip.CompressedEntriesIndex;
  * @date Aug 24, 2023
  *
  */
+@TestDependency({ "org.appwork.utils.zip.CompressedEntriesIndex" })
 public class CompressedEntriesIndexTest extends OnClassPathZipJarTests {
     public static void main(String[] args) {
         run();

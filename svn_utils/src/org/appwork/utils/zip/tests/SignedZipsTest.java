@@ -49,6 +49,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 
 import org.appwork.loggingv3.LogV3;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
@@ -67,6 +68,7 @@ import org.appwork.utils.zip.ZipIOWriter.EmptyPathZipIOException;
  * @date Aug 24, 2023
  *
  */
+@TestDependency({ "org.appwork.utils.zip.ZipIOWriter" })
 public class SignedZipsTest extends OnClassPathZipJarTests {
     public static void main(String[] args) {
         run();

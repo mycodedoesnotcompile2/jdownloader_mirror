@@ -72,18 +72,13 @@ public class ChunkRange {
 
     /* create a ChunkRange from index 'from' to index 'to' (included) */
     public ChunkRange(final long from, final Long to) {
-        rangeRequested = true;
         if (from < 0) {
-            throw new IllegalArgumentException("from < 0");
+            throw new IllegalArgumentException("from(" + from + ") < 0");
+        } else if (to != null && to >= 0 && from > to) {
+            throw new IllegalArgumentException("from(" + from + ") > to(" + to + ")");
         }
+        rangeRequested = true;
         this.from = from;
-        if (to != null && to >= 0) {
-            if (from > to) {
-                throw new IllegalArgumentException("from > to");
-            } else if (to < from) {
-                throw new IllegalArgumentException("to < from");
-            }
-        }
         this.to = to;
     }
 

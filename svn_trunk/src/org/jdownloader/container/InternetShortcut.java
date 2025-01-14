@@ -20,17 +20,18 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import jd.controlling.linkcrawler.CrawledLink;
-import jd.plugins.ContainerStatus;
-import jd.plugins.PluginsC;
-
 import org.appwork.utils.IO;
 import org.appwork.utils.Regex;
 import org.appwork.utils.StringUtils;
 
+import jd.controlling.linkcollector.LinkOrigin;
+import jd.controlling.linkcrawler.CrawledLink;
+import jd.plugins.ContainerStatus;
+import jd.plugins.PluginsC;
+
 public class InternetShortcut extends PluginsC {
     public InternetShortcut() {
-        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 49815 $");
+        super("InternetShortcut", "file:/.+\\.url$", "$Revision: 50430 $");
     }
 
     public InternetShortcut newPluginInstance() {
@@ -41,6 +42,16 @@ public class InternetShortcut extends PluginsC {
     protected void deleteContainer(CrawledLink source, File file) {
     }
 
+    @Override
+    public ArrayList<CrawledLink> decryptContainer(final CrawledLink source) {
+        if (source != null && source.getOrigin() != null && LinkOrigin.DOWNLOADED_CONTAINER.equals(source.getOrigin().getOrigin())) {
+            // do not open downloaded/extracted InternetShortcut files, they are often used for affiliate
+            return null;
+        }
+        return super.decryptContainer(source);
+    }
+
+    @Override
     public ContainerStatus callDecryption(File lc) {
         final ContainerStatus cs = new ContainerStatus(lc);
         try {

@@ -19,9 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
+import java.util.Map;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -29,7 +27,10 @@ import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
+@HostPlugin(revision = "$Revision: 50436 $", interfaceVersion = 3, names = {}, urls = {})
 public class XbabeCom extends KernelVideoSharingComV2 {
     public XbabeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -71,7 +72,7 @@ public class XbabeCom extends KernelVideoSharingComV2 {
     @Override
     protected String getDllink(final DownloadLink link, final Browser br) throws PluginException, IOException {
         /* 2021-09-01: Workaround as upper handling picks up preview-clips instead of the full videos. */
-        final HashMap<Integer, String> qualityMap = new HashMap<Integer, String>();
+        final Map<Integer, String> qualityMap = new HashMap<Integer, String>();
         final String[] htmls = br.getRegex("(<source[^>]*src=.*?[^>]*type=\"video/mp4\"[^>]*>)").getColumn(0);
         for (final String html : htmls) {
             final String url = new Regex(html, "src=\"(http[^\"]+)").getMatch(0);

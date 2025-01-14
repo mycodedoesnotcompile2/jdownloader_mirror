@@ -563,7 +563,7 @@ public class DownloadSession extends Property {
                     cachedGroups.add(hosterFreeGroup);
                 }
                 /* free(no account) */
-                final CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
+                CachedAccount noAccount = new CachedAccount(host, null, defaulPlugin);
                 final boolean addNoAccountGroup;
                 if (numberofPremiumAccounts > 0) {
                     /* At least one premium account is available -> Do not allow non-account download. */
@@ -575,11 +575,26 @@ public class DownloadSession extends Property {
                     /* Allow download without account */
                     addNoAccountGroup = true;
                 }
-                if (addNoAccountGroup) {
-                    final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);
-                    freeGroup.add(noAccount);
-                    cachedGroups.add(freeGroup);
+                if (!addNoAccountGroup) {
+                    noAccount = new CachedAccount(host, null, defaulPlugin) {
+                        final List<CachedAccountGroup> finalCachedGroups = new ArrayList<CachedAccountGroup>(cachedGroups);
+
+                        @Override
+                        public boolean canHandle(DownloadLink link) throws Exception {
+                            for (final CachedAccountGroup cachedGroup : finalCachedGroups) {
+                                for (final CachedAccount cachedAccount : cachedGroup) {
+                                    if (cachedAccount.canHandle(link)) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            return super.canHandle(link);
+                        }
+                    };
                 }
+                final CachedAccountGroup freeGroup = new CachedAccountGroup(Rules.ORDER);
+                freeGroup.add(noAccount);
+                cachedGroups.add(freeGroup);
                 ret = new AccountCache(cachedGroups);
             }
         }

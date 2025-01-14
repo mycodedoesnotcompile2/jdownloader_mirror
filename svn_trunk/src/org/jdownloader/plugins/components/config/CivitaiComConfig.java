@@ -1,6 +1,7 @@
 package org.jdownloader.plugins.components.config;
 
 import org.appwork.storage.config.annotations.AboutConfig;
+import org.appwork.storage.config.annotations.DefaultBooleanValue;
 import org.appwork.storage.config.annotations.DefaultIntValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.DescriptionForConfigEntry;
@@ -43,4 +44,12 @@ public interface CivitaiComConfig extends PluginConfigInterface {
     int getProfileCrawlerPaginationSleepMillis();
 
     void setProfileCrawlerPaginationSleepMillis(int millis);
+
+    @AboutConfig
+    @DefaultBooleanValue(false)
+    @DescriptionForConfigEntry("Use IndexID (/images/XXXXX) for image filename?")
+    @Order(30)
+    boolean isUseIndexIDForImageFilename();
+
+    void setUseIndexIDForImageFilename(boolean b);
 }

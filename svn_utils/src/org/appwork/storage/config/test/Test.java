@@ -46,11 +46,13 @@ import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
 import org.appwork.storage.config.handler.StorageHandler;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 
 /**
  * @author thomas
  *
  */
+@TestDependency({ "org.appwork.storage.config.JsonConfig" })
 public class Test extends AWTest {
     public static void main(final String[] args) throws InterruptedException {
         run();
@@ -63,7 +65,6 @@ public class Test extends AWTest {
      */
     @Override
     public void runTest() throws Exception {
-
         // new PerformanceObserver().start();
         JsonConfig.create(MyInterface.class);
         /*
@@ -73,9 +74,7 @@ public class Test extends AWTest {
          * 2. Create your storage. The Factory will check your interface and throw Exceptions if it is malformed. This helps to find Errors
          * immediately. The Check not only checks directly used Datatypes, but runs through the whole TypeStructure of the interface.
          */
-
         final MyInterface jc = JsonConfig.create(MyInterface.class);
-
         HashSet<String> storedSet = jc.getSet();
         if (storedSet == null) {
             storedSet = new HashSet<String>();
@@ -84,29 +83,24 @@ public class Test extends AWTest {
         jc.setSet(storedSet);
         //
         jc._getStorageHandler().getEventSender().addListener(new ConfigEventListener() {
-
             @Override
             public void onConfigValidatorError(final KeyHandler<Object> keyHandler, final Object invalidValue, final ValidationException validateException) {
-        	}
+            }
 
             @Override
             public void onConfigValueModified(final KeyHandler<Object> keyHandler, final Object newValue) {
                 LogV3.info("New value: " + keyHandler);
             }
-
         });
         MyInterface.INT.getEventSender().addListener(new GenericConfigEventListener<Integer>() {
-
             @Override
             public void onConfigValidatorError(final KeyHandler<Integer> keyHandler, final Integer invalidValue, final ValidationException validateException) {
-           	}
+            }
 
             @Override
             public void onConfigValueModified(final KeyHandler<Integer> keyHandler, final Integer newValue) {
-			}
-
+            }
         });
-
         double[] ar = jc.getDoubleArray();
         jc.setDoubleArray(new double[] { 1.2, 3.4, 5.6 });
         LogV3.info(JSonStorage.serializeToJson(jc.getObject()));
@@ -118,7 +112,6 @@ public class Test extends AWTest {
         o.setA(36287);
         jc.setObject(o);
         jc.setIntArray(new int[] { 1, 2, 3, 4, 5 });
-
         final ArrayList<TestObject> list = new ArrayList<TestObject>();
         list.add(o);
         list.add(new TestObject());
@@ -127,13 +120,10 @@ public class Test extends AWTest {
         LogV3.info(JSonStorage.serializeToJson(jc.getIntArray()));
         LogV3.info(JSonStorage.serializeToJson(jc.getObject()));
         LogV3.info(JSonStorage.serializeToJson(jc.getGenericList()));
-
         LogV3.info(JSonStorage.serializeToJson(jc.getStringArray()));
-
         /*
          * 4. get values by key
          */
-
         final StorageHandler<?> storageHandler = MyInterface.CFG._getStorageHandler();
         LogV3.info("" + storageHandler.getValue("Float"));
         LogV3.info("" + MyInterface.CFG.getInt());
@@ -154,6 +144,5 @@ public class Test extends AWTest {
          *
          */
         LogV3.info("" + MyInterface.CFG.getDefault());
-
     }
 }

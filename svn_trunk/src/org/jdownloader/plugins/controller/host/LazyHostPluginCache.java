@@ -22,7 +22,7 @@ import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
 import org.jdownloader.plugins.controller.LazyPluginClass;
 
 public class LazyHostPluginCache {
-    private static final long CACHEVERSION = 29042024001l + LazyPlugin.FEATURE.CACHEVERSION;
+    private static final long CACHEVERSION = 13012025001l + LazyPlugin.FEATURE.CACHEVERSION;
 
     public static ByteArrayOutputStream readFile(File file) throws IOException {
         final FileInputStream fis = new FileInputStream(file);
@@ -83,17 +83,20 @@ public class LazyHostPluginCache {
                         lazyHostPlugin.setPluginUsage(is.readLongOptimized());
                         final int flags = is.ensureRead();
                         lazyHostPlugin.setPremium((flags & (1 << 0)) != 0);
-                        lazyHostPlugin.setHasConfig((flags & (1 << 1)) != 0);
-                        if ((flags & (1 << 4)) != 0) {
+                        if (lazyHostPlugin.isPremium()) {
+                            lazyHostPlugin.setHasPremiumConfig((flags & (1 << 1)) != 0);
+                        }
+                        lazyHostPlugin.setHasConfig((flags & (1 << 2)) != 0);
+                        if ((flags & (1 << 5)) != 0) {
                             lazyHostPlugin.setPremiumUrl(is.readString(stringBuffer));
                         }
-                        if ((flags & (1 << 5)) != 0) {
+                        if ((flags & (1 << 6)) != 0) {
                             lazyHostPlugin.setHasRewrite(true);
                         }
-                        if ((flags & (1 << 6)) != 0) {
+                        if ((flags & (1 << 7)) != 0) {
                             lazyHostPlugin.setHasAllowHandle(true);
                         }
-                        if ((flags & (1 << 3)) != 0) {
+                        if ((flags & (1 << 4)) != 0) {
                             lazyHostPlugin.setConfigInterface(is.readString(stringBuffer));
                         }
                         final int sitesSupportedNumber = is.readShort();
@@ -106,7 +109,7 @@ public class LazyHostPluginCache {
                             }
                             lazyHostPlugin.setSitesSupported(sitesSupportedNames.toArray(new String[0]));
                         }
-                        if ((flags & (1 << 2)) != 0) {
+                        if ((flags & (1 << 3)) != 0) {
                             final ArrayList<LazyPlugin.FEATURE> features = new ArrayList<LazyPlugin.FEATURE>(LazyPlugin.FEATURE.values().length);
                             for (final LazyPlugin.FEATURE feature : LazyPlugin.FEATURE.values()) {
                                 if (is.readBoolean()) {
@@ -184,25 +187,28 @@ public class LazyHostPluginCache {
                     byte flags = 0;
                     if (plugin.isPremium()) {
                         flags |= (1 << 0);
+                        if (plugin.isHasPremiumConfig()) {
+                            flags |= (1 << 1);
+                        }
                     }
                     if (plugin.isHasConfig()) {
-                        flags |= (1 << 1);
+                        flags |= (1 << 2);
                     }
                     final LazyPlugin.FEATURE[] features = plugin.getFeatures();
                     if (features != null && features.length > 0) {
-                        flags |= (1 << 2);
-                    }
-                    if (plugin.isHasConfig() && plugin.getConfigInterface() != null) {
                         flags |= (1 << 3);
                     }
-                    if (plugin.isPremium() && plugin.getPremiumUrl() != null) {
+                    if (plugin.isHasConfig() && plugin.getConfigInterface() != null) {
                         flags |= (1 << 4);
                     }
-                    if (plugin.isHasRewrite()) {
+                    if (plugin.isPremium() && plugin.getPremiumUrl() != null) {
                         flags |= (1 << 5);
                     }
-                    if (plugin.isHasAllowHandle()) {
+                    if (plugin.isHasRewrite()) {
                         flags |= (1 << 6);
+                    }
+                    if (plugin.isHasAllowHandle()) {
+                        flags |= (1 << 7);
                     }
                     bos.write(flags);
                     if (plugin.isPremium() && plugin.getPremiumUrl() != null) {

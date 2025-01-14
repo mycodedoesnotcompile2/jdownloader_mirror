@@ -38,14 +38,15 @@ import java.io.IOException;
 import org.appwork.remoteapi.RemoteAPI;
 import org.appwork.storage.TypeRef;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 
 /**
  * @author daniel
  * @date Apr 18, 2023
  *
  */
+@TestDependency({ "org.appwork.remoteapi.RemoteAPI" })
 public class RemoteAPITest extends AWTest {
-
     public static enum TEST_ENUM {
         TEST1,
         TEST2;
@@ -70,20 +71,16 @@ public class RemoteAPITest extends AWTest {
         assertEquals(Boolean.FALSE, RemoteAPI.convert("\"false\"", Boolean.class));
         assertEquals(Boolean.FALSE, RemoteAPI.convert("false", Object.class));
         assertEquals("false", RemoteAPI.convert("\"false\"", Object.class));
-
         assertEquals(null, RemoteAPI.convert("null", Object.class));
         assertEquals("null", RemoteAPI.convert("\"null\"", Object.class));
         assertEquals(null, RemoteAPI.convert("null", String.class));
         assertEquals("null", RemoteAPI.convert("\"null\"", String.class));
-
         assertEquals("test", RemoteAPI.convert("test", Object.class));
         assertEquals("test", RemoteAPI.convert("\"test\"", Object.class));
         assertEquals("test", RemoteAPI.convert("test", String.class));
         assertEquals("test", RemoteAPI.convert("\"test\"", String.class));
-
         assertEquals("test\"", RemoteAPI.convert("test\"", Object.class));
         assertEquals("test\"", RemoteAPI.convert("test\"", String.class));
-
         assertEquals("{test", RemoteAPI.convert("{test", String.class));
         assertEquals("{test", RemoteAPI.convert("{test", Object.class));
         assertEquals("{test}", RemoteAPI.convert("{test}", String.class));
@@ -96,7 +93,6 @@ public class RemoteAPITest extends AWTest {
         assertEquals("{test}", RemoteAPI.convert("\"{test}\"", Object.class));
         assertEquals("test}", RemoteAPI.convert("\"test}\"", String.class));
         assertEquals("test}", RemoteAPI.convert("\"test}\"", Object.class));
-
         assertEquals("[test", RemoteAPI.convert("[test", String.class));
         assertEquals("[test", RemoteAPI.convert("[test", Object.class));
         assertEquals("[test]", RemoteAPI.convert("[test]", String.class));
@@ -109,15 +105,12 @@ public class RemoteAPITest extends AWTest {
         assertEquals("[test]", RemoteAPI.convert("\"[test]\"", Object.class));
         assertEquals("test]", RemoteAPI.convert("\"test]\"", String.class));
         assertEquals("test]", RemoteAPI.convert("\"test]\"", Object.class));
-
         assertEquals("\"test", RemoteAPI.convert("\"test", Object.class));
         assertEquals("\"test", RemoteAPI.convert("\"test", String.class));
-
         assertEquals(10, RemoteAPI.convert("10", Object.class));
         assertEquals("10", RemoteAPI.convert("\"10\"", Object.class));
         assertEquals(10, RemoteAPI.convert("10", Integer.class));
         assertEquals(10, RemoteAPI.convert("\"10\"", Integer.class));
-
         assertEquals(TEST_ENUM.TEST1, RemoteAPI.convert("TEST1", new TypeRef<TEST_ENUM>() {
         }.getType()));
         assertEquals(TEST_ENUM.TEST2, RemoteAPI.convert("TEST2", new TypeRef<TEST_ENUM>() {
@@ -126,17 +119,13 @@ public class RemoteAPITest extends AWTest {
         }.getType()));
         assertEquals(TEST_ENUM.TEST2, RemoteAPI.convert("\"TEST2\"", new TypeRef<TEST_ENUM>() {
         }.getType()));
-
         assertEquals(Long.MAX_VALUE, RemoteAPI.convert("" + Long.MAX_VALUE, Object.class));
         assertEquals(Long.MIN_VALUE, RemoteAPI.convert("" + Long.MIN_VALUE, Object.class));
         assertEquals(Long.MAX_VALUE, RemoteAPI.convert("" + Long.MAX_VALUE, Long.class));
         assertEquals(Long.MIN_VALUE, RemoteAPI.convert("" + Long.MIN_VALUE, Long.class));
-
         assertEquals(Integer.MAX_VALUE, RemoteAPI.convert("" + Integer.MAX_VALUE, Object.class));
         assertEquals(Integer.MIN_VALUE, RemoteAPI.convert("" + Integer.MIN_VALUE, Object.class));
-
         assertEquals(Integer.MAX_VALUE, RemoteAPI.convert("" + Integer.MAX_VALUE, Integer.class));
         assertEquals(Integer.MIN_VALUE, RemoteAPI.convert("" + Integer.MIN_VALUE, Integer.class));
     }
-
 }

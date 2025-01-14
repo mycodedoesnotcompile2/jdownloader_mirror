@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.utils.DebugMode;
@@ -40,7 +41,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49462 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50429 $", interfaceVersion = 3, names = {}, urls = {})
 public class MydaddyCc extends PluginForHost {
     public MydaddyCc(PluginWrapper wrapper) {
         super(wrapper);
@@ -139,7 +140,7 @@ public class MydaddyCc extends PluginForHost {
             serverReal = br.getRegex(catMouseVars.getMatch(0) + "=\"(//[^\"]+)\"").getMatch(0);
             internalVideoidReal = br.getRegex(catMouseVars.getMatch(1) + "=\"([^\"]+)\"").getMatch(0);
         }
-        final HashMap<Integer, String> qualityMap = new HashMap<Integer, String>();
+        final Map<Integer, String> qualityMap = new HashMap<Integer, String>();
         final String[] sources = br.getRegex("<source src.*?/>").getColumn(-1);
         int qualityMax = -1;
         for (final String source : sources) {
@@ -183,7 +184,7 @@ public class MydaddyCc extends PluginForHost {
     }
 
     /** Returns user preferred quality inside given quality map. Returns best, if user selection is not present in map. */
-    protected final String handleQualitySelection(final Browser br, final DownloadLink link, final HashMap<Integer, String> qualityMap) {
+    protected final String handleQualitySelection(final Browser br, final DownloadLink link, final Map<Integer, String> qualityMap) {
         if (qualityMap.isEmpty()) {
             return null;
         }

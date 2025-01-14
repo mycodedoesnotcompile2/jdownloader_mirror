@@ -10,7 +10,7 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.Type;
 
-@PluginHost(host = "missav.com", type = Type.HOSTER)
+@PluginHost(host = "missav.ws", type = Type.HOSTER)
 public interface MissavComConfig extends PluginConfigInterface {
     public static final MissavComConfig.TRANSLATION  TRANSLATION  = new TRANSLATION();
     public static final MissavComConfig.VideoQuality DEFAULT_MODE = VideoQuality.BEST;

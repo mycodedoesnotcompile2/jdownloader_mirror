@@ -34,7 +34,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50407 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50430 $", interfaceVersion = 3, names = {}, urls = {})
 public class HdencodeOrg extends PluginForDecrypt {
     public HdencodeOrg(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,35 +80,47 @@ public class HdencodeOrg extends PluginForDecrypt {
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Form captchaform = br.getFormByRegex(".*content-protector-access-form.*");
-        if (captchaform == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        int maxCaptchaForm = 3;
+        String[] htmls = null;
+        while (maxCaptchaForm-- >= 0) {
+            final Form captchaform = br.getFormByRegex(".*content-protector-access-form.*");
+            if (captchaform == null) {
+                break;
+            }
+            if (isAbort()) {
+                return ret;
+            }
+            /*
+             * Add special values to Form - without them, captcha will not be accepted (in browser, js needs to be active for this to work).
+             */
+            final String[][] specialFormKeyValuePairs = br.getRegex("data\\.data\\.append\\(\"([^\"]+)\", \"([^\"]+)\"\\);").getMatches();
+            if (specialFormKeyValuePairs == null || specialFormKeyValuePairs.length == 0) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            for (final String[] keyValuePair : specialFormKeyValuePairs) {
+                captchaform.put(Encoding.urlEncode(keyValuePair[0]), Encoding.urlEncode(keyValuePair[1]));
+            }
+            final CaptchaHelperCrawlerPluginRecaptchaV2 helper;
+            if (br.containsHTML("\"version\"\\s*:\\s*\"(invisible|v3)")) {
+                /* Invisible reCaptchaV2 */
+                helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
+                    public TYPE getType() {
+                        return TYPE.INVISIBLE;
+                    }
+                };
+            } else {
+                /* reCaptchaV2 auto handling */
+                helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br);
+            }
+            if (helper.getSiteKey() != null) {
+                captchaform.put("g-recaptcha-response", helper.getToken());
+            }
+            br.submitForm(captchaform);
+            htmls = br.getRegex("<blockquote>(.*?)</blockquote>").getColumn(0);
+            if (htmls != null && htmls.length > 0) {
+                break;
+            }
         }
-        /* Add special values to Form - without them, captcha will not be accepted (in browser, js needs to be active for this to work). */
-        final String[][] specialFormKeyValuePairs = br.getRegex("data\\.data\\.append\\(\"([^\"]+)\", \"([^\"]+)\"\\);").getMatches();
-        if (specialFormKeyValuePairs == null || specialFormKeyValuePairs.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        for (final String[] keyValuePair : specialFormKeyValuePairs) {
-            captchaform.put(Encoding.urlEncode(keyValuePair[0]), Encoding.urlEncode(keyValuePair[1]));
-        }
-        final CaptchaHelperCrawlerPluginRecaptchaV2 helper;
-        if (br.containsHTML("\"version\"\\s*:\\s*\"(invisible|v3)")) {
-            /* Invisible reCaptchaV2 */
-            helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br) {
-                public TYPE getType() {
-                    return TYPE.INVISIBLE;
-                }
-            };
-        } else {
-            /* reCaptchaV2 auto handling */
-            helper = new CaptchaHelperCrawlerPluginRecaptchaV2(this, br);
-        }
-        if (helper.getSiteKey() != null) {
-            captchaform.put("g-recaptcha-response", helper.getToken());
-        }
-        br.submitForm(captchaform);
-        final String[] htmls = br.getRegex("<blockquote>(.*?)</blockquote>").getColumn(0);
         if (htmls == null || htmls.length == 0) {
             /* This should never happen. */
             logger.warning("Somehow wrong captcha or plugin broken");

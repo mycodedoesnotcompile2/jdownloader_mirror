@@ -27,8 +27,7 @@ import org.appwork.utils.event.queue.Queue;
 import org.appwork.utils.event.queue.QueueAction;
 import org.appwork.utils.logging2.LogSource;
 import org.appwork.utils.swing.dialog.Dialog;
-import org.appwork.utils.swing.dialog.DialogCanceledException;
-import org.appwork.utils.swing.dialog.DialogClosedException;
+import org.appwork.utils.swing.dialog.DialogNoAnswerException;
 import org.jdownloader.gui.translate._GUI;
 import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.controller.host.LazyHostPlugin;
@@ -236,7 +235,9 @@ public class HosterRuleController implements AccountControllerListener {
             protected Void run() throws RuntimeException {
                 if (loadedRules != null) {
                     for (final AccountUsageRule hr : loadedRules) {
-                        validateRule(hr);
+                        if (!validateRule(hr)) {
+                            remove(hr);
+                        }
                     }
                 }
                 return null;
@@ -320,7 +321,7 @@ public class HosterRuleController implements AccountControllerListener {
         });
     }
 
-    protected void validateRule(final AccountUsageRule hr) {
+    public boolean validateRule(final AccountUsageRule hr) {
         final String host = hr.getHoster();
         final Set<Account> accounts = new HashSet<Account>();
         AccountGroup defaultAccountGroup = null;
@@ -422,9 +423,9 @@ public class HosterRuleController implements AccountControllerListener {
         if (Boolean.FALSE.equals(isHosterpluginAllowsUsageRuleCreation)) {
             logger.info("Disable and removed rule for host " + host + " because: plugin does not allow usage rule creation");
             hr.setEnabled(false);
-            this.remove(hr);
-            return;
+            return false;
         }
+        return true;
     }
 
     /** Returns true if new rule creation is allowed according to some factors given inside given LazyHostPlugin instance. */
@@ -483,7 +484,10 @@ public class HosterRuleController implements AccountControllerListener {
         queue.add(new QueueAction<Void, RuntimeException>() {
             @Override
             protected Void run() throws RuntimeException {
-                validateRule(rule);
+                if (!validateRule(rule)) {
+                    remove(rule);
+                    return null;
+                }
                 rule.setOwner(HosterRuleController.this);
                 loadedRules.add(rule);
                 delayedSaver.delayedrun();
@@ -506,10 +510,16 @@ public class HosterRuleController implements AccountControllerListener {
             @Override
             protected Void run() throws RuntimeException {
                 delayedSaver.delayedrun();
+                boolean valid = true;
                 try {
-                    validateRule(rule);
+                    valid = validateRule(rule);
+                    if (!valid) {
+                        remove(rule);
+                    }
                 } finally {
-                    eventSender.fireEvent(new HosterRuleControllerEvent(this, HosterRuleControllerEvent.Type.DATA_UPDATE, rule));
+                    if (valid) {
+                        eventSender.fireEvent(new HosterRuleControllerEvent(this, HosterRuleControllerEvent.Type.DATA_UPDATE, rule));
+                    }
                 }
                 return null;
             }
@@ -531,16 +541,14 @@ public class HosterRuleController implements AccountControllerListener {
             queue.add(new QueueAction<Void, RuntimeException>() {
                 @Override
                 protected Void run() throws RuntimeException {
-                    validateRule(newRule);
-                    editing.set(newRule.isEnabled(), newRule.getAccounts());
+                    if (validateRule(newRule)) {
+                        editing.set(newRule.isEnabled(), newRule.getAccounts());
+                    }
                     return null;
                 }
             });
             return true;
-        } catch (DialogClosedException e) {
-            e.printStackTrace();
-            return false;
-        } catch (DialogCanceledException e) {
+        } catch (DialogNoAnswerException e) {
             e.printStackTrace();
             return false;
         }

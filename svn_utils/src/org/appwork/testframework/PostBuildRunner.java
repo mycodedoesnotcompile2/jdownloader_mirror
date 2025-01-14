@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map.Entry;
 
 import org.appwork.builddecision.BuildDecisions;
 import org.appwork.exceptions.WTFException;
@@ -117,11 +118,12 @@ public class PostBuildRunner {
         }
     }
 
-    static File                      BASE;
-    private static HashSet<String>   MUST_RUN_WITHOUT_CLASSLOADER_ERRORS;
-    private static HashSet<String>   DO_NOT_TRY_TO_RUN;
-    private static boolean           PRINT_CLASSLOADER_ERRORS;
-    private static ArrayList<String> TESTS_OK;
+    static File                            BASE;
+    private static HashSet<String>         MUST_RUN_WITHOUT_CLASSLOADER_ERRORS;
+    private static HashSet<String>         DO_NOT_TRY_TO_RUN;
+    private static boolean                 PRINT_CLASSLOADER_ERRORS;
+    private static ArrayList<String>       TESTS_OK;
+    private static HashMap<String, String> TESTS_FAILED = new HashMap<String, String>();
 
     public static void main(final String[] args) throws Exception {
         BuildDecisions.setEnabled(false);
@@ -142,6 +144,7 @@ public class PostBuildRunner {
     protected static void runAllTestsInClasspath(final String[] args) throws Exception {
         BASE = new File(args[0]);
         TESTS_OK = new ArrayList<String>();
+        TESTS_FAILED = new HashMap<String, String>();
         MUST_RUN_WITHOUT_CLASSLOADER_ERRORS = new HashSet<String>();
         DO_NOT_TRY_TO_RUN = new HashSet<String>();
         String sourceFolder = null;
@@ -213,6 +216,9 @@ public class PostBuildRunner {
         if (!anyTest) {
             throw new Exception("No Tests found. This is probably a build error. Check folder " + new File(BASE, "tests") + " for tests classes");
         }
+        for (Entry<String, String> es : TESTS_FAILED.entrySet()) {
+            LogV3.info(header("FAILED") + es.getKey() + ": " + es.getValue());
+        }
         int i = 0;
         main: for (String p : MUST_RUN_WITHOUT_CLASSLOADER_ERRORS) {
             for (String test : TESTS_OK) {
@@ -223,7 +229,7 @@ public class PostBuildRunner {
             LogV3.info(header("error") + "-force Test not found: " + p);
             i++;
         }
-        if (i > 0) {
+        if (i > 0 || TESTS_FAILED.size() > 0) {
             throw new Exception("Could not find tests for at least 1 -force pattern");
         }
         LogV3.info(header("SUCCESS") + "Finished Post Build Tests");
@@ -295,10 +301,13 @@ public class PostBuildRunner {
             if (Exceptions.getInstanceof(e, NoClassDefFoundError.class) != null) {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, NoClassDefFoundError.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
-            }
-            if (Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
+                LogV3.disableSysout();
+                System.exit(3);
+            } else if (Exceptions.getInstanceof(e, ClassNotFoundException.class) != null) {
                 logInfoAnyway("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
                 System.err.println("Add @TestDependency({\"" + Exceptions.getInstanceof(e, ClassNotFoundException.class).getMessage().replace("/", ".") + "\"}) to " + testClass);
+                LogV3.disableSysout();
+                System.exit(3);
             }
             LogV3.disableSysout();
             System.exit(1);
@@ -421,7 +430,17 @@ public class PostBuildRunner {
             }
             int exit = result.getExitCode();
             AWTest.setLoggerSilent(false, false);
-            if (exit == 2) {
+            if (exit == 3) {
+                // error, but do not stop tests - just log
+                LogV3.info("  >>" + header("failed") + "Exit with ExitCode " + exit);
+                if (result.getStdOutString().length() > 0) {
+                    LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
+                }
+                if (result.getErrOutString().length() > 0) {
+                    LogV3.info("      " + result.getErrOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
+                }
+                TESTS_FAILED.put(cls.getName(), "Exit Code " + exit);
+            } else if (exit == 2) {
                 if (mustRunWithoutClassloaderErrors(cls.getName())) {
                     if (result.getStdOutString().length() > 0) {
                         LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));
@@ -447,8 +466,7 @@ public class PostBuildRunner {
                 }
                 TESTS_OK.add(cls.getName());
                 return;
-            }
-            if (exit == 1) {
+            } else if (exit == 1) {
                 LogV3.info("  >>" + header("failed") + "Exit with ExitCode " + exit);
                 if (result.getStdOutString().length() > 0) {
                     LogV3.info("      " + result.getStdOutString().replaceAll("[\r\n]{1,2}", "\r\n      "));

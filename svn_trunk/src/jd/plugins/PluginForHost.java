@@ -854,7 +854,7 @@ public abstract class PluginForHost extends Plugin {
     }
 
     protected PluginConfigPanelNG createConfigPanel() {
-        if (getConfigInterface() == null && !isPremiumEnabled()) {
+        if (getConfigInterface() == null && (!isPremiumEnabled() || getAccountConfigInterface(null) == null)) {
             return null;
         }
         final PluginConfigPanelNG ret = new PluginConfigPanelNG() {

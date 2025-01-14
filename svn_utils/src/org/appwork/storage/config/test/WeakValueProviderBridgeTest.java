@@ -49,6 +49,7 @@ import org.appwork.storage.flexijson.mapper.interfacestorage.PropertyHandler;
 import org.appwork.storage.flexijson.mapper.interfacestorage.PropertyHandlerImpl;
 import org.appwork.storage.flexijson.mapper.interfacestorage.PropertyHandlerListener;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 
 /**
@@ -56,6 +57,7 @@ import org.appwork.utils.Application;
  * @date 22.08.2022
  *
  */
+@TestDependency({ "org.appwork.storage.config.swing.ValueProviderListener" })
 public class WeakValueProviderBridgeTest extends AWTest {
     public static void main(String[] args) {
         run();
@@ -126,7 +128,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-			}
+            }
         }, false);
         ValueProviderListener<Boolean> listener;
         bridge.register(listener = new ValueProviderListener<Boolean>() {
@@ -137,7 +139,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-			}
+            }
         }, true);
         bridge.register(listener, false);
         bridge = null;
@@ -215,7 +217,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onConfigValidatorError(KeyHandler<Boolean> keyHandler, Boolean invalidValue, ValidationException validateException) {
-			}
+            }
         }, false);
         //
         KeyHandlerProviderBridge bridge = new KeyHandlerProviderBridge(keyHandler);
@@ -227,7 +229,7 @@ public class WeakValueProviderBridgeTest extends AWTest {
 
             @Override
             public void onValueValidationError(ValueProvider<Boolean> owner, Boolean invalidValue, Exception exception) {
-           	}
+            }
         }, false);
         ValueProviderListener<Boolean> listener;
         bridge.register(listener = new ValueProviderListener<Boolean>() {

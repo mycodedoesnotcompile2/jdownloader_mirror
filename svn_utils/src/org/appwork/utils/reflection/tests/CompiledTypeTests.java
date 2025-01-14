@@ -46,6 +46,7 @@ import org.appwork.storage.TypeRef;
 import org.appwork.storage.simplejson.MinimalMemoryMap;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.txtresource.LocaleMap;
 import org.appwork.utils.KeyValueEntry;
 import org.appwork.utils.KeyValueStringEntry;
@@ -61,6 +62,7 @@ import org.appwork.utils.reflection.JsonSyntax;
  * @date 17.10.2022
  *
  */
+@TestDependency({ "org.appwork.storage.simplejson.MinimalMemoryMap" })
 public class CompiledTypeTests<T extends Object> extends AWTest {
     public static enum MyEnum {
         A,

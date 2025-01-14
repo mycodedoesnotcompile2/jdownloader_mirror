@@ -45,6 +45,7 @@ import org.appwork.storage.simplejson.mapper.ColorMapper;
 import org.appwork.storage.simplejson.mapper.FileMapper;
 import org.appwork.storage.simplejson.mapper.URLMapper;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.duration.TimeSpan;
 
@@ -52,6 +53,7 @@ import org.appwork.utils.duration.TimeSpan;
  * @author thomas
  *
  */
+@TestDependency({ "org.appwork.storage.simplejson.mapper.ColorMapper", "org.appwork.storage.simplejson.mapper.FileMapper", "org.appwork.storage.simplejson.mapper.URLMapper" })
 public class SpecialMappers extends AWTest {
     public static void main(final String[] args) {
         run();

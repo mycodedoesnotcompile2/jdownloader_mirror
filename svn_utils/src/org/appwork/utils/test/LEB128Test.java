@@ -37,6 +37,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.LEB128;
 
 /**
@@ -44,6 +45,7 @@ import org.appwork.utils.LEB128;
  * @date Aug 24, 2023
  *
  */
+@TestDependency({ "org.appwork.utils.LEB128" })
 public class LEB128Test extends AWTest {
     public static void main(String[] args) {
         run();

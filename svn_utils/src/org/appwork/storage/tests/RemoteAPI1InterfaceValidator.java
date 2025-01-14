@@ -20,11 +20,13 @@ import org.appwork.storage.Storable;
 import org.appwork.storage.simplejson.mapper.ClassCache;
 import org.appwork.testframework.AWTest;
 import org.appwork.testframework.IgnoreInAWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.ClassPathScanner;
 import org.appwork.utils.ReflectionUtils;
 import org.appwork.utils.reflection.Clazz;
 import org.appwork.utils.reflection.CompiledType;
 
+@TestDependency({ "org.appwork.remoteapi.RemoteAPIInterface" })
 public class RemoteAPI1InterfaceValidator extends AWTest {
     public static void main(String[] args) {
         run();

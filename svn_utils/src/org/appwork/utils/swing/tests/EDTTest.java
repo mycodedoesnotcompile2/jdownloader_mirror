@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.appwork.exceptions.WTFException;
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Application;
 import org.appwork.utils.swing.EDT;
 
@@ -48,6 +49,7 @@ import org.appwork.utils.swing.EDT;
  * @date Mar 1, 2024
  *
  */
+@TestDependency({ "org.appwork.utils.swing.EDT" })
 public class EDTTest extends AWTest {
     /**
      * @param args

@@ -1,17 +1,18 @@
 package org.jdownloader.plugins.controller.host;
 
-import jd.plugins.PluginForHost;
-
 import org.jdownloader.DomainInfo;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPluginClass;
 import org.jdownloader.plugins.controller.PluginClassLoader.PluginClassLoaderChild;
 import org.jdownloader.plugins.controller.UpdateRequiredClassNotFoundException;
 
+import jd.plugins.PluginForHost;
+
 public class LazyHostPlugin extends LazyPlugin<PluginForHost> {
     private static enum PROPERTY {
         CONFIG,
         PREMIUM,
+        PREMIUM_CONFIG,
         REWRITE,
         ALLOW
     }
@@ -121,6 +122,14 @@ public class LazyHostPlugin extends LazyPlugin<PluginForHost> {
 
     protected void setPremium(boolean premium) {
         setProperty(premium, PROPERTY.PREMIUM);
+    }
+
+    public boolean isHasPremiumConfig() {
+        return getProperty(PROPERTY.PREMIUM_CONFIG);
+    }
+
+    protected void setHasPremiumConfig(boolean premium) {
+        setProperty(premium, PROPERTY.PREMIUM_CONFIG);
     }
 
     public DomainInfo getDomainInfo() {

@@ -50,7 +50,9 @@ public class NewRuleAction extends AbstractAddAction {
                 /* Add rule for selected item. */
                 final AccountUsageRule rule = new AccountUsageRule(di.getTld());
                 rule.setEnabled(true);
-                hrc.add(rule);
+                if (HosterRuleController.getInstance().validateRule(rule) && HosterRuleController.getInstance().showEditPanel(rule)) {
+                    hrc.add(rule);
+                }
             }
         } catch (DialogClosedException e1) {
             e1.printStackTrace();

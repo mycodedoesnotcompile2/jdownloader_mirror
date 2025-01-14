@@ -21,6 +21,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.JSonStorage;
+import org.appwork.storage.TypeRef;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -39,13 +45,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-import org.appwork.storage.JSonStorage;
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.plugins.components.config.CivitaiComConfig;
-import org.jdownloader.plugins.config.PluginJsonConfig;
-
-@DecrypterPlugin(revision = "$Revision: 50389 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -94,6 +94,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
         final String itemType = urlregex.getMatch(0);
         final String itemID = urlregex.getMatch(1);
         final CivitaiCom hosterplugin = (CivitaiCom) this.getNewPluginForHostInstance(this.getHost());
+        final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
         /*
          * Using API: https://github.com/civitai/civitai/wiki/REST-API-Reference,
          * https://wiki.civitai.com/wiki/Civitai_API#GET_/api/v1/images
@@ -137,9 +138,14 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             fp.setPackageKey("civitai://post/" + itemID);
             for (final Map<String, Object> image : images) {
                 final String imageurl = image.get("url").toString();
-                final String tempName = getFileNameFromURL(new URL(imageurl));
                 final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + image.get("id")).toExternalForm());
                 link._setFilePackage(fp);
+                final String tempName;
+                if (cfg.isUseIndexIDForImageFilename()) {
+                    tempName = image.get("id").toString() + ".jpg";
+                } else {
+                    tempName = getFileNameFromURL(new URL(imageurl));
+                }
                 if (tempName != null) {
                     link.setName(tempName);
                 }
@@ -147,7 +153,6 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 ret.add(link);
             }
         } else if (itemType.equals("user")) {
-            final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
             final FilePackage fp = FilePackage.getInstance();
             fp.setName(itemID);
             fp.setPackageKey("civitai://user/" + itemID);
@@ -156,7 +161,8 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             /* 2024-07-17: use small limit/pagination size to avoid timeout issues */
             /**
              * 2024-07-18: About the "nsfw" parameter: According to their docs, without nsfw parameter, all items will be rerturned but that
-             * is wrong --> Wrong API docs or bug in API. </br> Only with the nsfw parameter set to "X", all items will be returned.
+             * is wrong --> Wrong API docs or bug in API. </br>
+             * Only with the nsfw parameter set to "X", all items will be returned.
              */
             final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
             final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
@@ -182,7 +188,6 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                 int numberofNewItems = 0;
                 for (final Map<String, Object> image : images) {
                     final String imageurl = image.get("url").toString();
-                    final String tempName = getFileNameFromURL(new URL(imageurl));
                     final String imageid = image.get("id").toString();
                     if (!dupes.add(imageid)) {
                         continue;
@@ -190,6 +195,12 @@ public class CivitaiComCrawler extends PluginForDecrypt {
                     numberofNewItems++;
                     final DownloadLink link = this.createDownloadlink(br.getURL("/images/" + imageid).toExternalForm());
                     link._setFilePackage(fp);
+                    final String tempName;
+                    if (cfg.isUseIndexIDForImageFilename()) {
+                        tempName = imageid + ".jpg";
+                    } else {
+                        tempName = getFileNameFromURL(new URL(imageurl));
+                    }
                     if (tempName != null) {
                         link.setName(tempName);
                     }

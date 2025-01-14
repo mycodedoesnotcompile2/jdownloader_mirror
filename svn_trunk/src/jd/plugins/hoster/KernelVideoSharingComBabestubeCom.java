@@ -22,7 +22,7 @@ import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50411 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50429 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComBabestubeCom extends KernelVideoSharingComV2 {
     public KernelVideoSharingComBabestubeCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -32,7 +32,7 @@ public class KernelVideoSharingComBabestubeCom extends KernelVideoSharingComV2 {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "babestube.com", "foxytube.com", "moviesand.com" });
+        ret.add(new String[] { "babestube.com", "foxytube.com", "moviesand.com", "submityourflicks.com" });
         return ret;
     }
 

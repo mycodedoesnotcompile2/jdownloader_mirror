@@ -118,15 +118,7 @@ public class HosterOrderPanel extends SwitchPanel implements ActionListener, Acc
         if (!isShown()) {
             return;
         }
-        if (HosterRuleController.getInstance().showEditPanel(parameter)) {
-            updateTable();
-        } else {
-            /**
-             * User closed/cancelled edit rule dialog. </br>
-             * Remove rule and don't refresh table so it looks as if this rule has never been added.
-             */
-            HosterRuleController.getInstance().remove(parameter);
-        }
+        updateTable();
     }
 
     @Override

@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.appwork.testframework.AWTest;
+import org.appwork.testframework.TestDependency;
 import org.appwork.utils.Hash;
 import org.appwork.utils.awfc.AWFCEntry;
 import org.appwork.utils.awfc.AWFCInputStream;
@@ -51,6 +52,7 @@ import org.appwork.utils.formatter.HexFormatter;
  * @date Oct 13, 2022
  *
  */
+@TestDependency({ "org.appwork.utils.awfc.AWFCInputStream" })
 public class AWFCTest extends AWTest {
     public static void main(String[] args) {
         run();

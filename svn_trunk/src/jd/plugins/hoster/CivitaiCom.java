@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.jdownloader.plugins.components.config.CivitaiComConfig;
+import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
@@ -43,7 +45,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50389 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
 public class CivitaiCom extends PluginForHost {
     public CivitaiCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,6 +166,7 @@ public class CivitaiCom extends PluginForHost {
             this.login(account);
         }
         try {
+            final CivitaiComConfig cfg = PluginJsonConfig.get(CivitaiComConfig.class);
             if (regex_image.patternFind()) {
                 br.getPage(link.getPluginPatternMatcher());
                 if (br.getHttpConnection().getResponseCode() == 404) {
@@ -181,7 +184,9 @@ public class CivitaiCom extends PluginForHost {
                 final Map<String, Object> metadata = (Map<String, Object>) imagemap.get("metadata");
                 String filename = (String) imagemap.get("name");
                 final Number filesize = (Number) metadata.get("size");
-                if (!StringUtils.isEmpty(filename)) {
+                if (cfg.isUseIndexIDForImageFilename()) {
+                    filename = contentID;
+                } else if (!StringUtils.isEmpty(filename)) {
                     // images/videos may include ?token=YZX in name
                     filename = filename.replaceFirst("\\?token=.+", "");
                     filename = Encoding.htmlDecode(filename).trim();
@@ -225,7 +230,7 @@ public class CivitaiCom extends PluginForHost {
                     /* Do nothing - download handling will take care. */
                     return AvailableStatus.UNCHECKABLE;
                 }
-                basicLinkCheck(br, br.createGetRequest(link.getPluginPatternMatcher()), link, null, extDefault, FILENAME_SOURCE.HEADER);
+                basicLinkCheck(br, br.createGetRequest(link.getPluginPatternMatcher()), link, null, extDefault, FILENAME_SOURCE.CUSTOM, FILENAME_SOURCE.HEADER);
             }
         } catch (final AccountRequiredException e) {
             if (isDownload) {
