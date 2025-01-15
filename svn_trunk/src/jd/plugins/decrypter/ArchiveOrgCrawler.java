@@ -73,7 +73,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.HashInfo;
 import jd.plugins.hoster.ArchiveOrg;
 
-@DecrypterPlugin(revision = "$Revision: 50435 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
+@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 2, names = { "archive.org", "subdomain.archive.org" }, urls = { "https?://(?:www\\.)?archive\\.org/((?:details|download|stream|embed)/.+|search\\?query=.+)", "https?://[^/]+\\.archive\\.org/view_archive\\.php\\?archive=[^\\&]+(?:\\&file=[^\\&]+)?" })
 public class ArchiveOrgCrawler extends PluginForDecrypt {
     public ArchiveOrgCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -1172,7 +1172,7 @@ public class ArchiveOrgCrawler extends PluginForDecrypt {
             double totalLengthSeconds = Double.parseDouble(totalLengthSecondsOriginalStr);
             if (totalLengthSeconds == 0 && (totalLengthSecondsDerivativeStr != null && totalLengthSecondsDerivativeStr.matches("\\d+(\\.\\d+)?"))) {
                 /**
-                 * Edge case: Looks like archive.org original data may be corrupt sometimes, prividing "0.00" as length value. </br>
+                 * Edge case: Looks like archive.org original data may be corrupt sometimes, providing "0.00" as length value. </br>
                  * Example: https://archive.org/details/KNTV_20200205_073400_The_Tonight_Show_Starring_Jimmy_Fallon
                  */
                 logger.info("Failed to find video length via info from original item -> Fallback to length from derivative -> " + totalLengthSecondsDerivativeStr);

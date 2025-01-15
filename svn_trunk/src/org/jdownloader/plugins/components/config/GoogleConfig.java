@@ -101,10 +101,7 @@ public interface GoogleConfig extends PluginConfigInterface {
                 return "360p";
             }
         },
-        @Deprecated
         STREAM_480P {
-            // Check if this actual still possible
-            // https://support.google.com/photos/answer/6220791?hl=en&co=GENIE.Platform%3DDesktop#zippy=%2Cexpress
             @Override
             public String getLabel() {
                 return "480p";

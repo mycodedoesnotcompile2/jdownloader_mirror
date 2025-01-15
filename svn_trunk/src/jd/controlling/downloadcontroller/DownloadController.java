@@ -1237,7 +1237,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
     public void nodeUpdated(AbstractNode source, jd.controlling.packagecontroller.AbstractNodeNotifier.NOTIFY notify, Object param) {
         super.nodeUpdated(source, notify, param);
         switch (notify) {
-        case PROPERTY_CHANCE:
+        case PROPERTY_CHANGE:
             if (param instanceof DownloadLinkProperty) {
                 DownloadLinkProperty eventPropery = (DownloadLinkProperty) param;
                 switch (eventPropery.getProperty()) {
@@ -1313,7 +1313,7 @@ public class DownloadController extends PackageController<FilePackage, DownloadL
             //
             eventSender.fireEvent(new DownloadControllerEventDataUpdate(source, param));
             break;
-        case STRUCTURE_CHANCE:
+        case STRUCTURE_CHANGE:
             eventSender.fireEvent(new DownloadControllerEventStructureRefresh(source, param));
             break;
         }

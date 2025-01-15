@@ -54,7 +54,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SrfCh;
 
-@DecrypterPlugin(revision = "$Revision: 50140 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
 public class SrfChCrawler extends PluginForDecrypt {
     public SrfChCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,7 +102,12 @@ public class SrfChCrawler extends PluginForDecrypt {
         return this.crawl(param, cfg.getQualitySelectionMode(), cfg.getQualitySelectionFallbackMode());
     }
 
+    QualitySelectionMode         mode                         = null;
+    QualitySelectionFallbackMode qualitySelectionFallbackMode = null;
+
     public ArrayList<DownloadLink> crawl(final CryptedLink param, final QualitySelectionMode mode, final QualitySelectionFallbackMode qualitySelectionFallbackMode) throws Exception {
+        this.mode = mode;
+        this.qualitySelectionFallbackMode = qualitySelectionFallbackMode;
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         if (getSelectedQualities().isEmpty() && qualitySelectionFallbackMode == QualitySelectionFallbackMode.NONE) {
             logger.info("User deselected all qualities and has fallback set to none --> Returning nothing");
@@ -133,21 +138,12 @@ public class SrfChCrawler extends PluginForDecrypt {
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(br._getURL().getPath());
-        final String json = br.getRegex(">\\s*window\\.__SSR_VIDEO_DATA__ = (\\{.*?\\})</script>").getMatch(0);
+        final String json = br.getRegex(">\\s*window\\.(?:__SSR_VIDEO_DATA__|__remixContext) = (\\{.*?\\})</script>").getMatch(0);
         if (json != null) {
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
-            final Map<String, Object> initialData = (Map<String, Object>) entries.get("initialData");
-            final Map<String, Object> show = (Map<String, Object>) initialData.get("show");
-            final Map<String, Object> videoDetail = (Map<String, Object>) initialData.get("videoDetail");
-            if (videoDetail != null) {
-                return this.crawlMedia(videoDetail.get("urn").toString(), mode, qualitySelectionFallbackMode);
-            } else if (show != null) {
-                /* Crawl latest episode of tv-series-overview */
-                final Map<String, Object> latestMedia = (Map<String, Object>) show.get("latestMedia");
-                return this.crawlMedia(latestMedia.get("urn").toString(), mode, qualitySelectionFallbackMode);
-            } else {
-                /* Unsupported content */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            this.crawlVideos(entries, ret);
+            if (ret.size() > 0) {
+                return ret;
             }
         }
         final String json2 = br.getRegex("\"application/ld\\+json\">([^<]+)").getMatch(0);
@@ -186,6 +182,44 @@ public class SrfChCrawler extends PluginForDecrypt {
             progress++;
         }
         return ret;
+    }
+
+    /** Recursive function that crawls video content from nested json structures. */
+    private void crawlVideos(final Object o, final ArrayList<DownloadLink> results) throws Exception {
+        if (o instanceof Map) {
+            final Map<String, Object> map = (Map<String, Object>) o;
+            final Map<String, Object> videoDetail = (Map<String, Object>) map.get("videoDetail");
+            final Map<String, Object> show = (Map<String, Object>) map.get("show");
+            if (videoDetail != null) {
+                final String urn = (String) videoDetail.get("urn");
+                if (urn != null) {
+                    results.addAll(crawlMedia(urn, mode, qualitySelectionFallbackMode));
+                }
+            } else if (show != null) {
+                /* Crawl latest episode of tv-series-overview */
+                final Map<String, Object> show_latestMedia = (Map<String, Object>) show.get("latestMedia");
+                if (show_latestMedia != null) {
+                    results.addAll(crawlMedia(show_latestMedia.get("urn").toString(), mode, qualitySelectionFallbackMode));
+                }
+            }
+            for (final Map.Entry<String, Object> entry : map.entrySet()) {
+                final Object value = entry.getValue();
+                if (value instanceof List || value instanceof Map) {
+                    crawlVideos(value, results);
+                }
+            }
+            return;
+        } else if (o instanceof List) {
+            final List<Object> array = (List) o;
+            for (final Object arrayo : array) {
+                if (arrayo instanceof List || arrayo instanceof Map) {
+                    crawlVideos(arrayo, results);
+                }
+            }
+            return;
+        } else {
+            return;
+        }
     }
 
     private List<Integer> getSelectedQualities() {

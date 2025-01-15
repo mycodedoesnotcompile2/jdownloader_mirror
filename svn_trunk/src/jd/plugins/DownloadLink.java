@@ -362,7 +362,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             setProperty(PROPERTY_CHUNKS, chunks);
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.CHUNKS, chunks));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.CHUNKS, chunks));
         }
     }
 
@@ -379,7 +379,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             setProperty(PROPERTY_SPEEDLIMIT, limit);
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.SPEED_LIMIT, limit));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.SPEED_LIMIT, limit));
         }
     }
 
@@ -520,7 +520,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             return;
         }
         if (changedFlag && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTENT, url));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTENT, url));
         }
     }
 
@@ -565,7 +565,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             return;
         }
         if (changedFlag && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CUSTOM, url));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CUSTOM, url));
         }
     }
 
@@ -604,7 +604,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             return;
         }
         if (changedFlag && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTAINER, url));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTAINER, url));
         }
     }
 
@@ -625,7 +625,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setProperty(URL_ORIGIN, url);
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_ORIGIN, url));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_ORIGIN, url));
             }
         }
     }
@@ -647,7 +647,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setProperty(URL_REFERRER, url);
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_REFERRER, url));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_REFERRER, url));
             }
         }
     }
@@ -1113,7 +1113,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 break;
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.AVAILABILITY, availableStatus));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.AVAILABILITY, availableStatus));
             }
         }
     }
@@ -1184,7 +1184,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             }
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESET, null));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESET, null));
         }
     }
 
@@ -1211,7 +1211,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             }
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESUME, null));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESUME, null));
         }
     }
 
@@ -1243,7 +1243,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         downloadCurrent = downloadedCurrent;
         if (hasNotificationListener() && this.getCurrentDownloadInterface() == null) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, null);
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, null);
         }
     }
 
@@ -1273,7 +1273,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             downloadLinkController.onAttach(this);
         }
         if (old != downloadLinkController) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOAD_CONTROLLER, downloadLinkController));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOAD_CONTROLLER, downloadLinkController));
         }
     }
 
@@ -1289,7 +1289,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         this.downloadMax = Math.max(-1, downloadMax);
         if (hasNotificationListener() && this.getCurrentDownloadInterface() == null) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOADSIZE, downloadMax));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOADSIZE, downloadMax));
         }
     }
 
@@ -1314,7 +1314,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             }
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.ENABLED, isEnabled));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.ENABLED, isEnabled));
         }
     }
 
@@ -1355,7 +1355,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             this.skipReason = skipReason;
         }
         if (old != skipReason && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.SKIPPED, skipReason));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.SKIPPED, skipReason));
         }
         return old;
     }
@@ -1382,7 +1382,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 DownloadWatchDog.getInstance().reset(link);
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.FINAL_STATE, finalLinkState));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.FINAL_STATE, finalLinkState));
             }
         }
         return old;
@@ -1406,7 +1406,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             this.conditionalSkipReason = conditionalSkipReason;
         }
         if (old != conditionalSkipReason && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.CONDITIONAL_SKIPPED, conditionalSkipReason));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.CONDITIONAL_SKIPPED, conditionalSkipReason));
         }
         return old;
     }
@@ -1428,7 +1428,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         this.urlProtection = type;
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_PROTECTION, type));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_PROTECTION, type));
         }
     }
 
@@ -1486,7 +1486,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
             }
         }
     }
@@ -1516,7 +1516,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             if (!StringUtils.equals(oldName, newName)) {
                 setLinkInfo(null);
                 if (hasNotificationListener()) {
-                    notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
+                    notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
                 }
             }
         }
@@ -1557,7 +1557,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
             }
         }
     }
@@ -1570,7 +1570,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             changed = this.setProperty(PROPERTY_COMMENT, comment);
         }
         if (changed && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.COMMENT, comment));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.COMMENT, comment));
         }
     }
 
@@ -1608,7 +1608,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         if (!StringUtils.equals(oldName, newName)) {
             setLinkInfo(null);
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, newName));
             }
         }
     }
@@ -1639,7 +1639,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         cachedName = null;
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTENT, pluginPattern));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.URL_CONTENT, pluginPattern));
         }
         if (previousLinkID == null && previousURLDownload != null && !previousURLDownload.equals(pluginPattern)) {
             /* downloadURL changed, so set original one as linkID, so all dupemaps still work */
@@ -1719,7 +1719,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             setPasswordProtected(isPasswordProtected.booleanValue());
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOAD_PASSWORD, pass));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOAD_PASSWORD, pass));
         }
     }
 
@@ -1765,6 +1765,19 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         return null;
     }
 
+    /**
+     * Adds HashInfo to list of existing HashInfo items. </br>
+     * Use with caution!! This does not remove/replace existing HashInfo items!
+     */
+    public void addHashInfo(final HashInfo hashInfo) {
+        // TODO: Implement "add" functionality
+        this.setHashInfo(hashInfo);
+    }
+
+    /**
+     * Sets given HashInfo. </br>
+     * Replaces any already existing HashInfo!
+     */
     public void setHashInfo(final HashInfo hashInfo) {
         final boolean isForced = hashInfo != null && hashInfo.isForced();
         if (!isForced) {
@@ -1781,50 +1794,14 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         if (changed) {
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HASHINFO, hashInfo));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HASHINFO, hashInfo));
             }
-        }
-    }
-
-    /**
-     * Allows to set multiple HashInfo. </br>
-     * 2024-06-27: This is kind of just a mockup, add functionality. </br>
-     * Supported data types: </br>
-     * - String </br>
-     * - HashInfo </br>
-     * - List<HashInfo> and List<String> </br>
-     * Throws IllegalArgumentException if you provide something totally wrong. Wrong hash-strings are ignored (no Exception). <br>
-     * See ticket: https://svn.jdownloader.org/issues/90472
-     */
-    public void setHashInfos(final Object hashInfos) {
-        if (hashInfos instanceof HashInfo) {
-            /* Single HashInfo */
-            setHashInfo((HashInfo) hashInfos);
-        } else if (hashInfos instanceof String) {
-            final HashInfo hashInfo = HashInfo.parse(hashInfos.toString(), true, true);
-            this.setHashInfo(hashInfo);
-        } else if (hashInfos instanceof List) {
-            for (final Object hashInfo : (List) hashInfos) {
-                if (hashInfo instanceof HashInfo) {
-                    setHashInfo((HashInfo) hashInfo);
-                } else if (hashInfo instanceof String) {
-                    final HashInfo hashInfoParsed = HashInfo.parse(hashInfos.toString(), true, true);
-                    this.setHashInfo(hashInfoParsed);
-                } else {
-                    throw new IllegalArgumentException();
-                }
-                // TODO: Add support to set multiple HashInfo items
-                break;
-            }
-        } else {
-            /* Unsupported type */
-            throw new IllegalArgumentException();
         }
     }
 
     public void firePropertyChanged(DownloadLinkProperty.Property property, Object param) {
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, property, param));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, property, param));
         }
     }
 
@@ -1838,52 +1815,53 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     public void addPluginProgress(final PluginProgress progress) {
-        if (progress != null) {
-            synchronized (this) {
-                List<PluginProgress> lPluginProgress = pluginProgress;
-                if (lPluginProgress == null) {
-                    /* to avoid concurrentmodificationexception */
-                    lPluginProgress = new CopyOnWriteArrayList<PluginProgress>();
-                }
-                if (!lPluginProgress.contains(progress)) {
-                    lPluginProgress.add(0, progress);
-                } else if (lPluginProgress.get(0) != progress) {
-                    lPluginProgress.add(0, progress);
-                    final int index = lPluginProgress.lastIndexOf(progress);
-                    lPluginProgress.remove(index);
-                } else {
-                    return;
-                }
-                /* pluginProgress must always contain at least 1 item, see getPluginProgress */
-                pluginProgress = lPluginProgress;
+        if (progress == null) {
+            return;
+        }
+        synchronized (this) {
+            List<PluginProgress> lPluginProgress = pluginProgress;
+            if (lPluginProgress == null) {
+                /* to avoid concurrentmodificationexception */
+                lPluginProgress = new CopyOnWriteArrayList<PluginProgress>();
             }
-            if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PLUGIN_PROGRESS, progress));
+            if (!lPluginProgress.contains(progress)) {
+                lPluginProgress.add(0, progress);
+            } else if (lPluginProgress.get(0) != progress) {
+                lPluginProgress.add(0, progress);
+                final int index = lPluginProgress.lastIndexOf(progress);
+                lPluginProgress.remove(index);
+            } else {
+                return;
             }
+            /* pluginProgress must always contain at least 1 item, see getPluginProgress */
+            pluginProgress = lPluginProgress;
+        }
+        if (hasNotificationListener()) {
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PLUGIN_PROGRESS, progress));
         }
     }
 
     public boolean removePluginProgress(final PluginProgress remove) {
-        if (remove != null) {
-            final PluginProgress latest;
-            synchronized (this) {
-                final List<PluginProgress> lPluginProgress = pluginProgress;
-                if (lPluginProgress == null || lPluginProgress.remove(remove) == false) {
-                    return false;
-                }
-                if (lPluginProgress.size() == 0) {
-                    latest = null;
-                    pluginProgress = null;
-                } else {
-                    latest = lPluginProgress.get(0);
-                }
-            }
-            if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PLUGIN_PROGRESS, latest));
-            }
-            return true;
+        if (remove == null) {
+            return false;
         }
-        return false;
+        final PluginProgress latest;
+        synchronized (this) {
+            final List<PluginProgress> lPluginProgress = pluginProgress;
+            if (lPluginProgress == null || lPluginProgress.remove(remove) == false) {
+                return false;
+            }
+            if (lPluginProgress.size() == 0) {
+                latest = null;
+                pluginProgress = null;
+            } else {
+                latest = lPluginProgress.get(0);
+            }
+        }
+        if (hasNotificationListener()) {
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PLUGIN_PROGRESS, latest));
+        }
+        return true;
     }
 
     public PluginProgress getPluginProgress() {
@@ -2063,7 +2041,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             changed = setProperty(DownloadLink.PROPERTY_VERIFIEDFILESIZE, size);
         }
         if (changed && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOADSIZE_VERIFIED, size));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.DOWNLOADSIZE_VERIFIED, size));
         }
     }
 
@@ -2087,7 +2065,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         }
         setProperty(PROPERTY_RESUMEABLE, b);
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESUMABLE, b));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.RESUMABLE, b));
         }
     }
 
@@ -2189,7 +2167,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setProperty(PROPERTY_PRIORITY, priority.name());
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PRIORITY, priority));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.PRIORITY, priority));
             }
         }
     }
@@ -2208,7 +2186,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setPartOfAnArchive(null);
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.ARCHIVE_ID, id));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.ARCHIVE_ID, id));
             }
         } else {
             if (StringUtils.isNotEmpty(id)) {
@@ -2260,7 +2238,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 setProperty(DownloadLink.PROPERTY_EXTRACTION_STATUS, newExtractionStatus.name());
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.EXTRACTION_STATUS, newExtractionStatus));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.EXTRACTION_STATUS, newExtractionStatus));
             }
             return;
         }
@@ -2276,7 +2254,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             removeProperty(VARIANT_SUPPORT);
         }
         if (hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANTS_ENABLED, b));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANTS_ENABLED, b));
         }
     }
 
@@ -2472,7 +2450,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
     }
 
     public void firePropertyChange(DownloadLinkProperty downloadLinkProperty) {
-        notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, downloadLinkProperty);
+        notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, downloadLinkProperty);
     }
 
     public void setVariants(List<? extends LinkVariant> list) {
@@ -2481,7 +2459,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
             this.setProperty("VARIANTS", variantsString);
             getTempProperties().removeProperty("VARIANTS");
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANTS, list));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANTS, list));
             }
         }
     }
@@ -2515,7 +2493,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 }
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANT, variant));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.VARIANT, variant));
             }
         }
     }
@@ -2578,7 +2556,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 final TypeRef<ArrayList<T>> tref = new TypeRef<ArrayList<T>>() {
                 };
                 final ParameterizedType t = (ParameterizedType) tref.getType();
-                final Type actual = t.getActualTypeArguments()[0];
+                // final Type actual = t.getActualTypeArguments()[0];
                 final ArrayList<Object> basic = JSonStorage.restoreFromString(variantsID, new TypeRef<ArrayList<Object>>() {
                 });
                 for (Object o : basic) {
@@ -2604,7 +2582,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
         setProperty("EXTENSION", extension);
         cachedName = null;
         if (!StringUtils.equals(old, extension) && hasNotificationListener()) {
-            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, extension));
+            notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.NAME, extension));
         }
     }
 
@@ -2636,7 +2614,7 @@ public class DownloadLink extends Property implements Serializable, AbstractPack
                 history.add(entry);
             }
             if (hasNotificationListener()) {
-                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
+                notifyChanges(AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(this, DownloadLinkProperty.Property.HISTORY, entry));
             }
         }
     }

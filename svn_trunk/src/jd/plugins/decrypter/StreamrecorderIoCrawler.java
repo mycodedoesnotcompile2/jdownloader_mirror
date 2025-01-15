@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.StreamrecorderIo;
 
-@DecrypterPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { StreamrecorderIo.class })
 public class StreamrecorderIoCrawler extends PluginForDecrypt {
     public StreamrecorderIoCrawler(PluginWrapper wrapper) {
@@ -89,7 +89,7 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
-        return crawlAllAccountRecordings(param, account);
+        return crawl(param, account);
     }
 
     private StreamrecorderIo hosterplugin = null;
@@ -100,7 +100,7 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
         super.clean();
     }
 
-    public ArrayList<DownloadLink> crawlAllAccountRecordings(final CryptedLink param, final Account account) throws Exception {
+    public ArrayList<DownloadLink> crawl(final CryptedLink param, final Account account) throws Exception {
         if (account == null) {
             throw new AccountRequiredException();
         }
@@ -199,8 +199,12 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
         }
         final String[] favinfos = br.getRegex("togglefavorite\\((\\d+, [^\\)]+)\\)").getColumn(0);
         if (favinfos == null || favinfos.length == 0) {
-            // TODO: Add check for case that user has zero recordings
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            final String totalRecordings = br.getRegex("class=\"count\">(\\d+)</div>\\s*<div class=\"title\"[^^>]*>\\s*Total recordings\\s*</div>").getMatch(0);
+            if (StringUtils.equals(totalRecordings, "0")) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
         }
         final HashSet<String> dupes_user_ids = new HashSet<String>();
         userloop: for (final String favinfo : favinfos) {
@@ -325,6 +329,8 @@ public class StreamrecorderIoCrawler extends PluginForDecrypt {
             video.setHost(getHost());
             video.setProperty(StreamrecorderIo.PROPERTY_streamcategory, recording.get("streamcategory"));
             video.setProperty(StreamrecorderIo.PROPERTY_recorded_at, recording.get("recorded_at"));
+            video.setProperty(StreamrecorderIo.PROPERTY_downloaded_according_to_api, recording.get("downloaded"));
+            video.setProperty(StreamrecorderIo.PROPERTY_duration_seconds, recording.get("duration"));
             video.setProperty(StreamrecorderIo.PROPERTY_title, title);
             video.setProperty(StreamrecorderIo.PROPERTY_user_id, userID);
             video.setProperty(StreamrecorderIo.PROPERTY_username, username);

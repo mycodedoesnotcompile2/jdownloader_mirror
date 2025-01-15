@@ -367,7 +367,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             } finally {
                 getModifyLock().writeUnlock();
                 if (notifyStructureChanges) {
-                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANCE, null);
+                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
                 }
             }
         } else {
@@ -425,7 +425,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             } finally {
                 getModifyLock().writeUnlock();
                 if (notifyStructureChanges) {
-                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANCE, null);
+                    nodeUpdated(this, NOTIFY.STRUCTURE_CHANGE, null);
                 }
             }
         } else {
@@ -441,7 +441,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
             changed = this.setProperty(PROPERTY_COMMENT, comment);
         }
         if (changed && hasNotificationListener()) {
-            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new FilePackageProperty(this, FilePackageProperty.Property.COMMENT, getComment()));
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.COMMENT, getComment()));
         }
     }
 
@@ -467,7 +467,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         }
         downloadDirectory = dedupeString(folder.trim());
         if (hasNotificationListener()) {
-            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new FilePackageProperty(this, FilePackageProperty.Property.FOLDER, getDownloadDirectory()));
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.FOLDER, getDownloadDirectory()));
         }
     }
 
@@ -486,7 +486,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
         }
         this.name = name.trim();
         if (hasNotificationListener()) {
-            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new FilePackageProperty(this, FilePackageProperty.Property.NAME, getName()));
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.NAME, getName()));
         }
     }
 
@@ -603,7 +603,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
                 setProperty(PROPERTY_PRIORITY, priority.name());
             }
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new FilePackageProperty(this, FilePackageProperty.Property.PRIORITY, priority));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new FilePackageProperty(this, FilePackageProperty.Property.PRIORITY, priority));
             }
         }
     }
@@ -695,7 +695,7 @@ public class FilePackage extends Property implements Serializable, AbstractPacka
 
     @Override
     public void nodeUpdated(AbstractNode source, NOTIFY notify, Object param) {
-        if (source == this && NOTIFY.STRUCTURE_CHANCE.equals(notify)) {
+        if (source == this && NOTIFY.STRUCTURE_CHANGE.equals(notify)) {
             setModified(System.currentTimeMillis());
         } else {
             final PackageController<FilePackage, DownloadLink> n = getControlledBy();

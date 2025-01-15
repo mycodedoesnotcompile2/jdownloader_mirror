@@ -138,7 +138,7 @@ public class LinkStatus implements Serializable {
         this.status = status;
         DownloadLink dl = downloadLink;
         if (dl != null && dl.hasNotificationListener()) {
-            dl.notifyChanges(jd.controlling.packagecontroller.AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(dl, DownloadLinkProperty.Property.LINKSTATUS, toString(status)));
+            dl.notifyChanges(jd.controlling.packagecontroller.AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(dl, DownloadLinkProperty.Property.LINKSTATUS, toString(status)));
 
         }
     }
@@ -151,7 +151,7 @@ public class LinkStatus implements Serializable {
 
         DownloadLink dl = downloadLink;
         if (dl != null && dl.hasNotificationListener()) {
-            dl.notifyChanges(jd.controlling.packagecontroller.AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new DownloadLinkProperty(dl, DownloadLinkProperty.Property.LINKSTATUS, statusText));
+            dl.notifyChanges(jd.controlling.packagecontroller.AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new DownloadLinkProperty(dl, DownloadLinkProperty.Property.LINKSTATUS, statusText));
         }
     }
 

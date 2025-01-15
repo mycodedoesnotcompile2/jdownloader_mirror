@@ -55,7 +55,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FaceBookComVideos;
 
 @SuppressWarnings("deprecation")
-@DecrypterPlugin(revision = "$Revision: 50105 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
 public class FaceBookComGallery extends PluginForDecrypt {
     public FaceBookComGallery(PluginWrapper wrapper) {
         super(wrapper);
@@ -842,12 +842,12 @@ public class FaceBookComGallery extends PluginForDecrypt {
             final Map<String, Object> map = (Map<String, Object>) o;
             for (final Map.Entry<String, Object> entry : map.entrySet()) {
                 final String key = entry.getKey();
-                final Object ifThisIsAPhotoThisIsThePhotoID = entry.getValue();
-                if (key.equals("id") && ifThisIsAPhotoThisIsThePhotoID instanceof String) {
+                final Object value = entry.getValue();
+                if (key.equals("id") && value instanceof String) {
                     if (map.containsKey("__isMedia") && map.containsKey("image")) {
                         final String directurl = JavaScriptEngineFactory.walkJson(map, "image/uri").toString();
                         final DownloadLink photo = this.createDownloadlink(directurl);
-                        photo.setProperty(FaceBookComVideos.PROPERTY_CONTENT_ID, ifThisIsAPhotoThisIsThePhotoID);
+                        photo.setProperty(FaceBookComVideos.PROPERTY_CONTENT_ID, value);
                         photo.setProperty(FaceBookComVideos.PROPERTY_TYPE, FaceBookComVideos.TYPE_PHOTO);
                         photo.setProperty(FaceBookComVideos.PROPERTY_DIRECTURL_LAST, directurl);
                         photo.setAvailable(true);
@@ -856,8 +856,8 @@ public class FaceBookComGallery extends PluginForDecrypt {
                     } else {
                         continue;
                     }
-                } else if (ifThisIsAPhotoThisIsThePhotoID instanceof List || ifThisIsAPhotoThisIsThePhotoID instanceof Map) {
-                    crawlPhotos(ifThisIsAPhotoThisIsThePhotoID, results);
+                } else if (value instanceof List || value instanceof Map) {
+                    crawlPhotos(value, results);
                 }
             }
             return;

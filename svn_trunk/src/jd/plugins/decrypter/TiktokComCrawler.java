@@ -60,7 +60,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.plugins.hoster.TiktokCom;
 
-@DecrypterPlugin(revision = "$Revision: 50119 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50449 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { TiktokCom.class })
 public class TiktokComCrawler extends PluginForDecrypt {
     public TiktokComCrawler(PluginWrapper wrapper) {
@@ -513,6 +513,15 @@ public class TiktokComCrawler extends PluginForDecrypt {
     public ArrayList<DownloadLink> crawlProfile(final CryptedLink param, final String contenturl) throws Exception {
         if (PluginJsonConfig.get(TiktokConfig.class).getProfileCrawlerMaxItemsLimit() == 0) {
             logger.info("User has disabled profile crawler --> Returning empty array");
+            return new ArrayList<DownloadLink>();
+        }
+        /**
+         * See: https://board.jdownloader.org/showthread.php?t=91365 </br>
+         * and: https://svn.jdownloader.org/issues/90292
+         */
+        final boolean profileCrawlerPermanentlyBroken = true;
+        if (profileCrawlerPermanentlyBroken) {
+            this.displayBubbleNotification("Tiktok profile crawler permanently broken/not available anymore", "<html>Visit our forums for more information and possible workarounds:\r\n<a href=\"https://board.jdownloader.org/showthread.php?t=91365\">https://board.jdownloader.org/showthread.php?t=91365</a></html>");
             return new ArrayList<DownloadLink>();
         }
         if (PluginJsonConfig.get(TiktokConfig.class).getProfileCrawlMode() == ProfileCrawlMode.API) {

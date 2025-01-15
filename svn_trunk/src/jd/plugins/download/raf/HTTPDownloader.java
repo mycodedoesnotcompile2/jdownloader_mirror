@@ -29,6 +29,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.appwork.exceptions.WTFException;
+import org.appwork.net.protocol.http.HTTPConstants;
+import org.appwork.storage.config.JsonConfig;
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.TimeFormatter;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.logging2.LogSource;
+import org.appwork.utils.net.HTTPHeader;
+import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
+import org.appwork.utils.os.CrossSystem;
+import org.jdownloader.plugins.DownloadPluginProgress;
+import org.jdownloader.plugins.SkipReason;
+import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
+import org.jdownloader.translate._JDT;
+import org.jdownloader.updatev2.InternetConnectionSettings;
+
 import jd.controlling.downloadcontroller.DiskSpaceReservation;
 import jd.controlling.downloadcontroller.DownloadSession;
 import jd.controlling.downloadcontroller.ExceptionRunnable;
@@ -52,23 +69,6 @@ import jd.plugins.download.HashResult;
 import jd.plugins.download.raf.BytesMappedFile.BytesMappedFileCallback;
 import jd.plugins.download.raf.FileBytesMap.FileBytesMapView;
 import jd.plugins.download.raf.HTTPChunk.ERROR;
-
-import org.appwork.exceptions.WTFException;
-import org.appwork.net.protocol.http.HTTPConstants;
-import org.appwork.storage.config.JsonConfig;
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.TimeFormatter;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.logging2.LogSource;
-import org.appwork.utils.net.HTTPHeader;
-import org.appwork.utils.net.httpconnection.HTTPConnectionUtils;
-import org.appwork.utils.os.CrossSystem;
-import org.jdownloader.plugins.DownloadPluginProgress;
-import org.jdownloader.plugins.SkipReason;
-import org.jdownloader.plugins.SkipReasonException;
-import org.jdownloader.settings.GeneralSettings;
-import org.jdownloader.translate._JDT;
-import org.jdownloader.updatev2.InternetConnectionSettings;
 
 public class HTTPDownloader extends DownloadInterface implements FileBytesCacheFlusher, BytesMappedFileCallback {
     public static enum STATEFLAG {
@@ -662,29 +662,30 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
         final List<String> googleHashList = con.getRequest().getResponseHeaders("X-Goog-Hash");
         if (googleHashList != null && googleHashList.size() > 0) {
             for (final String googleHash : googleHashList) {
-                if (googleHash != null) {
-                    try {
-                        // https://cloud.google.com/storage/docs/hashes-etags
-                        // Hashes are base64 encoded. Multiple hashes can be given.
-                        // https://cloud.google.com/storage/docs/xml-api/reference-headers#xgooghash
-                        final String md5 = new Regex(googleHash, "md5\\s*=\\s*([^,]+)").getMatch(0);
-                        final String crc32c = new Regex(googleHash, "crc32c\\s*=\\s*([^,]+)").getMatch(0);
-                        final HashInfo hashInfo;
-                        if (md5 != null) {
-                            hashInfo = newConnectionHashInfo(logger, md5, HashInfo.TYPE.MD5);
-                        } else if (crc32c != null) {
-                            hashInfo = newConnectionHashInfo(logger, crc32c, HashInfo.TYPE.CRC32C);
-                        } else {
-                            continue;
-                        }
-                        if (hashInfo == null) {
-                            continue;
-                        } else if (ret == null || hashInfo.isStrongerThan(ret)) {
-                            ret = hashInfo;
-                        }
-                    } catch (final Exception ignore) {
-                        logger.log(ignore);
+                if (googleHash == null) {
+                    continue;
+                }
+                try {
+                    // https://cloud.google.com/storage/docs/hashes-etags
+                    // Hashes are base64 encoded. Multiple hashes can be given.
+                    // https://cloud.google.com/storage/docs/xml-api/reference-headers#xgooghash
+                    final String md5 = new Regex(googleHash, "md5\\s*=\\s*([^,]+)").getMatch(0);
+                    final String crc32c = new Regex(googleHash, "crc32c\\s*=\\s*([^,]+)").getMatch(0);
+                    final HashInfo hashInfo;
+                    if (md5 != null) {
+                        hashInfo = newConnectionHashInfo(logger, md5, HashInfo.TYPE.MD5);
+                    } else if (crc32c != null) {
+                        hashInfo = newConnectionHashInfo(logger, crc32c, HashInfo.TYPE.CRC32C);
+                    } else {
+                        continue;
                     }
+                    if (hashInfo == null) {
+                        continue;
+                    } else if (ret == null || hashInfo.isStrongerThan(ret)) {
+                        ret = hashInfo;
+                    }
+                } catch (final Exception ignore) {
+                    logger.log(ignore);
                 }
             }
         }

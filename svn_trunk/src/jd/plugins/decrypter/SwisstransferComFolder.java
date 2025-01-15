@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = { "swisstransfer.com" }, urls = { "https?://(?:www\\.)?swisstransfer\\.com/d/([a-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = { "swisstransfer.com" }, urls = { "https?://(?:www\\.)?swisstransfer\\.com/d/([a-z0-9\\-]+)" })
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,26 +88,25 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             final String deletedDate = (String) data.get("deletedDate");
             final String containerUUID = (String) data.get("containerUUID");
             final String directurl = "https://" + downloadHost + "/api/download/" + folderUUID;
-            final DownloadLink dl = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
-            // TODO: verify if resume is possible
-            dl.setProperty(DirectHTTP.NORESUME, true);
-            dl.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
-            dl.setFinalFileName("swisstransfer_" + containerUUID + ".zip");
+            final DownloadLink zip = createDownloadlink(DirectHTTP.createURLForThisPlugin(directurl));
+            zip.setProperty(DirectHTTP.NORESUME, false);
+            zip.setProperty(DirectHTTP.PROPERTY_CUSTOM_HOST, getHost());
+            zip.setFinalFileName("swisstransfer_" + containerUUID + ".zip");
             if (deletedDate != null) {
                 /* Deleted */
-                dl.setAvailable(false);
+                zip.setAvailable(false);
             } else if (expiredDate != null) {
                 final long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
                 if (System.currentTimeMillis() < timeStamp) {
-                    dl.setAvailable(true);
+                    zip.setAvailable(true);
                 } else {
-                    dl.setAvailable(false);
+                    zip.setAvailable(false);
                 }
             } else {
-                dl.setAvailable(true);
+                zip.setAvailable(true);
             }
-            ret.add(dl);
-            distribute(dl);
+            ret.add(zip);
+            distribute(zip);
             if (CrawlMode.ZIP.equals(crawlMode)) {
                 return ret;
             }

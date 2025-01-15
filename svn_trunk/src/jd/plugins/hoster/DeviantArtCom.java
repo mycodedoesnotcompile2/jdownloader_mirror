@@ -65,7 +65,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50101 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
+@HostPlugin(revision = "$Revision: 50446 $", interfaceVersion = 3, names = { "deviantart.com" }, urls = { "https?://[\\w\\.\\-]*?deviantart\\.com/(([\\w\\-]+/)?(art|journal)/[\\w\\-]+-\\d+|([\\w\\-]+/)?status(?:-update)?/\\d+)" })
 public class DeviantArtCom extends PluginForHost {
     private final String               TYPE_DOWNLOADALLOWED_HTML             = "(?i)class=\"text\">HTML download</span>";
     private final String               TYPE_DOWNLOADFORBIDDEN_HTML           = "<div class=\"grf\\-indent\"";
@@ -726,7 +726,7 @@ public class DeviantArtCom extends PluginForHost {
                  */
                 throw new PluginException(LinkStatus.ERROR_FATAL, "Avoiding download of blurred image");
             }
-            /* Workaround for old downloadcore bug that can lead to incomplete files */
+            /* Workaround for old download core bug that can lead to incomplete files */
             br.getHeaders().put("Accept-Encoding", "identity");
             /* Remove hashInfo before download in case quality/mirror/user settings have changed. will be updated again on download */
             link.setHashInfo(null);

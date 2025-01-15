@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.appwork.utils.DebugMode;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -45,13 +44,11 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50432 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsfireCom extends PluginForHost {
     public ModsfireCom(PluginWrapper wrapper) {
         super(wrapper);
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            this.enablePremium("https://" + getHost() + "/register");
-        }
+        this.enablePremium("https://" + getHost() + "/register");
     }
 
     @Override
@@ -106,6 +103,7 @@ public class ModsfireCom extends PluginForHost {
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
+        /* 2025-01-14: Max 1 chunk for free and premium users */
         return 1;
     }
 
@@ -295,7 +293,7 @@ public class ModsfireCom extends PluginForHost {
         if (expire == null) {
             throw new AccountInvalidException("Free accounts are not supported");
         }
-        ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "dd MMMM yyyy", Locale.ENGLISH));
+        ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "yyyy-MM-dd", Locale.ENGLISH));
         account.setType(AccountType.PREMIUM);
         account.setConcurrentUsePossible(true);
         return ai;
@@ -303,7 +301,7 @@ public class ModsfireCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        // this.handleDownload(link, account);
+        this.handleDownload(link, account);
     }
 
     @Override

@@ -194,7 +194,7 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
             this.comment = comment;
             setType(TYPE.NORMAL);
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.COMMENT, getComment()));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.COMMENT, getComment()));
             }
         }
     }
@@ -219,7 +219,7 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
             this.name = name;
             compiledDownloadFolder = null;
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.NAME, getName()));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.NAME, getName()));
             }
         }
     }
@@ -235,7 +235,7 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
             }
             compiledDownloadFolder = null;
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.FOLDER, getDownloadFolder()));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.FOLDER, getDownloadFolder()));
             }
         }
     }
@@ -293,7 +293,7 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
         if (getPriorityEnum() != priority) {
             this.priority = priority;
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.PRIORITY, priority));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledPackageProperty(this, CrawledPackageProperty.Property.PRIORITY, priority));
             }
         }
     }
@@ -314,11 +314,11 @@ public class CrawledPackage implements AbstractPackageNode<CrawledLink, CrawledP
 
     @Override
     public void nodeUpdated(AbstractNode source, NOTIFY notify, Object param) {
-        if (source == this && NOTIFY.STRUCTURE_CHANCE.equals(notify)) {
+        if (source == this && NOTIFY.STRUCTURE_CHANGE.equals(notify)) {
             setModified(System.currentTimeMillis());
             compiledDownloadFolder = null;
         } else {
-            if (source instanceof AbstractPackageChildrenNode && NOTIFY.PROPERTY_CHANCE.equals(notify) && param instanceof CrawledLinkProperty && CrawledLinkProperty.Property.NAME.equals(((CrawledLinkProperty) param).getProperty())) {
+            if (source instanceof AbstractPackageChildrenNode && NOTIFY.PROPERTY_CHANGE.equals(notify) && param instanceof CrawledLinkProperty && CrawledLinkProperty.Property.NAME.equals(((CrawledLinkProperty) param).getProperty())) {
                 compiledDownloadFolder = null;
             }
             final PackageController<CrawledPackage, CrawledLink> n = getControlledBy();

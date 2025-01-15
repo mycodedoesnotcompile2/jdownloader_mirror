@@ -47,7 +47,7 @@ public class NewRuleAction extends AbstractAddAction {
             Dialog.getInstance().showDialog(d);
             final DomainInfo di = d.getSelectedItem();
             if (di != null) {
-                /* Add rule for selected item. */
+                /* Add rule for selected item [unless user cancels edit dialog]. */
                 final AccountUsageRule rule = new AccountUsageRule(di.getTld());
                 rule.setEnabled(true);
                 if (HosterRuleController.getInstance().validateRule(rule) && HosterRuleController.getInstance().showEditPanel(rule)) {

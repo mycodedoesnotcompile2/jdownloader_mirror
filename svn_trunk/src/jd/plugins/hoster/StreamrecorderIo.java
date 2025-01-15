@@ -43,7 +43,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamrecorderIo extends PluginForHost {
     public StreamrecorderIo(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +55,8 @@ public class StreamrecorderIo extends PluginForHost {
     public static final String PROPERTY_title                       = "title";
     public static final String PROPERTY_streamcategory              = "streamcategory";
     public static final String PROPERTY_recorded_at                 = "recorded_at";
+    public static final String PROPERTY_downloaded_according_to_api = "downloaded_according_to_api";
+    public static final String PROPERTY_duration_seconds            = "duration_seconds";
     public static final String PROPERTY_user_id                     = "user_id";
     public static final String PROPERTY_username                    = "username";
     public static final String PROPERTY_video_resolution_height     = "video_resolution_height";

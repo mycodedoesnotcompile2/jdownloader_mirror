@@ -188,7 +188,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 pkg.getChildren().addAll(children);
             } finally {
                 pkg.getModifyLock().writeUnlock();
-                pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANCE, null);
+                pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
             }
             return true;
         } else {
@@ -755,7 +755,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         }
                     } finally {
                         pkg.getModifyLock().writeUnlock();
-                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANCE, null);
+                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
                     }
                     final boolean readL = pkg.getModifyLock().readLock();
                     try {
@@ -859,7 +859,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                         pkg.getChildren().addAll(children);
                     } finally {
                         pkg.getModifyLock().writeUnlock();
-                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANCE, null);
+                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
                     }
                     getMapLock().writeLock();
                     try {
@@ -938,7 +938,7 @@ public abstract class PackageController<PackageType extends AbstractPackageNode<
                 } finally {
                     pkg.getModifyLock().writeUnlock();
                     if (notifyStructureChanges) {
-                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANCE, null);
+                        pkg.nodeUpdated(pkg, NOTIFY.STRUCTURE_CHANGE, null);
                     }
                 }
                 if (links.size() > 0) {

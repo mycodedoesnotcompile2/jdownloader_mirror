@@ -368,7 +368,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
         }
         setLinkInfo(null);
         if (hasNotificationListener()) {
-            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
         }
     }
 
@@ -480,7 +480,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
     public void setEnabled(boolean b) {
         if (setProperty(b, PROPERTY.ENABLED)) {
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.ENABLED, b));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.ENABLED, b));
             }
         }
     }
@@ -778,7 +778,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
                 DownloadLinkProperty propertyEvent = (DownloadLinkProperty) param;
                 switch (propertyEvent.getProperty()) {
                 case AVAILABILITY:
-                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.AVAILABILITY, propertyEvent.getValue()));
+                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.AVAILABILITY, propertyEvent.getValue()));
                     return;
                 case ENABLED:
                     /* not needed to forward at the moment */
@@ -790,14 +790,14 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
                     if (!isNameSet()) {
                         /* we use the name from downloadLink */
                         setLinkInfo(null);
-                        nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, propertyEvent.getValue()));
+                        nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, propertyEvent.getValue()));
                     }
                     return;
                 case PRIORITY:
-                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.PRIORITY, propertyEvent.getValue()));
+                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.PRIORITY, propertyEvent.getValue()));
                     return;
                 case COMMENT:
-                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
+                    nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
                     return;
                 }
             }
@@ -830,7 +830,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
 
     public void firePropertyChanged(CrawledLinkProperty.Property property, Object value) {
         if (hasNotificationListener()) {
-            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, property, value));
+            nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, property, value));
         }
     }
 
@@ -847,7 +847,7 @@ public class CrawledLink implements AbstractPackageChildrenNode<CrawledPackage>,
         if (link != null) {
             link.setComment(comment);
             if (hasNotificationListener()) {
-                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANCE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
+                nodeUpdated(this, AbstractNodeNotifier.NOTIFY.PROPERTY_CHANGE, new CrawledLinkProperty(this, CrawledLinkProperty.Property.NAME, getName()));
             }
         }
     }
