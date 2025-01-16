@@ -57,9 +57,11 @@ import org.jdownloader.settings.GeneralSettings;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
+import jd.controlling.linkcrawler.LinkCrawlerDeepInspector;
 import jd.http.Browser;
 import jd.http.Cookie;
 import jd.http.Cookies;
+import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.nutils.encoding.HTMLEntities;
 import jd.parser.Regex;
@@ -85,7 +87,7 @@ import jd.plugins.decrypter.GoogleDriveCrawler;
 import jd.plugins.decrypter.GoogleDriveCrawler.JsonSchemeType;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50449 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50451 $", interfaceVersion = 3, names = {}, urls = {})
 public class GoogleDrive extends PluginForHost {
     public GoogleDrive(PluginWrapper wrapper) {
         super(wrapper);
@@ -189,6 +191,7 @@ public class GoogleDrive extends PluginForHost {
      * change the quality and then resume the started download with another URL.
      */
     private final static String   PROPERTY_USED_QUALITY                          = "USED_QUALITY";
+    private final static String   PROPERTY_USED_STREAM_DOWNLOAD_TYPE             = "USED_STREAM_DOWNLOAD_TYPE";
     private static final String   PROPERTY_GOOGLE_DOCUMENT                       = "IS_GOOGLE_DOCUMENT";
     private static final String   PROPERTY_GOOGLE_DOCUMENT_FILE_EXTENSION        = "GOOGLE_DOCUMENT_FILE_EXTENSION";
     private static final String   PROPERTY_FORCED_FINAL_DOWNLOADURL              = "FORCED_FINAL_DOWNLOADURL";
@@ -208,7 +211,6 @@ public class GoogleDrive extends PluginForHost {
     private final static String   PROPERTY_CACHED_LAST_DISPOSITION_STATUS        = "cached_last_disposition_status";
     private final String          PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED      = "timestamp_stream_download_failed";
     private final String          PROPERTY_TMP_ALLOW_OBTAIN_MORE_INFORMATION     = "tmp_allow_obtain_more_information";
-    private final String          PROPERTY_TMP_STREAM_DOWNLOAD_ACTIVE            = "tmp_stream_download_active";
     /* Misc */
     private final String          DISPOSITION_STATUS_QUOTA_EXCEEDED              = "QUOTA_EXCEEDED";
     /* Pre defined exceptions */
@@ -267,9 +269,15 @@ public class GoogleDrive extends PluginForHost {
 
     public static Browser prepBrowserWebAPI(final Browser br, final Account account) throws PluginException {
         final String domainWithProtocol = "https://drive.google.com";
-        // br.getHeaders().put("Origin", domainWithProtocol);
-        br.getHeaders().put("X-Referer", domainWithProtocol);
-        br.getHeaders().put("X-Origin", domainWithProtocol);
+        br.getHeaders().put("Origin", domainWithProtocol);
+        br.getHeaders().put("Referer", domainWithProtocol + "/");
+        /**
+         * Usage of "X-Referer" and "X-Origin" headers makes "content-workspacevideo-pa.googleapis.com/v1/drive/media/" request fail! </br>
+         * For GoogleDrive internal linkcheck, those headers can be set (they are set in browsers original request) but they are not
+         * mandatory.
+         */
+        // br.getHeaders().put("X-Referer", domainWithProtocol);
+        // br.getHeaders().put("X-Origin", domainWithProtocol);
         br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
         br.getHeaders().put("X-Javascript-User-Agent", "google-api-javascript-client/1.1.0");
         if (account != null) {
@@ -641,6 +649,9 @@ public class GoogleDrive extends PluginForHost {
                     if (looksLikeImageFile(link.getName()) && !canDownloadOfficially(link)) {
                         /* Allow deeper linkcheck to find alternative downloadlink for officially non-downloadable images. */
                         logger.info("File is online but we'll be looking for more information about this un-downloadable image");
+                    } else if (cfg.isDebugWebsiteAlwaysPerformExtendedLinkcheck() && !this.hasObtainedInformationFromAPIOrWebAPI(link)) {
+                        /* Debug functionality. Can be used by anyone but shall only be used by devs. */
+                        logger.info("Handling extra linkcheck because it is enabled by user and hasn't been done before");
                     } else if (deeperCheckHasAlreadyBeenPerformed || !itemIsEligableForObtainingMoreInformation) {
                         return status;
                     } else {
@@ -677,6 +688,10 @@ public class GoogleDrive extends PluginForHost {
                         logger.info("Google Document extended linkcheck failed");
                     }
                 }
+            } else if (cfg.isDebugWebsiteAlwaysPerformExtendedLinkcheck() && !this.hasObtainedInformationFromAPIOrWebAPI(link)) {
+                /* Debug functionality. Can be used by anyone but shall only be used by devs. */
+                logger.info("Handling extra linkcheck because it is enabled by user and hasn't been done before");
+                crawlAdditionalFileInformationFromWebsite(br, link, account, false);
             }
         } catch (final AccountRequiredException ae) {
             if (isDownload) {
@@ -1115,12 +1130,11 @@ public class GoogleDrive extends PluginForHost {
             }
             final String fileID = this.getFID(link);
             logger.info("Obtaining stream information");
-            final boolean useNewWay = false;
+            final boolean useNewWay = true;
             int chosenQuality = -1;
             String chosenQualityDownloadlinkProgressive = null;
             String chosenQualityDownloadlinkHLS = null;
             if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && useNewWay) {
-                // TODO: Finish implementation of this handling
                 if (this.websiteStreamAPIKey == null) {
                     this.handleLinkcheckFileOverview(br, link, account, false, false);
                     if (this.websiteStreamAPIKey == null) {
@@ -1128,21 +1142,25 @@ public class GoogleDrive extends PluginForHost {
                     }
                 }
                 final Browser videobr = br.cloneBrowser();
-                // TODO: Following request returns error 400 when this is used but we need it for account handling!
-                // prepBrowserWebAPI(videobr, account);
-                videobr.getHeaders().put("Referer", "https://drive.google.com/");
+                prepBrowserWebAPI(videobr, account);
                 videobr.getPage("https://workspacevideo-pa.clients6.google.com/v1/drive/media/" + fileID + "/playback?key=" + this.websiteStreamAPIKey + "&%24unique=gc078");
                 final Map<String, Object> entries = restoreFromString(videobr.getRequest().getHtmlCode(), TypeRef.MAP);
                 final Map<String, Object> error = (Map<String, Object>) entries.get("error");
                 if (error != null) {
-                    link.setProperty(PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED, System.currentTimeMillis());
                     final int code = ((Number) error.get("code")).intValue();
                     final String status = error.get("status").toString();
                     final String message = error.get("message").toString();
                     logger.info("Stream download impossible because: " + status + " | " + message);
-                    // final List<Map<String, Object>> details = (List<Map<String, Object>>) error.get("details");
-                    // final Map<String, Object> error0 = details.get(0);
-                    if (code == 429) {
+                    if (code == 404) {
+                        /* This should never happen but if it does, we know for sure that the file is offline! */
+                        /* "message": "media item <fileID> not found", */
+                        if (looksLikeVideoFile) {
+                            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                        } else {
+                            /* This should never happen! */
+                            throw new PluginException(LinkStatus.ERROR_FATAL, "FATAL: Attempted stream download of non streamable file!");
+                        }
+                    } else if (code == 429) {
                         /* Usually with status "RESOURCE_EXHAUSTED" and message "playback quota exhausted" */
                         /**
                          * Similar to file-download mode: File is definitely not streamable at this moment! </br>
@@ -1178,31 +1196,28 @@ public class GoogleDrive extends PluginForHost {
                                 break;
                             }
                         }
-                        link.setVerifiedFileSize(-1);
-                        link.setHashInfo(null);
-                        checkFFmpeg(link, "Download a HLS Stream");
-                        dl = new HLSDownloader(link, br, chosenQualityDownloadlinkHLS);
-                        dl.startDownload();
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "HLS test dl test SUCCESSFUL (\"Failed successfully\")");
-                    } catch (final Throwable e) {
+                    } catch (final InterruptedException ie) {
+                        throw ie;
+                    } catch (final Exception e) {
+                        /* This should never happen! */
                         logger.log(e);
-                        logger.warning("WTF");
-                        throw new PluginException(LinkStatus.ERROR_FATAL, "HLS test dl failed");
+                        throw new PluginException(LinkStatus.ERROR_FATAL, "HLS stream crawl failure");
                     }
-                }
-                logger.info("Found " + progressiveTranscodes.size() + " progressive stream qualities");
-                int heightMax = -1;
-                for (final Map<String, Object> progressiveTranscode : progressiveTranscodes) {
-                    final Map<String, Object> transcodeMetadata = (Map<String, Object>) progressiveTranscode.get("transcodeMetadata");
-                    final int height = ((Number) transcodeMetadata.get("height")).intValue();
-                    if (chosenQualityDownloadlinkProgressive == null || height > heightMax) {
-                        heightMax = height;
-                        chosenQuality = height;
-                        chosenQualityDownloadlinkProgressive = progressiveTranscode.get("url").toString();
-                    }
-                    if (height == preferredQualityHeight) {
-                        logger.info("Using user preferred quality: " + preferredQualityHeight + "p");
-                        break;
+                } else {
+                    logger.info("Found " + progressiveTranscodes.size() + " progressive stream qualities");
+                    int heightMax = -1;
+                    for (final Map<String, Object> progressiveTranscode : progressiveTranscodes) {
+                        final Map<String, Object> transcodeMetadata = (Map<String, Object>) progressiveTranscode.get("transcodeMetadata");
+                        final int height = ((Number) transcodeMetadata.get("height")).intValue();
+                        if (chosenQualityDownloadlinkProgressive == null || height > heightMax) {
+                            heightMax = height;
+                            chosenQuality = height;
+                            chosenQualityDownloadlinkProgressive = progressiveTranscode.get("url").toString();
+                        }
+                        if (height == preferredQualityHeight) {
+                            logger.info("Using user preferred quality: " + preferredQualityHeight + "p");
+                            break;
+                        }
                     }
                 }
             } else {
@@ -1230,7 +1245,6 @@ public class GoogleDrive extends PluginForHost {
                 /* Attempt final fallback/edge-case: Check for download of "un-downloadable" streams. */
                 final String errorcodeStr = queryvideo.get("errorcode");
                 if (errorcodeStr != null) {
-                    link.setProperty(PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED, System.currentTimeMillis());
                     /**
                      * This reason varies depending on the language of the google account in use / header preferred language. </br>
                      * It would be a huge effort to differ between different errormessages so at this moment we will only rely on the
@@ -1314,7 +1328,7 @@ public class GoogleDrive extends PluginForHost {
                     chosenQualityDownloadlinkProgressive = bestQualityDownloadlink;
                 }
             }
-            if (chosenQualityDownloadlinkProgressive == null || chosenQuality == -1) {
+            if ((chosenQualityDownloadlinkProgressive == null && chosenQualityDownloadlinkHLS == null) || chosenQuality == -1) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* We found a working stream downloadlink -> Remove quota reached flags */
@@ -1329,13 +1343,23 @@ public class GoogleDrive extends PluginForHost {
             }
             /* Save the quality we've decided to download in case user stops- and resumes download later. */
             link.setProperty(PROPERTY_USED_QUALITY, chosenQuality);
-            link.setProperty(PROPERTY_TMP_STREAM_DOWNLOAD_ACTIVE, true);
             /* Stream handling was successful so we can delete the 'failed timestamp'. */
             link.removeProperty(PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED);
             updateDownloadLinkForVideoStreamDownloads(link);
             prepareNonOriginalFileDownload(link);
-            return chosenQualityDownloadlinkProgressive;
+            /*
+             * 2025-01-15: Prefer HLS download because some progressive qualities that look to be available are actually not available or
+             * broken (= stop after the first few bytes). Especially 360p versions may be affected.
+             */
+            if (chosenQualityDownloadlinkHLS != null) {
+                link.setProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE, "HLS");
+                return chosenQualityDownloadlinkHLS;
+            } else {
+                // link.setProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE, "PROGRESSIVE");
+                return chosenQualityDownloadlinkProgressive;
+            }
         } catch (final PluginException pe) {
+            link.setProperty(PROPERTY_TIMESTAMP_STREAM_DOWNLOAD_FAILED, System.currentTimeMillis());
             if (isFallback) {
                 /* Expect this to throw an exception */
                 logger.log(pe);
@@ -1526,7 +1550,12 @@ public class GoogleDrive extends PluginForHost {
             } else {
                 logger.info("Downloading file");
             }
-            dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, resume, this.getMaxChunks(link));
+            if (StringUtils.equalsIgnoreCase(link.getStringProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE), "HLS")) {
+                this.checkFFmpeg(link, "Download a HLS Stream");
+                this.dl = new HLSDownloader(link, br, directurl);
+            } else {
+                dl = new jd.plugins.BrowserAdapter().openDownload(br, link, directurl, resume, this.getMaxChunks(link));
+            }
             if (!this.looksLikeDownloadableContent(dl.getConnection())) {
                 logger.info("Download attempt failed -> Direct download not possible -> One step more might be required or special handling for stream download or google document download");
                 br.followConnection(true);
@@ -1597,6 +1626,16 @@ public class GoogleDrive extends PluginForHost {
                     this.prepareNonOriginalFileDownload(link);
                 }
             }
+        }
+    }
+
+    @Override
+    protected boolean looksLikeDownloadableContent(final URLConnectionAdapter urlConnection) {
+        if (LinkCrawlerDeepInspector.looksLikeMpegURL(urlConnection)) {
+            /* HLS */
+            return true;
+        } else {
+            return super.looksLikeDownloadableContent(urlConnection);
         }
     }
 
@@ -2272,7 +2311,7 @@ public class GoogleDrive extends PluginForHost {
         link.removeProperty(PROPERTY_TIMESTAMP_QUOTA_REACHED_ACCOUNT);
         link.removeProperty(PROPERTY_TIMESTAMP_QUOTA_REACHED_ANONYMOUS);
         link.removeProperty(PROPERTY_TIMESTAMP_STREAM_QUOTA_REACHED);
-        link.removeProperty(PROPERTY_TMP_STREAM_DOWNLOAD_ACTIVE);
+        link.removeProperty(PROPERTY_USED_STREAM_DOWNLOAD_TYPE);
         link.removeProperty(PROPERTY_LAST_IS_PRIVATE_FILE_TIMESTAMP);
         /**
          * 2024-07-04: Workarounds for items which have been wrongly tagged as Google Documents. </br>
