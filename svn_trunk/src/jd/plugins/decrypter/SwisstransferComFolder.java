@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.storage.config.annotations.AboutConfig;
 import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
@@ -31,7 +32,6 @@ import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginHost;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.config.Type;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
@@ -47,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = { "swisstransfer.com" }, urls = { "https?://(?:www\\.)?swisstransfer\\.com/d/([a-z0-9\\-]+)" })
+@DecrypterPlugin(revision = "$Revision: 50458 $", interfaceVersion = 3, names = { "swisstransfer.com" }, urls = { "https?://(?:www\\.)?swisstransfer\\.com/d/([a-z0-9\\-]+)" })
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -64,7 +64,7 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            final Map<String, Object> root = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+            final Map<String, Object> root = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             data = (Map<String, Object>) root.get("data");
         } else {
             br.getHeaders().put("accept", "application/json, text/plain, */*");
@@ -75,16 +75,25 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             } else if (br.containsHTML("^\"late\"$")) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
-            data = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+            data = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         }
+        final int downloadCounterCredit = ((Number) data.get("downloadCounterCredit")).intValue();
         final String downloadHost = data.get("downloadHost").toString();
         final Map<String, Object> container = (Map<String, Object>) data.get("container");
         final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) container.get("files");
         final Number downloadLimit = (Number) container.get("downloadLimit");
         final SwisstransferComConfig cfg = PluginJsonConfig.get(SwisstransferComConfig.class);
         final CrawlMode crawlMode = cfg.getCrawlMode().getMode();
+        final boolean hasReachedDownloadsLimit = downloadCounterCredit == 0;
+        final String expiredDate = (String) data.get("expiredDate");
+        boolean isExpired = false;
+        if (expiredDate != null) {
+            final long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+            if (timeStamp < System.currentTimeMillis()) {
+                isExpired = true;
+            }
+        }
         if (ressourcelist.size() > 1 && !CrawlMode.FILES_FOLDERS.equals(crawlMode)) {
-            final String expiredDate = (String) data.get("expiredDate");
             final String deletedDate = (String) data.get("deletedDate");
             final String containerUUID = (String) data.get("containerUUID");
             final String directurl = "https://" + downloadHost + "/api/download/" + folderUUID;
@@ -95,18 +104,14 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             if (deletedDate != null) {
                 /* Deleted */
                 zip.setAvailable(false);
-            } else if (expiredDate != null) {
-                final long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                if (System.currentTimeMillis() < timeStamp) {
-                    zip.setAvailable(true);
-                } else {
-                    zip.setAvailable(false);
-                }
+            } else if (hasReachedDownloadsLimit) {
+                zip.setAvailable(false);
+            } else if (isExpired) {
+                zip.setAvailable(false);
             } else {
                 zip.setAvailable(true);
             }
             ret.add(zip);
-            distribute(zip);
             if (CrawlMode.ZIP.equals(crawlMode)) {
                 return ret;
             }
@@ -123,6 +128,7 @@ public class SwisstransferComFolder extends PluginForDecrypt {
         int page = 0;
         /* TODO: Add proper pagination support */
         boolean hasNext = false;
+        int totalDownloadsCounter = 0;
         do {
             // getPage("");
             // if (br.getHttpConnection().getResponseCode() == 404) {
@@ -140,7 +146,6 @@ public class SwisstransferComFolder extends PluginForDecrypt {
                     filesize = (Number) file.get("fileSizeInBytes");
                 }
                 final Number downloadCounter = (Number) file.get("downloadCounter");
-                final String expiredDate = (String) file.get("expiredDate");
                 final String deletedDate = (String) file.get("deletedDate");
                 /* Old format: */
                 // final String directurl = String.format("https://www.swisstransfer.com/api/download/%s/%s", linkUUID, fileid);
@@ -154,18 +159,15 @@ public class SwisstransferComFolder extends PluginForDecrypt {
                 if (deletedDate != null) {
                     /* Deleted */
                     dl.setAvailable(false);
-                } else if (expiredDate != null) {
-                    final long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-                    if (System.currentTimeMillis() < timeStamp) {
-                        dl.setAvailable(true);
-                    } else {
-                        dl.setAvailable(false);
-                    }
+                } else if (isExpired) {
+                    dl.setAvailable(false);
+                } else if (hasReachedDownloadsLimit) {
+                    dl.setAvailable(false);
                 } else {
                     dl.setAvailable(true);
                 }
-                if (downloadCounter != null && downloadLimit != null && downloadLimit.longValue() == downloadCounter.longValue()) {
-                    dl.setAvailable(false);
+                if (downloadCounter != null) {
+                    totalDownloadsCounter += downloadCounter.longValue();
                 }
                 dl._setFilePackage(fp);
                 if (ressourcelist.size() > 1) {
@@ -177,7 +179,7 @@ public class SwisstransferComFolder extends PluginForDecrypt {
                 distribute(dl);
                 offset++;
             }
-            logger.info("Crawled page " + page + " | Offset: " + offset + " | Found items so far: " + ret.size());
+            logger.info("Crawled page " + page + " | Offset: " + offset + " | Found items so far: " + ret.size() + " | downloadCounter = " + totalDownloadsCounter);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
                 break;

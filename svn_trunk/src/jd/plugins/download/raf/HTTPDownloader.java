@@ -1153,28 +1153,27 @@ public class HTTPDownloader extends DownloadInterface implements FileBytesCacheF
     }
 
     protected void finalizeDownload(File outputPartFile, File outputCompleteFile) throws Exception {
-        if (downloadable.rename(outputPartFile, outputCompleteFile)) {
-            try {
-                final Date lastModifiedDate = getLastModifiedDate(this.getDownloadable(), this.connection);
-                if (lastModifiedDate != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
-                    /* set original lastModified timestamp */
-                    outputCompleteFile.setLastModified(lastModifiedDate.getTime());
-                } else {
-                    /* set current timestamp as lastModified timestamp */
-                    outputCompleteFile.setLastModified(System.currentTimeMillis());
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
-            }
-            try {
-                if (CrossSystem.isWindows()) {
-                    logger.info("Removed SparseFlag:" + outputCompleteFile + "|" + org.jdownloader.jna.windows.FileSystemHelper.FSCTL_SET_SPARSE(outputCompleteFile, false));
-                }
-            } catch (final Throwable e) {
-                logger.log(e);
-            }
-        } else {
+        if (!downloadable.rename(outputPartFile, outputCompleteFile)) {
             throw new PluginException(LinkStatus.ERROR_DOWNLOAD_FAILED, _JDT.T.system_download_errors_couldnotrename(), LinkStatus.VALUE_LOCAL_IO_ERROR);
+        }
+        try {
+            final Date lastModifiedDate = getLastModifiedDate(this.getDownloadable(), this.connection);
+            if (lastModifiedDate != null && JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
+                /* set desired/original lastModified timestamp */
+                outputCompleteFile.setLastModified(lastModifiedDate.getTime());
+            } else {
+                /* set current timestamp as lastModified timestamp */
+                outputCompleteFile.setLastModified(System.currentTimeMillis());
+            }
+        } catch (final Throwable e) {
+            logger.log(e);
+        }
+        try {
+            if (CrossSystem.isWindows()) {
+                logger.info("Removed SparseFlag:" + outputCompleteFile + "|" + org.jdownloader.jna.windows.FileSystemHelper.FSCTL_SET_SPARSE(outputCompleteFile, false));
+            }
+        } catch (final Throwable e) {
+            logger.log(e);
         }
     }
 

@@ -99,6 +99,7 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.plugins.DownloadPluginProgress;
 import org.jdownloader.plugins.SkipReason;
 import org.jdownloader.plugins.SkipReasonException;
+import org.jdownloader.settings.GeneralSettings;
 import org.jdownloader.translate._JDT;
 
 //http://tools.ietf.org/html/draft-pantos-http-live-streaming-13
@@ -1803,11 +1804,24 @@ public class HLSDownloader extends DownloadInterface {
         }
     }
 
-    protected void finalizeDownload(File file) {
+    protected void finalizeDownload(final File file) {
         final long fileSize = file.length();
         downloadable.setLinkStatus(LinkStatus.FINISHED);
         downloadable.setDownloadBytesLoaded(fileSize);
         downloadable.setVerifiedFileSize(fileSize);
+        if (JsonConfig.create(GeneralSettings.class).isUseOriginalLastModified()) {
+            Long lastModifiedDate = null;
+            if (downloadable instanceof DownloadLinkDownloadable) {
+                final long lastModifiedTimestampDownloadLink = downloadable.getDownloadLink().getLastModifiedTimestamp();
+                if (lastModifiedTimestampDownloadLink != -1) {
+                    lastModifiedDate = lastModifiedTimestampDownloadLink;
+                }
+            }
+            if (lastModifiedDate != null) {
+                /* set desired/original lastModified timestamp */
+                file.setLastModified(lastModifiedDate.longValue());
+            }
+        }
     }
 
     protected boolean isPartFileComplete(PartFile partFile) {

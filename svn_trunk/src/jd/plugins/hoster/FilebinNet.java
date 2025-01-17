@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.formatter.SizeFormatter;
+
 import jd.PluginWrapper;
 import jd.parser.Regex;
 import jd.plugins.DownloadLink;
@@ -26,10 +28,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-
-@HostPlugin(revision = "$Revision: 49040 $", interfaceVersion = 3, names = { "filebin.net" }, urls = { "https?://(?:www\\.)?filebin\\.net/(?:qr/)?([a-z0-9]{12,})" })
+@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 3, names = { "filebin.net" }, urls = { "https?://(?:www\\.)?filebin\\.net/(?:qr/)?([a-z0-9]{12,})" })
 public class FilebinNet extends PluginForHost {
     public FilebinNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -37,7 +36,7 @@ public class FilebinNet extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://filebin.net/";
+        return "https://" + getHost() + "/";
     }
 
     @Override
@@ -57,7 +56,7 @@ public class FilebinNet extends PluginForHost {
     @Override
     public void correctDownloadLink(final DownloadLink link) {
         final Regex qr = new Regex(link.getPluginPatternMatcher(), "https?://[^/]+/qr/([a-z0-9]{12,})");
-        if (qr.matches()) {
+        if (qr.patternFind()) {
             link.setPluginPatternMatcher("https://" + this.getHost() + "/" + qr.getMatch(0));
         }
     }
@@ -98,11 +97,13 @@ public class FilebinNet extends PluginForHost {
     private void handleDownload(final DownloadLink link, final boolean resumable, final int maxchunks, final String directlinkproperty) throws Exception, PluginException {
         requestFileInformation(link);
         final String dllink = "/archive/" + this.getFID(link) + "/zip";
-        if (StringUtils.isEmpty(dllink)) {
-
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            /* 2025-01-16: They've added a 2nd step where the same URL needs to be called again */
+            logger.info("Executing download step #2");
+            br.followConnection(true);
+            dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, resumable, maxchunks);
+        }
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             br.followConnection(true);
             if (dl.getConnection().getResponseCode() == 403) {

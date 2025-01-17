@@ -24,41 +24,41 @@ import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.DownloadLink;
 import jd.plugins.FilePackage;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 39060 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(www\\.)?update\\.filehippo\\.com(/(es|en|pl|jp|de))?/update/check/[a-z0-9\\-]+/detailed" })
+@DecrypterPlugin(revision = "$Revision: 50453 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?update\\.filehippo\\.com(/[a-z]{2})?/update/check/[a-z0-9\\-]+/detailed" })
 public class FileHippoComDecrypter extends PluginForDecrypt {
     public FileHippoComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(CryptedLink param, ProgressController progress) throws Exception {
-        ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        final String parameter = param.toString().replaceAll("/(es|en|pl|jp|de(?!tailed))", "");
-        br.setCookie("https://filehippo.com/", "FH_PreferredCulture", "en-US");
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final String parameter = param.getCryptedUrl().replaceAll("/(es|en|pl|jp|de(?!tailed))", "");
+        br.setCookie(this.getHost(), "FH_PreferredCulture", "en-US");
         br.getPage(parameter);
-        if (br.containsHTML(">404 Error<|>Sorry the page you requested could not be found")) {
-            logger.info("Link offline: " + parameter);
-            return decryptedLinks;
+        if (br.getHttpConnection().getResponseCode() == 404 || br.containsHTML(">404 Error<|>Sorry the page you requested could not be found")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final String fpName = br.getRegex("<h3>([^<>\"]*?)</h3>").getMatch(0);
-        final String[] links = br.getRegex("\"(https?://(www\\.)?filehippo\\.com(/(es|en|pl|jp|de))?/download[^<>\"]*?)\" class=\"update\\-download\\-link\"").getColumn(0);
+        final String[] links = br.getRegex("\"(https?://(www\\.)?filehippo\\.com(/[a-z]{2})?/download[^<>\"]*?)\" class=\"update\\-download\\-link\"").getColumn(0);
         if (links == null || links.length == 0) {
-            logger.warning("Decrypter broken for link: " + parameter);
-            return null;
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         for (final String singleLink : links) {
-            decryptedLinks.add(createDownloadlink(singleLink));
+            ret.add(createDownloadlink(singleLink));
         }
         if (fpName != null) {
             final FilePackage fp = FilePackage.getInstance();
             fp.setName("filehippo.com - " + Encoding.htmlDecode(fpName.trim()));
-            fp.addLinks(decryptedLinks);
+            fp.addLinks(ret);
         }
-        return decryptedLinks;
+        return ret;
     }
 
-    /* NO OVERRIDE!! */
+    @Override
     public boolean hasCaptcha(CryptedLink link, jd.plugins.Account acc) {
         return false;
     }

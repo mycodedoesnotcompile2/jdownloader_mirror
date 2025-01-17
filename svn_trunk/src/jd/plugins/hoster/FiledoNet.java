@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 49305 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -187,10 +187,7 @@ public class FiledoNet extends PluginForHost {
                             link.setAvailable(false);
                             continue;
                         }
-                        final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-                        final String key = query.get("key");
-                        final String counterFileName = query.get("counterFileName");
-                        final String fileName = resp.get("fileName").toString();
+                        final String cryptedFileName = resp.get("fileName").toString();
                         final Number fileSize = (Number) resp.get("fileSize");
                         final String fileHash = resp.get("fileHash").toString();
                         final String downloadUrl = resp.get("downloadUrl").toString();
@@ -198,25 +195,25 @@ public class FiledoNet extends PluginForHost {
                         if (fileSize != null) {
                             link.setVerifiedFileSize(fileSize.longValue());
                         }
-                        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
-                        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
+                        /* Try to set final filename here because Content-Disposition header contains crypted filename. */
                         /* Set final filename here because Content-Disposition header contains crypted filename. */
-                        final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
-                        link.setFinalFileName(decryptedFileName);
+                        try {
+                            final String decryptedFileName = decryptFileName(cryptedFileName, link.getPluginPatternMatcher());
+                            link.setFinalFileName(decryptedFileName);
+                            link.setProperty("decryptedFileName", decryptedFileName);
+                        } catch (final Exception e) {
+                            logger.info("Invalid key");
+                            link.setName(cryptedFileName);
+                        }
                         link.setMD5Hash(fileHash);
                         link.setProperty("dl3", downloadUrl);
                         // link.setProperty("hashedFileName", fileName);
-                        link.setProperty("decryptedFileName", decryptedFileName);
                         if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
                             link.setProperty("hasCatpcha", hasCaptcha);
                         } else {
                             link.removeProperty("hasCatpcha");
                         }
-                        if (!this.isValidFileURL(link.getPluginPatternMatcher())) {
-                            link.setAvailable(false);
-                        } else {
-                            link.setAvailable(true);
-                        }
+                        link.setAvailable(true);
                     } catch (final Exception e) {
                         logger.log(e);
                     }
@@ -254,56 +251,34 @@ public class FiledoNet extends PluginForHost {
 
     @Deprecated
     private AvailableStatus requestFileInformationAPISingle(final DownloadLink link, final Account account) throws Exception {
-        if (isValidFileURL(link.getPluginPatternMatcher())) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
         final String fileId = this.getFID(link);
-        final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-        final String key = query.get("key");
-        final String counterFileName = query.get("counterFileName");
         final GetRequest req = br.createGetRequest(API_BASE + "/file?fileId=" + fileId);
         final Map<String, Object> resp = (Map<String, Object>) this.callAPI(req, null, link);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String fileName = resp.get("fileName").toString();
-        final String fileSize = PluginJSonUtils.getJson(br, "fileSize");
+        final String cryptedFileName = resp.get("fileName").toString();
         final String fileHash = resp.get("fileHash").toString();
         final String downloadUrl = resp.get("downloadUrl").toString();
-        final boolean hasCaptcha = PluginJSonUtils.parseBoolean(PluginJSonUtils.getJson(br, "hasCaptcha"));
-        if (fileSize != null) {
-            link.setVerifiedFileSize(Long.parseLong(fileSize) * 1024);
-        }
-        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
-        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
+        link.setVerifiedFileSize(((Number) resp.get("fileSize")).longValue() * 1024);
         /* Set final filename here because Content-Disposition header contains crypted filename. */
-        final String decryptedFileName = decryptFileName(fileName, decoded, decodedFileNameIv);
-        link.setFinalFileName(decryptedFileName);
+        try {
+            final String decryptedFileName = decryptFileName(cryptedFileName, link.getPluginPatternMatcher());
+            link.setFinalFileName(decryptedFileName);
+            link.setProperty("decryptedFileName", decryptedFileName);
+        } catch (final Exception e) {
+            logger.info("Invalid key");
+            link.setName(cryptedFileName);
+        }
         link.setMD5Hash(fileHash);
         link.setProperty("dl3", downloadUrl);
         // link.setProperty("hashedFileName", fileName);
-        link.setProperty("decryptedFileName", decryptedFileName);
         if (Boolean.TRUE.equals(resp.get("hasCaptcha"))) {
-            link.setProperty("hasCatpcha", hasCaptcha);
+            link.setProperty("hasCatpcha", true);
         } else {
             link.removeProperty("hasCatpcha");
         }
         return AvailableStatus.TRUE;
-    }
-
-    private boolean isValidFileURL(final String url) throws MalformedURLException {
-        final String fileId = this.getFID(url);
-        if (!isValidFileID(fileId)) {
-            return false;
-        }
-        final UrlQuery query = UrlQuery.parse(url);
-        final String key = query.get("key");
-        final String counterFileName = query.get("counterFileName");
-        if (StringUtils.isEmpty(key) || StringUtils.isEmpty(counterFileName)) {
-            return false;
-        } else {
-            return true;
-        }
     }
 
     private AvailableStatus requestFileInformationSingleViaMassLinkcheck(final DownloadLink link, final Account account) throws Exception {
@@ -341,6 +316,16 @@ public class FiledoNet extends PluginForHost {
         requestFileInformation(link);
         final String dlUrl = link.getStringProperty("dl3");
         handleDownload(link, null, dlUrl);
+    }
+
+    private String decryptFileName(String encryptedFileName, final String sourcelink) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, NoSuchPaddingException, UnsupportedEncodingException, MalformedURLException {
+        final UrlQuery query = UrlQuery.parse(sourcelink);
+        final String key = query.get("key");
+        final String counterFileName = query.get("counterFileName");
+        final byte[] decodedFileNameIv = Base64.decode(URLEncode.decodeURIComponent(counterFileName));
+        final byte[] decoded = Base64.decode(URLEncode.decodeURIComponent(key));
+        final String decryptedFileName = decryptFileName(encryptedFileName, decoded, decodedFileNameIv);
+        return decryptedFileName;
     }
 
     private String decryptFileName(String encryptedFileName, byte[] keyData, byte[] iv) throws IllegalBlockSizeException, BadPaddingException, InvalidKeyException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, NoSuchPaddingException, UnsupportedEncodingException {
@@ -383,6 +368,10 @@ public class FiledoNet extends PluginForHost {
             /* Programmer mistake */
             throw new IllegalArgumentException();
         }
+        final String decryptedFilename = link.getStringProperty("decryptedFileName");
+        if (decryptedFilename == null) {
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Invalid decryption key");
+        }
         if (account != null) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, this.getApikey(account));
         }
@@ -398,7 +387,7 @@ public class FiledoNet extends PluginForHost {
             final String key = UrlQuery.parse(link.getPluginPatternMatcher()).get("key");
             String downloadPath = dl.getDownloadable().getFileOutput();
             String destinationPath = (new File(downloadPath)).getParent();
-            destinationPath = destinationPath + "\\" + link.getStringProperty("decryptedFileName");
+            destinationPath = destinationPath + "\\" + decryptedFilename;
             final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
             final String countersString = Encoding.htmlDecode(query.get("counters"));
             String[] test = countersString.split(",");

@@ -916,4 +916,29 @@ public class GoogleHelper {
             return timeMillis + "_" + JDHash.getSHA1(timeMillis + " " + sapisid + " " + url);
         }
     }
+
+    public static Browser prepBrowserWebAPI(final Browser br, final Account account, final String domain) throws PluginException {
+        final String domainWithProtocol = "https://" + domain;
+        br.getHeaders().put("Accept", "*/*");
+        br.getHeaders().put("Origin", domainWithProtocol);
+        br.getHeaders().put("Referer", domainWithProtocol + "/");
+        /**
+         * Usage of "X-Referer" and "X-Origin" headers makes "content-workspacevideo-pa.googleapis.com/v1/drive/media/" request fail! </br>
+         * For GoogleDrive internal linkcheck, those headers can be set (they are set in browsers original request) but they are not
+         * mandatory.
+         */
+        // br.getHeaders().put("X-Referer", domainWithProtocol);
+        // br.getHeaders().put("X-Origin", domainWithProtocol);
+        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
+        br.getHeaders().put("X-Javascript-User-Agent", "google-api-javascript-client/1.1.0");
+        if (account != null) {
+            /* For logged in users: */
+            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domainWithProtocol);
+            if (sapisidhash != null) {
+                br.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
+            }
+            br.getHeaders().put("X-Goog-Authuser", "0");
+        }
+        return br;
+    }
 }

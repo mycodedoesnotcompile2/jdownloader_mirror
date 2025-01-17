@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50407 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -954,7 +954,28 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected boolean isOffline(final DownloadLink link, final Browser br) {
         if (br.getHttpConnection().getResponseCode() == 404) {
             return true;
-        } else if (br.containsHTML("(No such file|>\\s*File Not Found\\s*<|>\\s*The file was removed by|>\\s*Reason for deletion:?|File Not Found|>\\s*The file expired|>\\s*Sorry, we can't find the page you're looking for|>\\s*File could not be found due to expiration or removal by the file owner|>\\s*The file of the above link no longer exists|>\\s*video you are looking for is not found|>\\s*The file you were looking for doesn't exist)")) {
+        }
+        if (br.containsHTML("No such file")) {
+            return true;
+        } else if (br.containsHTML(">\\s*File Not Found\\s*<")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The file was removed by")) {
+            return true;
+        } else if (br.containsHTML(">\\s*Reason for deletion:?")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The file expired")) {
+            return true;
+        } else if (br.containsHTML(">\\s*Sorry, we can't find the page you're looking for")) {
+            return true;
+        } else if (br.containsHTML(">\\s*File could not be found due to expiration or removal by the file owner")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The file of the above link no longer exists")) {
+            return true;
+        } else if (br.containsHTML(">\\s*video you are looking for is not found")) {
+            return true;
+        } else if (br.containsHTML(">\\s*The file you were looking for doesn't exist")) {
+            return true;
+        } else if (br.containsHTML(">\\s*File is no longer available as it")) {
             return true;
         } else {
             return false;

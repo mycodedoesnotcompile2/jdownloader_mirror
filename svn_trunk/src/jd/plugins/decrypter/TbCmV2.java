@@ -102,7 +102,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@DecrypterPlugin(revision = "$Revision: 50354 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50453 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -1922,23 +1922,7 @@ public class TbCmV2 extends PluginForDecrypt {
     }
 
     public static Browser prepBrowserWebAPI(final Browser br, final Account account) throws PluginException {
-        final String domain = "youtube.com";
-        final String domainWithProtocol = "https://www." + domain;
-        br.getHeaders().put("Accept", "*/*");
-        br.getHeaders().put("Origin", domainWithProtocol);
-        br.getHeaders().put("X-Referer", domainWithProtocol);
-        br.getHeaders().put("X-Origin", domainWithProtocol);
-        br.getHeaders().put("X-Requested-With", "XMLHttpRequest");
-        br.getHeaders().put("Content-Type", "application/json");
-        if (account != null) {
-            /* For logged in users: */
-            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domainWithProtocol);
-            if (sapisidhash != null) {
-                br.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
-            }
-            br.getHeaders().put("X-Goog-Authuser", "0");
-        }
-        return br;
+        return GoogleHelper.prepBrowserWebAPI(br, account, "youtube.com");
     }
 
     protected String extractWebsiteTitle(final Browser br) {

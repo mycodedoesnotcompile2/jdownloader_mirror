@@ -26,7 +26,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50165 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledotXyz extends XFileSharingProBasic {
     public FiledotXyz(final PluginWrapper wrapper) {
         super(wrapper);
@@ -117,5 +117,11 @@ public class FiledotXyz extends XFileSharingProBasic {
         final ArrayList<String> regexStuff = super.getCleanupHTMLRegexes();
         regexStuff.add("(<font color=\"white\">[^<>]+</font>)");
         return regexStuff;
+    }
+
+    @Override
+    protected boolean supports_availablecheck_filesize_html() {
+        // 2025-01-16
+        return false;
     }
 }

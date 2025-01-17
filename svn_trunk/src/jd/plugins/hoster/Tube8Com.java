@@ -27,9 +27,10 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import org.appwork.storage.TypeRef;
-import org.appwork.utils.DebugMode;
+import org.jdownloader.downloader.hls.HLSDownloader;
+import org.jdownloader.plugins.components.hls.HlsContainer;
 import org.jdownloader.plugins.controller.LazyPlugin;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.http.Browser;
@@ -47,7 +48,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50416 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50456 $", interfaceVersion = 3, names = {}, urls = {})
 public class Tube8Com extends PluginForHost {
     /* DEV NOTES */
     /* Porn_plugin */
@@ -55,7 +56,12 @@ public class Tube8Com extends PluginForHost {
 
     public Tube8Com(PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium("http://www.tube8.com/signin.html");
+        this.enablePremium("https://www." + getHost() + "/register/");
+    }
+
+    @Override
+    public String getAGBLink() {
+        return "https://www." + getHost() + "/info.html#terms";
     }
 
     @Override
@@ -159,64 +165,42 @@ public class Tube8Com extends PluginForHost {
             title = Encoding.htmlDecode(title).trim();
             link.setFinalFileName((title + ".mp4"));
         }
-        final boolean useNewHandling = false;
-        if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && useNewHandling) {
-            // TODO: Fix this unfinished code
-            final Browser brc = br.cloneBrowser();
-            final String videoID = br.getRegex("page_params\\.videoId = (\\d+)").getMatch(0);
-            final String json = "{\"vkey\":" + videoID + ",\"s\":\"\",\"gt\":" + System.currentTimeMillis() + ",\"e\":false}";
-            final String jsonbase64 = Encoding.Base64Encode(json);
-            brc.getPage("https://www.tube8.com/media/hls/?s=" + jsonbase64);
-            final List<Map<String, Object>> qualities = (List<Map<String, Object>>) restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.OBJECT);
-            /* Find best quality */
-            int heightMax = 0;
-            for (final Map<String, Object> quality : qualities) {
-                final int height = Integer.parseInt(quality.get("quality").toString());
-                if (dllink == null || height > heightMax) {
-                    heightMax = height;
-                    dllink = quality.get("videoUrl").toString();
-                }
+        if (isDownload) {
+            br.getPage("/embed/" + fid + "/");
+            final String jssource = br.getRegex("\"?mediaDefinition\"?\\s*:\\s*(\\[[^\\]]+\\])").getMatch(0);
+            final List<Map<String, Object>> qualities = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
+            if (qualities.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
+            final Map<String, Object> bestqualitymap = getBestQualityMap(qualities);
+            br.getPage(bestqualitymap.get("videoUrl").toString());
+            final List<Map<String, Object>> qualities2 = (List<Map<String, Object>>) JavaScriptEngineFactory.jsonToJavaObject(br.getRequest().getHtmlCode());
+            if (qualities2.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            final Map<String, Object> bestqualitymap2 = getBestQualityMap(qualities2);
+            final String hlsMaster = bestqualitymap2.get("videoUrl").toString();
+            br.getPage(hlsMaster);
+            final HlsContainer best = HlsContainer.findBestVideoByBandwidth(HlsContainer.getHlsQualities(br));
+            this.dllink = best.getDownloadurl();
         }
         return AvailableStatus.TRUE;
     }
 
-    private void findStreamingLink() throws Exception {
-        String flashVars = br.getRegex("var flashvars\\s*=\\s*(\\{.*?\\});").getMatch(0);
-        if (flashVars == null) {
-            return;
-        }
-        final Map<String, Object> entries = restoreFromString(flashVars, TypeRef.MAP);
-        final String[] quals = new String[] { "quality_2160p", "quality_1440p", "quality_720p", "quality_480p", "quality_240p", "quality_180p" };
-        for (final String qual : quals) {
-            final Object qualO = entries.get(qual);
-            if (qualO instanceof String) {
-                this.dllink = qualO.toString();
+    private Map<String, Object> getBestQualityMap(final List<Map<String, Object>> qualities) {
+        int heightMax = 0;
+        Map<String, Object> result = null;
+        for (final Map<String, Object> quality : qualities) {
+            final Number heightO = (Number) quality.get("height");
+            if (result == null) {
+                result = quality;
+            } else if (heightO != null && heightO.intValue() > heightMax) {
+                heightMax = heightO.intValue();
+                result = quality;
             }
         }
-        final boolean isEncrypted = ((Boolean) entries.get("encrypted")).booleanValue();
-        if (isEncrypted) {
-            final String decrypted = (String) entries.get("video_url");
-            String key = (String) entries.get("video_title");
-            /* Dirty workaround, needed for links with cyrillic titles/filenames. */
-            if (key == null) {
-                key = "";
-            }
-            try {
-                dllink = new BouncyCastleAESCounterModeDecrypt().decrypt(decrypted, key, 256);
-            } catch (Throwable e) {
-                /* Fallback for stable version */
-                dllink = AESCounterModeDecrypt(decrypted, key, 256);
-            }
-            if (dllink != null && (dllink.startsWith("Error:") || !dllink.startsWith("http"))) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, dllink);
-            }
-        }
-    }
-
-    @Override
-    public String getAGBLink() {
-        return "https://www." + getHost() + "/info.html#terms";
+        logger.info("Chose quality: " + heightMax + "p");
+        return result;
     }
 
     @Override
@@ -234,18 +218,8 @@ public class Tube8Com extends PluginForHost {
         if (dllink == null) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
-        if (!looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (link.getIntegerProperty("401", -1) == 401) {
-                link.removeProperty("401");
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, 30 * 1000l);
-            } else if (dl.getConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-        }
+        this.checkFFmpeg(link, "Download a HLS Stream");
+        this.dl = new HLSDownloader(link, br, this.dllink);
         dl.startDownload();
     }
 
@@ -296,6 +270,39 @@ public class Tube8Com extends PluginForHost {
     @Override
     public void resetPluginGlobals() {
     }
+    // private void findStreamingLink() throws Exception {
+    // String flashVars = br.getRegex("var flashvars\\s*=\\s*(\\{.*?\\});").getMatch(0);
+    // if (flashVars == null) {
+    // return;
+    // }
+    // final Map<String, Object> entries = restoreFromString(flashVars, TypeRef.MAP);
+    // final String[] quals = new String[] { "quality_2160p", "quality_1440p", "quality_720p", "quality_480p", "quality_240p",
+    // "quality_180p" };
+    // for (final String qual : quals) {
+    // final Object qualO = entries.get(qual);
+    // if (qualO instanceof String) {
+    // this.dllink = qualO.toString();
+    // }
+    // }
+    // final boolean isEncrypted = ((Boolean) entries.get("encrypted")).booleanValue();
+    // if (isEncrypted) {
+    // final String decrypted = (String) entries.get("video_url");
+    // String key = (String) entries.get("video_title");
+    // /* Dirty workaround, needed for links with cyrillic titles/filenames. */
+    // if (key == null) {
+    // key = "";
+    // }
+    // try {
+    // dllink = new BouncyCastleAESCounterModeDecrypt().decrypt(decrypted, key, 256);
+    // } catch (Throwable e) {
+    // /* Fallback for stable version */
+    // dllink = AESCounterModeDecrypt(decrypted, key, 256);
+    // }
+    // if (dllink != null && (dllink.startsWith("Error:") || !dllink.startsWith("http"))) {
+    // throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, dllink);
+    // }
+    // }
+    // }
 
     /**
      * AES CTR(Counter) Mode for Java ported from AES-CTR-Mode implementation in JavaScript by Chris Veness
