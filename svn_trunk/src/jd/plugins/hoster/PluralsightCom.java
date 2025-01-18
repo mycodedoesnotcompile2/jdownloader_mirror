@@ -54,12 +54,7 @@ import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.PluralsightComDecrypter;
 
-/**
- *
- * @author Neokyuubi
- *
- */
-@HostPlugin(revision = "$Revision: 49286 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
+@HostPlugin(revision = "$Revision: 50463 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https://app\\.pluralsight\\.com/course-player\\?clipId=[a-f0-9\\-]+" })
 public class PluralsightCom extends antiDDoSForHost {
     private static final boolean                    cookieLoginOnly                          = true;
     private static WeakHashMap<Account, List<Long>> map100PerHour                            = new WeakHashMap<Account, List<Long>>();
@@ -181,28 +176,27 @@ public class PluralsightCom extends antiDDoSForHost {
                     if (!revalidate) {
                         /* Do not validate cookies */
                         return;
-                    } else {
-                        logger.info("Attempting cookie login");
-                        getRequest(br, this, br.createGetRequest(WEBSITE_BASE_APP + "/web-analytics/api/v1/users/current"));
-                        final Request request = br.getRequest();
-                        if (request.getHttpConnection().getResponseCode() != 200 || !StringUtils.containsIgnoreCase(request.getHttpConnection().getContentType(), "json")) {
-                            /* Full login required */
-                            logger.info("Cookie login failed");
-                            br.clearCookies(null);
-                            if (userCookies != null) {
-                                if (account.hasEverBeenValid()) {
-                                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
-                                } else {
-                                    throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
-                                }
+                    }
+                    logger.info("Attempting cookie login");
+                    getRequest(br, this, br.createGetRequest(WEBSITE_BASE_APP + "/web-analytics/api/v1/users/current"));
+                    final Request request = br.getRequest();
+                    if (request.getHttpConnection().getResponseCode() != 200 || !StringUtils.containsIgnoreCase(request.getHttpConnection().getContentType(), "json")) {
+                        /* Full login required */
+                        logger.info("Cookie login failed");
+                        br.clearCookies(null);
+                        if (userCookies != null) {
+                            if (account.hasEverBeenValid()) {
+                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
+                            } else {
+                                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                             }
-                        } else {
-                            logger.info("Cookie login successful");
-                            if (userCookies == null) {
-                                account.saveCookies(br.getCookies(this.getHost()), "");
-                            }
-                            return;
                         }
+                    } else {
+                        logger.info("Cookie login successful");
+                        if (userCookies == null) {
+                            account.saveCookies(br.getCookies(this.getHost()), "");
+                        }
+                        return;
                     }
                 }
                 if (cookieLoginOnly) {
@@ -630,7 +624,7 @@ public class PluralsightCom extends antiDDoSForHost {
             logger.info("Generating fresh directurl");
             if (isSubtitle(link)) {
                 /* Subtitle URLs are static -> Subtitle must have been deleted. */
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Deleted or invalid subtitle");
             }
             if (account != null) {
                 login(account, false);
@@ -701,8 +695,8 @@ public class PluralsightCom extends antiDDoSForHost {
             } catch (Throwable ignore) {
             }
             dl = null;
-            /* Do not retry with same invalid directURL. */
-            link.removeProperty(PROPERTY_DIRECTURL);
+            /* Ensure not to retry with same invalid directURL. */
+            resetDirecturl(link);
             return false;
         }
     }

@@ -16,11 +16,11 @@ import org.jdownloader.plugins.config.Type;
 @PluginHost(host = "pluralsight.com", type = Type.CRAWLER)
 public interface PluralsightComConfig extends PluginConfigInterface {
     final String              text_CrawlSubtitles                               = "Crawl subtitles?";
-    final String              text_UserAgent                                    = "Enter User-Agent which will be used for all website http requests:";
-    final String              text_WaittimeBetweenDownloadsSeconds              = "Define wait time in seconds between downloads";
+    final String              text_UserAgent                                    = "User-Agent which will be used for all website http requests:";
+    final String              text_WaittimeBetweenDownloadsSeconds              = "Wait time in seconds between downloads";
     final String              text_WaitMode                                     = "Wait between downloads mode";
     final String              text_AddRandomDelaySecondsBetweenDownloads        = "Add random delay in seconds to wait time between downloads?";
-    final String              text_AdditionalWaittimeBetweenDownloadsMaxSeconds = "Define max additional random wait time seconds between downloads";
+    final String              text_AdditionalWaittimeBetweenDownloadsMaxSeconds = "Max additional random wait seconds between downloads";
     /** 2021-07-21: Removed "fastLinkcheck" setting for now and so far we never had subtitles support --> Removed subtitle setting too */
     public static TRANSLATION TRANSLATION                                       = new TRANSLATION();
 

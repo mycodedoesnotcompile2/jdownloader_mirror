@@ -12,7 +12,6 @@ import org.jdownloader.plugins.components.antiDDoSForDecrypt;
 import org.jdownloader.plugins.components.config.PluralsightComConfig;
 import org.jdownloader.plugins.config.PluginConfigInterface;
 import org.jdownloader.plugins.config.PluginJsonConfig;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -31,7 +30,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.PluralsightCom;
 
-@DecrypterPlugin(revision = "$Revision: 49286 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https?://(?:app|www)?\\.pluralsight\\.com/.+" })
+@DecrypterPlugin(revision = "$Revision: 50463 $", interfaceVersion = 1, names = { "pluralsight.com" }, urls = { "https?://(?:app|www)?\\.pluralsight\\.com/.+" })
 public class PluralsightComDecrypter extends antiDDoSForDecrypt {
     public PluralsightComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -44,12 +43,7 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
 
     @Override
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final boolean useNewHandling = true;
-        if (useNewHandling) {
-            return newHandling(param);
-        } else {
-            return oldHandling(param);
-        }
+        return crawl(param);
     }
 
     @Override
@@ -57,7 +51,7 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
         super.sendRequest(ibr, request);
     }
 
-    private ArrayList<DownloadLink> newHandling(final CryptedLink param) throws Exception {
+    private ArrayList<DownloadLink> crawl(final CryptedLink param) throws Exception {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final boolean accountRequiredForCrawling = false;
         Account account = null;
@@ -74,13 +68,13 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
         final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
         String courseId = query.get("courseId");
         if (courseId == null) {
-            courseId = new Regex(param.getCryptedUrl(), "(?i)/video-courses/([a-f0-9\\-]+)").getMatch(0);
+            courseId = new Regex(param.getCryptedUrl(), "(?i)/video-courses/([a-f0-9\\-]{4,})").getMatch(0);
         }
         String clipIdByAddedURL = query.get("clipId");
         if (clipIdByAddedURL == null) {
-            clipIdByAddedURL = new Regex(param.getCryptedUrl(), "(?i)/clip/([a-f0-9\\-]+)").getMatch(0);
+            clipIdByAddedURL = new Regex(param.getCryptedUrl(), "(?i)/clips?/([a-f0-9\\-]+)").getMatch(0);
         }
-        final String courseSlug = new Regex(param.getCryptedUrl(), "https?://(?:app|www)?\\.pluralsight\\.com(?:\\/library)?\\/courses\\/([^/]+)").getMatch(0);
+        final String courseSlug = new Regex(param.getCryptedUrl(), "(?i)https?://(?:app|www)?\\.pluralsight\\.com(?:\\/library)?\\/courses\\/([^/]+)").getMatch(0);
         final String baseURL = "https://app.pluralsight.com";
         if (courseId == null && clipIdByAddedURL == null) {
             /* Find courseId */
@@ -202,107 +196,6 @@ public class PluralsightComDecrypter extends antiDDoSForDecrypt {
         } else {
             return ret;
         }
-    }
-
-    /** 2021-07-20: Deprecated because the API used here doesn't return all clips - some in between are just randomly missing! */
-    @Deprecated
-    private ArrayList<DownloadLink> oldHandling(final CryptedLink param) throws Exception {
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final UrlQuery query = UrlQuery.parse(param.getCryptedUrl());
-        String courseSlug = query.get("course");
-        if (StringUtils.isEmpty(courseSlug)) {
-            /* Slug or ID (course-hash) is allowed. */
-            courseSlug = new Regex(param.getCryptedUrl(), "/courses/([^/]+)").getMatch(0);
-        }
-        if (StringUtils.isEmpty(courseSlug)) {
-            /* Unsupported URL or offline content or broken plugin */
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Failed to find courseSlug");
-        }
-        final Account account = AccountController.getInstance().getValidAccount(getHost());
-        if (account != null) {
-            // account login is required for non free courses
-            final PluginForHost plg = this.getNewPluginForHostInstance(this.getHost());
-            ((jd.plugins.hoster.PluralsightCom) plg).login(account, false);
-            logger.info("Account - Mode:" + account.getUser());
-        } else {
-            logger.info("No account - Mode");
-        }
-        PluralsightCom.getClips(br, this, courseSlug);
-        if (br.getHttpConnection().getResponseCode() != 200 || br.containsHTML("You have reached the end of the internet")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (br.getRequest().getHttpConnection().getResponseCode() != 200) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Course or Data not found");
-        }
-        final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
-        final Map<String, Object> map = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "data/rpc/bootstrapPlayer");
-        final Object courseO = map.get("course");
-        if (courseO == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        }
-        final Map<String, Object> course = (Map<String, Object>) courseO;
-        final boolean supportsWideScreenVideoFormats = Boolean.TRUE.equals(course.get("supportsWideScreenVideoFormats"));
-        final List<Map<String, Object>> modules = (List<Map<String, Object>>) course.get("modules");
-        if (modules == null) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        } else if (modules.size() == 0) {
-            return null;
-        }
-        final String courseTitle = (String) course.get("title");
-        int moduleIndex = 0;
-        int totalNumberofClips = 0;
-        for (final Map<String, Object> module : modules) {
-            final int moduleOrderID = moduleIndex++;
-            final List<Map<String, Object>> clips = (List<Map<String, Object>>) module.get("clips");
-            if (clips != null) {
-                for (final Map<String, Object> clip : clips) {
-                    totalNumberofClips += 1;
-                    /*
-                     * 2021-07-21: The code below would generate their old contentURLs. These are still working in browser but not used
-                     * anymore.
-                     */
-                    // String playerUrl = (String) clip.get("playerUrl");
-                    // if (StringUtils.isEmpty(playerUrl)) {
-                    // final String id[] = new Regex((String) clip.get("id"), "(.*?):(.*?):(\\d+):(.+)").getRow(0);
-                    // playerUrl = "https://app.pluralsight.com/player?name=" + id[1] + "&mode=live&clip=" + id[2] + "&course=" + id[0] +
-                    // "&author=" + id[3];
-                    // }
-                    // final String url = br.getURL(playerUrl).toString();
-                    final String clipId = (String) clip.get("clipId");
-                    final DownloadLink link = new DownloadLink(null, null, this.getHost(), createContentURL(clipId), true);
-                    link.setProperty(PluralsightCom.PROPERTY_DURATION_SECONDS, clip.get("duration"));
-                    link.setProperty(PluralsightCom.PROPERTY_CLIP_ID, clipId);
-                    link.setLinkID(this.getHost() + "://" + clipId);
-                    final String title = (String) clip.get("title");
-                    final String moduleTitle = (String) clip.get("moduleTitle");
-                    Object ordering = clip.get("ordering");
-                    if (ordering == null) {
-                        ordering = clip.get("index");
-                    }
-                    final long orderingInt = Integer.parseInt(ordering.toString());
-                    link.setProperty(PluralsightCom.PROPERTY_ORDERING, ordering);
-                    link.setProperty(PluralsightCom.PROPERTY_SUPPORTS_WIDESCREEN_FORMATS, supportsWideScreenVideoFormats);
-                    link.setProperty(PluralsightCom.PROPERTY_MODULE_ORDER_ID, moduleOrderID);
-                    link.setProperty(PluralsightCom.PROPERTY_MODULE_TITLE, moduleTitle);
-                    link.setProperty(PluralsightCom.PROPERTY_MODULE_CLIP_TITLE, title);
-                    link.setProperty(PluralsightCom.PROPERTY_CLIP_ORDER_ID, orderingInt + 1);
-                    if (StringUtils.isNotEmpty(title) && StringUtils.isNotEmpty(moduleTitle) && ordering != null) {
-                        String fullName = String.format("%02d", moduleIndex) + "-" + String.format("%02d", orderingInt + 1) + " - " + moduleTitle + " -- " + title;
-                        link.setFinalFileName(fullName + ".mp4");
-                    }
-                    link.setProperty(PluralsightCom.PROPERTY_TYPE, "mp4");
-                    link.setAvailable(true);
-                    ret.add(link);
-                }
-            }
-        }
-        logger.info("Total number of clips found: " + totalNumberofClips);
-        final FilePackage fp = FilePackage.getInstance();
-        fp.setName(courseTitle);
-        fp.addLinks(ret);
-        ret.addAll(ret);
-        // TODO: add subtitles here, for each video add additional DownloadLink that represents subtitle, eg
-        // link.setProperty("type", "srt");
-        return ret;
     }
 
     private static String createContentURL(final String clipID) {

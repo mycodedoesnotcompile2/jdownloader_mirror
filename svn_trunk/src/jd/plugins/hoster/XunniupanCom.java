@@ -33,6 +33,7 @@ import jd.parser.html.Form;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
+import jd.plugins.AccountInvalidException;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -42,7 +43,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 49433 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50469 $", interfaceVersion = 2, names = {}, urls = {})
 public class XunniupanCom extends PluginForHost {
     public XunniupanCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -386,23 +387,22 @@ public class XunniupanCom extends PluginForHost {
             br.getPage("http://www." + account.getHoster() + "/account.php?action=login");
             final Form loginform = br.getFormbyProperty("name", "login_form");
             if (loginform == null) {
-                logger.warning("Failed to find loginform");
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "Failed to find loginform");
             }
-            loginform.put("username", account.getUser());
-            loginform.put("password", account.getPass());
             final String captchaFieldKey = "verycode";
             if (loginform.hasInputFieldByName(captchaFieldKey)) {
                 final DownloadLink dummyLink = new DownloadLink(this, "Account", account.getHoster(), "http://" + account.getHoster(), true);
                 final String code = getCaptchaCode("/includes/imgcode.inc.php?verycode_type=2&t=0." + System.currentTimeMillis(), dummyLink);
-                loginform.put(captchaFieldKey, code);
+                loginform.put(captchaFieldKey, Encoding.urlEncode(code));
             }
+            loginform.put("username", account.getUser());
+            loginform.put("password", account.getPass());
             loginform.put("remember", "1");
             br.submitForm(loginform);
             if (!isLoggedIn()) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+                throw new AccountInvalidException();
             }
-            account.saveCookies(this.br.getCookies(this.getHost()), "");
+            account.saveCookies(br.getCookies(this.getHost()), "");
             return true;
         }
     }

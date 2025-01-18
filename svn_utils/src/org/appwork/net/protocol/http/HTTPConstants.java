@@ -123,6 +123,7 @@ public class HTTPConstants {
         SERVERERROR_SERVICE_UNAVAILABLE(503, "Service Unavailable"),
         GATEWAY_TIMEOUT(504, "Gateway Time-out"),
         WEB_SERVER_DOWN(521, "Cloudflare, Web server is down");
+
         /**
          * @param responseCode
          * @return
@@ -312,16 +313,44 @@ public class HTTPConstants {
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_METHODS  = "Access-Control-Allow-Methods";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_ALLOW_HEADERS  = "Access-Control-Allow-Headers";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_MAX_AGE        = "Access-Control-Max-Age";
+    /**
+     * The CSP header allows you to define a whitelist of approved sources of content for your site. By restricting the assets that a
+     * browser can load for your site, like js and css, CSP can act as an effective countermeasure to XSS attacks. I have covered CSP in a
+     * lot more detail in my blog Content Security Policy - An Introduction. Here is a basic policy to enforce TLS on all assets and prevent
+     * mixed content warnings.
+     */
     public static final String           HEADER_RESPONSE_CONTENT_SECURITY_POLICY       = "Content-Security-Policy";
+    /**
+     * The X-Frame-Options header (RFC), or XFO header, protects your visitors against clickjacking attacks. An attacker can load up an
+     * iframe on their site and set your site as the source, it's quite easy: <iframe src="https://scotthelme.co.uk"></iframe>. Using some
+     * crafty CSS they can hide your site in the background and create some genuine looking overlays. When your visitors click on what they
+     * think is a harmless link, they're actually clicking on links on your website in the background. That might not seem so bad until we
+     * realise that the browser will execute those requests in the context of the user, which could include them being logged in and
+     * authenticated to your site! Troy Hunt has a great blog on Clickjack attack – the hidden threat right in front of you. Valid values
+     * include DENY meaning your site can't be framed, SAMEORIGIN which allows you to frame your own site or ALLOW-FROM https://example.com/
+     * which lets you specify sites that are permitted to frame your own site.
+     */
     public static final String           HEADER_RESPONSE_X_FRAME_OPTIONS               = "X-Frame-Options";
+    /**
+     * This header is used to configure the built in reflective XSS protection found in Internet Explorer, Chrome and Safari (Webkit). Valid
+     * settings for the header are 0, which disables the protection, 1 which enables the protection and 1; mode=block which tells the
+     * browser to block the response if it detects an attack rather than sanitising the script.
+     */
     public static final String           HEADER_RESPONSE_X_XSS_PROTECTION              = "X-Xss-Protection";
     public static final String           HEADER_RESPONSE_REFERRER_POLICY               = "Referrer-Policy";
+    public static final String           HEADER_REQUEST_CONTROL_HEADERS                = "Access-Control-Request-Headers";
     /*
      * https://www.rfc-editor.org/rfc/rfc2616#page-141
      *
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
      */
     public static final String           HEADER_RESPONSE_RETRY_AFTER                   = "Retry-After";
+    /**
+     * Nice and easy to configure, this header only has one valid value, nosniff. It prevents Google Chrome and Internet Explorer from
+     * trying to mime-sniff the content-type of a response away from the one being declared by the server. It reduces exposure to drive-by
+     * downloads and the risks of user uploaded content that, with clever naming, could be treated as a different content-type, like an
+     * executable.
+     */
     public static final String           HEADER_RESPONSE_X_CONTENT_TYPE_OPTIONS        = "X-Content-Type-Options";
     public static final String           HEADER_REQUEST_ORIGIN                         = "Origin";
     public static final String           HEADER_RESPONSE_ACCESS_CONTROL_EXPOSE_HEADERS = "Access-Control-Expose-Headers";

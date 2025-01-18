@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 
@@ -38,7 +39,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 48585 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50463 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiveSixSevenFileCom extends PluginForHost {
     public FiveSixSevenFileCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -164,7 +165,7 @@ public class FiveSixSevenFileCom extends PluginForHost {
                 }
                 final String code = getCaptchaCode("/imagecode.php?t=" + System.currentTimeMillis(), link);
                 br.postPage("/ajax.php", "action=check_code&code=" + Encoding.urlEncode(code));
-                if (br.toString().equals("false")) {
+                if (StringUtils.equalsIgnoreCase(br.getRequest().getHtmlCode(), "false")) {
                     throw new PluginException(LinkStatus.ERROR_CAPTCHA);
                 }
             }
@@ -187,7 +188,7 @@ public class FiveSixSevenFileCom extends PluginForHost {
                 } else {
                     throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
                 }
-            } else if (dllink.contains("account.php") || dllink.contains("vip\\.php")) {
+            } else if (StringUtils.contains(dllink, "account.php") || StringUtils.contains(dllink, "vip.php")) {
                 throw new AccountRequiredException();
             }
         }

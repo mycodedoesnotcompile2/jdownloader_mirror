@@ -84,7 +84,7 @@ public class AdvancedSettings extends AbstractConfigPanel implements DocumentLis
 
                     private boolean hasText() {
                         final String text = getText();
-                        return text != null && text.length() > 0 && !text.equals(filterText);
+                        return text != null && text.length() > 0 && !text.equals(filterHelp);
                     }
 
                     @Override

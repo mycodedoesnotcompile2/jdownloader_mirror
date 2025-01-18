@@ -17,6 +17,7 @@ package jd.plugins.decrypter;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.jdownloader.captcha.v2.challenge.multiclickcaptcha.MultiClickedPoint;
 
@@ -32,7 +33,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50091 $", interfaceVersion = 3, names = { "vipergirls.to" }, urls = { "https?://(?:www\\.)?vipergirls\\.to/secure/([A-F0-9]+)" })
+@DecrypterPlugin(revision = "$Revision: 50469 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsTo extends PluginForDecrypt {
     public VipergirlsTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -43,6 +44,34 @@ public class VipergirlsTo extends PluginForDecrypt {
         final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
+    }
+
+    public static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "vipergirls.to", "viper.to" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        return buildAnnotationUrls(getPluginDomains());
+    }
+
+    public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : pluginDomains) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/secure/([A-F0-9]+)");
+        }
+        return ret.toArray(new String[0]);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {

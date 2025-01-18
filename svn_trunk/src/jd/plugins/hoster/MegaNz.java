@@ -23,9 +23,11 @@ import java.security.spec.RSAPrivateKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -107,7 +109,7 @@ import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 50418 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50468 $", interfaceVersion = 2, names = {}, urls = {})
 public class MegaNz extends PluginForHost {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
@@ -1352,6 +1354,12 @@ public class MegaNz extends PluginForHost {
     }
 
     @Override
+    public void handle(DownloadLink downloadLink, Account account) throws Exception {
+        addShutdownVetoListener();
+        super.handle(downloadLink, account);
+    }
+
+    @Override
     public void handleFree(DownloadLink link) throws Exception {
         apiDownload(link, null);
     }
@@ -1429,30 +1437,60 @@ public class MegaNz extends PluginForHost {
         }
     }
 
-    private volatile DownloadLink decryptingDownloadLink = null;
+    private volatile DownloadLink                        decryptingDownloadLink = null;
+
+    private static AtomicReference<ShutdownVetoListener> SHUTDOWN_VETO_LISTENER = new AtomicReference<ShutdownVetoListener>();
+    private static WeakHashMap<DownloadLink, Object>     DECRYPTION_VETOS       = new WeakHashMap<DownloadLink, Object>();
+
+    private void addShutdownVetoListener() {
+        synchronized (SHUTDOWN_VETO_LISTENER) {
+            if (SHUTDOWN_VETO_LISTENER.get() == null) {
+                final ShutdownVetoListener vetoListener = new ShutdownVetoListener() {
+                    @Override
+                    public void onShutdownVetoRequest(ShutdownRequest request) throws ShutdownVetoException {
+                        synchronized (DECRYPTION_VETOS) {
+                            final Iterator<DownloadLink> it = DECRYPTION_VETOS.keySet().iterator();
+                            while (it.hasNext()) {
+                                final DownloadLink next = it.next();
+                                if (next != null) {
+                                    throw new ShutdownVetoException(next.getHost() + " decryption in progress:" + next.getName(), this);
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onShutdownVeto(ShutdownRequest request) {
+                    }
+
+                    @Override
+                    public void onShutdown(ShutdownRequest request) {
+                    }
+
+                    @Override
+                    public long getShutdownVetoPriority() {
+                        return 0;
+                    }
+                };
+                SHUTDOWN_VETO_LISTENER.set(vetoListener);
+                ShutdownController.getInstance().addShutdownVetoListener(vetoListener);
+            }
+        }
+    }
+
+    private void setDecryptingDownloadLink(final DownloadLink link) {
+        synchronized (DECRYPTION_VETOS) {
+            if (link == null) {
+                DECRYPTION_VETOS.remove(link);
+            } else {
+                DECRYPTION_VETOS.put(link, new Object());
+            }
+        }
+        decryptingDownloadLink = link;
+    }
 
     private void decrypt(final String path, AtomicLong encryptionDone, AtomicBoolean successFulFlag, final DownloadLink link, String keyString) throws Exception {
-        final ShutdownVetoListener vetoListener = new ShutdownVetoListener() {
-            @Override
-            public void onShutdownVetoRequest(ShutdownRequest request) throws ShutdownVetoException {
-                throw new ShutdownVetoException(getHost() + " decryption in progress:" + link.getName(), this);
-            }
-
-            @Override
-            public void onShutdownVeto(ShutdownRequest request) {
-            }
-
-            @Override
-            public void onShutdown(ShutdownRequest request) {
-            }
-
-            @Override
-            public long getShutdownVetoPriority() {
-                return 0;
-            }
-        };
-        ShutdownController.getInstance().addShutdownVetoListener(vetoListener);
-        decryptingDownloadLink = link;
+        setDecryptingDownloadLink(link);
         try {
             byte[] b64Dec = b64decode(keyString);
             int[] intKey = aByte_to_aInt(b64Dec);
@@ -1611,8 +1649,7 @@ public class MegaNz extends PluginForHost {
                 FileStateManager.getInstance().releaseFileState(outputFile, this);
             }
         } finally {
-            ShutdownController.getInstance().removeShutdownVetoListener(vetoListener);
-            decryptingDownloadLink = null;
+            setDecryptingDownloadLink(null);
         }
     }
 

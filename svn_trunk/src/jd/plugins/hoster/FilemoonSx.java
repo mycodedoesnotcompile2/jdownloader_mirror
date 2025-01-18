@@ -21,6 +21,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
+import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
@@ -36,13 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.decrypter.FilemoonSxCrawler;
 
-import org.appwork.utils.StringUtils;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-import org.jdownloader.plugins.components.config.XFSConfigVideo.DownloadMode;
-import org.jdownloader.plugins.components.config.XFSConfigVideoFilemoonSx;
-
-@HostPlugin(revision = "$Revision: 50268 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50461 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilemoonSx extends XFileSharingProBasic {
     public FilemoonSx(final PluginWrapper wrapper) {
         super(wrapper);
@@ -281,6 +281,11 @@ public class FilemoonSx extends XFileSharingProBasic {
     @Override
     protected boolean trustAvailablecheckVideoEmbed() {
         return true;
+    }
+
+    @Override
+    protected Boolean requiresCaptchaForOfficialVideoDownload() {
+        return Boolean.TRUE;
     }
 
     @Override

@@ -486,7 +486,7 @@ public class RemoteAPI implements HttpRequestHandler {
      * @param request
      * @return
      */
-    protected Object prepareRawRequest(HttpRequest request) {        
+    protected Object prepareRawRequest(HttpRequest request) {
         return null;
     }
 
@@ -668,6 +668,7 @@ public class RemoteAPI implements HttpRequestHandler {
     }
 
     protected boolean onUnknownRequest(final HttpRequest request, final HttpResponse response) {
+        LogV3.info("Unknown API Request: " + request);
         return false;
     }
 
@@ -816,13 +817,13 @@ public class RemoteAPI implements HttpRequestHandler {
     /**
      * @param request
      */
-    protected void validateRequest(final HttpRequest request) throws BasicRemoteAPIException {        
+    protected void validateRequest(final HttpRequest request) throws BasicRemoteAPIException {
     }
 
     /**
      * @param ret
      */
-    protected void validateRequest(final RemoteAPIRequest ret) throws BasicRemoteAPIException {        
+    protected void validateRequest(final RemoteAPIRequest ret) throws BasicRemoteAPIException {
     }
 
     public void writeStringResponse(Object responseData, final Method method, final RemoteAPIRequest request, final RemoteAPIResponse response) throws BasicRemoteAPIException {
