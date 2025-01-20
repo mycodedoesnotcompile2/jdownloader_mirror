@@ -44,6 +44,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 import org.appwork.builddecision.BuildDecisionData.Option;
 import org.appwork.exceptions.WTFException;
@@ -262,7 +265,27 @@ public class BuildDecisions {
                 String cp = bean.getClassPath();
                 if (cp != null) {
                     for (String s : cp.split(File.pathSeparator)) {
-                        logger.info("ClassPath: " + s);
+                        logger.info("ClassPath: " + s.replaceAll("^.*?[/\\\\]libs[/\\\\]", "libs/"));
+                        if (s.endsWith(".jar")) {
+                            JarFile jf = null;
+                            try {
+                                jf = new JarFile(s);
+                                Manifest manifest = jf.getManifest();
+                                if (manifest != null) {
+                                    // Read the attributes
+                                    Attributes attributes = manifest.getMainAttributes();
+                                    for (Object key : attributes.keySet()) {
+                                        logger.info(StringUtils.fillPost("", " ", "ClassPath: ".length()) + key + ": " + attributes.getValue(String.valueOf(key)));
+                                    }
+                                } else {
+                                    logger.info(StringUtils.fillPost("", " ", s.length()) + "- no Manifest");
+                                }
+                            } finally {
+                                if (jf != null) {
+                                    jf.close();
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -578,11 +578,29 @@
       "minJRE":null,
       "name":"\"Public Suffix List Library\"",
       "version":"2025.9.0 d283cf7b0d097b0ac17b59e984e25827b91d4e69"
+    },
+    {
+      "changes":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370\t: add `edu.vg` (#2367)",
+      "date":"2025-01-13T11:46:30.732+01:00",
+      "dependencies":null,
+      "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
+      "files":null,
+      "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"0271ce0c4bc237f906be5854430f04caa27c93accb54af80e36ca52480c628ab"},
+      "licenses":[{
+        "name":"Mozilla Public License 2.0",
+        "spdx_id":"MPL-2.0",
+        "key":"mpl-2.0",
+        "url":"https://api.github.com/licenses/mpl-2.0",
+        "node_id":"MDc6TGljZW5zZTE0"
+      }],
+      "minJRE":null,
+      "name":"\"Public Suffix List Library\"",
+      "version":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370"
     }
   ],
   "installed":{
-    "changes":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370\t: add `edu.vg` (#2367)",
-    "date":"2025-01-13T11:46:30.732+01:00",
+    "changes":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737\t: Add subsc-pay suffix domain (#2310)",
+    "date":"2025-01-19T12:59:47.292+01:00",
     "dependencies":null,
     "description":"The publicsuffix/list is a Java library that provides an updated version of Mozilla's Public Suffix List. This is an essential resource for web developers, as it allows users to parse domain names, extract their effective top-level domains (TLDs), or check whether a domain is a public suffix. It can be used to avoid 'supercookie' vulnerabilities, ensure correct cookie scope, and uphold the same-origin policy. (Library description by ChatGPT)",
     "files":[
@@ -687,7 +705,7 @@
       "tools/psltool",
       "tools/psltool/psltool.go"
     ],
-    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"0271ce0c4bc237f906be5854430f04caa27c93accb54af80e36ca52480c628ab"},
+    "hashes":{"../src/org/appwork/utils/net/effective_tld_names.dat":"99a3bf14a398110b98dfe94ae08f067e05a94ba3cd1a559d7a205e3a70320602"},
     "licenses":[{
       "name":"Mozilla Public License 2.0",
       "spdx_id":"MPL-2.0",
@@ -697,7 +715,7 @@
     }],
     "minJRE":null,
     "name":"\"Public Suffix List Library\"",
-    "version":"2025.10.0 b067df3f267dc1233e27e2d4d37c470886861370"
+    "version":"2025.16.0 4f2d3b20034a6c7a0ad4400716f1e0f752e2c737"
   },
   "minJRE":null,
   "provider":"github-clone",
