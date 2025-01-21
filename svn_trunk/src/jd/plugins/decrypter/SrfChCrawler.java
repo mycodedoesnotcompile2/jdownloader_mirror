@@ -54,7 +54,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.SrfCh;
 
-@DecrypterPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class SrfChCrawler extends PluginForDecrypt {
     public SrfChCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -132,13 +132,12 @@ public class SrfChCrawler extends PluginForDecrypt {
             } catch (final Throwable ignore) {
             }
         }
-        br.getPage(param.getCryptedUrl());
         if (br.getHttpConnection().getResponseCode() == 404 || br.getHttpConnection().getResponseCode() == 410) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(br._getURL().getPath());
-        final String json = br.getRegex(">\\s*window\\.(?:__SSR_VIDEO_DATA__|__remixContext) = (\\{.*?\\})</script>").getMatch(0);
+        final String json = br.getRegex(">\\s*window\\.(?:__SSR_VIDEO_DATA__|__remixContext)\\s*=\\s*(\\{.*?\\});?\\s*</script>").getMatch(0);
         if (json != null) {
             final Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
             this.crawlVideos(entries, ret);
@@ -150,7 +149,7 @@ public class SrfChCrawler extends PluginForDecrypt {
         if (json2 != null) {
             /* E.g. https://www.swissinfo.ch/eng/banking-fintech/destruction-of-swiss-damaged-banknotes/87340353 */
             final Map<String, Object> entries = restoreFromString(json2, TypeRef.MAP);
-            final Map<String, Object> video = (Map<String, Object>) entries.get("video");
+            Map<String, Object> video = (Map<String, Object>) entries.get("video");
             if (video == null) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }

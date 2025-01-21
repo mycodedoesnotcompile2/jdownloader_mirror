@@ -7,6 +7,7 @@ import jd.controlling.linkcrawler.CrawledLink;
 import jd.plugins.DownloadLink;
 
 import org.jdownloader.extensions.extraction.ArchiveFile;
+import org.jdownloader.extensions.extraction.ExtractionStatus;
 import org.jdownloader.extensions.extraction.MissingArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.crawledlink.CrawledLinkArchiveFile;
 import org.jdownloader.extensions.extraction.bindings.downloadlink.DownloadLinkArchiveFile;
@@ -83,6 +84,13 @@ public class ArchiveFileSandbox {
 
     public boolean exists() {
         return archiveFile != null && archiveFile.exists();
+    }
+
+    public String getExtractionStatus() {
+        if (archiveFile != null) {
+            return archiveFile.getStatus().name();
+        }
+        return ExtractionStatus.NA.name();
     }
 
     public boolean exists(boolean ignoreCache) {

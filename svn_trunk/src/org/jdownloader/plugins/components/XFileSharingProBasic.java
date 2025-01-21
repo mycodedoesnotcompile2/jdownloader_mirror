@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50479 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -3128,8 +3128,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
         if (isPremium(acc)) {
             /* Premium accounts don't have captchas */
             return false;
+        } else if (isImagehoster()) {
+            /* Image hosts usually don't have captchas. */
+            return false;
         } else {
-            /* Anonymous downloads & Free account downloads may have captchas */
+            /* Normal file hoster: Anonymous downloads & Free account downloads may have captchas */
             return true;
         }
     }

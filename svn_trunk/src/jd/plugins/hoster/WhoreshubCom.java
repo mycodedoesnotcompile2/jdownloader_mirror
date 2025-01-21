@@ -22,10 +22,11 @@ import org.jdownloader.plugins.components.config.KVSConfig;
 import org.jdownloader.plugins.components.config.KVSConfigWhoreshubCom;
 
 import jd.PluginWrapper;
+import jd.http.Browser;
 import jd.plugins.Account;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50386 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class WhoreshubCom extends KernelVideoSharingComV2 {
     public WhoreshubCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -62,6 +63,24 @@ public class WhoreshubCom extends KernelVideoSharingComV2 {
     protected int getMaxChunks(final Account account) {
         /* 2022-08-10: Max total connections per IP: 10 */
         return -2;
+    }
+
+    @Override
+    protected boolean isLoggedIN(final Browser br) {
+        if (!super.isLoggedIN(br)) {
+            return false;
+        }
+        try {
+            // normal main website does not indicate login being expired but accessing profile or videos result in "please login"
+            final Browser ibr = br.cloneBrowser();
+            ibr.getPage("/my/");
+            if (ibr.getURL().endsWith("/my/")) {
+                return true;
+            }
+        } catch (Exception e) {
+            logger.log(e);
+        }
+        return false;
     }
 
     @Override

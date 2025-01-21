@@ -17,6 +17,7 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
@@ -31,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?filehippo\\.com(?:/[a-z]{2})?/download_[^<>/\"]+" })
+@HostPlugin(revision = "$Revision: 50471 $", interfaceVersion = 2, names = { "filehippo.com" }, urls = { "https?://(?:www\\.)?filehippo\\.com(?:/[a-z]{2})?/download_[^<>/\"]+" })
 public class FileHippoCom extends PluginForHost {
     public FileHippoCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -102,15 +103,24 @@ public class FileHippoCom extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
+        final String text_ErrorExternalDownloadUnsupported = "Download impossible - download-url points to external site";
         String continuelink = br.getRegex("(/download_[^/]+/post_download/\\?dt=internalDownload)").getMatch(0);
         if (continuelink == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (br.containsHTML("\"program_download_type\":\\s*\"download_external\"")) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, text_ErrorExternalDownloadUnsupported);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
         }
         continuelink = Encoding.htmlOnlyDecode(continuelink);
         br.getPage(continuelink);
-        String dllink = br.getRegex("(/download-launch/[^\"]+\\?dt=internalDownload[^\"]*)\"").getMatch(0);
+        String dllink = br.getRegex("(/download-launch/[^\"]+\\?dt=(external|internal)Download[^\"]*)\"").getMatch(0);
         if (dllink == null) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            if (StringUtils.containsIgnoreCase(continuelink, "external")) {
+                throw new PluginException(LinkStatus.ERROR_FATAL, text_ErrorExternalDownloadUnsupported);
+            } else {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            }
         }
         dllink = Encoding.htmlOnlyDecode(dllink);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);

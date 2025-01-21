@@ -5,11 +5,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.extensions.eventscripter.EnvironmentException;
 import org.jdownloader.extensions.eventscripter.ScriptThread;
 import org.jdownloader.extensions.extraction.Archive;
 import org.jdownloader.extensions.extraction.ArchiveFile;
 import org.jdownloader.extensions.extraction.ExtractionExtension;
+import org.jdownloader.extensions.extraction.ExtractionStatus;
 
 public class ArchiveSandbox {
     private final Archive archive;
@@ -39,6 +41,23 @@ public class ArchiveSandbox {
             }
         }
         return null;
+    }
+
+    public String getExtractionStatus() {
+        final String archiveID = getArchiveID();
+        if (archiveID == null) {
+            return ExtractionStatus.NA.name();
+        }
+        final ArchiveFileSandbox archiveFiles[] = getArchiveFiles();
+        if (archiveFiles == null) {
+            return ExtractionStatus.NA.name();
+        }
+        for (ArchiveFileSandbox archiveFile : archiveFiles) {
+            if (archiveID.equals(archiveFile.getArchiveID())) {
+                return archiveFile.getExtractionStatus();
+            }
+        }
+        return ExtractionStatus.NA.name();
     }
 
     public ArchiveFileSandbox getLastArchiveFile() {
@@ -162,7 +181,7 @@ public class ArchiveSandbox {
 
     public String getArchiveType() {
         if (archive != null) {
-            return archive.getSplitType() == null ? (String.valueOf(archive.getArchiveType())) : (String.valueOf(archive.getSplitType()));
+            return archive.getSplitType() == null ? (StringUtils.valueOfOrNull(archive.getArchiveType())) : (StringUtils.valueOfOrNull(archive.getSplitType()));
         } else {
             return null;
         }

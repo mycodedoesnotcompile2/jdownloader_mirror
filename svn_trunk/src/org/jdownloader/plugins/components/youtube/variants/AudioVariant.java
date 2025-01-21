@@ -44,9 +44,12 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
                         DebugMode.debugger();
                     } else if (getGenericInfo().getaId() != null && !StringUtils.equals(getGenericInfo().getaId(), a.getLngId())) {
                         DebugMode.debugger();
+                    } else if (getGenericInfo().isDrc() != a.isDrc()) {
+                        DebugMode.debugger();
                     }
                 }
                 getGenericInfo().setaId(a.getLngId());
+                getGenericInfo().setDrc(a.isDrc());
                 if (a.getBitrate() > 0 && vid.duration > 0 && a.getContentLength() > 0) {
                     final long abr = (8 * a.getContentLength()) / (1024l * vid.duration / 1000);
                     getGenericInfo().setaBitrate((int) abr);
@@ -71,6 +74,9 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
             final String aId = getGenericInfo().getaId();
             if (aId != null) {
                 uniqueIDString += ".aid" + aId;
+            }
+            if (getGenericInfo().isDrc()) {
+                uniqueIDString += ".drc";
             }
         }
         return uniqueIDString;
@@ -177,5 +183,10 @@ public class AudioVariant extends AbstractVariant<GenericAudioInfo> implements A
     @Override
     public AudioType getAudioType() {
         return AudioType.getAudioType(this);
+    }
+
+    @Override
+    public boolean isDrc() {
+        return getGenericInfo().isDrc();
     }
 }

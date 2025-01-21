@@ -56,7 +56,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.KemonoParty;
 
-@DecrypterPlugin(revision = "$Revision: 50244 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class KemonoPartyCrawler extends PluginForDecrypt {
     public KemonoPartyCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -308,6 +308,7 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             /* Fallback */
             fp.setName(portal + " - " + userID + " - " + postID);
         }
+        fp.setIgnoreVarious(true);
         fp.setPackageKey(KemonoParty.UNIQUE_ID_PREFIX + "portal/" + portal + "/userid/" + userID + "/postid/" + postID);
         return fp;
     }
@@ -453,7 +454,8 @@ public class KemonoPartyCrawler extends PluginForDecrypt {
             }
         }
         if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
-            postFilePackage.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) + postFilePackage.getName());
+            // postFilePackage.setName(String.format("[@DEV: %d Expected kemono results] ", kemonoResults.size()) +
+            // postFilePackage.getName());
         }
         postFilePackage.addLinks(ret);
         return ret;

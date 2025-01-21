@@ -64,6 +64,9 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
             if (aId != null) {
                 uniqueIDString += ".aid" + aId;
             }
+            if (getGenericInfo().isDrc()) {
+                uniqueIDString += ".drc";
+            }
         }
         return uniqueIDString;
     }
@@ -197,9 +200,12 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
                         DebugMode.debugger();
                     } else if (getGenericInfo().getaId() != null && !StringUtils.equals(getGenericInfo().getaId(), a.getLngId())) {
                         DebugMode.debugger();
+                    } else if (getGenericInfo().isDrc() != a.isDrc()) {
+                        DebugMode.debugger();
                     }
                 }
                 getGenericInfo().setaId(a.getLngId());
+                getGenericInfo().setDrc(a.isDrc());
                 if (a.getBitrate() > 0 && vid.duration > 0 && a.getContentLength() > 0) {
                     final long abr = (8 * a.getContentLength()) / (1024l * vid.duration / 1000);
                     getGenericInfo().setaBitrate((int) abr);
@@ -312,6 +318,11 @@ public class VideoVariant extends AbstractVariant<GenericVideoInfo> implements V
     @Override
     public String getAudioId() {
         return getGenericInfo().getaId();
+    }
+
+    @Override
+    public boolean isDrc() {
+        return getGenericInfo().isDrc();
     }
 
     @Override

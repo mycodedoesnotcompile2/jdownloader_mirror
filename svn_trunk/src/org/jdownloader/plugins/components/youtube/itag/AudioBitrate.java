@@ -69,7 +69,7 @@ public enum AudioBitrate implements IntegerInterface, LabelInterface {
         final AudioBitrate[] values = AudioBitrate.values();
         for (int index = values.length - 1; index >= 0; index--) {
             final AudioBitrate rate = values[index];
-            if (best == null || (bitrate <= rate.getKbit() * 1024 && bitrate >= best.getKbit() * 1024)) {
+            if (best == null || bitrate >= rate.getKbit() * 1024) {
                 best = rate;
             }
         }

@@ -52,6 +52,8 @@ public interface ArchiveFile {
 
     public void setStatus(ExtractionController controller, ExtractionStatus error);
 
+    public ExtractionStatus getStatus();
+
     public void setMessage(ExtractionController controller, String plugins_optional_extraction_status_notenoughspace);
 
     public void setProgress(ExtractionController controller, long value, long max, Color color);
@@ -69,4 +71,5 @@ public interface ArchiveFile {
     public void notifyChanges(Object type);
 
     public String getArchiveID();
+
 }

@@ -84,7 +84,19 @@ public class FileArchiveFile implements ArchiveFile {
         return name;
     }
 
-    public void setStatus(ExtractionController controller, ExtractionStatus error) {
+    private volatile ExtractionStatus status = ExtractionStatus.NA;
+
+    @Override
+    public void setStatus(ExtractionController controller, ExtractionStatus status) {
+        this.status = status;
+    }
+
+    public ExtractionStatus getStatus() {
+        final ExtractionStatus status = this.status;
+        if (status == null) {
+            return ExtractionStatus.NA;
+        }
+        return status;
     }
 
     public void setMessage(ExtractionController controller, String plugins_optional_extraction_status_notenoughspace) {

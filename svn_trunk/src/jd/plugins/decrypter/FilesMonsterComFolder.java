@@ -33,14 +33,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.FilesMonsterCom;
 
-@DecrypterPlugin(revision = "$Revision: 48302 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/folders\\.php\\?fid=([0-9a-zA-Z_-]{22,}|\\d+)" })
+@DecrypterPlugin(revision = "$Revision: 50471 $", interfaceVersion = 2, names = { "filesmonster.com" }, urls = { "https?://(?:www\\.)?filesmonster\\.com/folders\\.php\\?fid=([0-9a-zA-Z_-]{22,}|\\d+)" })
 public class FilesMonsterComFolder extends PluginForDecrypt {
     public FilesMonsterComFolder(PluginWrapper wrapper) {
         super(wrapper);
     }
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String parameter = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         final String folderID = UrlQuery.parse(param.getCryptedUrl()).get("fid");
         if (StringUtils.isEmpty(folderID)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
@@ -48,7 +48,7 @@ public class FilesMonsterComFolder extends PluginForDecrypt {
         FilesMonsterCom.prepBR(br);
         br.setFollowRedirects(true);
         br.setCookiesExclusive(true);
-        br.getPage(parameter);
+        br.getPage(contenturl);
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -76,7 +76,12 @@ public class FilesMonsterComFolder extends PluginForDecrypt {
         do {
             String[] urls = br.getRegex("<a[^>]*href=\"(https?://[\\w\\.\\d]*?filesmonster\\.com/(download|folders)\\.php.*?)\">").getColumn(0);
             if (urls == null || urls.length == 0) {
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                if (br.containsHTML("Files count:?\\s*</td>\\s*<td>\\s*0\\s*</td>")) {
+                    /* Empty folder */
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Empty folder");
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
             }
             int numberofNewItems = 0;
             for (final String url : urls) {

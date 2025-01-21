@@ -22,6 +22,22 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.Challenge;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
+import org.jdownloader.plugins.components.RequestHistory.TYPE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.ConsString;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.ScriptableObject;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -43,29 +59,13 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.Challenge;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.solvemedia.SolveMedia;
-import org.jdownloader.plugins.components.RequestHistory.TYPE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.mozilla.javascript.ConsString;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ContextFactory;
-import org.mozilla.javascript.ScriptableObject;
-
 /**
  *
  * @author raztoki
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@HostPlugin(revision = "$Revision: 50232 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForHost extends PluginForHost {
     public antiDDoSForHost(PluginWrapper wrapper) {
         super(wrapper);
@@ -83,7 +83,7 @@ public abstract class antiDDoSForHost extends PluginForHost {
     private static final String                   cfRequiredCookies     = "__cfduid|cf_clearance";
     private static final String                   icRequiredCookies     = "visid_incap_\\d+|incap_ses_\\d+_\\d+";
     private static final String                   suRequiredCookies     = "sucuri_cloudproxy_uuid_[a-f0-9]+";
-    private static final String                   bfRequiredCookies     = "rcksid|BLAZINGFAST-WEB-PROTECT";
+    private static final String                   bfRequiredCookies     = "rcksid|BLAZINGFAST-WEB-PROTECT|BlazingWebCookie|BlazingPuzzleCookie";
     protected static HashMap<String, Cookies>     antiDDoSCookies       = new HashMap<String, Cookies>();
     protected static Map<String, String>          agent                 = new HashMap<String, String>();
     protected final WeakHashMap<Browser, Boolean> browserPrepped        = new WeakHashMap<Browser, Boolean>();
@@ -504,7 +504,7 @@ public abstract class antiDDoSForHost extends PluginForHost {
                 }
                 // BlazingFast
                 else if (containsBlazingFast(ibr)) {
-                    processBlazingFast(ibr, cookies);
+                    antiDDoSForDecrypt.processBlazingFast(this, ibr, cookies);
                 }
                 // ddosprotectionru
                 else if (containsDDoSProtectionRu(ibr)) {
@@ -1177,41 +1177,6 @@ public abstract class antiDDoSForHost extends PluginForHost {
      * @author raztoki
      * @throws Exception
      */
-    private void processBlazingFast(final Browser ibr, final Cookies cookies) throws Exception {
-        // only one known protection measure (at this time)
-        final Browser br = ibr.cloneBrowser();
-        // javascript based checks.
-        String xhr = br.getRegex("xhr\\.open\\(\"GET\",\"(.*?)\",true").getMatch(0);
-        // ww is just screen size
-        final String ww = "1920";
-        xhr = xhr.replaceFirst("\"\\s*\\s*\\+\\s*ww\\s*\\+\\s*\"", ww);
-        br.getHeaders().put("Accept", "*/*");
-        // javascript.
-        br.getPage(xhr);
-        // replace window/document references, remove the redirect
-        final String js = br.toString().replace("redir();", "").replaceFirst("if\\(\\$\\(window\\)\\.width\\(\\)>0\\)\\s*\\{.*?\\}", "");
-        try {
-            final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
-            final ScriptEngine engine = manager.getEngineByName("javascript");
-            engine.eval(js);
-            engine.eval("var result = toHex(BFCrypt.decrypt(c,2,a,b));");
-            final String result = (String) engine.get("result");
-            ibr.setCookie(ibr.getURL(), "BLAZINGFAST-WEB-PROTECT", result);
-        } catch (final Throwable e) {
-            e.printStackTrace();
-        }
-        // redirect happens via js to specified url but its always current url.
-        ibr.getPage(ibr.getURL());
-        // get cookies we want/need.
-        // refresh these with every getPage/postPage/submitForm?
-        final Cookies add = ibr.getCookies(ibr.getHost());
-        for (final Cookie c : add.getCookies()) {
-            if (new Regex(c.getKey(), bfRequiredCookies).matches()) {
-                cookies.add(c);
-            }
-        }
-    }
-
     /**
      * one known method, Javascript. this is within text/html and request code 200? don't believe they set cookie, think they just track by
      * IP.

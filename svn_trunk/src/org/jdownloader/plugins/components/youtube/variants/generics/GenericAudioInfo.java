@@ -9,8 +9,9 @@ public class GenericAudioInfo extends AbstractGenericVariantInfo implements Stor
     public GenericAudioInfo(/* storable */) {
     }
 
-    private int    aBitrate = -1;
-    private Locale _locale;
+    private int     aBitrate = -1;
+    private Locale  _locale;
+    private boolean drc      = false;
 
     public Locale _getLocale() {
         return _locale;
@@ -36,6 +37,14 @@ public class GenericAudioInfo extends AbstractGenericVariantInfo implements Stor
             this.aId = null;
             this._locale = null;
         }
+    }
+
+    public boolean isDrc() {
+        return drc;
+    }
+
+    public void setDrc(boolean isDrc) {
+        this.drc = isDrc;
     }
 
     private String aId = null;

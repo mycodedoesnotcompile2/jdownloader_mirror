@@ -18,5 +18,7 @@ public interface AudioInterface {
 
     String getAudioId();
 
+    boolean isDrc();
+
     AudioType getAudioType();
 }

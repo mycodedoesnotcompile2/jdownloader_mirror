@@ -21,6 +21,20 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.logging2.LogInterface;
+import org.appwork.utils.parser.UrlQuery;
+import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
+import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
+import org.jdownloader.plugins.components.RequestHistory.TYPE;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+import org.mozilla.javascript.ConsString;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.ScriptableObject;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.http.Cookie;
@@ -36,24 +50,11 @@ import jd.parser.html.Form;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
 import jd.plugins.LinkStatus;
+import jd.plugins.Plugin;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
-import org.appwork.utils.parser.UrlQuery;
-import org.jdownloader.captcha.v2.challenge.hcaptcha.AbstractHCaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v1.Recaptcha;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.AbstractRecaptchaV2;
-import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperCrawlerPluginRecaptchaV2;
-import org.jdownloader.plugins.components.RequestHistory.TYPE;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
-import org.mozilla.javascript.ConsString;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ContextFactory;
-import org.mozilla.javascript.ScriptableObject;
 
 /**
  *
@@ -61,7 +62,7 @@ import org.mozilla.javascript.ScriptableObject;
  *
  */
 @SuppressWarnings({ "deprecation", "unused" })
-@DecrypterPlugin(revision = "$Revision: 47831 $", interfaceVersion = 2, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
     public antiDDoSForDecrypt(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,7 +81,7 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
     private static final String                   cfRequiredCookies     = "__cfduid|cf_clearance";
     private static final String                   icRequiredCookies     = "visid_incap_\\d+|incap_ses_\\d+_\\d+";
     private static final String                   suRequiredCookies     = "sucuri_cloudproxy_uuid_[a-f0-9]+";
-    private static final String                   bfRequiredCookies     = "rcksid|BLAZINGFAST-WEB-PROTECT";
+    private static final String                   bfRequiredCookies     = "rcksid|BLAZINGFAST-WEB-PROTECT|BlazingWebCookie|BlazingPuzzleCookie";
     protected static HashMap<String, Cookies>     antiDDoSCookies       = new HashMap<String, Cookies>();
     private static Map<String, String>            agent                 = new HashMap<String, String>();
     protected final WeakHashMap<Browser, Boolean> browserPrepped        = new WeakHashMap<Browser, Boolean>();
@@ -454,7 +455,7 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
                 }
                 // BlazingFast
                 else if (containsBlazingFast(ibr)) {
-                    processBlazingFast(ibr, cookies);
+                    processBlazingFast(this, ibr, cookies);
                 }
                 // ddosprotectionru
                 else if (containsDDoSProtectionRu(ibr)) {
@@ -1092,44 +1093,40 @@ public abstract class antiDDoSForDecrypt extends PluginForDecrypt {
         }
     }
 
-    /**
-     * <a href="https://blazingfast.io/">Blazingfast.io</a> 'web/vps/dedicated server' service provider with antiDDoS functionality within
-     * product <a href="https://blazingfast.io/web">"web"</a>
-     *
-     * @author raztoki
-     * @throws Exception
-     */
-    private void processBlazingFast(final Browser ibr, final Cookies cookies) throws Exception {
+    public static void processBlazingFast(final Plugin plugin, final Browser ibr, final Cookies cookies) throws Exception {
         // only one known protection measure (at this time)
         final Browser br = ibr.cloneBrowser();
-        // javascript based checks.
-        String xhr = br.getRegex("xhr\\.open\\(\"GET\",\"(.*?)\",true").getMatch(0);
-        // ww is just screen size
-        final String ww = "1920";
-        xhr = xhr.replaceFirst("\"\\s*\\s*\\+\\s*ww\\s*\\+\\s*\"", ww);
-        br.getHeaders().put("Accept", "*/*");
-        // javascript.
-        br.getPage(xhr);
-        // replace window/document references, remove the redirect
-        final String js = br.toString().replace("redir();", "").replaceFirst("if\\(\\$\\(window\\)\\.width\\(\\)>0\\)\\s*\\{.*?\\}", "");
-        try {
-            final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(this);
-            final ScriptEngine engine = manager.getEngineByName("javascript");
-            engine.eval(js);
-            engine.eval("var result = toHex(BFCrypt.decrypt(c,2,a,b));");
-            final String result = (String) engine.get("result");
-            ibr.setCookie(ibr.getURL(), "BLAZINGFAST-WEB-PROTECT", result);
-        } catch (final Throwable e) {
-            e.printStackTrace();
-        }
-        // redirect happens via js to specified url but its always current url.
-        ibr.getPage(ibr.getURL());
-        // get cookies we want/need.
-        // refresh these with every getPage/postPage/submitForm?
-        final Cookies add = ibr.getCookies(ibr.getHost());
-        for (final Cookie c : add.getCookies()) {
-            if (new Regex(c.getKey(), bfRequiredCookies).matches()) {
-                cookies.add(c);
+        final Form blzgfstshark = br.getFormbyAction("/blzgfst-shark/");
+        if (blzgfstshark != null) {
+            br.cloneBrowser().getPage("/bf.jquery.max.js");// required!
+            final String bfu = br.getRegex("r\\.value\\s*=\\s*\"(.*?)\"").getMatch(0);
+            String sleep = br.getRegex("submit\\(\\);\\s*\\}\\s*,\\s*(\\d+)\\)\\s*;").getMatch(0);
+            if (sleep == null) {
+                sleep = "5100";
+            }
+            String blazing_answer = br.getRegex("a\\[_.*?\\]\\s*=\\s*(.*?);").getMatch(0);
+            if (bfu != null && blazing_answer != null) {
+                try {
+                    final ScriptEngineManager manager = JavaScriptEngineFactory.getScriptEngineManager(plugin);
+                    final ScriptEngine engine = manager.getEngineByName("javascript");
+                    engine.eval("var result = " + blazing_answer);
+                    blazing_answer = StringUtils.valueOfOrNull(engine.get("result"));
+                } catch (final Exception e) {
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, e);
+                }
+                if (blazing_answer != null) {
+                    blzgfstshark.put("bfu", bfu);
+                    blzgfstshark.put("blazing_answer", blazing_answer);
+                    Thread.sleep(Integer.parseInt(sleep));// timing is important!
+                    ibr.submitForm(blzgfstshark);
+                    final Cookies add = ibr.getCookies(ibr.getHost());
+                    for (final Cookie c : add.getCookies()) {
+                        if (new Regex(c.getKey(), bfRequiredCookies).matches()) {
+                            cookies.add(c);
+                        }
+                    }
+                    return;
+                }
             }
         }
     }

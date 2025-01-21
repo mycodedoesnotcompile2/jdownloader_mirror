@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50344 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -96,7 +96,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         for (final String[] domains : pluginDomains) {
             String regex = "https?://(?:(beta|www|chan)\\.)?" + buildHostsPatternPart(domains) + "/(";
             regex += "([a-z]{2,3}/)?books/[A-Za-z0-9]+";
-            regex += "|[a-z]{2}\\?tags=pool:\\d+";
+            regex += "|[a-z]{2}/?\\?tags=.+";
             regex += "|[a-z0-9]{2,3}/books\\?tags=.+";
             regex += "|[a-z0-9]{2,3}(?:/posts)?\\?tags=.+";
             regex += ")";
@@ -106,7 +106,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     }
 
     private final Pattern      TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    private final String       TYPE_TAGS_BOOK  = "(?i)https?://[^/]+/([a-z]{2})\\?tags=pool:(\\d+)";
     private final String       TYPE_TAGS_BOOKS = "(?i)https?://[^/]+/([a-z0-9]{2,3})/books\\?tags=(.+)";
     private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/(([a-z]{2,3})/)?.*tags=([^&]+)";
     public static final String API_BASE        = "https://capi-v2.sankakucomplex.com";

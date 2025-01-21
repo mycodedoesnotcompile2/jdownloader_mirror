@@ -57,7 +57,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50452 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50471 $", interfaceVersion = 3, names = {}, urls = {})
 public class FiledoNet extends PluginForHost {
     public FiledoNet(PluginWrapper wrapper) {
         super(wrapper);
@@ -370,7 +370,7 @@ public class FiledoNet extends PluginForHost {
         }
         final String decryptedFilename = link.getStringProperty("decryptedFileName");
         if (decryptedFilename == null) {
-            throw new PluginException(LinkStatus.ERROR_FATAL, "Invalid decryption key");
+            throw new PluginException(LinkStatus.ERROR_FATAL, "Decryption key invalid/missing");
         }
         if (account != null) {
             br.getHeaders().put(HTTPConstants.HEADER_REQUEST_AUTHORIZATION, this.getApikey(account));

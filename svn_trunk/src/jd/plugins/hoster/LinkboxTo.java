@@ -42,7 +42,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 48882 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class LinkboxTo extends PluginForHost {
     public LinkboxTo(PluginWrapper wrapper) {
         super(wrapper);
@@ -69,7 +69,7 @@ public class LinkboxTo extends PluginForHost {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "linkbox.to", "sharezweb.com" });
+        ret.add(new String[] { "linkbox.to", "sharezweb.com", "linkbox.cloud" });
         return ret;
     }
 

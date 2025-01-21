@@ -75,7 +75,8 @@ public class YoutubeFinalLinkResource implements Storable {
         this.lngId = lngId;
     }
 
-    private String lngId = null;
+    private String  lngId = null;
+    private boolean drc   = false;
 
     public int getThrottle() {
         return throttle;
@@ -118,6 +119,7 @@ public class YoutubeFinalLinkResource implements Storable {
         setEstimatedContentLength(si.getEstimatedContentLength());
         setThrottle(si.getThrottle());
         setLngId(si.getLngId());
+        setDrc(si.isDrc());
     }
 
     public String getFps() {
@@ -137,6 +139,15 @@ public class YoutubeFinalLinkResource implements Storable {
         ret.setEstimatedContentLength(getEstimatedContentLength());
         ret.setThrottle(getThrottle());
         ret.setLngId(getLngId());
+        ret.setDrc(ret.isDrc());
         return ret;
+    }
+
+    public boolean isDrc() {
+        return drc;
+    }
+
+    public void setDrc(boolean drc) {
+        this.drc = drc;
     }
 }

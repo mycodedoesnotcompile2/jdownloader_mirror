@@ -134,6 +134,7 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
     }
 
     public void setStatus(ExtractionController controller, ExtractionStatus status) {
+        this.status = status;
         for (final DownloadLink downloadLink : getDownloadLinks()) {
             if (!FilePackage.isDefaultFilePackage(downloadLink.getFilePackage())) {
                 downloadLink.setExtractionStatus(status);
@@ -145,6 +146,16 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
                 }
             }
         }
+    }
+
+    private volatile ExtractionStatus status = ExtractionStatus.NA;
+
+    public ExtractionStatus getStatus() {
+        final ExtractionStatus status = this.status;
+        if (status == null) {
+            return ExtractionStatus.NA;
+        }
+        return status;
     }
 
     public void setMessage(ExtractionController controller, String text) {

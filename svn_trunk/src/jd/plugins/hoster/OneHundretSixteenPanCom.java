@@ -45,12 +45,14 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50469 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50479 $", interfaceVersion = 2, names = {}, urls = {})
 public class OneHundretSixteenPanCom extends PluginForHost {
     public OneHundretSixteenPanCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://www." + getHost() + "/vip.php");
     }
+
+    private static final boolean SKIP_FREE_DOWNLOAD_CAPTCHA = true;
 
     @Override
     public String getAGBLink() {
@@ -164,7 +166,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
             final Browser ajax = br.cloneBrowser();
             ajax.getHeaders().put("X-Requested-With", "XMLHttpRequest");
             final String code;
-            if (isPremium) {
+            if (isPremium || SKIP_FREE_DOWNLOAD_CAPTCHA) {
                 /* No captcha required */
                 code = "";
             } else {
@@ -203,7 +205,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
 
     private String checkDirectLink(final DownloadLink link, final String property) {
         String dllink = link.getStringProperty(property);
-        if (dllink != null) {
+        if (dllink == null) {
             return null;
         }
         URLConnectionAdapter con = null;
@@ -304,6 +306,7 @@ public class OneHundretSixteenPanCom extends PluginForHost {
 
     @Override
     public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        login(account, false);
         this.handleDownload(link, account);
     }
 
@@ -320,6 +323,17 @@ public class OneHundretSixteenPanCom extends PluginForHost {
     @Override
     public SiteTemplate siteTemplateType() {
         return SiteTemplate.PhpDisk;
+    }
+
+    @Override
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
+        if (acc != null && AccountType.PREMIUM.equals(acc.getType())) {
+            return false;
+        } else if (SKIP_FREE_DOWNLOAD_CAPTCHA) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     @Override

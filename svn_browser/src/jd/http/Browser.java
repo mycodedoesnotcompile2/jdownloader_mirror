@@ -2338,9 +2338,9 @@ public class Browser {
         }
     }
 
-    public void setCookiesExclusive(final boolean b) {
+    public boolean setCookiesExclusive(final boolean b) {
         if (this.cookiesExclusive == b) {
-            return;
+            return false;
         }
         if (b) {
             this.cookies.clear();
@@ -2354,6 +2354,7 @@ public class Browser {
         }
         // this needs to be last so you can drop to frame, in test situations. Otherwise this reference is destroyed.
         this.cookiesExclusive = b;
+        return true;
     }
 
     /**

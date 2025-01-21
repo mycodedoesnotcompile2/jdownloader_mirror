@@ -18,11 +18,13 @@ package jd.plugins.decrypter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.StringUtils;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.CivitaiComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -45,7 +47,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.CivitaiCom;
 import jd.plugins.hoster.DirectHTTP;
 
-@DecrypterPlugin(revision = "$Revision: 50439 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { CivitaiCom.class })
 public class CivitaiComCrawler extends PluginForDecrypt {
     public CivitaiComCrawler(PluginWrapper wrapper) {
@@ -102,15 +104,7 @@ public class CivitaiComCrawler extends PluginForDecrypt {
         final String apiBase = "https://civitai.com/api/v1";
         final List<Map<String, Object>> modelVersions = new ArrayList<Map<String, Object>>();
         String modelName = null;
-        if (modelVersionId != null) {
-            /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1models-versionsmodelversionid */
-            br.getPage(apiBase + "/model-versions/" + modelVersionId);
-            if (br.getHttpConnection().getResponseCode() == 404) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-            modelVersions.add(entries);
-        } else if (itemType.equals("models")) {
+        if (itemType.equals("models")) {
             /* Crawl all versions of a model */
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1modelsmodelid */
             br.getPage(apiBase + "/models/" + itemID);
@@ -121,6 +115,15 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             modelName = entries.get("name").toString();
             final List<Map<String, Object>> _modelVersions_ = (List<Map<String, Object>>) entries.get("modelVersions");
             modelVersions.addAll(_modelVersions_);
+            if (modelVersionId != null) {
+                final Iterator<Map<String, Object>> it = modelVersions.iterator();
+                while (it.hasNext()) {
+                    final Map<String, Object> next = it.next();
+                    if (!modelVersionId.equals(StringUtils.valueOfOrNull(next.get("id")))) {
+                        it.remove();
+                    }
+                }
+            }
         } else if (itemType.equals("posts")) {
             /* Handles such links: https://civitai.com/posts/1234567 */
             /* https://github.com/civitai/civitai/wiki/REST-API-Reference#get-apiv1images */
@@ -167,6 +170,9 @@ public class CivitaiComCrawler extends PluginForDecrypt {
             final int maxItemsPerPage = cfg.getProfileCrawlerMaxPaginationItems();
             final int paginationSleepMillis = cfg.getProfileCrawlerPaginationSleepMillis();
             String nextpage = apiBase + "/images?username=" + itemID + "&limit=" + maxItemsPerPage + "&nsfw=X";
+            if (modelVersionId != null) {
+                nextpage += "&modelVersionId=" + modelVersionId;
+            }
             int page = 1;
             final HashSet<String> dupes = new HashSet<String>();
             pagination: while (nextpage != null && !isAbort()) {

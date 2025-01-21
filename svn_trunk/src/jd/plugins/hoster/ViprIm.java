@@ -18,6 +18,8 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jdownloader.plugins.components.XFileSharingProBasic;
+
 import jd.PluginWrapper;
 import jd.http.Browser;
 import jd.plugins.Account;
@@ -25,9 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-import org.jdownloader.plugins.components.XFileSharingProBasic;
-
-@HostPlugin(revision = "$Revision: 44954 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
 public class ViprIm extends XFileSharingProBasic {
     public ViprIm(final PluginWrapper wrapper) {
         super(wrapper);
@@ -123,6 +123,11 @@ public class ViprIm extends XFileSharingProBasic {
     @Override
     protected boolean isImagehoster() {
         return true;
+    }
+
+    @Override
+    public boolean hasCaptcha(DownloadLink link, Account acc) {
+        return false;
     }
 
     @Override

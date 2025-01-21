@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 49928 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50471 $", interfaceVersion = 3, names = {}, urls = {})
 public class FileupOrg extends XFileSharingProBasic {
     public FileupOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -58,8 +58,14 @@ public class FileupOrg extends XFileSharingProBasic {
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "file-up.org", "file-up.io", "file-up.cc", "file-up.com", "file-upload.org", "file-upload.io", "file-upload.cc", "file-upload.com", "file-upload.download" });
+        ret.add(new String[] { "file-upload.org", "file-up.org", "file-up.io", "file-up.cc", "file-up.com", "file-upload.io", "file-upload.cc", "file-upload.com", "file-upload.download" });
         return ret;
+    }
+
+    @Override
+    public String rewriteHost(final String host) {
+        /* They often switch domains. */
+        return this.rewriteHost(getPluginDomains(), host);
     }
 
     @Override
@@ -68,6 +74,7 @@ public class FileupOrg extends XFileSharingProBasic {
         deadDomains.add("file-up.io");
         deadDomains.add("file-up.cc");
         deadDomains.add("file-up.com");
+        deadDomains.add("file-up.org");
         return deadDomains;
     }
 

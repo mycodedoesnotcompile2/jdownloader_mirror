@@ -92,8 +92,19 @@ public class MissingArchiveFile implements ArchiveFile {
         return name;
     }
 
+    private volatile ExtractionStatus status = ExtractionStatus.NA;
+
     @Override
-    public void setStatus(ExtractionController controller, ExtractionStatus error) {
+    public void setStatus(ExtractionController controller, ExtractionStatus status) {
+        this.status = status;
+    }
+
+    public ExtractionStatus getStatus() {
+        final ExtractionStatus status = this.status;
+        if (status == null) {
+            return ExtractionStatus.NA;
+        }
+        return status;
     }
 
     @Override

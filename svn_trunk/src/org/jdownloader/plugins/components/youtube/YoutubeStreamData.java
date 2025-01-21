@@ -149,8 +149,17 @@ public class YoutubeStreamData {
         this.approxDurationMs = approxDurationMs;
     }
 
-    private int bitrate        = -1;
-    private int averageBitrate = -1;
+    private int     bitrate        = -1;
+    private int     averageBitrate = -1;
+    private boolean drc            = false;
+
+    public boolean isDrc() {
+        return drc;
+    }
+
+    public void setDrc(boolean drc) {
+        this.drc = drc;
+    }
 
     public int getAverageBitrate() {
         return averageBitrate;

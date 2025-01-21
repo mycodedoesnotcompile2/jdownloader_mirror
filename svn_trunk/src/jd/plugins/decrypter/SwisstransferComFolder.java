@@ -50,7 +50,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.SwisstransferCom;
 
-@DecrypterPlugin(revision = "$Revision: 50469 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50474 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -141,6 +141,10 @@ public class SwisstransferComFolder extends PluginForDecrypt {
         if (!pwsuccess) {
             throw new DecrypterException(DecrypterException.PASSWORD);
         }
+        final String type = (String) data.get("type");
+        if (StringUtils.equalsIgnoreCase(type, "expired")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
         /**
          * Every .zip container download deducts 1 credits. </br>
          * Every single file download also deducts 1 credits. </br>
@@ -161,50 +165,63 @@ public class SwisstransferComFolder extends PluginForDecrypt {
                 isExpired = true;
             }
         }
+        boolean isOnlineAndDownloadable = true;
+        if (deletedDate != null) {
+            /* Deleted */
+            isOnlineAndDownloadable = false;
+        } else if (isExpired) {
+            isOnlineAndDownloadable = false;
+        } else if (hasReachedDownloadsLimit) {
+            isOnlineAndDownloadable = false;
+        }
         final Map<String, Object> container = (Map<String, Object>) data.get("container");
         final List<Map<String, Object>> ressourcelist = (List<Map<String, Object>>) container.get("files");
         final Number dlLimit = (Number) container.get("downloadLimit");
-        boolean crawlIndividualFiles = true;
-        if (ressourcelist.size() > 1 && !CrawlMode.FILES_FOLDERS.equals(crawlMode)) {
-            /* Server side created .zip file which contains all files of this folder */
-            final DownloadLink zip = createDownloadlink("");
-            zip.setProperty(SwisstransferCom.PROPERTY_IS_ZIP_CONTAINER, true);
-            zip.setName("swisstransfer_" + containerUUID + ".zip");
-            zip.setDownloadSize(((Number) container.get("sizeUploaded")).longValue());
-            ret.add(zip);
-            if (CrawlMode.ZIP.equals(crawlMode)) {
-                crawlIndividualFiles = false;
-            }
-        }
         int totalDownloadsCounter = 0;
         for (final Map<String, Object> file : ressourcelist) {
-            if (crawlIndividualFiles) {
-                final String filename = file.get("fileName").toString();
-                final String fileid = file.get("UUID").toString();
-                Number filesize = (Number) file.get("fileSizeInBytes");
-                if (filesize == null) {
-                    filesize = (Number) file.get("receivedSizeInBytes");
-                }
-                final String path = (String) file.get("path");
-                final DownloadLink dl = createDownloadlink("");
-                dl.setProperty(SwisstransferCom.PROPERTY_FILE_ID, fileid);
-                if (filesize != null) {
-                    dl.setVerifiedFileSize(filesize.longValue());
-                }
-                dl.setFinalFileName(filename);
-                dl.setContentUrl(addedlink);
-                if (!StringUtils.isEmpty(path)) {
-                    dl.setComment(path);
-                }
-                ret.add(dl);
+            final String filename = file.get("fileName").toString();
+            final String fileid = file.get("UUID").toString();
+            Number filesize = (Number) file.get("fileSizeInBytes");
+            if (filesize == null) {
+                filesize = (Number) file.get("receivedSizeInBytes");
             }
+            final String path = (String) file.get("path");
+            final DownloadLink dl = createDownloadlink("");
+            dl.setProperty(SwisstransferCom.PROPERTY_FILE_ID, fileid);
+            if (filesize != null) {
+                dl.setVerifiedFileSize(filesize.longValue());
+            }
+            dl.setFinalFileName(filename);
+            dl.setContentUrl(addedlink);
+            if (!StringUtils.isEmpty(path)) {
+                dl.setComment(path);
+            }
+            ret.add(dl);
             final Number downloadCounter = (Number) file.get("downloadCounter");
             if (downloadCounter != null) {
                 totalDownloadsCounter += downloadCounter.longValue();
             }
         }
-        if (dlCounterCredit > 0 && ressourcelist.size() > dlCounterCredit) {
+        boolean forceZipOnly = false;
+        if (isOnlineAndDownloadable && dlCounterCredit > 0 && ressourcelist.size() > dlCounterCredit) {
+            /*
+             * For example folder with 2500 files while global max downloads limit is set to only 250 -> User can never download all
+             * individual files but can download the .zip which contains all files since that only counts as 1 download.
+             */
             logger.info("The user will not be able to download all individual files of this folder as the download count limit will be reached before: Files: " + ressourcelist.size() + " > " + dlCounterCredit);
+            forceZipOnly = true;
+        }
+        if (ressourcelist.size() > 1 && (!CrawlMode.FILES_FOLDERS.equals(crawlMode) || forceZipOnly)) {
+            /* Server side created .zip file which contains all files of this folder */
+            final DownloadLink zip = createDownloadlink("");
+            zip.setProperty(SwisstransferCom.PROPERTY_IS_ZIP_CONTAINER, true);
+            zip.setName("swisstransfer_" + containerUUID + ".zip");
+            zip.setDownloadSize(((Number) container.get("sizeUploaded")).longValue());
+            if (CrawlMode.ZIP.equals(crawlMode) || forceZipOnly) {
+                /* Remove all non-zip files */
+                ret.clear();
+            }
+            ret.add(zip);
         }
         logger.info("Found file items: " + ressourcelist.size() + " | downloadCounter = " + totalDownloadsCounter);
         /* Set additional properties */
@@ -230,18 +247,11 @@ public class SwisstransferComFolder extends PluginForDecrypt {
             if (passCode != null) {
                 result.setDownloadPassword(passCode);
             }
-            if (deletedDate != null) {
-                /* Deleted */
-                result.setAvailable(false);
-                result.setProperty(SwisstransferCom.PROPERTY_PERMANENTLY_OFFLINE, true);
-            } else if (isExpired) {
-                result.setAvailable(false);
-                result.setProperty(SwisstransferCom.PROPERTY_PERMANENTLY_OFFLINE, true);
-            } else if (hasReachedDownloadsLimit) {
-                result.setAvailable(false);
-                result.setProperty(SwisstransferCom.PROPERTY_PERMANENTLY_OFFLINE, true);
-            } else {
+            if (isOnlineAndDownloadable) {
                 result.setAvailable(true);
+            } else {
+                result.setAvailable(false);
+                result.setProperty(SwisstransferCom.PROPERTY_PERMANENTLY_OFFLINE, true);
             }
             result._setFilePackage(fp);
         }
