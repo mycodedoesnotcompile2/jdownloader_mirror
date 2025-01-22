@@ -14,7 +14,6 @@ import jd.http.Cookies;
 
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.utils.StringUtils;
-import org.appwork.utils.logging2.LogInterface;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.UniqueAlltimeID;
 
@@ -228,6 +227,7 @@ public class LinkCrawlerRule {
             return false;
         }
         int cookiesSet = 0;
+        final String host = Browser.getHost(url);
         for (final String cookie[] : cookies) {
             if (cookie == null) {
                 continue;
@@ -242,17 +242,11 @@ public class LinkCrawlerRule {
                 cookiesSet++;
                 break;
             case 3:
-                try {
-                    if (cookie[2] != null && url.matches(cookie[2])) {
-                        br.setCookie(url, cookie[0], cookie[1]);
-                        cookiesSet++;
-                    }
-                } catch (final Exception e) {
-                    final LogInterface logger = br.getLogger();
-                    if (logger != null) {
-                        logger.log(e);
-                    }
+                if (cookie[2] != null && !StringUtils.equalsIgnoreCase(host, cookie[2])) {
+                    continue;
                 }
+                br.setCookie(url, cookie[0], cookie[1]);
+                cookiesSet++;
                 break;
             default:
                 break;

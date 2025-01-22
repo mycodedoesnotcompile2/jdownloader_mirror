@@ -27,7 +27,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50471 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class FilespayoutCom extends XFileSharingProBasic {
     public FilespayoutCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -120,10 +120,5 @@ public class FilespayoutCom extends XFileSharingProBasic {
     protected boolean supports_availablecheck_filesize_html() {
         // 2025-01-20
         return false;
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return true;
     }
 }

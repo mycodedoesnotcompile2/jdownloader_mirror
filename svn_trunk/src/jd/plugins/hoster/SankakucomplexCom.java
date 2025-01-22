@@ -17,6 +17,8 @@ package jd.plugins.hoster;
 
 import java.io.IOException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -51,7 +53,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50342 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50483 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -88,6 +90,7 @@ public class SankakucomplexCom extends PluginForHost {
     public static final String         PROPERTY_PAGE_NUMBER                  = "page_number";
     public static final String         PROPERTY_PAGE_NUMBER_MAX              = "page_number_max";
     public static final String         PROPERTY_SOURCE                       = "source";
+    public static final String         PROPERTY_DATE_PUBLISHED               = "date_published";
     /* Contains file extension hint. */
     public static final String         PROPERTY_EXT_HINT                     = "ext_hint";
     private final String               TIMESTAMP_LAST_TIME_FILE_MAYBE_BROKEN = "timestamp_last_time_file_maybe_broken";
@@ -255,6 +258,12 @@ public class SankakucomplexCom extends PluginForHost {
                 link.setComment(tagsCommaSeparated);
             }
         }
+        final String datePublished = br.getRegex("Posted\\s*:?\\s*</span>\\s*<a[^>]*title=\"(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
+        if (datePublished != null) {
+            link.setProperty(datePublished, PROPERTY_DATE_PUBLISHED);
+        } else {
+            logger.warning("Failed to find publish date");
+        }
         if (dllink != null) {
             link.setProperty(PROPERTY_DIRECTURL, dllink);
             if (filesizeBytesStr == null && !isDownload) {
@@ -361,6 +370,14 @@ public class SankakucomplexCom extends PluginForHost {
             link.setFinalFileName(StringUtils.formatByPadLength(StringUtils.getPadLength(pageNumberMax), pageNumber) + "_" + item.get("id") + "." + ext);
         } else {
             link.setFinalFileName(item.get("id") + "." + ext);
+        }
+        final Map<String, Object> created_at_map = (Map<String, Object>) item.get("created_at");
+        if (created_at_map != null) {
+            final long created_at_timestamp = ((Number) created_at_map.get("s")).longValue();
+            final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+            final String dateFormatted = formatter.format(new Date(created_at_timestamp * 1000));
+            System.out.print("DateFormatted: " + dateFormatted);
+            link.setProperty(PROPERTY_DATE_PUBLISHED, dateFormatted);
         }
     }
 

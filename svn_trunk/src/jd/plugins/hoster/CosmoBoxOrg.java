@@ -31,7 +31,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48396 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class CosmoBoxOrg extends XFileSharingProBasic {
     public CosmoBoxOrg(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,10 +135,5 @@ public class CosmoBoxOrg extends XFileSharingProBasic {
             throw new PluginException(LinkStatus.ERROR_IP_BLOCKED, null, Long.parseLong(reconnect_hours) * 60 * 60 * 1001l);
         }
         super.checkErrors(br, html, link, account, checkAll);
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return true;
     }
 }

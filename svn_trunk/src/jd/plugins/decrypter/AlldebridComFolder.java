@@ -30,6 +30,7 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.parser.Regex;
 import jd.plugins.Account;
+import jd.plugins.AccountInfo;
 import jd.plugins.AccountRequiredException;
 import jd.plugins.CryptedLink;
 import jd.plugins.DecrypterPlugin;
@@ -40,7 +41,7 @@ import jd.plugins.FilePackage;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.AllDebridCom;
 
-@DecrypterPlugin(revision = "$Revision: 50179 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50480 $", interfaceVersion = 3, names = {}, urls = {})
 public class AlldebridComFolder extends PluginForDecrypt {
     public AlldebridComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -76,25 +77,24 @@ public class AlldebridComFolder extends PluginForDecrypt {
 
     /** API docs: https://docs.alldebrid.com/#status */
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final String addedURL = param.getCryptedUrl();
+        final String contenturl = param.getCryptedUrl();
         /*
          * Important: Every account has its own files. A magnetID generated inside account A will not work in account B! Alldebrid support
          * knows about this issue and is thinking about adding a modifier into their magnetURL so that we know which account to use in case
          * the user owns multiple alldebrid.com accounts.
          */
-        final String magnetID = new Regex(addedURL, this.getSupportedLinks()).getMatch(0);
+        final String magnetID = new Regex(contenturl, this.getSupportedLinks()).getMatch(0);
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (account == null) {
             throw new AccountRequiredException();
         }
         final AllDebridCom plg = (AllDebridCom) this.getNewPluginForHostInstance(this.getHost());
+        plg.login(account, new AccountInfo(), false);
         final UrlQuery query = new UrlQuery();
-        query.appendEncoded("agent", AllDebridCom.agent_raw);
-        query.appendEncoded("apikey", plg.getApiKey(account));
         query.appendEncoded("id", magnetID);
         /* When "jd" parameter is supplied, information which is unnecessary for JD will be excluded from json response. */
         query.appendEncoded("jd", "");
-        br.getPage(AllDebridCom.api_base_41 + "/magnet/status?" + query.toString());
+        br.postPage(AllDebridCom.api_base_v_41 + "/magnet/status", query);
         final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
         if (errormap != null) {

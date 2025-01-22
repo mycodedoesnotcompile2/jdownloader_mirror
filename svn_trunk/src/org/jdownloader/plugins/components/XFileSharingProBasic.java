@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50479 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -609,10 +609,10 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
 
     /**
      * Set this to false if a website is using links that look like short URLs but are not short URLs. <br>
-     * Example: streamhide.com
+     * Example: streamhide.com, ddownload.com, filoz.net, filespayout.com
      */
     protected boolean supportsShortURLs() {
-        return false;
+        return true;
     }
 
     @Override
@@ -1523,9 +1523,11 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
     protected URL_TYPE getURLType(final String url) {
         if (url == null) {
             return null;
-        } else if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
+        }
+        final String shorturlID = this.supportsShortURLs() ? new Regex(url, PATTERN_SHORTURL).getMatch(0) : null;
+        if (isImagehoster() && url.matches("(?i)^https?://[^/]+/(?:th|i)/\\d+/([a-z0-9]{12}).*")) {
             return URL_TYPE.IMAGE;
-        } else if (this.supportsShortURLs() && url.matches("(?i)^https?://[^/]+/d/([a-z0-9]{1,11}).*")) {
+        } else if (shorturlID != null && shorturlID.length() != 12 && !shorturlID.toLowerCase(Locale.ENGLISH).equals(shorturlID)) {
             return URL_TYPE.SHORT;
         } else if (url.matches("(?i)^https?://[^/]+/d/([a-z0-9]{12}).*")) {
             return URL_TYPE.OFFICIAL_VIDEO_DOWNLOAD;
@@ -1542,6 +1544,8 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             return null;
         }
     }
+
+    private static final Pattern PATTERN_SHORTURL = Pattern.compile("/d/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
 
     protected String getFUID(final String url, URL_TYPE type) {
         if (url == null || type == null) {
@@ -1562,7 +1566,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             case FILE:
                 return new Regex(new URL(url).getPath(), "(?i)/file/([a-z0-9]{12})").getMatch(0);
             case SHORT:
-                return new Regex(new URL(url).getPath(), "(?i)/d/([a-z0-9]+)").getMatch(0);
+                return new Regex(new URL(url).getPath(), PATTERN_SHORTURL).getMatch(0);
             case OFFICIAL_VIDEO_DOWNLOAD:
                 return new Regex(new URL(url).getPath(), "(?i)/d/([a-z0-9]{12})").getMatch(0);
             case NORMAL:

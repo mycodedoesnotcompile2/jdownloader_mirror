@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -105,12 +106,13 @@ import org.jdownloader.plugins.components.config.MegaNzConfig.LimitMode;
 import org.jdownloader.plugins.config.PluginJsonConfig;
 import org.jdownloader.plugins.controller.LazyPlugin;
 import org.jdownloader.plugins.controller.LazyPlugin.FEATURE;
+import org.jdownloader.plugins.controller.host.LazyHostPlugin;
 import org.jdownloader.settings.GraphicalUserInterfaceSettings.SIZEUNIT;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.translate._JDT;
 
-@HostPlugin(revision = "$Revision: 50468 $", interfaceVersion = 2, names = {}, urls = {})
-public class MegaNz extends PluginForHost {
+@HostPlugin(revision = "$Revision: 50484 $", interfaceVersion = 2, names = {}, urls = {})
+public class MegaNz extends PluginForHost implements ShutdownVetoListener {
     private final String       USED_PLUGIN = "usedPlugin";
     private final String       encrypted   = ".encrypted";
     public final static String MAIN_DOMAIN = "mega.nz";
@@ -130,6 +132,15 @@ public class MegaNz extends PluginForHost {
         // each entry in List<String[]> will result in one PluginForDecrypt, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { MAIN_DOMAIN, "mega.co.nz" });
         return ret;
+    }
+
+    @Override
+    public void setLazyP(LazyHostPlugin lazyP) {
+        super.setLazyP(lazyP);
+        // remove this workaround after few days, with empty DECRYPTION_VETOS the old handler no longer blocks shutdown
+        synchronized (DECRYPTION_VETOS) {
+            DECRYPTION_VETOS.clear();
+        }
     }
 
     @Override
@@ -1437,9 +1448,9 @@ public class MegaNz extends PluginForHost {
         }
     }
 
-    private volatile DownloadLink                        decryptingDownloadLink = null;
-
     private static AtomicReference<ShutdownVetoListener> SHUTDOWN_VETO_LISTENER = new AtomicReference<ShutdownVetoListener>();
+    private static WeakHashMap<MegaNz, DownloadLink>     DECRYPTING             = new WeakHashMap<MegaNz, DownloadLink>();
+    @Deprecated
     private static WeakHashMap<DownloadLink, Object>     DECRYPTION_VETOS       = new WeakHashMap<DownloadLink, Object>();
 
     private void addShutdownVetoListener() {
@@ -1448,12 +1459,14 @@ public class MegaNz extends PluginForHost {
                 final ShutdownVetoListener vetoListener = new ShutdownVetoListener() {
                     @Override
                     public void onShutdownVetoRequest(ShutdownRequest request) throws ShutdownVetoException {
-                        synchronized (DECRYPTION_VETOS) {
-                            final Iterator<DownloadLink> it = DECRYPTION_VETOS.keySet().iterator();
+                        synchronized (DECRYPTING) {
+                            final Iterator<Entry<MegaNz, DownloadLink>> it = DECRYPTING.entrySet().iterator();
                             while (it.hasNext()) {
-                                final DownloadLink next = it.next();
+                                final Entry<MegaNz, DownloadLink> next = it.next();
                                 if (next != null) {
-                                    throw new ShutdownVetoException(next.getHost() + " decryption in progress:" + next.getName(), this);
+                                    final MegaNz plugin = next.getKey();
+                                    final DownloadLink link = next.getValue();
+                                    throw new ShutdownVetoException(link.getHost() + " decryption in progress:" + link.getName(), plugin);
                                 }
                             }
                         }
@@ -1479,14 +1492,13 @@ public class MegaNz extends PluginForHost {
     }
 
     private void setDecryptingDownloadLink(final DownloadLink link) {
-        synchronized (DECRYPTION_VETOS) {
+        synchronized (DECRYPTING) {
             if (link == null) {
-                DECRYPTION_VETOS.remove(link);
+                DECRYPTING.remove(this);
             } else {
-                DECRYPTION_VETOS.put(link, new Object());
+                DECRYPTING.put(this, link);
             }
         }
-        decryptingDownloadLink = link;
     }
 
     private void decrypt(final String path, AtomicLong encryptionDone, AtomicBoolean successFulFlag, final DownloadLink link, String keyString) throws Exception {
@@ -1665,11 +1677,12 @@ public class MegaNz extends PluginForHost {
 
     @Override
     public boolean isSpeedLimited(DownloadLink link, Account account) {
-        if (decryptingDownloadLink != null && link == decryptingDownloadLink) {
-            return false;
-        } else {
-            return super.isSpeedLimited(link, account);
+        synchronized (DECRYPTING) {
+            if (DECRYPTING.values().contains(link)) {
+                return false;
+            }
         }
+        return super.isSpeedLimited(link, account);
     }
 
     private class MegaHashCheck extends DownloadInterface {
@@ -1925,5 +1938,26 @@ public class MegaNz extends PluginForHost {
     @Override
     public Class<? extends MegaNzConfig> getConfigInterface() {
         return MegaNzConfig.class;
+    }
+
+    @Override
+    public void onShutdown(ShutdownRequest request) {
+    }
+
+    @Override
+    public void onShutdownVeto(ShutdownRequest request) {
+    }
+
+    @Override
+    public void onShutdownVetoRequest(final ShutdownRequest request) throws ShutdownVetoException {
+        final ShutdownVetoListener vetoListener = SHUTDOWN_VETO_LISTENER.get();
+        if (vetoListener != null) {
+            vetoListener.onShutdownVeto(request);
+        }
+    }
+
+    @Override
+    public long getShutdownVetoPriority() {
+        return 0;
     }
 }

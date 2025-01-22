@@ -28,7 +28,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50398 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class EmbedriseCom extends XFileSharingProBasic {
     public EmbedriseCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -125,11 +125,6 @@ public class EmbedriseCom extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return false;
     }
 
     @Override

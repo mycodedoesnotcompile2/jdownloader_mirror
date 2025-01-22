@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50475 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50483 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -142,6 +142,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         tags = URLEncode.decodeURIComponent(tags.replace("+", " "));
         final PostTagCrawlerCrawlMode mode = cfg.getPostTagCrawlerCrawlMode();
+        /**
+         * Some items are only visible for logged in users and are never returned via API. </br>
+         * For these reasons, website mode is preferred if user owns account && mode is set to AUTO.
+         */
         if (mode == PostTagCrawlerCrawlMode.WEBSITE || (mode == PostTagCrawlerCrawlMode.AUTO && account != null)) {
             return crawlTagsPostsWebsite(param, tags, language);
         } else {
@@ -172,11 +176,30 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         final FilePackage fp = FilePackage.getInstance();
         fp.setName(tags);
         int page = 1;
-        final String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>(\\d+)</span>").getMatch(0);
+        final String numberofItemsStr = br.getRegex("class=\"tag-count\"[^>]*>([^<]+)</span>").getMatch(0);
         final HashSet<String> dupes = new HashSet<String>();
         int position = 1;
         pagination: do {
-            final String[] postIDs = br.getRegex("/posts/([A-Za-z0-9]+)").getColumn(0);
+            String html = br.getRequest().getHtmlCode();
+            /**
+             * Remove unwanted items / ads from html source. Typically this is only relevant for the html code of the first page. </br>
+             * Typically this removes two kinds of items: Popular/Recommended items and ads for "Create your own ai art"
+             */
+            final String[] ads = new Regex(html, "<div class=\"post-gallery post-gallery-inline post-gallery-150\"[^>]*>(.*?)</div>\\s*</div>\\s*</div>\\s*</div>").getColumn(0);
+            if (ads != null && ads.length > 0) {
+                for (final String ad : ads) {
+                    html = html.replace(ad, "");
+                }
+            } else {
+                if (page == 1) {
+                    logger.warning("Failed to remove unwanted posts (ads) from html source");
+                }
+            }
+            final String chatWithMeAds = br.getRegex("<div class=\"carousel-data carousel-data-companion\"[^>]*>(.*?)</div>\\s*</div>\\s*</div>").getMatch(0);
+            if (chatWithMeAds != null) {
+                html = html.replace(chatWithMeAds, "");
+            }
+            final String[] postIDs = new Regex(html, "/posts/([A-Za-z0-9]+)").getColumn(0);
             if (postIDs == null || postIDs.length == 0) {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
@@ -269,7 +292,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         }
         query.appendEncoded("limit", Integer.toString(maxItemsPerPage));
         query.appendEncoded("hide_posts_in_books", "in-larger-tags");
-        query.add("tags", tagsUrlEncoded);
+        query.append("tags", tagsUrlEncoded, false);
         int page = 1;
         int position = 1;
         pagination: do {
@@ -319,13 +342,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             }
         } while (true);
         return ret;
-    }
-
-    private static String generateSinglePostURL(final String postID, String language, final String tagsUrlEncoded) {
-        if (language == null) {
-            language = "en";
-        }
-        return "https://beta.sankakucomplex.com/" + language + "/post/show/" + postID + "?tags=" + tagsUrlEncoded;
     }
 
     /** Crawls books via tag. Typically used to crawl all books of a user. */
@@ -436,6 +452,13 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
         fp.setName(author.get("name") + " - " + bookTitle);
         fp.addLinks(ret);
         return ret;
+    }
+
+    private static String generateSinglePostURL(final String postID, String language, final String tagsUrlEncoded) {
+        if (language == null) {
+            language = "en";
+        }
+        return "https://beta.sankakucomplex.com/" + language + "/post/show/" + postID + "?tags=" + tagsUrlEncoded;
     }
 
     @Override

@@ -16,12 +16,9 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import org.appwork.utils.StringUtils;
-import org.appwork.utils.formatter.SizeFormatter;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -41,7 +38,11 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.PluginForHost;
 import jd.utils.JDUtilities;
 
-@DecrypterPlugin(revision = "$Revision: 50044 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?" })
+import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
+import org.jdownloader.scripting.JavaScriptEngineFactory;
+
+@DecrypterPlugin(revision = "$Revision: 50485 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?(?:\\?tab=files&file_id=(\\d+))?" })
 public class NexusmodsComCrawler extends PluginForDecrypt {
     public NexusmodsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,6 +56,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         ((jd.plugins.hoster.NexusmodsCom) plugin).setBrowser(br);
         final String game_domain_name = new Regex(url, this.getSupportedLinks()).getMatch(0);
         final String mod_id = new Regex(url, this.getSupportedLinks()).getMatch(1);
+        final String file_id = new Regex(url, this.getSupportedLinks()).getMatch(2);
         if (game_domain_name == null || mod_id == null) {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "game_domain_name or mod_id missing");
@@ -65,6 +67,15 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             ret = crawlAPI(param, account, game_domain_name, mod_id);
         } else {
             ret = crawlWebsite(param, game_domain_name, mod_id);
+        }
+        if (file_id != null) {
+            final Iterator<DownloadLink> it = ret.iterator();
+            while (it.hasNext()) {
+                final DownloadLink next = it.next();
+                if (!file_id.equals(next.getStringProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_file_id, null))) {
+                    it.remove();
+                }
+            }
         }
         return ret;
     }
@@ -121,6 +132,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             /* Important! These properties are especially required for all API requests! */
             link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_game_domain_name, game_domain_name);
             link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_mod_id, mod_id);
+            link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_file_id, file_id);
             /* Every category goes into a subfolder */
             link.setRelativeDownloadFolderPath(game_domain_name + "/" + mod_name + "/" + category_name);
             link.setAvailable(true);
@@ -169,8 +181,8 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
                 String category_name = null;
                 if (categoryNames != null && categoryNames.length == downloadCategoriesHTMLs.length) {
                     category_name = categoryNames[index];
+                    category_name = Encoding.htmlDecode(category_name).trim();
                 }
-                category_name = Encoding.htmlDecode(category_name).trim();
                 ret.addAll(websiteCrawlFiles(downnloadTypeHTML, category_name, index, mod_id, game_id, game_domain_name, mod_name));
             }
         } else {
@@ -242,8 +254,9 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             link.setRelativeDownloadFolderPath(currentPath);
             link._setFilePackage(fp);
             /* Important! These properties are especially required for all API requests! */
-            link.setProperty("game_domain_name", game_domain_name);
-            link.setProperty("mod_id", mod_id);
+            link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_game_domain_name, game_domain_name);
+            link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_mod_id, mod_id);
+            link.setProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_file_id, file_id);
             if (category_name != null) {
                 /* Every category goes into a subfolder */
                 link.setRelativeDownloadFolderPath(game_domain_name + "/" + category_name);

@@ -29,7 +29,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50106 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class UseruploadNet extends XFileSharingProBasic {
     public UseruploadNet(final PluginWrapper wrapper) {
         super(wrapper);
@@ -145,11 +145,6 @@ public class UseruploadNet extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return true;
     }
 
     @Override

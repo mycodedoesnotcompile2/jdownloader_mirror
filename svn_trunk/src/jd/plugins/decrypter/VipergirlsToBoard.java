@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.appwork.utils.Regex;
-
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -18,7 +16,10 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 50469 $", interfaceVersion = 3, names = {}, urls = {})
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
+@DecrypterPlugin(revision = "$Revision: 50484 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -82,16 +83,38 @@ public class VipergirlsToBoard extends PluginForDecrypt {
             for (final String post : posts) {
                 final String postID = new Regex(post, "name\\s*=\\s*\"post(\\d+)").getMatch(0);
                 final ArrayList<DownloadLink> thisCrawledLinks = new ArrayList<DownloadLink>();
-                String title = new Regex(post, "<div style\\s*=\\s*\"text-align: center;\">\\s*<i>\\s*<b>\\s*<font color\\s*=\\s*\\s*\"red\"\\s*>\\s*<font[^>]*>(.*?)</font>\\s*</font>\\s*</b>\\s*</i>\\s*<br />").getMatch(0);
+                // Get all post content and then filter it for the href links
+                String postContent = new Regex(post, "<h2 class=\"title icon\">\\s*(.*?)\\s*<div\\s*class\\s*=\\s*\"(after_content|postfoot)\"").getMatch(0);
+                if (postContent == null) {
+                    postContent = new Regex(post, "<div\\s*class\\s*=\\s*\"content\"\\s*>\\s*(.*?)\\s*<div\\s*class\\s*=\\s*\"(after_content|postfoot)\"").getMatch(0);
+                }
+                final String titleArea = new Regex(postContent, "(.*?)<(a href|img src)").getMatch(0);
+                String title = null;
+                if (titleArea != null) {
+                    String complexTitle = new Regex(titleArea, "<blockquote[^>]*>(.+)").getMatch(0);
+                    if (complexTitle != null) {
+                        complexTitle = complexTitle.replaceAll("<br\\s*/>\\s*<br\\s*/>[^<]+", "");
+                        complexTitle = complexTitle.replaceAll("<[^>]*>", "");
+                        complexTitle = complexTitle.replaceAll("[\r\n\t]+", " ");
+                        complexTitle = complexTitle.replaceAll("^\\s+", "");
+                        complexTitle = complexTitle.replaceAll("\\s+&", "");
+                        if (StringUtils.isNotEmpty(complexTitle)) {
+                            title = complexTitle;
+                        }
+                    }
+                }
                 if (title == null) {
-                    title = new Regex(post, "<b>\\s*<div style\\s*=\\s*\"text-align: center;\">\\s*<font[^>]*>\\s*(.*?)\\s*</font>\\s*</div>\\s*</b>").getMatch(0);
+                    title = new Regex(post, "<div style\\s*=\\s*\"text-align: center;\">\\s*<i>\\s*<b>\\s*<font color\\s*=\\s*\\s*\"red\"\\s*>\\s*<font[^>]*>(.*?)</font>\\s*</font>\\s*</b>\\s*</i>\\s*<br />").getMatch(0);
                     if (title == null) {
-                        title = new Regex(post, "<blockquote[^>]*>\\s*<b>\\s*(.*?)\\s*</b>\\s*<br").getMatch(0);
+                        title = new Regex(post, "<b>\\s*<div style\\s*=\\s*\"text-align: center;\">\\s*<font[^>]*>\\s*(.*?)\\s*</font>\\s*</div>\\s*</b>").getMatch(0);
                         if (title == null) {
-                            // The title is in the H2 tag spanning 3 lines
-                            title = new Regex(post, "<h2[^>]*>[\\r\\n\\s]*(.*?)[\\r\\n\\s]*</h2>").getMatch(0);
+                            title = new Regex(post, "<blockquote[^>]*>\\s*<b>\\s*(.*?)\\s*</b>\\s*<br").getMatch(0);
                             if (title == null) {
-                                title = threadID + "_" + postID;
+                                // The title is in the H2 tag spanning 3 lines
+                                title = new Regex(post, "<h2[^>]*>[\\r\\n\\s]*(.*?)[\\r\\n\\s]*</h2>").getMatch(0);
+                                if (title == null) {
+                                    title = threadID + "_" + postID;
+                                }
                             }
                         }
                     }
@@ -103,11 +126,6 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     fp = FilePackage.getInstance();
                     fp.setName(title);
                     fp.setComment("https://vipergirls.to/threads/" + threadID + "?p=" + postID + "&viewfull=1#post" + postID);
-                }
-                // Get all post content and then filter it for the href links
-                String postContent = new Regex(post, "<h2 class=\"title icon\">\\s*(.*?)\\s*<div\\s*class\\s*=\\s*\"(after_content|postfoot)\"").getMatch(0);
-                if (postContent == null) {
-                    postContent = new Regex(post, "<div\\s*class\\s*=\\s*\"content\"\\s*>\\s*(.*?)\\s*<div\\s*class\\s*=\\s*\"(after_content|postfoot)\"").getMatch(0);
                 }
                 final String[] results = new Regex(postContent, "<a href=\"(https?://[^\"]+)").getColumn(0);
                 for (final String result : results) {

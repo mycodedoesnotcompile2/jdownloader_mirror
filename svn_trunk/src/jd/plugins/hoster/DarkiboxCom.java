@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50363 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class DarkiboxCom extends XFileSharingProBasic {
     public DarkiboxCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -135,11 +135,6 @@ public class DarkiboxCom extends XFileSharingProBasic {
             uglyTempWorkaround = true;
         }
         return super.getDllinkViaOfficialVideoDownload(br, link, account, returnFilesize);
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return false;
     }
 
     @Override

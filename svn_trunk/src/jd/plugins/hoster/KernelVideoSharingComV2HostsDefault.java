@@ -21,7 +21,7 @@ import java.util.List;
 import jd.PluginWrapper;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50425 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50482 $", interfaceVersion = 3, names = {}, urls = {})
 public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2 {
     public KernelVideoSharingComV2HostsDefault(final PluginWrapper wrapper) {
         super(wrapper);
@@ -66,8 +66,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "nudez.com" });
         ret.add(new String[] { "pornomovies.com" });
         ret.add(new String[] { "3movs.com" });
-        /* 2021-01-12 */
-        ret.add(new String[] { "camhoes.tv" });
         /* 2021-01-18 */
         ret.add(new String[] { "gaysearch.com" });
         /* 2021-04-06 */
@@ -76,8 +74,6 @@ public class KernelVideoSharingComV2HostsDefault extends KernelVideoSharingComV2
         ret.add(new String[] { "camstreams.tv" });
         /* 2021-09-06 */
         ret.add(new String[] { "pornfd.com" });
-        /* 2021-11-19 */
-        ret.add(new String[] { "femdomrip.com" });
         /* 2022-01-17 */
         ret.add(new String[] { "fpo.xxx" });
         /* 2022-03-24 */

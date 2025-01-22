@@ -58,7 +58,7 @@ import org.jdownloader.plugins.accounts.AccountBuilderInterface;
 import org.jdownloader.plugins.components.antiDDoSForHost;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50183 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
+@HostPlugin(revision = "$Revision: 50484 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
 public class NexusmodsCom extends antiDDoSForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -77,6 +77,7 @@ public class NexusmodsCom extends antiDDoSForHost {
     public static final String API_BASE                     = "https://api.nexusmods.com/v1";
     public static final String PROPERTY_game_domain_name    = "game_domain_name";
     public static final String PROPERTY_mod_id              = "mod_id";
+    public static final String PROPERTY_file_id             = "file_id";
     private String             dllink;
 
     @Override

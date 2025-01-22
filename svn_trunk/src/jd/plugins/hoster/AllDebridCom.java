@@ -45,6 +45,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.appwork.utils.os.CrossSystem;
+import org.appwork.utils.parser.UrlQuery;
 import org.appwork.utils.swing.dialog.ConfirmDialog;
 import org.jdownloader.gui.IconKey;
 import org.jdownloader.gui.InputChangedCallbackInterface;
@@ -66,8 +67,6 @@ import jd.http.Browser;
 import jd.http.URLConnectionAdapter;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
-import jd.parser.html.Form;
-import jd.parser.html.Form.MethodType;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
@@ -88,7 +87,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50404 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50480 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -144,10 +143,9 @@ public class AllDebridCom extends PluginForHost {
 
     private static MultiHosterManagement                 mhm                                = new MultiHosterManagement("alldebrid.com");
     private static WeakHashMap<Account, HashSet<String>> RATE_LIMITED                       = new WeakHashMap<Account, HashSet<String>>();
-    public static final String                           api_base                           = "https://api.alldebrid.com/v4";
-    public static final String                           api_base_41                        = "https://api.alldebrid.com/v4.1";
-    public static final String                           agent_raw                          = "JDownloader";
-    private static final String                          agent                              = "agent=" + agent_raw;
+    @Deprecated
+    public static final String                           api_base_v_40                      = "https://api.alldebrid.com/v4";
+    public static final String                           api_base_v_41                      = "https://api.alldebrid.com/v4.1";
     private static final String                          PROPERTY_apikey                    = "apiv4_apikey";
     private final String                                 PROPERTY_maxchunks                 = "alldebrid_maxchunks";
     private static final String                          ERROR_CODE_LINK_PASSWORD_PROTECTED = "LINK_PASS_PROTECTED";
@@ -164,14 +162,16 @@ public class AllDebridCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         login(account, ai, true);
         /* They got 3 arrays of types of supported websites --> We want to have the "hosts" Array only! */
-        final boolean includeStreamingItems = true;
+        final boolean includeStreamingItems = false;
+        final Map<String, Object> data;
         if (includeStreamingItems) {
-            br.getPage(api_base + "/user/hosts?" + agent);
+            /* Warning! Old endpoint! Do not use anymore! */
+            br.getPage(api_base_v_40 + "/user/hosts");
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            data = (Map<String, Object>) entries.get("data");
         } else {
-            br.getPage(api_base + "/user/hosts?" + agent + "&hostsOnly=true");
+            data = this.callAPI("/user/hosts", account, null);
         }
-        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        final Map<String, Object> data = (Map<String, Object>) entries.get("data");
         final String[] allowedServiceTypes = new String[] { "hosts", "streams" };
         final List<MultiHostHost> supportedhosts = new ArrayList<MultiHostHost>();
         final HashSet<String> streamDomains = new HashSet<String>();
@@ -303,7 +303,7 @@ public class AllDebridCom extends PluginForHost {
         return ai;
     }
 
-    private Map<String, Object> login(final Account account, final AccountInfo accountInfo, final boolean validateApikey) throws Exception {
+    public Map<String, Object> login(final Account account, final AccountInfo ai, final boolean validateApikey) throws Exception {
         synchronized (account) {
             String apikey = getApiKey(account);
             if (apikey != null) {
@@ -312,14 +312,13 @@ public class AllDebridCom extends PluginForHost {
                     return null;
                 }
                 logger.info("Attempting login with existing apikey");
-                final Map<String, Object> userinfo = getAccountInfo(account, accountInfo, apikey);
+                final Map<String, Object> userinfo = getAccountInfo(account, ai, apikey);
                 logger.info("Apikey login successful");
                 return userinfo;
             }
             /* Full login */
             logger.info("Performing full login");
-            br.getPage(api_base + "/pin/get?" + agent);
-            final Map<String, Object> data = this.handleErrors(account, null);
+            final Map<String, Object> data = this.callAPI("/pin/get", account, null);
             final String user_url = data.get("user_url").toString();
             final String check_url = data.get("check_url").toString();
             final int maxSecondsServerside = ((Number) data.get("expires_in")).intValue();
@@ -370,7 +369,7 @@ public class AllDebridCom extends PluginForHost {
             }
             account.setProperty(PROPERTY_apikey, apikey);
             setAuthHeader(br, apikey);
-            final Map<String, Object> userinfo = getAccountInfo(account, accountInfo, apikey);
+            final Map<String, Object> userinfo = getAccountInfo(account, ai, apikey);
             return userinfo;
         }
     }
@@ -378,8 +377,7 @@ public class AllDebridCom extends PluginForHost {
     private Map<String, Object> getAccountInfo(final Account account, final AccountInfo ai, final String apikey) throws Exception {
         synchronized (account) {
             setAuthHeader(br, apikey);
-            br.getPage(api_base + "/user?" + agent);
-            final Map<String, Object> data = handleErrors(account, null);
+            final Map<String, Object> data = this.callAPI("/user", account, null);
             final Map<String, Object> user = (Map<String, Object>) data.get("user");
             final String userName = (String) user.get("username");
             if (!StringUtils.isEmpty(userName)) {
@@ -425,272 +423,91 @@ public class AllDebridCom extends PluginForHost {
         }
     }
 
-    private Thread showPINLoginInformation(final String pin_url, final int timeoutSeconds) {
-        final String host = getHost();
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "Alldebrid - Login";
-                        message += "Hallo liebe(r) alldebrid NutzerIn\r\n";
-                        message += "Um deinen " + host + " Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
-                        message += "1. Öffne diesen Link im Browser falls das nicht automatisch passiert:\r\n\t'" + pin_url + "'\t\r\n";
-                        message += "2. Bestätige den PIN Code im Browser.\r\n";
-                        message += "3. Optional: Falls du noch nicht in deinem AD Account im Browser eingeloggt bist, logge dich ein und bestätige den PIN Code erneut.\r\n";
-                        message += "Dein Account sollte nach wenigen Sekunden von JDownloader akzeptiert werden.\r\n";
-                    } else {
-                        title = "Alldebrid - Login";
-                        message += "Hello dear alldebrid user\r\n";
-                        message += "In order to use " + host + " in JDownloader, you need to follow these steps:\r\n";
-                        message += "1. Open this URL in your browser if it wasn't opened automatically:\r\n\t'" + pin_url + "'\t\r\n";
-                        message += "2. Confirm the PIN Code you see in the browser window.\r\n";
-                        message += "3. Optional: If you haven't been logged in into your AD account in your browser already, login and confirm the PIN Code again.\r\n";
-                        message += "Your account should be accepted in JDownloader within a few seconds.\r\n";
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(timeoutSeconds * 1000);
-                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL(pin_url);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
-    }
-
     /**
      * This is executed whenever user is suddently logged out by alldebrid as a security measurement and needs to confirm his login via
      * email.
      */
-    public void authBlockedLogin(final Account account, final DownloadLink link, final Map<String, Object> errormap) throws Exception {
-        final String msg = errormap.get("message").toString();
-        final String token = errormap.get("token").toString();
-        if (StringUtils.isEmpty(msg)) {
-            /* This should never happen */
-            throw new IllegalArgumentException();
-        } else if (StringUtils.isEmpty(token)) {
-            /* No token given -> No way for us to refresh apikey */
-            account.removeProperty(PROPERTY_apikey);
-            throw new AccountInvalidException("Authorization has been denied by account owner.");
-        }
-        final AccountUnavailableException exceptionOnFailure = new AccountUnavailableException(msg, 10 * 60 * 1000);
-        final PluginException exceptionOnDownloadAndSuccess = new PluginException(LinkStatus.ERROR_RETRY, "Retry after successful AUTH_BLOCKED handling");
-        final String oldAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
-        synchronized (account) {
-            final String newAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
-            if (!StringUtils.equals(oldAuth, newAuth)) {
-                /* Previous download-attempt already successfully ran through this handling so we don't need to do this here again. */
-                throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
-            }
-            logger.info("Performing auth blocked login");
-            final String check_url = api_base + "/user/verif?agent=" + agent_raw + "&token=" + token;
-            final int maxSecondsWait = 600;
-            final Thread dialog = showNewLocationLoginInformation(null, msg, maxSecondsWait);
-            int secondsWaited = 0;
-            final int waitSecondsPerLoop = 3;
-            String apikey = null;
-            boolean throwThisException = false;
-            try {
-                try {
-                    for (int i = 0; i <= 23; i++) {
-                        logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsWait);
-                        Thread.sleep(waitSecondsPerLoop * 1000);
-                        secondsWaited += waitSecondsPerLoop;
-                        br.getPage(check_url);
-                        if (secondsWaited >= maxSecondsWait) {
-                            logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsWait + " seconds");
-                            break;
-                        }
-                        /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
-                        final Map<String, Object> data = this.handleErrors(account, link);
-                        final String verifStatus = data.get("verif").toString();
-                        if (verifStatus.equals("denied")) {
-                            /* User opened link from email and denied this login-attempt. */
-                            throwThisException = true;
-                            throw new AccountInvalidException("Authorization has been denied by account owner");
-                        }
-                        apikey = (String) data.get("apikey");
-                        if (!StringUtils.isEmpty(apikey)) {
-                            logger.info("Stopping because: Found apikey!");
-                            break;
-                        } else if (!dialog.isAlive()) {
-                            logger.info("Stopping because: Dialog closed!");
-                            break;
-                        }
-                    }
-                } finally {
-                    dialog.interrupt();
-                }
-            } catch (final Exception e) {
-                if (throwThisException) {
-                    throw e;
-                } else {
-                    throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
-                }
-            }
-            if (StringUtils.isEmpty(apikey)) {
-                logger.warning("Failed for unknown reasons");
-                throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
-            }
-            logger.info("Using new apikey: " + apikey);
-            account.setProperty(PROPERTY_apikey, apikey);
-            setAuthHeader(br, apikey);
-            if (link == null) {
-                throw new AccountUnavailableException("Retry after blocked login has been cleared", 5 * 1000);
-            } else {
-                throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
-            }
-        }
-    }
-
-    private Thread showNewLocationLoginInformation(final String pin_url, final String api_errormsg, final int timeoutSeconds) {
-        final Thread thread = new Thread() {
-            public void run() {
-                try {
-                    String message = "";
-                    final String title;
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        title = "Alldebrid - Login von neuem Standort bestätigen";
-                        message += "Hallo liebe(r) alldebrid NutzerIn";
-                        message += "\r\nDu versuchst gerade, deinen Account an einem neuen Standort zu verwenden.";
-                        message += "\r\nBestätige diesen Loginversuch mit dem Link, den du per E-Mail erhalten hast, um deinen Account in JD weiterverwenden zu können.";
-                        message += "\r\nDieser dialog schließt sich automatisch, sobald du den Login bestätigt hast.";
-                        if (api_errormsg != null) {
-                            message += "\r\nFehlermeldung der Alldebrid API:";
-                            message += "\r\n" + api_errormsg;
-                        }
-                    } else {
-                        title = "Alldebrid - Confirm new location";
-                        message += "Hello dear alldebrid user";
-                        message += "\r\nYou are trying to use this service from a new location.";
-                        message += "\r\nYou've received an e-mail with a link to confirm this new location.";
-                        message += "\r\n Confirm this e-mail to continue using your Alldebrid account in JDownloader.";
-                        message += "\r\nOnce accepted, this dialog will be closed automatically.";
-                        if (api_errormsg != null) {
-                            message += "\r\nMessage from Alldebrid API:";
-                            message += "\r\n" + api_errormsg;
-                        }
-                    }
-                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
-                    dialog.setTimeout(timeoutSeconds * 1000);
-                    if (pin_url != null && CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
-                        CrossSystem.openURL(pin_url);
-                    }
-                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
-                    ret.throwCloseExceptions();
-                } catch (final Throwable e) {
-                    getLogger().log(e);
-                }
-            };
-        };
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
-    }
-
-    /** See https://docs.alldebrid.com/#all-errors */
-    private Map<String, Object> handleErrors(final Account account, final DownloadLink link) throws PluginException, Exception {
-        /* 2020-03-25: E.g. {"status": "error", "error": {"code": "AUTH_BAD_APIKEY","message": "The auth apikey is invalid"}} */
-        Map<String, Object> entries = null;
-        try {
-            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
-        } catch (final JSonMapperException jme) {
-            if (link != null) {
-                mhm.handleErrorGeneric(account, link, "Bad API answer", 50, 5 * 60 * 1000l);
-            } else {
-                throw Exceptions.addSuppressed(new AccountUnavailableException("Bad API answer", 1 * 60 * 1000l), jme);
-            }
-        }
-        final String status = (String) entries.get("status");
-        if (!"error".equalsIgnoreCase(status)) {
-            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
-            return data;
-        }
-        final boolean isSelfhosted = this.isSelfhosted(link);
-        final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
-        final String errorcode = errormap.get("code").toString();
-        final String message = errormap.get("message").toString();
-        final HashSet<String> accountErrorsPermanent = new HashSet<String>();
-        accountErrorsPermanent.add("AUTH_MISSING_APIKEY");
-        accountErrorsPermanent.add("AUTH_BAD_APIKEY");
-        accountErrorsPermanent.add("AUTH_USER_BANNED");
-        accountErrorsPermanent.add("PIN_EXPIRED");
-        accountErrorsPermanent.add("PIN_INVALID");
-        accountErrorsPermanent.add("ACCOUNT_INVALID");
-        final HashSet<String> accountErrorsTemporary = new HashSet<String>();
-        accountErrorsTemporary.add("MAINTENANCE");
-        accountErrorsTemporary.add("AUTH_BLOCKED");
-        accountErrorsTemporary.add("ALREADY_SENT");
-        accountErrorsTemporary.add("NO_SERVER");
-        accountErrorsTemporary.add("FREE_TRIAL_LIMIT_REACHED");
-        accountErrorsTemporary.add("PIN_ALREADY_AUTHED");
-        accountErrorsTemporary.add("PIN_EXPIRED");
-        accountErrorsTemporary.add("INSUFFICIENT_BALANCE");
-        final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
-        downloadErrorsHostUnavailable.add("LINK_HOST_NOT_SUPPORTED");
-        downloadErrorsHostUnavailable.add("LINK_HOST_UNAVAILABLE");
-        downloadErrorsHostUnavailable.add("LINK_HOST_FULL");
-        downloadErrorsHostUnavailable.add("LINK_HOST_LIMIT_REACHED");
-        downloadErrorsHostUnavailable.add("USER_LINK_INVALID");
-        final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
-        downloadErrorsFileUnavailable.add("LINK_IS_MISSING");
-        downloadErrorsFileUnavailable.add("BAD_LINK");
-        downloadErrorsFileUnavailable.add("LINK_TOO_MANY_DOWNLOADS");
-        downloadErrorsFileUnavailable.add("LINK_ERROR");
-        downloadErrorsFileUnavailable.add("LINK_TEMPORARY_UNAVAILABLE");
-        downloadErrorsFileUnavailable.add("LINK_NOT_SUPPORTED");
-        downloadErrorsFileUnavailable.add("MUST_BE_PREMIUM");
-        downloadErrorsFileUnavailable.add("DOWNLOAD_FAILED");
-        downloadErrorsFileUnavailable.add("DELAYED_INVALID_ID");
-        if (errorcode.equalsIgnoreCase("LINK_DOWN")) {
-            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (errorcode.equalsIgnoreCase("LINK_HOST_NOT_SUPPORTED")) {
-            if (isSelfhosted) {
-                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            } else {
-                mhm.putError(account, link, 5 * 60 * 1000l, message);
-            }
-        } else if (errorcode.equalsIgnoreCase(ERROR_CODE_LINK_PASSWORD_PROTECTED)) {
-            link.setDownloadPassword(null);
-            link.setPasswordProtected(true);
-            throw new PluginException(LinkStatus.ERROR_RETRY, "URL is password protected", 5 * 60 * 1000l);
-        } else if (accountErrorsPermanent.contains(errorcode)) {
-            /* This is the only error which allows us to remove the apikey and re-login. */
-            account.removeProperty(PROPERTY_apikey);
-            throw new AccountInvalidException(message);
-        } else if (accountErrorsTemporary.contains(errorcode)) {
-            throw new AccountUnavailableException(message, 5 * 60 * 1000);
-        } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
-            mhm.putError(account, link, 5 * 60 * 1000l, message);
-        } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
-        } else {
-            /*
-             * Unknown/Generic error --> Assume it is a download issue but display it as temp. account issue if no DownloadLink is given.
-             */
-            /*
-             * E.g. LINK_ERROR, LINK_IS_MISSING, STREAM_INVALID_GEN_ID, STREAM_INVALID_STREAM_ID, DELAYED_INVALID_ID, REDIRECTOR_XXX,
-             * MAGNET_XXX, USER_LINK_INVALID, MISSING_NOTIF_ENDPOINT
-             */
-            logger.info("Unknown API error: " + errorcode);
-            if (link != null) {
-                mhm.handleErrorGeneric(account, link, message, 50);
-            } else {
-                /* Temp disable account */
-                throw new AccountUnavailableException(message, 5 * 60 * 1000);
-            }
-        }
-        return entries;
-    }
-
+    // public void authBlockedLogin(final Account account, final DownloadLink link, final Map<String, Object> errormap) throws Exception {
+    // final String msg = errormap.get("message").toString();
+    // final String token = errormap.get("token").toString();
+    // if (StringUtils.isEmpty(msg)) {
+    // /* This should never happen */
+    // throw new IllegalArgumentException();
+    // } else if (StringUtils.isEmpty(token)) {
+    // /* No token given -> No way for us to refresh apikey */
+    // account.removeProperty(PROPERTY_apikey);
+    // throw new AccountInvalidException("Authorization has been denied by account owner.");
+    // }
+    // final AccountUnavailableException exceptionOnFailure = new AccountUnavailableException(msg, 10 * 60 * 1000);
+    // final PluginException exceptionOnDownloadAndSuccess = new PluginException(LinkStatus.ERROR_RETRY, "Retry after successful
+    // AUTH_BLOCKED handling");
+    // final String oldAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
+    // final UrlQuery postdata = new UrlQuery();
+    // postdata.appendEncoded("token", token);
+    // synchronized (account) {
+    // final String newAuth = br.getHeaders().getHeader(HTTPConstants.HEADER_REQUEST_AUTHORIZATION).getValue();
+    // if (!StringUtils.equals(oldAuth, newAuth)) {
+    // /* Previous download-attempt already successfully ran through this handling so we don't need to do this here again. */
+    // throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
+    // }
+    // logger.info("Performing auth blocked login");
+    // final int maxSecondsWait = 600;
+    // final Thread dialog = showNewLocationLoginInformation(null, msg, maxSecondsWait);
+    // int secondsWaited = 0;
+    // final int waitSecondsPerLoop = 3;
+    // String apikey = null;
+    // boolean throwThisException = false;
+    // try {
+    // try {
+    // for (int i = 0; i <= 23; i++) {
+    // logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsWait);
+    // Thread.sleep(waitSecondsPerLoop * 1000);
+    // secondsWaited += waitSecondsPerLoop;
+    // /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
+    // final Map<String, Object> data = this.callAPI("/user/verif", postdata, account, null);
+    // if (secondsWaited >= maxSecondsWait) {
+    // logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsWait + " seconds");
+    // break;
+    // }
+    // final String verifStatus = data.get("verif").toString();
+    // if (verifStatus.equals("denied")) {
+    // /* User opened link from email and denied this login-attempt. */
+    // throwThisException = true;
+    // throw new AccountInvalidException("Authorization has been denied by account owner");
+    // }
+    // apikey = (String) data.get("apikey");
+    // if (!StringUtils.isEmpty(apikey)) {
+    // logger.info("Stopping because: Found apikey!");
+    // break;
+    // } else if (!dialog.isAlive()) {
+    // logger.info("Stopping because: Dialog closed!");
+    // break;
+    // }
+    // }
+    // } finally {
+    // dialog.interrupt();
+    // }
+    // } catch (final Exception e) {
+    // if (throwThisException) {
+    // throw e;
+    // } else {
+    // throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
+    // }
+    // }
+    // if (StringUtils.isEmpty(apikey)) {
+    // logger.warning("Failed for unknown reasons");
+    // throw (AccountUnavailableException) exceptionOnFailure.fillInStackTrace();
+    // }
+    // logger.info("Using new apikey: " + apikey);
+    // account.setProperty(PROPERTY_apikey, apikey);
+    // setAuthHeader(br, apikey);
+    // if (link == null) {
+    // throw new AccountUnavailableException("Retry after blocked login has been cleared", 5 * 1000);
+    // } else {
+    // throw (PluginException) exceptionOnDownloadAndSuccess.fillInStackTrace();
+    // }
+    // }
+    // }
     @Override
     public int getMaxSimultanFreeDownloadNum() {
         return Integer.MAX_VALUE;
@@ -892,9 +709,6 @@ public class AllDebridCom extends PluginForHost {
         logger.info("Generating fresh directurl");
         this.login(account, new AccountInfo(), false);
         String downloadPassword = link.getDownloadPassword();
-        final Form dlform = new Form();
-        dlform.setMethod(MethodType.GET);
-        dlform.setAction(api_base + "/link/unlock");
         final String url;
         final boolean isSelfhosted = isSelfhosted(link);
         if (isSelfhosted) {
@@ -902,21 +716,21 @@ public class AllDebridCom extends PluginForHost {
         } else {
             url = link.getDefaultPlugin().buildExternalDownloadURL(link, this);
         }
-        dlform.put("link", Encoding.urlEncode(url));
-        dlform.put("agent", agent_raw);
-        if (downloadPassword != null) {
-            dlform.put("password", Encoding.urlEncode(downloadPassword));
-        }
         int counter = 0;
+        Map<String, Object> data = null;
+        boolean passwordSuccess = false;
         do {
             counter++;
+            final UrlQuery postdata = new UrlQuery();
+            postdata.appendEncoded("link", url);
             if (counter > 1) {
                 downloadPassword = getUserInput("Password?", link);
-                dlform.put("password", Encoding.urlEncode(downloadPassword));
             }
-            br.submitForm(dlform);
+            if (downloadPassword != null) {
+                postdata.appendEncoded("password", downloadPassword);
+            }
             try {
-                handleErrors(account, link);
+                data = this.callAPI("/link/unlock", postdata, account, link);
             } catch (final PluginException e) {
                 if (br.containsHTML(ERROR_CODE_LINK_PASSWORD_PROTECTED)) {
                     /*
@@ -930,24 +744,20 @@ public class AllDebridCom extends PluginForHost {
                 }
             }
             logger.info("Breaking loop because: User entered correct password or none was needed");
+            passwordSuccess = true;
             break;
         } while (counter <= 3);
-        Map<String, Object> data = handleErrors(account, link);
+        if (!passwordSuccess) {
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+        }
         if (!StringUtils.isEmpty(downloadPassword)) {
             /* Entered password looks to be correct -> Store password */
             link.setDownloadPassword(downloadPassword);
         }
         final Object delayID = data.get("delayed");
         if (delayID != null) {
-            /* See https://docs.alldebrid.com/#delayed-links */
-            if (!cacheDLChecker(link, account, delayID.toString())) {
-                /* Error or serverside download not finished in given time. */
-                logger.info("Delayed handling failure");
-                handleErrors(account, link);
-                mhm.handleErrorGeneric(account, link, "Serverside download failure in 'delayed' handling", 50, 5 * 60 * 1000l);
-            } else {
-                logger.info("Delayed handling success");
-            }
+            /* Serverside download required, see https://docs.alldebrid.com/#delayed-links */
+            cacheDLChecker(link, account, delayID.toString());
         }
         String dllink = (String) data.get("link");
         if (StringUtils.isEmpty(dllink)) {
@@ -967,14 +777,10 @@ public class AllDebridCom extends PluginForHost {
                 }
             }
             final String streamID = best.get("id").toString();
-            final Form streamform = new Form();
-            streamform.setMethod(MethodType.GET);
-            streamform.setAction(api_base + "/link/streaming");
-            dlform.put("agent", agent_raw);
-            streamform.put("id", linkID);
-            streamform.put("stream", streamID);
-            br.submitForm(streamform);
-            data = handleErrors(account, link);
+            final UrlQuery streampostdata = new UrlQuery();
+            streampostdata.appendEncoded("id", linkID);
+            streampostdata.appendEncoded("stream", streamID);
+            data = this.callAPI("/link/streaming", streampostdata, account, link);
             dllink = (String) data.get("link");
         }
         if (isSelfhosted) {
@@ -1011,7 +817,7 @@ public class AllDebridCom extends PluginForHost {
     }
 
     /* Stolen from LinkSnappyCom plugin */
-    private boolean cacheDLChecker(final DownloadLink link, final Account account, final String delayID) throws Exception {
+    private void cacheDLChecker(final DownloadLink link, final Account account, final String delayID) throws Exception {
         final PluginProgress waitProgress = new PluginProgress(0, 100, null) {
             protected long lastCurrent    = -1;
             protected long lastTotal      = -1;
@@ -1059,13 +865,10 @@ public class AllDebridCom extends PluginForHost {
         waitProgress.setIcon(new AbstractIcon(IconKey.ICON_WAIT, 16));
         waitProgress.setProgressSource(this);
         int lastProgress = -1;
+        final UrlQuery postdata = new UrlQuery();
+        postdata.appendEncoded("id", delayID);
         try {
             /* See https://docs.alldebrid.com/#delayed-links */
-            final Form dlform = new Form();
-            dlform.setMethod(MethodType.GET);
-            dlform.setAction(api_base + "/link/delayed");
-            dlform.put("id", delayID);
-            dlform.put("agent", agent_raw);
             final int maxWaitSeconds = 300;
             /* 2020-03-27: API docs say checking every 5 seconds is recommended */
             final int waitSecondsPerLoop = 5;
@@ -1088,33 +891,25 @@ public class AllDebridCom extends PluginForHost {
                     // lastProgressChange = System.currentTimeMillis();
                     lastProgress = currentProgress.intValue();
                 }
-                br.submitForm(dlform);
-                try {
-                    /* We have to use the parser here because json contains two 'status' objects ;) */
-                    final Map<String, Object> data = handleErrors(account, link);
-                    delayedStatus = (int) JavaScriptEngineFactory.toLong(data.get("status"), 3);
-                    final int tmpCurrentProgress = (int) ((Number) data.get("progress")).doubleValue() * 100;
-                    if (tmpCurrentProgress > currentProgress) {
-                        /* Do not allow the progress to "go back". */
-                        currentProgress = tmpCurrentProgress;
-                    }
-                    /* 2020-03-27: We cannot trust their 'time_left' :D */
-                    // final int timeLeft = (int) JavaScriptEngineFactory.toLong(entries.get("time_left"), 30);
-                    if (currentProgress >= 100) {
-                        /* 2020-03-27: Do not trust their 100% :D */
-                        currentProgress = 85;
-                    }
-                } catch (final Throwable e) {
-                    logger.info("Error parsing json response");
-                    logger.log(e);
-                    break;
+                final Map<String, Object> data = this.callAPI("/link/delayed", postdata, account, link);
+                delayedStatus = (int) JavaScriptEngineFactory.toLong(data.get("status"), 3);
+                final int tmpCurrentProgress = (int) ((Number) data.get("progress")).doubleValue() * 100;
+                if (tmpCurrentProgress > currentProgress) {
+                    /* Do not allow the progress to "go back". */
+                    currentProgress = tmpCurrentProgress;
+                }
+                /* 2020-03-27: We cannot trust their 'time_left' :D */
+                // final int timeLeft = (int) JavaScriptEngineFactory.toLong(entries.get("time_left"), 30);
+                if (currentProgress >= 100) {
+                    /* 2020-03-27: Do not trust their 100% :D */
+                    currentProgress = 85;
                 }
                 waitSecondsLeft -= waitSecondsPerLoop;
             } while (waitSecondsLeft > 0 && delayedStatus == 1);
             if (delayedStatus == 2) {
-                return true;
+                return;
             } else {
-                return false;
+                mhm.handleErrorGeneric(account, link, "Serverside download failure in 'delayed' handling", 50, 5 * 60 * 1000l);
             }
         } finally {
             link.removePluginProgress(waitProgress);
@@ -1174,7 +969,7 @@ public class AllDebridCom extends PluginForHost {
     }
 
     private void checkRateLimit(final Browser br, URLConnectionAdapter con, final Account account, final DownloadLink link) throws PluginException {
-        if (br.containsHTML("rate limiting, please retry") || con.getResponseCode() == 429) {
+        if (con.getResponseCode() == 429 || br.containsHTML("rate limiting, please retry")) {
             Browser.setRequestIntervalLimitGlobal(br.getHost(), 2000);
             setRateLimit(link, account, con.getURL());
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Too many requests:" + br.getHost());
@@ -1326,5 +1121,196 @@ public class AllDebridCom extends PluginForHost {
     @Override
     protected String getAPILoginHelpURL() {
         return "https://help." + getHost() + "/en/Third%20party%20tools/jdownloader";
+    }
+
+    private Map<String, Object> callAPI(final String path, final Account account, final DownloadLink link) throws Exception {
+        br.getPage(api_base_v_41 + path);
+        return handleErrors(account, link);
+    }
+
+    private Map<String, Object> callAPI(final String path, final UrlQuery postdata, final Account account, final DownloadLink link) throws Exception {
+        br.postPage(api_base_v_41 + path, postdata);
+        return handleErrors(account, link);
+    }
+
+    /** See https://docs.alldebrid.com/#all-errors */
+    private Map<String, Object> handleErrors(final Account account, final DownloadLink link) throws PluginException, Exception {
+        /* 2020-03-25: E.g. {"status": "error", "error": {"code": "AUTH_BAD_APIKEY","message": "The auth apikey is invalid"}} */
+        Map<String, Object> entries = null;
+        try {
+            entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+        } catch (final JSonMapperException jme) {
+            if (link != null) {
+                mhm.handleErrorGeneric(account, link, "Bad API answer", 50, 5 * 60 * 1000l);
+            } else {
+                throw Exceptions.addSuppressed(new AccountUnavailableException("Bad API answer", 1 * 60 * 1000l), jme);
+            }
+        }
+        final String status = (String) entries.get("status");
+        if (!"error".equalsIgnoreCase(status)) {
+            final Map<String, Object> data = (Map<String, Object>) entries.get("data");
+            return data;
+        }
+        final boolean isSelfhosted = this.isSelfhosted(link);
+        final Map<String, Object> errormap = (Map<String, Object>) entries.get("error");
+        final String errorcode = errormap.get("code").toString();
+        final String message = errormap.get("message").toString();
+        final HashSet<String> accountErrorsPermanent = new HashSet<String>();
+        accountErrorsPermanent.add("AUTH_MISSING_APIKEY");
+        accountErrorsPermanent.add("AUTH_BAD_APIKEY");
+        accountErrorsPermanent.add("AUTH_USER_BANNED");
+        accountErrorsPermanent.add("PIN_EXPIRED");
+        accountErrorsPermanent.add("PIN_INVALID");
+        accountErrorsPermanent.add("ACCOUNT_INVALID");
+        final HashSet<String> accountErrorsTemporary = new HashSet<String>();
+        accountErrorsTemporary.add("MAINTENANCE");
+        accountErrorsTemporary.add("AUTH_BLOCKED");
+        accountErrorsTemporary.add("ALREADY_SENT");
+        accountErrorsTemporary.add("NO_SERVER");
+        accountErrorsTemporary.add("FREE_TRIAL_LIMIT_REACHED");
+        accountErrorsTemporary.add("PIN_ALREADY_AUTHED");
+        accountErrorsTemporary.add("PIN_EXPIRED");
+        accountErrorsTemporary.add("INSUFFICIENT_BALANCE");
+        final HashSet<String> downloadErrorsHostUnavailable = new HashSet<String>();
+        downloadErrorsHostUnavailable.add("LINK_HOST_NOT_SUPPORTED");
+        downloadErrorsHostUnavailable.add("LINK_HOST_UNAVAILABLE");
+        downloadErrorsHostUnavailable.add("LINK_HOST_FULL");
+        downloadErrorsHostUnavailable.add("LINK_HOST_LIMIT_REACHED");
+        downloadErrorsHostUnavailable.add("USER_LINK_INVALID");
+        final HashSet<String> downloadErrorsFileUnavailable = new HashSet<String>();
+        downloadErrorsFileUnavailable.add("LINK_IS_MISSING");
+        downloadErrorsFileUnavailable.add("BAD_LINK");
+        downloadErrorsFileUnavailable.add("LINK_TOO_MANY_DOWNLOADS");
+        downloadErrorsFileUnavailable.add("LINK_ERROR");
+        downloadErrorsFileUnavailable.add("LINK_TEMPORARY_UNAVAILABLE");
+        downloadErrorsFileUnavailable.add("LINK_NOT_SUPPORTED");
+        downloadErrorsFileUnavailable.add("MUST_BE_PREMIUM");
+        downloadErrorsFileUnavailable.add("DOWNLOAD_FAILED");
+        downloadErrorsFileUnavailable.add("DELAYED_INVALID_ID");
+        if (errorcode.equalsIgnoreCase("LINK_DOWN")) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        } else if (errorcode.equalsIgnoreCase("LINK_HOST_NOT_SUPPORTED")) {
+            if (isSelfhosted) {
+                throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+            } else {
+                mhm.putError(account, link, 5 * 60 * 1000l, message);
+            }
+        } else if (errorcode.equalsIgnoreCase(ERROR_CODE_LINK_PASSWORD_PROTECTED)) {
+            link.setDownloadPassword(null);
+            link.setPasswordProtected(true);
+            throw new PluginException(LinkStatus.ERROR_RETRY, "Wrong password entered");
+        } else if (accountErrorsPermanent.contains(errorcode)) {
+            /* This is the only error which allows us to remove the apikey and re-login. */
+            account.removeProperty(PROPERTY_apikey);
+            throw new AccountInvalidException(message);
+        } else if (accountErrorsTemporary.contains(errorcode)) {
+            throw new AccountUnavailableException(message, 5 * 60 * 1000);
+        } else if (downloadErrorsHostUnavailable.contains(errorcode)) {
+            mhm.putError(account, link, 5 * 60 * 1000l, message);
+        } else if (downloadErrorsFileUnavailable.contains(errorcode)) {
+            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, message);
+        } else {
+            /*
+             * Unknown/Generic error --> Assume it is a download issue but display it as temp. account issue if no DownloadLink is given.
+             */
+            /*
+             * E.g. LINK_ERROR, LINK_IS_MISSING, STREAM_INVALID_GEN_ID, STREAM_INVALID_STREAM_ID, DELAYED_INVALID_ID, REDIRECTOR_XXX,
+             * MAGNET_XXX, USER_LINK_INVALID, MISSING_NOTIF_ENDPOINT
+             */
+            logger.info("Unknown API error: " + errorcode);
+            if (link != null) {
+                mhm.handleErrorGeneric(account, link, message, 50);
+            } else {
+                /* Temp disable account */
+                throw new AccountUnavailableException(message, 5 * 60 * 1000);
+            }
+        }
+        return entries;
+    }
+
+    private Thread showPINLoginInformation(final String pin_url, final int timeoutSeconds) {
+        final String host = getHost();
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    String message = "";
+                    final String title;
+                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                        title = "Alldebrid - Login";
+                        message += "Hallo liebe(r) alldebrid NutzerIn\r\n";
+                        message += "Um deinen " + host + " Account in JDownloader verwenden zu können, musst du folgende Schritte beachten:\r\n";
+                        message += "1. Öffne diesen Link im Browser falls das nicht automatisch passiert:\r\n\t'" + pin_url + "'\t\r\n";
+                        message += "2. Bestätige den PIN Code im Browser.\r\n";
+                        message += "3. Optional: Falls du noch nicht in deinem AD Account im Browser eingeloggt bist, logge dich ein und bestätige den PIN Code erneut.\r\n";
+                        message += "Dein Account sollte nach wenigen Sekunden von JDownloader akzeptiert werden.\r\n";
+                    } else {
+                        title = "Alldebrid - Login";
+                        message += "Hello dear alldebrid user\r\n";
+                        message += "In order to use " + host + " in JDownloader, you need to follow these steps:\r\n";
+                        message += "1. Open this URL in your browser if it wasn't opened automatically:\r\n\t'" + pin_url + "'\t\r\n";
+                        message += "2. Confirm the PIN Code you see in the browser window.\r\n";
+                        message += "3. Optional: If you haven't been logged in into your AD account in your browser already, login and confirm the PIN Code again.\r\n";
+                        message += "Your account should be accepted in JDownloader within a few seconds.\r\n";
+                    }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(timeoutSeconds * 1000);
+                    if (CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
+                        CrossSystem.openURL(pin_url);
+                    }
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    private Thread showNewLocationLoginInformation(final String pin_url, final String api_errormsg, final int timeoutSeconds) {
+        final Thread thread = new Thread() {
+            public void run() {
+                try {
+                    String message = "";
+                    final String title;
+                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                        title = "Alldebrid - Login von neuem Standort bestätigen";
+                        message += "Hallo liebe(r) alldebrid NutzerIn";
+                        message += "\r\nDu versuchst gerade, deinen Account an einem neuen Standort zu verwenden.";
+                        message += "\r\nBestätige diesen Loginversuch mit dem Link, den du per E-Mail erhalten hast, um deinen Account in JD weiterverwenden zu können.";
+                        message += "\r\nDieser dialog schließt sich automatisch, sobald du den Login bestätigt hast.";
+                        if (api_errormsg != null) {
+                            message += "\r\nFehlermeldung der Alldebrid API:";
+                            message += "\r\n" + api_errormsg;
+                        }
+                    } else {
+                        title = "Alldebrid - Confirm new location";
+                        message += "Hello dear alldebrid user";
+                        message += "\r\nYou are trying to use this service from a new location.";
+                        message += "\r\nYou've received an e-mail with a link to confirm this new location.";
+                        message += "\r\n Confirm this e-mail to continue using your Alldebrid account in JDownloader.";
+                        message += "\r\nOnce accepted, this dialog will be closed automatically.";
+                        if (api_errormsg != null) {
+                            message += "\r\nMessage from Alldebrid API:";
+                            message += "\r\n" + api_errormsg;
+                        }
+                    }
+                    final ConfirmDialog dialog = new ConfirmDialog(UIOManager.LOGIC_COUNTDOWN, title, message);
+                    dialog.setTimeout(timeoutSeconds * 1000);
+                    if (pin_url != null && CrossSystem.isOpenBrowserSupported() && !Application.isHeadless()) {
+                        CrossSystem.openURL(pin_url);
+                    }
+                    final ConfirmDialogInterface ret = UIOManager.I().show(ConfirmDialogInterface.class, dialog);
+                    ret.throwCloseExceptions();
+                } catch (final Throwable e) {
+                    getLogger().log(e);
+                }
+            };
+        };
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
     }
 }

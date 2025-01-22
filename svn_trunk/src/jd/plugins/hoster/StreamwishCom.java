@@ -36,7 +36,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 49889 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 3, names = {}, urls = {})
 public class StreamwishCom extends XFileSharingProBasic {
     public StreamwishCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -195,11 +195,6 @@ public class StreamwishCom extends XFileSharingProBasic {
         } else {
             return super.getURLType(url);
         }
-    }
-
-    @Override
-    protected boolean supportsShortURLs() {
-        return false;
     }
 
     @Override
