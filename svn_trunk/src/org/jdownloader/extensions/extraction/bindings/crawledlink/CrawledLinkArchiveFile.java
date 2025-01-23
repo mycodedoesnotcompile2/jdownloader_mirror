@@ -126,7 +126,7 @@ public class CrawledLinkArchiveFile implements ArchiveFile {
         return name;
     }
 
-    private volatile ExtractionStatus status = ExtractionStatus.NA;
+    private volatile ExtractionStatus status = null;
 
     public void setStatus(ExtractionController controller, ExtractionStatus status) {
         this.status = status;
@@ -134,10 +134,10 @@ public class CrawledLinkArchiveFile implements ArchiveFile {
 
     public ExtractionStatus getStatus() {
         final ExtractionStatus status = this.status;
-        if (status == null) {
-            return ExtractionStatus.NA;
+        if (status != null) {
+            return status;
         }
-        return status;
+        return ExtractionStatus.NA;
     }
 
     public void setMessage(ExtractionController controller, String plugins_optional_extraction_status_notenoughspace) {

@@ -41,6 +41,7 @@ import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.AccountInfo;
 import jd.plugins.AccountInvalidException;
+import jd.plugins.AccountRequiredException;
 import jd.plugins.AccountUnavailableException;
 import jd.plugins.DownloadLink;
 import jd.plugins.DownloadLink.AvailableStatus;
@@ -49,7 +50,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49954 $", interfaceVersion = 2, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/f/([a-z0-9]{16,})" })
+@HostPlugin(revision = "$Revision: 50489 $", interfaceVersion = 2, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/f/([a-z0-9]{16,})" })
 public class FourShareVn extends PluginForHost {
     public FourShareVn(PluginWrapper wrapper) {
         super(wrapper);
@@ -116,6 +117,10 @@ public class FourShareVn extends PluginForHost {
         }
         if (filename == null) {
             filename = br.getRegex("<title>Download\\s*([^<>\"]+) \\| 4share\\.vn\\s*</title>").getMatch(0);
+            if (filename == null) {
+                /* 2025-01-22 */
+                filename = br.getRegex("<h4 class=\"qqqq1111\"[^>]*title=\"([^\"]+)\"").getMatch(0);
+            }
         }
         String filesize = br.getRegex(">\\s*Kích thước\\s*:\\s*<strong>\\s*(\\d+(?:\\.\\d+)?\\s*(?:B(?:yte)?|KB|MB|GB))\\s*</strong>").getMatch(0);
         if (filesize == null) {
@@ -124,6 +129,10 @@ public class FourShareVn extends PluginForHost {
             if (filesize == null) {
                 /* 2021-10-21 */
                 filesize = br.getRegex("/strong>\\s*</h1>\\s*(\\d+[^<]+)<br/>").getMatch(0);
+                if (filesize == null) {
+                    /* 2025-01-22 */
+                    filesize = br.getRegex("</h4>\\s*<div>\\s*(\\d+[^<]+)</div>").getMatch(0);
+                }
             }
         }
         if (filename != null) {
@@ -142,7 +151,7 @@ public class FourShareVn extends PluginForHost {
         if (md5 != null) {
             link.setMD5Hash(md5);
         } else {
-            logger.warning("Failed to find md5hash");
+            logger.info("Failed to find md5hash");
         }
         /* Website may still provide names of deleted files --> First check for file info, then check for offline status. */
         if (br.getHttpConnection().getResponseCode() == 404) {
@@ -317,7 +326,15 @@ public class FourShareVn extends PluginForHost {
     @Override
     public void handleFree(final DownloadLink link) throws Exception, PluginException {
         requestFileInformation(link);
-        // Can be skipped
+        final boolean premiumRequiredIfNoFormIsFound = true;
+        if (br.containsHTML(">\\s*Đăng nhập để tải file này")) {
+            throw new AccountRequiredException();
+        }
+        Form captchaform = br.getFormbyKey("free_download");
+        if (captchaform == null && premiumRequiredIfNoFormIsFound) {
+            throw new AccountRequiredException();
+        }
+        /* Can be skipped */
         final boolean skipWait = true;
         if (!skipWait) {
             int wait = 60;
@@ -329,7 +346,10 @@ public class FourShareVn extends PluginForHost {
         }
         boolean success = false;
         captchaloop: for (int i = 0; i <= 3; i++) {
-            Form captchaform = br.getFormbyKey("free_download");
+            captchaform = br.getFormbyKey("free_download");
+            if (captchaform == null && premiumRequiredIfNoFormIsFound) {
+                throw new AccountRequiredException();
+            }
             if (captchaform == null) {
                 captchaform = new Form();
                 captchaform.setMethod(MethodType.POST);

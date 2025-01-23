@@ -148,14 +148,24 @@ public class DownloadLinkArchiveFile implements ArchiveFile {
         }
     }
 
-    private volatile ExtractionStatus status = ExtractionStatus.NA;
+    private volatile ExtractionStatus status = null;
 
     public ExtractionStatus getStatus() {
-        final ExtractionStatus status = this.status;
-        if (status == null) {
-            return ExtractionStatus.NA;
+        ExtractionStatus status = this.status;
+        if (status != null) {
+            return status;
         }
-        return status;
+        final String archiveID = getArchiveID();
+        for (final DownloadLink downloadLink : getDownloadLinks()) {
+            if (!StringUtils.equals(archiveID, downloadLink.getArchiveID())) {
+                continue;
+            }
+            status = downloadLink.getExtractionStatus();
+            if (status != null) {
+                return status;
+            }
+        }
+        return ExtractionStatus.NA;
     }
 
     public void setMessage(ExtractionController controller, String text) {

@@ -7,6 +7,7 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="jd/ressourcen/libs/dbus"/>
+			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="ressourcen/libs/irclib.jar"/>
@@ -37,7 +38,6 @@
 	<classpathentry kind="lib" path="ressourcen/libs/sevenzipjbinding.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs_ext/AppleJavaExtensions.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/JDBrowser"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/AppWorkUtils"/>
 	<classpathentry kind="lib" path="ressourcen/libs/sevenzipjbindingWin.jar"/>
 	<classpathentry kind="lib" path="/AppWorkUtils/libs/miglayout.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/sevenzipjbindingLinux.jar"/>
@@ -78,5 +78,6 @@
 	<classpathentry kind="lib" path="ressourcen/libs/laf/flatlaf.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/bcutil-jdk15on.jar"/>
 	<classpathentry kind="lib" path="ressourcen/libs/proxyVole.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/AppWorkUtils"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

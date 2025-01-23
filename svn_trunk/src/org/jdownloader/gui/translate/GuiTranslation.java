@@ -1569,6 +1569,9 @@ public interface GuiTranslation extends TranslateInterface {
     @Default(lngs = { "en" }, values = { "Original Filetype" })
     String PackagizerFilterRuleDialog_createVariablesMenu_filetype_org();
 
+    @Default(lngs = { "en" }, values = { "Plugin property" })
+    String PackagizerFilterRuleDialog_createVariablesMenu_plugin_property();
+
     @Default(lngs = { "en" }, values = { "Priority" })
     String settings_linkgrabber_filter_columns_exepriority();
 

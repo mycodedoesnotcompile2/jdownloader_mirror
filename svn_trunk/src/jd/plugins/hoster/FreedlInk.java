@@ -18,6 +18,7 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.appwork.utils.StringUtils;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
@@ -29,7 +30,7 @@ import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
-@HostPlugin(revision = "$Revision: 50396 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = {}, urls = {})
 public class FreedlInk extends XFileSharingProBasic {
     public FreedlInk(final PluginWrapper wrapper) {
         super(wrapper);
@@ -121,6 +122,15 @@ public class FreedlInk extends XFileSharingProBasic {
             return waitSecondsStr;
         } else {
             return super.regexWaittime(br);
+        }
+    }
+
+    @Override
+    protected boolean isOffline(final DownloadLink link, final Browser br) {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/404.html")) {
+            return true;
+        } else {
+            return super.isOffline(link, br);
         }
     }
 

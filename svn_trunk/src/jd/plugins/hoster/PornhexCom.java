@@ -37,7 +37,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49989 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50493 $", interfaceVersion = 3, names = {}, urls = {})
 public class PornhexCom extends PluginForHost {
     public PornhexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -171,7 +171,11 @@ public class PornhexCom extends PluginForHost {
                  */
                 final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(jssource);
                 final boolean onlyOneQualityAvailable = ressourcelist.size() == 1;
-                final int userSelectedQuality = -1;
+                int userSelectedQuality = -1;
+                if (false) {
+                    // avoid eclipse error due to comparing identical constants
+                    userSelectedQuality = 0;
+                }
                 if (userSelectedQuality == -1) {
                     logger.info("Looking for BEST video stream");
                 } else {

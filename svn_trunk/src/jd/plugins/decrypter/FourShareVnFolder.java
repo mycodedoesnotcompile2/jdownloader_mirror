@@ -16,13 +16,13 @@
 package jd.plugins.decrypter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.regex.Pattern;
 
-import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
-import jd.http.Request;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -30,13 +30,12 @@ import jd.plugins.DecrypterPlugin;
 import jd.plugins.DecrypterRetryException;
 import jd.plugins.DecrypterRetryException.RetryReason;
 import jd.plugins.DownloadLink;
-import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.FilePackage;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48304 $", interfaceVersion = 3, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/(?:d|dlist)/([a-f0-9]{16})" })
+@DecrypterPlugin(revision = "$Revision: 50489 $", interfaceVersion = 3, names = { "4share.vn" }, urls = { "https?://(?:www\\.)?(?:up\\.)?4share\\.vn/(?:d|dlist)/([a-f0-9]{16})" })
 public class FourShareVnFolder extends PluginForDecrypt {
     public FourShareVnFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -65,10 +64,14 @@ public class FourShareVnFolder extends PluginForDecrypt {
             /* E.g. redirect to mainpage */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final String[] filter = br.getRegex("<tr>\\s*<td>.*?</td></tr>").getColumn(-1);
+        final HashSet<String> dupes = new HashSet<String>();
         String currentFolderTitle = br.getRegex("<h1[^>]*>\\s*Folder: ([^<]+)</h1>").getMatch(0);
         if (currentFolderTitle == null) {
-            currentFolderTitle = br.getRegex("(?i)<b>\\s*Thư mục:\\s*(.*?)\\s*</b>").getMatch(0);
+            currentFolderTitle = br.getRegex("<b>\\s*Thư mục:\\s*(.*?)\\s*</b>").getMatch(0);
+            if (currentFolderTitle == null) {
+                /* 2025-01-22 */
+                currentFolderTitle = br.getRegex("<h2 class=\"\"[^>]*>([^<]+)</h2>").getMatch(0);
+            }
         }
         if (currentFolderTitle == null) {
             /* Fallback */
@@ -81,73 +84,54 @@ public class FourShareVnFolder extends PluginForDecrypt {
         } else {
             subfolderpath += "/" + currentFolderTitle;
         }
-        FilePackage fp = null;
+        FilePackage fp = FilePackage.getInstance();
         if (subfolderpath != null) {
             fp = FilePackage.getInstance();
             fp.setName(subfolderpath);
+        } else {
+            fp.setName(currentFolderTitle);
         }
-        if (filter != null && filter.length > 0) {
-            for (final String f : filter) {
-                final String url = new Regex(f, "(/(d/[a-f0-9]{16}|f/[a-f0-9]{16}(?:/.*?)?))('|\")").getMatch(0);
-                if (url == null) {
+        final String[] subfolderurls = br.getRegex("(/d/[a-f0-9]{16})").getColumn(0);
+        if (subfolderurls != null && subfolderurls.length > 0) {
+            for (String url : subfolderurls) {
+                if (url.contains(folderID)) {
+                    /* Skip folder which we are crawling at this moment */
+                    continue;
+                } else if (!dupes.add(url)) {
                     continue;
                 }
-                /* 2019-08-28 */
-                String item_title = new Regex(f, "title=\\'([^<>\"\\']+)\\'").getMatch(0);
-                if (StringUtils.isEmpty(item_title)) {
-                    item_title = new Regex(f, ">\\s*([^<]+)\\s*</a>").getMatch(0);
+                url = br.getURL(url).toExternalForm();
+                final DownloadLink folder = createDownloadlink(url);
+                folder.setRelativeDownloadFolderPath(subfolderpath);
+                ret.add(folder);
+            }
+        }
+        final String[] fileurls = br.getRegex("(/f/[a-f0-9]{16}(/[^<>\"]{1,})?)").getColumn(0);
+        if (fileurls != null && fileurls.length > 0) {
+            for (String url : fileurls) {
+                if (!dupes.add(url)) {
+                    continue;
                 }
-                if (item_title != null) {
-                    item_title = Encoding.htmlDecode(item_title).trim();
+                final String urlQuoted = Pattern.quote(url);
+                final String filename = br.getRegex(urlQuoted + "\">\\s*<[^>]*></i>([^<]+)</a>").getMatch(0);
+                final String filesize = br.getRegex(">([^<]+)</td>\\s*<td><a href=\"" + urlQuoted).getMatch(0);
+                url = br.getURL(url).toExternalForm();
+                final DownloadLink file = createDownloadlink(url);
+                if (filename != null) {
+                    file.setName(Encoding.htmlDecode(filename).trim());
                 }
-                final DownloadLink dl = createDownloadlink(br.getURL(url).toExternalForm());
-                if (url.contains("/f/")) {
-                    /* File */
-                    final String filesizeStr = new Regex(f, ">\\s*(\\d+(?:\\.\\d+)?\\s*(?:B(?:yte)?|KB|MB|GB))\\s*<").getMatch(0);
-                    final String temp_filename;
-                    if (item_title != null) {
-                        temp_filename = item_title;
-                    } else {
-                        /* Fallback */
-                        temp_filename = url.substring(url.lastIndexOf("/") + 1);
-                    }
-                    dl.setName(temp_filename);
-                    if (filesizeStr != null) {
-                        dl.setDownloadSize(SizeFormatter.getSize(filesizeStr));
-                    }
-                    dl.setAvailableStatus(AvailableStatus.TRUE);
-                    if (subfolderpath != null) {
-                        dl.setRelativeDownloadFolderPath(subfolderpath);
-                        dl._setFilePackage(fp);
-                    }
-                } else {
-                    /* Subfolder */
-                    if (item_title != null) {
-                        dl.setRelativeDownloadFolderPath(subfolderpath);
-                    }
+                if (filesize != null) {
+                    file.setDownloadSize(SizeFormatter.getSize(filesize));
                 }
-                ret.add(dl);
+                file.setRelativeDownloadFolderPath(subfolderpath);
+                file.setAvailable(true);
+                file._setFilePackage(fp);
+                ret.add(file);
             }
         }
         if (ret.isEmpty()) {
-            // fail over
-            final String[] links = br.getRegex("(?:https?://(?:up\\.)?4share\\.vn)?/(?:d/[a-f0-9]{16}|f/[a-f0-9]{16}/[^<>\"]{1,})").getColumn(-1);
-            if (links == null || links.length == 0) {
-                if (br.containsHTML("get_link_file_list_in_folder")) {
-                    logger.info("Seems like we have an empty folder: " + contenturl);
-                    throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
-                } else {
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-            }
-            for (String dl : links) {
-                dl = Request.getLocation(dl, br.getRequest()) + dl;
-                final String fid = new Regex(dl, "f/([a-f0-9]{16})/").getMatch(0);
-                if (fid != null) {
-                    final DownloadLink file = createDownloadlink(dl);
-                    ret.add(file);
-                }
-            }
+            /* Assume that we got an empty table of contents -> Empty folder */
+            throw new DecrypterRetryException(RetryReason.EMPTY_FOLDER);
         }
         return ret;
     }

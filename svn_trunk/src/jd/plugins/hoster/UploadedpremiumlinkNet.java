@@ -50,7 +50,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50409 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = { "uploadedpremiumlink.net" }, urls = { "" })
 public class UploadedpremiumlinkNet extends PluginForHost {
     /** Docs: https://docs.uploadedpremiumlink.net/, alternative domain: uploadedpremiumlink.xyz */
     private final String                 API_BASE                                       = "https://api.uploadedpremiumlink.net/wp-json/api";
@@ -189,15 +189,10 @@ public class UploadedpremiumlinkNet extends PluginForHost {
             final String customStatusText = (String) hoster.get("StatusText");
             final MultiHostHost mhost = new MultiHostHost(primary_domain);
             mhost.addDomains(domains);
-            final boolean isWorking;
             if (hoster.get("status").toString().equalsIgnoreCase("offline")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
-                isWorking = false;
             } else if (account.getType() == AccountType.FREE && !hoster.get("type").toString().equalsIgnoreCase("free")) {
                 mhost.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST_NOT_FOR_THIS_ACCOUNT_TYPE);
-                isWorking = false;
-            } else {
-                isWorking = true;
             }
             final long daily_quota_total = ((Number) hoster.get("daily_quota_total")).longValue();
             final long daily_quota_left = ((Number) hoster.get("daily_quota_left")).longValue();
@@ -222,9 +217,6 @@ public class UploadedpremiumlinkNet extends PluginForHost {
                 } else {
                     statustext = "Weekly traffic left: " + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_left) + "/" + SIZEUNIT.formatValue(maxSizeUnit, weekly_quota_total);
                 }
-            }
-            if (!isWorking) {
-                statustext = mhost.getStatus().getLabel() + " | " + statustext;
             }
             mhost.setStatusText(statustext);
             supportedhosts.add(mhost);

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.appwork.storage.TypeRef;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Hash;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
@@ -71,7 +72,7 @@ import jd.plugins.components.MediathekHelper;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.ARDMediathek;
 
-@DecrypterPlugin(revision = "$Revision: 50225 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
+@DecrypterPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = { "ardmediathek.de", "daserste.de", "sandmann.de", "wdr.de", "sportschau.de", "wdrmaus.de", "eurovision.de", "sputnik.de", "mdr.de", "ndr.de", "tagesschau.de" }, urls = { "https?://(?:\\w+\\.)?ardmediathek\\.de/.+", "https?://(?:\\w+\\.)?daserste\\.de/.*?\\.html", "https?://(?:www\\.)?sandmann\\.de/.+", "https?://(?:\\w+\\.)?wdr\\.de/[^<>\"]+\\.html|https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js", "https?://(?:\\w+\\.)?sportschau\\.de/.*?\\.html", "https?://(?:\\w+\\.)?wdrmaus\\.de/.+", "https?://(?:\\w+\\.)?eurovision\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?sputnik\\.de/[^<>\"]+\\.html", "https?://(?:www\\.)?mdr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?ndr\\.de/[^<>\"]+\\.html", "https?://(?:\\w+\\.)?tagesschau\\.de/[^<>\"]+\\.html" })
 public class Ardmediathek extends PluginForDecrypt {
     /* Constants */
     private static final String  type_embedded                          = "(?i)https?://deviceids-[a-z0-9\\-]+\\.wdr\\.de/ondemand/\\d+/\\d+\\.js";
@@ -82,6 +83,7 @@ public class Ardmediathek extends PluginForDecrypt {
     private boolean              checkPluginSettingsFlag                = false;
     private ArdConfigInterface   cfg                                    = null;
     private static final boolean FILESIZE_NEEDED_FOR_QUALITY_COMPARISON = false;
+    private final String         PROPERTY_INTERNAL_IS_SINGLE_VIDEO      = "internal_is_single_video";
 
     public Ardmediathek(final PluginWrapper wrapper) {
         super(wrapper);
@@ -357,7 +359,7 @@ public class Ardmediathek extends PluginForDecrypt {
             String ardBase64;
             // final String pattern_player = ".+/player/([^/]+).*";
             final Regex pattern_player = new Regex(url.getPath(), "(?i).+/player/([^/]+).*");
-            if (pattern_player.matches()) {
+            if (pattern_player.patternFind()) {
                 /* E.g. URLs that are a little bit older */
                 ardBase64 = pattern_player.getMatch(0);
             } else {
@@ -378,6 +380,47 @@ public class Ardmediathek extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             br.setAllowedResponseCodes(400);
+            if (param.getDownloadLink() == null || !param.getDownloadLink().hasProperty(PROPERTY_INTERNAL_IS_SINGLE_VIDEO)) {
+                /* Determine the type of this link if we don't know it already. */
+                br.getPage("https://api.ardmediathek.de/page-gateway/widgets/ard/asset/" + Encoding.urlEncode(ardBase64) + "?single=true");
+                if (br.getHttpConnection().getResponseCode() == 400) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                } else if (br.getHttpConnection().getResponseCode() == 404) {
+                    throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                }
+                final Map<String, Object> root0 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+                final String root0_type = root0.get("type").toString();
+                if (root0_type.equalsIgnoreCase("gridlist")) {
+                    /* List of multiple videos */
+                    final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+                    final List<Map<String, Object>> teasers = (List<Map<String, Object>>) root0.get("teasers");
+                    for (final Map<String, Object> teaser : teasers) {
+                        final Map<String, Object> publicationService = (Map<String, Object>) teaser.get("publicationService");
+                        final String video_id = teaser.get("id").toString();
+                        final String longTitle = teaser.get("longTitle").toString();
+                        final String longTitleSlug = this.toSlug(longTitle);
+                        final String videourl = "https://www.ardmediathek.de/video/" + longTitleSlug + "/" + longTitleSlug + "/" + publicationService.get("partner") + "/" + video_id;
+                        final DownloadLink singlevideo = this.createDownloadlink(videourl);
+                        /* Signal next crawl run, that this is a single video. */
+                        singlevideo.setProperty(PROPERTY_INTERNAL_IS_SINGLE_VIDEO, true);
+                        ret.add(singlevideo);
+                    }
+                    return ret;
+                } else if (!root0_type.equalsIgnoreCase("player_ondemand")) {
+                    if (DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+                        /* Throw this exception for devs in IDE */
+                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                    } else {
+                        /*
+                         * Throw this exception in stable so that the item gets displayed as offline to users while in reality, the user has
+                         * just added a link to an unsupported item.
+                         */
+                        throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+                    }
+                }
+                logger.info("Added link leads to a single video");
+            }
+            /* Crawl single video */
             br.getPage("https://api.ardmediathek.de/page-gateway/pages/ard/item/" + Encoding.urlEncode(ardBase64) + "?embedded=false&mcV6=true");
             /*
              * Old request -> 2024-07-02: This would preferably only return audio-description versions of video streams so I replaced it
@@ -391,8 +434,8 @@ public class Ardmediathek extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
             }
             oldArdDocumentID = PluginJSonUtils.getJson(br, "contentId");
-            final Map<String, Object> root = restoreFromString(br.toString(), TypeRef.MAP);
-            final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root, "widgets/{0}/");
+            final Map<String, Object> root1 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> video = (Map<String, Object>) JavaScriptEngineFactory.walkJson(root1, "widgets/{0}/");
             final String broadcastedOn = (String) video.get("broadcastedOn");
             final String title = (String) video.get("title");
             final String showname = (String) JavaScriptEngineFactory.walkJson(video, "show/title");
@@ -425,7 +468,7 @@ public class Ardmediathek extends PluginForDecrypt {
             if (!StringUtils.isEmpty(description)) {
                 metadata.setDescription(description);
             }
-            streamMap = root;
+            streamMap = root1;
         }
         metadata.setChannel("ardmediathek");
         final List<Map<String, Object>> subtitles = (List<Map<String, Object>>) JavaScriptEngineFactory.walkJson(streamMap, "widgets/{0}/mediaCollection/embedded/subtitles");
@@ -446,6 +489,23 @@ public class Ardmediathek extends PluginForDecrypt {
             }
         }
         return crawlARDMediathekJson2024(param, metadata, streamMap);
+    }
+
+    /* Copy & paste from OrfAt plugin */
+    private String toSlug(final String str) {
+        final String preparedSlug = str.toLowerCase(Locale.ENGLISH).replace("ü", "u").replace("ä", "a").replace("ö", "o");
+        String slug = preparedSlug.replaceAll("[^a-z0-9]", "-");
+        /* Remove double-minus */
+        slug = slug.replaceAll("-{2,}", "-");
+        /* Do not begin with minus */
+        if (slug.startsWith("-")) {
+            slug = slug.substring(1);
+        }
+        /* Do not end with minus */
+        if (slug.endsWith("-")) {
+            slug = slug.substring(0, slug.length() - 1);
+        }
+        return slug;
     }
 
     private ArrayList<DownloadLink> crawlARDMediathekJson2024(final CryptedLink param, final ArdMetadata metadata, final Object mediaCollection) throws Exception {

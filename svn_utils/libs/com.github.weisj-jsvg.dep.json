@@ -2,10 +2,25 @@
   "artefact":"com.github.weisj/jsvg",
   "dependencies":null,
   "filter":null,
-  "history":[],
-  "installed":{
+  "history":[{
     "changes":null,
     "date":"2024-08-16T17:31:45.247+02:00",
+    "dependencies":null,
+    "description":"A lightweight Java2D SVG renderer",
+    "files":null,
+    "hashes":{"jsvg.jar":"bb7e4a0afb9cd1ee2caa2cc7044befe4379080093795c6fb95ce1e475265dc82"},
+    "licenses":[{
+      "name":"MIT",
+      "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
+      "distribution":"repo"
+    }],
+    "minJRE":"JVM_1_8",
+    "name":"Jsvg",
+    "version":"1.6.1"
+  }],
+  "installed":{
+    "changes":"1.7.0\t: ## Changes:\r\n- `NullPlatformSupport` is now a singleton. Its constructor has been deprecated. Use `NullPlatformSupport.INSTANCE` instead. (by @VISTALL )\r\n\r\n## Fixed issues: \r\n- Parsing loop if `paint-order` is invalid (some cases) or `normal` #88",
+    "date":"2025-01-22T15:36:49.707+01:00",
     "dependencies":null,
     "description":"A lightweight Java2D SVG renderer",
     "files":[
@@ -52,7 +67,7 @@
       "jsvg.pom.sha512",
       "meta.json"
     ],
-    "hashes":{"jsvg.jar":"bb7e4a0afb9cd1ee2caa2cc7044befe4379080093795c6fb95ce1e475265dc82"},
+    "hashes":{"jsvg.jar":"9d5ea5f1d1ae516d5b94e5bdf6f611efc52715fa5e13db9129c003119f21d584"},
     "licenses":[{
       "name":"MIT",
       "url":"https://github.com/weisj/jsvg/blob/master/LICENSE",
@@ -60,7 +75,7 @@
     }],
     "minJRE":"JVM_1_8",
     "name":"Jsvg",
-    "version":"1.6.1"
+    "version":"1.7.0"
   },
   "minJRE":"1.8",
   "provider":"maven",

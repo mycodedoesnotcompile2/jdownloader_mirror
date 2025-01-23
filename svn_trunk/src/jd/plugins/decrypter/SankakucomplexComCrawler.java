@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50483 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50487 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -94,21 +94,22 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     public static String[] buildAnnotationUrls(final List<String[]> pluginDomains) {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : pluginDomains) {
-            String regex = "https?://(?:(beta|www|chan)\\.)?" + buildHostsPatternPart(domains) + "/(";
-            regex += "([a-z]{2,3}/)?books/[A-Za-z0-9]+";
-            regex += "|[a-z]{2}/?\\?tags=.+";
-            regex += "|[a-z0-9]{2,3}/books\\?tags=.+";
-            regex += "|[a-z0-9]{2,3}(?:/posts)?\\?tags=.+";
+            String regex = "https?://(?:(beta|www|chan)\\.)?" + buildHostsPatternPart(domains) + "(";
+            regex += TYPE_BOOK.pattern();
+            regex += "|";
+            regex += TYPE_TAGS_BOOKS.pattern();
+            regex += "|";
+            regex += TYPE_TAGS_POSTS.pattern();
             regex += ")";
             ret.add(regex);
         }
         return ret.toArray(new String[0]);
     }
 
-    private final Pattern      TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
-    private final String       TYPE_TAGS_BOOKS = "(?i)https?://[^/]+/([a-z0-9]{2,3})/books\\?tags=(.+)";
-    private final String       TYPE_TAGS_POSTS = "(?i)https?://[^/]+/(([a-z]{2,3})/)?.*tags=([^&]+)";
-    public static final String API_BASE        = "https://capi-v2.sankakucomplex.com";
+    private static final Pattern TYPE_BOOK       = Pattern.compile("/(([a-z]{2,3})/)?books/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_BOOKS = Pattern.compile("/(([a-z]{2,3})/)?books\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TYPE_TAGS_POSTS = Pattern.compile("/(([a-z]{2,3})/)?posts\\?tags=([^&]+)", Pattern.CASE_INSENSITIVE);
+    public static final String   API_BASE        = "https://capi-v2.sankakucomplex.com";
 
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
@@ -116,9 +117,10 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             final SankakucomplexCom hosterplugin = (SankakucomplexCom) this.getNewPluginForHostInstance(this.getHost());
             hosterplugin.login(account, false);
         }
-        if (param.getCryptedUrl().matches(TYPE_TAGS_BOOKS)) {
+        final String contenturl = param.getCryptedUrl();
+        if (new Regex(contenturl, TYPE_TAGS_BOOKS).patternFind()) {
             return crawlTagsBooksAPI(param);
-        } else if (new Regex(param.getCryptedUrl(), TYPE_BOOK).patternFind()) {
+        } else if (new Regex(contenturl, TYPE_BOOK).patternFind()) {
             return crawlBook(param);
         } else {
             return crawlTagsPosts(param, account);
@@ -134,7 +136,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_POSTS);
-        final String language = urlinfo.getMatch(1);
+        final String language = urlinfo.getMatch(0);
         String tags = urlinfo.getMatch(2);
         if (tags == null) {
             /* Developer mistake */
@@ -154,7 +156,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
     }
 
     private ArrayList<DownloadLink> crawlTagsPostsWebsite(final CryptedLink param, final String tags, final String language) throws Exception {
-        if (language == null || tags == null) {
+        if (tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
@@ -243,6 +245,9 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 position++;
             }
             String nextPageURL = br.getRegex("next-page-url=\"([^\"]+)\"").getMatch(0);
+            if (nextPageURL != null) {
+                nextPageURL = Encoding.htmlOnlyDecode(nextPageURL);
+            }
             logger.info("Crawled page " + page + " | Found items so far: " + ret.size() + "/" + numberofItemsStr + " | nextPageURL = " + nextPageURL);
             if (this.isAbort()) {
                 logger.info("Stopping because: Aborted by user");
@@ -259,7 +264,6 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
                 break pagination;
             } else {
                 /* Continue to next page */
-                nextPageURL = Encoding.htmlOnlyDecode(nextPageURL);
                 br.getPage(nextPageURL);
                 page++;
                 continue pagination;
@@ -354,8 +358,8 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_BOOKS);
-        final String languageFromURL = urlinfo.getMatch(0);
-        String tags = urlinfo.getMatch(1);
+        final String languageFromURL = urlinfo.getMatch(1);
+        String tags = urlinfo.getMatch(2);
         if (languageFromURL == null || tags == null) {
             /* Developer mistake */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);

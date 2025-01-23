@@ -38,6 +38,22 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import jd.controlling.AccountController;
+import jd.controlling.accountchecker.AccountCheckerThread;
+import jd.http.Browser;
+import jd.http.Browser.BrowserException;
+import jd.http.Request;
+import jd.http.StaticProxySelector;
+import jd.http.URLConnectionAdapter;
+import jd.http.requests.GetRequest;
+import jd.http.requests.PostRequest;
+import jd.nutils.encoding.Encoding;
+import jd.parser.html.Form;
+import jd.plugins.Account;
+import jd.plugins.DownloadLink;
+import jd.plugins.LinkStatus;
+import jd.plugins.PluginException;
+
 import org.appwork.exceptions.WTFException;
 import org.appwork.net.protocol.http.HTTPConstants;
 import org.appwork.storage.JSonStorage;
@@ -104,22 +120,6 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
-import jd.controlling.AccountController;
-import jd.controlling.accountchecker.AccountCheckerThread;
-import jd.http.Browser;
-import jd.http.Browser.BrowserException;
-import jd.http.Request;
-import jd.http.StaticProxySelector;
-import jd.http.URLConnectionAdapter;
-import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
-import jd.nutils.encoding.Encoding;
-import jd.parser.html.Form;
-import jd.plugins.Account;
-import jd.plugins.DownloadLink;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
 public class YoutubeHelper {
     static {
@@ -2655,117 +2655,6 @@ public class YoutubeHelper {
         vid.subtitles = loadSubtitles();
     }
 
-    private static boolean API_IOS_ENABLED = true;
-
-    /**
-     * https://github.com/zerodytrash/YouTube-Internal-Clients
-     *
-     *
-     * does not return opus audio codec
-     */
-    protected Request buildAPI_IOS_Request(final Browser br) throws Exception {
-        if (!API_IOS_ENABLED) {
-            logger.info("buildAPI_IOS_Request:disabled");
-            return null;
-        }
-        final Map<String, Object> post = new LinkedHashMap<String, Object>();
-        final Map<String, Object> client = new LinkedHashMap<String, Object>();
-        client.put("clientName", "IOS");
-        client.put("clientVersion", "19.45.4");
-        client.put("deviceMake", "Apple");
-        client.put("deviceModel", "iPhone16,2");
-        client.put("userAgent", "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)");
-        client.put("osName", "iPhone");
-        client.put("osVersion", "18.1.0.22B83");
-        client.put("hl", "en");
-        client.put("timeZone", "UTC");
-        client.put("utcOffsetMinutes", 0);
-        final Map<String, Object> context = new LinkedHashMap<String, Object>();
-        context.put("client", client);
-        post.put("context", context);
-        post.put("videoId", vid.videoID);
-        final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
-        contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
-        final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
-        playbackContext.put("contentPlaybackContext", contentPlaybackContext);
-        post.put("playbackContext", playbackContext);
-        post.put("contentCheckOk", true);
-        post.put("racyCheckOk", true);
-        final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
-        request.getHeaders().put("X-Youtube-Client-Name", "5");
-        request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
-        final String domain = "https://www.youtube.com";
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
-        final Account account = getAccountLoggedIn();
-        if (account != null) {
-            /* For logged in users: */
-            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
-            if (sapisidhash != null) {
-                request.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
-            }
-            request.getHeaders().put("X-Goog-Authuser", "0");
-        } else {
-            request.getHeaders().remove("Authorization");
-            request.getHeaders().put("X-Goog-Authuser", "0");
-        }
-        return request;
-    }
-
-    private static boolean API_MWEB_ENABLED = true;
-
-    /**
-     * does also return ultralow formats
-     *
-     * @param br
-     * @return
-     * @throws Exception
-     */
-    protected Request buildAPI_MWEB_Request(final Browser br) throws Exception {
-        if (!API_MWEB_ENABLED) {
-            logger.info("buildAPI_MWEB_Request:disabled");
-            return null;
-        }
-        final Map<String, Object> post = new LinkedHashMap<String, Object>();
-        final Map<String, Object> client = new LinkedHashMap<String, Object>();
-        client.put("clientName", "MWEB");
-        client.put("clientVersion", "2.20241202.07.00");
-        client.put("userAgent", "Mozilla/5.0 (iPad; CPU OS 16_7_10 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1,gzip(gfe)");
-        client.put("hl", "en");
-        client.put("timeZone", "UTC");
-        client.put("utcOffsetMinutes", 0);
-        final Map<String, Object> context = new LinkedHashMap<String, Object>();
-        context.put("client", client);
-        post.put("context", context);
-        post.put("videoId", vid.videoID);
-        final Map<String, Object> contentPlaybackContext = new LinkedHashMap<String, Object>();
-        contentPlaybackContext.put("html5Preferences", "HTML5_PREF_WANTS");
-        final Map<String, Object> playbackContext = new LinkedHashMap<String, Object>();
-        playbackContext.put("contentPlaybackContext", contentPlaybackContext);
-        post.put("playbackContext", playbackContext);
-        post.put("contentCheckOk", true);
-        post.put("racyCheckOk", true);
-        final PostRequest request = br.createJSonPostRequest("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", JSonStorage.serializeToJson(post));
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_USER_AGENT, (String) client.get("userAgent"));
-        request.getHeaders().put("X-Youtube-Client-Name", "2");
-        request.getHeaders().put("X-Youtube-Client-Version", (String) client.get("clientVersion"));
-        final String domain = "https://www.youtube.com";
-        request.getHeaders().put(HTTPConstants.HEADER_REQUEST_ORIGIN, domain);
-        final Account account = getAccountLoggedIn();
-        if (account != null) {
-            /* For logged in users: */
-            final String sapisidhash = GoogleHelper.getSAPISidHash(br, domain);
-            if (sapisidhash != null) {
-                request.getHeaders().put("Authorization", "SAPISIDHASH " + sapisidhash);
-            }
-            request.getHeaders().put("X-Goog-Authuser", "0");
-        } else {
-            request.getHeaders().remove("Authorization");
-            request.getHeaders().put("X-Goog-Authuser", "0");
-        }
-        return request;
-    }
-
     private static boolean API_TV_ENABLED = true;
 
     /**
@@ -2826,13 +2715,19 @@ public class YoutubeHelper {
             request.getHeaders().put("X-Goog-Authuser", "0");
         } else {
             request.getHeaders().remove("Authorization");
-            request.getHeaders().put("X-Goog-Authuser", "0");
+        }
+        String visitorData = br.getRegex("\"visitor_data\"\\s*,\\s*\"value\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+        if (visitorData == null) {
+            visitorData = br.getRegex("\"VISITOR_DATA\"\\s*:\\s*\"(.*?)\"").getMatch(0);
+        }
+        if (visitorData != null) {
+            request.getHeaders().put("X-Goog-Visitor-Id", visitorData);
         }
         return request;
     }
 
     protected int collectMapsFromAPIResponse(Browser br) throws InterruptedException, Exception {
-        if (!API_IOS_ENABLED && !API_TV_ENABLED) {
+        if (!API_TV_ENABLED) {
             logger.info("collectMapsFromAPIResponse:disabled");
             return -1;
         }
@@ -2860,28 +2755,6 @@ public class YoutubeHelper {
         } catch (Exception e) {
             API_TV_ENABLED = false;
             logger.log(e);
-        }
-        if (!vid.ageCheck || getAccountLoggedIn() != null) {
-            try {
-                final Browser brc = br.cloneBrowser();
-                final Request request = buildAPI_IOS_Request(brc);
-                if (request != null) {
-                    brc.getPage(request);
-                    if (brc.getRegex("\"status\"\\s*:\\s*\"LOGIN_REQUIRED\"").patternFind()) {
-                        // skip parsing
-                    } else if (request.getHttpConnection().getResponseCode() == 200) {
-                        final Map<String, Object> response = JSonStorage.restoreFromString(request.getHtmlCode(), TypeRef.MAP);
-                        ret += collectMapsFromPlayerResponse(response, "api.ios");
-                    } else {
-                        throw new Exception("auto disable api due to unexpected responseCode:" + request.getHttpConnection().getResponseCode());
-                    }
-                }
-            } catch (InterruptedException e) {
-                throw e;
-            } catch (Exception e) {
-                API_IOS_ENABLED = false;
-                logger.log(e);
-            }
         }
         return ret;
     }

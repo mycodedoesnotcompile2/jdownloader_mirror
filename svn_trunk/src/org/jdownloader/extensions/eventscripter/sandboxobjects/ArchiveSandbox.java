@@ -52,9 +52,12 @@ public class ArchiveSandbox {
         if (archiveFiles == null) {
             return ExtractionStatus.NA.name();
         }
-        for (ArchiveFileSandbox archiveFile : archiveFiles) {
+        for (final ArchiveFileSandbox archiveFile : archiveFiles) {
             if (archiveID.equals(archiveFile.getArchiveID())) {
-                return archiveFile.getExtractionStatus();
+                final String status = archiveFile.getExtractionStatus();
+                if (status != null && !ExtractionStatus.NA.name().equals(status)) {
+                    return status;
+                }
             }
         }
         return ExtractionStatus.NA.name();

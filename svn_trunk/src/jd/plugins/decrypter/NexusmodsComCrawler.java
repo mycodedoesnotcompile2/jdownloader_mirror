@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jd.PluginWrapper;
 import jd.controlling.AccountController;
@@ -42,7 +44,7 @@ import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.SizeFormatter;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@DecrypterPlugin(revision = "$Revision: 50485 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?(?:\\?tab=files&file_id=(\\d+))?" })
+@DecrypterPlugin(revision = "$Revision: 50499 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com/(?!contents)([^/]+)/mods/(\\d+)/?(?:\\?tab=files&file_id=(\\d+))?" })
 public class NexusmodsComCrawler extends PluginForDecrypt {
     public NexusmodsComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -52,13 +54,10 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String url = param.getCryptedUrl().replaceFirst("^http://", "https://");
         final PluginForHost plugin = this.getNewPluginForHostInstance(this.getHost());
-        ((jd.plugins.hoster.NexusmodsCom) plugin).setLogger(getLogger());
-        ((jd.plugins.hoster.NexusmodsCom) plugin).setBrowser(br);
         final String game_domain_name = new Regex(url, this.getSupportedLinks()).getMatch(0);
         final String mod_id = new Regex(url, this.getSupportedLinks()).getMatch(1);
         final String file_id = new Regex(url, this.getSupportedLinks()).getMatch(2);
         if (game_domain_name == null || mod_id == null) {
-            /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, "game_domain_name or mod_id missing");
         }
         final Account account = AccountController.getInstance().getValidAccount(plugin.getHost());
@@ -72,7 +71,8 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             final Iterator<DownloadLink> it = ret.iterator();
             while (it.hasNext()) {
                 final DownloadLink next = it.next();
-                if (!file_id.equals(next.getStringProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_file_id, null))) {
+                final String next_file_id = next.getStringProperty(jd.plugins.hoster.NexusmodsCom.PROPERTY_file_id, null);
+                if (!file_id.equals(next_file_id)) {
                     it.remove();
                 }
             }
@@ -171,24 +171,25 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         }
         final Browser br2 = br.cloneBrowser();
         ((jd.plugins.hoster.NexusmodsCom) plugin).getPage(br2, "/" + game_domain_name + "/mods/" + mod_id + "?tab=files");
-        final String[] categoryNames = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>([^>]+)</h2>").getColumn(0);
-        final String[] downloadCategoriesHTMLs = br2.getRegex("<dd[^>]*data-id=\"\\d+\"[^>]*>.*?</div>\\s*</dt>").getColumn(-1);
+        final String[] categoryNames = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>\\s*([^>]+)\\s*</h2>").getColumn(0);
+        final String[] downloadCategoriesHTMLs = br2.getRegex("<dd[^>]*data-id=\"\\d+\"[^>]*>.*?</div>\\s*</d(t|d)>").getColumn(-1);
         String description = br2.getRegex("<meta name=\"description\" content=\"([^\"]+)").getMatch(0);
         if (downloadCategoriesHTMLs != null && downloadCategoriesHTMLs.length > 0) {
             int index = -1;
-            for (final String downnloadTypeHTML : downloadCategoriesHTMLs) {
+            for (final String downloadTypeHTML : downloadCategoriesHTMLs) {
                 index++;
                 String category_name = null;
-                if (categoryNames != null && categoryNames.length == downloadCategoriesHTMLs.length) {
-                    category_name = categoryNames[index];
-                    category_name = Encoding.htmlDecode(category_name).trim();
+                final int downloadIndex = br2.getRequest().getHtmlCode().indexOf(downloadTypeHTML);
+                for (String categoryName : categoryNames) {
+                    final Matcher m = br2.getRegex("<div class=\"file-category-header\">\\s*<h2>\\s*" + Pattern.quote(categoryName) + "\\s*</h2>").getMatcher();
+                    if (m.find() && downloadIndex > m.end()) {
+                        category_name = categoryName;
+                    }
                 }
-                ret.addAll(websiteCrawlFiles(downnloadTypeHTML, category_name, index, mod_id, game_id, game_domain_name, mod_name));
+                ret.addAll(websiteCrawlFiles(br2, downloadTypeHTML, category_name, index, mod_id, game_id, game_domain_name, mod_name));
             }
         } else {
-            /* Fallback: Don't care about the categories, just find the files */
-            logger.warning("Failed to find categories");
-            ret.addAll(websiteCrawlFiles(br2.getRequest().getHtmlCode(), null, 0, mod_id, game_id, game_domain_name, mod_name));
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         if (ret.isEmpty()) {
             /*
@@ -211,7 +212,7 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
         return ret;
     }
 
-    private List<DownloadLink> websiteCrawlFiles(final String html_source, final String category_name, final int categoryIndex, final String mod_id, final String game_id, final String game_domain_name, final String mod_name) throws PluginException {
+    private List<DownloadLink> websiteCrawlFiles(final Browser br, final String html_source, final String category_name, final int categoryIndex, final String mod_id, final String game_id, final String game_domain_name, final String mod_name) throws PluginException {
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final FilePackage fp = FilePackage.getInstance();
         if (category_name != null) {
@@ -220,13 +221,9 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             fp.setName(game_domain_name + " - " + mod_name);
         }
         final String currentPath = game_domain_name + "/" + mod_name + "/" + category_name;
-        final String[] htmls = new Regex(html_source, "<dt id=\"file-expander-header-\\d+\".*?/use>\\s*</svg>\\s*</div>").getColumn(-1);
-        if (htmls == null || htmls.length == 0) {
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
         final String extDefault = ".zip";
         int position = 0;
-        for (final String html : htmls) {
+        for (final String html : new String[] { html_source }) {
             String file_id = new Regex(html, "\\?id=(\\d+)").getMatch(0);
             if (file_id == null) {
                 file_id = new Regex(html, "data-id=\"(\\d+)\"").getMatch(0);
@@ -239,17 +236,18 @@ public class NexusmodsComCrawler extends PluginForDecrypt {
             final String filename = new Regex(html, "data-url=\"([^\"]+)\"").getMatch(0);
             final DownloadLink link = createDownloadlink(generatePluginPatternMatcher(file_id, game_id));
             link.setContentUrl(generateContentURL(game_domain_name, mod_id, file_id));
-            final String filesizeStr = new Regex(html, ">\\s*File\\s*size\\s*</div>.*?\"stat\"\\s*>\\s*([0-9\\.TKGMB]+)").getMatch(0);
+            final String filesizeStr = br.getRegex("<dt id\\s*=\\s*\"file-expander-header-" + file_id + "\"[^>]*data-size\\s*=\\s*\"(\\d+)\"[^>]*>").getMatch(0);
             if (filesizeStr != null) {
-                link.setDownloadSize(SizeFormatter.getSize(filesizeStr));
-            } else {
-                logger.warning("Failed to find filesize");
+                link.setDownloadSize(SizeFormatter.getSize(filesizeStr + "kb"));
             }
+            String name;
             if (filename != null) {
-                link.setName(file_id + "_" + Encoding.htmlOnlyDecode(filename) + extDefault);
+                name = file_id + "_" + Encoding.htmlOnlyDecode(filename);
             } else {
-                link.setName(fp.getName() + "_" + file_id + "_" + position + extDefault);
+                name = fp.getName() + "_" + file_id + "_" + position;
             }
+            name = correctOrApplyFileNameExtension(name, extDefault, null);
+            link.setName(name);
             link.setAvailable(true);
             link.setRelativeDownloadFolderPath(currentPath);
             link._setFilePackage(fp);

@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
+import org.appwork.utils.formatter.SizeFormatter;
 import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.plugins.components.config.SankakucomplexComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -53,7 +54,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.decrypter.SankakucomplexComCrawler;
 
-@HostPlugin(revision = "$Revision: 50483 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
+@HostPlugin(revision = "$Revision: 50487 $", interfaceVersion = 2, names = { "sankakucomplex.com" }, urls = { "https?://(?:beta|chan|idol|www)\\.sankakucomplex\\.com/(?:[a-z]{2}/)?(?:post/show|posts)/([A-Za-z0-9]+)" })
 public class SankakucomplexCom extends PluginForHost {
     public SankakucomplexCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -150,7 +151,7 @@ public class SankakucomplexCom extends PluginForHost {
         final Account account = AccountController.getInstance().getValidAccount(this.getHost());
         if (status == AvailableStatus.TRUE && link.hasProperty(PROPERTY_IS_PREMIUMONLY) && allowUseAPI && !link.isSizeSet() && account != null) {
             /* Workaround for when some file information is missing when link leads to account-only content and is checked via API. */
-            logger.info("Failed to find filesize via API and item is only available via account while we have an account -> Checking status again via website in hope to obtain all information");
+            logger.info("Failed to find file size via API and item is only available via account while we have an account -> Checking status again via website in hope to obtain all information");
             return requestFileInformationWebsite(link, account, false);
         } else {
             return status;
@@ -247,6 +248,12 @@ public class SankakucomplexCom extends PluginForHost {
         final String filesizeBytesStr = br.getRegex("([0-9,]+) bytes").getMatch(0);
         if (filesizeBytesStr != null) {
             link.setDownloadSize(Long.parseLong(filesizeBytesStr.replace(",", "")));
+        } else {
+            /* Look for rough file size aka "177 KB". */
+            final String filesizeRoughStr = br.getRegex("\\d+x\\d+ \\((\\d+ [A-Za-z]{2,5}) [^\\)]*\\)").getMatch(0);
+            if (filesizeRoughStr != null) {
+                link.setDownloadSize(SizeFormatter.getSize(filesizeRoughStr));
+            }
         }
         /* Crawl tags */
         String tagsNewlineSeparatedStr = br.getRegex("<textarea[^>]*id=\"post_tags\"[^>]*>([^<]+)</textarea>").getMatch(0);
@@ -266,7 +273,7 @@ public class SankakucomplexCom extends PluginForHost {
         }
         if (dllink != null) {
             link.setProperty(PROPERTY_DIRECTURL, dllink);
-            if (filesizeBytesStr == null && !isDownload) {
+            if (!isDownload && !link.isSizeSet()) {
                 /* Obtain file size from header */
                 try {
                     final Browser brc = br.cloneBrowser();

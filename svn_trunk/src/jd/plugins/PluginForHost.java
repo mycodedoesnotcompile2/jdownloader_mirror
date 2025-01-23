@@ -84,6 +84,7 @@ import org.appwork.uio.ConfirmDialogInterface;
 import org.appwork.uio.InputDialogInterface;
 import org.appwork.uio.UIOManager;
 import org.appwork.utils.Application;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.Exceptions;
 import org.appwork.utils.Files;
 import org.appwork.utils.Hash;
@@ -3204,6 +3205,7 @@ public abstract class PluginForHost extends Plugin {
         boolean shouldShowTrafficLimitColumns = false;
         boolean shouldShowTrafficCaculationColumn = false;
         boolean shouldShowUnavailableForColumn = false;
+        boolean containsItemsWithCustomStatusText = false;
         for (final MultiHostHost mhost : hosts) {
             if (!shouldShowLinkLimitColumns && !mhost.isUnlimitedLinks()) {
                 shouldShowLinkLimitColumns = true;
@@ -3217,6 +3219,9 @@ public abstract class PluginForHost extends Plugin {
             if (!shouldShowUnavailableForColumn && mhost.getUnavailableTimeMillis() > 0) {
                 shouldShowUnavailableForColumn = true;
             }
+            if (!containsItemsWithCustomStatusText && mhost.getStatusText() != null) {
+                containsItemsWithCustomStatusText = true;
+            }
             if (shouldShowTrafficLimitColumns && shouldShowLinkLimitColumns && shouldShowTrafficCaculationColumn && shouldShowUnavailableForColumn) {
                 break;
             }
@@ -3225,6 +3230,7 @@ public abstract class PluginForHost extends Plugin {
         final boolean shouldShowTrafficLimitColumns_final = shouldShowTrafficLimitColumns;
         final boolean shouldShowTrafficCaculationColumn_final = shouldShowTrafficCaculationColumn;
         final boolean shouldShowUnavailableForColumn_final = shouldShowUnavailableForColumn;
+        final boolean shouldShowUInternalStatusColumn_final = containsItemsWithCustomStatusText;
         final Icon icon_error = NewTheme.I().getIcon(IconKey.ICON_ERROR, 16);
         final Icon icon_okay = NewTheme.I().getIcon(IconKey.ICON_OK, 16);
         final Icon icon_warning = NewTheme.I().getIcon(IconKey.ICON_WARNING, 16);
@@ -3355,9 +3361,7 @@ public abstract class PluginForHost extends Plugin {
                     public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int column) {
                         super.configureRendererComponent(value, isSelected, hasFocus, row, column);
                         final MultihosterHostStatus status = value.getStatus();
-                        if (status == MultihosterHostStatus.WORKING_UNSTABLE) {
-                            rendererField.setForeground(Color.ORANGE);
-                        } else if (status != MultihosterHostStatus.WORKING) {
+                        if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
                             rendererField.setForeground(Color.RED);
                         } else {
                             rendererField.setForeground(defaultColor);
@@ -3387,6 +3391,37 @@ public abstract class PluginForHost extends Plugin {
                         return mhost.isEnabled();
                     }
                 });
+                if (DebugMode.TRUE_IN_IDE_ELSE_FALSE && shouldShowUInternalStatusColumn_final) {
+                    /* This column exists for debugging purposes only! */
+                    addColumn(new ExtTextColumn<MultiHostHost>("Internal status") {
+                        @Override
+                        public String getStringValue(final MultiHostHost mhost) {
+                            return mhost.getStatus().getLabel();
+                        }
+
+                        private final Color defaultColor;
+                        {
+                            renderer.setLayout(new MigLayout("ins 0", "[grow,fill][]", "[grow,fill]"));
+                            defaultColor = rendererField.getForeground();
+                        }
+
+                        @Override
+                        public void configureRendererComponent(MultiHostHost value, boolean isSelected, boolean hasFocus, int row, int column) {
+                            super.configureRendererComponent(value, isSelected, hasFocus, row, column);
+                            final MultihosterHostStatus status = value.getStatus();
+                            if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
+                                rendererField.setForeground(Color.RED);
+                            } else {
+                                rendererField.setForeground(defaultColor);
+                            }
+                        }
+
+                        @Override
+                        public boolean isEnabled(final MultiHostHost mhost) {
+                            return mhost.isEnabled();
+                        }
+                    });
+                }
                 if (shouldShowUnavailableForColumn_final) {
                     addColumn(new ExtLongColumn<MultiHostHost>(_GUI.T.multihost_detailed_host_info_table_column_unavailable_for()) {
                         @Override

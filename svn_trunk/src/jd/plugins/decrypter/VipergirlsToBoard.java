@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.appwork.utils.Regex;
+import org.appwork.utils.StringUtils;
+
 import jd.PluginWrapper;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
@@ -16,10 +19,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-import org.appwork.utils.Regex;
-import org.appwork.utils.StringUtils;
-
-@DecrypterPlugin(revision = "$Revision: 50484 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50487 $", interfaceVersion = 3, names = {}, urls = {})
 public class VipergirlsToBoard extends PluginForDecrypt {
     public VipergirlsToBoard(PluginWrapper wrapper) {
         super(wrapper);
@@ -125,7 +125,7 @@ public class VipergirlsToBoard extends PluginForDecrypt {
                     title = Encoding.htmlDecode(title).trim();
                     fp = FilePackage.getInstance();
                     fp.setName(title);
-                    fp.setComment("https://vipergirls.to/threads/" + threadID + "?p=" + postID + "&viewfull=1#post" + postID);
+                    fp.setComment("https://" + br.getHost(true) + "/threads/" + threadID + "?p=" + postID + "&viewfull=1#post" + postID);
                 }
                 final String[] results = new Regex(postContent, "<a href=\"(https?://[^\"]+)").getColumn(0);
                 for (final String result : results) {

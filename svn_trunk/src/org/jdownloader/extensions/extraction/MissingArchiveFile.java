@@ -92,7 +92,7 @@ public class MissingArchiveFile implements ArchiveFile {
         return name;
     }
 
-    private volatile ExtractionStatus status = ExtractionStatus.NA;
+    private volatile ExtractionStatus status = null;
 
     @Override
     public void setStatus(ExtractionController controller, ExtractionStatus status) {
@@ -101,10 +101,10 @@ public class MissingArchiveFile implements ArchiveFile {
 
     public ExtractionStatus getStatus() {
         final ExtractionStatus status = this.status;
-        if (status == null) {
-            return ExtractionStatus.NA;
+        if (status != null) {
+            return status;
         }
-        return status;
+        return ExtractionStatus.NA;
     }
 
     @Override

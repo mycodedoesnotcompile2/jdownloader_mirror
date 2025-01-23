@@ -22,6 +22,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,6 +57,7 @@ import jd.controlling.AccountController;
 import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Request;
+import jd.http.requests.GetRequest;
 import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
@@ -77,7 +79,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50396 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50491 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1214,7 +1216,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         /* Login is mandatory! */
         loginOrFail(account, loggedIN);
         getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final Qdb qdb = getQueryHash(br, Qdb.QUERY.USER);
         final Map<String, Object> entries = restoreFromString(websiteGetJson(), TypeRef.MAP);
         final Map<String, Object> data = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "entry_data/TagPage/{0}/data");
@@ -1261,17 +1263,17 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.info("Stopping because: Found no new links on current page: " + page);
                 break;
             }
-            decryptedLinksLastSize = decryptedLinks.size();
+            decryptedLinksLastSize = ret.size();
             for (final Object o : resource_data_list) {
                 final List<Object> medias = (List<Object>) JavaScriptEngineFactory.walkJson(o, "layout_content/medias/");
                 if (medias != null) {
                     for (final Object media : medias) {
-                        decryptedLinks.addAll(this.crawlPost(param, metadata, (Map<String, Object>) JavaScriptEngineFactory.walkJson(media, "media/")));
+                        ret.addAll(this.crawlPost(param, metadata, (Map<String, Object>) JavaScriptEngineFactory.walkJson(media, "media/")));
                     }
                 }
             }
             crawledNumberofPosts += resource_data_list.size();
-            logger.info("Crawled page " + page + " | Number of posts crawled so far: " + crawledNumberofPosts + "/" + totalNumberofPosts + " | Items crawled so far: " + decryptedLinks.size());
+            logger.info("Crawled page " + page + " | Number of posts crawled so far: " + crawledNumberofPosts + "/" + totalNumberofPosts + " | Items crawled so far: " + ret.size());
             if (!Boolean.TRUE.equals(more_available)) {
                 logger.info("Stopping because: Reached end");
                 break;
@@ -1281,16 +1283,86 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             } else if (next_page == null) {
                 logger.info("Stopping because: Failed to find next_page");
                 break;
-            } else if (decryptedLinks.size() == decryptedLinksLastSize) {
+            } else if (ret.size() == decryptedLinksLastSize) {
                 logger.info("Stopping because: Failed to find any new items this run");
                 break;
-            } else if (decryptedLinks.size() >= maxItemsLimit) {
+            } else if (ret.size() >= maxItemsLimit) {
                 logger.info("Stopping because: Number of items selected in plugin setting has been crawled --> Done");
                 break;
             }
             page++;
         } while (!this.isAbort());
-        return decryptedLinks;
+        return ret;
+    }
+
+    /**
+     * Crawls all items found when searching for a specific term in the Instagram search bar.
+     */
+    private ArrayList<DownloadLink> crawlSearchWebsite(final CryptedLink param, final Account account, final AtomicBoolean loggedIN, final String searchTerm) throws UnsupportedEncodingException, Exception {
+        if (StringUtils.isEmpty(searchTerm)) {
+            /* Developer mistake */
+            throw new IllegalArgumentException();
+        }
+        /* Login is mandatory! */
+        loginOrFail(account, loggedIN);
+        getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        final InstagramMetadata metadata = new InstagramMetadata();
+        metadata.setHashtag(searchTerm);
+        metadata.setPackageName(getPackagenameHashtag(metadata));
+        int page = 1;
+        final long maxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getHashtagCrawlerMaxItemsLimit();
+        final UrlQuery query = new UrlQuery();
+        query.appendEncoded("enable_metadata", "true");
+        query.appendEncoded("query", searchTerm);
+        final HashSet<String> dupes = new HashSet<String>();
+        do {
+            br.getPage("https://www.instagram.com/api/v1/fbsearch/web/top_serp/?" + query.toString());
+            final GetRequest req = br.createGetRequest("https://www.instagram.com/api/v1/fbsearch/web/top_serp/?" + query.toString());
+            req.getHeaders().put("Origin", "https://www." + this.getHost());
+            req.getHeaders().put("Referer", "https://www." + this.getHost());
+            br.setCurrentURL("https://www." + this.getHost());
+            // TODO: Check/fix this
+            getPageAutoLogin(account, loggedIN, "/api/v1/tags", param, br, req, null, null);
+            InstaGramCom.checkErrors(this, br);
+            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> media_grid = (Map<String, Object>) entries.get("media_grid");
+            final List<Map<String, Object>> sections = (List<Map<String, Object>>) media_grid.get("sections");
+            String next_max_id = (String) media_grid.get("next_max_id");
+            int numberofNewItemsThisPage = 0;
+            for (final Map<String, Object> section : sections) {
+                final List<Object> medias = (List<Object>) JavaScriptEngineFactory.walkJson(section, "layout_content/medias");
+                if (medias == null) {
+                    /* Skip items we cannot handle */
+                    continue;
+                }
+                for (final Object mediaO : medias) {
+                    final Map<String, Object> media = (Map<String, Object>) mediaO;
+                    final Map<String, Object> media_inner = (Map<String, Object>) media.get("media");
+                    if (!dupes.add(media_inner.get("id").toString())) {
+                        continue;
+                    }
+                    numberofNewItemsThisPage++;
+                    ret.addAll(this.crawlPost(param, metadata, media_inner));
+                }
+            }
+            logger.info("Crawled page " + page + " | New items this page: " + numberofNewItemsThisPage + " | Number of items crawled so far: " + dupes.size() + "/?" + " | Items crawled so far: " + ret.size());
+            if (!Boolean.TRUE.equals(media_grid.get("has_more"))) {
+                logger.info("Stopping because: Reached end");
+                break;
+            } else if (next_max_id == null) {
+                logger.info("Stopping because: Failed to find next_max_id");
+                break;
+            } else if (numberofNewItemsThisPage == 0) {
+                logger.info("Stopping because: Failed to find any new items on current page");
+                break;
+            } else if (ret.size() >= maxItemsLimit) {
+                logger.info("Stopping because: Number of items selected in plugin setting has been crawled --> Done");
+                break;
+            }
+            page++;
+        } while (!this.isAbort());
+        return ret;
     }
 
     private String getPackagenameHashtag(final InstagramMetadata metadata) {

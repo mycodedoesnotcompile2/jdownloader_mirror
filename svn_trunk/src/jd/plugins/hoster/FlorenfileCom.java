@@ -32,7 +32,7 @@ import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 47633 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50491 $", interfaceVersion = 3, names = {}, urls = {})
 public class FlorenfileCom extends XFileSharingProBasic {
     public FlorenfileCom(final PluginWrapper wrapper) {
         super(wrapper);
@@ -51,6 +51,13 @@ public class FlorenfileCom extends XFileSharingProBasic {
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "florenfile.com", "lafile.com" });
         return ret;
+    }
+    
+    @Override
+    protected List<String> getDeadDomains() {
+        final ArrayList<String> deadDomains = new ArrayList<String>();
+        deadDomains.add("lafile.com");
+        return deadDomains;
     }
 
     public static String[] getAnnotationNames() {
