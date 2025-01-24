@@ -1175,11 +1175,11 @@ public abstract class PluginForHost extends Plugin {
                 return false;
             }
             final MultihosterHostStatus status = mhost.getStatus();
-            if (mhost.getUnavailableTimeMillis() > 0) {
-                throw new ConditionalSkipReasonException(new WaitingSkipReasonMultihostHostUnavailable(account, downloadLink.getHost(), mhost.getUnavailableStatusText(), mhost.getUnavailableUntilTimestamp()));
-            } else if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
+            if (status != MultihosterHostStatus.WORKING && status != MultihosterHostStatus.WORKING_UNSTABLE) {
                 /* Download of that host is permanently not possible. */
                 return false;
+            } else if (mhost.getUnavailableTimeMillis() > 0) {
+                throw new ConditionalSkipReasonException(new WaitingSkipReasonMultihostHostUnavailable(account, downloadLink.getHost(), mhost.getUnavailableStatusText(), mhost.getUnavailableUntilTimestamp()));
             }
         }
         return true;

@@ -5,15 +5,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
+import org.appwork.storage.Storable;
+import org.appwork.utils.StringUtils;
+
 import jd.plugins.Account;
 import jd.plugins.Account.AccountError;
 import jd.plugins.AccountInfo;
 import jd.plugins.MultiHostHost;
 import jd.plugins.MultiHostHostData;
-
-import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
-import org.appwork.storage.Storable;
-import org.appwork.utils.StringUtils;
 
 public class AccountData implements Storable {
     // Variables
@@ -47,6 +47,7 @@ public class AccountData implements Storable {
     }
 
     // Getter and Setter methods
+    @AllowNonStorableObjects
     public Map<String, Object> getProperties() {
         return properties;
     }

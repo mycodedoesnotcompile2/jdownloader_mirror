@@ -8,14 +8,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
-import jd.http.Browser;
-import jd.http.Cookie;
-import jd.http.Cookies;
-
 import org.appwork.remoteapi.annotations.AllowNonStorableObjects;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.net.URLHelper;
 import org.jdownloader.controlling.UniqueAlltimeID;
+
+import jd.http.Browser;
+import jd.http.Cookie;
+import jd.http.Cookies;
 
 public class LinkCrawlerRule {
     public static enum RULE {
@@ -85,6 +85,7 @@ public class LinkCrawlerRule {
         }
     }
 
+    @AllowNonStorableObjects
     public Map<String, Object> getPropertyPatterns() {
         if (propertyPatterns == null) {
             return null;

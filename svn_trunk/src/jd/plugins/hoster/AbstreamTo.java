@@ -21,17 +21,14 @@ import java.util.List;
 import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.Browser;
-import jd.nutils.encoding.Encoding;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
 
 @HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 3, names = {}, urls = {})
-public class FsvidLol extends XFileSharingProBasic {
-    public FsvidLol(final PluginWrapper wrapper) {
+public class AbstreamTo extends XFileSharingProBasic {
+    public AbstreamTo(final PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium(super.getPurchasePremiumURL());
     }
@@ -40,13 +37,13 @@ public class FsvidLol extends XFileSharingProBasic {
      * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: null 4dignum reCaptchaV2, hcaptcha<br />
+     * captchatype-info: 2025-02-22: null <br />
      * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
-        ret.add(new String[] { "fsvid.lol" });
+        ret.add(new String[] { "abstream.to" });
         return ret;
     }
 
@@ -106,29 +103,5 @@ public class FsvidLol extends XFileSharingProBasic {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    public String[] scanInfo(final String html, final String[] fileInfo) {
-        super.scanInfo(html, fileInfo);
-        final String betterFilename = new Regex(html, ">\\s*Informations sur votre fichier : ([^<]+)</th>").getMatch(0);
-        if (betterFilename != null) {
-            fileInfo[0] = Encoding.htmlDecode(betterFilename).trim();
-        }
-        return fileInfo;
-    }
-
-    @Override
-    protected String getDllink(final DownloadLink link, final Account account, final Browser br, String src) {
-        String dllink = br.getRegex("<a href=\"(https?://[^\"]+)\">\\s*Lancer le téléchargement").getMatch(0);
-        if (dllink == null) {
-            /* 2025-01-23 */
-            dllink = br.getRegex("id=\"customDownloadSpan\"[^>]*>\\s*<a href=\"(https://[^\"]+)").getMatch(0);
-        }
-        if (dllink != null) {
-            return dllink;
-        } else {
-            return super.getDllink(link, account, br, src);
-        }
     }
 }

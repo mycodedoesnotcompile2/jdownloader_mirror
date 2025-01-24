@@ -87,7 +87,7 @@ import jd.plugins.download.DownloadInterface;
 import jd.plugins.download.DownloadLinkDownloadable;
 import jd.plugins.download.HashInfo;
 
-@HostPlugin(revision = "$Revision: 50480 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50505 $", interfaceVersion = 3, names = { "alldebrid.com" }, urls = { "https?://alldebrid\\.com/f/([A-Za-z0-9\\-_]+)" })
 public class AllDebridCom extends PluginForHost {
     public AllDebridCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -320,7 +320,9 @@ public class AllDebridCom extends PluginForHost {
             logger.info("Performing full login");
             final Map<String, Object> data = this.callAPI("/pin/get", account, null);
             final String user_url = data.get("user_url").toString();
-            final String check_url = data.get("check_url").toString();
+            final UrlQuery query = new UrlQuery();
+            query.appendEncoded("check", data.get("check").toString());
+            query.appendEncoded("pin", data.get("pin").toString());
             final int maxSecondsServerside = ((Number) data.get("expires_in")).intValue();
             final int maxWaitSecondsClientside = 1200;
             final int waitSecondsForDialog = Math.min(maxSecondsServerside, maxWaitSecondsClientside);
@@ -332,13 +334,8 @@ public class AllDebridCom extends PluginForHost {
                     logger.info("Waiting for user to authorize application. Seconds waited: " + secondsWaited + "/" + maxSecondsServerside);
                     Thread.sleep(waitSecondsPerLoop * 1000);
                     secondsWaited += waitSecondsPerLoop;
-                    br.getPage(check_url);
-                    if (secondsWaited >= maxSecondsServerside) {
-                        logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
-                        break;
-                    }
                     /** Example response: { "status": "success", "data": { "activated": false, "expires_in": 590 }}} */
-                    final Map<String, Object> resp = this.handleErrors(account, null);
+                    final Map<String, Object> resp = this.callAPI("/pin/check", query, account, null);
                     apikey = (String) resp.get("apikey");
                     final int secondsLeftServerside = ((Number) data.get("expires_in")).intValue();
                     if (!StringUtils.isEmpty(apikey)) {
@@ -359,6 +356,9 @@ public class AllDebridCom extends PluginForHost {
                     } else if (this.isAbort()) {
                         logger.info("Stopping because: Aborted by user");
                         throw new InterruptedException();
+                    } else if (secondsWaited + waitSecondsPerLoop >= maxSecondsServerside) {
+                        logger.info("Stopping because: Timeout #1 | User did not perform authorization within " + maxSecondsServerside + " seconds");
+                        break;
                     }
                 }
             } finally {
@@ -802,7 +802,7 @@ public class AllDebridCom extends PluginForHost {
         final URL url = new URL(dllink);
         if (StringUtils.equals("https", url.getProtocol())) {
             logger.info("https for final downloadurls is disabled:" + dllink);
-            String newDllink = dllink.replaceFirst("https://", "http://");
+            String newDllink = dllink.replaceFirst("(?i)https://", "http://");
             if (url.getPort() != -1) {
                 // remove custom https port
                 newDllink = dllink.replace(":" + url.getPort() + "/", "/");
@@ -948,12 +948,12 @@ public class AllDebridCom extends PluginForHost {
 
     private int getMaxChunks(final Account account, final DownloadLink link, final URL downloadURL) {
         /* 2024-05-17: Chunks limited to 16 RE: admin, limit is 32/IP/Server */
-        final int defaultMaxChunks = -16;
-        int chunks = link.getIntegerProperty(PROPERTY_maxchunks, defaultMaxChunks);
-        if (chunks <= 0) {
+        final int defaultMaxChunks = 16;
+        int chunks = Math.abs(link.getIntegerProperty(PROPERTY_maxchunks, defaultMaxChunks));
+        if (chunks > 1 && defaultMaxChunks > 1) {
+            chunks = -Math.min(chunks, defaultMaxChunks);
+        } else {
             chunks = 1;
-        } else if (chunks > 1) {
-            chunks = -chunks;
         }
         if (chunks != 1) {
             /* Check if we are rate limited */

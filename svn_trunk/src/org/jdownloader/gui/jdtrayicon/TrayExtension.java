@@ -34,6 +34,7 @@ import java.awt.event.ComponentListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowStateListener;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -45,12 +46,7 @@ import javax.swing.Icon;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
-import jd.SecondLevelLaunch;
-import jd.gui.swing.jdgui.JDGui;
-import jd.gui.swing.jdgui.MainFrameClosingHandler;
-import jd.gui.swing.jdgui.views.settings.sidebar.CheckBoxedEntry;
-import jd.plugins.AddonPanel;
-
+import org.appwork.loggingv3.LogV3;
 import org.appwork.storage.config.ValidationException;
 import org.appwork.storage.config.events.GenericConfigEventListener;
 import org.appwork.storage.config.handler.KeyHandler;
@@ -89,6 +85,12 @@ import org.jdownloader.logging.LogController;
 import org.jdownloader.settings.staticreferences.CFG_GUI;
 import org.jdownloader.updatev2.RestartController;
 import org.jdownloader.updatev2.SmartRlyExitRequest;
+
+import jd.SecondLevelLaunch;
+import jd.gui.swing.jdgui.JDGui;
+import jd.gui.swing.jdgui.MainFrameClosingHandler;
+import jd.gui.swing.jdgui.views.settings.sidebar.CheckBoxedEntry;
+import jd.plugins.AddonPanel;
 
 public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTranslation> implements TrayMouseListener, WindowStateListener, ActionListener, MainFrameClosingHandler, CheckBoxedEntry, GenericConfigEventListener<Boolean> {
     @Override
@@ -215,9 +217,19 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                         try {
                             removeTrayIcon();
                             final SystemTray systemTray = SystemTray.getSystemTray();
-                            final int trayIconWidth = (int) systemTray.getTrayIconSize().getWidth();
-                            final int trayIconHeight = (int) systemTray.getTrayIconSize().getHeight();
+                            int trayIconWidth = (int) systemTray.getTrayIconSize().getWidth();
+                            int trayIconHeight = (int) systemTray.getTrayIconSize().getHeight();
                             final BufferedImage img;
+                            if (CrossSystem.isWindows()) {
+                                try {
+                                    // Improve HighDPI Tray Icon image quality
+                                    AffineTransform tx = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().getDefaultTransform();
+                                    trayIconHeight *= tx.getScaleY();
+                                    trayIconWidth *= tx.getScaleX();
+                                } catch (Exception e) {
+                                    LogV3.log(e);
+                                }
+                            }
                             if (getSettings().isGreyIconEnabled()) {
                                 img = ImageProvider.convertToGrayScale(IconIO.getScaledInstance(NewTheme.I().getImage("logo/jd_logo_128_128", -1), trayIconWidth, trayIconHeight));
                             } else {
@@ -345,11 +357,11 @@ public class TrayExtension extends AbstractExtension<TrayConfig, TrayiconTransla
                             /*
                              * on Gnome3, Unity, this can happen because icon might be blacklisted, see here
                              * http://www.webupd8.org/2011/04/how-to-re-enable -notification-area.html
-                             * 
+                             *
                              * dconf-editor", then navigate to desktop > unity > panel and whitelist JDownloader
-                             * 
+                             *
                              * also see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7103610
-                             * 
+                             *
                              * TODO: maybe add dialog to inform user
                              */
                             LogController.CL().log(e);

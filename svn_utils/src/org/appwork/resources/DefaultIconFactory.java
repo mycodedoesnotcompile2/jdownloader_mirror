@@ -4,9 +4,9 @@
  *         "AppWork Utilities" License
  *         The "AppWork Utilities" will be called [The Product] from now on.
  * ====================================================================================================================================================
- *         Copyright (c) 2009-2015, AppWork GmbH <e-mail@appwork.org>
- *         Schwabacher Straße 117
- *         90763 Fürth
+ *         Copyright (c) 2009-2024, AppWork GmbH <e-mail@appwork.org>
+ *         Spalter Strasse 58
+ *         91183 Abenberg
  *         Germany
  * === Preamble ===
  *     This license establishes the terms under which the [The Product] Source Code & Binary files may be used, copied, modified, distributed, and/or redistributed.
@@ -37,7 +37,6 @@ import java.awt.Image;
 import java.net.URL;
 
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 
 import org.appwork.utils.ImageProvider.ImageProvider;
@@ -79,9 +78,6 @@ public class DefaultIconFactory implements IconFactory {
      */
     @Override
     public Image toImage(Icon icon) {
-        if (icon instanceof ImageIcon) {
-            ((ImageIcon) icon).getImage();
-        }
         return IconIO.toBufferedImage(icon);
     }
 }

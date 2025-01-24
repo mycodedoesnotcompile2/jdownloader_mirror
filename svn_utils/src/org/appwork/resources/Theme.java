@@ -315,7 +315,8 @@ public class Theme implements MinTimeWeakReferenceCleanup {
     }
 
     public Image getImage(final String relativePath, final int size) {
-        return this.getImage(relativePath, size, false);
+        // test if using the cache causes issues in the ide. if not, we may set it to true as default some day
+        return this.getImage(relativePath, size, Application.isJared(null) ? false : true);
     }
 
     public Image getImage(final String key, final int size, final boolean useCache) {

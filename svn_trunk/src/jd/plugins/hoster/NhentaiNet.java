@@ -32,7 +32,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginDependencies;
 import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 48276 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 3, names = {}, urls = {})
 @PluginDependencies(dependencies = { jd.plugins.decrypter.NhentaiNet.class })
 public class NhentaiNet extends antiDDoSForHost {
     public NhentaiNet(PluginWrapper wrapper) {
@@ -75,7 +75,7 @@ public class NhentaiNet extends antiDDoSForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://nhentai.net/";
+        return "https://" + this.getHost() + "/";
     }
 
     @Override

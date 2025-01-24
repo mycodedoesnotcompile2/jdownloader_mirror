@@ -16,11 +16,12 @@
 package jd.plugins.hoster;
 
 import java.awt.Color;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -44,6 +45,8 @@ import jd.plugins.DownloadLink.AvailableStatus;
 import jd.plugins.HostPlugin;
 import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
+import jd.plugins.PluginForHost;
+import jd.plugins.decrypter.NexusmodsComCrawler;
 
 import org.appwork.storage.TypeRef;
 import org.appwork.swing.MigPanel;
@@ -55,11 +58,9 @@ import org.appwork.utils.parser.UrlQuery;
 import org.jdownloader.captcha.v2.challenge.recaptcha.v2.CaptchaHelperHostPluginRecaptchaV2;
 import org.jdownloader.gui.InputChangedCallbackInterface;
 import org.jdownloader.plugins.accounts.AccountBuilderInterface;
-import org.jdownloader.plugins.components.antiDDoSForHost;
-import org.jdownloader.scripting.JavaScriptEngineFactory;
 
-@HostPlugin(revision = "$Revision: 50484 $", interfaceVersion = 3, names = { "nexusmods.com" }, urls = { "https?://(?:www\\.)?nexusmods\\.com+/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+|nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=\\d+" })
-public class NexusmodsCom extends antiDDoSForHost {
+@HostPlugin(revision = "$Revision: 50510 $", interfaceVersion = 3, names = {}, urls = {})
+public class NexusmodsCom extends PluginForHost {
     public NexusmodsCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://users.nexusmods.com/register/memberships");
@@ -70,123 +71,166 @@ public class NexusmodsCom extends antiDDoSForHost {
         return "https://help.nexusmods.com/article/18-terms-of-service";
     }
 
-    /* Connection stuff */
-    private final int          FREE_MAXDOWNLOADS            = -1;
-    private static final int   ACCOUNT_PREMIUM_MAXDOWNLOADS = -1;
-    /* API documentation: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0 */
-    public static final String API_BASE                     = "https://api.nexusmods.com/v1";
-    public static final String PROPERTY_game_domain_name    = "game_domain_name";
-    public static final String PROPERTY_mod_id              = "mod_id";
-    public static final String PROPERTY_file_id             = "file_id";
-    private String             dllink;
-
     @Override
-    public String getLinkID(final DownloadLink link) {
-        final String file_id = getFileID(link);
-        if (file_id != null) {
-            final String linkid = this.getHost() + "://" + file_id;
-            if (this.isSpecialNexusModmanagerDownloadURL(link)) {
-                /*
-                 * Free (account) users can add URLs which can expire. Allow them to add them again with new download_key parameters to make
-                 * this easier.
-                 */
-                String dlKey = null;
-                try {
-                    dlKey = UrlQuery.parse(link.getPluginPatternMatcher()).get("key");
-                } catch (final MalformedURLException ignore) {
-                }
-                return linkid + "_" + dlKey;
-            } else {
-                return linkid;
-            }
-        } else {
-            return super.getLinkID(link);
-        }
-    }
-
-    /* URLs for their official downloadmanager --> We support them too --> Also see linkIsAPICompatible */
-    private boolean isSpecialNexusModmanagerDownloadURL(final DownloadLink link) {
-        return link.getPluginPatternMatcher() != null && link.getPluginPatternMatcher().matches("nxm://.+");
-    }
-
-    /** Returns the file_id (this comment is here as the URL contains multiple IDs) */
-    private String getFileID(final DownloadLink link) {
-        if (isSpecialNexusModmanagerDownloadURL(link)) {
-            return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(3);
-        } else {
-            return new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(0);
-        }
-    }
-
-    public static Browser prepBrAPI(final Browser br, final Account account) throws PluginException {
-        prepBRGeneral(br);
-        br.getHeaders().put("User-Agent", "JDownloader");
-        final String apikey = getApikey(account);
-        if (apikey == null) {
-            /* This should never happen */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        br.getHeaders().put("apikey", apikey);
-        return br;
-    }
-
-    public static boolean isOfflineWebsite(final Browser br) {
-        return br.getHttpConnection().getResponseCode() == 404 || br.containsHTML("(?i)No files have been uploaded yet|>File not found<|>Not found<|/noimage-1.png");
-    }
-
-    @Override
-    public void correctDownloadLink(final DownloadLink link) throws Exception {
-        if (this.isSpecialNexusModmanagerDownloadURL(link)) {
-            final String gameDomainName = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(1);
-            final String modID = new Regex(link.getPluginPatternMatcher(), this.getSupportedLinks()).getMatch(2);
-            link.setProperty(PROPERTY_game_domain_name, gameDomainName);
-            link.setProperty(PROPERTY_mod_id, modID);
-            /* Create a meaningful ContentURL in case the URL expires and the user wants to refresh it later. */
-            link.setContentUrl("https://www." + this.getHost() + "/" + gameDomainName + "/mods/" + modID + "?tab=files&file_id=" + this.getFileID(link) + "&nmm=1");
-        } else if (StringUtils.contains(link.getPluginPatternMatcher(), "nmm=1")) {
-            link.setPluginPatternMatcher(link.getPluginPatternMatcher().replace("nmm=1", "nmm=0"));
-        }
-    }
-
-    /** Account is either required because the files are 'too large' or also for 'adult files', or for 'no reason at all'. */
-    public boolean isLoginRequired(final Browser br) {
-        if (br.containsHTML("(?i)<h1>\\s*Error\\s*</h1>") && br.containsHTML("(?i)<h2>\\s*Adult-only content\\s*</h2>")) {
-            // adult only content.
-            return true;
-        } else if (br.containsHTML("(?i)You need to be a member and logged in to download files larger")) {
-            // large files
-            return true;
-        } else if (br.containsHTML("(?i)>\\s*Please login or signup to download this file\\s*<")) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /** URLs added <= rev. 41547 are missing properties which are required to do download & linkcheck via API. */
-    private boolean linkIsAPICompatible(final DownloadLink link) {
-        final String game_domain_name = link.getStringProperty(PROPERTY_game_domain_name);
-        final String mod_id = link.getStringProperty(PROPERTY_mod_id);
-        if (game_domain_name != null && mod_id != null) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    private static Browser prepBRGeneral(final Browser br) {
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
         br.setFollowRedirects(true);
         return br;
     }
 
+    public static Browser prepBrAPI(final Browser br, final Account account) throws PluginException {
+        br.getHeaders().put("User-Agent", "JDownloader");
+        final String apikey = getApikey(account);
+        br.getHeaders().put("apikey", apikey);
+        return br;
+    }
+
+    private static List<String[]> getPluginDomains() {
+        final List<String[]> ret = new ArrayList<String[]>();
+        // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
+        ret.add(new String[] { "nexusmods.com" });
+        return ret;
+    }
+
+    public static String[] getAnnotationNames() {
+        return buildAnnotationNames(getPluginDomains());
+    }
+
+    @Override
+    public String[] siteSupportedNames() {
+        return buildSupportedNames(getPluginDomains());
+    }
+
+    public static String[] getAnnotationUrls() {
+        final List<String> ret = new ArrayList<String>();
+        for (final String[] domains : getPluginDomains()) {
+            ret.add("https?://(?:www\\.)?" + buildHostsPatternPart(domains) + PATTERN_NORMAL.pattern() + "|" + PATTERN_NEXUS_DOWNLOAD_MANAGER.pattern());
+        }
+        return ret.toArray(new String[0]);
+    }
+
+    private static final Pattern PATTERN_NORMAL                                = Pattern.compile("/Core/Libs/Common/Widgets/DownloadPopUp\\?id=(\\d+).+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_NEXUS_DOWNLOAD_MANAGER                = Pattern.compile("nxm://([^/]+)/mods/(\\d+)/files/(\\d+)\\?key=([a-zA-Z0-9_/\\+\\=\\-%]+)\\&expires=(\\d+)\\&user_id=(\\d+)", Pattern.CASE_INSENSITIVE);
+    /* API documentation: https://app.swaggerhub.com/apis-docs/NexusMods/nexus-mods_public_api_params_in_form_data/1.0 */
+    public static final String   API_BASE                                      = "https://api.nexusmods.com/v1";
+    public static final String   PROPERTY_game_domain_name                     = "game_domain_name";
+    public static final String   PROPERTY_game_id                              = "game_id";
+    public static final String   PROPERTY_mod_id                               = "mod_id";
+    public static final String   PROPERTY_file_id                              = "file_id";
+    private String               dllink                                        = null;
+    private static final boolean WEBSITE_ACCOUNT_ALWAYS_NEEDED_FOR_DOWNLOADING = true;
+
+    private String getContentURL(final DownloadLink link) {
+        final String game_id = getGameID(link);
+        final String game_domain_name = getGameDomainName(link);
+        final String mod_id = this.getModID(link);
+        final String file_id = this.getFileID(link);
+        if (game_domain_name != null && mod_id != null && file_id != null) {
+            return NexusmodsComCrawler.generateContentURL(game_domain_name, mod_id, file_id);
+        } else {
+            return NexusmodsComCrawler.generatePluginPatternMatcher(game_id, file_id);
+        }
+    }
+
+    @Override
+    public String getLinkID(final DownloadLink link) {
+        final String file_id = getFileID(link);
+        if (file_id == null) {
+            return super.getLinkID(link);
+        }
+        String linkid = getHost() + "://" + file_id;
+        final String nxm_dlkey = new Regex(link.getPluginPatternMatcher(), PATTERN_NEXUS_DOWNLOAD_MANAGER).getMatch(3);
+        if (nxm_dlkey != null) {
+            linkid += "_" + nxm_dlkey;
+        }
+        return linkid;
+    }
+
+    /* URLs for their official downloadmanager --> We support them too --> Also see linkIsAPICompatible */
+    private boolean isSpecialNexusModmanagerDownloadURL(final DownloadLink link) {
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NEXUS_DOWNLOAD_MANAGER).patternFind();
+    }
+
+    /** Returns the file_id (this comment is here as the URL contains multiple IDs) */
+    private String getFileID(final DownloadLink link) {
+        final String storedFileID = link.getStringProperty(PROPERTY_file_id);
+        if (storedFileID != null) {
+            return storedFileID;
+        }
+        String fileID = new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).getMatch(0);
+        if (fileID == null) {
+            fileID = new Regex(link.getPluginPatternMatcher(), PATTERN_NEXUS_DOWNLOAD_MANAGER).getMatch(2);
+        }
+        return fileID;
+    }
+
+    private String getGameDomainName(final DownloadLink link) {
+        final String storedGameDomainName = link.getStringProperty(PROPERTY_game_domain_name);
+        if (storedGameDomainName != null) {
+            return storedGameDomainName;
+        }
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NEXUS_DOWNLOAD_MANAGER).getMatch(0);
+    }
+
+    private String getGameID(final DownloadLink link) {
+        final String storedGameID = link.getStringProperty(PROPERTY_game_id);
+        if (storedGameID != null) {
+            return storedGameID;
+        }
+        return new Regex(link.getPluginPatternMatcher(), "game_id=(\\d+)").getMatch(0);
+    }
+
+    private String getModID(final DownloadLink link) {
+        final String storedModID = link.getStringProperty(PROPERTY_mod_id);
+        if (storedModID != null) {
+            return storedModID;
+        }
+        return new Regex(link.getPluginPatternMatcher(), PATTERN_NEXUS_DOWNLOAD_MANAGER).getMatch(1);
+    }
+
+    public static boolean isOfflineWebsite(final Browser br) {
+        if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else if (br.containsHTML("No files have been uploaded yet|>\\s*File not found\\s*<|>\\s*Not found\\s*<|/noimage-1\\.png")) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /** Account is either required because the files are 'too large' or also for 'adult files', or for 'no reason at all'. */
+    public boolean isLoginRequiredWebsite(final Browser br) {
+        if (br.containsHTML("<h1>\\s*Error\\s*</h1>") && br.containsHTML("<h2>\\s*Adult-only content\\s*</h2>")) {
+            // adult only content.
+            return true;
+        } else if (br.containsHTML("You need to be a member and logged in to download files larger")) {
+            // large files
+            return true;
+        } else if (br.containsHTML(">\\s*Please login or signup to download this file\\s*<")) {
+            return true;
+        } else if (WEBSITE_ACCOUNT_ALWAYS_NEEDED_FOR_DOWNLOADING) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private void ensureDownloadable(final DownloadLink link) throws PluginException {
+        if (new Regex(link.getPluginPatternMatcher(), PATTERN_NORMAL).patternFind() && this.getGameID(link) == null) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND, "Invalid link");
+        }
+    }
+
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws Exception {
+        dllink = null;
         if (!link.isNameSet()) {
             link.setName(this.getFileID(link) + ".zip");
         }
+        ensureDownloadable(link);
         final Account acc = AccountController.getInstance().getValidAccount(this.getHost());
         final String apikey = getApikey(acc);
-        if (acc != null && apikey != null && linkIsAPICompatible(link)) {
+        if (acc != null && apikey != null) {
             return requestFileInformationAPI(link, acc);
         } else {
             return requestFileInformationWebsite(link);
@@ -194,7 +238,6 @@ public class NexusmodsCom extends antiDDoSForHost {
     }
 
     private AvailableStatus requestFileInformationWebsite(final DownloadLink link) throws Exception {
-        prepBRGeneral(br);
         if (isSpecialNexusModmanagerDownloadURL(link)) {
             /* Cannot check here but let's assume the status by expire param */
             final long expireTimstamp = Long.parseLong(UrlQuery.parse(link.getPluginPatternMatcher()).get("expires")) * 1000;
@@ -206,37 +249,16 @@ public class NexusmodsCom extends antiDDoSForHost {
                 return AvailableStatus.TRUE;
             }
         } else {
-            getPage(link.getPluginPatternMatcher());
+            br.getPage(getContentURL(link));
             if (br.getHttpConnection().getResponseCode() == 404) {
                 throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-            }
-            String loadBox = br.getRegex("loadBox\\('(https?://.*?)'").getMatch(0);
-            if (loadBox != null) {
-                getPage(loadBox);
-                loadBox = br.getRegex("loadBox\\('(https?://.*?skipdonate)'").getMatch(0);
-                if (loadBox != null) {
-                    getPage(loadBox);
-                }
-            }
-            dllink = br.getRegex("window\\.location\\.href\\s*=\\s*\"(http[^<>\"]+)\";").getMatch(0);
-            if (dllink == null) {
-                dllink = br.getRegex("\"(https?://filedelivery\\.nexusmods\\.com/[^<>\"]+)\"").getMatch(0);
-                if (dllink == null) {
-                    dllink = br.getRegex("\"(https?://(?:www\\.)?nexusmods\\.com/[^<>\"]*Libs/Common/Managers/Downloads\\?Download[^<>\"]+)\"").getMatch(0);
-                    if (dllink == null) {
-                        dllink = br.getRegex("id\\s*=\\s*\"dl_link\"\\s*value\\s*=\\s*\"(https?://[^<>\"]*?)\"").getMatch(0);
-                        if (dllink == null) {
-                            dllink = br.getRegex("data-link\\s*=\\s*\"(https?://(?:premium-files|fs-[a-z0-9]+)\\.(?:nexusmods|nexus-cdn)\\.com/[^<>\"]*?)\"").getMatch(0);
-                        }
-                    }
-                }
             }
             String filename = br.getRegex("<div class=\"header\"[^>]*>([^<]+)<").getMatch(0);
             if (filename != null) {
                 filename = Encoding.htmlDecode(filename).trim();
                 link.setName(filename);
-            } else if (dllink != null) {
-                filename = getFileNameFromURL(new URL(dllink));
+            } else {
+                logger.warning("Failed to find filename");
             }
             final String filesize = br.getRegex(">\\s*folder\\s*</i>\\s*<span>([^<]+)</span>").getMatch(0);
             if (filesize != null) {
@@ -249,18 +271,58 @@ public class NexusmodsCom extends antiDDoSForHost {
     }
 
     private AvailableStatus requestFileInformationAPI(final DownloadLink link, final Account account) throws Exception {
+        this.ensureDataNeededForAPIUsage(link);
         prepBrAPI(br, account);
-        final String game_domain_name = link.getStringProperty(PROPERTY_game_domain_name);
-        final String mod_id = link.getStringProperty(PROPERTY_mod_id);
+        final String game_domain_name = getGameDomainName(link);
+        final String mod_id = this.getModID(link);
         final String file_id = this.getFileID(link);
         if (file_id == null || mod_id == null || game_domain_name == null) {
             /* This should never happen */
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        getPage(API_BASE + String.format("/games/%s/mods/%s/files/%s", game_domain_name, mod_id, file_id));
+        br.getPage(API_BASE + String.format("/games/%s/mods/%s/files/%s", game_domain_name, mod_id, file_id));
         handleErrorsAPI(br);
-        final Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(br.getRequest().getHtmlCode());
+        final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         return setFileInformationAPI(link, entries, game_domain_name, mod_id, file_id);
+    }
+
+    /**
+     * Typically, game_domain_name is needed for API requests while in the links added by the user, only game_id, mod_id and file_id is
+     * given. </br> If needed, this function will find the additional data via website.
+     */
+    private void ensureDataNeededForAPIUsage(final DownloadLink link) throws IOException, PluginException {
+        final String game_domain_name = getGameDomainName(link);
+        final String mod_id = this.getModID(link);
+        final String file_id = this.getFileID(link);
+        if (game_domain_name != null && mod_id != null && file_id != null) {
+            /* Needed data is already available */
+            return;
+        }
+        final String game_id = getGameID(link);
+        if (game_id == null) {
+            /* This should never happen */
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        logger.info("Trying to find additional information to be able to obtain file information from API");
+        final Browser brc = br.cloneBrowser();
+        brc.setFollowRedirects(false);
+        brc.getPage(NexusmodsComCrawler.generatePluginPatternMatcher(game_id, file_id));
+        if (brc.getHttpConnection().getResponseCode() == 404) {
+            throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        /* We expect a redirect which will contain the required strings "game_domain_name" and "mod_id" in the redirect-URL. */
+        final String redirect = brc.getRedirectLocation();
+        if (redirect == null) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final Regex urlinfo = new Regex(redirect, "(?i)https?://[^/]+/([^/]+)/mods/(\\d+)");
+        if (!urlinfo.patternFind()) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        final String game_domain_name_from_url = urlinfo.getMatch(0);
+        final String mod_id_from_url = urlinfo.getMatch(1);
+        link.setProperty(PROPERTY_game_domain_name, game_domain_name_from_url);
+        link.setProperty(PROPERTY_mod_id, mod_id_from_url);
     }
 
     public static AvailableStatus setFileInformationAPI(final DownloadLink link, final Map<String, Object> entries, final String game_domain_name, final String mod_id, final String file_id) throws Exception {
@@ -280,9 +342,6 @@ public class NexusmodsCom extends antiDDoSForHost {
         if (!StringUtils.isEmpty(description) && StringUtils.isEmpty(link.getComment())) {
             link.setComment(description);
         }
-        /* TODO: Add free account (error-) handling */
-        // loginRequired = isLoginRequired(br);
-        /* For some files we can find a sha256 hash through this sketchy hash. Example: TODO: Add example */
         final String external_virus_scan_url = (String) entries.get("external_virus_scan_url");
         if (external_virus_scan_url != null) {
             final String sha256_hash = new Regex(external_virus_scan_url, "(?i)virustotal\\.com/(?:gui/)?file/([a-f0-9]+)/.*").getMatch(0);
@@ -299,34 +358,6 @@ public class NexusmodsCom extends antiDDoSForHost {
         handleDownload(link, null);
     }
 
-    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
-        if (StringUtils.isEmpty(dllink)) {
-            if (this.isLoginRequired(br)) {
-                if (account == null) {
-                    throw new AccountRequiredException();
-                } else {
-                    /*
-                     * 2019-01-23: Added errorhandling but this should never happen because if an account exists we should be able to
-                     * download!
-                     */
-                    throw new AccountUnavailableException("Session expired?", 5 * 60 * 1000l);
-                }
-            }
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), getMaxChunks(account));
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            br.followConnection(true);
-            if (this.isSpecialNexusModmanagerDownloadURL(link)) {
-                /* Most likely that downloadurl is expired so user has to delete- and re-add it! */
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "URL expired?");
-            } else {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unknown server error");
-            }
-        }
-        dl.startDownload();
-    }
-
     public int getMaxChunks(final Account account) {
         return 0;
     }
@@ -338,73 +369,65 @@ public class NexusmodsCom extends antiDDoSForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Deprecated
     public void loginWebsite(final Account account) throws Exception {
         synchronized (account) {
-            try {
-                if (isAPIOnlyMode()) {
-                    /* This should never happen */
-                    throw new AccountInvalidException("Login with username + password is not supported!");
-                }
-                prepBRGeneral(br);
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                boolean loggedIN = false;
-                if (cookies != null) {
-                    br.setCookies(account.getHoster(), cookies);
-                    getPage("https://www." + account.getHoster());
-                    if (!isLoggedinCookies()) {
-                        logger.info("Existing login invalid: Full login required!");
-                        br.clearCookies(getHost());
-                    } else {
-                        loggedIN = true;
-                    }
-                }
-                if (!loggedIN) {
-                    getPage("https://users." + this.getHost() + "/auth/sign_in");
-                    final Form loginform = br.getFormbyKey("user%5Blogin%5D");
-                    if (loginform == null) {
-                        logger.warning("Failed to find loginform");
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                    }
-                    String reCaptchaKey = br.getRegex("grecaptcha\\.execute\\('([^<>\"\\']+)'").getMatch(0);
-                    if (reCaptchaKey == null) {
-                        /* 2020-01-08: Fallback */
-                        reCaptchaKey = "6Lf4vsIUAAAAAN6TyJATjxQbMAcKjBZ3rOc0ijrp";
-                    }
-                    loginform.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
-                    loginform.put("user%5Bpassword%5D", Encoding.urlEncode(account.getPass()));
-                    final DownloadLink original = this.getDownloadLink();
-                    if (original == null) {
-                        this.setDownloadLink(new DownloadLink(this, "Account", getHost(), "http://" + br.getRequest().getURL().getHost(), true));
-                    }
-                    try {
-                        /* 2019-11-20: Invisible reCaptchaV2 is always required */
-                        final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey).getToken();
-                        if (recaptchaV2Response == null) {
-                            throw new PluginException(LinkStatus.ERROR_CAPTCHA);
-                        }
-                        loginform.put("g-recaptcha-response%5Blogin%5D", Encoding.urlEncode(recaptchaV2Response));
-                    } finally {
-                        if (original == null) {
-                            this.setDownloadLink(null);
-                        }
-                    }
-                    this.submitForm(loginform);
-                    if (!isLoggedinCookies()) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "Login failed.\r\nIf you own a premium account you should disable website login in Settings --> Plugin Settings --> nexusmods.com\r\nBe sure to delete your account and try again after changing this setting!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                account.saveCookies(br.getCookies(account.getHoster()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
+            if (isAPIOnlyMode()) {
+                /* This should never happen */
+                throw new AccountInvalidException("Login with username + password is not supported!");
             }
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            boolean loggedIN = false;
+            if (cookies != null) {
+                br.setCookies(cookies);
+                br.getPage("https://www." + getHost());
+                if (!isLoggedinCookies()) {
+                    logger.info("Existing login invalid: Full login required!");
+                    br.clearCookies(getHost());
+                } else {
+                    loggedIN = true;
+                }
+            }
+            if (!loggedIN) {
+                br.getPage("https://users." + this.getHost() + "/auth/sign_in");
+                final Form loginform = br.getFormbyKey("user%5Blogin%5D");
+                if (loginform == null) {
+                    logger.warning("Failed to find loginform");
+                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+                }
+                String reCaptchaKey = br.getRegex("grecaptcha\\.execute\\('([^<>\"\\']+)'").getMatch(0);
+                if (reCaptchaKey == null) {
+                    /* 2020-01-08: Fallback */
+                    reCaptchaKey = "6Lf4vsIUAAAAAN6TyJATjxQbMAcKjBZ3rOc0ijrp";
+                }
+                loginform.put("user%5Blogin%5D", Encoding.urlEncode(account.getUser()));
+                loginform.put("user%5Bpassword%5D", Encoding.urlEncode(account.getPass()));
+                final DownloadLink original = this.getDownloadLink();
+                if (original == null) {
+                    this.setDownloadLink(new DownloadLink(this, "Account", getHost(), "http://" + br.getRequest().getURL().getHost(), true));
+                }
+                try {
+                    /* 2019-11-20: Invisible reCaptchaV2 is always required */
+                    final String recaptchaV2Response = new CaptchaHelperHostPluginRecaptchaV2(this, br, reCaptchaKey).getToken();
+                    if (recaptchaV2Response == null) {
+                        throw new PluginException(LinkStatus.ERROR_CAPTCHA);
+                    }
+                    loginform.put("g-recaptcha-response%5Blogin%5D", Encoding.urlEncode(recaptchaV2Response));
+                } finally {
+                    if (original == null) {
+                        this.setDownloadLink(null);
+                    }
+                }
+                br.submitForm(loginform);
+                if (!isLoggedinCookies()) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "Login failed.\r\nIf you own a premium account you should disable website login in Settings --> Plugin Settings --> nexusmods.com\r\nBe sure to delete your account and try again after changing this setting!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                }
+            }
+            account.saveCookies(br.getCookies(br.getHost()), "");
         }
     }
 
@@ -417,48 +440,50 @@ public class NexusmodsCom extends antiDDoSForHost {
         String apikey = getApikey(account);
         if (apikey != null) {
             return fetchAccountInfoAPI(account);
-        }
-        /* Old code! Website mode doesn't work anymore! */
-        final AccountInfo ai = new AccountInfo();
-        loginWebsite(account);
-        getPage("/users/myaccount?tab=api%20access");
-        /* Try to find apikey - prefer API */
-        /* TODO: Maybe generate apikey is it is not yet available */
-        /* 2019-11-19: Turned this off as it is nothing that we should do. */
-        // Form requestApiForm = null;
-        // final Form[] forms = br.getForms();
-        // for (final Form tmpForm : forms) {
-        // final InputField actionField = tmpForm.getInputFieldByName("action");
-        // final InputField application_slugField = tmpForm.getInputFieldByName("application_slug");
-        // if (actionField != null && actionField.getValue().equals("request-key") && application_slugField == null) {
-        // logger.info("Found 'request apikey' Form");
-        // requestApiForm = tmpForm;
-        // break;
-        // }
-        // }
-        // if (requestApiForm != null) {
-        // logger.info("Requesting apikey for the first time ...");
-        // this.submitForm(requestApiForm);
-        // }
-        apikey = br.getRegex("id=\"personal_key\"[^>]*>([^<>\"]+)<").getMatch(0);
-        if (apikey != null) {
-            /* TODO: Consider removing original logindata once we found an apikey for safety reasons! */
-            logger.info("Found apikey");
-            saveApikey(account, apikey);
-            return fetchAccountInfoAPI(account);
         } else {
-            logger.info("Failed to find apikey - continuing via website");
-            getPage("/users/myaccount");
-            if (StringUtils.equalsIgnoreCase(br.getRegex("\"premium-desc\">\\s*(.*?)\\s*<").getMatch(0), "Inactive")) {
-                account.setType(AccountType.FREE);
-                account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(false);
+            /* Website mode */
+            /* Old code! Website mode doesn't work anymore! */
+            final AccountInfo ai = new AccountInfo();
+            loginWebsite(account);
+            br.getPage("/users/myaccount?tab=api%20access");
+            /* Try to find apikey - prefer API */
+            /* TODO: Maybe generate apikey is it is not yet available */
+            /* 2019-11-19: Turned this off as it is nothing that we should do. */
+            // Form requestApiForm = null;
+            // final Form[] forms = br.getForms();
+            // for (final Form tmpForm : forms) {
+            // final InputField actionField = tmpForm.getInputFieldByName("action");
+            // final InputField application_slugField = tmpForm.getInputFieldByName("application_slug");
+            // if (actionField != null && actionField.getValue().equals("request-key") && application_slugField == null) {
+            // logger.info("Found 'request apikey' Form");
+            // requestApiForm = tmpForm;
+            // break;
+            // }
+            // }
+            // if (requestApiForm != null) {
+            // logger.info("Requesting apikey for the first time ...");
+            // this.submitForm(requestApiForm);
+            // }
+            apikey = br.getRegex("id=\"personal_key\"[^>]*>([^<>\"]+)<").getMatch(0);
+            if (apikey != null) {
+                /* TODO: Consider removing original login data once we found an apikey for safety reasons! */
+                logger.info("Found apikey");
+                saveApikey(account, apikey);
+                return fetchAccountInfoAPI(account);
             } else {
-                account.setType(AccountType.PREMIUM);
-                account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
-                account.setConcurrentUsePossible(true);
+                logger.info("Failed to find apikey - continuing via website");
+                br.getPage("/users/myaccount");
+                if (StringUtils.equalsIgnoreCase(br.getRegex("\"premium-desc\">\\s*(.*?)\\s*<").getMatch(0), "Inactive")) {
+                    account.setType(AccountType.FREE);
+                    account.setMaxSimultanDownloads(this.getMaxSimultanFreeDownloadNum());
+                    account.setConcurrentUsePossible(false);
+                } else {
+                    account.setType(AccountType.PREMIUM);
+                    account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
+                    account.setConcurrentUsePossible(true);
+                }
+                return ai;
             }
-            return ai;
         }
     }
 
@@ -470,9 +495,9 @@ public class NexusmodsCom extends antiDDoSForHost {
             throw new AccountInvalidException("Invalid API key format");
         }
         prepBrAPI(br, account);
-        getPage(API_BASE + "/users/validate.json");
+        br.getPage(API_BASE + "/users/validate.json");
         handleErrorsAPI(br);
-        final Map<String, Object> user = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> user = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final String email = (String) user.get("email");
         if (!StringUtils.isEmpty(email)) {
             /* User can enter whatever he wants into username field in JDownloader but we want unique usernames. */
@@ -481,19 +506,19 @@ public class NexusmodsCom extends antiDDoSForHost {
         final AccountInfo ai = new AccountInfo();
         if ((Boolean) user.get("is_premium") == Boolean.TRUE) {
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             ai.setUnlimitedTraffic();
             ai.setStatus("Premium user");
         } else if ((Boolean) user.get("is_supporter") == Boolean.TRUE) {
             account.setType(AccountType.PREMIUM);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(true);
             ai.setUnlimitedTraffic();
             ai.setStatus("Supporter");
         } else {
             account.setType(AccountType.FREE);
-            account.setMaxSimultanDownloads(ACCOUNT_PREMIUM_MAXDOWNLOADS);
+            account.setMaxSimultanDownloads(this.getMaxSimultanPremiumDownloadNum());
             account.setConcurrentUsePossible(false);
             if (isAPIOnlyMode()) {
                 ai.setStatus("Free user [Only pre generated nxm:// URLs can be downloaded]");
@@ -512,7 +537,7 @@ public class NexusmodsCom extends antiDDoSForHost {
              * 2020-01-15: Attempted free account download fails:
              * {"code":400,"message":"Provided key and expire time isn't correct for this user/file."}
              */
-            throw new AccountRequiredException("nxm URL expired");
+            throw new AccountRequiredException("Error 400: nxm URL expired");
         } else if (br.getHttpConnection().getResponseCode() == 401) {
             /* {"message":"Please provide a valid API Key"} */
             throw new AccountInvalidException("Invalid or expired API Key");
@@ -535,6 +560,7 @@ public class NexusmodsCom extends antiDDoSForHost {
             /* {"msg":"You have fired too many requests. Please wait for some time."} */
             /* TODO: Maybe check which limit ends first (daily / hourly) to display an even more precise waittime! */
             String reset_date = br.getRequest().getResponseHeader("X-RL-Hourly-Reset").toString();
+            long waitMillis = 30 * 60 * 1000l;
             if (reset_date != null) {
                 /* Try to find the exact waittime */
                 reset_date = reset_date.substring(0, reset_date.lastIndexOf(":")) + "00";
@@ -542,11 +568,94 @@ public class NexusmodsCom extends antiDDoSForHost {
                 final long waittime_until_reset = reset_timestamp - System.currentTimeMillis();
                 if (waittime_until_reset > 0) {
                     /* Wait exact waittime + 5 extra seconds */
-                    throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API limit has been reached", waittime_until_reset + 5000l);
+                    waitMillis = waittime_until_reset + 5000l;
                 }
             }
-            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API limit has been reached", 30 * 60 * 1000l);
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "API limit has been reached", waitMillis);
         }
+    }
+
+    @Override
+    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
+        handleDownload(link, account);
+    }
+
+    private void handleDownload(final DownloadLink link, final Account account) throws Exception, PluginException {
+        ensureDownloadable(link);
+        if (getApikey(account) != null) {
+            this.ensureDataNeededForAPIUsage(link);
+            prepBrAPI(br, account);
+            /* We do not have to perform an extra onlinecheck - if the file is offline, the download request will return 404. */
+            // requestFileInformationAPI(link);
+            if (account.getType() == AccountType.FREE && !this.isSpecialNexusModmanagerDownloadURL(link)) {
+                // logger.info("Only premium account download is possible as information for free account download is missing");
+                throw new AccountRequiredException("Free Account users can only download 'nxm://' URLs!");
+            }
+            final String game_domain_name = link.getStringProperty(PROPERTY_game_domain_name);
+            final String mod_id = this.getModID(link);
+            final String file_id = this.getFileID(link);
+            if (file_id == null || mod_id == null || game_domain_name == null) {
+                /* This should never happen */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            String url = API_BASE + String.format("/games/%s/mods/%s/files/%s/download_link.json", game_domain_name, mod_id, file_id);
+            if (account.getType() == AccountType.FREE) {
+                final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
+                final String dlExpires = query.get("expires");
+                if (Long.parseLong(dlExpires) * 1000 < System.currentTimeMillis()) {
+                    /* Do not use LinkStatus FILE_NOT_FOUND here because we can be pretty sure that this file is online! */
+                    throw new PluginException(LinkStatus.ERROR_FATAL, "This downloadurl has expired");
+                }
+                url += "?key=" + query.get("key") + "&expires=" + dlExpires;
+            }
+            br.getPage(url);
+            handleErrorsAPI(br);
+            final List<Map<String, Object>> mirrors = (List<Map<String, Object>>) restoreFromString(br.getRequest().getHtmlCode(), TypeRef.OBJECT);
+            if (mirrors == null || mirrors.isEmpty()) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unable to find any downloadable mirrors");
+            }
+            /*
+             * First element = User preferred mirror. Users can set their preferred mirror here: https://www.nexusmods.com/users/myaccount
+             * --> Premium membership preferences
+             */
+            final Map<String, Object> mirror = mirrors.get(0);
+            final String mirrorName = (String) mirror.get("name");
+            this.dllink = (String) mirror.get("URI");
+            if (StringUtils.isEmpty(this.dllink)) {
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unable to find download link for mirror: " + mirrorName);
+            }
+            logger.info("Selected random mirror: " + mirrorName);
+        } else {
+            /* Website handling. Important! Login before requestFileInformation! */
+            loginWebsite(account);
+            requestFileInformation(link);
+        }
+        /* Free- and premium download handling is the same. */
+        if (StringUtils.isEmpty(dllink)) {
+            if (this.isLoginRequiredWebsite(br)) {
+                if (account == null) {
+                    throw new AccountRequiredException();
+                } else {
+                    /*
+                     * 2019-01-23: Added errorhandling but this should never happen because if an account exists we should be able to
+                     * download!
+                     */
+                    throw new AccountUnavailableException("Session expired?", 5 * 60 * 1000l);
+                }
+            }
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
+        dl = new jd.plugins.BrowserAdapter().openDownload(br, link, dllink, this.isResumeable(link, account), getMaxChunks(account));
+        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
+            br.followConnection(true);
+            if (this.isSpecialNexusModmanagerDownloadURL(link)) {
+                /* Most likely that downloadurl is expired so user has to delete- and re-add it! */
+                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "URL expired?");
+            } else {
+                handleConnectionErrors(br, dl.getConnection());
+            }
+        }
+        dl.startDownload();
     }
 
     public static String getApikey(final Account account) {
@@ -560,70 +669,7 @@ public class NexusmodsCom extends antiDDoSForHost {
     }
 
     private void saveApikey(final Account account, final String apikey) {
-        if (account == null) {
-            return;
-        } else {
-            account.setProperty("apikey", apikey);
-        }
-    }
-
-    @Override
-    public void handlePremium(final DownloadLink link, final Account account) throws Exception {
-        /*
-         * TODO: Consider saving- and re-using direct downloadurls. Consider that premium users do not have any traffic limits so re-using
-         * generated downloadurls does not bring any huge benefits. Also when re-using generated downloadlinks consider that they do have
-         * different download mirrors/location and these are currently randomly selected on downloadstart!
-         */
-        if (getApikey(account) != null && linkIsAPICompatible(link)) {
-            prepBrAPI(br, account);
-            /* We do not have to perform an extra onlinecheck - if the file is offline, the download request will return 404. */
-            // requestFileInformationAPI(link);
-            final String game_domain_name = link.getStringProperty(PROPERTY_game_domain_name);
-            final String mod_id = link.getStringProperty(PROPERTY_mod_id);
-            final String file_id = this.getFileID(link);
-            if (file_id == null || mod_id == null || game_domain_name == null) {
-                /* This should never happen */
-                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-            }
-            String action = API_BASE + String.format("/games/%s/mods/%s/files/%s/download_link.json", game_domain_name, mod_id, file_id);
-            if (account.getType() == AccountType.FREE) {
-                if (!this.isSpecialNexusModmanagerDownloadURL(link)) {
-                    // logger.info("Only premium account download is possible as information for free account download is missing");
-                    // throw new AccountRequiredException();
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "Free Account users can only download nxm:// URLs!");
-                }
-                final UrlQuery query = UrlQuery.parse(link.getPluginPatternMatcher());
-                final String dlExpires = query.get("expires");
-                if (Long.parseLong(dlExpires) * 1000 < System.currentTimeMillis()) {
-                    /* Do not use LinkStatus FILE_NOT_FOUND here because we can be pretty sure that this file is online! */
-                    throw new PluginException(LinkStatus.ERROR_FATAL, "This downloadurl has expired");
-                }
-                action += "?key=" + query.get("key") + "&expires=" + dlExpires;
-            }
-            getPage(action);
-            handleErrorsAPI(br);
-            final List<Object> ressourcelist = (List<Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-            if (ressourcelist == null || ressourcelist.isEmpty()) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unable to find downloadlink");
-            }
-            /*
-             * First element = User preferred mirror. Users can set their preferred mirror here: https://www.nexusmods.com/users/myaccount
-             * --> Premium membership preferences
-             */
-            Map<String, Object> entries = (Map<String, Object>) ressourcelist.get(0);
-            final String mirrorName = (String) entries.get("name");
-            this.dllink = (String) entries.get("URI");
-            if (StringUtils.isEmpty(this.dllink)) {
-                throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Unable to find downloadlink for mirror: " + mirrorName);
-            }
-            logger.info("Selected random mirror: " + mirrorName);
-        } else {
-            /* Website handling. Important! Login before requestFileInformation! */
-            loginWebsite(account);
-            requestFileInformation(link);
-        }
-        /* Free- and premium download handling is the same. */
-        handleDownload(link, account);
+        account.setProperty("apikey", apikey);
     }
 
     private static boolean isAPIKey(final String str) {
@@ -728,35 +774,42 @@ public class NexusmodsCom extends antiDDoSForHost {
         return true;
     }
 
-    public void getPage(Browser ibr, String page) throws Exception {
-        super.getPage(ibr, page);
+    @Override
+    protected String getAPILoginHelpURL() {
+        return "https://www.nexusmods.com/users/myaccount?tab=api%20access";
+    }
+
+    @Override
+    protected boolean looksLikeValidAPIKey(final String str) {
+        if (str == null) {
+            return false;
+        } else if (str.matches("[A-Za-z0-9\\-=/\\+_]{64,}")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
-        return ACCOUNT_PREMIUM_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
     }
 
     @Override
     public boolean canHandle(final DownloadLink link, final Account account) throws Exception {
-        if (account == null) {
+        if (WEBSITE_ACCOUNT_ALWAYS_NEEDED_FOR_DOWNLOADING && account == null) {
             /* Downloads without account are not possible */
             return false;
         } else if (account.getType() != AccountType.PREMIUM && !isSpecialNexusModmanagerDownloadURL(link)) {
             /* Free account users can only download special URLs which contain authorization information. */
             return false;
-        } else if (!linkIsAPICompatible(link)) {
-            /* E.g. older URLs or in case important properties got lost somehow, a download (via API) is not possible at all! */
-            return false;
+        } else {
+            return super.canHandle(link, account);
         }
-        return super.canHandle(link, account);
     }
 
     @Override
     public void reset() {
     }
 
-    @Override
-    public void resetDownloadlink(DownloadLink link) {
-    }
 }

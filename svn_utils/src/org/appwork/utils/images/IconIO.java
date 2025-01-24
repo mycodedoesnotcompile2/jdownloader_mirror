@@ -453,10 +453,13 @@ public class IconIO {
             }
             return new ImageIcon(ImageProvider.createIcon("DUMMY", w, h));
         }
-        if (w <= 0 && h <= 0) {
-            return new ImageIcon(IconIO.getImage(resource));
+        BufferedImage image = IconIO.getImage(resource);
+        if (image.getWidth() == w && image.getHeight() == h) {
+            return new ImageIcon(image);
+        } else if (w <= 0 && h <= 0) {
+            return new ImageIcon(image);
         } else {
-            return new ImageIcon(IconIO.getScaledInstance(IconIO.getImage(resource), w, h, Interpolation.BICUBIC, true));
+            return new ImageIcon(IconIO.getScaledInstance(image, w, h, Interpolation.BICUBIC, true));
         }
     }
 

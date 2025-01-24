@@ -69,7 +69,7 @@ public class SyntheticaHelper {
     /**
      *
      */
-    @AWTestValidateClassReference(classpath = "syntheticaSimple2D\\.jar")
+    @AWTestValidateClassReference(classpath = ".*/?syntheticaSimple2D\\.jar")
     private static final String     DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_SIMPLE2D_LOOK_AND_FEEL = "de.javasoft.plaf.synthetica.SyntheticaSimple2DLookAndFeel";
     public final SyntheticaSettings config;
     public static Boolean           IS_SYNTHETICA                                                 = null;
@@ -81,7 +81,7 @@ public class SyntheticaHelper {
         this(JsonConfig.create(SyntheticaSettings.class));
     }
 
-    @AWTestValidateClassReference(classpath = "synthetica\\.jar")
+    @AWTestValidateClassReference(classpath = ".*/?synthetica\\.jar")
     public static final String CLASS_DE_JAVASOFT_PLAF_SYNTHETICA_SYNTHETICA_LOOK_AND_FEEL = "de.javasoft.plaf.synthetica.SyntheticaLookAndFeel";
 
     /**

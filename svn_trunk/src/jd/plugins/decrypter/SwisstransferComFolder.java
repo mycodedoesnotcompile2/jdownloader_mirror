@@ -26,6 +26,7 @@ import org.appwork.storage.config.annotations.DefaultEnumValue;
 import org.appwork.storage.config.annotations.DefaultOnNull;
 import org.appwork.storage.config.annotations.LabelInterface;
 import org.appwork.utils.DebugMode;
+import org.appwork.utils.JavaVersion;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.formatter.TimeFormatter;
 import org.jdownloader.plugins.config.Order;
@@ -50,7 +51,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.decrypter.SwisstransferComFolder.SwisstransferComConfig.CrawlMode;
 import jd.plugins.hoster.SwisstransferCom;
 
-@DecrypterPlugin(revision = "$Revision: 50474 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50503 $", interfaceVersion = 3, names = {}, urls = {})
 public class SwisstransferComFolder extends PluginForDecrypt {
     public SwisstransferComFolder(PluginWrapper wrapper) {
         super(wrapper);
@@ -160,8 +161,15 @@ public class SwisstransferComFolder extends PluginForDecrypt {
         final String containerUUID = (String) data.get("containerUUID");
         boolean isExpired = false;
         if (expiredDate != null) {
-            final long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
-            if (timeStamp < System.currentTimeMillis()) {
+            long timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd HH:mm:ss", Locale.ENGLISH);
+            if (timeStamp == -1) {
+                if (JavaVersion.getVersion().isMinimum(JavaVersion.JVM_1_8)) {
+                    timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd'T'HH:mm:ssX", Locale.ENGLISH);
+                } else {
+                    timeStamp = TimeFormatter.getMilliSeconds(expiredDate, "yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+                }
+            }
+            if (timeStamp != -1 && timeStamp < System.currentTimeMillis()) {
                 isExpired = true;
             }
         }

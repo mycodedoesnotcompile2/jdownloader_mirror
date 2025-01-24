@@ -55,7 +55,7 @@ import jd.plugins.MultiHostHost.MultihosterHostStatus;
 import jd.plugins.PluginException;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50394 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50504 $", interfaceVersion = 3, names = { "torbox.app" }, urls = { "" })
 public class TorboxApp extends UseNet {
     /* Docs: https://api-docs.torbox.app/ */
     private final String                 API_BASE                                                 = "https://api.torbox.app/v1/api";
@@ -372,7 +372,7 @@ public class TorboxApp extends UseNet {
                 if (reason != null) {
                     msg += " | API error: " + msg;
                 }
-                usenet.setStatus(MultihosterHostStatus.DEACTIVATED_JDOWNLOADER);
+                usenet.setStatus(MultihosterHostStatus.DEACTIVATED_MULTIHOST);
                 usenet.setStatusText(msg);
             }
         } else {

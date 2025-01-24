@@ -58,7 +58,6 @@ import jd.controlling.ProgressController;
 import jd.http.Browser;
 import jd.http.Request;
 import jd.http.requests.GetRequest;
-import jd.http.requests.PostRequest;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.Account;
@@ -79,7 +78,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.InstaGramCom;
 
-@DecrypterPlugin(revision = "$Revision: 50491 $", interfaceVersion = 4, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50501 $", interfaceVersion = 4, names = {}, urls = {})
 public class InstaGramComDecrypter extends PluginForDecrypt {
     public InstaGramComDecrypter(PluginWrapper wrapper) {
         super(wrapper);
@@ -1113,7 +1112,7 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         /* Login is mandatory! */
         loginOrFail(account, loggedIN);
         getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         final String json = websiteGetJson();
         Map<String, Object> entries = restoreFromString(json, TypeRef.MAP);
         final String rhxGis = getVarRhxGis(this.br);
@@ -1172,8 +1171,8 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 savedPostsCount = ((Number) JavaScriptEngineFactory.walkJson(entries, "user/edge_saved_media/count")).intValue();
                 if (savedPostsCount == 0) {
                     /* Looks like profile doesn't contain any saved posts. */
-                    decryptedLinks.add(this.getDummyDownloadlinkProfileHasNoSavedPosts(usernameURL));
-                    return decryptedLinks;
+                    ret.add(this.getDummyDownloadlinkProfileHasNoSavedPosts(usernameURL));
+                    return ret;
                 } else {
                     logger.info("Expected number of saved posts: " + savedPostsCount);
                 }
@@ -1184,114 +1183,21 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.info("Found no items on page " + page + " --> Stopping decryption");
                 break;
             }
-            decryptedLinksLastSize = decryptedLinks.size();
+            decryptedLinksLastSize = ret.size();
             for (final Object o : resource_data_list) {
                 final Map<String, Object> result = (Map<String, Object>) o;
                 // pages > 0, have a additional nodes entry
                 if (result.size() == 1 && result.containsKey("node")) {
-                    decryptedLinks.addAll(crawlPost(param, metadata, (Map<String, Object>) result.get("node")));
+                    ret.addAll(crawlPost(param, metadata, (Map<String, Object>) result.get("node")));
                 } else {
-                    decryptedLinks.addAll(crawlPost(param, metadata, result));
+                    ret.addAll(crawlPost(param, metadata, result));
                 }
             }
             numberofCrawledPosts += resource_data_list.size();
-            decryptedLinksCurrentSize = decryptedLinks.size();
+            decryptedLinksCurrentSize = ret.size();
             logger.info("Crawled page: " + page + " | Found items: " + decryptedLinksCurrentSize + " | Crawled posts: " + numberofCrawledPosts + "/" + savedPostsCount);
             page++;
         } while (!this.isAbort() && nextid != null && decryptedLinksCurrentSize > decryptedLinksLastSize && decryptedLinksCurrentSize < savedPostsCount);
-        return decryptedLinks;
-    }
-
-    /**
-     * Crawls all items found when looking for a specified items. </br>
-     * Max. number of items which this returns can be limited by user setting. </br>
-     * Doesn't require the user to be logged in!
-     */
-    private ArrayList<DownloadLink> crawlHashtagWebsite(final CryptedLink param, final Account account, final AtomicBoolean loggedIN) throws UnsupportedEncodingException, Exception {
-        final String hashtag = new Regex(param.getCryptedUrl(), TYPE_HASHTAG).getMatch(0);
-        if (hashtag == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        /* Login is mandatory! */
-        loginOrFail(account, loggedIN);
-        getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        final Qdb qdb = getQueryHash(br, Qdb.QUERY.USER);
-        final Map<String, Object> entries = restoreFromString(websiteGetJson(), TypeRef.MAP);
-        final Map<String, Object> data = (Map<String, Object>) JavaScriptEngineFactory.walkJson(entries, "entry_data/TagPage/{0}/data");
-        List<Object> resource_data_list = (List<Object>) JavaScriptEngineFactory.walkJson(data, "recent/sections");
-        final InstagramMetadata metadata = new InstagramMetadata();
-        metadata.setHashtag(hashtag);
-        metadata.setPackageName(getPackagenameHashtag(metadata));
-        String next_max_id = (String) get(entries, "entry_data/TagPage/{0}/data/recent/next_max_id");
-        Boolean more_available = (Boolean) get(entries, "entry_data/TagPage/{0}/data/recent/more_available");
-        Number next_page = (Number) get(entries, "entry_data/TagPage/{0}/data/recent/next_page");
-        int page = 1;
-        int decryptedLinksLastSize = 0;
-        final int totalNumberofPosts = ((Number) data.get("media_count")).intValue();
-        int crawledNumberofPosts = 0;
-        final long maxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getHashtagCrawlerMaxItemsLimit();
-        do {
-            if (more_available && next_page != null && page > 1) {
-                final Browser br = this.br.cloneBrowser();
-                InstaGramCom.prepBRAltAPI(br);
-                final PostRequest postRequest = br.createPostRequest(InstaGramCom.ALT_API_BASE + "/tags/" + hashtag + "/sections/", "include_persistent=0&max_id=" + URLEncode.encodeURIComponent(next_max_id) + "&page=" + next_page.toString() + "&surface=grid&tab=recent");
-                prepRequest(br, postRequest, qdb);
-                postRequest.getHeaders().put("Origin", "https://www." + this.getHost());
-                postRequest.getHeaders().put("Referer", "https://www." + this.getHost());
-                br.setCurrentURL("https://www." + this.getHost());
-                try {
-                    getPageAutoLogin(account, loggedIN, "/api/v1/tags", param, br, postRequest, null, null);
-                } catch (final AccountRequiredException ar) {
-                    logger.log(ar);
-                    /* Instagram blocks the amount of items a user can see based on */
-                    if (loggedIN.get()) {
-                        throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT, null, ar);
-                    } else {
-                        throw new DecrypterRetryException(RetryReason.NO_ACCOUNT, "Account required to crawl more items of hashtag " + hashtag, null, ar);
-                    }
-                }
-                InstaGramCom.checkErrors(this, br);
-                final Map<String, Object> paginationRoot = (Map<String, Object>) JavaScriptEngineFactory.jsonToJavaObject(br.toString());
-                resource_data_list = (List<Object>) JavaScriptEngineFactory.walkJson(paginationRoot, "sections");
-                next_max_id = (String) get(paginationRoot, "next_max_id");
-                more_available = (Boolean) get(paginationRoot, "more_available");
-                next_page = (Number) get(paginationRoot, "next_page");
-            }
-            if (resource_data_list == null || resource_data_list.size() == 0) {
-                logger.info("Stopping because: Found no new links on current page: " + page);
-                break;
-            }
-            decryptedLinksLastSize = ret.size();
-            for (final Object o : resource_data_list) {
-                final List<Object> medias = (List<Object>) JavaScriptEngineFactory.walkJson(o, "layout_content/medias/");
-                if (medias != null) {
-                    for (final Object media : medias) {
-                        ret.addAll(this.crawlPost(param, metadata, (Map<String, Object>) JavaScriptEngineFactory.walkJson(media, "media/")));
-                    }
-                }
-            }
-            crawledNumberofPosts += resource_data_list.size();
-            logger.info("Crawled page " + page + " | Number of posts crawled so far: " + crawledNumberofPosts + "/" + totalNumberofPosts + " | Items crawled so far: " + ret.size());
-            if (!Boolean.TRUE.equals(more_available)) {
-                logger.info("Stopping because: Reached end");
-                break;
-            } else if (next_max_id == null) {
-                logger.info("Stopping because: Failed to find next_max_id");
-                break;
-            } else if (next_page == null) {
-                logger.info("Stopping because: Failed to find next_page");
-                break;
-            } else if (ret.size() == decryptedLinksLastSize) {
-                logger.info("Stopping because: Failed to find any new items this run");
-                break;
-            } else if (ret.size() >= maxItemsLimit) {
-                logger.info("Stopping because: Number of items selected in plugin setting has been crawled --> Done");
-                break;
-            }
-            page++;
-        } while (!this.isAbort());
         return ret;
     }
 
@@ -1305,8 +1211,12 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         }
         /* Login is mandatory! */
         loginOrFail(account, loggedIN);
+        if (!DebugMode.TRUE_IN_IDE_ELSE_FALSE) {
+            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+        }
         getPageAutoLogin(account, loggedIN, null, param, br, param.getCryptedUrl(), null, null);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
+        // final boolean isHashtag = searchTerm.startsWith("#");
         final InstagramMetadata metadata = new InstagramMetadata();
         metadata.setHashtag(searchTerm);
         metadata.setPackageName(getPackagenameHashtag(metadata));
@@ -1317,18 +1227,18 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
         query.appendEncoded("query", searchTerm);
         final HashSet<String> dupes = new HashSet<String>();
         do {
-            br.getPage("https://www.instagram.com/api/v1/fbsearch/web/top_serp/?" + query.toString());
+            // br.getPage("https://www.instagram.com/api/v1/fbsearch/web/top_serp/?" + query.toString());
             final GetRequest req = br.createGetRequest("https://www.instagram.com/api/v1/fbsearch/web/top_serp/?" + query.toString());
             req.getHeaders().put("Origin", "https://www." + this.getHost());
-            req.getHeaders().put("Referer", "https://www." + this.getHost());
+            req.getHeaders().put("Referer", param.getCryptedUrl());
+            br.getPage(req);
             br.setCurrentURL("https://www." + this.getHost());
-            // TODO: Check/fix this
-            getPageAutoLogin(account, loggedIN, "/api/v1/tags", param, br, req, null, null);
             InstaGramCom.checkErrors(this, br);
             final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
             final Map<String, Object> media_grid = (Map<String, Object>) entries.get("media_grid");
             final List<Map<String, Object>> sections = (List<Map<String, Object>>) media_grid.get("sections");
-            String next_max_id = (String) media_grid.get("next_max_id");
+            final String next_max_id = (String) media_grid.get("next_max_id");
+            final String rank_token = (String) media_grid.get("rank_token");
             int numberofNewItemsThisPage = 0;
             for (final Map<String, Object> section : sections) {
                 final List<Object> medias = (List<Object>) JavaScriptEngineFactory.walkJson(section, "layout_content/medias");
@@ -1350,8 +1260,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             if (!Boolean.TRUE.equals(media_grid.get("has_more"))) {
                 logger.info("Stopping because: Reached end");
                 break;
-            } else if (next_max_id == null) {
+            } else if (StringUtils.isEmpty(next_max_id)) {
                 logger.info("Stopping because: Failed to find next_max_id");
+                break;
+            } else if (StringUtils.isEmpty(rank_token)) {
+                logger.info("Stopping because: Failed to find rank_token");
                 break;
             } else if (numberofNewItemsThisPage == 0) {
                 logger.info("Stopping because: Failed to find any new items on current page");
@@ -1360,6 +1273,9 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
                 logger.info("Stopping because: Number of items selected in plugin setting has been crawled --> Done");
                 break;
             }
+            /* Continue to next page */
+            query.addAndReplace("next_max_id", Encoding.urlEncode(next_max_id));
+            query.addAndReplace("rank_token", Encoding.urlEncode(rank_token));
             page++;
         } while (!this.isAbort());
         return ret;
@@ -2160,83 +2076,11 @@ public class InstaGramComDecrypter extends PluginForDecrypt {
             logger.info("Stopping because: User has disabled hashtag crawling");
             return new ArrayList<DownloadLink>();
         }
-        if (loggedIN.get() || account != null) {
-            return this.crawlHashtagAltAPI(param, account, loggedIN);
-        } else {
-            return this.crawlHashtagWebsite(param, account, loggedIN);
+        String hashtag = new Regex(param.getCryptedUrl(), TYPE_HASHTAG).getMatch(0);
+        if (!hashtag.startsWith("#")) {
+            hashtag = "#" + hashtag;
         }
-    }
-
-    private ArrayList<DownloadLink> crawlHashtagAltAPI(final CryptedLink param, final Account account, final AtomicBoolean loggedIN) throws UnsupportedEncodingException, Exception {
-        final String hashtag = new Regex(param.getCryptedUrl(), TYPE_HASHTAG).getMatch(0);
-        if (hashtag == null) {
-            /* Developer mistake */
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
-        /* Login is mandatory! */
-        loginOrFail(account, loggedIN);
-        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
-        InstaGramCom.prepBRAltAPI(this.br);
-        InstaGramCom.getPageAltAPI(account, this.br, InstaGramCom.ALT_API_BASE + "/tags/" + hashtag + "/info/");
-        Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-        final long totalNumberofPosts = JavaScriptEngineFactory.toLong(entries.get("media_count"), 0);
-        if (totalNumberofPosts == 0) {
-            ret.add(this.createOfflinelink(param.getCryptedUrl(), "No items available for this tag: " + hashtag, "No items available for this tag: " + hashtag));
-            return ret;
-        }
-        final InstagramMetadata metadata = new InstagramMetadata();
-        metadata.setHashtag(hashtag);
-        metadata.setPackageName(this.getPackagenameHashtag(metadata));
-        String nextid = null;
-        int page = 1;
-        int numberofCrawledPostsTotal = 0;
-        final String baseURL = InstaGramCom.ALT_API_BASE + "/feed/tag/" + hashtag + "/";
-        final long maxItemsLimit = PluginJsonConfig.get(InstagramConfig.class).getHashtagCrawlerMaxItemsLimit();
-        do {
-            if (page == 1) {
-                /*
-                 * Returns a lot of items on first access and then a lot less e.g. 84 on first request, then 8-9 on each subsequent request.
-                 */
-                InstaGramCom.getPageAltAPI(account, this.br, baseURL);
-            } else {
-                InstaGramCom.getPageAltAPI(account, this.br, baseURL + "?max_id=" + nextid);
-            }
-            entries = restoreFromString(br.toString(), TypeRef.MAP);
-            final int numberofPostsOnThisPage = (int) JavaScriptEngineFactory.toLong(entries.get("num_results"), 0);
-            if (numberofPostsOnThisPage == 0) {
-                /* Rare case */
-                logger.info("Stopping because: 0 items available ...");
-                return ret;
-            }
-            nextid = (String) entries.get("next_max_id");
-            final List<Map<String, Object>> resource_data_list = (List<Map<String, Object>>) entries.get("items");
-            if (resource_data_list.size() == 0) {
-                /* Should never happen(?) */
-                logger.info("Stopping because: Found no new links on page " + page + " --> Stopping decryption");
-                break;
-            }
-            for (final Map<String, Object> post : resource_data_list) {
-                ret.addAll(this.crawlPostAltAPI(param, metadata, post));
-            }
-            numberofCrawledPostsTotal += numberofPostsOnThisPage;
-            logger.info("Crawled page: " + page + " | Crawled posts so far: " + numberofCrawledPostsTotal + "/" + totalNumberofPosts);
-            if (!((Boolean) entries.get("more_available"))) {
-                logger.info("Stopping because: More_available == false");
-                break;
-            } else if (numberofCrawledPostsTotal >= totalNumberofPosts) {
-                logger.info("Stopping because: Found number of items is higher or equal to expected number of items");
-                break;
-            } else if (StringUtils.isEmpty(nextid)) {
-                logger.info("Stopping because: No nextid available");
-                break;
-            } else if (numberofCrawledPostsTotal >= maxItemsLimit) {
-                logger.info("Stopping because: Reached user defined max items limit of " + maxItemsLimit);
-                break;
-            } else {
-                page++;
-            }
-        } while (!this.isAbort());
-        return ret;
+        return this.crawlSearchWebsite(param, account, loggedIN, hashtag);
     }
 
     private ArrayList<DownloadLink> crawlProfileTaggedAltAPI(final CryptedLink param, final Account account, final AtomicBoolean loggedIN) throws UnsupportedEncodingException, Exception {

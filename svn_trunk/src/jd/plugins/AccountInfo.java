@@ -688,22 +688,22 @@ public class AccountInfo extends Property implements AccountTrafficView {
     public void setMultiHostSupportV2(final List<MultiHostHost> mhosts) {
         if (mhosts == null || mhosts.size() == 0) {
             this.multihostSupportV2 = null;
-        } else {
-            for (final MultiHostHost mhost : mhosts) {
-                mhost.setAccountInfo(this);
-            }
-            try {
-                Collections.sort(mhosts, new Comparator<MultiHostHost>() {
-                    @Override
-                    public int compare(MultiHostHost o1, MultiHostHost o2) {
-                        return StringUtils.valueOrEmpty(o1.getDomain()).compareToIgnoreCase(StringUtils.valueOrEmpty(o2.getDomain()));
-                    }
-                });
-            } catch (UnsupportedOperationException ignore) {
-                // eg mHosts instanceof CopyOnWriteArrayList
-            }
-            this.multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(mhosts);
+            return;
         }
+        for (final MultiHostHost mhost : mhosts) {
+            mhost.setAccountInfo(this);
+        }
+        try {
+            Collections.sort(mhosts, new Comparator<MultiHostHost>() {
+                @Override
+                public int compare(MultiHostHost o1, MultiHostHost o2) {
+                    return StringUtils.valueOrEmpty(o1.getDomain()).compareToIgnoreCase(StringUtils.valueOrEmpty(o2.getDomain()));
+                }
+            });
+        } catch (UnsupportedOperationException ignore) {
+            // eg mHosts instanceof CopyOnWriteArrayList
+        }
+        this.multihostSupportV2 = new CopyOnWriteArrayList<MultiHostHost>(mhosts);
     }
 
     /** Returns information about specific host if it is supported. */

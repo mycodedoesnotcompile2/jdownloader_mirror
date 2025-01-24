@@ -47,7 +47,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.SankakucomplexCom;
 
-@DecrypterPlugin(revision = "$Revision: 50487 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50504 $", interfaceVersion = 3, names = {}, urls = {})
 public class SankakucomplexComCrawler extends PluginForDecrypt {
     public SankakucomplexComCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -136,7 +136,7 @@ public class SankakucomplexComCrawler extends PluginForDecrypt {
             return ret;
         }
         final Regex urlinfo = new Regex(param.getCryptedUrl(), TYPE_TAGS_POSTS);
-        final String language = urlinfo.getMatch(0);
+        final String language = urlinfo.getMatch(1);
         String tags = urlinfo.getMatch(2);
         if (tags == null) {
             /* Developer mistake */

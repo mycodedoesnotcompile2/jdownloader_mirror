@@ -99,7 +99,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.components.SiteType.SiteTemplate;
 
-@HostPlugin(revision = "$Revision: 50481 $", interfaceVersion = 2, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50501 $", interfaceVersion = 2, names = {}, urls = {})
 public abstract class XFileSharingProBasic extends antiDDoSForHost implements DownloadConnectionVerifier {
     public XFileSharingProBasic(PluginWrapper wrapper) {
         super(wrapper);
@@ -4009,7 +4009,7 @@ public abstract class XFileSharingProBasic extends antiDDoSForHost implements Do
             throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 'Error happened when generating Download Link'", 10 * 60 * 1000l);
         }
         /** Error handling for premiumonly links */
-        final String premiumOnlyMessage = this.getPremiumOnlyErrorMessage(br);
+        final String premiumOnlyMessage = getPremiumOnlyErrorMessage(br);
         if (premiumOnlyMessage != null) {
             throw new AccountRequiredException(premiumOnlyMessage);
         } else if (isPremiumOnly(br)) {

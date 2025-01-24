@@ -224,7 +224,8 @@ public class AccountController implements AccountControllerListener, AccountProp
             if (ai != null) {
                 final List<MultiHostHost> multiHostSupport = ai.getMultiHostSupportV2();
                 if (multiHostSupport != null) {
-                    for (MultiHostHost support : multiHostSupport) {
+                    for (final MultiHostHost support : multiHostSupport) {
+                        isMulti = true;
                         final MultihosterHostStatus status = support.getStatus();
                         switch (status) {
                         case WORKING:
@@ -233,7 +234,6 @@ public class AccountController implements AccountControllerListener, AccountProp
                         default:
                             continue;
                         }
-                        isMulti = true;
                         final String host = support.getDomain();
                         Map<Account, Object> accs = MULTIHOSTER_ACCOUNTS.get(host);
                         if (accs == null) {

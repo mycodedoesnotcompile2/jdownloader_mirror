@@ -33,7 +33,7 @@ import org.appwork.resources.AWUTheme;
 import org.appwork.resources.IconRef;
 import org.appwork.scheduler.DelayedRunnable;
 import org.appwork.swing.action.BasicAction;
-import org.appwork.utils.images.IconIO;
+import org.appwork.utils.DebugMode;
 import org.appwork.utils.os.CrossSystem;
 import org.appwork.utils.swing.EDTRunner;
 
@@ -92,28 +92,34 @@ public abstract class AbstractTray implements TrayMouseListener {
         systemTray.add(this.trayIcon);
     }
 
+    protected String getBaseIconKey() {
+        return "icon";
+    }
+
     protected TrayIcon initTray() {
         IconRef icon = TrayIconRef.trayicon;
         if (!TrayIconRef.trayicon.exists()) {
             icon = new IconRef() {
                 @Override
                 public String path() {
-                    return "icon";
+                    return getBaseIconKey();
                 }
 
                 @Override
                 public Image image(int size) {
-                    return AWUTheme.I().getImage("icon", size);
+                    return AWUTheme.I().getImage(getBaseIconKey(), size);
                 }
 
                 @Override
                 public Icon icon(int size) {
-                    return AWUTheme.I().getIcon("icon", size);
+                    return AWUTheme.I().getIcon(getBaseIconKey(), size);
                 }
             };
         }
         final Image img = this.createTrayImage(icon);
         final TrayIcon trayIcon = new TrayIcon(img, null, null);
+        // workaround. we should use MultiResImage here amd set auto to false to get a nice image in case of HIghDPI Screens.
+        // however, using true scales img down pretty good.
         trayIcon.setImageAutoSize(true);
         return trayIcon;
     }
@@ -134,18 +140,21 @@ public abstract class AbstractTray implements TrayMouseListener {
      * @param systemTray
      * @return
      */
-    protected Image createTrayImage(IconRef id) {
+    protected Image createTrayImage(final IconRef id) {
         final SystemTray systemTray = SystemTray.getSystemTray();
-        final Image img = IconIO.getScaledInstance(getImage(id), (int) systemTray.getTrayIconSize().getWidth(), (int) systemTray.getTrayIconSize().getHeight());
-        return img;
-    }
-
-    protected Image getImage(IconRef id) {
-        return id.image(-1);
-    }
-
-    protected Image getIcon(IconRef id) {
-        return id.image(-1);
+        Dimension traySize = systemTray.getTrayIconSize();
+        if (CrossSystem.isWindows()) {
+            try {
+                //
+                AffineTransform tx = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().getDefaultTransform();
+                Image img = id.image(Math.max((int) (traySize.width * tx.getScaleX()), (int) (traySize.height * tx.getScaleY())));
+                return img;
+            } catch (Exception e) {
+                LogV3.log(e);
+                DebugMode.debugger();
+            }
+        }
+        return id.image(Math.max(traySize.width, traySize.height));
     }
 
     public void showAbout(MouseEvent mouseevent) {
