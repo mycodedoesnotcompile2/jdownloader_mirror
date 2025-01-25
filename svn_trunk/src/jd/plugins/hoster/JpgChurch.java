@@ -42,7 +42,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 49918 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50511 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -53,9 +53,15 @@ public class JpgChurch extends PluginForHost {
         return new LazyPlugin.FEATURE[] { LazyPlugin.FEATURE.IMAGE_HOST };
     }
 
-    /* Connection stuff */
-    private static final boolean       free_resume        = true;
-    private static final int           free_maxchunks     = 1;
+    @Override
+    public boolean isResumeable(final DownloadLink link, final Account account) {
+        return false;
+    }
+
+    public int getMaxChunks(final DownloadLink link, final Account account) {
+        return 1;
+    }
+
     private String                     dllink             = null;
     private final String               PROPERTY_USER      = "user";
     public static final String         PROPERTY_PHPSESSID = "phpsessid";
@@ -151,7 +157,8 @@ public class JpgChurch extends PluginForHost {
 
     public AvailableStatus requestFileInformation(final DownloadLink link, final boolean isDownload) throws Exception {
         if (!link.isNameSet()) {
-            link.setName(this.applyFilenameExtension(this.getFID(link).replaceAll("-+", " ").trim(), ".jpg"));
+            final String weakTitle = this.getFID(link).replaceAll("-+", " ").trim();
+            link.setName(this.applyFilenameExtension(weakTitle, ".jpg"));
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
@@ -295,7 +302,7 @@ public class JpgChurch extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, free_resume, free_maxchunks);
+        dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, this.isResumeable(link, null), this.getMaxChunks(link, null));
         handleConnectionErrors(br, dl.getConnection());
         /* Add a download slot */
         controlMaxFreeDownloads(null, link, +1);

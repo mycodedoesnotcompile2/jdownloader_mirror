@@ -36,7 +36,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 import jd.plugins.hoster.GigafileNu;
 
-@DecrypterPlugin(revision = "$Revision: 50348 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50512 $", interfaceVersion = 3, names = {}, urls = {})
 public class GigafileNuFolderCrawler extends PluginForDecrypt {
     public GigafileNuFolderCrawler(PluginWrapper wrapper) {
         super(wrapper);
@@ -161,8 +161,8 @@ public class GigafileNuFolderCrawler extends PluginForDecrypt {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
         }
-        // String fpName = br.getRegex("").getMatch(0);
         final FilePackage fp = FilePackage.getInstance();
+        fp.setName(contentID);
         fp.setPackageKey(this.getHost() + "/folder/" + contentID);
         fp.addLinks(ret);
         return ret;

@@ -31,7 +31,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 49274 $", interfaceVersion = 2, names = { "gigabaza.ru" }, urls = { "https?://(?:www\\.)?gigabaza\\.ru/download/(\\d+)\\.html" })
+@HostPlugin(revision = "$Revision: 50511 $", interfaceVersion = 2, names = { "gigabaza.ru" }, urls = { "https?://(?:www\\.)?gigabaza\\.ru/download/(\\d+)\\.html" })
 public class GigabazaRu extends PluginForHost {
     public GigabazaRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -39,7 +39,7 @@ public class GigabazaRu extends PluginForHost {
 
     @Override
     public String getAGBLink() {
-        return "https://gigabaza.ru/copyright.html";
+        return "https://" + getHost() + "/copyright.html";
     }
 
     @Override
@@ -59,14 +59,20 @@ public class GigabazaRu extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         /* 2020-12-04: All files are .zip files(?) */
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
-            link.setName(getFID(link) + ".zip");
+            link.setName(fid + ".zip");
         }
         this.setBrowserExclusive();
         br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
+        }
+        String title = br.getRegex("<h2>Страница скачивания ([^<]+)</h2>").getMatch(0);
+        if (title != null) {
+            title = Encoding.htmlDecode(title).trim();
+            link.setName(fid + "_" + title + ".zip");
         }
         return AvailableStatus.TRUE;
     }

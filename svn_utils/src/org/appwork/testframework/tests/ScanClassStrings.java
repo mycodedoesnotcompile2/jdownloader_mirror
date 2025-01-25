@@ -100,32 +100,36 @@ public class ScanClassStrings extends AWTest {
                         }
                     }
                 }
-                for (Field f : type.getDeclaredFields()) {
-                    if (Modifier.isFinal(f.getModifiers())) {
-                        if (Modifier.isStatic(f.getModifiers())) {
-                            if (f.getType().equals(String.class)) {
-                                AWTestValidateClassReference anno = f.getAnnotation(AWTestValidateClassReference.class);
-                                if (anno != null) {
-                                    f.setAccessible(true);
-                                    String str = (String) f.get(null);
-                                    try {
-                                        // logInfoAnyway("Check class reference: " + (String) f.get(null) + " in: " + type.getName());
-                                        Class.forName(str);
-                                    } catch (Exception e) {
-                                        if (!checkPackage(anno, str)) {
-                                            logInfoAnyway("Skip Class Check: " + type.getName() + "." + f.getName() + " because none of " + anno.classpath() + " is in classpath");
-                                            return;
+                try {
+                    for (Field f : type.getDeclaredFields()) {
+                        if (Modifier.isFinal(f.getModifiers())) {
+                            if (Modifier.isStatic(f.getModifiers())) {
+                                if (f.getType().equals(String.class)) {
+                                    AWTestValidateClassReference anno = f.getAnnotation(AWTestValidateClassReference.class);
+                                    if (anno != null) {
+                                        f.setAccessible(true);
+                                        String str = (String) f.get(null);
+                                        try {
+                                            // logInfoAnyway("Check class reference: " + (String) f.get(null) + " in: " + type.getName());
+                                            Class.forName(str);
+                                        } catch (Exception e) {
+                                            if (!checkPackage(anno, str)) {
+                                                logInfoAnyway("Skip Class Check: " + type.getName() + "." + f.getName() + " because none of " + anno.classpath() + " is in classpath");
+                                                return;
+                                            }
+                                            LogV3.log(e);
+                                            throw e;
                                         }
-                                        LogV3.log(e);
-                                        throw e;
-                                    }
-                                    if (!checkPackage(anno, str)) {
-                                        throw new WTFException("Something is wrong with the dependsOnPackages declarion. Class is availaible, but non of its jar.: \r\n" + type.getName() + "." + f.getName() + "\r\n" + ManagementFactory.getRuntimeMXBean().getClassPath());
+                                        if (!checkPackage(anno, str)) {
+                                            throw new WTFException("Something is wrong with the dependsOnPackages declarion. Class is availaible, but non of its jar.: \r\n" + type.getName() + "." + f.getName() + "\r\n" + ManagementFactory.getRuntimeMXBean().getClassPath());
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } catch (Exception e) {
+                    throw e;
                 }
             }
 

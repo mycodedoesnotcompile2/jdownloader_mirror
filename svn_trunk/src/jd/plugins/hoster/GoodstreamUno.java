@@ -1,5 +1,5 @@
 //jDownloader - Downloadmanager
-//Copyright (C) 2016  JD-Team support@jdownloader.org
+//Copyright (C) 2013  JD-Team support@jdownloader.org
 //
 //This program is free software: you can redistribute it and/or modify
 //it under the terms of the GNU General Public License as published by
@@ -18,43 +18,33 @@ package jd.plugins.hoster;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jdownloader.plugins.components.YetiShareCore;
+import org.jdownloader.plugins.components.XFileSharingProBasic;
 
 import jd.PluginWrapper;
-import jd.http.URLConnectionAdapter;
-import jd.parser.Regex;
 import jd.plugins.Account;
 import jd.plugins.Account.AccountType;
 import jd.plugins.DownloadLink;
 import jd.plugins.HostPlugin;
-import jd.plugins.LinkStatus;
-import jd.plugins.PluginException;
 
-@HostPlugin(revision = "$Revision: 50072 $", interfaceVersion = 2, names = {}, urls = {})
-public class GoodstreamUno extends YetiShareCore {
-    public GoodstreamUno(PluginWrapper wrapper) {
+@HostPlugin(revision = "$Revision: 50513 $", interfaceVersion = 3, names = {}, urls = {})
+public class GoodstreamUno extends XFileSharingProBasic {
+    public GoodstreamUno(final PluginWrapper wrapper) {
         super(wrapper);
-        this.enablePremium(getPurchasePremiumURL());
+        this.enablePremium(super.getPurchasePremiumURL());
     }
 
     /**
-     * DEV NOTES YetiShare<br />
-     ****************************
+     * DEV NOTES XfileSharingProBasic Version SEE SUPER-CLASS<br />
      * mods: See overridden functions<br />
      * limit-info:<br />
-     * captchatype-info: 2023-03-21: null <br />
-     * other: <br />
+     * captchatype-info: null 4dignum solvemedia reCaptchaV2, hcaptcha<br />
+     * other:<br />
      */
     public static List<String[]> getPluginDomains() {
         final List<String[]> ret = new ArrayList<String[]>();
         // each entry in List<String[]> will result in one PluginForHost, Plugin.getHost() will return String[0]->main domain
         ret.add(new String[] { "goodstream.one", "goodstream.uno" });
         return ret;
-    }
-
-    @Override
-    public String rewriteHost(String host) {
-        return this.rewriteHost(getPluginDomains(), host);
     }
 
     public static String[] getAnnotationNames() {
@@ -67,77 +57,45 @@ public class GoodstreamUno extends YetiShareCore {
     }
 
     public static String[] getAnnotationUrls() {
-        final List<String> ret = new ArrayList<String>();
-        for (final String[] domains : getPluginDomains()) {
-            ret.add("https?://(?:www\\.)?" + YetiShareCore.buildHostsPatternPart(domains) + "/(?!folder|shared)(video/embed/[A-Za-z0-9]+(/\\d+x\\d+/[^/<>]+)?|[A-Za-z0-9]+(?:/[^/<>]+)?)");
-        }
-        return ret.toArray(new String[0]);
-    }
-
-    final String PATTERN_EMBED = "(?i)https?://[^/]+/video/embed/([A-Za-z0-9]+)(/\\d+x\\d+/([^/<>]+))?";
-
-    @Override
-    protected String getContentURL(final DownloadLink link) {
-        if (link == null || link.getPluginPatternMatcher() == null) {
-            return null;
-        }
-        /* Change embed URLs -> Normal file-URLs. */
-        final Regex embed = new Regex(link.getPluginPatternMatcher(), PATTERN_EMBED);
-        if (embed.patternFind()) {
-            /* Make sure that upper handling can work with these links -> Return a fitting URL. */
-            final String filenameInsideURL = embed.getMatch(2);
-            String newurl = this.getMainPage(link) + "/" + embed.getMatch(0);
-            if (filenameInsideURL != null) {
-                newurl += "/" + filenameInsideURL;
-            }
-            return newurl;
-        } else {
-            return super.getContentURL(link);
-        }
-    }
-
-    @Override
-    public String getFUIDFromURL(final String url) {
-        final Regex embed = new Regex(url, PATTERN_EMBED);
-        if (embed.patternFind()) {
-            return embed.getMatch(0);
-        } else {
-            return super.getFUIDFromURL(url);
-        }
+        return XFileSharingProBasic.buildAnnotationUrls(getPluginDomains());
     }
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
             /* Free Account */
             return true;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
             /* Premium account */
             return true;
         } else {
             /* Free(anonymous) and unknown account type */
             return true;
-        }
-    }
-
-    public int getMaxChunks(final Account account) {
-        if (account != null && account.getType() == AccountType.FREE) {
-            /* Free Account */
-            return 1;
-        } else if (account != null && account.getType() == AccountType.PREMIUM) {
-            /* Premium account */
-            return 1;
-        } else {
-            /* Free(anonymous) and unknown account type */
-            return 1;
         }
     }
 
     @Override
-    public int getMaxSimultanFreeDownloadNum() {
+    public int getMaxChunks(final Account account) {
+        final AccountType type = account != null ? account.getType() : null;
+        if (AccountType.FREE.equals(type)) {
+            /* Free Account */
+            return 0;
+        } else if (AccountType.PREMIUM.equals(type) || AccountType.LIFETIME.equals(type)) {
+            /* Premium account */
+            return 0;
+        } else {
+            /* Free(anonymous) and unknown account type */
+            return 0;
+        }
+    }
+
+    @Override
+    public int getMaxSimultaneousFreeAnonymousDownloads() {
         return -1;
     }
 
+    @Override
     public int getMaxSimultaneousFreeAccountDownloads() {
         return -1;
     }
@@ -145,17 +103,5 @@ public class GoodstreamUno extends YetiShareCore {
     @Override
     public int getMaxSimultanPremiumDownloadNum() {
         return -1;
-    }
-
-    @Override
-    protected void checkResponseCodeErrors(final URLConnectionAdapter con) throws PluginException {
-        if (con == null) {
-            return;
-        }
-        super.checkResponseCodeErrors(con);
-        final long responsecode = con.getResponseCode();
-        if (responsecode == 500) {
-            throw new PluginException(LinkStatus.ERROR_TEMPORARILY_UNAVAILABLE, "Server error 500", 30 * 60 * 1000l);
-        }
     }
 }

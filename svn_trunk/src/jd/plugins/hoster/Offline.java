@@ -45,7 +45,7 @@ import jd.plugins.PluginForHost;
  *
  * @author raztoki<br />
  */
-@HostPlugin(revision = "$Revision: 50482 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50512 $", interfaceVersion = 3, names = {}, urls = {})
 public class Offline extends PluginForHost {
     public static String getOfflineVersion() {
         final HostPlugin hostPlugin = Offline.class.getAnnotation(HostPlugin.class);
@@ -184,6 +184,7 @@ public class Offline extends PluginForHost {
         ret.add(new String[] { "qqupload.com" });
         ret.add(new String[] { "femdomrip.com" });
         ret.add(new String[] { "camhoes.tv" });
+        ret.add(new String[] { "sincity.is", "goodporn.to", "goodporn.se" });
         if (cache != null) {
             cache.put(cacheID, ret);
         }

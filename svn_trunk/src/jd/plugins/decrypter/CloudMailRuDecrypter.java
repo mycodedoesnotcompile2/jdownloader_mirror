@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.appwork.storage.TypeRef;
 import org.appwork.utils.StringUtils;
 import org.appwork.utils.encoding.URLEncode;
 import org.jdownloader.scripting.JavaScriptEngineFactory;
@@ -26,6 +27,7 @@ import org.jdownloader.scripting.JavaScriptEngineFactory;
 import jd.PluginWrapper;
 import jd.config.SubConfiguration;
 import jd.controlling.ProgressController;
+import jd.http.Browser;
 import jd.nutils.encoding.Encoding;
 import jd.parser.Regex;
 import jd.plugins.CryptedLink;
@@ -40,10 +42,21 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.hoster.CloudMailRu;
 
-@DecrypterPlugin(revision = "$Revision: 46794 $", interfaceVersion = 3, names = { "cloud.mail.ru" }, urls = { "https?://(?:www\\.)?cloud\\.mail\\.ru((?:/|%2F)public(?:/|%2F)[a-z0-9]+(?:/|%2F)[^<>\"]+|(?:/|%2F)(?:files(?:/|%2F))?[A-Z0-9]{32})" })
+@DecrypterPlugin(revision = "$Revision: 50511 $", interfaceVersion = 3, names = { "cloud.mail.ru" }, urls = { "https?://(?:www\\.)?cloud\\.mail\\.ru((?:/|%2F)public(?:/|%2F)[a-z0-9]+(?:/|%2F)[^<>\"]+|(?:/|%2F)(?:files(?:/|%2F))?[A-Z0-9]{32})" })
 public class CloudMailRuDecrypter extends PluginForDecrypt {
     public CloudMailRuDecrypter(PluginWrapper wrapper) {
         super(wrapper);
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        br.getHeaders().put("Accept-Language", "en-us;q=0.7,en;q=0.3");
+        br.getHeaders().put("Accept-Charset", null);
+        br.setAllowedResponseCodes(new int[] { 400 });
+        br.setFollowRedirects(true);
+        return br;
     }
 
     /* Last updated: 2020-12-16 */
@@ -52,13 +65,11 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
     private static final double MAX_ZIP_FILESIZE = 4194304;
     private static String       DOWNLOAD_ZIP     = "DOWNLOAD_ZIP_2";
     private static final String TYPE_APIV2       = "https?://(www\\.)?cloud\\.mail\\.ru/(?:files/)?[A-Z0-9]{32}";
-    private String              json;
     private String              parameter        = null;
 
     @SuppressWarnings({ "deprecation", "unchecked" })
     public ArrayList<DownloadLink> decryptIt(final CryptedLink param, ProgressController progress) throws Exception {
-        final ArrayList<DownloadLink> decryptedLinks = new ArrayList<DownloadLink>();
-        prepBR();
+        final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         parameter = Encoding.htmlDecode(param.toString()).replace("http://", "https://");
         if (parameter.endsWith("/")) {
             parameter = parameter.substring(0, parameter.lastIndexOf("/"));
@@ -100,8 +111,7 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
             }
         }
         // main.setProperty("plain_request_id", id);
-        json = br.toString();
-        Map<String, Object> entries = JavaScriptEngineFactory.jsonToJavaMap(json);
+        Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         entries = (Map<String, Object>) entries.get("body");
         long completeFolderSize = 0;
         if (entries.containsKey("size")) {
@@ -145,7 +155,7 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
                 weblink = "https://cloud.mail.ru/public/" + encoded_weblink;
                 final DownloadLink folderLink = createDownloadlink(weblink);
                 folderLink.setRelativeDownloadFolderPath(subfolder + "/" + itemTitle);
-                decryptedLinks.add(folderLink);
+                ret.add(folderLink);
             } else {
                 if ("illegal".equals(entries.get("uflr"))) {
                     // flagged as illegal, no longer available, doesn't show up in browser either
@@ -185,10 +195,10 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
                 if (fp != null) {
                     dl._setFilePackage(fp);
                 }
-                decryptedLinks.add(dl);
+                ret.add(dl);
             }
         }
-        if (decryptedLinks.size() > 1 && completeFolderSize <= MAX_ZIP_FILESIZE * 1024 && SubConfiguration.getConfig("cloud.mail.ru").getBooleanProperty(DOWNLOAD_ZIP, false)) {
+        if (ret.size() > 1 && completeFolderSize <= MAX_ZIP_FILESIZE * 1024 && SubConfiguration.getConfig("cloud.mail.ru").getBooleanProperty(DOWNLOAD_ZIP, false)) {
             /* = all files (links) of the folder as .zip archive */
             final DownloadLink main = createDownloadlink(parameter);
             if (!StringUtils.isEmpty(title_of_current_folder)) {
@@ -207,16 +217,8 @@ public class CloudMailRuDecrypter extends PluginForDecrypt {
             if (fp != null) {
                 main._setFilePackage(fp);
             }
-            decryptedLinks.add(main);
+            ret.add(main);
         }
-        return decryptedLinks;
-    }
-
-    private void prepBR() {
-        br.setFollowRedirects(true);
-        br.getHeaders().put("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        br.getHeaders().put("Accept-Language", "en-us;q=0.7,en;q=0.3");
-        br.getHeaders().put("Accept-Charset", null);
-        br.setAllowedResponseCodes(new int[] { 400 });
+        return ret;
     }
 }

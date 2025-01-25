@@ -46,7 +46,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49212 $", interfaceVersion = 2, names = { "cloud.mail.ru" }, urls = { "https?://cloud\\.mail\\.ru/public/[A-Za-z0-9]+/[A-Za-z0-9]+.*|https?://[a-z0-9]+\\.datacloudmail\\.ru/weblink/(view|get)/[a-z0-9]+/[^<>\"/]+/[^<>\"/]+" })
+@HostPlugin(revision = "$Revision: 50511 $", interfaceVersion = 2, names = { "cloud.mail.ru" }, urls = { "https?://cloud\\.mail\\.ru/public/[A-Za-z0-9]+/[A-Za-z0-9]+.*|https?://[a-z0-9]+\\.datacloudmail\\.ru/weblink/(view|get)/[a-z0-9]+/[^<>\"/]+/[^<>\"/]+" })
 public class CloudMailRu extends PluginForHost {
     public CloudMailRu(PluginWrapper wrapper) {
         super(wrapper);
@@ -68,7 +68,6 @@ public class CloudMailRu extends PluginForHost {
     /* Connection stuff */
     private static final boolean FREE_RESUME               = true;
     private static final int     FREE_MAXCHUNKS            = 0;
-    private static final int     FREE_MAXDOWNLOADS         = -1;
     private static final boolean ACCOUNT_FREE_RESUME       = true;
     private static final int     ACCOUNT_FREE_MAXCHUNKS    = 0;
     private static final int     ACCOUNT_FREE_MAXDOWNLOADS = -1;
@@ -110,6 +109,7 @@ public class CloudMailRu extends PluginForHost {
                     }
                 } else {
                     br2.followConnection(true);
+                    this.checkErrorsWebsite(br, link, null);
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } finally {
@@ -123,11 +123,13 @@ public class CloudMailRu extends PluginForHost {
             /* Check if main-folder still exists */
             if (link.getBooleanProperty("noapi", false)) {
                 br.getPage(getContentURL(link));
+                this.checkErrorsWebsite(br, link, null);
                 if (br.getHttpConnection().getResponseCode() == 404) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
             } else {
                 br.getPage(API_BASE + "/folder?weblink=" + URLEncode.encodeURIComponent(getWeblink(link)) + "&sort=%7B%22type%22%3A%22name%22%2C%22order%22%3A%22asc%22%7D&offset=0&limit=500&api=2&build=" + BUILD);
+                this.checkErrorsWebsite(br, link, null);
                 if (br.containsHTML("\"status\":400")) {
                     throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
                 }
@@ -233,6 +235,7 @@ public class CloudMailRu extends PluginForHost {
                 String dataserver = null;
                 String pageid = null;
                 this.br.getPage(getContentURL(link));
+                this.checkErrorsWebsite(br, link, null);
                 final String web_json = this.br.getRegex("window\\[\"__configObject[^<>\"]+\"\\] =(\\{.*?\\});<").getMatch(0);
                 if (web_json != null) {
                     // using linkedhashmap here will result in exception
@@ -375,87 +378,73 @@ public class CloudMailRu extends PluginForHost {
 
     private void login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            try {
-                br.setCookiesExclusive(true);
-                final Cookies cookies = account.loadCookies("");
-                /* TODO: Add cookie check */
-                if (cookies != null && !force) {
-                    this.br.setCookies(this.getHost(), cookies);
-                    logger.info("Trust cookies without check");
-                    return;
-                }
-                if (true) {
-                    /* 2020-12-16: Login is broken */
-                    throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-                }
-                br.setFollowRedirects(true);
-                br.getPage("https://account.mail.ru/login");
-                final UrlQuery login1 = new UrlQuery();
-                login1.appendEncoded("login", account.getUser());
-                login1.add("htmlencoded", "false");
-                login1.appendEncoded("referrer", "https://cloud.mail.ru/");
-                login1.appendEncoded("email", account.getUser());
-                br.getHeaders().put("Referer", "https://account.mail.ru/");
-                br.postPage("https://auth.mail.ru/api/v1/pushauth/info", login1);
-                Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
-                final int status = ((Number) entries.get("status")).intValue();
-                if (status != 200) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                entries = (Map<String, Object>) entries.get("body");
-                final boolean twoStep = ((Boolean) entries.get("twostep")).booleanValue();
-                if (twoStep) {
-                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "two-factor-authentication is not yet supported!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                }
-                final UrlQuery login2 = new UrlQuery();
-                login2.appendEncoded("username", account.getUser());
-                login2.appendEncoded("Login", account.getUser());
-                login2.appendEncoded("password", account.getPass());
-                login2.appendEncoded("Password", account.getPass());
-                login2.appendEncoded("saveauth", "1");
-                login2.appendEncoded("new_auth_form", "1");
-                login2.add("FromAccount", "opener%3Daccount%26twoSteps%3D1");
-                login2.add("act_token", "TODO");
-                login2.add("page", "TODO");
-                login2.add("lang", "en_US");
-                br.postPage("https://auth.mail.ru/cgi-bin/auth", login2);
-                final String mail_domain = account.getUser().split("@")[1];
-                final String postData = "page=https%3A%2F%2Fcloud.mail.ru%2F&FailPage=&Domain=" + mail_domain + "&Login=" + URLEncode.encodeURIComponent(account.getUser()) + "&Password=" + URLEncode.encodeURIComponent(account.getPass()) + "&new_auth_form=1&saveauth=1";
-                br.postPage("https://auth.mail.ru/cgi-bin/auth?lang=ru_RU&from=authpopup", postData);
-                if (br.containsHTML("\\&fail=1") || br.getCookie("http://auth.mail.ru/", "ssdc") == null) {
-                    if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    } else {
-                        throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-                    }
-                }
-                br.getPage("https://cloud.mail.ru/?from=authpopup");
-                account.saveCookies(this.br.getCookies(this.getHost()), "");
-            } catch (final PluginException e) {
-                if (e.getLinkStatus() == LinkStatus.ERROR_PREMIUM) {
-                    account.clearCookies("");
-                }
-                throw e;
+            br.setCookiesExclusive(true);
+            final Cookies cookies = account.loadCookies("");
+            /* TODO: Add cookie check */
+            if (cookies != null && !force) {
+                this.br.setCookies(this.getHost(), cookies);
+                logger.info("Trust cookies without check");
+                return;
             }
+            if (true) {
+                /* 2020-12-16: Login is broken */
+                throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
+            }
+            br.setFollowRedirects(true);
+            br.getPage("https://account.mail.ru/login");
+            final UrlQuery login1 = new UrlQuery();
+            login1.appendEncoded("login", account.getUser());
+            login1.add("htmlencoded", "false");
+            login1.appendEncoded("referrer", "https://cloud.mail.ru/");
+            login1.appendEncoded("email", account.getUser());
+            br.getHeaders().put("Referer", "https://account.mail.ru/");
+            br.postPage("https://auth.mail.ru/api/v1/pushauth/info", login1);
+            Map<String, Object> entries = restoreFromString(br.toString(), TypeRef.MAP);
+            final int status = ((Number) entries.get("status")).intValue();
+            if (status != 200) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            entries = (Map<String, Object>) entries.get("body");
+            final boolean twoStep = ((Boolean) entries.get("twostep")).booleanValue();
+            if (twoStep) {
+                throw new PluginException(LinkStatus.ERROR_PREMIUM, "two-factor-authentication is not yet supported!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+            }
+            final UrlQuery login2 = new UrlQuery();
+            login2.appendEncoded("username", account.getUser());
+            login2.appendEncoded("Login", account.getUser());
+            login2.appendEncoded("password", account.getPass());
+            login2.appendEncoded("Password", account.getPass());
+            login2.appendEncoded("saveauth", "1");
+            login2.appendEncoded("new_auth_form", "1");
+            login2.add("FromAccount", "opener%3Daccount%26twoSteps%3D1");
+            login2.add("act_token", "TODO");
+            login2.add("page", "TODO");
+            login2.add("lang", "en_US");
+            br.postPage("https://auth.mail.ru/cgi-bin/auth", login2);
+            final String mail_domain = account.getUser().split("@")[1];
+            final String postData = "page=https%3A%2F%2Fcloud.mail.ru%2F&FailPage=&Domain=" + mail_domain + "&Login=" + URLEncode.encodeURIComponent(account.getUser()) + "&Password=" + URLEncode.encodeURIComponent(account.getPass()) + "&new_auth_form=1&saveauth=1";
+            br.postPage("https://auth.mail.ru/cgi-bin/auth?lang=ru_RU&from=authpopup", postData);
+            if (br.containsHTML("\\&fail=1") || br.getCookie("http://auth.mail.ru/", "ssdc") == null) {
+                this.checkErrorsWebsite(br, null, account);
+                if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nUngültiger Benutzername oder ungültiges Passwort!\r\nSchnellhilfe: \r\nDu bist dir sicher, dass dein eingegebener Benutzername und Passwort stimmen?\r\nFalls dein Passwort Sonderzeichen enthält, ändere es und versuche es erneut!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                } else {
+                    throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nInvalid username/password!\r\nQuick help:\r\nYou're sure that the username and password you entered are correct?\r\nIf your password contains special characters, change it (remove them) and try again!", PluginException.VALUE_ID_PREMIUM_DISABLE);
+                }
+            }
+            br.getPage("https://cloud.mail.ru/?from=authpopup");
+            account.saveCookies(this.br.getCookies(this.getHost()), "");
         }
     }
 
     @Override
     public AccountInfo fetchAccountInfo(final Account account) throws Exception {
         final AccountInfo ai = new AccountInfo();
-        if (!account.getUser().matches(".+@.+\\..+")) {
-            if ("de".equalsIgnoreCase(System.getProperty("user.language"))) {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nBitte gib deine E-Mail Adresse ins Benutzername Feld ein!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            } else {
-                throw new PluginException(LinkStatus.ERROR_PREMIUM, "\r\nPlease enter your e-mail address in the username field!", PluginException.VALUE_ID_PREMIUM_DISABLE);
-            }
-        }
         login(account, true);
         ai.setUnlimitedTraffic();
         account.setMaxSimultanDownloads(ACCOUNT_FREE_MAXDOWNLOADS);
         account.setConcurrentUsePossible(true);
         account.setType(AccountType.FREE);
-        ai.setStatus("Free Account");
         return ai;
     }
 
@@ -466,6 +455,7 @@ public class CloudMailRu extends PluginForHost {
         login(account, false);
         br.setFollowRedirects(false);
         br.getPage(link.getDownloadURL());
+        this.checkErrorsWebsite(br, link, account);
         if (AccountType.FREE.equals(account.getType())) {
             doFree(link, ACCOUNT_FREE_RESUME, ACCOUNT_FREE_MAXCHUNKS, "account_free_directlink");
             return;
@@ -479,10 +469,17 @@ public class CloudMailRu extends PluginForHost {
         if (!this.looksLikeDownloadableContent(dl.getConnection())) {
             logger.warning("The final dllink seems not to be a file!");
             br.followConnection(true);
+            this.checkErrorsWebsite(br, link, account);
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
         link.setProperty("premium_directlink", dllink);
         dl.startDownload();
+    }
+
+    private void checkErrorsWebsite(final Browser br, final DownloadLink link, final Account account) throws PluginException {
+        if (StringUtils.containsIgnoreCase(br.getURL(), "/challenge.html")) {
+            throw new PluginException(LinkStatus.ERROR_HOSTER_TEMPORARILY_UNAVAILABLE, "Blocked by anti bot challenge");
+        }
     }
 
     private void setConfigElements() {
@@ -495,7 +492,13 @@ public class CloudMailRu extends PluginForHost {
 
     @Override
     public int getMaxSimultanFreeDownloadNum() {
-        return FREE_MAXDOWNLOADS;
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override
