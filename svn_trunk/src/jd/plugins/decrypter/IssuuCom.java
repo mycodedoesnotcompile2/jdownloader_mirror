@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.appwork.storage.JSonStorage;
 import org.appwork.storage.TypeRef;
 import org.jdownloader.plugins.components.config.IssuuComConfig;
 import org.jdownloader.plugins.config.PluginJsonConfig;
@@ -37,7 +36,7 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForDecrypt;
 
-@DecrypterPlugin(revision = "$Revision: 48194 $", interfaceVersion = 2, names = { "issuu.com" }, urls = { "https?://(?:www\\.)?issuu\\.com/[a-z0-9\\-_\\.]+/docs/[a-z0-9\\-_\\.]+|https?://e\\.issuu\\.com/embed\\.html#\\d+/\\d+" })
+@DecrypterPlugin(revision = "$Revision: 50515 $", interfaceVersion = 2, names = { "issuu.com" }, urls = { "https?://(?:www\\.)?issuu\\.com/[a-z0-9\\-_\\.]+/docs/[a-z0-9\\-_\\.]+|https?://e\\.issuu\\.com/embed\\.html#\\d+/\\d+" })
 public class IssuuCom extends PluginForDecrypt {
     public IssuuCom(PluginWrapper wrapper) {
         super(wrapper);
@@ -80,15 +79,15 @@ public class IssuuCom extends PluginForDecrypt {
             ownerUsername = urlinfo.getMatch(0);
             documentURI = urlinfo.getMatch(1);
         }
-        br.getPage("https://api.issuu.com/call/backend-reader3/dynamic/" + ownerUsername + "/" + documentURI);
+        br.getPage("https://issuu.com/call/reader/dynamic/" + ownerUsername + "/" + documentURI);
         if (isOffline(br)) {
             /* E.g. {"message":"Document does not exist"} */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
-        final Map<String, Object> docInfo = restoreFromString(br.toString(), TypeRef.MAP);
+        final Map<String, Object> docInfo = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> metadata = (Map<String, Object>) docInfo.get("metadata");
         br.getPage("https://reader3.isu.pub/" + ownerUsername + "/" + documentURI + "/reader3_4.json");
-        Map<String, Object> docInfo2 = restoreFromString(br.toString(), TypeRef.MAP);
+        Map<String, Object> docInfo2 = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
         final Map<String, Object> document = (Map<String, Object>) docInfo2.get("document");
         final List<Map<String, Object>> pages = (List<Map<String, Object>>) document.get("pages");
         // final String username = docInfo.get("userDisplayName").toString();
@@ -124,7 +123,13 @@ public class IssuuCom extends PluginForDecrypt {
     }
 
     private boolean isOffline(final Browser br) {
-        return br.getHttpConnection().getResponseCode() == 403 || br.getHttpConnection().getResponseCode() == 404;
+        if (br.getHttpConnection().getResponseCode() == 403) {
+            return true;
+        } else if (br.getHttpConnection().getResponseCode() == 404) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override

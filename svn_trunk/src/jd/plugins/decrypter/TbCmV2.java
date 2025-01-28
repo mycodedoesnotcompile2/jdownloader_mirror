@@ -102,7 +102,7 @@ import jd.plugins.PluginForDecrypt;
 import jd.plugins.components.UserAgents;
 import jd.plugins.components.UserAgents.BrowserName;
 
-@DecrypterPlugin(revision = "$Revision: 50453 $", interfaceVersion = 3, names = {}, urls = {})
+@DecrypterPlugin(revision = "$Revision: 50518 $", interfaceVersion = 3, names = {}, urls = {})
 public class TbCmV2 extends PluginForDecrypt {
     /* Shorted wait time between requests when JDownloader is run in IDE to allow for faster debugging. */
     private static final int DDOS_WAIT_MAX        = Application.isJared(null) ? 1000 : 10;
@@ -135,7 +135,7 @@ public class TbCmV2 extends PluginForDecrypt {
     public static String[] getAnnotationUrls() {
         final List<String> ret = new ArrayList<String>();
         for (final String[] domains : getPluginDomains()) {
-            String pattern = "https?://(?:www\\.)?" + buildHostsPatternPart(domains) + "/";
+            String pattern = "https?://(?:(?:www|m)\\.)?" + buildHostsPatternPart(domains) + "/";
             pattern += "(";
             pattern += "embed(\\?v=|/)" + VIDEO_ID_PATTERN + ".*";
             pattern += "|live/" + VIDEO_ID_PATTERN;

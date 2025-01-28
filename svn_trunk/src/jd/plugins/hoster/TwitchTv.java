@@ -62,7 +62,7 @@ import jd.plugins.components.PluginJSonUtils;
 import jd.plugins.download.raf.FileBytesMap;
 import jd.utils.locale.JDL;
 
-@HostPlugin(revision = "$Revision: 49732 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
+@HostPlugin(revision = "$Revision: 50515 $", interfaceVersion = 2, names = { "twitch.tv" }, urls = { "http://twitchdecrypted\\.tv/\\d+" })
 public class TwitchTv extends PluginForHost {
     public TwitchTv(PluginWrapper wrapper) {
         super(wrapper);
@@ -770,10 +770,17 @@ public class TwitchTv extends PluginForHost {
 
     @Override
     public void resetDownloadlink(DownloadLink link) {
-        if (link != null) {
-            link.removeProperty(twitchEstimatedSize);
-            link.removeProperty(applyMissingVideoStreamWorkaround);
+        if (link == null) {
+            return;
         }
+        link.removeProperty(twitchEstimatedSize);
+        link.removeProperty(applyMissingVideoStreamWorkaround);
+    }
+
+    @Override
+    public boolean allowHandle(final DownloadLink link, final PluginForHost plugin) {
+        /* No not allow multihost plugins to handle items from this plugin. */
+        return link.getHost().equalsIgnoreCase(plugin.getHost());
     }
 
     @Override

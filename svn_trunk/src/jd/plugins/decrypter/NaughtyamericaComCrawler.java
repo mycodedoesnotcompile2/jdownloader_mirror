@@ -52,7 +52,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.hoster.DirectHTTP;
 import jd.plugins.hoster.NaughtyamericaCom;
 
-@DecrypterPlugin(revision = "$Revision: 49968 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
+@DecrypterPlugin(revision = "$Revision: 50515 $", interfaceVersion = 2, names = { "naughtyamerica.com" }, urls = { "https?://(?:members|tour|www)\\.naughtyamerica\\.com/scene/[a-z0-9\\-]+\\-\\d+" })
 public class NaughtyamericaComCrawler extends PluginForDecrypt {
     private NaughtyamericaConfig cfg;
 
@@ -91,7 +91,7 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
         return entries.get(0);
     }
 
-    public ArrayList<DownloadLink> crawlContent(final CryptedLink param, final boolean ignoreQualitySelection) throws Exception {
+    public ArrayList<DownloadLink> crawlContent(final CryptedLink param, boolean ignoreQualitySelection) throws Exception {
         cfg = PluginJsonConfig.get(NaughtyamericaConfig.class);
         final ArrayList<DownloadLink> ret = new ArrayList<DownloadLink>();
         /* 2016-12-12: Prefer current website instead of beta */
@@ -244,7 +244,8 @@ public class NaughtyamericaComCrawler extends PluginForDecrypt {
                     ret.addAll(unknownQualities);
                 }
                 if (ret.isEmpty()) {
-                    throw new DecrypterRetryException(RetryReason.PLUGIN_SETTINGS, "FAILED_TO_FIND_ANY_SELECTED_QUALITY_" + urlSlug, "None of your selected qualities have been found. Select all to get results.");
+                    logger.info("User configured plugin in a way that would return zero results -> Returning all instead");
+                    ignoreQualitySelection = true;
                 }
             } else {
                 /* Fallback: Add all unknown qualities */

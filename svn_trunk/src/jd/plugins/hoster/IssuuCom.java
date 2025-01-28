@@ -43,11 +43,18 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.PluginJSonUtils;
 
-@HostPlugin(revision = "$Revision: 50001 $", interfaceVersion = 3, names = { "issuu.com" }, urls = { "https?://issuu\\.com/([a-z0-9\\-_\\.]+)/docs/([a-z0-9\\-_]+)" })
+@HostPlugin(revision = "$Revision: 50517 $", interfaceVersion = 3, names = { "issuu.com" }, urls = { "https?://issuu\\.com/([a-z0-9\\-_\\.]+)/docs/([a-z0-9\\-_]+)" })
 public class IssuuCom extends PluginForHost {
     public IssuuCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/signup");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -60,7 +67,6 @@ public class IssuuCom extends PluginForHost {
         return "https://" + getHost() + "/acceptterms";
     }
 
-    private String             documentID           = null;
     public static final String PROPERTY_FINAL_NAME  = "finalname";
     public static final String PROPERTY_DOCUMENT_ID = "document_id";
 
@@ -76,21 +82,22 @@ public class IssuuCom extends PluginForHost {
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
         this.setBrowserExclusive();
-        /* Typically this oembed API returns 501 for offline content */
-        this.br.setAllowedResponseCodes(501);
-        this.br.setFollowRedirects(true);
         final String filename = link.getStringProperty("finalname");
         if (filename != null) {
             link.setFinalFileName(filename);
         }
-        this.br.getPage("https://issuu.com/oembed?format=json&url=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
-        if (this.br.getHttpConnection().getResponseCode() != 200) {
+        final Browser brc = br.cloneBrowser();
+        brc.setAllowedResponseCodes(501);
+        brc.getPage("https://issuu.com/oembed?format=json&url=" + Encoding.urlEncode(link.getPluginPatternMatcher()));
+        if (brc.getHttpConnection().getResponseCode() != 200) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
         if (filename == null) {
-            final Map<String, Object> entries = restoreFromString(br.getRequest().getHtmlCode(), TypeRef.MAP);
+            final Map<String, Object> entries = restoreFromString(brc.getRequest().getHtmlCode(), TypeRef.MAP);
             link.setFinalFileName(entries.get("title") + ".pdf");
         }
+        /* Small hack */
+        br.setRequest(brc.getRequest());
         return AvailableStatus.TRUE;
     }
 
@@ -103,21 +110,14 @@ public class IssuuCom extends PluginForHost {
         synchronized (account) {
             br.setCookiesExclusive(true);
             final Cookies userCookies = account.loadUserCookies();
-            if (userCookies == null) {
-                showCookieLoginInfo();
-                throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_required());
-            }
-            br.setCookies(this.getHost(), userCookies);
+            br.setCookies(userCookies);
             if (!force) {
                 /* Do not check cookies */
                 return;
             }
             br.setFollowRedirects(true);
             br.getPage("https://" + this.getHost() + "/home/publisher");
-            if (isLoggedIn(br)) {
-                logger.info("User cookie login successful");
-                return;
-            } else {
+            if (!isLoggedIn(br)) {
                 logger.info("User cookie login failed");
                 if (account.hasEverBeenValid()) {
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_expired());
@@ -125,11 +125,12 @@ public class IssuuCom extends PluginForHost {
                     throw new AccountInvalidException(_GUI.T.accountdialog_check_cookies_invalid());
                 }
             }
+            logger.info("User cookie login successful");
         }
     }
 
     private boolean isLoggedIn(final Browser br) {
-        if (br.containsHTML("data-track=\"logout\"")) {
+        if (br.containsHTML("<a[^>]*href\\s*=\\s*\"/logout\"")) {
             return true;
         } else {
             return false;
@@ -142,6 +143,14 @@ public class IssuuCom extends PluginForHost {
         final AccountInfo ai = new AccountInfo();
         ai.setUnlimitedTraffic();
         account.setType(AccountType.FREE);
+        final String htmlUnescaped = PluginJSonUtils.unescape(br.getRequest().getHtmlCode());
+        final String email = new Regex(htmlUnescaped, "\"email\":\"([^\"]+)").getMatch(0);
+        if (email == null) {
+            logger.info("Failed to find unique user-ID in html source");
+        } else if (!htmlUnescaped.contains(account.getUser() + "\"") && !email.equalsIgnoreCase(account.getUser())) {
+            /* User may have used username or email in JDownloaders' "username" field. */
+            account.setUser(email);
+        }
         return ai;
     }
 
@@ -152,7 +161,7 @@ public class IssuuCom extends PluginForHost {
 
     public void handleDownload(final DownloadLink link, final Account account) throws Exception {
         requestFileInformation(link);
-        documentID = this.br.getRegex("\"thumbnail_url\":\"https?://image\\.issuu\\.com/([^<>\"/]*?)/").getMatch(0);
+        String documentID = this.br.getRegex("\"thumbnail_url\":\"https?://image\\.issuu\\.com/([^<>\"/]*?)/").getMatch(0);
         if (documentID == null) {
             br.getPage(link.getPluginPatternMatcher());
             if (br.getHttpConnection().getResponseCode() == 404) {
@@ -200,14 +209,10 @@ public class IssuuCom extends PluginForHost {
         if (StringUtils.isEmpty(dllink)) {
             throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
         }
-        // We have to wait here, otherwise we'll get an empty file!
+        // We have to wait here, otherwise we might get an empty file!
         sleep(3 * 1000l, link);
         dl = jd.plugins.BrowserAdapter.openDownload(br, link, dllink, true, 0);
-        if (!this.looksLikeDownloadableContent(dl.getConnection())) {
-            logger.warning("The final dllink seems not to be a file!");
-            br.followConnection(true);
-            throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
-        }
+        this.handleConnectionErrors(br, dl.getConnection());
         dl.startDownload();
     }
 

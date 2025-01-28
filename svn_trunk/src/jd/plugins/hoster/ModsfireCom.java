@@ -44,11 +44,18 @@ import jd.plugins.LinkStatus;
 import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 
-@HostPlugin(revision = "$Revision: 50442 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50515 $", interfaceVersion = 3, names = {}, urls = {})
 public class ModsfireCom extends PluginForHost {
     public ModsfireCom(PluginWrapper wrapper) {
         super(wrapper);
         this.enablePremium("https://" + getHost() + "/register");
+    }
+
+    @Override
+    public Browser createNewBrowserInstance() {
+        final Browser br = super.createNewBrowserInstance();
+        br.setFollowRedirects(true);
+        return br;
     }
 
     @Override
@@ -109,16 +116,15 @@ public class ModsfireCom extends PluginForHost {
 
     @Override
     public AvailableStatus requestFileInformation(final DownloadLink link) throws IOException, PluginException {
+        final String fid = this.getFID(link);
         if (!link.isNameSet()) {
             /* Fallback */
-            link.setName(this.getFID(link));
+            link.setName(fid);
         }
-        this.setBrowserExclusive();
-        br.setFollowRedirects(true);
         br.getPage(link.getPluginPatternMatcher());
         if (br.getHttpConnection().getResponseCode() == 404) {
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
-        } else if (!br.containsHTML("/download/" + this.getFID(link))) {
+        } else if (!br.containsHTML("/download/" + fid)) {
             /* Not a download url e.g. "https://modsfire.com/register" */
             throw new PluginException(LinkStatus.ERROR_FILE_NOT_FOUND);
         }
@@ -234,7 +240,6 @@ public class ModsfireCom extends PluginForHost {
 
     private boolean login(final Account account, final boolean force) throws Exception {
         synchronized (account) {
-            br.setFollowRedirects(true);
             br.setCookiesExclusive(true);
             final Cookies cookies = account.loadCookies("");
             final String url_relative_premium = "/premium";
@@ -291,6 +296,7 @@ public class ModsfireCom extends PluginForHost {
         ai.setUnlimitedTraffic();
         final String expire = br.getRegex("(\\d{4}-\\d{2}-\\d{2})").getMatch(0);
         if (expire == null) {
+            /* Either this is a free account or the website layout was changed. */
             throw new AccountInvalidException("Free accounts are not supported");
         }
         ai.setValidUntil(TimeFormatter.getMilliSeconds(expire, "yyyy-MM-dd", Locale.ENGLISH));

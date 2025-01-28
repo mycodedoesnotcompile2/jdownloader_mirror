@@ -55,7 +55,7 @@ import jd.plugins.PluginException;
 import jd.plugins.PluginForHost;
 import jd.plugins.components.MultiHosterManagement;
 
-@HostPlugin(revision = "$Revision: 50303 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
+@HostPlugin(revision = "$Revision: 50517 $", interfaceVersion = 3, names = { "leechall.io" }, urls = { "" })
 public class LeechallIo extends PluginForHost {
     /* Connection limits */
     private final boolean                ACCOUNT_PREMIUM_RESUME             = true;
@@ -257,7 +257,7 @@ public class LeechallIo extends PluginForHost {
                 final Map<String, Object> limitsbandwidth = (Map<String, Object>) limitinfo.get("bandwidth");
                 if (limitsbandwidth != null) {
                     mhost.setTrafficMax(Long.parseLong(limitsbandwidth.get("total").toString()));
-                    mhost.setTrafficLeft(mhost.getTrafficLeft() - Long.parseLong(limitsbandwidth.get("used").toString()));
+                    mhost.setTrafficLeft(mhost.getTrafficMax() - Long.parseLong(limitsbandwidth.get("used").toString()));
                 }
                 final Map<String, Object> limitsfilenum = (Map<String, Object>) limitinfo.get("files");
                 if (limitsfilenum != null) {

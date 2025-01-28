@@ -42,7 +42,7 @@ import jd.plugins.PluginForHost;
 import jd.plugins.components.SiteType.SiteTemplate;
 import jd.plugins.decrypter.JpgChurchCrawler;
 
-@HostPlugin(revision = "$Revision: 50511 $", interfaceVersion = 3, names = {}, urls = {})
+@HostPlugin(revision = "$Revision: 50517 $", interfaceVersion = 3, names = {}, urls = {})
 public class JpgChurch extends PluginForHost {
     public JpgChurch(PluginWrapper wrapper) {
         super(wrapper);
@@ -55,7 +55,7 @@ public class JpgChurch extends PluginForHost {
 
     @Override
     public boolean isResumeable(final DownloadLink link, final Account account) {
-        return false;
+        return true;
     }
 
     public int getMaxChunks(final DownloadLink link, final Account account) {
@@ -209,7 +209,7 @@ public class JpgChurch extends PluginForHost {
                 throw new PluginException(LinkStatus.ERROR_PLUGIN_DEFECT);
             }
             /* Remove part of this URL to get the full image. */
-            this.dllink = thumbnailURL.replaceFirst("(?i)\\.md\\.(jpe?g|webp|gif)$", ".$1");
+            this.dllink = thumbnailURL.replaceFirst("(?i)\\.md\\.(jpe?g|webp|gif|png|bmp)$", ".$1");
             final String author = (String) entries.get("author");
             if (author != null) {
                 link.setProperty(PROPERTY_USER, author);
